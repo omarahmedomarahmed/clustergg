@@ -1,4 +1,7 @@
 {
+  "framework": "nextjs",
+  "installCommand": "npm install --no-audit --no-fund",
+  "buildCommand": "next build",
   "crons": [
     { "path": "/api/cron/sync", "schedule": "0 6 * * *" }
   ]
