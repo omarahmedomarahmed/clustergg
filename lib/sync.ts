@@ -159,6 +159,9 @@ export async function finalizeChallenges(db: DB) {
     const podium = challenge.format === "top1" ? 1 : 3;
     for (let i = 0; i < standings.length; i++) {
       const p = standings[i];
+      await db.update(schema.challengeParticipants)
+        .set({ finalPlacement: i + 1, status: p.status === "disqualified" ? "disqualified" : "completed" })
+        .where(eq(schema.challengeParticipants.id, p.id));
       if (i === 0 && p.currentPoints > 0) await grantBadgeByCode(db, p.userId, "challenge_top1", challenge.id);
       else if (i < podium && p.currentPoints > 0) await grantBadgeByCode(db, p.userId, "challenge_top3", challenge.id);
       if (i < podium && p.currentPoints > 0) {

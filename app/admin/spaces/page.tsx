@@ -29,7 +29,7 @@ export default async function AdminSpacesPage() {
           <form action={saveSpace} className="grid sm:grid-cols-2 gap-3">
             <input name="name" required placeholder="Name" className="input-cosmic" />
             <input name="game" placeholder="Game (optional, ties to leaderboards)" className="input-cosmic" />
-            <input name="coverEmoji" placeholder="Emoji (default 🌌)" className="input-cosmic" />
+            
             <input name="description" placeholder="Description" className="input-cosmic" />
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked className="accent-violet-500" /> Active</label>
             <div><button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Create</button></div>
@@ -41,7 +41,7 @@ export default async function AdminSpacesPage() {
             <tbody>
               {spaces.map((s) => (
                 <tr key={s.id}>
-                  <td><Link href={`/spaces/${s.slug}`} className="font-semibold text-sm hover:text-cyan-300">{s.coverEmoji} {s.name}</Link></td>
+                  <td><Link href={`/spaces/${s.slug}`} className="font-semibold text-sm hover:text-cyan-300">{s.name}</Link></td>
                   <td className="text-sm text-muted">{s.game ?? "—"}</td>
                   <td className="text-sm">{s.memberCount}</td>
                   <td className="text-sm">{s.postCount}</td>
@@ -60,8 +60,8 @@ export default async function AdminSpacesPage() {
             <div key={post.id} className="glass p-4 flex flex-wrap items-start gap-3">
               <div className="min-w-0 flex-1">
                 <div className="text-xs text-muted mb-1">
-                  {author.displayName} in {space.coverEmoji} {space.name} · {timeAgo(post.createdAt)}
-                  {post.isPinned && <span className="text-amber-300"> · 📌 pinned</span>}
+                  {author.displayName} in {space.name} · {timeAgo(post.createdAt)}
+                  {post.isPinned && <span className="text-amber-300"> · pinned</span>}
                 </div>
                 <p className="text-sm line-clamp-2">{post.body}</p>
               </div>

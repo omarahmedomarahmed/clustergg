@@ -1,29 +1,75 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import Icon from "@/components/Icon";
 
-export default function MobileMenu({ links, loggedIn }: { links: { href: string; label: string }[]; loggedIn: boolean }) {
+export default function MobileMenu({
+  links, loggedIn,
+}: { links: { href: string; label: string; icon: string }[]; loggedIn: boolean }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  useEffect(() => { setOpen(false); }, [pathname]);
+  useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
   return (
     <div className="md:hidden">
-      <button aria-label="Menu" className="text-xl px-1" onClick={() => setOpen((o) => !o)}>
-        {open ? "✕" : "☰"}
+      <button
+        aria-label="Menu"
+        className="flex h-9 w-9 items-center justify-center rounded-lg border border-violet-400/25 text-muted hover:text-ink"
+        onClick={() => setOpen(true)}
+      >
+        <Icon name="menu" size={18} />
       </button>
+
       {open && (
-        <div className="absolute left-0 right-0 top-16 z-50 border-b border-violet-500/20 bg-[#04051a]/97 backdrop-blur-xl px-6 py-4 flex flex-col gap-3">
-          {links.map((l) => (
-            <Link key={l.href} href={l.href} onClick={() => setOpen(false)} className="text-muted hover:text-ink py-1">
-              {l.label}
-            </Link>
-          ))}
-          <Link href="/search" onClick={() => setOpen(false)} className="text-muted hover:text-ink py-1">Search</Link>
-          {loggedIn && (
-            <>
-              <Link href="/settings/connections" onClick={() => setOpen(false)} className="text-muted hover:text-ink py-1">Settings</Link>
-              <Link href="/notifications" onClick={() => setOpen(false)} className="text-muted hover:text-ink py-1">Notifications</Link>
-            </>
-          )}
+        <div className="fixed inset-0 z-[60]">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-0 h-full w-72 bg-[#070826]/98 border-l border-violet-500/25 backdrop-blur-xl p-5 flex flex-col animate-[rise-in_.25s_ease]">
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-sm font-bold tracking-widest grad-text">CLUSTER</span>
+              <button
+                aria-label="Close menu"
+                onClick={() => setOpen(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-violet-400/25 text-muted"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+            <nav className="flex flex-col gap-1">
+              {links.map((l) => {
+                const active = pathname === l.href || pathname.startsWith(l.href + "/");
+                return (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    className={`flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] transition-colors ${
+                      active ? "bg-violet-500/15 text-ink border border-violet-400/30" : "text-muted hover:text-ink hover:bg-violet-500/8"
+                    }`}
+                  >
+                    <Icon name={l.icon} size={18} className={active ? "text-cyan-300" : ""} />
+                    {l.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <div className="mt-auto pt-6 border-t border-violet-400/15">
+              {loggedIn ? (
+                <Link href="/settings/connections" className="flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-muted hover:text-ink">
+                  <Icon name="link" size={18} /> Connections
+                </Link>
+              ) : (
+                <Link href="/signup" className="glow-btn block rounded-full px-6 py-3 text-center font-semibold text-white">
+                  Join the Cluster
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -102,19 +102,92 @@ html, body {
 .rise-in-1 { animation-delay: .08s; } .rise-in-2 { animation-delay: .16s; }
 .rise-in-3 { animation-delay: .24s; } .rise-in-4 { animation-delay: .32s; }
 
-/* Badge sprite: /assets/badges.png is a 3x2 grid (b1..b6). */
-.badge-sprite {
-  background-image: url("/assets/badges.png");
-  background-size: 300% 200%;
-  border-radius: 9999px;
-  box-shadow: 0 0 14px -4px rgba(139,92,246,.7);
+/* ---------- Interaction layer ---------- */
+a, button, [role="button"], select, summary { cursor: pointer; }
+
+.pressable { transition: transform .12s ease, filter .15s ease; }
+.pressable:hover { filter: brightness(1.08); }
+.pressable:active { transform: scale(.96); }
+
+.nav-link { position: relative; transition: color .2s; }
+.nav-link:hover { color: #e8eaf6; }
+.nav-link::after {
+  content: ""; position: absolute; left: 0; right: 100%; bottom: -4px; height: 2px;
+  background: linear-gradient(90deg, #8b5cf6, #22d3ee);
+  transition: right .25s ease; border-radius: 2px;
 }
-.badge-b1 { background-position: 0% 0%; }
-.badge-b2 { background-position: 50% 0%; }
-.badge-b3 { background-position: 100% 0%; }
-.badge-b4 { background-position: 0% 100%; }
-.badge-b5 { background-position: 50% 100%; }
-.badge-b6 { background-position: 100% 100%; }
+.nav-link:hover::after { right: 0; }
+
+.card-lift {
+  transition: transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s, border-color .3s;
+}
+.card-lift:hover {
+  transform: translateY(-4px) scale(1.012);
+  border-color: rgba(139,92,246,.55);
+  box-shadow: 0 16px 48px -16px rgba(139,92,246,.45);
+}
+.card-lift:active { transform: translateY(-1px) scale(.995); }
+
+/* Event/challenge hero card: hidden standings panel reveals on hover */
+.event-card .event-reveal {
+  opacity: 0; transform: translateY(10px);
+  transition: opacity .3s ease, transform .3s ease;
+}
+.event-card:hover .event-reveal { opacity: 1; transform: translateY(0); }
+.event-card .event-cover { transition: transform .5s cubic-bezier(.2,.7,.3,1), opacity .3s; }
+.event-card:hover .event-cover { transform: scale(1.05); }
+
+/* Partners marquee */
+@keyframes marquee-x { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-track { animation: marquee-x 28s linear infinite; }
+.marquee-track:hover { animation-play-state: paused; }
+
+/* Leaderboard podium */
+.podium-step {
+  position: relative;
+  background: linear-gradient(180deg, rgba(139,92,246,.14), rgba(139,92,246,.03));
+  border: 1px solid rgba(139,92,246,.3);
+  border-radius: 1rem 1rem .4rem .4rem;
+  transition: transform .25s, box-shadow .25s;
+}
+.podium-step:hover { transform: translateY(-4px); box-shadow: 0 12px 36px -12px rgba(139,92,246,.5); }
+.podium-1 { border-color: rgba(251,191,36,.55); background: linear-gradient(180deg, rgba(251,191,36,.16), rgba(251,191,36,.03)); }
+.podium-2 { border-color: rgba(203,213,225,.45); background: linear-gradient(180deg, rgba(203,213,225,.13), rgba(203,213,225,.03)); }
+.podium-3 { border-color: rgba(217,119,6,.5); background: linear-gradient(180deg, rgba(217,119,6,.14), rgba(217,119,6,.03)); }
+
+.rank-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 2rem; height: 2rem; padding: 0 .4rem;
+  border-radius: .6rem; font-weight: 800; font-size: .85rem;
+  border: 1px solid rgba(139,92,246,.25); color: #9aa0c3;
+}
+.rank-chip-1 { border-color: rgba(251,191,36,.7); color: #fbbf24; background: rgba(251,191,36,.1); box-shadow: 0 0 14px -4px rgba(251,191,36,.6); }
+.rank-chip-2 { border-color: rgba(203,213,225,.6); color: #e2e8f0; background: rgba(203,213,225,.08); }
+.rank-chip-3 { border-color: rgba(217,119,6,.65); color: #f59e0b; background: rgba(217,119,6,.1); }
+
+/* Stat tab pills */
+.stat-tab {
+  border: 1px solid rgba(139,92,246,.22); color: #9aa0c3;
+  border-radius: 9999px; padding: .35rem .9rem; font-size: .8rem;
+  transition: all .2s; white-space: nowrap;
+}
+.stat-tab:hover { border-color: rgba(139,92,246,.6); color: #e8eaf6; }
+.stat-tab-active {
+  border-color: rgba(34,211,238,.7); color: #a5f3fc;
+  background: rgba(34,211,238,.1); box-shadow: 0 0 16px -6px rgba(34,211,238,.6);
+}
+
+@keyframes glow-sweep {
+  0% { transform: translateX(-100%) skewX(-12deg); }
+  100% { transform: translateX(250%) skewX(-12deg); }
+}
+.glow-sweep { position: relative; overflow: hidden; }
+.glow-sweep::before {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 35%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
+  animation: glow-sweep 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
 
 .input-cosmic {
   background: rgba(6, 8, 30, 0.7);

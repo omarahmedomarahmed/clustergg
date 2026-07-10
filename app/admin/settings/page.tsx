@@ -54,17 +54,17 @@ export default function AdminSettingsPage() {
           <tbody>
             {PROVIDERS.map((p) => (
               <tr key={p.id}>
-                <td className="text-sm">{p.glyph} {p.name}</td>
+                <td className="text-sm">{p.name}</td>
                 <td>
                   <span className={`text-xs ${isProviderLive(p) ? "text-emerald-300" : p.legalFlag && p.phase === 3 ? "text-rose-300" : "text-amber-300"}`}>
-                    {isProviderLive(p) ? "● live" : p.legalFlag && p.phase === 3 ? "✕ legal review" : "○ needs key"}
+                    {isProviderLive(p) ? "live" : p.legalFlag && p.phase === 3 ? "legal review" : "needs key"}
                   </span>
                 </td>
                 <td className="font-mono text-[10px] text-muted">{p.envVars.join(", ") || "none (public API)"}</td>
                 <td>
                   {p.docsUrl && (
                     <a href={p.docsUrl} target="_blank" rel="noopener" className="text-xs text-cyan-300 hover:underline">
-                      get key →
+                      get key
                     </a>
                   )}
                 </td>

@@ -31,7 +31,7 @@ export default async function OnboardingPage() {
         <div className="flex items-center gap-3 mb-1">
           <span className="glow-btn flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white">1</span>
           <h2 className="text-lg font-bold">Link your game accounts</h2>
-          {accounts.length > 0 && <span className="text-emerald-300 text-sm ml-auto">{accounts.length} linked ✦</span>}
+          {accounts.length > 0 && <span className="text-emerald-300 text-sm ml-auto">{accounts.length} linked</span>}
         </div>
         <p className="text-sm text-muted mb-4 ml-10">
           Green providers verify instantly against real APIs — try Chess.com, Lichess, Dota 2, Speedrun.com or Roblox.
@@ -71,8 +71,8 @@ export default async function OnboardingPage() {
       </section>
 
       <div className="text-center">
-        <Link href="/feed" className="glow-btn rounded-full px-10 py-3 font-semibold text-white">
-          Enter the Cluster →
+        <Link href="/feed" className="glow-btn pressable rounded-full px-10 py-3 font-semibold text-white">
+          Enter the Cluster
         </Link>
       </div>
     </div>

@@ -7,6 +7,7 @@ import { getProvider } from "@/lib/providers/registry";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import { unlinkGameAccount, resyncGameAccount } from "@/app/actions/connections";
 import SettingsNav from "@/components/SettingsNav";
+import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export default async function ConnectionsPage() {
             const p = getProvider(a.provider);
             return (
               <div key={a.id} className="glass flex flex-wrap items-center gap-3 p-4">
-                <span className="text-2xl">{p?.glyph ?? "🎮"}</span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-400/25 bg-gradient-to-br from-violet-600/25 to-cyan-600/15 shrink-0"><Icon name="gamepad" size={18} className="text-violet-200" /></div>
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold">{a.inGameName} <span className="text-muted font-normal text-sm">· {p?.name ?? a.provider}</span></div>
                   <div className="text-xs text-muted">

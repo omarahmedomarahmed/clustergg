@@ -119,6 +119,7 @@ CREATE TABLE "challenge_participants" (
 	"baseline" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"current_points" integer DEFAULT 0 NOT NULL,
 	"status" text DEFAULT 'active' NOT NULL,
+	"final_placement" integer,
 	"joined_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -136,6 +137,12 @@ CREATE TABLE "challenges" (
 	"start_at" timestamp with time zone NOT NULL,
 	"end_at" timestamp with time zone NOT NULL,
 	"status" text DEFAULT 'draft' NOT NULL,
+	"cadence" text DEFAULT 'custom' NOT NULL,
+	"hero_type" text DEFAULT 'image' NOT NULL,
+	"hero_url" text,
+	"cover_url" text,
+	"cover_adjust" jsonb DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb NOT NULL,
+	"trophy_id" text,
 	"prize_description" text,
 	"created_by" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL
@@ -177,6 +184,19 @@ CREATE TABLE "follows" (
 	"following_id" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	CONSTRAINT "follows_follower_id_following_id_pk" PRIMARY KEY("follower_id","following_id")
+);
+--> statement-breakpoint
+CREATE TABLE "games" (
+	"id" text PRIMARY KEY NOT NULL,
+	"slug" text NOT NULL,
+	"name" text NOT NULL,
+	"description" text DEFAULT '' NOT NULL,
+	"logo_url" text,
+	"cover_url" text,
+	"cover_adjust" jsonb DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb NOT NULL,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL,
+	CONSTRAINT "games_slug_unique" UNIQUE("slug")
 );
 --> statement-breakpoint
 CREATE TABLE "leaderboards" (
@@ -234,6 +254,15 @@ CREATE TABLE "oauth_identities" (
 	"expires_at" timestamp with time zone,
 	"scopes" text,
 	"connected_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "partners" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"logo_url" text NOT NULL,
+	"url" text,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"is_active" boolean DEFAULT true NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "platform_settings" (
@@ -325,6 +354,14 @@ CREATE TABLE "stat_snapshots" (
 	"metric_key" text NOT NULL,
 	"metric_value" double precision NOT NULL,
 	"recorded_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "trophies" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"image_url" text NOT NULL,
+	"tier" text DEFAULT 'gold' NOT NULL,
+	"game" text
 );
 --> statement-breakpoint
 CREATE TABLE "user_badges" (

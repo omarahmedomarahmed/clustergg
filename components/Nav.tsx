@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { and, count, eq, isNull } from "drizzle-orm";
-import { getCurrentUser, isAdmin } from "@/lib/auth";
+import { getCurrentUser, isStaff } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
-import Avatar from "@/components/Avatar";
-import { logout } from "@/app/actions/auth";
+import Icon from "@/components/Icon";
+import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
 
 export default async function Nav() {
@@ -17,10 +17,12 @@ export default async function Nav() {
   }
 
   const links = [
-    { href: "/leaderboards", label: "Leaderboards" },
-    { href: "/spaces", label: "Spaces" },
-    ...(user ? [{ href: "/feed", label: "Feed" }, { href: "/messages", label: "Messages" }] : []),
-    { href: "/for-brands", label: "For Brands" },
+    { href: "/games", label: "Games", icon: "gamepad" },
+    { href: "/leaderboards", label: "Leaderboards", icon: "chart" },
+    { href: "/spaces", label: "Spaces", icon: "users" },
+    ...(user
+      ? [{ href: "/feed", label: "Feed", icon: "home" }, { href: "/messages", label: "Messages", icon: "message" }]
+      : []),
   ];
 
   return (
@@ -34,38 +36,35 @@ export default async function Nav() {
 
         <nav className="hidden md:flex items-center gap-5 text-sm text-muted">
           {links.map((l) => (
-            <Link key={l.href} href={l.href} className="hover:text-ink transition-colors">{l.label}</Link>
+            <Link key={l.href} href={l.href} className="nav-link">{l.label}</Link>
           ))}
         </nav>
 
         <div className="ml-auto flex items-center gap-3">
-          <Link href="/search" aria-label="Search" className="hidden sm:flex text-muted hover:text-ink transition-colors text-lg">⌕</Link>
+          <Link href="/search" aria-label="Search" className="hidden sm:flex text-muted hover:text-ink transition-colors">
+            <Icon name="search" size={19} />
+          </Link>
           {user ? (
             <>
               <Link href="/notifications" className="relative text-muted hover:text-ink transition-colors" aria-label="Notifications">
-                <span className="text-lg">🔔</span>
+                <Icon name="bell" size={19} />
                 {unread > 0 && (
-                  <span className="absolute -right-1.5 -top-1 rounded-full bg-fuchsia-500 px-1.5 text-[10px] font-bold text-white">
+                  <span className="absolute -right-2 -top-1.5 rounded-full bg-fuchsia-500 px-1.5 text-[10px] font-bold text-white">
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
               </Link>
-              {isAdmin(user) && (
-                <Link href="/admin" className="hidden sm:inline text-xs text-amber-300/90 hover:text-amber-200 border border-amber-400/30 rounded-full px-2.5 py-1">
-                  Admin
-                </Link>
-              )}
-              <Link href="/profile" className="flex items-center gap-2">
-                <Avatar name={user.displayName} src={user.avatarUrl} size={32} />
-              </Link>
-              <form action={logout}>
-                <button className="hidden sm:inline text-xs text-muted hover:text-ink" type="submit">Sign out</button>
-              </form>
+              <UserMenu
+                displayName={user.displayName}
+                avatarUrl={user.avatarUrl}
+                slug={user.slug}
+                canAdmin={isStaff(user)}
+              />
             </>
           ) : (
             <>
               <Link href="/login" className="text-sm text-muted hover:text-ink">Log in</Link>
-              <Link href="/signup" className="glow-btn rounded-full px-4 py-1.5 text-sm font-semibold text-white">
+              <Link href="/signup" className="glow-btn pressable rounded-full px-4 py-1.5 text-sm font-semibold text-white">
                 Join the Cluster
               </Link>
             </>

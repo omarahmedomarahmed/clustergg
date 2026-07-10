@@ -35,7 +35,7 @@ export default async function AdminLinkedAccountsPage() {
               title={p.envVars.join(", ") || "public API"}
               className={`text-xs rounded-full px-2.5 py-1 border ${isProviderLive(p) ? "border-emerald-400/40 text-emerald-300" : "border-amber-400/30 text-amber-300/80"}`}
             >
-              {p.glyph} {p.name}
+              {p.name}
             </span>
           ))}
         </div>
@@ -50,7 +50,7 @@ export default async function AdminLinkedAccountsPage() {
             {rows.map(({ a, u }) => (
               <tr key={a.id}>
                 <td className="font-semibold text-sm">{a.inGameName}</td>
-                <td className="text-sm">{getProvider(a.provider)?.glyph} {getProvider(a.provider)?.name ?? a.provider}</td>
+                <td className="text-sm">{getProvider(a.provider)?.name ?? a.provider}</td>
                 <td><Link href={`/admin/users/${u.id}`} className="text-sm hover:text-cyan-300">{u.displayName}</Link></td>
                 <td>
                   <span className={`text-xs ${a.syncStatus === "ok" ? "text-emerald-300" : a.syncStatus === "error" ? "text-rose-300" : "text-amber-300"}`}>

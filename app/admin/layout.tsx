@@ -1,32 +1,52 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getCurrentUser, isAdmin } from "@/lib/auth";
+import { getCurrentUser, isAdmin, isStaff } from "@/lib/auth";
+import Icon from "@/components/Icon";
 
-const NAV: { section: string; items: { href: string; label: string }[] }[] = [
+const NAV: { section: string; adminOnly?: boolean; items: { href: string; label: string; adminOnly?: boolean }[] }[] = [
   {
     section: "Overview",
-    items: [{ href: "/admin", label: "Dashboard" }, { href: "/admin/audit-log", label: "Audit log" }],
+    items: [
+      { href: "/admin", label: "Dashboard" },
+      { href: "/admin/audit-log", label: "Audit log", adminOnly: true },
+    ],
+  },
+  {
+    section: "Moderation",
+    items: [
+      { href: "/admin/spaces", label: "Spaces" },
+      { href: "/admin/spaces/requests", label: "Space requests" },
+      { href: "/admin/challenges", label: "Challenges" },
+    ],
   },
   {
     section: "Community",
     items: [
       { href: "/admin/users", label: "Users" },
-      { href: "/admin/roles", label: "Roles" },
+      { href: "/admin/roles", label: "Roles", adminOnly: true },
       { href: "/admin/linked-accounts", label: "Linked accounts" },
-      { href: "/admin/spaces", label: "Spaces" },
-      { href: "/admin/spaces/requests", label: "Space requests" },
     ],
   },
   {
     section: "Competition",
     items: [
-      { href: "/admin/badges", label: "Badges" },
-      { href: "/admin/leaderboards", label: "Leaderboards" },
-      { href: "/admin/challenges", label: "Challenges" },
+      { href: "/admin/badges", label: "Badges", adminOnly: true },
+      { href: "/admin/leaderboards", label: "Leaderboards", adminOnly: true },
+      { href: "/admin/trophies", label: "Trophies", adminOnly: true },
     ],
   },
   {
-    section: "Monetization",
+    section: "Website (CMS)",
+    adminOnly: true,
+    items: [
+      { href: "/admin/content", label: "Site content" },
+      { href: "/admin/games", label: "Games catalog" },
+      { href: "/admin/partners", label: "Partners" },
+    ],
+  },
+  {
+    section: "Ads (offline sales)",
+    adminOnly: true,
     items: [
       { href: "/admin/brands", label: "Brands" },
       { href: "/admin/creatives", label: "Creatives" },
@@ -37,6 +57,7 @@ const NAV: { section: string; items: { href: string; label: string }[] }[] = [
   },
   {
     section: "Platform",
+    adminOnly: true,
     items: [{ href: "/admin/settings", label: "Settings" }],
   },
 ];
@@ -44,14 +65,27 @@ const NAV: { section: string; items: { href: string; label: string }[] }[] = [
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
-  if (!isAdmin(user)) redirect("/feed");
+  if (!isStaff(user)) redirect("/feed");
+  const admin = isAdmin(user);
+
+  const nav = NAV
+    .filter((g) => admin || !g.adminOnly)
+    .map((g) => ({ ...g, items: g.items.filter((i) => admin || !i.adminOnly) }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 flex gap-8">
       <aside className="hidden lg:block w-52 shrink-0">
         <div className="glass p-4 sticky top-20 space-y-5">
-          <div className="text-xs uppercase tracking-widest text-amber-300">⚙ Mission Control</div>
-          {NAV.map((group) => (
+          <div className="text-xs uppercase tracking-widest text-amber-300 flex items-center gap-2">
+            <Icon name="shield" size={14} /> Mission Control
+          </div>
+          {!admin && (
+            <div className="text-[10px] text-muted border border-amber-400/25 rounded-lg p-2">
+              Staff access: moderation of spaces & challenges, read-only elsewhere.
+            </div>
+          )}
+          {nav.map((group) => (
             <div key={group.section}>
               <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">{group.section}</div>
               <ul className="space-y-1">

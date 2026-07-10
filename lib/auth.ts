@@ -69,8 +69,20 @@ export function isAdmin(user: { role: string } | null): boolean {
   return !!user && (user.role === "admin" || user.role === "superadmin");
 }
 
+// Staff can access the admin portal for moderation (spaces, challenges) and
+// read-only views; full CRUD elsewhere requires admin/superadmin.
+export function isStaff(user: { role: string } | null): boolean {
+  return !!user && (user.role === "staff" || isAdmin(user));
+}
+
 export async function requireAdmin(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (!user || !isAdmin(user)) throw new Error("FORBIDDEN");
+  return user;
+}
+
+export async function requireStaff(): Promise<CurrentUser> {
+  const user = await getCurrentUser();
+  if (!user || !isStaff(user)) throw new Error("FORBIDDEN");
   return user;
 }
