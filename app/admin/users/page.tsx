@@ -2,7 +2,7 @@ import Link from "next/link";
 import { desc, ilike, or } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import Avatar from "@/components/Avatar";
-import { setUserStatus } from "@/app/actions/admin";
+import { setUserStatus, setUserRole } from "@/app/actions/admin";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +50,16 @@ export default async function AdminUsersPage({
                     {u.status !== "active" && (
                       <form action={setUserStatus.bind(null, u.id, "active")}>
                         <button className="text-xs ghost-btn rounded-full px-2.5 py-1">Restore</button>
+                      </form>
+                    )}
+                    {u.status === "active" && u.role === "user" && (
+                      <form action={setUserRole.bind(null, u.id, "staff")}>
+                        <button className="text-xs rounded-full px-2.5 py-1 border border-cyan-400/40 text-cyan-300">Make staff</button>
+                      </form>
+                    )}
+                    {u.status === "active" && u.role === "staff" && (
+                      <form action={setUserRole.bind(null, u.id, "user")}>
+                        <button className="text-xs rounded-full px-2.5 py-1 border border-violet-400/40 text-muted">Remove staff</button>
                       </form>
                     )}
                     {u.status === "active" && u.role !== "superadmin" && (

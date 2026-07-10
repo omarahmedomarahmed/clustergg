@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { requireAdmin } from "@/lib/auth";
+import { requireAdmin, requireStaff } from "@/lib/auth";
 import { uid, slugify } from "@/lib/utils";
 import { syncAccount } from "@/lib/sync";
 
@@ -22,9 +22,10 @@ export async function setUserStatus(userId: string, status: "active" | "suspende
   revalidatePath(`/admin/users/${userId}`);
 }
 
-export async function setUserRole(userId: string, role: "user" | "admin" | "brand") {
+export async function setUserRole(userId: string, role: "user" | "admin" | "brand" | "staff") {
   const admin = await requireAdmin();
-  if (admin.role !== "superadmin") return;
+  // Admins can promote/demote staff; only superadmins can grant the admin role.
+  if (role === "admin" && admin.role !== "superadmin") return;
   const db = await getDb();
   const [target] = await db.select().from(schema.users).where(eq(schema.users.id, userId)).limit(1);
   if (!target || target.role === "superadmin") return;
@@ -95,7 +96,7 @@ export async function saveSpace(formData: FormData) {
     name: String(formData.get("name") ?? "").trim(),
     description: String(formData.get("description") ?? "").trim(),
     game: String(formData.get("game") ?? "").trim() || null,
-    coverEmoji: String(formData.get("coverEmoji") ?? "🌌").trim() || "🌌",
+    coverEmoji: "",
     isActive: formData.get("isActive") === "on",
   };
   if (!values.name) return;
@@ -113,7 +114,7 @@ export async function saveSpace(formData: FormData) {
 }
 
 export async function reviewSpaceRequest(requestId: string, approve: boolean, note: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   const [request] = await db.select().from(schema.spaceRequests)
     .where(eq(schema.spaceRequests.id, requestId)).limit(1);
@@ -138,7 +139,7 @@ export async function reviewSpaceRequest(requestId: string, approve: boolean, no
 }
 
 export async function adminDeletePost(postId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   await db.update(schema.posts).set({ deletedAt: new Date() }).where(eq(schema.posts.id, postId));
   await audit(admin.id, "post.delete", "post", postId);
@@ -146,7 +147,7 @@ export async function adminDeletePost(postId: string) {
 }
 
 export async function togglePinPost(postId: string, pin: boolean, path: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   await db.update(schema.posts).set({ isPinned: pin }).where(eq(schema.posts.id, postId));
   await audit(admin.id, pin ? "post.pin" : "post.unpin", "post", postId);
@@ -155,7 +156,7 @@ export async function togglePinPost(postId: string, pin: boolean, path: string) 
 
 // ---------- Challenges ----------
 export async function saveChallenge(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   const challengeId = String(formData.get("challengeId") ?? "");
 
@@ -179,6 +180,17 @@ export async function saveChallenge(formData: FormData) {
     }
   } catch { conditions = []; }
 
+  const cadence = String(formData.get("cadence") ?? "custom");
+  const startAt = new Date(String(formData.get("startAt") ?? new Date().toISOString()));
+  const cadenceDays: Record<string, number> = { daily: 1, weekly: 7, monthly: 30 };
+  const endAt = cadenceDays[cadence]
+    ? new Date(startAt.getTime() + cadenceDays[cadence] * 86400000)
+    : new Date(String(formData.get("endAt") ?? new Date(Date.now() + 7 * 86400000).toISOString()));
+  const adjust = {
+    zoom: Number(formData.get("coverZoom")) || 1,
+    x: Number(formData.get("coverX")) || 50,
+    y: Number(formData.get("coverY")) || 50,
+  };
   const values = {
     spaceId: String(formData.get("spaceId") ?? ""),
     game: String(formData.get("game") ?? "").trim(),
@@ -189,8 +201,14 @@ export async function saveChallenge(formData: FormData) {
     rules: { conditions },
     pointsEngine,
     thresholdTarget: Number(formData.get("thresholdTarget")) || null,
-    startAt: new Date(String(formData.get("startAt") ?? new Date().toISOString())),
-    endAt: new Date(String(formData.get("endAt") ?? new Date(Date.now() + 7 * 86400000).toISOString())),
+    startAt,
+    endAt,
+    cadence,
+    heroType: String(formData.get("heroType") ?? "image"),
+    heroUrl: String(formData.get("heroUrl") ?? "").trim() || null,
+    coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
+    coverAdjust: adjust,
+    trophyId: String(formData.get("trophyId") ?? "").trim() || null,
     status: String(formData.get("status") ?? "draft"),
     prizeDescription: String(formData.get("prizeDescription") ?? "").trim() || null,
   };
@@ -207,7 +225,7 @@ export async function saveChallenge(formData: FormData) {
 }
 
 export async function setParticipantStatus(participantId: string, status: "active" | "disqualified", challengeId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   await db.update(schema.challengeParticipants).set({ status })
     .where(eq(schema.challengeParticipants.id, participantId));
@@ -367,4 +385,120 @@ export async function deleteLeaderboard(lbId: string) {
   await db.delete(schema.leaderboards).where(eq(schema.leaderboards.id, lbId));
   await audit(admin.id, "leaderboard.delete", "leaderboard", lbId);
   revalidatePath("/admin/leaderboards");
+}
+
+// ---------- Games catalog ----------
+export async function saveGame(formData: FormData) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const gameId = String(formData.get("gameId") ?? "");
+  const values = {
+    name: String(formData.get("name") ?? "").trim(),
+    description: String(formData.get("description") ?? "").trim(),
+    logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
+    coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
+    coverAdjust: {
+      zoom: Number(formData.get("coverZoom")) || 1,
+      x: Number(formData.get("coverX")) || 50,
+      y: Number(formData.get("coverY")) || 50,
+    },
+    sortOrder: Number(formData.get("sortOrder")) || 0,
+    isActive: formData.get("isActive") === "on",
+  };
+  if (!values.name) return;
+  if (gameId) {
+    await db.update(schema.games).set(values).where(eq(schema.games.id, gameId));
+    await audit(admin.id, "game.update", "game", gameId);
+  } else {
+    await db.insert(schema.games).values({ id: uid(), slug: slugify(values.name), ...values }).onConflictDoNothing();
+    await audit(admin.id, "game.create", "game", values.name);
+  }
+  revalidatePath("/admin/games");
+  revalidatePath("/games");
+  revalidatePath("/");
+}
+
+export async function deleteGame(gameId: string) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  await db.delete(schema.games).where(eq(schema.games.id, gameId));
+  await audit(admin.id, "game.delete", "game", gameId);
+  revalidatePath("/admin/games");
+  revalidatePath("/games");
+}
+
+// ---------- Partners ("Trusted by") ----------
+export async function savePartner(formData: FormData) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const partnerId = String(formData.get("partnerId") ?? "");
+  const values = {
+    name: String(formData.get("name") ?? "").trim(),
+    logoUrl: String(formData.get("logoUrl") ?? "").trim(),
+    url: String(formData.get("url") ?? "").trim() || null,
+    sortOrder: Number(formData.get("sortOrder")) || 0,
+    isActive: formData.get("isActive") === "on",
+  };
+  if (!values.name || !values.logoUrl) return;
+  if (partnerId) {
+    await db.update(schema.partners).set(values).where(eq(schema.partners.id, partnerId));
+    await audit(admin.id, "partner.update", "partner", partnerId);
+  } else {
+    await db.insert(schema.partners).values({ id: uid(), ...values });
+    await audit(admin.id, "partner.create", "partner", values.name);
+  }
+  revalidatePath("/admin/partners");
+  revalidatePath("/");
+}
+
+export async function deletePartner(partnerId: string) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  await db.delete(schema.partners).where(eq(schema.partners.id, partnerId));
+  await audit(admin.id, "partner.delete", "partner", partnerId);
+  revalidatePath("/admin/partners");
+  revalidatePath("/");
+}
+
+// ---------- Trophies ----------
+export async function saveTrophy(formData: FormData) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const trophyId = String(formData.get("trophyId") ?? "");
+  const values = {
+    name: String(formData.get("name") ?? "").trim(),
+    imageUrl: String(formData.get("imageUrl") ?? "").trim(),
+    tier: String(formData.get("tier") ?? "gold"),
+    game: String(formData.get("game") ?? "").trim() || null,
+  };
+  if (!values.name || !values.imageUrl) return;
+  if (trophyId) {
+    await db.update(schema.trophies).set(values).where(eq(schema.trophies.id, trophyId));
+    await audit(admin.id, "trophy.update", "trophy", trophyId);
+  } else {
+    await db.insert(schema.trophies).values({ id: uid(), ...values });
+    await audit(admin.id, "trophy.create", "trophy", values.name);
+  }
+  revalidatePath("/admin/trophies");
+}
+
+export async function deleteTrophy(trophyId: string) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  await db.delete(schema.trophies).where(eq(schema.trophies.id, trophyId));
+  await audit(admin.id, "trophy.delete", "trophy", trophyId);
+  revalidatePath("/admin/trophies");
+}
+
+// ---------- Site content (CMS) ----------
+export async function saveContent(formData: FormData) {
+  const admin = await requireAdmin();
+  const { setContent } = await import("@/lib/cms");
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("content:") && typeof value === "string") {
+      await setContent(key.slice("content:".length), value.trim());
+    }
+  }
+  await audit(admin.id, "content.update", "site_content");
+  revalidatePath("/", "layout");
 }

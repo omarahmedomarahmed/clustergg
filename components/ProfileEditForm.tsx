@@ -26,7 +26,7 @@ export default function ProfileEditForm({
         <input name="country" defaultValue={defaults.country} maxLength={2} className="input-cosmic mt-1 uppercase" />
       </div>
       {state?.error && <p className="text-sm text-rose-300">{state.error}</p>}
-      {state?.ok && <p className="text-sm text-emerald-300">Profile updated ✦</p>}
+      {state?.ok && <p className="text-sm text-emerald-300">Profile updated</p>}
       <button disabled={pending} className="glow-btn rounded-full px-8 py-2.5 font-semibold text-white">
         {pending ? "Saving…" : "Save changes"}
       </button>

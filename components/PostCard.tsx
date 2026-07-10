@@ -5,6 +5,7 @@ import Avatar from "@/components/Avatar";
 import ReactionBar from "@/components/ReactionBar";
 import CommentThread from "@/components/CommentThread";
 import { timeAgo } from "@/lib/utils";
+import Icon from "@/components/Icon";
 
 type Post = typeof schema.posts.$inferSelect;
 type User = typeof schema.users.$inferSelect;
@@ -35,17 +36,17 @@ export default async function PostCard({
     if (viewerId && r.userId === viewerId) mine = r.reactionType;
   }
 
-  const tierBadge = expertTier === "expert" ? "🌟 Expert" : expertTier === "helper" ? "💫 Helper" : expertTier === "contributor" ? "✨ Contributor" : null;
+  const tierBadge = expertTier === "expert" ? "Expert" : expertTier === "helper" ? "Helper" : expertTier === "contributor" ? "Contributor" : null;
 
   return (
     <article className="glass p-5">
-      {post.isPinned && <div className="text-[10px] uppercase tracking-widest text-amber-300 mb-2">📌 Pinned</div>}
+      {post.isPinned && <div className="text-[10px] uppercase tracking-widest text-amber-300 mb-2 inline-flex items-center gap-1"><Icon name="pin" size={10} /> Pinned</div>}
       <div className="flex items-center gap-3">
         <Link href={`/u/${author.slug}`}><Avatar name={author.displayName} src={author.avatarUrl} size={38} /></Link>
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Link href={`/u/${author.slug}`} className="font-semibold hover:text-cyan-300">{author.displayName}</Link>
-            {tierBadge && <span className="text-[10px] rounded-full border border-amber-400/40 text-amber-200 px-2 py-0.5">{tierBadge}</span>}
+            {tierBadge && <span className="text-[10px] rounded-full border border-amber-400/40 text-amber-200 px-2 py-0.5 inline-flex items-center gap-1"><Icon name="star" size={9} /> {tierBadge}</span>}
           </div>
           <div className="text-xs text-muted">
             {spaceName && <>{spaceName} · </>}{timeAgo(post.createdAt)}

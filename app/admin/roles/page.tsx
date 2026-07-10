@@ -11,7 +11,7 @@ export default async function AdminRolesPage() {
   const me = await getCurrentUser();
   const db = await getDb();
   const privileged = await db.select().from(schema.users)
-    .where(inArray(schema.users.role, ["admin", "superadmin", "brand"]))
+    .where(inArray(schema.users.role, ["admin", "superadmin", "brand", "staff"]))
     .orderBy(desc(schema.users.createdAt));
   const isSuper = me?.role === "superadmin";
 
@@ -19,8 +19,7 @@ export default async function AdminRolesPage() {
     <div>
       <h1 className="text-2xl font-bold mb-2">Roles & permissions</h1>
       <p className="text-sm text-muted mb-6">
-        superadmin — everything incl. role grants · admin — all consoles ·
-        brand — reserved for self-serve brand portal.
+        superadmin — everything incl. role grants · admin — all consoles · staff — moderation of spaces & challenges + read-only views · brand — reserved.
         {!isSuper && " (Only superadmins can change roles.)"}
       </p>
 
@@ -45,6 +44,11 @@ export default async function AdminRolesPage() {
                         {u.role !== "admin" && (
                           <form action={setUserRole.bind(null, u.id, "admin")}>
                             <button className="text-xs ghost-btn rounded-full px-3 py-1">Make admin</button>
+                          </form>
+                        )}
+                        {u.role !== "staff" && (
+                          <form action={setUserRole.bind(null, u.id, "staff")}>
+                            <button className="text-xs rounded-full px-3 py-1 border border-cyan-400/40 text-cyan-300">Make staff</button>
                           </form>
                         )}
                         <form action={setUserRole.bind(null, u.id, "user")}>

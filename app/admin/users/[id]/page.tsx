@@ -57,7 +57,7 @@ export default async function AdminUserDetail({ params }: { params: Promise<{ id
         <div className="space-y-2">
           {accounts.map((a) => (
             <div key={a.id} className="flex flex-wrap items-center gap-3 border border-violet-400/15 rounded-lg p-3">
-              <span className="text-xl">{getProvider(a.provider)?.glyph ?? "🎮"}</span>
+              <span className="text-xs font-bold text-violet-300 border border-violet-400/25 rounded-lg px-2 py-1">{(getProvider(a.provider)?.name ?? a.provider).slice(0, 3).toUpperCase()}</span>
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-sm">{a.inGameName} · {getProvider(a.provider)?.name ?? a.provider}</div>
                 <div className="text-xs text-muted">

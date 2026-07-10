@@ -67,7 +67,7 @@ export default async function SearchPage({
               <div className="grid sm:grid-cols-2 gap-3">
                 {spaces.map((s) => (
                   <Link key={s.id} href={`/spaces/${s.slug}`} className="glass glass-hover flex items-center gap-3 p-3">
-                    <span className="text-2xl">{s.coverEmoji}</span>
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-violet-400/25 bg-violet-600/15 text-violet-200 text-sm font-bold shrink-0">{s.name.slice(0,1)}</div>
                     <div className="min-w-0">
                       <div className="font-semibold">{s.name}</div>
                       <div className="text-xs text-muted truncate">{s.memberCount} members</div>
@@ -84,7 +84,7 @@ export default async function SearchPage({
                 {posts.map(({ post, author, space }) => (
                   <Link key={post.id} href={`/spaces/${space.slug}`} className="glass glass-hover block p-4">
                     <div className="text-xs text-muted mb-1">
-                      {author.displayName} in {space.coverEmoji} {space.name} · {timeAgo(post.createdAt)}
+                      {author.displayName} in {space.name} · {timeAgo(post.createdAt)}
                     </div>
                     <p className="text-sm line-clamp-2">{post.body}</p>
                   </Link>

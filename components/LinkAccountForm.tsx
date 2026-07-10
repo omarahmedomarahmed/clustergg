@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { linkGameAccount } from "@/app/actions/connections";
+import Icon from "@/components/Icon";
 
 export type ProviderInfo = {
   id: string;
@@ -33,11 +34,11 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
             className={`glass glass-hover p-3 text-left ${selected?.id === p.id ? "!border-cyan-400/70" : ""} ${!p.live ? "opacity-55" : ""}`}
           >
             <div className="flex items-center gap-2">
-              <span className="text-xl">{p.glyph}</span>
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-400/25 bg-violet-600/15 shrink-0"><Icon name="gamepad" size={15} className="text-violet-200" /></span>
               <div className="min-w-0">
                 <div className="text-sm font-semibold truncate">{p.name}</div>
                 <div className={`text-[10px] uppercase tracking-wider ${p.live ? "text-emerald-300" : "text-amber-300/80"}`}>
-                  {p.live ? "● Live" : "○ Needs key"}
+                  {p.live ? "Live" : "Needs key"}
                 </div>
               </div>
             </div>
@@ -49,11 +50,11 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
         <form action={action} className="glass mt-5 p-5 space-y-3">
           <input type="hidden" name="provider" value={selected.id} />
           <div className="font-semibold flex items-center gap-2">
-            <span>{selected.glyph}</span> Link {selected.name}
+            <Icon name="link" size={16} className="text-cyan-300" /> Link {selected.name}
           </div>
           {selected.legalFlag && (
             <p className="text-xs text-rose-300/90 border border-rose-400/30 rounded-lg p-2.5 bg-rose-500/5">
-              ⚠ {selected.legalFlag}
+              {selected.legalFlag}
             </p>
           )}
           {selected.live ? (
@@ -71,7 +72,7 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
                 </select>
               )}
               {state?.error && <p className="text-sm text-rose-300">{state.error}</p>}
-              {state?.ok && <p className="text-sm text-emerald-300">Linked! First sync completed. ✦</p>}
+              {state?.ok && <p className="text-sm text-emerald-300">Linked! First sync completed.</p>}
               <button disabled={pending} className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">
                 {pending ? "Verifying with API…" : "Verify & link"}
               </button>

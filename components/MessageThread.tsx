@@ -33,7 +33,7 @@ export default function MessageThread({ conversationId, viewerId }: { conversati
   return (
     <div className="glass flex-1 overflow-y-auto p-4 space-y-3" style={{ maxHeight: "55vh", minHeight: "300px" }}>
       {!messages && <div className="text-center text-muted text-sm py-10">Opening channel…</div>}
-      {messages?.length === 0 && <div className="text-center text-muted text-sm py-10">Say hi across the void 👋</div>}
+      {messages?.length === 0 && <div className="text-center text-muted text-sm py-10">Say hi across the void.</div>}
       {messages?.map((m) => {
         const mine = m.senderId === viewerId;
         return (

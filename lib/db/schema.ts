@@ -248,6 +248,13 @@ export const challenges = pgTable("challenges", {
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
   endAt: timestamp("end_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("draft"), // draft | active | completed | cancelled
+  cadence: text("cadence").notNull().default("custom"), // daily | weekly | monthly | custom
+  heroType: text("hero_type").notNull().default("image"), // image | video | stream
+  heroUrl: text("hero_url"),
+  coverUrl: text("cover_url"),
+  coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
+    .notNull().default({ zoom: 1, x: 50, y: 50 }),
+  trophyId: text("trophy_id"),
   prizeDescription: text("prize_description"),
   createdBy: text("created_by"),
   createdAt: now("created_at"),
@@ -261,6 +268,7 @@ export const challengeParticipants = pgTable("challenge_participants", {
   baseline: jsonb("baseline").$type<Record<string, number>>().notNull().default({}),
   currentPoints: integer("current_points").notNull().default(0),
   status: text("status").notNull().default("active"), // active | completed | disqualified
+  finalPlacement: integer("final_placement"),
   joinedAt: now("joined_at"),
 }, (t) => [uniqueIndex("cp_challenge_user_idx").on(t.challengeId, t.userId)]);
 
@@ -353,6 +361,39 @@ export const adClicks = pgTable("ad_clicks", {
   campaignCreativeId: text("campaign_creative_id").notNull().references(() => adCampaignCreatives.id, { onDelete: "cascade" }),
   impressionId: text("impression_id"),
   createdAt: now("created_at"),
+});
+
+// ===== Games catalog (logos/covers are DB-driven, admin-editable) =====
+export const games = pgTable("games", {
+  id: id(),
+  slug: text("slug").notNull().unique(),
+  name: text("name").notNull(),
+  description: text("description").notNull().default(""),
+  logoUrl: text("logo_url"),
+  coverUrl: text("cover_url"),
+  coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
+    .notNull().default({ zoom: 1, x: 50, y: 50 }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+// ===== Partners ("Trusted by" slider, admin-managed) =====
+export const partners = pgTable("partners", {
+  id: id(),
+  name: text("name").notNull(),
+  logoUrl: text("logo_url").notNull(),
+  url: text("url"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+// ===== Trophy art for challenge prizes =====
+export const trophies = pgTable("trophies", {
+  id: id(),
+  name: text("name").notNull(),
+  imageUrl: text("image_url").notNull(),
+  tier: text("tier").notNull().default("gold"), // gold | silver | bronze | legendary
+  game: text("game"),
 });
 
 // ===== Admin =====

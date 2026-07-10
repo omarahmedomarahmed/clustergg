@@ -14,7 +14,7 @@ export default function CopyLinkButton({ path }: { path: string }) {
       className="text-xs ghost-btn rounded-full px-2.5 py-0.5"
       title="Copy profile link"
     >
-      {copied ? "Copied ✦" : "Copy link"}
+      {copied ? "Copied" : "Copy link"}
     </button>
   );
 }

@@ -1,18 +1,23 @@
-const EMOJI: Record<string, string> = {
-  b1: "🏆", b2: "✨", b3: "🧠", b4: "👑", b5: "📡", b6: "☄️",
-};
+import Icon from "@/components/Icon";
+import { BADGE_ART } from "@/lib/assets";
 
+// Badge art: badges.icon holds either a full image URL, a legacy sprite key
+// (b1..b6 → generated medallion art), or an Icon name as final fallback.
 export function BadgeIcon({ icon, size = 40 }: { icon: string; size?: number }) {
-  if (/^b[1-6]$/.test(icon)) {
+  const url = icon.startsWith("http")
+    ? icon
+    : (BADGE_ART as Record<string, string>)[icon];
+  if (url) {
     return (
-      <span
-        className={`badge-sprite badge-${icon} inline-block shrink-0`}
-        style={{ width: size, height: size }}
-        aria-hidden
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={url} alt="" width={size} height={size}
+        className="inline-block shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size, boxShadow: "0 0 14px -4px rgba(139,92,246,.7)" }}
       />
     );
   }
-  return <span style={{ fontSize: size * 0.7, lineHeight: 1 }}>{EMOJI[icon] ?? icon ?? "⭐"}</span>;
+  return <Icon name={icon || "medal"} size={size * 0.8} className="text-amber-300" />;
 }
 
 export default function BadgeChip({

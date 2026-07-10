@@ -7,6 +7,7 @@ import PostCard from "@/components/PostCard";
 import AdSlot from "@/components/AdSlot";
 import JoinSpaceButton from "@/components/JoinSpaceButton";
 import { createPost } from "@/app/actions/social";
+import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -42,13 +43,13 @@ export default async function SpacePage({ params }: { params: Promise<{ slug: st
       <div className="glass relative overflow-hidden p-6 md:p-8 mb-6">
         <div className="absolute inset-0 opacity-25 bg-cover bg-center" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
         <div className="relative flex flex-wrap items-center gap-4">
-          <span className="text-5xl">{space.coverEmoji}</span>
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-violet-400/30 bg-gradient-to-br from-violet-600/30 to-cyan-600/20 shrink-0"><Icon name="users" size={30} className="text-violet-200" /></div>
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl md:text-3xl font-bold">{space.name}</h1>
             <p className="text-muted text-sm mt-1">{space.description}</p>
             <div className="flex gap-4 mt-2 text-xs text-muted">
-              <span>👥 {space.memberCount} members</span>
-              <span>💬 {space.postCount} posts</span>
+              <span className="inline-flex items-center gap-1.5"><Icon name="users" size={12} /> {space.memberCount} members</span>
+              <span className="inline-flex items-center gap-1.5"><Icon name="message" size={12} /> {space.postCount} posts</span>
             </div>
           </div>
           {viewer && <JoinSpaceButton spaceId={space.id} isMember={membership.length > 0} path={path} />}
@@ -60,15 +61,15 @@ export default async function SpacePage({ params }: { params: Promise<{ slug: st
         <Link
           key={c.id}
           href={`/spaces/${space.slug}/challenges/${c.id}`}
-          className="glass glass-hover mb-6 flex flex-wrap items-center gap-4 p-5 !border-cyan-400/40"
+          className="glass card-lift mb-6 flex flex-wrap items-center gap-4 p-5 !border-cyan-400/40"
         >
-          <span className="text-3xl">⚡</span>
+          <Icon name="zap" size={28} className="text-amber-300 shrink-0" />
           <div className="min-w-0 flex-1">
             <div className="text-[10px] uppercase tracking-widest text-cyan-300">Live challenge · ends {timeAgo(c.endAt).replace(" ago", "")}</div>
             <div className="font-bold">{c.title}</div>
             <div className="text-xs text-muted truncate">{c.prizeDescription}</div>
           </div>
-          <span className="glow-btn rounded-full px-5 py-2 text-sm font-semibold text-white">Compete →</span>
+          <span className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">Compete</span>
         </Link>
       ))}
 

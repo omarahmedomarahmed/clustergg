@@ -39,7 +39,8 @@ export default async function FeedPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-bold mb-6">Your <span className="grad-text">constellation feed</span></h1>
+      <h1 className="text-2xl font-bold mb-4">Your <span className="grad-text">constellation feed</span></h1>
+      <AdSlot placement="feed_top_banner" className="mb-6" />
       {posts.length === 0 ? (
         <div className="glass p-10 text-center text-muted">
           <p>Your feed is empty space.</p>
@@ -54,7 +55,7 @@ export default async function FeedPage() {
             <div key={post.id}>
               <PostCard
                 post={post} author={author} viewerId={user.id}
-                path="/feed" spaceName={`${space.coverEmoji} ${space.name}`}
+                path="/feed" spaceName={space.name}
               />
               {(i + 1) % 6 === 0 && i + 1 < posts.length && <div className="mt-4"><AdSlot placement="feed_inline" /></div>}
             </div>

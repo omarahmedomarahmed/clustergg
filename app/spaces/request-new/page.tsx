@@ -15,7 +15,7 @@ export default function RequestSpacePage() {
         </p>
         {state?.ok ? (
           <div className="mt-6 rounded-lg border border-emerald-400/40 bg-emerald-500/10 p-4 text-emerald-200">
-            🛰️ Transmission received! Your request is in the review queue — you&apos;ll get a
+            Transmission received! Your request is in the review queue — you&apos;ll get a
             notification when it&apos;s decided.
           </div>
         ) : (

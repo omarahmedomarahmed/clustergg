@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { toggleSpaceMembership } from "@/app/actions/social";
+import Icon from "@/components/Icon";
 
 export default function JoinSpaceButton({
   spaceId, isMember, path,
@@ -11,9 +12,9 @@ export default function JoinSpaceButton({
     <button
       disabled={pending}
       onClick={() => startTransition(() => toggleSpaceMembership(spaceId, path))}
-      className={`rounded-full px-6 py-2 text-sm font-semibold ${isMember ? "ghost-btn" : "glow-btn text-white"} ${pending ? "opacity-60" : ""}`}
+      className={`pressable rounded-full px-6 py-2 text-sm font-semibold inline-flex items-center gap-1.5 ${isMember ? "ghost-btn" : "glow-btn text-white"} ${pending ? "opacity-60" : ""}`}
     >
-      {isMember ? "Joined ✓" : "Join space"}
+      {isMember ? <><Icon name="check" size={14} /> Joined</> : "Join space"}
     </button>
   );
 }
