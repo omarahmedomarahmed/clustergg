@@ -49,6 +49,7 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { slug: "roblox", name: "Roblox", description: "The creator universe — followers, friends and legacy." },
     { slug: "apex-legends", name: "Apex Legends", description: "Ranked RP and lifetime kills from the Outlands." },
     { slug: "osu", name: "osu!", description: "Performance points and global rank precision clicking." },
+    { slug: "mobile-legends", name: "Mobile Legends", description: "MLBB wins, win rate and MVPs — verified with an in-game code." },
   ];
   const gameIds: Record<string, string> = {};
   for (let i = 0; i < gameDefs.length; i++) {
@@ -100,6 +101,7 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { slug: "fortnite", name: "Fortnite", game: "Fortnite", description: "Drop in, build up, fly out." },
     { slug: "chess", name: "Chess", game: "Chess", description: "Chess.com & Lichess grinders. Real rating leaderboards." },
     { slug: "dota-2", name: "Dota 2", game: "Dota 2", description: "MMR climbers and Immortal dreamers." },
+    { slug: "mobile-legends", name: "Mobile Legends", game: "Mobile Legends", description: "MLBB grinders — rank up, rack up MVPs, top the win-rate board." },
     { slug: "general-gaming", name: "General Gaming", game: null, description: "Everything gaming across the galaxy." },
     { slug: "hardware-setups", name: "Hardware & Setups", game: null, description: "Battlestations, peripherals, and RGB supremacy." },
     { slug: "lfg-team-finder", name: "LFG / Team Finder", game: null, description: "Find your squad among the stars." },
@@ -134,6 +136,10 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { game: "Minecraft", metricKey: "network_level", title: "Minecraft · Hypixel Level", unit: "lvl" },
     { game: "osu!", metricKey: "pp", title: "osu! · Performance Points", unit: "pp" },
     { game: "Apex Legends", metricKey: "rank_score", title: "Apex · Rank Score", unit: "RP" },
+    { game: "Mobile Legends", metricKey: "wins", title: "Mobile Legends · Total Wins", unit: "wins" },
+    { game: "Mobile Legends", metricKey: "win_rate", title: "Mobile Legends · Win Rate", unit: "%" },
+    { game: "Mobile Legends", metricKey: "mvp", title: "Mobile Legends · MVP Count", unit: "MVPs" },
+    { game: "Mobile Legends", metricKey: "level", title: "Mobile Legends · Account Level", unit: "lvl" },
   ];
   for (const lb of lbDefs) {
     await db.insert(schema.leaderboards).values({ id: uid(), sortDir: "desc", ...lb }).onConflictDoNothing();

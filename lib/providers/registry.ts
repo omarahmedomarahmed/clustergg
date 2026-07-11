@@ -12,7 +12,7 @@ export type ProviderDef = {
   game: string;
   glyph: string;
   color: string;
-  authType: "public" | "apikey" | "oauth" | "openid";
+  authType: "public" | "apikey" | "oauth" | "openid" | "vc";
   envVars: string[];
   identifierLabel: string;
   identifierHint?: string;
@@ -21,6 +21,8 @@ export type ProviderDef = {
   docsUrl?: string;
   legalFlag?: string;
   identityOnly?: boolean;
+  // Special two-step in-game verification-code link flow (Mobile Legends).
+  linkFlow?: "vc";
 };
 
 export const PROVIDERS: ProviderDef[] = [
@@ -246,6 +248,21 @@ export const PROVIDERS: ProviderDef[] = [
     identifierLabel: "Discord account", phase: 1, docsUrl: "https://discord.com/developers",
     identityOnly: true,
     capabilities: [{ key: "connected", label: "Account connected" }],
+  },
+  {
+    id: "mobile-legends", name: "Mobile Legends", game: "Mobile Legends", glyph: "🛡", color: "#f0a500",
+    authType: "vc", envVars: ["MLBB_API_BASE"], linkFlow: "vc",
+    identifierLabel: "Player ID + Server (Zone) ID",
+    identifierHint: "Found in-game under Profile — e.g. ID 12345678 (1234)", phase: 3,
+    docsUrl: "https://github.com/ridwaanhall/api-mobilelegends",
+    legalFlag: "Unofficial community API (self-hosted). Uses Moonton's in-game verification code — no password shared. May break if Moonton changes their systems; previously synced stats are always preserved.",
+    capabilities: [
+      { key: "level", label: "Account level", higherIsBetter: true },
+      { key: "wins", label: "Total wins", higherIsBetter: true },
+      { key: "matches", label: "Matches played", higherIsBetter: true },
+      { key: "win_rate", label: "Win rate %", unit: "%", higherIsBetter: true },
+      { key: "mvp", label: "MVP count", higherIsBetter: true },
+    ],
   },
   // ===== Phase 3 — flagged, not built (legal risk per plan §15) =====
   {

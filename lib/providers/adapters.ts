@@ -8,10 +8,15 @@ export type VerifyResult =
 
 export type Metric = { value: number; rankLabel?: string };
 export type StatsResult =
-  | { ok: true; metrics: Record<string, Metric> }
-  | { ok: false; error: string };
+  | { ok: true; metrics: Record<string, Metric>; providerDataPatch?: Record<string, unknown> }
+  | { ok: false; error: string; authExpired?: boolean };
 
-export type AccountRef = { providerAccountId: string; inGameName: string; region?: string | null };
+export type AccountRef = {
+  providerAccountId: string;
+  inGameName: string;
+  region?: string | null;
+  providerData?: Record<string, unknown> | null;
+};
 
 const UA = { "User-Agent": "ClusterGG/1.0 (clustergg.com stat sync)" };
 
@@ -567,6 +572,31 @@ const apex = {
   },
 };
 
+// ============ Mobile Legends (self-hosted wrapper via MLBB_API_BASE) ============
+// Linking happens through dedicated verification-code server actions, not verify().
+// fetchStats reads the stored encrypted token; on token expiry it reports
+// authExpired so the sync engine can flag the account WITHOUT deleting stats.
+const mobileLegends = {
+  async verify(): Promise<VerifyResult> {
+    return { ok: false, error: "Mobile Legends links via an in-game verification code (see the link form)" };
+  },
+  async fetchStats(a: AccountRef): Promise<StatsResult> {
+    const { decryptSecret } = await import("@/lib/crypto");
+    const { fetchMlbbStats } = await import("@/lib/providers/mlbb");
+    const enc = (a.providerData?.token as string) ?? "";
+    const token = enc ? decryptSecret(enc) : null;
+    if (!token) return { ok: false, error: "Reconnect needed — no saved session", authExpired: true };
+    const r = await fetchMlbbStats(token);
+    if (!r.ok) return { ok: false, error: r.error, authExpired: r.authExpired };
+    const metrics: Record<string, Metric> = {};
+    for (const [k, v] of Object.entries(r.stats.metrics)) {
+      metrics[k] = { value: v, rankLabel: k === "level" ? undefined : undefined };
+    }
+    if (r.stats.rankLabel && metrics.level) metrics.level.rankLabel = undefined;
+    return { ok: true, metrics, providerDataPatch: { lastRank: r.stats.rankLabel ?? null } };
+  },
+};
+
 // ============ Identity-only providers ============
 const identityOnly = (label: string) => ({
   async verify(): Promise<VerifyResult> {
@@ -586,7 +616,7 @@ export const ADAPTERS: Record<string, Adapter> = {
   chesscom, lichess, opendota, speedruncom, roblox, steam,
   "riot-lol": riotLol, "riot-valorant": riotValorant,
   fortnite, hypixel, pubg, faceit, clashofclans, clashroyale, brawlstars,
-  xbox, osu, apex,
+  xbox, osu, apex, "mobile-legends": mobileLegends,
   battlenet: identityOnly("Battle.net"),
   epic: identityOnly("Epic Games"),
   discord: identityOnly("Discord"),

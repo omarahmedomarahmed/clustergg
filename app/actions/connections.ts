@@ -55,6 +55,75 @@ export async function linkGameAccount(_prev: LinkState, formData: FormData): Pro
   return { ok: true };
 }
 
+// ---------- Mobile Legends: two-step in-game verification-code link ----------
+export type VcState = { error?: string; ok?: boolean; sent?: boolean } | undefined;
+
+export async function mlbbSendCode(_prev: VcState, formData: FormData): Promise<VcState> {
+  await requireUser();
+  const roleId = String(formData.get("roleId") ?? "").trim();
+  const zoneId = String(formData.get("zoneId") ?? "").trim();
+  if (!/^\d+$/.test(roleId) || !/^\d+$/.test(zoneId)) {
+    return { error: "Enter your numeric Player ID and Server (Zone) ID." };
+  }
+  const { isMlbbConfigured, sendVerificationCode } = await import("@/lib/providers/mlbb");
+  if (!isMlbbConfigured()) return { error: "Mobile Legends isn't configured yet (MLBB_API_BASE)." };
+  const r = await sendVerificationCode(roleId, zoneId);
+  if (!r.ok) return { error: `Couldn't send the code: ${r.error}` };
+  return { ok: true, sent: true };
+}
+
+export async function mlbbConfirmLink(_prev: LinkState, formData: FormData): Promise<LinkState> {
+  const me = await requireUser();
+  const roleId = String(formData.get("roleId") ?? "").trim();
+  const zoneId = String(formData.get("zoneId") ?? "").trim();
+  const vc = String(formData.get("vc") ?? "").trim();
+  if (!roleId || !zoneId) return { error: "Missing Player/Server ID — start over." };
+  if (!/^\d{4,8}$/.test(vc)) return { error: "Enter the verification code from your in-game mail." };
+
+  const { isMlbbConfigured, login } = await import("@/lib/providers/mlbb");
+  if (!isMlbbConfigured()) return { error: "Mobile Legends isn't configured yet." };
+
+  const r = await login(roleId, zoneId, vc);
+  if (!r.ok) return { error: r.error };
+
+  const { encryptSecret } = await import("@/lib/crypto");
+  const db = await getDb();
+  const providerAccountId = `${roleId}-${zoneId}`;
+  const [existing] = await db.select().from(schema.linkedGameAccounts).where(and(
+    eq(schema.linkedGameAccounts.userId, me.id),
+    eq(schema.linkedGameAccounts.provider, "mobile-legends"),
+    eq(schema.linkedGameAccounts.providerAccountId, providerAccountId),
+  )).limit(1);
+
+  const providerData = { token: encryptSecret(r.login.token), roleId, zoneId };
+  const inGameName = r.login.name || `MLBB ${roleId}`;
+
+  let accountId: string;
+  if (existing) {
+    // Reconnect: refresh the token, keep the account (and all its stats/points).
+    accountId = existing.id;
+    await db.update(schema.linkedGameAccounts)
+      .set({ providerData: { ...(existing.providerData ?? {}), ...providerData }, inGameName, syncStatus: "pending", syncError: null, nextSyncAt: new Date(0) })
+      .where(eq(schema.linkedGameAccounts.id, existing.id));
+  } else {
+    accountId = uid();
+    await db.insert(schema.linkedGameAccounts).values({
+      id: accountId, userId: me.id, provider: "mobile-legends",
+      providerAccountId, inGameName, region: zoneId, verified: true,
+      syncStatus: "pending", providerData,
+    });
+  }
+
+  const [account] = await db.select().from(schema.linkedGameAccounts)
+    .where(eq(schema.linkedGameAccounts.id, accountId)).limit(1);
+  if (account) await syncAccount(db, account);
+  try { await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
+
+  revalidatePath("/settings/connections");
+  revalidatePath("/onboarding");
+  return { ok: true };
+}
+
 export async function unlinkGameAccount(accountId: string) {
   const me = await requireUser();
   const db = await getDb();
