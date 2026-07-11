@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { linkGameAccount } from "@/app/actions/connections";
 import Icon from "@/components/Icon";
+import MlbbLinkForm from "@/components/MlbbLinkForm";
 
 export type ProviderInfo = {
   id: string;
@@ -15,6 +16,7 @@ export type ProviderInfo = {
   needsRegion?: boolean;
   envVars: string[];
   legalFlag?: string;
+  linkFlow?: "vc";
 };
 
 const RIOT_REGIONS = ["euw", "na", "eune", "kr", "br", "jp", "lan", "las", "oce", "tr", "ru", "me"];
@@ -57,7 +59,9 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
               {selected.legalFlag}
             </p>
           )}
-          {selected.live ? (
+          {selected.linkFlow === "vc" ? (
+            <MlbbLinkForm live={selected.live} />
+          ) : selected.live ? (
             <>
               <label className="block text-sm text-muted">{selected.identifierLabel}</label>
               <input

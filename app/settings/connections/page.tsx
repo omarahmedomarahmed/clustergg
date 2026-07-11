@@ -15,7 +15,9 @@ export const dynamic = "force-dynamic";
 const STATUS_STYLE: Record<string, string> = {
   ok: "text-emerald-300", pending: "text-amber-300", rate_limited: "text-amber-300",
   error: "text-rose-300", revoked: "text-rose-300", needs_key: "text-amber-300",
+  needs_reconnect: "text-amber-300",
 };
+const STATUS_LABEL: Record<string, string> = { needs_reconnect: "reconnect needed" };
 
 export default async function ConnectionsPage() {
   const user = await getCurrentUser();
@@ -39,14 +41,21 @@ export default async function ConnectionsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="font-semibold">{a.inGameName} <span className="text-muted font-normal text-sm">· {p?.name ?? a.provider}</span></div>
                   <div className="text-xs text-muted">
-                    <span className={STATUS_STYLE[a.syncStatus] ?? "text-muted"}>● {a.syncStatus}</span>
+                    <span className={STATUS_STYLE[a.syncStatus] ?? "text-muted"}>● {STATUS_LABEL[a.syncStatus] ?? a.syncStatus}</span>
                     {a.lastSyncedAt && <> · synced {timeAgo(a.lastSyncedAt)}</>}
-                    {a.syncError && <> · {a.syncError}</>}
+                    {a.syncError && a.syncStatus !== "needs_reconnect" && <> · {a.syncError}</>}
                   </div>
+                  {a.syncStatus === "needs_reconnect" && (
+                    <div className="text-[11px] text-amber-300/90 mt-1">
+                      Session expired — your stats are safe. Re-link below with a fresh in-game code to resume syncing.
+                    </div>
+                  )}
                 </div>
-                <form action={resyncGameAccount.bind(null, a.id, "/settings/connections")}>
-                  <button className="ghost-btn rounded-full px-4 py-1.5 text-xs">Re-sync</button>
-                </form>
+                {a.provider !== "mobile-legends" && (
+                  <form action={resyncGameAccount.bind(null, a.id, "/settings/connections")}>
+                    <button className="ghost-btn rounded-full px-4 py-1.5 text-xs">Re-sync</button>
+                  </form>
+                )}
                 <form action={unlinkGameAccount.bind(null, a.id)}>
                   <button className="rounded-full px-4 py-1.5 text-xs border border-rose-400/40 text-rose-300 hover:bg-rose-500/10">
                     Unlink

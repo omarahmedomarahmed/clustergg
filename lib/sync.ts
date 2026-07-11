@@ -34,19 +34,32 @@ export async function syncAccount(db: DB, account: Account): Promise<{ ok: boole
     providerAccountId: account.providerAccountId,
     inGameName: account.inGameName,
     region: account.region,
+    providerData: account.providerData,
   });
 
   if (!result.ok) {
+    // IMPORTANT: on any failure — including an expired token — we only update the
+    // account's status. Previously synced stat_current / stat_snapshots rows and
+    // challenge points are left untouched, so the gamer keeps their progress and
+    // leaderboard standing until they reconnect.
     const rateLimited = /429/.test(result.error);
+    const status = result.authExpired ? "needs_reconnect" : rateLimited ? "rate_limited" : "error";
     await db.update(schema.linkedGameAccounts)
       .set({
-        syncStatus: rateLimited ? "rate_limited" : "error",
+        syncStatus: status,
         syncError: result.error.slice(0, 300),
         lastSyncedAt: new Date(),
-        nextSyncAt: nextErr,
+        // Reconnect-needed accounts back off hard — no point retrying a dead token.
+        nextSyncAt: result.authExpired ? new Date(Date.now() + 24 * 60 * 60_000) : nextErr,
       })
       .where(eq(schema.linkedGameAccounts.id, account.id));
     return { ok: false, error: result.error };
+  }
+
+  if (result.providerDataPatch) {
+    await db.update(schema.linkedGameAccounts)
+      .set({ providerData: { ...(account.providerData ?? {}), ...result.providerDataPatch } })
+      .where(eq(schema.linkedGameAccounts.id, account.id));
   }
 
   const game = provider.game;
@@ -211,5 +224,8 @@ export async function syncUserAccountsIfStale(db: DB, userId: string, cooldownMi
       lt(schema.linkedGameAccounts.lastSyncedAt, cutoff),
     ),
   ));
-  await Promise.allSettled(accounts.map((a) => syncAccount(db, a)));
+  // Skip accounts that need a manual reconnect — their token is dead, and their
+  // stats are already preserved. Retrying just wastes API calls.
+  const syncable = accounts.filter((a) => a.syncStatus !== "needs_reconnect");
+  await Promise.allSettled(syncable.map((a) => syncAccount(db, a)));
 }

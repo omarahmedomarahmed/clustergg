@@ -131,6 +131,26 @@ check `/admin/settings` for a live status table.
 - Epic: https://dev.epicgames.com/portal → create product → OAuth client → `EPIC_CLIENT_ID/SECRET`.
 - Battle.net: https://develop.battle.net/access → create client → `BATTLENET_CLIENT_ID/SECRET`.
 
+### Mobile Legends (`MLBB_API_BASE`) — self-host your own copy
+Mobile Legends has no official API, so we run our **own private copy** of the open-source
+community wrapper. Player verification codes then only ever pass through infrastructure you
+control — never a stranger's server.
+
+1. Open https://github.com/ridwaanhall/api-mobilelegends and click **Fork** (top right) to
+   copy it into your own GitHub account.
+2. Go to https://vercel.com/new → **Import** your fork → click **Deploy** (it already has a
+   `vercel.json`, so no settings needed). Wait for it to finish.
+3. Copy the deployment URL Vercel gives you (e.g. `https://api-mobilelegends-yourname.vercel.app`).
+4. Back in your **clustergg** Vercel project → Settings → Environment Variables, add:
+   `MLBB_API_BASE` = that URL **+ `/api`** (e.g. `https://api-mobilelegends-yourname.vercel.app/api`).
+5. Redeploy clustergg. Mobile Legends now shows **live** at `/admin/settings`.
+
+**How players link it:** Settings → Connections → Mobile Legends → they enter their in-game
+Player ID + Server, tap "Send code", read the code from their in-game mailbox, and confirm.
+No password is ever typed. **Their stats are stored permanently** — if the session later
+expires, their profile, leaderboard rank and challenge points all stay put; they just tap
+re-link with a fresh code to resume live syncing. Test it by linking your own MLBB account first.
+
 ### PSN / Call of Duty
 Not integrated on purpose — no official public APIs; unofficial ones risk player account
 bans. Revisit only with legal sign-off (plan §15).
