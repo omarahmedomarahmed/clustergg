@@ -1,20 +1,25 @@
 import Link from "next/link";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, asc, count, eq, isNull } from "drizzle-orm";
 import { getCurrentUser, isStaff } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import Icon from "@/components/Icon";
+import GameLogo from "@/components/GameLogo";
 import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
 
 export default async function Nav() {
   const user = await getCurrentUser();
+  const db = await getDb();
   let unread = 0;
   if (user) {
-    const db = await getDb();
     const [row] = await db.select({ c: count() }).from(schema.notifications)
       .where(and(eq(schema.notifications.userId, user.id), isNull(schema.notifications.readAt)));
     unread = Number(row?.c ?? 0);
   }
+  // Games pinned to the nav by an admin (Admin → Games → "Show in nav").
+  const navGames = await db.select().from(schema.games)
+    .where(and(eq(schema.games.isActive, true), eq(schema.games.showInNav, true)))
+    .orderBy(asc(schema.games.sortOrder)).limit(8);
 
   const links = [
     { href: "/games", label: "Games", icon: "gamepad" },
@@ -38,6 +43,15 @@ export default async function Nav() {
           {links.map((l) => (
             <Link key={l.href} href={l.href} className="nav-link">{l.label}</Link>
           ))}
+          {navGames.length > 0 && (
+            <span className="flex items-center gap-2.5 border-l border-violet-400/20 pl-4">
+              {navGames.map((g) => (
+                <Link key={g.id} href={`/games/${g.slug}`} title={g.name} className="opacity-80 hover:opacity-100 transition-all hover:scale-110">
+                  <GameLogo logoUrl={g.logoUrl} name={g.name} size={26} rounded="rounded-lg" />
+                </Link>
+              ))}
+            </span>
+          )}
         </nav>
 
         <div className="ml-auto flex items-center gap-3">

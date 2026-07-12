@@ -403,6 +403,7 @@ export async function saveGame(formData: FormData) {
       y: Number(formData.get("coverY")) || 50,
     },
     sortOrder: Number(formData.get("sortOrder")) || 0,
+    showInNav: formData.get("showInNav") === "on",
     isActive: formData.get("isActive") === "on",
   };
   if (!values.name) return;

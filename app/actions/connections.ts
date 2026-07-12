@@ -172,6 +172,21 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
   return { ok: true };
 }
 
+// Save the full profile theme/customization JSON (from the profile builder).
+export async function saveProfileTheme(theme: Record<string, unknown>, extras: { title?: string; bio?: string; avatarUrl?: string; bannerUrl?: string }) {
+  const me = await requireUser();
+  const db = await getDb();
+  const patch: Record<string, unknown> = { theme };
+  if (extras.title !== undefined) patch.title = extras.title.slice(0, 60) || null;
+  if (extras.bio !== undefined) patch.bio = extras.bio.slice(0, 400) || null;
+  if (extras.avatarUrl !== undefined) patch.avatarUrl = extras.avatarUrl.trim() || null;
+  if (extras.bannerUrl !== undefined) patch.bannerUrl = extras.bannerUrl.trim() || null;
+  await db.update(schema.users).set(patch).where(eq(schema.users.id, me.id));
+  revalidatePath(`/u/${me.slug}`);
+  revalidatePath("/profile");
+  return { ok: true };
+}
+
 export async function updatePrivacy(formData: FormData) {
   const me = await requireUser();
   const db = await getDb();

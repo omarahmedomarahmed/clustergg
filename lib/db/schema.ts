@@ -17,6 +17,7 @@ export const users = pgTable("users", {
   bannerUrl: text("banner_url"),
   bio: text("bio"),
   country: text("country"),
+  title: text("title"), // flex title shown under the name (e.g. "Blitz Grandmaster")
   role: text("role").notNull().default("user"), // user | admin | superadmin | brand
   status: text("status").notNull().default("active"), // active | suspended | banned
   isVerified: boolean("is_verified").notNull().default(false),
@@ -24,6 +25,9 @@ export const users = pgTable("users", {
   profileVisibility: text("profile_visibility").notNull().default("public"), // public | followers | private
   allowMessagesFrom: text("allow_messages_from").notNull().default("everyone"), // everyone | following | nobody
   emailNotifications: boolean("email_notifications").notNull().default(true),
+  // Full profile customization ("profile builder"): theme, layout, cursor,
+  // section order & visibility. Rendered as inline CSS vars on the public page.
+  theme: jsonb("theme").$type<Record<string, unknown>>().notNull().default({}),
   createdAt: now("created_at"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
 }, (t) => [index("users_slug_idx").on(t.slug)]);
@@ -374,6 +378,7 @@ export const games = pgTable("games", {
   coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
     .notNull().default({ zoom: 1, x: 50, y: 50 }),
   sortOrder: integer("sort_order").notNull().default(0),
+  showInNav: boolean("show_in_nav").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
 });
 

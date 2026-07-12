@@ -1,5 +1,5 @@
 {
-  "id": "460de518-c286-42ed-a800-f3eb21f5218b",
+  "id": "5c209cc7-d84a-4272-b758-46d4f43f8ad0",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -1527,6 +1527,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "show_in_nav": {
+          "name": "show_in_nav",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
         },
         "is_active": {
           "name": "is_active",
@@ -3102,6 +3109,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "title": {
+          "name": "title",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "role": {
           "name": "role",
           "type": "text",
@@ -3149,6 +3162,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "theme": {
+          "name": "theme",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
         },
         "created_at": {
           "name": "created_at",
