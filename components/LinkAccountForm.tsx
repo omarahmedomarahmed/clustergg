@@ -49,8 +49,11 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
       </div>
 
       {selected && (
-        <form action={action} className="glass mt-5 p-5 space-y-3">
-          <input type="hidden" name="provider" value={selected.id} />
+        // NOTE: this is a <div>, not a <form>. The VC (Mobile Legends) path
+        // renders its own nested forms, and a form-in-form is invalid HTML that
+        // throws "A React form was unexpectedly submitted". Only the generic
+        // identifier path below gets its own <form>.
+        <div className="glass mt-5 p-5 space-y-3">
           <div className="font-semibold flex items-center gap-2">
             <Icon name="link" size={16} className="text-cyan-300" /> Link {selected.name}
           </div>
@@ -62,7 +65,8 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
           {selected.linkFlow === "vc" ? (
             <MlbbLinkForm live={selected.live} />
           ) : selected.live ? (
-            <>
+            <form action={action} className="space-y-3">
+              <input type="hidden" name="provider" value={selected.id} />
               <label className="block text-sm text-muted">{selected.identifierLabel}</label>
               <input
                 name="identifier"
@@ -80,7 +84,7 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
               <button disabled={pending} className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">
                 {pending ? "Verifying with API…" : "Verify & link"}
               </button>
-            </>
+            </form>
           ) : (
             <p className="text-sm text-muted">
               This provider activates when the platform admin sets{" "}
@@ -88,7 +92,7 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
               adapter is already wired — no code changes needed.
             </p>
           )}
-        </form>
+        </div>
       )}
     </div>
   );
