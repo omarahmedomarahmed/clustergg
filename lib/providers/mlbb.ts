@@ -10,11 +10,17 @@
 
 const UA = { "User-Agent": "ClusterGG/1.0 (clustergg.com)" };
 
+// All wrapper user endpoints live under the absolute prefix /api/user (from the
+// FastAPI router: APIRouter(prefix="/api/user")). We normalize MLBB_API_BASE to
+// the domain ROOT — stripping any trailing /api the user may (or may not) have
+// added — then build the exact /api/user/... path ourselves. This makes the
+// integration work whether the env var is "https://host" or "https://host/api".
 function base(): string | null {
-  let b = process.env.MLBB_API_BASE?.trim().replace(/\/+$/, "");
+  let b = process.env.MLBB_API_BASE?.trim();
   if (!b) return null;
-  // Tolerate a bare host (no scheme) — fetch() needs an absolute URL.
-  if (!/^https?:\/\//i.test(b)) b = `https://${b}`;
+  if (!/^https?:\/\//i.test(b)) b = `https://${b}`;     // tolerate a bare host
+  b = b.replace(/\/+$/, "");                             // drop trailing slashes
+  b = b.replace(/\/api(\/v\d+)?$/i, "");                 // drop a trailing /api or /api/v2
   return b;
 }
 
@@ -70,7 +76,7 @@ function readableError(json: any, status: number): string {
 // the wrapper defines them as query params or a request body.
 export async function sendVerificationCode(roleId: string, zoneId: string) {
   const qs = `?role_id=${encodeURIComponent(roleId)}&zone_id=${encodeURIComponent(zoneId)}`;
-  return call(`/user/auth/send-vc${qs}`, {
+  return call(`/api/user/auth/send-vc${qs}`, {
     method: "POST",
     body: JSON.stringify({ role_id: roleId, zone_id: zoneId }),
   });
@@ -86,7 +92,7 @@ function extractToken(data: any): string | undefined {
 export async function login(roleId: string, zoneId: string, vc: string):
   Promise<{ ok: true; login: MlbbLogin } | { ok: false; error: string }> {
   const qs = `?role_id=${encodeURIComponent(roleId)}&zone_id=${encodeURIComponent(zoneId)}&vc=${encodeURIComponent(vc)}`;
-  const r = await call<any>(`/user/auth/login${qs}`, {
+  const r = await call<any>(`/api/user/auth/login${qs}`, {
     method: "POST",
     body: JSON.stringify({ role_id: roleId, zone_id: zoneId, vc }),
   });
@@ -146,8 +152,8 @@ export type MlbbStats = {
 export async function fetchMlbbStats(token: string):
   Promise<{ ok: true; stats: MlbbStats } | { ok: false; error: string; authExpired: boolean }> {
   const [info, stats] = await Promise.all([
-    call<any>("/user/info", { token }),
-    call<any>("/user/stats", { token }),
+    call<any>("/api/user/info", { token }),
+    call<any>("/api/user/stats", { token }),
   ]);
 
   const authExpired = (!info.ok && (info.status === 401 || info.status === 403)) ||
