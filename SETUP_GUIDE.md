@@ -131,19 +131,25 @@ check `/admin/settings` for a live status table.
 - Epic: https://dev.epicgames.com/portal → create product → OAuth client → `EPIC_CLIENT_ID/SECRET`.
 - Battle.net: https://develop.battle.net/access → create client → `BATTLENET_CLIENT_ID/SECRET`.
 
-### Mobile Legends (`MLBB_API_BASE`) — self-host your own copy
-Mobile Legends has no official API, so we run our **own private copy** of the open-source
-community wrapper. Player verification codes then only ever pass through infrastructure you
-control — never a stranger's server.
+### Mobile Legends (`MLBB_API_BASE`)
+Mobile Legends has no official API, so Cluster talks to the community wrapper via a
+configurable base URL. **Important:** that wrapper is only a front door — it forwards to a
+*private upstream* URL (`RONE_DEV_ACCESS_KEY`) that actually reaches Moonton, and the
+maintainer keeps that private. A self-hosted fork with a blank `RONE_DEV_ACCESS_KEY` will
+return a 500 on "send code". So there are two options:
 
-1. Open https://github.com/ridwaanhall/api-mobilelegends and click **Fork** (top right) to
-   copy it into your own GitHub account.
-2. Go to https://vercel.com/new → **Import** your fork → click **Deploy** (it already has a
-   `vercel.json`, so no settings needed). Wait for it to finish.
-3. Copy the deployment URL Vercel gives you (e.g. `https://api-mobilelegends-yourname.vercel.app`).
-4. Back in your **clustergg** Vercel project → Settings → Environment Variables, add:
-   `MLBB_API_BASE` = that URL **+ `/api`** (e.g. `https://api-mobilelegends-yourname.vercel.app/api`).
-5. Redeploy clustergg. Mobile Legends now shows **live** at `/admin/settings`.
+**Option A — use the maintainer's hosted API (works immediately):**
+Set `MLBB_API_BASE` = `https://openmlbb.fastapicloud.dev/api` (or `https://mlbb.rone.dev/api`)
+in your clustergg Vercel env vars, then redeploy. Trade-off: verification codes/tokens pass
+through the maintainer's server. Simplest path to a working integration.
+
+**Option B — self-host (only if you can obtain the upstream key):**
+1. Fork https://github.com/ridwaanhall/api-mobilelegends and deploy it on Vercel.
+2. In that project's env vars, set `RONE_DEV_ACCESS_KEY` (and `_V2`) to the private upstream
+   URL — you'd need to get this from the maintainer; it is not public.
+3. Set clustergg's `MLBB_API_BASE` to your instance URL + `/api`.
+
+Either way, Mobile Legends shows **live** at `/admin/settings` once `MLBB_API_BASE` is set.
 
 **How players link it:** Settings → Connections → Mobile Legends → they enter their in-game
 Player ID + Server, tap "Send code", read the code from their in-game mailbox, and confirm.
