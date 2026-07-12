@@ -102,6 +102,49 @@ html, body {
 .rise-in-1 { animation-delay: .08s; } .rise-in-2 { animation-delay: .16s; }
 .rise-in-3 { animation-delay: .24s; } .rise-in-4 { animation-delay: .32s; }
 
+/* ---------- Themed gamer profile (scoped to .profile-root) ---------- */
+.profile-root {
+  background-color: var(--p-bg);
+  color: var(--p-text);
+  font-family: var(--p-font);
+  min-height: 100vh;
+}
+.profile-root.has-bg-image { background-size: cover; background-position: center; background-attachment: fixed; }
+.profile-root .p-muted { color: var(--p-muted); }
+.profile-root .p-accent { color: var(--p-accent); }
+
+.p-card {
+  border-radius: var(--p-radius);
+  padding: 1.25rem;
+  transition: transform .25s, box-shadow .25s, border-color .25s;
+}
+.p-card-glass { background: color-mix(in srgb, var(--p-panel) 70%, transparent); border: 1px solid color-mix(in srgb, var(--p-accent) 25%, transparent); backdrop-filter: blur(14px); }
+.p-card-solid { background: var(--p-panel); border: 1px solid color-mix(in srgb, var(--p-accent) 18%, transparent); }
+.p-card-outline { background: transparent; border: 1.5px solid color-mix(in srgb, var(--p-accent) 45%, transparent); }
+.p-card-flat { background: color-mix(in srgb, var(--p-panel) 50%, transparent); border: none; }
+.p-card:hover { transform: translateY(-3px); box-shadow: 0 14px 40px -16px color-mix(in srgb, var(--p-accent) 55%, transparent); border-color: color-mix(in srgb, var(--p-accent) 55%, transparent); }
+
+.p-grad { background: linear-gradient(92deg, var(--p-accent), var(--p-accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+.p-btn { border-radius: 9999px; padding: .55rem 1.4rem; font-weight: 600; font-size: .9rem; transition: all .2s; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem; }
+.p-btn-neon { background: linear-gradient(92deg, var(--p-accent), var(--p-accent2)); color: #fff; box-shadow: 0 0 22px -4px var(--p-accent); }
+.p-btn-neon:hover { box-shadow: 0 0 38px -4px var(--p-accent); filter: brightness(1.1); }
+.p-btn-solid { background: var(--p-accent); color: #fff; }
+.p-btn-solid:hover { filter: brightness(1.12); }
+.p-btn-outline { background: transparent; border: 1.5px solid var(--p-accent); color: var(--p-accent); }
+.p-btn-outline:hover { background: color-mix(in srgb, var(--p-accent) 15%, transparent); }
+.p-btn-glass { background: color-mix(in srgb, var(--p-accent) 15%, transparent); border: 1px solid color-mix(in srgb, var(--p-accent) 40%, transparent); color: var(--p-text); backdrop-filter: blur(8px); }
+.p-btn-glass:hover { background: color-mix(in srgb, var(--p-accent) 28%, transparent); }
+.p-btn-pill { background: color-mix(in srgb, var(--p-accent) 90%, #000); color: #fff; border-radius: 9999px; box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--p-accent) 60%, #000); }
+.p-btn-pill:hover { transform: translateY(-1px); }
+
+.p-avatar-circle { border-radius: 9999px; }
+.p-avatar-rounded { border-radius: 1.25rem; }
+.p-avatar-square { border-radius: .25rem; }
+
+/* ---------- Guest-selectable site cursor (set via data attr on <html>) ---------- */
+:root[data-cursor="spark"] * { cursor: inherit; }
+
 /* ---------- Interaction layer ---------- */
 a, button, [role="button"], select, summary { cursor: pointer; }
 

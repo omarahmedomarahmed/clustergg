@@ -195,6 +195,7 @@ CREATE TABLE "games" (
 	"cover_url" text,
 	"cover_adjust" jsonb DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb NOT NULL,
 	"sort_order" integer DEFAULT 0 NOT NULL,
+	"show_in_nav" boolean DEFAULT false NOT NULL,
 	"is_active" boolean DEFAULT true NOT NULL,
 	CONSTRAINT "games_slug_unique" UNIQUE("slug")
 );
@@ -382,6 +383,7 @@ CREATE TABLE "users" (
 	"banner_url" text,
 	"bio" text,
 	"country" text,
+	"title" text,
 	"role" text DEFAULT 'user' NOT NULL,
 	"status" text DEFAULT 'active' NOT NULL,
 	"is_verified" boolean DEFAULT false NOT NULL,
@@ -389,6 +391,7 @@ CREATE TABLE "users" (
 	"profile_visibility" text DEFAULT 'public' NOT NULL,
 	"allow_messages_from" text DEFAULT 'everyone' NOT NULL,
 	"email_notifications" boolean DEFAULT true NOT NULL,
+	"theme" jsonb DEFAULT '{}'::jsonb NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"last_login_at" timestamp with time zone,
 	CONSTRAINT "users_email_unique" UNIQUE("email"),

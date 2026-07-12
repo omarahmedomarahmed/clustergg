@@ -27,6 +27,9 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
           y% <input name="coverY" type="number" min="0" max="100" defaultValue={game?.coverAdjust.y ?? 50} className="input-cosmic !w-20 !py-1" />
         </label>
         <label className="flex items-center gap-2 text-sm ml-auto">
+          <input type="checkbox" name="showInNav" defaultChecked={game?.showInNav ?? false} className="accent-cyan-500" /> Show logo in nav
+        </label>
+        <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="isActive" defaultChecked={game?.isActive ?? true} className="accent-violet-500" /> Active
         </label>
       </div>

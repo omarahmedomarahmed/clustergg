@@ -52,13 +52,13 @@ const PATHS: Record<string, React.ReactNode> = {
 };
 
 export default function Icon({
-  name, size = 18, className = "", strokeWidth = 2,
-}: { name: string; size?: number; className?: string; strokeWidth?: number }) {
+  name, size = 18, className = "", strokeWidth = 2, style,
+}: { name: string; size?: number; className?: string; strokeWidth?: number; style?: React.CSSProperties }) {
   return (
     <svg
       width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
-      className={`inline-block shrink-0 ${className}`} aria-hidden
+      className={`inline-block shrink-0 ${className}`} style={style} aria-hidden
     >
       {PATHS[name] ?? PATHS.spark}
     </svg>
