@@ -45,6 +45,10 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
     ],
   },
   {
+    section: "Studio",
+    items: [{ href: "/admin/brand-kit", label: "Brand & marketing kit" }],
+  },
+  {
     section: "Ads (offline sales)",
     adminOnly: true,
     items: [
