@@ -19,10 +19,41 @@ function rowsOf(result: unknown): Record<string, unknown>[] {
 
 // Zero-terminal provisioning: if the Neon database is empty, create the full
 // schema and seed platform defaults (+ superadmin from env) on first connect.
+// Idempotent column back-fills for databases provisioned before a column was
+// added. Every entry uses ADD COLUMN IF NOT EXISTS, so this is a no-op once the
+// column exists. Append here whenever the schema gains a column — this is our
+// lightweight, zero-downtime migration path for the live Neon database.
+const COLUMN_MIGRATIONS = [
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "title" text`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "theme" jsonb NOT NULL DEFAULT '{}'::jsonb`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "profile_visibility" text NOT NULL DEFAULT 'public'`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "allow_messages_from" text NOT NULL DEFAULT 'everyone'`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_notifications" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "show_in_nav" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cadence" text NOT NULL DEFAULT 'custom'`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "hero_type" text NOT NULL DEFAULT 'image'`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "hero_url" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_url" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_adjust" jsonb NOT NULL DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
+  `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
+];
+
+async function runColumnMigrations(db: DB) {
+  for (const stmt of COLUMN_MIGRATIONS) {
+    try { await db.execute(dsql.raw(stmt)); }
+    catch (e) { if (!/already exists|does not exist/i.test(String(e))) throw e; }
+  }
+}
+
 async function ensureProvisioned(db: DB) {
   const existing = await db.execute(dsql`SELECT to_regclass('public.users') AS t`);
-  if (rowsOf(existing).some((r) => r.t)) return;
-
+  if (rowsOf(existing).some((r) => r.t)) {
+    // Schema already exists — just back-fill any columns added since.
+    await runColumnMigrations(db);
+    return;
+  }
+  
   const { DDL_STATEMENTS } = await import("./ddl");
   for (const statement of DDL_STATEMENTS) {
     try {
@@ -32,6 +63,7 @@ async function ensureProvisioned(db: DB) {
       if (!/already exists/i.test(String(e))) throw e;
     }
   }
+  await runColumnMigrations(db);
   const { seed } = await import("./seed");
   try {
     await seed(db, { demo: false });
