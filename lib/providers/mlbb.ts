@@ -11,8 +11,11 @@
 const UA = { "User-Agent": "ClusterGG/1.0 (clustergg.com)" };
 
 function base(): string | null {
-  const b = process.env.MLBB_API_BASE?.replace(/\/+$/, "");
-  return b || null;
+  let b = process.env.MLBB_API_BASE?.trim().replace(/\/+$/, "");
+  if (!b) return null;
+  // Tolerate a bare host (no scheme) — fetch() needs an absolute URL.
+  if (!/^https?:\/\//i.test(b)) b = `https://${b}`;
+  return b;
 }
 
 export function isMlbbConfigured(): boolean {
