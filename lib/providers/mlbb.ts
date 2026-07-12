@@ -43,8 +43,7 @@ async function call<T = any>(
     let json: any = {};
     try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
     if (!res.ok) {
-      const msg = json?.detail || json?.message || json?.error || `HTTP ${res.status}`;
-      return { ok: false, status: res.status, error: String(msg).slice(0, 200) };
+      return { ok: false, status: res.status, error: readableError(json, res.status) };
     }
     return { ok: true, data: json as T };
   } catch (e) {
@@ -52,8 +51,26 @@ async function call<T = any>(
   }
 }
 
+// FastAPI's error `detail` may be a string OR an array of {loc,msg,type}. Turn
+// either into a human-readable line so the UI never shows "[object Object]".
+function readableError(json: any, status: number): string {
+  const d = json?.detail;
+  if (typeof d === "string") return d;
+  if (Array.isArray(d)) {
+    const parts = d.map((e) => (typeof e === "string" ? e : e?.msg || JSON.stringify(e))).filter(Boolean);
+    if (parts.length) return parts.join("; ").slice(0, 220);
+  }
+  const m = json?.message || json?.error || json?.raw;
+  if (typeof m === "string" && m) return m.slice(0, 220);
+  if (status >= 500) return `Your MLBB API instance returned ${status} — it likely needs RONE_DEV_ACCESS_KEY set (see notes).`;
+  return `HTTP ${status}`;
+}
+
+// Params are sent BOTH as query string and JSON body so the call works whether
+// the wrapper defines them as query params or a request body.
 export async function sendVerificationCode(roleId: string, zoneId: string) {
-  return call("/user/auth/send-vc", {
+  const qs = `?role_id=${encodeURIComponent(roleId)}&zone_id=${encodeURIComponent(zoneId)}`;
+  return call(`/user/auth/send-vc${qs}`, {
     method: "POST",
     body: JSON.stringify({ role_id: roleId, zone_id: zoneId }),
   });
@@ -68,7 +85,8 @@ function extractToken(data: any): string | undefined {
 
 export async function login(roleId: string, zoneId: string, vc: string):
   Promise<{ ok: true; login: MlbbLogin } | { ok: false; error: string }> {
-  const r = await call<any>("/user/auth/login", {
+  const qs = `?role_id=${encodeURIComponent(roleId)}&zone_id=${encodeURIComponent(zoneId)}&vc=${encodeURIComponent(vc)}`;
+  const r = await call<any>(`/user/auth/login${qs}`, {
     method: "POST",
     body: JSON.stringify({ role_id: roleId, zone_id: zoneId, vc }),
   });
