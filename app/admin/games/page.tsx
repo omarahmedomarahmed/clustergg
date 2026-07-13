@@ -3,6 +3,7 @@ import { getDb, schema } from "@/lib/db";
 import { saveGame, deleteGame } from "@/app/actions/admin";
 import GameLogo from "@/components/GameLogo";
 import ImageUpload from "@/components/ImageUpload";
+import CoverFramer from "@/components/CoverFramer";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Games" };
@@ -15,19 +16,12 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
       <input name="sortOrder" type="number" defaultValue={game?.sortOrder ?? 0} placeholder="Sort order" className="input-cosmic" />
       <input name="description" defaultValue={game?.description} placeholder="Description" className="input-cosmic sm:col-span-2" />
       <ImageUpload name="logoUrl" defaultValue={game?.logoUrl ?? ""} label="Logo (square)" aspect="1/1" rounded="rounded-lg" maxDim={512} hint="Square game logo — shown in nav, cards and leaderboards." />
-      <ImageUpload name="coverUrl" defaultValue={game?.coverUrl ?? ""} label="Cover (wide)" aspect="16/9" maxDim={1600} hint="Wide banner shown on the game planet header." />
-      <div className="flex gap-2 sm:col-span-2 items-center flex-wrap">
-        <span className="text-xs text-muted">Cover framing:</span>
-        <label className="text-xs text-muted flex items-center gap-1.5">
-          zoom <input name="coverZoom" type="number" step="0.05" min="1" max="3" defaultValue={game?.coverAdjust.zoom ?? 1} className="input-cosmic !w-20 !py-1" />
-        </label>
-        <label className="text-xs text-muted flex items-center gap-1.5">
-          x% <input name="coverX" type="number" min="0" max="100" defaultValue={game?.coverAdjust.x ?? 50} className="input-cosmic !w-20 !py-1" />
-        </label>
-        <label className="text-xs text-muted flex items-center gap-1.5">
-          y% <input name="coverY" type="number" min="0" max="100" defaultValue={game?.coverAdjust.y ?? 50} className="input-cosmic !w-20 !py-1" />
-        </label>
-        <label className="flex items-center gap-2 text-sm ml-auto">
+      <div className="sm:col-span-2">
+        <CoverFramer name="coverUrl" defaultUrl={game?.coverUrl ?? ""} defaultAdjust={game?.coverAdjust}
+          hint="Drag the image to reposition and use the zoom slider — the frame is exactly how it appears on the planet header." />
+      </div>
+      <div className="flex gap-4 sm:col-span-2 items-center flex-wrap pt-1">
+        <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="showInNav" defaultChecked={game?.showInNav ?? false} className="accent-cyan-500" /> Show logo in nav
         </label>
         <label className="flex items-center gap-2 text-sm">
