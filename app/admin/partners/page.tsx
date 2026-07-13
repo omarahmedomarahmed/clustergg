@@ -24,7 +24,7 @@ export default async function AdminPartnersPage() {
           <input name="name" required placeholder="Partner name" className="input-cosmic" />
           <input name="url" placeholder="Website link (optional)" className="input-cosmic" />
           <div className="sm:col-span-2">
-            <ImageUpload name="logoUrl" label="Partner logo" aspect="16/9" maxDim={600} hint="Transparent PNG/SVG works best." />
+            <ImageUpload name="logoUrl" label="Partner logo" aspect="16/9" maxDim={600} scope="partner" hint="Transparent PNG/SVG works best." />
           </div>
           <input name="sortOrder" type="number" defaultValue={0} placeholder="Sort order" className="input-cosmic" />
           <label className="flex items-center gap-2 text-sm">

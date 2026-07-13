@@ -9,6 +9,7 @@ import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
+import { slimImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
@@ -154,7 +155,7 @@ export default async function FeedPage() {
                   const g = s.game ? gameByName.get(s.game) : undefined;
                   return (
                     <Link key={s.id} href={`/planets/${s.slug}`} className="flex items-center gap-2.5 hover:text-cyan-300">
-                      {g ? <GameLogo logoUrl={g.logoUrl} name={s.name} size={28} rounded="rounded-lg" /> : <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
+                      {g ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={28} rounded="rounded-lg" /> : <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
                       <span className="text-sm font-medium truncate">{s.name}</span>
                     </Link>
                   );
@@ -171,7 +172,7 @@ export default async function FeedPage() {
                 const g = s.game ? gameByName.get(s.game) : undefined;
                 return (
                   <Link key={s.id} href={`/planets/${s.slug}`} className="flex items-center gap-2.5 hover:text-cyan-300">
-                    {g ? <GameLogo logoUrl={g.logoUrl} name={s.name} size={28} rounded="rounded-lg" /> : <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
+                    {g ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={28} rounded="rounded-lg" /> : <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
                     <span className="text-sm font-medium truncate flex-1">{s.name}</span>
                     <Icon name="chevronRight" size={14} className="text-muted" />
                   </Link>

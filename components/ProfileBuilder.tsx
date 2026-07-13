@@ -195,7 +195,7 @@ export default function ProfileBuilder({
                     style={{ backgroundImage: `url("${b.url}")` }} />
                 ))}
               </div>
-              <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1280} quality={0.72} hint="Upload your own background image (auto-optimized)." />
+              <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1280} quality={0.72} scope="profile" hint="Upload your own background image (auto-optimized)." />
               <label className="text-xs text-muted flex items-center justify-between gap-3">Background blur
                 <input type="range" min={0} max={20} value={theme.bgBlur} onChange={(e) => set("bgBlur", Number(e.target.value))} className="accent-violet-500 flex-1 max-w-48" />
               </label>
@@ -290,8 +290,8 @@ export default function ProfileBuilder({
               </div>
             </div>
             <div className="space-y-4">
-              <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={480} quality={0.82} hint="Square image works best." />
-              <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1280} quality={0.78} hint="Wide image shown behind your name." />
+              <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={480} quality={0.82} scope="profile" hint="Square image works best." />
+              <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1280} quality={0.78} scope="profile" hint="Wide image shown behind your name." />
             </div>
           </div>
         )}

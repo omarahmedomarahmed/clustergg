@@ -36,7 +36,7 @@ export default async function AdminCreativesPage() {
           </select>
           <input name="durationSeconds" type="number" max={5} placeholder="Duration s (video only)" className="input-cosmic" />
           <div className="sm:col-span-2">
-            <ImageUpload name="fileUrl" label="Creative file" aspect="16/9" maxDim={1600} hint="Image is optimized on upload. Video: use “paste a link”." />
+            <ImageUpload name="fileUrl" label="Creative file" aspect="16/9" maxDim={1600} scope="creative" hint="Image is optimized on upload. Video: use “paste a link”." />
           </div>
           <input name="clickUrl" placeholder="Click-through URL" className="input-cosmic sm:col-span-2" />
           <div className="flex gap-2">

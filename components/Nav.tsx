@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
 import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
+import { slimImg } from "@/lib/img";
 
 export default async function Nav() {
   const user = await getCurrentUser();
@@ -57,7 +58,7 @@ export default async function Nav() {
             <Link key={g.id} href={planetHref(g)} title={g.name}
               className="group shrink-0 relative rounded-xl transition-transform hover:scale-110">
               <span className="absolute -inset-1 rounded-xl bg-gradient-to-br from-violet-500/0 to-cyan-500/0 group-hover:from-violet-500/25 group-hover:to-cyan-500/25 blur-md transition-all" />
-              <GameLogo logoUrl={g.logoUrl} name={g.name} size={40} rounded="rounded-xl"
+              <GameLogo logoUrl={slimImg(g.logoUrl)} name={g.name} size={40} rounded="rounded-xl"
                 className="relative ring-1 ring-violet-400/25 group-hover:ring-cyan-400/60 shadow-lg" />
             </Link>
           ))}

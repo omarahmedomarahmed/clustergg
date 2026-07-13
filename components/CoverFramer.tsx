@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { downscale } from "@/lib/downscale";
+import { uploadImage } from "@/lib/upload-client";
 
 type Adjust = { zoom: number; x: number; y: number };
 
@@ -39,7 +40,7 @@ export default function CoverFramer({
   async function onPick(file: File) {
     if (!file.type.startsWith("image/")) return;
     setBusy(true);
-    try { setUrl(await downscale(file, maxDim, 0.82)); }
+    try { setUrl(await uploadImage(await downscale(file, maxDim, 0.78), "game")); }
     finally { setBusy(false); }
   }
 
