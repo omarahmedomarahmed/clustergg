@@ -49,8 +49,13 @@ async function runColumnMigrations(db: DB) {
 async function ensureProvisioned(db: DB) {
   const existing = await db.execute(dsql`SELECT to_regclass('public.users') AS t`);
   if (rowsOf(existing).some((r) => r.t)) {
-    // Schema already exists — just back-fill any columns added since.
+    // Schema already exists — back-fill any columns added since, and make sure
+    // our house ads exist (idempotent) so no ad placement is ever empty.
     await runColumnMigrations(db);
+    try {
+      const { seedHouseAds } = await import("./seed");
+      await seedHouseAds(db);
+    } catch { /* non-fatal — ads just won't backfill this boot */ }
     return;
   }
   
@@ -64,12 +69,13 @@ async function ensureProvisioned(db: DB) {
     }
   }
   await runColumnMigrations(db);
-  const { seed } = await import("./seed");
+  const { seed, seedHouseAds } = await import("./seed");
   try {
     await seed(db, { demo: false });
   } catch (e) {
     if (!/duplicate key|already exists/i.test(String(e))) throw e;
   }
+  try { await seedHouseAds(db); } catch { /* non-fatal */ }
 }
 
 async function createDb(): Promise<DB> {

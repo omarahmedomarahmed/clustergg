@@ -17,9 +17,8 @@ export default async function Footer() {
         <div>
           <div className="font-semibold mb-3 text-ink">Platform</div>
           <ul className="space-y-2 text-muted">
-            <li><Link href="/games" className="hover:text-ink">Games</Link></li>
+            <li><Link href="/planets" className="hover:text-ink">Planets</Link></li>
             <li><Link href="/leaderboards" className="hover:text-ink">Leaderboards</Link></li>
-            <li><Link href="/spaces" className="hover:text-ink">Spaces</Link></li>
             <li><Link href="/search" className="hover:text-ink">Find gamers</Link></li>
             <li><Link href="/signup" className="hover:text-ink">Create your profile</Link></li>
           </ul>

@@ -1,6 +1,7 @@
 import { asc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { savePartner, deletePartner } from "@/app/actions/admin";
+import ImageUpload from "@/components/ImageUpload";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Partners" };
@@ -21,8 +22,10 @@ export default async function AdminPartnersPage() {
         <h2 className="font-bold mb-4">Add partner</h2>
         <form action={savePartner} className="grid sm:grid-cols-2 gap-3">
           <input name="name" required placeholder="Partner name" className="input-cosmic" />
-          <input name="logoUrl" required placeholder="Logo image URL (transparent PNG/SVG ideal)" className="input-cosmic" />
           <input name="url" placeholder="Website link (optional)" className="input-cosmic" />
+          <div className="sm:col-span-2">
+            <ImageUpload name="logoUrl" label="Partner logo" aspect="16/9" maxDim={600} hint="Transparent PNG/SVG works best." />
+          </div>
           <input name="sortOrder" type="number" defaultValue={0} placeholder="Sort order" className="input-cosmic" />
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="isActive" defaultChecked className="accent-violet-500" /> Visible

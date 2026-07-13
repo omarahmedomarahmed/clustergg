@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { saveCreative, reviewCreative } from "@/app/actions/admin";
+import ImageUpload from "@/components/ImageUpload";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Creatives" };
@@ -22,7 +23,7 @@ export default async function AdminCreativesPage() {
       <div className="glass p-6 mb-8">
         <h2 className="font-bold mb-1">Upload creative</h2>
         <p className="text-xs text-muted mb-4">
-          Paste a hosted file URL (or data: URL). Video creatives are rejected above 5 seconds — plan §11 hard cap.
+          Upload the image straight from your device. For video, use &quot;paste a link&quot; — video creatives are rejected above 5 seconds (hard cap).
         </p>
         <form action={saveCreative} className="grid sm:grid-cols-2 gap-3">
           <select name="brandId" required className="input-cosmic">
@@ -34,8 +35,10 @@ export default async function AdminCreativesPage() {
             <option value="video">Video (max 5s)</option>
           </select>
           <input name="durationSeconds" type="number" max={5} placeholder="Duration s (video only)" className="input-cosmic" />
-          <input name="fileUrl" required placeholder="File URL" className="input-cosmic sm:col-span-2" />
-          <input name="clickUrl" placeholder="Click-through URL" className="input-cosmic" />
+          <div className="sm:col-span-2">
+            <ImageUpload name="fileUrl" label="Creative file" aspect="16/9" maxDim={1600} hint="Image is optimized on upload. Video: use “paste a link”." />
+          </div>
+          <input name="clickUrl" placeholder="Click-through URL" className="input-cosmic sm:col-span-2" />
           <div className="flex gap-2">
             <input name="width" type="number" placeholder="W px" className="input-cosmic" />
             <input name="height" type="number" placeholder="H px" className="input-cosmic" />

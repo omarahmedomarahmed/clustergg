@@ -48,11 +48,13 @@ export default function UserMenu({
               </div>
             </div>
           </Link>
-          <nav className="py-1.5" onClick={() => setOpen(false)}>
-            <Link href="/profile" className={item}><Icon name="edit" size={16} className="text-violet-300" /> Customize profile</Link>
-            <Link href="/settings/account" className={item}><Icon name="settings" size={16} className="text-violet-300" /> Settings</Link>
+          <nav className="py-1.5">
+            {/* Close per-link (not on the wrapper) so clicking Sign out does not
+                unmount the logout <form> before the server action submits. */}
+            <Link href="/profile" onClick={() => setOpen(false)} className={item}><Icon name="edit" size={16} className="text-violet-300" /> Customize profile</Link>
+            <Link href="/settings/account" onClick={() => setOpen(false)} className={item}><Icon name="settings" size={16} className="text-violet-300" /> Settings</Link>
             {canAdmin && (
-              <Link href="/admin" className={`${item} !text-amber-300 hover:!text-amber-200`}>
+              <Link href="/admin" onClick={() => setOpen(false)} className={`${item} !text-amber-300 hover:!text-amber-200`}>
                 <Icon name="shield" size={16} /> Mission Control
               </Link>
             )}

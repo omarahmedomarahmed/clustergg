@@ -4,10 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
+import { logout } from "@/app/actions/auth";
 
 export default function MobileMenu({
-  links, loggedIn,
-}: { links: { href: string; label: string; icon: string }[]; loggedIn: boolean }) {
+  links, loggedIn, profileSlug,
+}: { links: { href: string; label: string; icon: string }[]; loggedIn: boolean; profileSlug?: string | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -58,11 +59,23 @@ export default function MobileMenu({
                 );
               })}
             </nav>
-            <div className="mt-auto pt-6 border-t border-violet-400/15">
+            <div className="mt-auto pt-6 border-t border-violet-400/15 space-y-1">
               {loggedIn ? (
-                <Link href="/settings/connections" className="flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-muted hover:text-ink">
-                  <Icon name="link" size={18} /> Connections
-                </Link>
+                <>
+                  {profileSlug && (
+                    <Link href={`/u/${profileSlug}`} className="flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-muted hover:text-ink">
+                      <Icon name="user" size={18} /> My profile
+                    </Link>
+                  )}
+                  <Link href="/profile" className="flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-muted hover:text-ink">
+                    <Icon name="edit" size={18} /> Customize profile
+                  </Link>
+                  <form action={logout}>
+                    <button type="submit" className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-rose-300 hover:text-rose-200 text-left">
+                      <Icon name="logout" size={18} /> Sign out
+                    </button>
+                  </form>
+                </>
               ) : (
                 <Link href="/signup" className="glow-btn block rounded-full px-6 py-3 text-center font-semibold text-white">
                   Join the Cluster

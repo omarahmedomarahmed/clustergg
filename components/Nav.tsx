@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, count, eq, isNull } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
 import { getCurrentUser, isStaff } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import Icon from "@/components/Icon";
@@ -21,10 +21,21 @@ export default async function Nav() {
     .where(and(eq(schema.games.isActive, true), eq(schema.games.showInNav, true)))
     .orderBy(asc(schema.games.sortOrder)).limit(8);
 
+  // Resolve each nav game to its planet (community space) slug.
+  const navGameNames = navGames.map((g) => g.name);
+  const navSpaces = navGameNames.length
+    ? await db.select({ slug: schema.spaces.slug, game: schema.spaces.game }).from(schema.spaces)
+        .where(and(eq(schema.spaces.isActive, true), inArray(schema.spaces.game, navGameNames)))
+    : [];
+  const planetSlugByGame = new Map(navSpaces.filter((s) => s.game).map((s) => [s.game as string, s.slug]));
+  const planetHref = (g: typeof navGames[number]) => {
+    const s = planetSlugByGame.get(g.name);
+    return s ? `/planets/${s}` : `/games/${g.slug}`; // fallback redirects to a planet
+  };
+
   const links = [
-    { href: "/games", label: "Games", icon: "gamepad" },
+    { href: "/planets", label: "Planets", icon: "planet" },
     { href: "/leaderboards", label: "Leaderboards", icon: "chart" },
-    { href: "/spaces", label: "Spaces", icon: "users" },
     ...(user
       ? [{ href: "/feed", label: "Feed", icon: "home" }, { href: "/messages", label: "Messages", icon: "message" }]
       : []),
@@ -46,7 +57,7 @@ export default async function Nav() {
           {navGames.length > 0 && (
             <span className="flex items-center gap-2.5 border-l border-violet-400/20 pl-4">
               {navGames.map((g) => (
-                <Link key={g.id} href={`/games/${g.slug}`} title={g.name} className="opacity-80 hover:opacity-100 transition-all hover:scale-110">
+                <Link key={g.id} href={planetHref(g)} title={g.name} className="opacity-80 hover:opacity-100 transition-all hover:scale-110">
                   <GameLogo logoUrl={g.logoUrl} name={g.name} size={26} rounded="rounded-lg" />
                 </Link>
               ))}
@@ -83,7 +94,7 @@ export default async function Nav() {
               </Link>
             </>
           )}
-          <MobileMenu links={links} loggedIn={!!user} />
+          <MobileMenu links={links} loggedIn={!!user} profileSlug={user?.slug ?? null} />
         </div>
       </div>
     </header>

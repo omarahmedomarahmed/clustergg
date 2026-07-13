@@ -3,10 +3,21 @@
 import { useMemo, useState, useTransition } from "react";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
+import ImageUpload from "@/components/ImageUpload";
 import { saveProfileTheme } from "@/app/actions/connections";
 import {
-  ProfileTheme, resolveTheme, themeToVars, TEMPLATES, FONTS, CURSORS, SECTIONS, BG_PRESETS,
+  ProfileTheme, resolveTheme, themeToVars, bgStyle, TEMPLATES, FONTS, CURSORS, SECTIONS, BG_PRESETS,
 } from "@/lib/theme";
+
+export type PreviewData = {
+  accounts: { name: string; provider: string }[];
+  trophies: { title: string; game: string }[];
+  badges: { name: string }[];
+  challenges: { title: string; game: string }[];
+  spaces: { name: string }[];
+  postsCount: number;
+  standingsCount: number;
+};
 
 type Props = {
   slug: string;
@@ -16,6 +27,7 @@ type Props = {
   initialBio: string;
   initialAvatar: string;
   initialBanner: string;
+  previewData?: PreviewData;
 };
 
 const CARD_STYLES = ["glass", "solid", "outline", "flat"] as const;
@@ -36,7 +48,7 @@ function Swatch({ label, value, onChange }: { label: string; value: string; onCh
 }
 
 export default function ProfileBuilder({
-  slug, displayName, initialTheme, initialTitle, initialBio, initialAvatar, initialBanner,
+  slug, displayName, initialTheme, initialTitle, initialBio, initialAvatar, initialBanner, previewData,
 }: Props) {
   const [theme, setTheme] = useState<ProfileTheme>(() => resolveTheme(initialTheme));
   const [title, setTitle] = useState(initialTitle);
@@ -80,6 +92,41 @@ export default function ProfileBuilder({
     { k: "cursor", label: "Cursor", icon: "target" },
     { k: "identity", label: "Identity", icon: "user" },
   ] as const;
+
+  // Real content per section, styled with the live theme so the preview is
+  // exactly what visitors see. Falls back to a gentle hint when empty.
+  const pd = previewData;
+  const empty = (msg: string) => <div className="text-xs" style={{ color: theme.muted }}>{msg}</div>;
+  const chip = (label: string, i: number) => (
+    <span key={i} className="text-xs rounded-full px-2.5 py-1" style={{ background: `color-mix(in srgb, ${theme.accent} 16%, transparent)`, color: theme.text, border: `1px solid color-mix(in srgb, ${theme.accent} 35%, transparent)` }}>{label}</span>
+  );
+  const renderSection = (key: string): React.ReactNode => {
+    if (!pd) return empty("Your real content shows here.");
+    switch (key) {
+      case "accounts":
+        return pd.accounts.length
+          ? <div className="grid grid-cols-2 gap-2">{pd.accounts.map((a, i) => (
+              <div key={i} className="rounded-lg px-2.5 py-2 text-xs" style={{ background: `color-mix(in srgb, ${theme.accent} 10%, transparent)`, color: theme.text }}>
+                <div className="font-semibold truncate">{a.name}</div>
+                <div style={{ color: theme.muted }}>{a.provider}</div>
+              </div>))}</div>
+          : empty("No accounts linked yet — connect a game above.");
+      case "standings":
+        return pd.standingsCount ? empty(`Ranked across ${pd.standingsCount} game account${pd.standingsCount > 1 ? "s" : ""}.`) : empty("Link a game to appear on leaderboards.");
+      case "trophies":
+        return pd.trophies.length ? <div className="flex flex-wrap gap-1.5">{pd.trophies.map((t, i) => chip(t.title, i))}</div> : empty("Win a challenge to earn a trophy.");
+      case "badges":
+        return pd.badges.length ? <div className="flex flex-wrap gap-1.5">{pd.badges.map((b, i) => chip(b.name, i))}</div> : empty("No badges yet.");
+      case "challenges":
+        return pd.challenges.length ? <div className="flex flex-wrap gap-1.5">{pd.challenges.map((c, i) => chip(c.title, i))}</div> : empty("Not competing in any challenges right now.");
+      case "activity":
+        return pd.postsCount ? empty(`${pd.postsCount} post${pd.postsCount > 1 ? "s" : ""} across your planets.`) : empty("No posts yet.");
+      case "spaces":
+        return pd.spaces.length ? <div className="flex flex-wrap gap-1.5">{pd.spaces.map((s, i) => chip(s.name, i))}</div> : empty("Join a planet to show it here.");
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className="grid lg:grid-cols-[380px_1fr] gap-6">
@@ -138,10 +185,13 @@ export default function ProfileBuilder({
                     style={{ backgroundImage: `url("${b.url}")` }} />
                 ))}
               </div>
-              <input value={theme.bgImage ?? ""} onChange={(e) => set("bgImage", e.target.value || null)} placeholder="or paste any image URL" className="input-cosmic text-xs" />
+              <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1920} hint="Upload your own background image." />
             </div>
             <label className="text-xs text-muted flex items-center justify-between">Background blur
               <input type="range" min={0} max={20} value={theme.bgBlur} onChange={(e) => set("bgBlur", Number(e.target.value))} className="accent-violet-500 w-32" />
+            </label>
+            <label className="text-xs text-muted flex items-center justify-between">Background darken (overlay)
+              <input type="range" min={0} max={90} value={theme.bgOverlay} onChange={(e) => set("bgOverlay", Number(e.target.value))} className="accent-violet-500 w-32" />
             </label>
           </div>
         )}
@@ -227,14 +277,8 @@ export default function ProfileBuilder({
               <label className="text-xs text-muted">Bio</label>
               <textarea value={bio} onChange={(e) => { setBio(e.target.value); setSaved(false); }} rows={3} maxLength={400} className="input-cosmic mt-1" />
             </div>
-            <div>
-              <label className="text-xs text-muted">Avatar image URL</label>
-              <input value={avatarUrl} onChange={(e) => { setAvatarUrl(e.target.value); setSaved(false); }} placeholder="https://…" className="input-cosmic mt-1 text-xs" />
-            </div>
-            <div>
-              <label className="text-xs text-muted">Cover / banner image URL</label>
-              <input value={bannerUrl} onChange={(e) => { setBannerUrl(e.target.value); setSaved(false); }} placeholder="https://…" className="input-cosmic mt-1 text-xs" />
-            </div>
+            <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={512} hint="Square image works best." />
+            <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1600} hint="Wide image shown behind your name." />
           </div>
         )}
       </div>
@@ -248,7 +292,7 @@ export default function ProfileBuilder({
             style={{
               ...vars,
               cursor: previewCursor,
-              ...(theme.bgImage ? { backgroundImage: `url("${theme.bgImage}")`, backgroundSize: "cover", backgroundPosition: "center" } : {}),
+              ...bgStyle(theme),
             }}
           >
             {/* Cover */}
@@ -270,24 +314,16 @@ export default function ProfileBuilder({
                 <button className={`p-btn p-btn-${theme.buttonStyle === "neon" ? "glass" : "outline"}`}>Message</button>
               </div>
 
-              {/* Section previews in chosen order */}
+              {/* Section previews in chosen order — real content, live-themed */}
               <div className="mt-5 space-y-3">
                 {theme.order.filter((k) => theme.sections[k]).map((key) => {
                   const sec = SECTIONS.find((s) => s.key === key)!;
                   return (
                     <div key={key} className={`p-card p-card-${theme.cardStyle}`}>
-                      <div className="text-sm font-semibold flex items-center gap-2" style={{ color: theme.text }}>
+                      <div className="text-sm font-semibold flex items-center gap-2 mb-2" style={{ color: theme.text }}>
                         <span className="h-2 w-2 rounded-full" style={{ background: theme.accent }} /> {sec.label}
                       </div>
-                      <div className="text-xs mt-1.5" style={{ color: theme.muted }}>
-                        {key === "accounts" && "Your connected game accounts with live stats"}
-                        {key === "standings" && "Your rank on every leaderboard"}
-                        {key === "trophies" && "Challenge trophies you've won"}
-                        {key === "badges" && "Every badge you've earned"}
-                        {key === "challenges" && "Challenges you're competing in now"}
-                        {key === "activity" && "Your latest posts across spaces"}
-                        {key === "spaces" && "Communities you're part of"}
-                      </div>
+                      {renderSection(key)}
                     </div>
                   );
                 })}

@@ -14,8 +14,8 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
   {
     section: "Moderation",
     items: [
-      { href: "/admin/spaces", label: "Spaces" },
-      { href: "/admin/spaces/requests", label: "Space requests" },
+      { href: "/admin/spaces", label: "Planets" },
+      { href: "/admin/spaces/requests", label: "Planet requests" },
       { href: "/admin/challenges", label: "Challenges" },
     ],
   },
@@ -30,14 +30,13 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
   {
     section: "Competition",
     items: [
-      { href: "/admin/badges", label: "Badges", adminOnly: true },
-      { href: "/admin/leaderboards", label: "Leaderboards", adminOnly: true },
-      { href: "/admin/trophies", label: "Trophies", adminOnly: true },
+      { href: "/admin/badges", label: "Badges" },
+      { href: "/admin/leaderboards", label: "Leaderboards" },
+      { href: "/admin/trophies", label: "Trophies" },
     ],
   },
   {
     section: "Website (CMS)",
-    adminOnly: true,
     items: [
       { href: "/admin/content", label: "Site content" },
       { href: "/admin/games", label: "Games catalog" },
@@ -86,7 +85,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
           {!admin && (
             <div className="text-[10px] text-muted border border-amber-400/25 rounded-lg p-2">
-              Staff access: moderation of spaces & challenges, read-only elsewhere.
+              Staff access: edit planets, games, challenges, content, badges, trophies &amp; leaderboards. Ads, roles &amp; settings stay admin-only.
             </div>
           )}
           {nav.map((group) => (

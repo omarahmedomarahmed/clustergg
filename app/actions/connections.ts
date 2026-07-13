@@ -51,6 +51,7 @@ export async function linkGameAccount(_prev: LinkState, formData: FormData): Pro
   try { await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
 
   revalidatePath("/settings/connections");
+  revalidatePath("/profile");
   revalidatePath("/onboarding");
   return { ok: true };
 }
@@ -120,6 +121,7 @@ export async function mlbbConfirmLink(_prev: LinkState, formData: FormData): Pro
   try { await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
 
   revalidatePath("/settings/connections");
+  revalidatePath("/profile");
   revalidatePath("/onboarding");
   return { ok: true };
 }
@@ -132,6 +134,7 @@ export async function unlinkGameAccount(accountId: string) {
     eq(schema.linkedGameAccounts.userId, me.id),
   ));
   revalidatePath("/settings/connections");
+  revalidatePath("/profile");
 }
 
 export async function resyncGameAccount(accountId: string, path: string) {

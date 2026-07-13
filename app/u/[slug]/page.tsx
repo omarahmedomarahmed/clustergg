@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { getProvider } from "@/lib/providers/registry";
 import { syncUserAccountsIfStale } from "@/lib/sync";
-import { resolveTheme, themeToVars } from "@/lib/theme";
+import { resolveTheme, themeToVars, bgStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import { BadgeIcon } from "@/components/BadgeChip";
@@ -111,8 +111,15 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.accounts) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="gamepad" size={19} style={{ color: theme.accent }} /> Connected accounts</h2>
-            {accounts.length === 0 ? <div className={`${cardCls} text-center p-muted text-sm`}>No accounts linked yet.</div> : (
+            <div className="flex items-center justify-between mb-3 gap-3">
+              <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: theme.text }}><Icon name="gamepad" size={19} style={{ color: theme.accent }} /> Connected accounts</h2>
+              {isOwner && (
+                <Link href="/profile" className="text-xs rounded-full px-3 py-1.5 inline-flex items-center gap-1.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 40%, transparent)`, color: theme.accent }}>
+                  <Icon name="link" size={12} /> Connect a game
+                </Link>
+              )}
+            </div>
+            {accounts.length === 0 ? <div className={`${cardCls} text-center p-muted text-sm`}>{isOwner ? "No accounts linked yet — connect your first game." : "No accounts linked yet."}</div> : (
               <div className="grid sm:grid-cols-2 gap-4">
                 {accounts.map((a) => {
                   const p = getProvider(a.provider); const aStats = statsByAccount.get(a.id) ?? []; const st = standingsByAccount.get(a.id) ?? []; const caps = p?.capabilities ?? [];
@@ -201,7 +208,7 @@ export default async function ProfilePage({ params }: Props) {
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="message" size={19} style={{ color: theme.accent }} /> Recent posts</h2>
             <div className="space-y-2">
               {recentPosts.map(({ post, space }) => (
-                <Link key={post.id} href={`/spaces/${space.slug}`} className={`${cardCls} block`}>
+                <Link key={post.id} href={`/planets/${space.slug}`} className={`${cardCls} block`}>
                   <div className="text-xs p-muted mb-1">{space.name} · {timeAgo(post.createdAt)}</div>
                   <p className="text-sm line-clamp-2" style={{ color: theme.text }}>{post.body}</p>
                 </Link>
@@ -216,7 +223,7 @@ export default async function ProfilePage({ params }: Props) {
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="users" size={19} style={{ color: theme.accent }} /> My spaces</h2>
             <div className="flex flex-wrap gap-2">
               {spaceRows.map(({ s }) => (
-                <Link key={s.id} href={`/spaces/${s.slug}`} className="text-sm rounded-full px-3 py-1.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 30%, transparent)`, color: theme.text }}>{s.name}</Link>
+                <Link key={s.id} href={`/planets/${s.slug}`} className="text-sm rounded-full px-3 py-1.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 30%, transparent)`, color: theme.text }}>{s.name}</Link>
               ))}
             </div>
           </section>
@@ -228,7 +235,7 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <div
       className={`profile-root ${theme.bgImage ? "has-bg-image" : ""}`}
-      style={{ ...vars, ...(theme.bgImage ? { backgroundImage: `url("${theme.bgImage}")` } : {}) }}
+      style={{ ...vars, ...bgStyle(theme) }}
     >
       {adminView && (
         <div className="bg-amber-500/15 border-b border-amber-400/40 text-amber-200 text-sm text-center py-2 px-4">
