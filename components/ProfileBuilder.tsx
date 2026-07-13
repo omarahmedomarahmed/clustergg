@@ -3,9 +3,10 @@
 import { useMemo, useState, useTransition } from "react";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
+import ImageUpload from "@/components/ImageUpload";
 import { saveProfileTheme } from "@/app/actions/connections";
 import {
-  ProfileTheme, resolveTheme, themeToVars, TEMPLATES, FONTS, CURSORS, SECTIONS, BG_PRESETS,
+  ProfileTheme, resolveTheme, themeToVars, bgStyle, TEMPLATES, FONTS, CURSORS, SECTIONS, BG_PRESETS,
 } from "@/lib/theme";
 
 type Props = {
@@ -138,10 +139,13 @@ export default function ProfileBuilder({
                     style={{ backgroundImage: `url("${b.url}")` }} />
                 ))}
               </div>
-              <input value={theme.bgImage ?? ""} onChange={(e) => set("bgImage", e.target.value || null)} placeholder="or paste any image URL" className="input-cosmic text-xs" />
+              <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1920} hint="Upload your own background image." />
             </div>
             <label className="text-xs text-muted flex items-center justify-between">Background blur
               <input type="range" min={0} max={20} value={theme.bgBlur} onChange={(e) => set("bgBlur", Number(e.target.value))} className="accent-violet-500 w-32" />
+            </label>
+            <label className="text-xs text-muted flex items-center justify-between">Background darken (overlay)
+              <input type="range" min={0} max={90} value={theme.bgOverlay} onChange={(e) => set("bgOverlay", Number(e.target.value))} className="accent-violet-500 w-32" />
             </label>
           </div>
         )}
@@ -227,14 +231,8 @@ export default function ProfileBuilder({
               <label className="text-xs text-muted">Bio</label>
               <textarea value={bio} onChange={(e) => { setBio(e.target.value); setSaved(false); }} rows={3} maxLength={400} className="input-cosmic mt-1" />
             </div>
-            <div>
-              <label className="text-xs text-muted">Avatar image URL</label>
-              <input value={avatarUrl} onChange={(e) => { setAvatarUrl(e.target.value); setSaved(false); }} placeholder="https://…" className="input-cosmic mt-1 text-xs" />
-            </div>
-            <div>
-              <label className="text-xs text-muted">Cover / banner image URL</label>
-              <input value={bannerUrl} onChange={(e) => { setBannerUrl(e.target.value); setSaved(false); }} placeholder="https://…" className="input-cosmic mt-1 text-xs" />
-            </div>
+            <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={512} hint="Square image works best." />
+            <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1600} hint="Wide image shown behind your name." />
           </div>
         )}
       </div>
@@ -248,7 +246,7 @@ export default function ProfileBuilder({
             style={{
               ...vars,
               cursor: previewCursor,
-              ...(theme.bgImage ? { backgroundImage: `url("${theme.bgImage}")`, backgroundSize: "cover", backgroundPosition: "center" } : {}),
+              ...bgStyle(theme),
             }}
           >
             {/* Cover */}

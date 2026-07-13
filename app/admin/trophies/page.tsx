@@ -1,5 +1,6 @@
 import { getDb, schema } from "@/lib/db";
 import { saveTrophy, deleteTrophy } from "@/app/actions/admin";
+import ImageUpload from "@/components/ImageUpload";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Trophies" };
@@ -13,18 +14,20 @@ export default async function AdminTrophiesPage() {
       <h1 className="text-2xl font-bold mb-2">Trophy library</h1>
       <p className="text-sm text-muted mb-6">
         Prize art attached to challenges. Winners display their trophy on their profile.
-        Add game-themed trophies by pasting any hosted image URL.
+        Upload game-themed trophy images straight from your device.
       </p>
 
       <div className="glass p-6 mb-8">
         <h2 className="font-bold mb-4">Add trophy</h2>
         <form action={saveTrophy} className="grid sm:grid-cols-2 gap-3">
           <input name="name" required placeholder="Trophy name" className="input-cosmic" />
-          <input name="imageUrl" required placeholder="Image URL" className="input-cosmic" />
           <select name="tier" className="input-cosmic">
             {["gold", "silver", "bronze", "legendary"].map((t) => <option key={t}>{t}</option>)}
           </select>
-          <input name="game" placeholder="Game (optional — blank = universal)" className="input-cosmic" />
+          <input name="game" placeholder="Game (optional — blank = universal)" className="input-cosmic sm:col-span-2" />
+          <div className="sm:col-span-2">
+            <ImageUpload name="imageUrl" label="Trophy image" aspect="1/1" maxDim={700} hint="Transparent PNG of the trophy/cup." />
+          </div>
           <div><button className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">Add trophy</button></div>
         </form>
       </div>

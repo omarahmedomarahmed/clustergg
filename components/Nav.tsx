@@ -83,7 +83,7 @@ export default async function Nav() {
               </Link>
             </>
           )}
-          <MobileMenu links={links} loggedIn={!!user} />
+          <MobileMenu links={links} loggedIn={!!user} profileSlug={user?.slug ?? null} />
         </div>
       </div>
     </header>

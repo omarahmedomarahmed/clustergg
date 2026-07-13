@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { getProvider } from "@/lib/providers/registry";
 import { syncUserAccountsIfStale } from "@/lib/sync";
-import { resolveTheme, themeToVars } from "@/lib/theme";
+import { resolveTheme, themeToVars, bgStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import { BadgeIcon } from "@/components/BadgeChip";
@@ -228,7 +228,7 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <div
       className={`profile-root ${theme.bgImage ? "has-bg-image" : ""}`}
-      style={{ ...vars, ...(theme.bgImage ? { backgroundImage: `url("${theme.bgImage}")` } : {}) }}
+      style={{ ...vars, ...bgStyle(theme) }}
     >
       {adminView && (
         <div className="bg-amber-500/15 border-b border-amber-400/40 text-amber-200 text-sm text-center py-2 px-4">

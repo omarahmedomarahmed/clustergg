@@ -3,12 +3,15 @@
 // stylesheet on their public /u/[slug] page. Everything degrades to sane
 // cosmic defaults when a field is missing.
 
+import type { CSSProperties } from "react";
+
 export type ProfileTheme = {
   template: string;          // preset key applied as a starting point
   mode: "dark" | "light";
   bg: string;                // page background color
   bgImage: string | null;    // page background image URL
   bgBlur: number;            // 0-20 px backdrop blur over bg image
+  bgOverlay: number;         // 0-90 % dark overlay over bg image (readability)
   panel: string;             // card background color
   accent: string;            // primary accent
   accent2: string;           // secondary accent (gradients)
@@ -114,6 +117,7 @@ export const DEFAULT_THEME: ProfileTheme = {
   bg: "#04051a",
   bgImage: null,
   bgBlur: 0,
+  bgOverlay: 45,
   panel: "#0b0d26",
   accent: "#8b5cf6",
   accent2: "#22d3ee",
@@ -138,6 +142,20 @@ export function resolveTheme(raw: unknown): ProfileTheme {
     ...merged,
     sections: { ...DEFAULT_THEME.sections, ...(t.sections ?? {}) },
     order: Array.isArray(t.order) && t.order.length ? t.order : DEFAULT_THEME.order,
+  };
+}
+
+// Background style (image + dark overlay for readability) shared by the builder
+// preview and the public profile so they render identically.
+export function bgStyle(t: ProfileTheme): CSSProperties {
+  if (!t.bgImage) return {};
+  const a = Math.max(0, Math.min(90, t.bgOverlay ?? 0)) / 100;
+  const overlay = a > 0 ? `linear-gradient(rgba(0,0,0,${a}), rgba(0,0,0,${a})), ` : "";
+  return {
+    backgroundImage: `${overlay}url("${t.bgImage}")`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    backgroundAttachment: "fixed",
   };
 }
 

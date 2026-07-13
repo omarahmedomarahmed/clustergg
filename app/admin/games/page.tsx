@@ -2,6 +2,7 @@ import { asc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { saveGame, deleteGame } from "@/app/actions/admin";
 import GameLogo from "@/components/GameLogo";
+import ImageUpload from "@/components/ImageUpload";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Games" };
@@ -13,8 +14,8 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
       <input name="name" required defaultValue={game?.name} placeholder="Game name" className="input-cosmic" />
       <input name="sortOrder" type="number" defaultValue={game?.sortOrder ?? 0} placeholder="Sort order" className="input-cosmic" />
       <input name="description" defaultValue={game?.description} placeholder="Description" className="input-cosmic sm:col-span-2" />
-      <input name="logoUrl" defaultValue={game?.logoUrl ?? ""} placeholder="Logo image URL (square)" className="input-cosmic" />
-      <input name="coverUrl" defaultValue={game?.coverUrl ?? ""} placeholder="Cover image URL (wide)" className="input-cosmic" />
+      <ImageUpload name="logoUrl" defaultValue={game?.logoUrl ?? ""} label="Logo (square)" aspect="1/1" rounded="rounded-lg" maxDim={512} hint="Square game logo — shown in nav, cards and leaderboards." />
+      <ImageUpload name="coverUrl" defaultValue={game?.coverUrl ?? ""} label="Cover (wide)" aspect="16/9" maxDim={1600} hint="Wide banner shown on the game planet header." />
       <div className="flex gap-2 sm:col-span-2 items-center flex-wrap">
         <span className="text-xs text-muted">Cover framing:</span>
         <label className="text-xs text-muted flex items-center gap-1.5">
@@ -50,9 +51,8 @@ export default async function AdminGamesPage() {
     <div>
       <h1 className="text-2xl font-bold mb-2">Games catalog</h1>
       <p className="text-sm text-muted mb-6">
-        Logos, covers and framing shown across the site (homepage, game hubs, leaderboards,
-        spaces). Paste any hosted image URL — upload to your favorite host or reuse
-        Higgsfield generations.
+        Logos, covers and framing shown across the site (homepage, planets, leaderboards).
+        Upload images straight from your device — they&apos;re optimized automatically.
       </p>
 
       <div className="glass p-6 mb-8">
