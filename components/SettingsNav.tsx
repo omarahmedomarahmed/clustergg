@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const TABS = [
   { key: "account", href: "/settings/account", label: "Account" },
-  { key: "connections", href: "/settings/connections", label: "Connections" },
+  { key: "connections", href: "/profile", label: "Game accounts" },
   { key: "notifications", href: "/settings/notifications", label: "Notifications" },
   { key: "privacy", href: "/settings/privacy", label: "Privacy" },
 ];

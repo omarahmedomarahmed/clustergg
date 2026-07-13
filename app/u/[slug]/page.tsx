@@ -111,8 +111,15 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.accounts) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="gamepad" size={19} style={{ color: theme.accent }} /> Connected accounts</h2>
-            {accounts.length === 0 ? <div className={`${cardCls} text-center p-muted text-sm`}>No accounts linked yet.</div> : (
+            <div className="flex items-center justify-between mb-3 gap-3">
+              <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: theme.text }}><Icon name="gamepad" size={19} style={{ color: theme.accent }} /> Connected accounts</h2>
+              {isOwner && (
+                <Link href="/profile" className="text-xs rounded-full px-3 py-1.5 inline-flex items-center gap-1.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 40%, transparent)`, color: theme.accent }}>
+                  <Icon name="link" size={12} /> Connect a game
+                </Link>
+              )}
+            </div>
+            {accounts.length === 0 ? <div className={`${cardCls} text-center p-muted text-sm`}>{isOwner ? "No accounts linked yet — connect your first game." : "No accounts linked yet."}</div> : (
               <div className="grid sm:grid-cols-2 gap-4">
                 {accounts.map((a) => {
                   const p = getProvider(a.provider); const aStats = statsByAccount.get(a.id) ?? []; const st = standingsByAccount.get(a.id) ?? []; const caps = p?.capabilities ?? [];

@@ -35,7 +35,7 @@ export const SECTIONS = [
   { key: "badges", label: "Badges" },
   { key: "challenges", label: "Active challenges" },
   { key: "activity", label: "Recent posts" },
-  { key: "spaces", label: "My spaces" },
+  { key: "spaces", label: "My planets" },
 ] as const;
 
 export const FONTS: Record<string, string> = {
