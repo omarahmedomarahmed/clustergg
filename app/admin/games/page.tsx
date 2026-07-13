@@ -17,6 +17,9 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
       <input name="description" defaultValue={game?.description} placeholder="Description" className="input-cosmic sm:col-span-2" />
       <ImageUpload name="logoUrl" defaultValue={game?.logoUrl ?? ""} label="Logo (square)" aspect="1/1" rounded="rounded-lg" maxDim={256} quality={0.8} scope="game" hint="Square game logo — shown in nav, cards and leaderboards." />
       <div className="sm:col-span-2">
+        <ImageUpload name="planetImageUrl" defaultValue={game?.planetImageUrl ?? ""} label="Planet skin (interactive hero)" aspect="1/1" rounded="rounded-full" maxDim={1024} scope="game" hint="Square planet render (Higgsfield). When set, the game's planet page shows the interactive globe hero." />
+      </div>
+      <div className="sm:col-span-2">
         <CoverFramer name="coverUrl" defaultUrl={game?.coverUrl ?? ""} defaultAdjust={game?.coverAdjust} maxDim={1200}
           hint="Drag the image to reposition and use the zoom slider — the frame is exactly how it appears on the planet header." />
       </div>

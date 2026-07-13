@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { DB } from "./index";
 import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
@@ -422,6 +422,21 @@ const HOUSE_TAGLINES: { title: string; from: string; to: string; click: string }
   { title: "Join a planet. Find your crew.", from: "#9d174d", to: "#4c1d95", click: "/planets" },
   { title: "Your stats. Everywhere.", from: "#4338ca", to: "#0891b2", click: "/signup" },
 ];
+
+// ================= PLANET SKINS =================
+// Higgsfield-generated per-game planet heroes. Sets each game's planetImageUrl
+// once (idempotent — only fills when null, so admin edits are never clobbered).
+const HF_CDN = "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082";
+const PLANET_SKINS: Record<string, string> = {
+  "League of Legends": `${HF_CDN}/hf_20260713_214125_1f7f8ec6-ee58-4c5c-9c9b-3201f6bf47c6.png`,
+  "VALORANT": `${HF_CDN}/hf_20260713_214139_cba722cd-6ede-4996-b8a7-ae0315304705.png`,
+};
+export async function ensurePlanetSkins(db: DB) {
+  for (const [name, url] of Object.entries(PLANET_SKINS)) {
+    await db.update(schema.games).set({ planetImageUrl: url })
+      .where(and(eq(schema.games.name, name), isNull(schema.games.planetImageUrl)));
+  }
+}
 
 export async function seedHouseAds(db: DB) {
   const [exists] = await db.select({ id: schema.brands.id }).from(schema.brands)

@@ -375,6 +375,7 @@ export const games = pgTable("games", {
   description: text("description").notNull().default(""),
   logoUrl: text("logo_url"),
   coverUrl: text("cover_url"),
+  planetImageUrl: text("planet_image_url"), // per-game interactive planet hero skin
   coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
     .notNull().default({ zoom: 1, x: 50, y: 50 }),
   sortOrder: integer("sort_order").notNull().default(0),

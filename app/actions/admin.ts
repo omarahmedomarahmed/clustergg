@@ -397,6 +397,7 @@ export async function saveGame(formData: FormData) {
     description: String(formData.get("description") ?? "").trim(),
     logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
     coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
+    planetImageUrl: String(formData.get("planetImageUrl") ?? "").trim() || null,
     coverAdjust: {
       zoom: Number(formData.get("coverZoom")) || 1,
       x: Number(formData.get("coverX")) || 50,

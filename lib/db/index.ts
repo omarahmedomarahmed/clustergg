@@ -30,6 +30,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "allow_messages_from" text NOT NULL DEFAULT 'everyone'`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_notifications" boolean NOT NULL DEFAULT true`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "show_in_nav" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_image_url" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cadence" text NOT NULL DEFAULT 'custom'`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "hero_type" text NOT NULL DEFAULT 'image'`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "hero_url" text`,
@@ -53,9 +54,10 @@ async function ensureProvisioned(db: DB) {
     // our house ads exist (idempotent) so no ad placement is ever empty.
     await runColumnMigrations(db);
     try {
-      const { seedHouseAds } = await import("./seed");
+      const { seedHouseAds, ensurePlanetSkins } = await import("./seed");
       await seedHouseAds(db);
-    } catch { /* non-fatal — ads just won't backfill this boot */ }
+      await ensurePlanetSkins(db);
+    } catch { /* non-fatal — ads/skins just won't backfill this boot */ }
     return;
   }
   
@@ -69,13 +71,14 @@ async function ensureProvisioned(db: DB) {
     }
   }
   await runColumnMigrations(db);
-  const { seed, seedHouseAds } = await import("./seed");
+  const { seed, seedHouseAds, ensurePlanetSkins } = await import("./seed");
   try {
     await seed(db, { demo: false });
   } catch (e) {
     if (!/duplicate key|already exists/i.test(String(e))) throw e;
   }
   try { await seedHouseAds(db); } catch { /* non-fatal */ }
+  try { await ensurePlanetSkins(db); } catch { /* non-fatal */ }
 }
 
 async function createDb(): Promise<DB> {
@@ -94,6 +97,9 @@ async function createDb(): Promise<DB> {
   const db = drizzle(client, { schema }) as DB;
   const { DDL } = await import("./ddl");
   await client.exec(DDL);
+  // Apply the same idempotent column back-fills so demo mode matches the schema
+  // without hand-editing the static DDL for every new column.
+  await runColumnMigrations(db);
   const { seed } = await import("./seed");
   await seed(db, { demo: true });
   return db;
