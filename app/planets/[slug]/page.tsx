@@ -75,6 +75,30 @@ export default async function PlanetPage({
   const cover = game?.coverUrl ?? cms["banner.games"];
   const activeChallenges = challenges.filter((c) => c.status === "active");
 
+  // Live standings for each challenge on this planet (its own leaderboard).
+  const challengeIds = challenges.map((c) => c.id);
+  const parts = challengeIds.length
+    ? await db.select({
+        challengeId: schema.challengeParticipants.challengeId,
+        points: schema.challengeParticipants.currentPoints,
+        placement: schema.challengeParticipants.finalPlacement,
+        name: schema.users.displayName,
+        slug: schema.users.slug,
+        avatarUrl: schema.users.avatarUrl,
+      })
+      .from(schema.challengeParticipants)
+      .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
+      .where(and(inArray(schema.challengeParticipants.challengeId, challengeIds),
+        eq(schema.challengeParticipants.status, "active")))
+      .orderBy(desc(schema.challengeParticipants.currentPoints))
+      .limit(200)
+    : [];
+  const topByChallenge = new Map<string, typeof parts>();
+  for (const p of parts) {
+    const arr = topByChallenge.get(p.challengeId) ?? [];
+    if (arr.length < 5) { arr.push(p); topByChallenge.set(p.challengeId, arr); }
+  }
+
   return (
     <div>
       {/* ===== Hero ===== */}
@@ -141,39 +165,63 @@ export default async function PlanetPage({
         <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
           <div className="min-w-0 space-y-12">
             {/* Standings (only if this planet has a game) */}
+            {/* Leaderboard #1 — connected-account standings for this game */}
             {game && boards.length > 0 && (
               <section>
-                <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icon name="chart" size={20} className="text-cyan-300" /> Standings</h2>
+                <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Icon name="chart" size={20} className="text-cyan-300" /> {game.name} leaderboard</h2>
+                <p className="text-xs text-muted mb-4">Live standings from API-verified accounts. Switch stats below.</p>
                 <LeaderboardWidget boards={boards} activeMetric={stat} basePath={path} limit={25} />
               </section>
             )}
 
-            {/* Challenges */}
+            {/* Leaderboard #2 — challenges, each with its own live board */}
             <section>
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icon name="zap" size={20} className="text-amber-300" /> Challenges</h2>
+              <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Icon name="zap" size={20} className="text-amber-300" /> Challenges</h2>
+              <p className="text-xs text-muted mb-4">Time-based events on this planet — each with its own live leaderboard.</p>
               {challenges.length === 0 ? (
                 <div className="glass p-8 text-center text-muted text-sm">No challenges here yet — watch this planet.</div>
               ) : (
-                <div className="grid sm:grid-cols-2 gap-4">
-                  {challenges.map((ch) => (
-                    <Link key={ch.id} href={`${path}/challenges/${ch.id}`} className="glass card-lift overflow-hidden group">
-                      <div className="h-24 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
-                          style={{ backgroundImage: `url(${ch.coverUrl ?? cover})` }} />
-                        <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] to-transparent" />
-                        <span className={`absolute top-2 right-2 text-[10px] uppercase tracking-widest rounded-full px-2 py-0.5 border ${ch.status === "active" ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10" : "border-violet-400/40 text-muted bg-black/40"}`}>
-                          {ch.status === "active" ? "Live" : "Completed"}
-                        </span>
-                      </div>
-                      <div className="p-4">
-                        <div className="font-bold text-sm">{ch.title}</div>
-                        <div className="text-xs text-muted mt-1 flex items-center gap-1.5">
-                          <Icon name="clock" size={12} /> {ch.status === "active" ? `ends ${timeAgo(ch.endAt).replace(" ago", "")}` : `ended ${timeAgo(ch.endAt)}`}
-                          <span className="capitalize">· {ch.cadence}</span>
+                <div className="space-y-5">
+                  {challenges.map((ch) => {
+                    const top = topByChallenge.get(ch.id) ?? [];
+                    return (
+                      <div key={ch.id} className="glass overflow-hidden">
+                        <Link href={`${path}/challenges/${ch.id}`} className="block relative h-32 group overflow-hidden">
+                          <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                            style={{ backgroundImage: `url(${ch.coverUrl ?? cover})` }} />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/50 to-transparent" />
+                          <span className={`absolute top-3 right-3 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest rounded-full px-2.5 py-1 border ${ch.status === "active" ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10" : "border-violet-400/40 text-muted bg-black/40"}`}>
+                            {ch.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+                            {ch.status === "active" ? "Live" : "Completed"}
+                          </span>
+                          <div className="absolute bottom-3 left-4 right-4">
+                            <div className="font-bold text-lg drop-shadow">{ch.title}</div>
+                            <div className="text-xs text-muted inline-flex items-center gap-1.5">
+                              <Icon name="clock" size={11} /> {ch.status === "active" ? `ends ${timeAgo(ch.endAt).replace(" ago", "")}` : `ended ${timeAgo(ch.endAt)}`}
+                              <span className="capitalize">· {ch.cadence}</span>
+                            </div>
+                          </div>
+                        </Link>
+                        <div className="p-4">
+                          {top.length === 0 ? (
+                            <div className="text-xs text-cyan-300 inline-flex items-center gap-1.5"><Icon name="crown" size={12} /> Throne unclaimed — <Link href={`${path}/challenges/${ch.id}`} className="underline">be first to compete</Link></div>
+                          ) : (
+                            <div className="space-y-1.5">
+                              {top.map((t, i) => (
+                                <Link key={t.slug} href={`/u/${t.slug}`} className="flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-violet-500/10">
+                                  <span className={`rank-chip rank-chip-${i + 1} !h-6 !min-w-6 text-xs`}>{i + 1}</span>
+                                  <Avatar name={t.name} src={t.avatarUrl} size={24} />
+                                  <span className="text-sm truncate flex-1">{t.name}</span>
+                                  <span className="text-cyan-200 font-bold text-sm">{t.points} pts</span>
+                                </Link>
+                              ))}
+                              <Link href={`${path}/challenges/${ch.id}`} className="block text-center text-xs text-cyan-300 hover:underline pt-1">Full standings →</Link>
+                            </div>
+                          )}
                         </div>
                       </div>
-                    </Link>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </section>

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import Icon from "@/components/Icon";
+import { downscale } from "@/lib/downscale";
 
 /**
  * Real image upload used everywhere in place of a raw URL text box.
@@ -143,35 +144,3 @@ export default function ImageUpload({
   );
 }
 
-// Downscale + re-encode an image entirely in the browser so stored data URLs
-// stay small (logos ~10–40KB, covers ~100–250KB).
-function downscale(file: File, maxDim: number, quality: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxDim || height > maxDim) {
-          const scale = Math.min(maxDim / width, maxDim / height);
-          width = Math.round(width * scale);
-          height = Math.round(height * scale);
-        }
-        const canvas = document.createElement("canvas");
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return reject(new Error("no ctx"));
-        ctx.drawImage(img, 0, 0, width, height);
-        // PNG source with transparency (e.g. logos) → keep PNG; else WebP.
-        const isPng = file.type === "image/png";
-        const out = canvas.toDataURL(isPng ? "image/png" : "image/webp", quality);
-        resolve(out);
-      };
-      img.onerror = reject;
-      img.src = String(reader.result);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}

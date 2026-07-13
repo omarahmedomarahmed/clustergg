@@ -8,6 +8,7 @@ import { getProvider } from "@/lib/providers/registry";
 import { syncUserAccountsIfStale } from "@/lib/sync";
 import { resolveTheme, themeToVars, bgStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
+import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import { BadgeIcon } from "@/components/BadgeChip";
 import FollowButton from "@/components/FollowButton";
@@ -78,6 +79,14 @@ export default async function ProfilePage({ params }: Props) {
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(12),
   ]);
 
+  const games = await db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl }).from(schema.games);
+  const logoByGameName = new Map(games.map((g) => [g.name, g.logoUrl]));
+  const accountAvatar = (a: typeof accounts[number]): string | null => {
+    const pd = a.providerData as Record<string, unknown> | null;
+    const av = pd && (pd.avatar ?? pd.avatarUrl ?? pd.image);
+    return typeof av === "string" && av.startsWith("http") ? av : null;
+  };
+
   const accountIds = accounts.map((a) => a.id);
   const stats = accountIds.length ? await db.select().from(schema.statCurrent).where(inArray(schema.statCurrent.linkedAccountId, accountIds)) : [];
   const statsByAccount = new Map<string, typeof stats>();
@@ -126,7 +135,12 @@ export default async function ProfilePage({ params }: Props) {
                   return (
                     <div key={a.id} className={cardCls}>
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: `color-mix(in srgb, ${theme.accent} 20%, transparent)` }}><Icon name="gamepad" size={18} style={{ color: theme.accent }} /></div>
+                        {accountAvatar(a) ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={accountAvatar(a)!} alt="" className="h-10 w-10 rounded-xl object-cover border" style={{ borderColor: `color-mix(in srgb, ${theme.accent} 40%, transparent)` }} />
+                        ) : (
+                          <GameLogo logoUrl={logoByGameName.get(p?.game ?? "") ?? null} name={p?.game || p?.name || a.provider} size={40} rounded="rounded-xl" />
+                        )}
                         <div className="min-w-0"><div className="font-bold truncate" style={{ color: theme.text }}>{a.inGameName}</div><div className="text-xs p-muted">{p?.name ?? a.provider}</div></div>
                         {a.verified && <span className="ml-auto text-[11px]" style={{ color: theme.accent2 }}>✓ verified</span>}
                       </div>

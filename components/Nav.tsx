@@ -33,39 +33,42 @@ export default async function Nav() {
     return s ? `/planets/${s}` : `/games/${g.slug}`; // fallback redirects to a planet
   };
 
-  const links = [
-    { href: "/planets", label: "Planets", icon: "planet" },
-    { href: "/leaderboards", label: "Leaderboards", icon: "chart" },
-    ...(user
-      ? [{ href: "/feed", label: "Feed", icon: "home" }, { href: "/messages", label: "Messages", icon: "message" }]
-      : []),
+  // Nav is game-first: the only things in the bar are the game planets. Feed and
+  // "all planets" live in the mobile drawer for reachability.
+  const mobileLinks = [
+    ...(user ? [{ href: "/feed", label: "Home", icon: "home" }] : []),
+    { href: "/planets", label: "All planets", icon: "planet" },
+    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad" })),
+    ...(user ? [{ href: "/messages", label: "Messages", icon: "message" }] : []),
   ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4">
-        <Link href="/" className="flex items-center gap-2.5 shrink-0">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
+        <Link href={user ? "/feed" : "/"} className="flex items-center gap-2.5 shrink-0" aria-label="Cluster home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/assets/logo.png" alt="Cluster" width={34} height={34} className="rounded-full pulse-glow" />
-          <span className="text-lg font-bold tracking-wide grad-text">CLUSTER</span>
+          <span className="hidden sm:inline text-lg font-bold tracking-wide grad-text">CLUSTER</span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-5 text-sm text-muted">
-          {links.map((l) => (
-            <Link key={l.href} href={l.href} className="nav-link">{l.label}</Link>
+        {/* Game planets — the whole nav. Bigger, glorified logos. */}
+        <nav className="hidden md:flex items-center gap-2.5 flex-1 min-w-0 overflow-x-auto no-scrollbar">
+          {navGames.map((g) => (
+            <Link key={g.id} href={planetHref(g)} title={g.name}
+              className="group shrink-0 relative rounded-xl transition-transform hover:scale-110">
+              <span className="absolute -inset-1 rounded-xl bg-gradient-to-br from-violet-500/0 to-cyan-500/0 group-hover:from-violet-500/25 group-hover:to-cyan-500/25 blur-md transition-all" />
+              <GameLogo logoUrl={g.logoUrl} name={g.name} size={40} rounded="rounded-xl"
+                className="relative ring-1 ring-violet-400/25 group-hover:ring-cyan-400/60 shadow-lg" />
+            </Link>
           ))}
-          {navGames.length > 0 && (
-            <span className="flex items-center gap-2.5 border-l border-violet-400/20 pl-4">
-              {navGames.map((g) => (
-                <Link key={g.id} href={planetHref(g)} title={g.name} className="opacity-80 hover:opacity-100 transition-all hover:scale-110">
-                  <GameLogo logoUrl={g.logoUrl} name={g.name} size={26} rounded="rounded-lg" />
-                </Link>
-              ))}
-            </span>
-          )}
+          <Link href="/planets" title="All planets"
+            className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl border border-violet-400/25 text-muted hover:text-cyan-300 hover:border-cyan-400/50 transition-colors">
+            <Icon name="planet" size={18} />
+          </Link>
         </nav>
+        <div className="md:hidden flex-1" />
 
-        <div className="ml-auto flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <Link href="/search" aria-label="Search" className="hidden sm:flex text-muted hover:text-ink transition-colors">
             <Icon name="search" size={19} />
           </Link>
@@ -94,7 +97,7 @@ export default async function Nav() {
               </Link>
             </>
           )}
-          <MobileMenu links={links} loggedIn={!!user} profileSlug={user?.slug ?? null} />
+          <MobileMenu links={mobileLinks} loggedIn={!!user} profileSlug={user?.slug ?? null} />
         </div>
       </div>
     </header>

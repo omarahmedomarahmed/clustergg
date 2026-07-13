@@ -57,6 +57,7 @@ export default function ProfileBuilder({
   const [bannerUrl, setBannerUrl] = useState(initialBanner);
   const [tab, setTab] = useState<"theme" | "colors" | "layout" | "cursor" | "identity">("theme");
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const set = <K extends keyof ProfileTheme>(k: K, v: ProfileTheme[K]) => { setTheme((t) => ({ ...t, [k]: v })); setSaved(false); };
@@ -78,8 +79,13 @@ export default function ProfileBuilder({
   };
 
   const save = () => start(async () => {
-    await saveProfileTheme(theme as unknown as Record<string, unknown>, { title, bio, avatarUrl, bannerUrl });
-    setSaved(true);
+    setSaveError(null);
+    try {
+      await saveProfileTheme(theme as unknown as Record<string, unknown>, { title, bio, avatarUrl, bannerUrl });
+      setSaved(true);
+    } catch {
+      setSaveError("Couldn't save — an image may be too large. Try a smaller one.");
+    }
   });
 
   const vars = useMemo(() => themeToVars(theme) as React.CSSProperties, [theme]);
@@ -129,26 +135,28 @@ export default function ProfileBuilder({
   };
 
   return (
-    <div className="grid lg:grid-cols-[380px_1fr] gap-6">
-      {/* ===== Controls ===== */}
-      <div className="glass p-5 h-fit lg:sticky lg:top-20">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-bold flex items-center gap-2"><Icon name="edit" size={18} className="text-cyan-300" /> Profile Builder</h2>
-          <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">
-            {pending ? "Saving…" : saved ? "Saved ✓" : "Save"}
-          </button>
-        </div>
-
-        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-          {tabs.map((t) => (
-            <button key={t.k} onClick={() => setTab(t.k)} className={`stat-tab ${tab === t.k ? "stat-tab-active" : ""}`}>
-              {t.label}
+    <div className="space-y-6">
+      {/* ===== Controls: full-width sticky banner, no horizontal scroll ===== */}
+      <div className="glass p-4 md:p-5 sticky top-16 z-30 border border-violet-400/25">
+        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+          <div className="flex flex-wrap gap-2">
+            {tabs.map((t) => (
+              <button key={t.k} onClick={() => setTab(t.k)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium border transition-colors ${tab === t.k ? "border-cyan-400/70 bg-cyan-400/10 text-cyan-200" : "border-violet-400/25 text-muted hover:text-ink hover:border-violet-400/50"}`}>
+                <Icon name={t.icon} size={15} /> {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-3">
+            {saveError && <span className="text-xs text-rose-300">{saveError}</span>}
+            <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">
+              {pending ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
             </button>
-          ))}
+          </div>
         </div>
 
         {tab === "theme" && (
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
             {TEMPLATES.map((t) => {
               const rt = resolveTheme({ ...t.theme, template: t.key });
               return (
@@ -168,16 +176,18 @@ export default function ProfileBuilder({
         )}
 
         {tab === "colors" && (
-          <div className="space-y-3">
-            <Swatch label="Page background" value={theme.bg} onChange={(v) => set("bg", v)} />
-            <Swatch label="Card background" value={theme.panel} onChange={(v) => set("panel", v)} />
-            <Swatch label="Accent" value={theme.accent} onChange={(v) => set("accent", v)} />
-            <Swatch label="Accent 2 (gradients)" value={theme.accent2} onChange={(v) => set("accent2", v)} />
-            <Swatch label="Text" value={theme.text} onChange={(v) => set("text", v)} />
-            <Swatch label="Muted text" value={theme.muted} onChange={(v) => set("muted", v)} />
-            <div>
-              <label className="text-xs text-muted block mb-1.5">Background image</label>
-              <div className="grid grid-cols-4 gap-1.5 mb-2">
+          <div className="grid lg:grid-cols-[1fr_1.2fr] gap-x-8 gap-y-5 items-start">
+            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+              <Swatch label="Page background" value={theme.bg} onChange={(v) => set("bg", v)} />
+              <Swatch label="Card background" value={theme.panel} onChange={(v) => set("panel", v)} />
+              <Swatch label="Accent" value={theme.accent} onChange={(v) => set("accent", v)} />
+              <Swatch label="Accent 2 (gradients)" value={theme.accent2} onChange={(v) => set("accent2", v)} />
+              <Swatch label="Text" value={theme.text} onChange={(v) => set("text", v)} />
+              <Swatch label="Muted text" value={theme.muted} onChange={(v) => set("muted", v)} />
+            </div>
+            <div className="space-y-3">
+              <label className="text-xs text-muted block">Page background image</label>
+              <div className="grid grid-cols-5 gap-1.5">
                 <button onClick={() => set("bgImage", null)} className={`h-10 rounded-lg border text-[9px] ${!theme.bgImage ? "border-cyan-400/70" : "border-violet-400/20"}`} style={{ background: theme.bg }}>None</button>
                 {BG_PRESETS.map((b) => (
                   <button key={b.url} onClick={() => set("bgImage", b.url)} title={b.name}
@@ -185,19 +195,19 @@ export default function ProfileBuilder({
                     style={{ backgroundImage: `url("${b.url}")` }} />
                 ))}
               </div>
-              <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1920} hint="Upload your own background image." />
+              <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1280} quality={0.72} hint="Upload your own background image (auto-optimized)." />
+              <label className="text-xs text-muted flex items-center justify-between gap-3">Background blur
+                <input type="range" min={0} max={20} value={theme.bgBlur} onChange={(e) => set("bgBlur", Number(e.target.value))} className="accent-violet-500 flex-1 max-w-48" />
+              </label>
+              <label className="text-xs text-muted flex items-center justify-between gap-3">Background darken (overlay)
+                <input type="range" min={0} max={90} value={theme.bgOverlay} onChange={(e) => set("bgOverlay", Number(e.target.value))} className="accent-violet-500 flex-1 max-w-48" />
+              </label>
             </div>
-            <label className="text-xs text-muted flex items-center justify-between">Background blur
-              <input type="range" min={0} max={20} value={theme.bgBlur} onChange={(e) => set("bgBlur", Number(e.target.value))} className="accent-violet-500 w-32" />
-            </label>
-            <label className="text-xs text-muted flex items-center justify-between">Background darken (overlay)
-              <input type="range" min={0} max={90} value={theme.bgOverlay} onChange={(e) => set("bgOverlay", Number(e.target.value))} className="accent-violet-500 w-32" />
-            </label>
           </div>
         )}
 
         {tab === "layout" && (
-          <div className="space-y-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4 items-start">
             <div>
               <label className="text-xs text-muted block mb-1.5">Card style</label>
               <div className="flex flex-wrap gap-1.5">
@@ -225,9 +235,9 @@ export default function ProfileBuilder({
                 {AVATAR_SHAPES.map((s) => <button key={s} onClick={() => set("avatarShape", s)} className={`stat-tab capitalize ${theme.avatarShape === s ? "stat-tab-active" : ""}`}>{s}</button>)}
               </div>
             </div>
-            <div>
-              <label className="text-xs text-muted block mb-2">Sections — show, hide & reorder</label>
-              <div className="space-y-1.5">
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className="text-xs text-muted block mb-2">Sections — show, hide &amp; reorder</label>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
                 {theme.order.map((key, i) => {
                   const sec = SECTIONS.find((s) => s.key === key);
                   if (!sec) return null;
@@ -251,7 +261,7 @@ export default function ProfileBuilder({
         {tab === "cursor" && (
           <div className="space-y-4">
             <p className="text-xs text-muted">Anyone who opens your profile sees this cursor.</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2">
               {CURSOR_KEYS.map((c) => (
                 <button key={c} onClick={() => set("cursor", c)}
                   className={`rounded-lg border p-4 text-center capitalize text-xs ${theme.cursor === c ? "border-cyan-400/70 bg-cyan-400/10" : "border-violet-400/20"}`}
@@ -268,17 +278,21 @@ export default function ProfileBuilder({
         )}
 
         {tab === "identity" && (
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-muted">Flex title (under your name)</label>
-              <input value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} maxLength={60} placeholder="e.g. Blitz Grandmaster" className="input-cosmic mt-1" />
+          <div className="grid md:grid-cols-2 gap-x-8 gap-y-4 items-start">
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted">Flex title (under your name)</label>
+                <input value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} maxLength={60} placeholder="e.g. Blitz Grandmaster" className="input-cosmic mt-1" />
+              </div>
+              <div>
+                <label className="text-xs text-muted">Bio</label>
+                <textarea value={bio} onChange={(e) => { setBio(e.target.value); setSaved(false); }} rows={3} maxLength={400} className="input-cosmic mt-1" />
+              </div>
             </div>
-            <div>
-              <label className="text-xs text-muted">Bio</label>
-              <textarea value={bio} onChange={(e) => { setBio(e.target.value); setSaved(false); }} rows={3} maxLength={400} className="input-cosmic mt-1" />
+            <div className="space-y-4">
+              <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={480} quality={0.82} hint="Square image works best." />
+              <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1280} quality={0.78} hint="Wide image shown behind your name." />
             </div>
-            <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={512} hint="Square image works best." />
-            <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1600} hint="Wide image shown behind your name." />
           </div>
         )}
       </div>
