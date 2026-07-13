@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { linkGameAccount } from "@/app/actions/connections";
 import Icon from "@/components/Icon";
+import GameLogo from "@/components/GameLogo";
 import MlbbLinkForm from "@/components/MlbbLinkForm";
 
 export type ProviderInfo = {
@@ -21,7 +22,7 @@ export type ProviderInfo = {
 
 const RIOT_REGIONS = ["euw", "na", "eune", "kr", "br", "jp", "lan", "las", "oce", "tr", "ru", "me"];
 
-export default function LinkAccountForm({ providers }: { providers: ProviderInfo[] }) {
+export default function LinkAccountForm({ providers, gameLogos = {} }: { providers: ProviderInfo[]; gameLogos?: Record<string, string | null> }) {
   const [selected, setSelected] = useState<ProviderInfo | null>(null);
   const [state, action, pending] = useActionState(linkGameAccount, undefined);
 
@@ -35,8 +36,8 @@ export default function LinkAccountForm({ providers }: { providers: ProviderInfo
             onClick={() => setSelected(p)}
             className={`glass glass-hover p-3 text-left ${selected?.id === p.id ? "!border-cyan-400/70" : ""} ${!p.live ? "opacity-55" : ""}`}
           >
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-violet-400/25 bg-violet-600/15 shrink-0"><Icon name="gamepad" size={15} className="text-violet-200" /></span>
+            <div className="flex items-center gap-2.5">
+              <GameLogo logoUrl={gameLogos[p.id] ?? null} name={p.game || p.name} size={34} rounded="rounded-lg" />
               <div className="min-w-0">
                 <div className="text-sm font-semibold truncate">{p.name}</div>
                 <div className={`text-[10px] uppercase tracking-wider ${p.live ? "text-emerald-300" : "text-amber-300/80"}`}>
