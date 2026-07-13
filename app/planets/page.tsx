@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
+import { slimImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Planets" };
@@ -43,16 +44,16 @@ export default async function PlanetsDirectory() {
           return (
             <Link key={s.id} href={`/planets/${s.slug}`} className="glass card-lift overflow-hidden flex flex-col group">
               <div className="h-28 relative overflow-hidden">
-                {g?.coverUrl ? (
+                {slimImg(g?.coverUrl) ? (
                   <div className="absolute inset-0 bg-cover transition-transform duration-500 group-hover:scale-110"
-                    style={{ backgroundImage: `url(${g.coverUrl})`, backgroundPosition: `${g.coverAdjust.x}% ${g.coverAdjust.y}%` }} />
+                    style={{ backgroundImage: `url(${slimImg(g!.coverUrl)})`, backgroundPosition: `${g!.coverAdjust.x}% ${g!.coverAdjust.y}%` }} />
                 ) : (
                   <div className="absolute inset-0 bg-cover" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/40 to-transparent" />
                 <div className="absolute bottom-3 left-4 flex items-center gap-3">
                   {g ? (
-                    <GameLogo logoUrl={g.logoUrl} name={s.name} size={44} />
+                    <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={44} />
                   ) : (
                     <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-violet-400/25 bg-gradient-to-br from-violet-600/40 to-fuchsia-600/30">
                       <Icon name="planet" size={20} className="text-violet-100" />

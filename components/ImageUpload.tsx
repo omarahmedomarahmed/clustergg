@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { downscale } from "@/lib/downscale";
+import { uploadImage } from "@/lib/upload-client";
 
 /**
  * Real image upload used everywhere in place of a raw URL text box.
@@ -26,6 +27,7 @@ export default function ImageUpload({
   maxDim = 1280,
   quality = 0.85,
   hint,
+  scope = "misc",
 }: {
   /** Form mode: renders a hidden input so a server action reads formData.get(name). */
   name?: string;
@@ -39,6 +41,8 @@ export default function ImageUpload({
   maxDim?: number;
   quality?: number;
   hint?: string;
+  /** Upload bucket + permission scope (e.g. "game", "profile", "trophy"). */
+  scope?: string;
 }) {
   const controlled = onChange !== undefined;
   const [internal, setInternal] = useState(defaultValue ?? "");
@@ -58,7 +62,7 @@ export default function ImageUpload({
     setBusy(true);
     try {
       const dataUrl = await downscale(file, maxDim, quality);
-      setValue(dataUrl);
+      setValue(await uploadImage(dataUrl, scope));
     } catch {
       setError("Couldn't read that image. Try another file.");
     } finally {

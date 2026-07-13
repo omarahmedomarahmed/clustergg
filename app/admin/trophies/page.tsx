@@ -26,7 +26,7 @@ export default async function AdminTrophiesPage() {
           </select>
           <input name="game" placeholder="Game (optional — blank = universal)" className="input-cosmic sm:col-span-2" />
           <div className="sm:col-span-2">
-            <ImageUpload name="imageUrl" label="Trophy image" aspect="1/1" maxDim={700} hint="Transparent PNG of the trophy/cup." />
+            <ImageUpload name="imageUrl" label="Trophy image" aspect="1/1" maxDim={700} scope="trophy" hint="Transparent PNG of the trophy/cup." />
           </div>
           <div><button className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">Add trophy</button></div>
         </form>
