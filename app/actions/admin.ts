@@ -54,7 +54,7 @@ export async function adminResyncAccount(accountId: string) {
 
 // ---------- Badges ----------
 export async function saveBadge(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   const badgeId = String(formData.get("badgeId") ?? "");
   let criteria: Record<string, unknown> = {};
@@ -80,7 +80,7 @@ export async function saveBadge(formData: FormData) {
 }
 
 export async function deleteBadge(badgeId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   await db.delete(schema.badges).where(eq(schema.badges.id, badgeId));
   await audit(admin.id, "badge.delete", "badge", badgeId);
@@ -89,7 +89,7 @@ export async function deleteBadge(badgeId: string) {
 
 // ---------- Spaces ----------
 export async function saveSpace(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   const spaceId = String(formData.get("spaceId") ?? "");
   const values = {
@@ -356,7 +356,7 @@ export async function savePlacement(formData: FormData) {
 
 // ---------- Leaderboards ----------
 export async function saveLeaderboard(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   const lbId = String(formData.get("lbId") ?? "");
   const values = {
@@ -380,7 +380,7 @@ export async function saveLeaderboard(formData: FormData) {
 }
 
 export async function deleteLeaderboard(lbId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   await db.delete(schema.leaderboards).where(eq(schema.leaderboards.id, lbId));
   await audit(admin.id, "leaderboard.delete", "leaderboard", lbId);
@@ -389,7 +389,7 @@ export async function deleteLeaderboard(lbId: string) {
 
 // ---------- Games catalog ----------
 export async function saveGame(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   const gameId = String(formData.get("gameId") ?? "");
   const values = {
@@ -420,7 +420,7 @@ export async function saveGame(formData: FormData) {
 }
 
 export async function deleteGame(gameId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   await db.delete(schema.games).where(eq(schema.games.id, gameId));
   await audit(admin.id, "game.delete", "game", gameId);
@@ -430,7 +430,7 @@ export async function deleteGame(gameId: string) {
 
 // ---------- Partners ("Trusted by") ----------
 export async function savePartner(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   const partnerId = String(formData.get("partnerId") ?? "");
   const values = {
@@ -453,7 +453,7 @@ export async function savePartner(formData: FormData) {
 }
 
 export async function deletePartner(partnerId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   await db.delete(schema.partners).where(eq(schema.partners.id, partnerId));
   await audit(admin.id, "partner.delete", "partner", partnerId);
@@ -463,7 +463,7 @@ export async function deletePartner(partnerId: string) {
 
 // ---------- Trophies ----------
 export async function saveTrophy(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   const trophyId = String(formData.get("trophyId") ?? "");
   const values = {
@@ -484,7 +484,7 @@ export async function saveTrophy(formData: FormData) {
 }
 
 export async function deleteTrophy(trophyId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const db = await getDb();
   await db.delete(schema.trophies).where(eq(schema.trophies.id, trophyId));
   await audit(admin.id, "trophy.delete", "trophy", trophyId);
@@ -493,7 +493,7 @@ export async function deleteTrophy(trophyId: string) {
 
 // ---------- Site content (CMS) ----------
 export async function saveContent(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const { setContent } = await import("@/lib/cms");
   for (const [key, value] of formData.entries()) {
     if (key.startsWith("content:") && typeof value === "string") {
