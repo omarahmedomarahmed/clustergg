@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import type { DB } from "./index";
 import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
@@ -403,7 +404,60 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     reason: "Big RL community with real rank APIs available via TRN — perfect fit for challenges.",
   });
   await db.insert(schema.notifications).values([
-    { id: uid(), userId: nova, type: "challenge", title: "Blitz Supernova is live!", body: "The weekly wins race has begun. Points sync automatically.", href: "/spaces/chess" },
+    { id: uid(), userId: nova, type: "challenge", title: "Blitz Supernova is live!", body: "The weekly wins race has begun. Points sync automatically.", href: "/planets/chess" },
     { id: uid(), userId: nova, type: "follow", title: "Orion started following you", href: "/u/orion" },
   ]);
+}
+
+// ================= HOUSE ADS (production + demo) =================
+// Runs on every boot (idempotent — gated on the house brand existing). Fills
+// EVERY ad placement with our own Cluster creatives so no slot is ever empty,
+// for guests and signed-in gamers alike. Admin-sold campaigns outrank these
+// (house ads are priority 0) so real inventory always wins; house ads backfill.
+const HOUSE_BRAND_ID = "house-cluster-brand";
+const HOUSE_TAGLINES: { title: string; from: string; to: string; click: string }[] = [
+  { title: "Every game. One identity.", from: "#4c1d95", to: "#0e7490", click: "/signup" },
+  { title: "Compete. Climb. Conquer.", from: "#7c2d12", to: "#4c1d95", click: "/planets" },
+  { title: "Build your gamer profile.", from: "#0e7490", to: "#7c3aed", click: "/signup" },
+  { title: "Join a planet. Find your crew.", from: "#9d174d", to: "#4c1d95", click: "/planets" },
+  { title: "Your stats. Everywhere.", from: "#4338ca", to: "#0891b2", click: "/signup" },
+];
+
+export async function seedHouseAds(db: DB) {
+  const [exists] = await db.select({ id: schema.brands.id }).from(schema.brands)
+    .where(eq(schema.brands.id, HOUSE_BRAND_ID)).limit(1);
+  if (exists) return;
+
+  // Ensure the feed rail placement exists (added with the feed redesign).
+  await db.insert(schema.adPlacements).values({
+    id: uid(), key: "feed_sidebar", pageScope: "Feed right rail", device: "desktop",
+    width: 300, height: 250, mobileWidth: null, mobileHeight: null,
+  }).onConflictDoNothing();
+
+  await db.insert(schema.brands).values({
+    id: HOUSE_BRAND_ID, name: "Cluster", industry: "gaming", status: "active", logoUrl: BANNER_ART.logo,
+  }).onConflictDoNothing();
+
+  const campId = uid();
+  await db.insert(schema.adCampaigns).values({
+    id: campId, brandId: HOUSE_BRAND_ID, name: "Cluster House Promos",
+    startDate: new Date("2020-01-01"), endDate: new Date("2100-01-01"),
+    targetDevice: "both", status: "active",
+  });
+
+  const placements = await db.select().from(schema.adPlacements);
+  let i = 0;
+  for (const p of placements) {
+    const t = HOUSE_TAGLINES[i % HOUSE_TAGLINES.length];
+    i++;
+    const crId = uid();
+    await db.insert(schema.adCreatives).values({
+      id: crId, brandId: HOUSE_BRAND_ID, name: `Cluster · ${p.key}`, type: "image",
+      fileUrl: svgAd(p.width, p.height, t.from, t.to, "CLUSTER", t.title),
+      clickUrl: t.click, width: p.width, height: p.height, status: "approved",
+    });
+    await db.insert(schema.adCampaignCreatives).values({
+      id: uid(), campaignId: campId, creativeId: crId, placementId: p.id, weight: 1, priority: 0,
+    });
+  }
 }
