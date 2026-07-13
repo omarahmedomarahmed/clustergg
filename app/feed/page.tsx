@@ -45,7 +45,7 @@ export default async function FeedPage() {
         <div className="glass p-10 text-center text-muted">
           <p>Your feed is empty space.</p>
           <p className="mt-2 text-sm">
-            <Link href="/spaces" className="text-cyan-300 underline">Join some spaces</Link> or{" "}
+            <Link href="/planets" className="text-cyan-300 underline">Explore planets</Link> or{" "}
             <Link href="/search" className="text-cyan-300 underline">follow gamers</Link> to light it up.
           </p>
         </div>

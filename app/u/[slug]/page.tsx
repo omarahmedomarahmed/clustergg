@@ -201,7 +201,7 @@ export default async function ProfilePage({ params }: Props) {
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="message" size={19} style={{ color: theme.accent }} /> Recent posts</h2>
             <div className="space-y-2">
               {recentPosts.map(({ post, space }) => (
-                <Link key={post.id} href={`/spaces/${space.slug}`} className={`${cardCls} block`}>
+                <Link key={post.id} href={`/planets/${space.slug}`} className={`${cardCls} block`}>
                   <div className="text-xs p-muted mb-1">{space.name} · {timeAgo(post.createdAt)}</div>
                   <p className="text-sm line-clamp-2" style={{ color: theme.text }}>{post.body}</p>
                 </Link>
@@ -216,7 +216,7 @@ export default async function ProfilePage({ params }: Props) {
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="users" size={19} style={{ color: theme.accent }} /> My spaces</h2>
             <div className="flex flex-wrap gap-2">
               {spaceRows.map(({ s }) => (
-                <Link key={s.id} href={`/spaces/${s.slug}`} className="text-sm rounded-full px-3 py-1.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 30%, transparent)`, color: theme.text }}>{s.name}</Link>
+                <Link key={s.id} href={`/planets/${s.slug}`} className="text-sm rounded-full px-3 py-1.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 30%, transparent)`, color: theme.text }}>{s.name}</Link>
               ))}
             </div>
           </section>

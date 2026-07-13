@@ -154,7 +154,7 @@ export default async function LandingPage() {
                 </h2>
                 <p className="text-muted mt-2 max-w-xl">{c["section.challenges.subtitle"]}</p>
               </div>
-              <Link href="/spaces" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">All challenges</Link>
+              <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">All challenges</Link>
             </div>
 
             <div className="grid md:grid-cols-3 gap-5">
@@ -163,7 +163,7 @@ export default async function LandingPage() {
                 return (
                   <Link
                     key={challenge.id}
-                    href={`/spaces/${space.slug}/challenges/${challenge.id}`}
+                    href={`/planets/${space.slug}/challenges/${challenge.id}`}
                     className="event-card glass card-lift overflow-hidden group relative block"
                   >
                     <div className="h-40 relative overflow-hidden">
@@ -229,7 +229,7 @@ export default async function LandingPage() {
             </h2>
             <p className="text-muted mt-2 max-w-xl">{c["section.games.subtitle"]}</p>
           </div>
-          <Link href="/games" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">All games</Link>
+          <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">All planets</Link>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
           {games.map((g, i) => (

@@ -8,9 +8,9 @@ export default function RequestSpacePage() {
   return (
     <div className="mx-auto max-w-lg px-4 py-16">
       <div className="glass p-8">
-        <h1 className="text-2xl font-bold">Propose a <span className="grad-text">new space</span></h1>
+        <h1 className="text-2xl font-bold">Propose a <span className="grad-text">new planet</span></h1>
         <p className="text-sm text-muted mt-2">
-          Mission Control reviews every proposal. Approved spaces launch with their own feed —
+          Mission Control reviews every proposal. Approved planets launch with their own feed —
           and a leaderboard if the game has an API.
         </p>
         {state?.ok ? (
@@ -20,9 +20,9 @@ export default function RequestSpacePage() {
           </div>
         ) : (
           <form action={action} className="mt-6 space-y-4">
-            <input name="proposedName" required placeholder="Space name (e.g. Rocket League)" className="input-cosmic" />
+            <input name="proposedName" required placeholder="Planet name (e.g. Rocket League)" className="input-cosmic" />
             <textarea
-              name="reason" required rows={4} placeholder="Why should this space exist? Does the game have a public stats API?"
+              name="reason" required rows={4} placeholder="Why should this planet exist? Does the game have a public stats API?"
               className="input-cosmic resize-none"
             />
             {state?.error && <p className="text-sm text-rose-300">{state.error}</p>}

@@ -14,8 +14,8 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
   {
     section: "Moderation",
     items: [
-      { href: "/admin/spaces", label: "Spaces" },
-      { href: "/admin/spaces/requests", label: "Space requests" },
+      { href: "/admin/spaces", label: "Planets" },
+      { href: "/admin/spaces/requests", label: "Planet requests" },
       { href: "/admin/challenges", label: "Challenges" },
     ],
   },

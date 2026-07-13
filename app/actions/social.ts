@@ -67,7 +67,7 @@ export async function createPost(spaceId: string, spaceSlug: string, formData: F
     .where(eq(schema.spaces.id, spaceId));
   await db.insert(schema.spaceMembers).values({ spaceId, userId: me.id }).onConflictDoNothing();
   try { await recomputeExpertScores(db, spaceId); await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
-  revalidatePath(`/spaces/${spaceSlug}`);
+  revalidatePath(`/planets/${spaceSlug}`);
 }
 
 export async function reactToPost(postId: string, reactionType: "like" | "dislike" | "meh", path: string) {

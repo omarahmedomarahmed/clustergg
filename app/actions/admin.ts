@@ -110,7 +110,7 @@ export async function saveSpace(formData: FormData) {
     await audit(admin.id, "space.create", "space", values.name);
   }
   revalidatePath("/admin/spaces");
-  revalidatePath("/spaces");
+  revalidatePath("/planets");
 }
 
 export async function reviewSpaceRequest(requestId: string, approve: boolean, note: string) {
@@ -132,7 +132,7 @@ export async function reviewSpaceRequest(requestId: string, approve: boolean, no
   await db.insert(schema.notifications).values({
     id: uid(), userId: request.requestedBy, type: "system",
     title: approve ? `Your space "${request.proposedName}" was approved!` : `Space request "${request.proposedName}" was declined`,
-    body: note || undefined, href: "/spaces",
+    body: note || undefined, href: "/planets",
   });
   await audit(admin.id, approve ? "space_request.approve" : "space_request.reject", "space_request", requestId);
   revalidatePath("/admin/spaces/requests");
@@ -415,7 +415,7 @@ export async function saveGame(formData: FormData) {
     await audit(admin.id, "game.create", "game", values.name);
   }
   revalidatePath("/admin/games");
-  revalidatePath("/games");
+  revalidatePath("/planets");
   revalidatePath("/");
 }
 
@@ -425,7 +425,7 @@ export async function deleteGame(gameId: string) {
   await db.delete(schema.games).where(eq(schema.games.id, gameId));
   await audit(admin.id, "game.delete", "game", gameId);
   revalidatePath("/admin/games");
-  revalidatePath("/games");
+  revalidatePath("/planets");
 }
 
 // ---------- Partners ("Trusted by") ----------
