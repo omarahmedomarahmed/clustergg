@@ -42,6 +42,63 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_adjust" jsonb NOT NULL DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
+  // ----- Quests & gamification (new tables; idempotent so both fresh and
+  // existing databases converge without editing the static DDL string) -----
+  `CREATE TABLE IF NOT EXISTS "quests" (
+    "id" text PRIMARY KEY NOT NULL,
+    "key" text NOT NULL UNIQUE,
+    "name" text NOT NULL,
+    "tagline" text NOT NULL DEFAULT '',
+    "lore" text NOT NULL DEFAULT '',
+    "color" text NOT NULL DEFAULT '#8b5cf6',
+    "accent2" text NOT NULL DEFAULT '#22d3ee',
+    "icon" text NOT NULL DEFAULT 'trophy',
+    "logo_url" text,
+    "card_bg_url" text,
+    "cover_url" text,
+    "action_weights" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "daily_caps" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "sort_order" integer NOT NULL DEFAULT 0,
+    "is_active" boolean NOT NULL DEFAULT true
+  )`,
+  `CREATE TABLE IF NOT EXISTS "quest_tiers" (
+    "id" text PRIMARY KEY NOT NULL,
+    "quest_id" text NOT NULL,
+    "tier_index" integer NOT NULL DEFAULT 0,
+    "name" text NOT NULL,
+    "description" text NOT NULL DEFAULT '',
+    "threshold_qp" integer NOT NULL DEFAULT 100,
+    "icon_url" text,
+    "color" text,
+    "is_active" boolean NOT NULL DEFAULT true
+  )`,
+  `CREATE INDEX IF NOT EXISTS "qt_quest_idx" ON "quest_tiers" ("quest_id","tier_index")`,
+  `CREATE TABLE IF NOT EXISTS "user_quest_progress" (
+    "user_id" text NOT NULL,
+    "quest_id" text NOT NULL,
+    "qp" integer NOT NULL DEFAULT 0,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT "user_quest_progress_pk" PRIMARY KEY("user_id","quest_id")
+  )`,
+  `CREATE TABLE IF NOT EXISTS "quest_events" (
+    "id" text PRIMARY KEY NOT NULL,
+    "user_id" text NOT NULL,
+    "quest_id" text NOT NULL,
+    "action_key" text NOT NULL,
+    "qp_awarded" integer NOT NULL DEFAULT 0,
+    "ref_type" text,
+    "ref_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "qe_user_idx" ON "quest_events" ("user_id","created_at")`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "qe_dedup_idx" ON "quest_events" ("user_id","quest_id","action_key","ref_type","ref_id")`,
+  `CREATE TABLE IF NOT EXISTS "user_quest_tiers" (
+    "id" text PRIMARY KEY NOT NULL,
+    "user_id" text NOT NULL,
+    "quest_tier_id" text NOT NULL,
+    "awarded_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "uqt_user_tier_idx" ON "user_quest_tiers" ("user_id","quest_tier_id")`,
 ];
 
 async function runColumnMigrations(db: DB) {

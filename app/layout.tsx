@@ -5,6 +5,7 @@ import Starfield from "@/components/Starfield";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import CookieConsent from "@/components/CookieConsent";
+import QuestOrbMount from "@/components/QuestOrbMount";
 
 const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk" });
 
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="flex-1">{children}</main>
           <Footer />
         </div>
+        <QuestOrbMount />
         <CookieConsent />
       </body>
     </html>

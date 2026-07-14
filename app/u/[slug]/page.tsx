@@ -18,6 +18,8 @@ import AdSlot from "@/components/AdSlot";
 import ProfileAccounts from "@/components/ProfileAccounts";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import DiscordTag from "@/components/DiscordTag";
+import QuestCard from "@/components/QuestCard";
+import { getUserQuests } from "@/lib/quests";
 import { startConversation } from "@/app/actions/social";
 import { fmtNum, timeAgo } from "@/lib/utils";
 
@@ -62,8 +64,13 @@ export default async function ProfilePage({ params }: Props) {
   // number the gamer can show off. Owners viewing their own page don't count.
   let viewCount = user.profileViews ?? 0;
   if (!isOwner) {
+    const before = viewCount;
     viewCount += 1;
     try { await db.update(schema.users).set({ profileViews: viewCount }).where(eq(schema.users.id, user.id)); } catch { /* non-fatal */ }
+    // Every 25 views feeds the owner's Orbit quest (one award per 25-bucket).
+    if (Math.floor(viewCount / 25) > Math.floor(before / 25)) {
+      try { const { awardQuestAction } = await import("@/lib/quests"); await awardQuestAction(db, user.id, "profile_views_25", { refType: "views", refId: `${Math.floor(viewCount / 25)}` }); } catch { /* non-fatal */ }
+    }
   }
 
   const theme = resolveTheme(user.theme);
@@ -91,6 +98,7 @@ export default async function ProfilePage({ params }: Props) {
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(12),
   ]);
 
+  const profileQuests = await getUserQuests(db, user.id);
   const games = await db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games);
   const logoByGameName = new Map(games.map((g) => [g.name, g.logoUrl]));
   const coverByGameName = new Map(games.map((g) => [g.name, g.coverUrl]));
@@ -296,6 +304,19 @@ export default async function ProfilePage({ params }: Props) {
           <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">views</span></span>
           {bestStanding && S.standings && <span style={{ color: theme.accent }}><Icon name="chart" size={14} className="inline mr-1" /> Top {Math.max(1, Math.round((bestStanding.rank / bestStanding.total) * 100))}% · {bestStanding.title}</span>}
         </div>
+
+        {profileQuests.length > 0 && (
+          <div className="mt-8">
+            <div className="flex items-center gap-2 mb-3">
+              <Icon name="trophy" size={16} style={{ color: theme.accent }} />
+              <h2 className="text-lg font-bold" style={{ color: theme.text }}>Quests</h2>
+              <Link href="/quests" className="text-xs p-muted hover:underline ml-auto">Leaderboard →</Link>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-4">
+              {profileQuests.map((q) => <QuestCard key={q.id} quest={q} />)}
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 space-y-10 pb-16">
           {theme.order.map((key) => sectionNode(key))}

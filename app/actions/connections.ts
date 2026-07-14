@@ -9,6 +9,7 @@ import { ADAPTERS } from "@/lib/providers/adapters";
 import { getProvider, isProviderLive } from "@/lib/providers/registry";
 import { syncAccount } from "@/lib/sync";
 import { evaluateBadgesForUser } from "@/lib/badges";
+import { awardQuestAction } from "@/lib/quests";
 
 export type LinkState = { error?: string; ok?: boolean } | undefined;
 
@@ -49,6 +50,7 @@ export async function linkGameAccount(_prev: LinkState, formData: FormData): Pro
     .where(eq(schema.linkedGameAccounts.id, id)).limit(1);
   if (account) await syncAccount(db, account);
   try { await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
+  await awardQuestAction(db, me.id, "connect_account", { refType: "account", refId: id });
 
   revalidatePath("/settings/connections");
   revalidatePath("/profile");

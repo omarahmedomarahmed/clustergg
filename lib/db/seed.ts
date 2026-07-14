@@ -509,7 +509,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-14.1";
+const MAINT_VERSION = "2026-07-14.2";
 
 export async function runBootMaintenance(db: DB) {
   try {
@@ -522,6 +522,7 @@ export async function runBootMaintenance(db: DB) {
   await seedHouseAds(db);
   await ensurePlanetSkins(db);
   await migrateGameImagesToBlob(db);
+  try { const { seedQuests } = await import("@/lib/quests"); await seedQuests(db); } catch { /* non-fatal */ }
 
   await db.insert(schema.platformSettings)
     .values({ key: "boot_maintenance", value: { version: MAINT_VERSION } })

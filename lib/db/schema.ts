@@ -425,3 +425,72 @@ export const platformSettings = pgTable("platform_settings", {
   value: jsonb("value").$type<unknown>(),
   updatedAt: now("updated_at"),
 });
+
+// ===== Quests & gamification =====
+// A Quest is a themed progression track (fully admin-editable). It "listens" to
+// a subset of the engine's known actions via `actionWeights` (actionKey -> QP)
+// and has an ordered list of tiers (badges), each with its own QP threshold and
+// art. Admins can add quests, add any number of tiers, and edit every field.
+export const quests = pgTable("quests", {
+  id: id(),
+  key: text("key").notNull().unique(),         // stable slug (e.g. conquest)
+  name: text("name").notNull(),
+  tagline: text("tagline").notNull().default(""),
+  lore: text("lore").notNull().default(""),    // the story shown to gamers
+  color: text("color").notNull().default("#8b5cf6"),
+  accent2: text("accent2").notNull().default("#22d3ee"),
+  icon: text("icon").notNull().default("trophy"),
+  logoUrl: text("logo_url"),
+  cardBgUrl: text("card_bg_url"),              // gamified floating-card background
+  coverUrl: text("cover_url"),
+  actionWeights: jsonb("action_weights").$type<Record<string, number>>().notNull().default({}),
+  dailyCaps: jsonb("daily_caps").$type<Record<string, number>>().notNull().default({}),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+});
+
+// The ordered tiers (badges) inside a quest. Any count; threshold is cumulative
+// QP. Reaching a tier's threshold unlocks its badge.
+export const questTiers = pgTable("quest_tiers", {
+  id: id(),
+  questId: text("quest_id").notNull().references(() => quests.id, { onDelete: "cascade" }),
+  tierIndex: integer("tier_index").notNull().default(0), // order within the quest
+  name: text("name").notNull(),                 // e.g. Bronze / "Star Recruit"
+  description: text("description").notNull().default(""), // the badge's story/path
+  thresholdQp: integer("threshold_qp").notNull().default(100),
+  iconUrl: text("icon_url"),                    // uploaded badge art
+  color: text("color"),                          // optional tier accent
+  isActive: boolean("is_active").notNull().default(true),
+}, (t) => [index("qt_quest_idx").on(t.questId, t.tierIndex)]);
+
+// A gamer's accumulated Quest Points per quest (monotonic).
+export const userQuestProgress = pgTable("user_quest_progress", {
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  questId: text("quest_id").notNull().references(() => quests.id, { onDelete: "cascade" }),
+  qp: integer("qp").notNull().default(0),
+  updatedAt: now("updated_at"),
+}, (t) => [primaryKey({ columns: [t.userId, t.questId] })]);
+
+// Append-only ledger of awarded actions — powers dedup, daily caps and the
+// "recent progress" feed.
+export const questEvents = pgTable("quest_events", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  questId: text("quest_id").notNull().references(() => quests.id, { onDelete: "cascade" }),
+  actionKey: text("action_key").notNull(),
+  qpAwarded: integer("qp_awarded").notNull().default(0),
+  refType: text("ref_type"),
+  refId: text("ref_id"),
+  createdAt: now("created_at"),
+}, (t) => [
+  index("qe_user_idx").on(t.userId, t.createdAt),
+  uniqueIndex("qe_dedup_idx").on(t.userId, t.questId, t.actionKey, t.refType, t.refId),
+]);
+
+// Which tier-badges a gamer has unlocked (for profile display + leaderboards).
+export const userQuestTiers = pgTable("user_quest_tiers", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  questTierId: text("quest_tier_id").notNull().references(() => questTiers.id, { onDelete: "cascade" }),
+  awardedAt: now("awarded_at"),
+}, (t) => [uniqueIndex("uqt_user_tier_idx").on(t.userId, t.questTierId)]);

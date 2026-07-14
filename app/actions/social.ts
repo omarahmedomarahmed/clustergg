@@ -8,6 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { uid } from "@/lib/utils";
 import { evaluateBadgesForUser } from "@/lib/badges";
 import { recomputeExpertScores } from "@/lib/experts";
+import { awardQuestAction } from "@/lib/quests";
 
 // ---------- Follows ----------
 export async function toggleFollow(targetUserId: string, path: string) {
@@ -30,6 +31,7 @@ export async function toggleFollow(targetUserId: string, path: string) {
       title: `${me.displayName} started following you`, href: `/u/${me.slug}`,
     });
     try { await evaluateBadgesForUser(db, targetUserId); } catch { /* non-fatal */ }
+    await awardQuestAction(db, targetUserId, "follower_gained", { refType: "follow", refId: me.id });
   }
   revalidatePath(path);
 }
@@ -53,6 +55,7 @@ export async function toggleSpaceMembership(spaceId: string, path: string) {
     await db.insert(schema.spaceMembers).values({ spaceId, userId: me.id }).onConflictDoNothing();
     await db.update(schema.spaces).set({ memberCount: sql`${schema.spaces.memberCount} + 1` })
       .where(eq(schema.spaces.id, spaceId));
+    await awardQuestAction(db, me.id, "join_planet", { refType: "planet", refId: spaceId });
   }
   revalidatePath(path);
 }
@@ -62,11 +65,13 @@ export async function createPost(spaceId: string, spaceSlug: string, formData: F
   const body = String(formData.get("body") ?? "").trim();
   if (!body || body.length > 5000) return;
   const db = await getDb();
-  await db.insert(schema.posts).values({ id: uid(), spaceId, authorId: me.id, body });
+  const postId = uid();
+  await db.insert(schema.posts).values({ id: postId, spaceId, authorId: me.id, body });
   await db.update(schema.spaces).set({ postCount: sql`${schema.spaces.postCount} + 1` })
     .where(eq(schema.spaces.id, spaceId));
   await db.insert(schema.spaceMembers).values({ spaceId, userId: me.id }).onConflictDoNothing();
   try { await recomputeExpertScores(db, spaceId); await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
+  await awardQuestAction(db, me.id, "write_post", { refType: "post", refId: postId });
   revalidatePath(`/planets/${spaceSlug}`);
 }
 
@@ -89,6 +94,11 @@ export async function reactToPost(postId: string, reactionType: "like" | "dislik
     ));
   } else {
     await db.insert(schema.postReactions).values({ postId, userId: me.id, reactionType });
+    await awardQuestAction(db, me.id, "reaction_given", { refType: "reaction", refId: postId });
+    const [post] = await db.select({ authorId: schema.posts.authorId }).from(schema.posts).where(eq(schema.posts.id, postId)).limit(1);
+    if (post && post.authorId !== me.id) {
+      await awardQuestAction(db, post.authorId, "reaction_received", { refType: "reaction", refId: `${postId}:${me.id}` });
+    }
   }
   revalidatePath(path);
 }
@@ -98,7 +108,9 @@ export async function addComment(postId: string, parentCommentId: string | null,
   const body = String(formData.get("body") ?? "").trim();
   if (!body || body.length > 2000) return;
   const db = await getDb();
-  await db.insert(schema.comments).values({ id: uid(), postId, parentCommentId, authorId: me.id, body });
+  const commentId = uid();
+  await db.insert(schema.comments).values({ id: commentId, postId, parentCommentId, authorId: me.id, body });
+  await awardQuestAction(db, me.id, "write_comment", { refType: "comment", refId: commentId });
   revalidatePath(path);
 }
 
@@ -149,6 +161,7 @@ export async function startConversation(targetUserId: string) {
     { conversationId: convId, userId: me.id },
     { conversationId: convId, userId: targetUserId },
   ]);
+  await awardQuestAction(db, me.id, "message_new", { refType: "dm", refId: targetUserId });
   redirect(`/messages/${convId}`);
 }
 
@@ -199,5 +212,6 @@ export async function joinChallenge(challengeId: string, linkedAccountId: string
   await db.insert(schema.challengeParticipants).values({
     id: uid(), challengeId, userId: me.id, linkedAccountId: account.id, baseline,
   }).onConflictDoNothing();
+  await awardQuestAction(db, me.id, "join_challenge", { refType: "challenge", refId: challengeId });
   revalidatePath(path);
 }
