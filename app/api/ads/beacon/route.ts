@@ -31,6 +31,10 @@ export async function POST(req: NextRequest) {
       geoCountry: req.headers.get("x-vercel-ip-country"),
       geoCity: req.headers.get("x-vercel-ip-city"),
     });
+    if (session?.uid) {
+      const { awardQuestAction } = await import("@/lib/quests");
+      await awardQuestAction(db, session.uid, "ad_impression", { refType: "imp", refId: id });
+    }
     return NextResponse.json({ ok: true, id });
   }
 
@@ -42,9 +46,15 @@ export async function POST(req: NextRequest) {
   }
 
   if (payload.type === "click" && payload.ccId) {
+    const clickId = uid();
     await db.insert(schema.adClicks).values({
-      id: uid(), campaignCreativeId: payload.ccId, impressionId: payload.id ?? null,
+      id: clickId, campaignCreativeId: payload.ccId, impressionId: payload.id ?? null,
     });
+    const session = await getSession().catch(() => null);
+    if (session?.uid) {
+      const { awardQuestAction } = await import("@/lib/quests");
+      await awardQuestAction(db, session.uid, "ad_click", { refType: "click", refId: payload.id ?? clickId });
+    }
     return NextResponse.json({ ok: true });
   }
 

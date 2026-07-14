@@ -93,58 +93,78 @@ export default async function LandingPage() {
       )}
 
       {/* ===== HERO ===== */}
-      <section className="relative">
-        <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-80" style={{ backgroundImage: `url(${c["hero.image"]})` }} />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a]/30 via-[#04051a]/60 to-[#04051a]" />
-
-        <div className="mx-auto max-w-6xl px-4 pt-24 pb-20 text-center">
-          <div className="rise-in inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-xs text-cyan-200/90 mb-8">
-            <span className="inline-block h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
-            {c["hero.badge"]}
-          </div>
-          <h1 className="rise-in rise-in-1 text-5xl md:text-7xl font-bold leading-[1.05] tracking-tight">
-            {c["hero.title.line1"]}<br />
-            <span className="grad-text">{c["hero.title.line2"]}</span>
-          </h1>
-          <p className="rise-in rise-in-2 mx-auto mt-6 max-w-2xl text-lg text-muted leading-relaxed">
-            {c["hero.subtitle"]}
-          </p>
-          <div className="rise-in rise-in-3 mt-10 flex flex-col items-center gap-4">
-            {viewer ? (
-              <Link href="/feed" className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white text-lg">
-                Enter your feed <Icon name="arrowRight" size={16} className="ml-1" />
-              </Link>
-            ) : (
-              <>
-                <div className="w-full max-w-xs"><OAuthButtons next="/onboarding" /></div>
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <Link href="/signup" className="ghost-btn pressable rounded-full px-6 py-2.5">
-                    {c["hero.cta.primary"]} <Icon name="arrowRight" size={15} className="ml-1" />
-                  </Link>
-                  <Link href="/leaderboards" className="ghost-btn pressable rounded-full px-6 py-2.5">
-                    {c["hero.cta.secondary"]}
-                  </Link>
-                </div>
-              </>
-            )}
-          </div>
-
-          <div className="rise-in rise-in-4 mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">
+      {skinnedPlanets.length > 0 ? (
+        // The interactive globe above is the hero. Keep only a slim guest CTA
+        // and the platform numbers — the old marketing hero is retired.
+        <section className="mx-auto max-w-6xl px-4 pt-2 pb-14">
+          {!viewer && (
+            <div className="flex flex-col items-center gap-4 mb-12 text-center">
+              <p className="text-lg text-muted max-w-xl">{c["hero.subtitle"]}</p>
+              <div className="w-full max-w-xs"><OAuthButtons next="/onboarding" /></div>
+              <Link href="/leaderboards" className="text-sm text-cyan-300 hover:underline">{c["hero.cta.secondary"]} →</Link>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">
             {[
               { n: counts.users, label: "Gamers", icon: "users" },
               { n: counts.accounts, label: "Linked accounts", icon: "link" },
               { n: counts.games, label: "Games", icon: "gamepad" },
               { n: counts.challenges, label: "Challenges", icon: "zap" },
             ].map((s) => (
-              <div key={s.label} className="glass card-lift px-4 py-4">
+              <div key={s.label} className="glass card-lift px-4 py-4 text-center">
                 <Icon name={s.icon} size={16} className="text-violet-300 mb-1.5" />
                 <div className="text-3xl font-bold grad-text">{Number(s.n).toLocaleString()}</div>
                 <div className="text-xs uppercase tracking-widest text-muted mt-1">{s.label}</div>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
+      ) : (
+        <section className="relative">
+          <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-80" style={{ backgroundImage: `url(${c["hero.image"]})` }} />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a]/30 via-[#04051a]/60 to-[#04051a]" />
+          <div className="mx-auto max-w-6xl px-4 pt-24 pb-20 text-center">
+            <div className="rise-in inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-xs text-cyan-200/90 mb-8">
+              <span className="inline-block h-2 w-2 rounded-full bg-cyan-300 animate-pulse" />
+              {c["hero.badge"]}
+            </div>
+            <h1 className="rise-in rise-in-1 text-5xl md:text-7xl font-bold leading-[1.05] tracking-tight">
+              {c["hero.title.line1"]}<br />
+              <span className="grad-text">{c["hero.title.line2"]}</span>
+            </h1>
+            <p className="rise-in rise-in-2 mx-auto mt-6 max-w-2xl text-lg text-muted leading-relaxed">{c["hero.subtitle"]}</p>
+            <div className="rise-in rise-in-3 mt-10 flex flex-col items-center gap-4">
+              {viewer ? (
+                <Link href="/feed" className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white text-lg">
+                  Enter your feed <Icon name="arrowRight" size={16} className="ml-1" />
+                </Link>
+              ) : (
+                <>
+                  <div className="w-full max-w-xs"><OAuthButtons next="/onboarding" /></div>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Link href="/signup" className="ghost-btn pressable rounded-full px-6 py-2.5">{c["hero.cta.primary"]} <Icon name="arrowRight" size={15} className="ml-1" /></Link>
+                    <Link href="/leaderboards" className="ghost-btn pressable rounded-full px-6 py-2.5">{c["hero.cta.secondary"]}</Link>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="rise-in rise-in-4 mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">
+              {[
+                { n: counts.users, label: "Gamers", icon: "users" },
+                { n: counts.accounts, label: "Linked accounts", icon: "link" },
+                { n: counts.games, label: "Games", icon: "gamepad" },
+                { n: counts.challenges, label: "Challenges", icon: "zap" },
+              ].map((s) => (
+                <div key={s.label} className="glass card-lift px-4 py-4">
+                  <Icon name={s.icon} size={16} className="text-violet-300 mb-1.5" />
+                  <div className="text-3xl font-bold grad-text">{Number(s.n).toLocaleString()}</div>
+                  <div className="text-xs uppercase tracking-widest text-muted mt-1">{s.label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ===== LIVE TICKER ===== */}
       {ticker.length > 0 && (

@@ -64,6 +64,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
       });
       const [acc] = await db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.id, accId)).limit(1);
       if (acc) { const { syncAccount } = await import("@/lib/sync"); await syncAccount(db, acc); }
+      const { awardQuestAction } = await import("@/lib/quests");
+      await awardQuestAction(db, userId, "connect_account", { refType: "account", refId: accId });
     } catch { /* non-fatal — the game link can be retried from onboarding */ }
   };
 

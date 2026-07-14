@@ -4,6 +4,7 @@ import { schema } from "@/lib/db";
 import { ADAPTERS } from "@/lib/providers/adapters";
 import { getProvider, isProviderLive } from "@/lib/providers/registry";
 import { evaluateBadgesForUser, grantBadgeByCode } from "@/lib/badges";
+import { awardQuestAction } from "@/lib/quests";
 import { uid } from "@/lib/utils";
 
 const SYNC_INTERVAL_MIN = 30;
@@ -175,8 +176,9 @@ export async function finalizeChallenges(db: DB) {
       await db.update(schema.challengeParticipants)
         .set({ finalPlacement: i + 1, status: p.status === "disqualified" ? "disqualified" : "completed" })
         .where(eq(schema.challengeParticipants.id, p.id));
-      if (i === 0 && p.currentPoints > 0) await grantBadgeByCode(db, p.userId, "challenge_top1", challenge.id);
-      else if (i < podium && p.currentPoints > 0) await grantBadgeByCode(db, p.userId, "challenge_top3", challenge.id);
+      if (p.status !== "disqualified") await awardQuestAction(db, p.userId, "finish_challenge", { refType: "challenge", refId: challenge.id });
+      if (i === 0 && p.currentPoints > 0) { await grantBadgeByCode(db, p.userId, "challenge_top1", challenge.id); await awardQuestAction(db, p.userId, "win_challenge", { refType: "challenge", refId: challenge.id }); await awardQuestAction(db, p.userId, "top3_challenge", { refType: "challenge", refId: challenge.id }); }
+      else if (i < podium && p.currentPoints > 0) { await grantBadgeByCode(db, p.userId, "challenge_top3", challenge.id); await awardQuestAction(db, p.userId, "top3_challenge", { refType: "challenge", refId: challenge.id }); }
       if (i < podium && p.currentPoints > 0) {
         await db.insert(schema.notifications).values({
           id: uid(), userId: p.userId, type: "challenge",
