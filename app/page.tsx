@@ -8,12 +8,15 @@ import GameLogo from "@/components/GameLogo";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
+import PlanetHero from "@/components/PlanetHero";
+import { buildSkinnedPlanets } from "@/lib/planets";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
   const db = await getDb();
+  const skinnedPlanets = await buildSkinnedPlanets(db);
   const c = await getContent([
     "hero.badge", "hero.title.line1", "hero.title.line2", "hero.subtitle",
     "hero.cta.primary", "hero.cta.secondary", "hero.image",
@@ -81,6 +84,11 @@ export default async function LandingPage() {
 
   return (
     <div className="overflow-x-clip">
+      {/* ===== INTERACTIVE GLOBE HERO ===== */}
+      {skinnedPlanets.length > 0 && (
+        <PlanetHero planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} swap heading="The Cluster galaxy — pick a game" />
+      )}
+
       {/* ===== HERO ===== */}
       <section className="relative">
         <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-80" style={{ backgroundImage: `url(${c["hero.image"]})` }} />

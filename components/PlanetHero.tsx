@@ -20,14 +20,17 @@ export type PlanetData = {
 };
 
 // The interactive game planet: a floating sphere you can tilt (mouse parallax),
-// zoom (hover), and explore by clicking a region hotspot. The game logos on the
-// map switch planets — each links to that game's planet page.
-export default function PlanetHero({ planets, initialSlug }: { planets: PlanetData[]; initialSlug: string }) {
-  const p = planets.find((x) => x.slug === initialSlug) ?? planets[0];
+// zoom (hover), and explore by clicking a region hotspot. Logos switch planets —
+// on a planet page they navigate; in `swap` mode (home/feed) they swap in place.
+export default function PlanetHero({ planets, initialSlug, swap = false, heading }: { planets: PlanetData[]; initialSlug: string; swap?: boolean; heading?: string }) {
+  const start = Math.max(0, planets.findIndex((x) => x.slug === initialSlug));
+  const [idx, setIdx] = useState(start);
+  const p = planets[idx] ?? planets[0];
   const [region, setRegion] = useState<RegionStat | null>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(false);
   const frame = useRef<HTMLDivElement>(null);
+  const selectPlanet = (i: number) => { setIdx(i); setRegion(null); };
 
   function onMove(e: React.MouseEvent) {
     const el = frame.current;
@@ -60,18 +63,16 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
           {/* Soft glow that fades toward the planet (no hard ring) */}
           <div className="absolute inset-0 rounded-full blur-3xl opacity-60" style={{ background: `radial-gradient(circle, transparent 52%, ${p.accent}33 62%, transparent 78%)` }} />
 
-          {/* Game logos on the map — switch planets (navigate) */}
+          {/* Game logos on the map — switch planets */}
           {planets.length > 1 && (
             <div className="absolute top-1 left-1 z-20 flex flex-col gap-2">
-              {planets.map((pl) => {
-                const active = pl.slug === p.slug;
-                return (
-                  <Link key={pl.slug} href={`/planets/${pl.slug}`} title={pl.name}
-                    className={`rounded-xl transition-all ${active ? "scale-110" : "opacity-55 hover:opacity-100 hover:scale-105"}`}>
-                    <GameLogo logoUrl={slimImg(pl.logoUrl, 300000)} name={pl.name} size={active ? 44 : 34} rounded="rounded-xl"
-                      className={active ? "ring-2 shadow-lg" : "ring-1 ring-violet-400/25"} />
-                  </Link>
-                );
+              {planets.map((pl, i) => {
+                const active = i === idx;
+                const cls = `rounded-xl transition-all ${active ? "scale-110" : "opacity-55 hover:opacity-100 hover:scale-105"}`;
+                const logo = <GameLogo logoUrl={slimImg(pl.logoUrl, 300000)} name={pl.name} size={active ? 44 : 34} rounded="rounded-xl" className={active ? "ring-2 shadow-lg" : "ring-1 ring-violet-400/25"} />;
+                return swap
+                  ? <button key={pl.slug} onClick={() => selectPlanet(i)} title={pl.name} className={cls}>{logo}</button>
+                  : <Link key={pl.slug} href={`/planets/${pl.slug}`} title={pl.name} className={cls}>{logo}</Link>;
               })}
             </div>
           )}
@@ -111,7 +112,7 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
         {/* ===== Info / controls ===== */}
         <div>
           <div className="text-[11px] uppercase tracking-widest text-cyan-300 mb-2 inline-flex items-center gap-1.5">
-            <Icon name="planet" size={13} /> Interactive planet
+            <Icon name="planet" size={13} /> {heading ?? "Interactive planet"}
           </div>
           <h1 className="text-3xl md:text-5xl font-bold">{p.name}</h1>
           <p className="text-muted mt-2 max-w-md">Spin it, zoom in, and click a region to see how many gamers orbit there and who&apos;s on top. Switch planets with the logos on the globe.</p>
@@ -161,14 +162,22 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
           {/* Switch planets */}
           {planets.length > 1 && (
             <div className="mt-4 flex flex-wrap gap-2">
-              {planets.map((pl) => (
-                <Link key={pl.slug} href={`/planets/${pl.slug}`}
-                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold border transition-colors ${pl.slug === p.slug ? "text-white" : "text-muted border-violet-400/25 hover:text-ink"}`}
-                  style={pl.slug === p.slug ? { borderColor: `${pl.accent}aa`, background: `${pl.accent}22`, color: "#fff" } : undefined}>
-                  <GameLogo logoUrl={slimImg(pl.logoUrl, 300000)} name={pl.name} size={20} rounded="rounded-md" /> {pl.name}
-                </Link>
-              ))}
+              {planets.map((pl, i) => {
+                const active = i === idx;
+                const cls = `inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold border transition-colors ${active ? "text-white" : "text-muted border-violet-400/25 hover:text-ink"}`;
+                const style = active ? { borderColor: `${pl.accent}aa`, background: `${pl.accent}22`, color: "#fff" } : undefined;
+                const inner = <><GameLogo logoUrl={slimImg(pl.logoUrl, 300000)} name={pl.name} size={20} rounded="rounded-md" /> {pl.name}</>;
+                return swap
+                  ? <button key={pl.slug} onClick={() => selectPlanet(i)} className={cls} style={style}>{inner}</button>
+                  : <Link key={pl.slug} href={`/planets/${pl.slug}`} className={cls} style={style}>{inner}</Link>;
+              })}
             </div>
+          )}
+
+          {swap && (
+            <Link href={`/planets/${p.slug}`} className="mt-5 inline-flex items-center gap-2 glow-btn pressable rounded-full px-6 py-2.5 text-sm font-semibold text-white">
+              Enter the {p.name} planet <Icon name="arrowRight" size={15} />
+            </Link>
           )}
         </div>
       </div>

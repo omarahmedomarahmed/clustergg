@@ -5,7 +5,9 @@ import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { getProvider } from "@/lib/providers/registry";
+import { providerInfoList } from "@/lib/providers/serialize";
 import { syncUserAccountsIfStale } from "@/lib/sync";
+import { slimImg } from "@/lib/img";
 import { resolveTheme, themeToVars, bgStyle, coverStyle, avatarClip } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
@@ -13,6 +15,7 @@ import Icon from "@/components/Icon";
 import { BadgeIcon } from "@/components/BadgeChip";
 import FollowButton from "@/components/FollowButton";
 import AdSlot from "@/components/AdSlot";
+import ProfileAccounts from "@/components/ProfileAccounts";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import { startConversation } from "@/app/actions/social";
 import { fmtNum, timeAgo } from "@/lib/utils";
@@ -79,8 +82,9 @@ export default async function ProfilePage({ params }: Props) {
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(12),
   ]);
 
-  const games = await db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl }).from(schema.games);
+  const games = await db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games);
   const logoByGameName = new Map(games.map((g) => [g.name, g.logoUrl]));
+  const coverByGameName = new Map(games.map((g) => [g.name, g.coverUrl]));
   const accountAvatar = (a: typeof accounts[number]): string | null => {
     const pd = a.providerData as Record<string, unknown> | null;
     const av = pd && (pd.avatar ?? pd.avatarUrl ?? pd.image);
@@ -114,60 +118,43 @@ export default async function ProfilePage({ params }: Props) {
   const activeChallenges = participations.filter(({ c }) => c.status === "active");
 
   const S = theme.sections;
+
+  // Serializable account cards for the interactive <ProfileAccounts>.
+  const accountsData = accounts.map((a) => {
+    const p = getProvider(a.provider);
+    const caps = p?.capabilities ?? [];
+    const aStats = statsByAccount.get(a.id) ?? [];
+    const st = standingsByAccount.get(a.id) ?? [];
+    return {
+      id: a.id,
+      tag: a.inGameName,
+      providerName: p?.name ?? a.provider,
+      gameName: p?.game ?? "",
+      verified: a.verified,
+      logoUrl: slimImg(logoByGameName.get(p?.game ?? "") ?? null, 300000),
+      coverUrl: slimImg(coverByGameName.get(p?.game ?? "") ?? null, 400000),
+      avatar: accountAvatar(a),
+      stats: aStats.slice(0, 6).map((s) => ({ label: caps.find((c) => c.key === s.metricKey)?.label ?? s.metricKey, value: s.rankLabel ?? fmtNum(s.metricValue) })),
+      standings: (S.standings ? st.slice(0, 3) : []).map((x) => ({ rank: x.rank, total: x.total, label: x.title.split("·")[1]?.trim() ?? x.metricKey, game: x.game, metricKey: x.metricKey })),
+    };
+  });
+  const accountGameLogos: Record<string, string | null> = {};
+  for (const info of providerInfoList()) accountGameLogos[info.id] = slimImg(logoByGameName.get(info.game) ?? null, 300000);
+
   const sectionNode = (key: string): React.ReactNode => {
     switch (key) {
       case "accounts":
         if (!S.accounts) return null;
         return (
-          <section key={key}>
-            <div className="flex items-center justify-between mb-3 gap-3">
-              <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: theme.text }}><Icon name="gamepad" size={19} style={{ color: theme.accent }} /> Connected accounts</h2>
-              {isOwner && (
-                <Link href="/profile" className="text-xs rounded-full px-3 py-1.5 inline-flex items-center gap-1.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 40%, transparent)`, color: theme.accent }}>
-                  <Icon name="link" size={12} /> Connect a game
-                </Link>
-              )}
-            </div>
-            {accounts.length === 0 ? <div className={`${cardCls} text-center p-muted text-sm`}>{isOwner ? "No accounts linked yet — connect your first game." : "No accounts linked yet."}</div> : (
-              <div className="grid sm:grid-cols-2 gap-4">
-                {accounts.map((a) => {
-                  const p = getProvider(a.provider); const aStats = statsByAccount.get(a.id) ?? []; const st = standingsByAccount.get(a.id) ?? []; const caps = p?.capabilities ?? [];
-                  return (
-                    <div key={a.id} className={cardCls}>
-                      <div className="flex items-center gap-3">
-                        {accountAvatar(a) ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={accountAvatar(a)!} alt="" className="h-10 w-10 rounded-xl object-cover border" style={{ borderColor: `color-mix(in srgb, ${theme.accent} 40%, transparent)` }} />
-                        ) : (
-                          <GameLogo logoUrl={logoByGameName.get(p?.game ?? "") ?? null} name={p?.game || p?.name || a.provider} size={40} rounded="rounded-xl" />
-                        )}
-                        <div className="min-w-0"><div className="font-bold truncate" style={{ color: theme.text }}>{a.inGameName}</div><div className="text-xs p-muted">{p?.name ?? a.provider}</div></div>
-                        {a.verified && <span className="ml-auto text-[11px]" style={{ color: theme.accent2 }}>✓ verified</span>}
-                      </div>
-                      {aStats.length > 0 && (
-                        <div className="mt-3 grid grid-cols-2 gap-2">
-                          {aStats.slice(0, 6).map((s) => { const cap = caps.find((c) => c.key === s.metricKey); return (
-                            <div key={s.id} className="rounded-lg px-2.5 py-1.5" style={{ background: `color-mix(in srgb, ${theme.panel} 60%, transparent)` }}>
-                              <div className="text-[10px] uppercase tracking-wider p-muted truncate">{cap?.label ?? s.metricKey}</div>
-                              <div className="font-bold" style={{ color: theme.accent2 }}>{s.rankLabel ?? fmtNum(s.metricValue)}</div>
-                            </div>); })}
-                        </div>
-                      )}
-                      {st.length > 0 && S.standings && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {st.slice(0, 3).map((x) => (
-                            <Link key={x.metricKey} href={`/leaderboards/${encodeURIComponent(x.game)}?stat=${x.metricKey}`} className="text-[11px] rounded-full px-2 py-0.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 35%, transparent)`, color: theme.accent }}>
-                              #{x.rank} of {x.total} · {x.title.split("·")[1]?.trim() ?? x.metricKey}
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+          <div key={key}>
+            <ProfileAccounts
+              accounts={accountsData}
+              colors={{ accent: theme.accent, accent2: theme.accent2, text: theme.text, muted: theme.muted, panel: theme.panel, radius: theme.radius }}
+              isOwner={isOwner}
+              providers={providerInfoList()}
+              gameLogos={accountGameLogos}
+            />
+          </div>
         );
       case "trophies":
         if (!S.trophies || trophyWins.length === 0) return null;
