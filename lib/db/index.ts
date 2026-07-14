@@ -29,6 +29,8 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "profile_visibility" text NOT NULL DEFAULT 'public'`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "allow_messages_from" text NOT NULL DEFAULT 'everyone'`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_notifications" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_username" text`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "profile_views" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "show_in_nav" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_image_url" text`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_bg_url" text`,
@@ -52,14 +54,14 @@ async function runColumnMigrations(db: DB) {
 async function ensureProvisioned(db: DB) {
   const existing = await db.execute(dsql`SELECT to_regclass('public.users') AS t`);
   if (rowsOf(existing).some((r) => r.t)) {
-    // Schema already exists — back-fill any columns added since, and make sure
-    // our house ads exist (idempotent) so no ad placement is ever empty.
+    // Schema already exists — back-fill any columns added since, then run the
+    // once-per-version maintenance (house ads, planet skins, image→Blob). The
+    // maintenance gate is a single tiny read, so steady-state boots do no
+    // table scans — this is what keeps Neon data-transfer from ballooning.
     await runColumnMigrations(db);
     try {
-      const { seedHouseAds, ensurePlanetSkins, migrateGameImagesToBlob } = await import("./seed");
-      await seedHouseAds(db);
-      await ensurePlanetSkins(db);
-      await migrateGameImagesToBlob(db);
+      const { runBootMaintenance } = await import("./seed");
+      await runBootMaintenance(db);
     } catch { /* non-fatal — ads/skins just won't backfill this boot */ }
     return;
   }
@@ -74,14 +76,13 @@ async function ensureProvisioned(db: DB) {
     }
   }
   await runColumnMigrations(db);
-  const { seed, seedHouseAds, ensurePlanetSkins } = await import("./seed");
+  const { seed, runBootMaintenance } = await import("./seed");
   try {
     await seed(db, { demo: false });
   } catch (e) {
     if (!/duplicate key|already exists/i.test(String(e))) throw e;
   }
-  try { await seedHouseAds(db); } catch { /* non-fatal */ }
-  try { await ensurePlanetSkins(db); } catch { /* non-fatal */ }
+  try { await runBootMaintenance(db); } catch { /* non-fatal */ }
 }
 
 async function createDb(): Promise<DB> {

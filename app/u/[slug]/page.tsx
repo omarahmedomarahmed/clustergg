@@ -17,6 +17,7 @@ import FollowButton from "@/components/FollowButton";
 import AdSlot from "@/components/AdSlot";
 import ProfileAccounts from "@/components/ProfileAccounts";
 import CopyLinkButton from "@/components/CopyLinkButton";
+import DiscordTag from "@/components/DiscordTag";
 import { startConversation } from "@/app/actions/social";
 import { fmtNum, timeAgo } from "@/lib/utils";
 
@@ -56,6 +57,14 @@ export default async function ProfilePage({ params }: Props) {
   }
 
   try { await syncUserAccountsIfStale(db, user.id); } catch { /* render regardless */ }
+
+  // Count a profile view when someone other than the owner looks — a brag
+  // number the gamer can show off. Owners viewing their own page don't count.
+  let viewCount = user.profileViews ?? 0;
+  if (!isOwner) {
+    viewCount += 1;
+    try { await db.update(schema.users).set({ profileViews: viewCount }).where(eq(schema.users.id, user.id)); } catch { /* non-fatal */ }
+  }
 
   const theme = resolveTheme(user.theme);
   const vars = themeToVars(theme) as React.CSSProperties;
@@ -261,7 +270,8 @@ export default async function ProfilePage({ params }: Props) {
               {user.isVerified && <Icon name="check" size={20} strokeWidth={3} style={{ color: theme.accent2 }} />}
             </h1>
             {user.title && <div className="text-lg font-semibold p-grad">{user.title}</div>}
-            <div className="flex items-center gap-2 text-sm p-muted mt-1">
+            {user.discordUsername && <div className="mt-1.5"><DiscordTag username={user.discordUsername} size="md" /></div>}
+            <div className="flex items-center gap-2 text-sm p-muted mt-1.5">
               <span>clustergg.com/u/{user.slug}</span><CopyLinkButton path={`/u/${user.slug}`} />
             </div>
           </div>
@@ -283,6 +293,7 @@ export default async function ProfilePage({ params }: Props) {
         <div className="flex flex-wrap gap-6 mt-4 text-sm">
           <Link href={`/u/${user.slug}/followers`} style={{ color: theme.text }}><b>{Number(followerRow?.c ?? 0)}</b> <span className="p-muted">followers</span></Link>
           <Link href={`/u/${user.slug}/following`} style={{ color: theme.text }}><b>{Number(followingRow?.c ?? 0)}</b> <span className="p-muted">following</span></Link>
+          <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">views</span></span>
           {bestStanding && S.standings && <span style={{ color: theme.accent }}><Icon name="chart" size={14} className="inline mr-1" /> Top {Math.max(1, Math.round((bestStanding.rank / bestStanding.total) * 100))}% · {bestStanding.title}</span>}
         </div>
 

@@ -7,6 +7,8 @@ import { providerInfoList } from "@/lib/providers/serialize";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import FollowButton from "@/components/FollowButton";
 import Avatar from "@/components/Avatar";
+import DiscordTag from "@/components/DiscordTag";
+import OAuthButtons from "@/components/OAuthButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -21,10 +23,23 @@ export default async function OnboardingPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-14">
-      <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold">Welcome to the Cluster, <span className="grad-text">{user.displayName}</span></h1>
-        <p className="text-muted mt-2">Three steps to light up your constellation.</p>
+    <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
+      <div className="text-center mb-8 sm:mb-10">
+        <div className="flex justify-center mb-4">
+          <Avatar name={user.displayName} src={user.avatarUrl} size={72} />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold">Welcome to the Cluster, <span className="grad-text">{user.displayName}</span></h1>
+        <p className="text-muted mt-2">Your identity is set — now light up your constellation.</p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {user.discordUsername ? (
+            <DiscordTag username={user.discordUsername} size="md" />
+          ) : (
+            <div className="w-full max-w-xs">
+              <p className="text-xs text-muted mb-2">Link Discord to make it your universal identity:</p>
+              <OAuthButtons next="/onboarding" intent="link" compact />
+            </div>
+          )}
+        </div>
       </div>
 
       <section className="glass p-6 mb-6">

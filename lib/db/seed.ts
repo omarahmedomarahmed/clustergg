@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, like, or } from "drizzle-orm";
 import type { DB } from "./index";
 import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
@@ -466,8 +466,15 @@ export async function migrateGameImagesToBlob(db: DB) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return;
   const { uploadDataUrlToBlob } = await import("@/lib/blob");
   const isData = (s?: string | null) => !!s && s.startsWith("data:");
+  const DATA = "data:%";
 
-  const games = await db.select().from(schema.games);
+  // Only ever read rows that still hold an inline data URL — filtering in SQL so
+  // once everything is migrated these queries return zero rows and transfer
+  // (almost) nothing. Reading whole tables on every cold boot was the main
+  // source of Neon data-transfer, so keep these scans as narrow as possible.
+  const games = await db.select({ id: schema.games.id, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl, planetImageUrl: schema.games.planetImageUrl })
+    .from(schema.games)
+    .where(or(like(schema.games.logoUrl, DATA), like(schema.games.coverUrl, DATA), like(schema.games.planetImageUrl, DATA)));
   for (const g of games) {
     const patch: Partial<typeof schema.games.$inferInsert> = {};
     if (isData(g.logoUrl)) patch.logoUrl = (await uploadDataUrlToBlob(g.logoUrl!, "game")) ?? undefined;
@@ -476,7 +483,9 @@ export async function migrateGameImagesToBlob(db: DB) {
     if (Object.keys(patch).length) await db.update(schema.games).set(patch).where(eq(schema.games.id, g.id));
   }
 
-  const challenges = await db.select().from(schema.challenges);
+  const challenges = await db.select({ id: schema.challenges.id, coverUrl: schema.challenges.coverUrl, heroUrl: schema.challenges.heroUrl })
+    .from(schema.challenges)
+    .where(or(like(schema.challenges.coverUrl, DATA), like(schema.challenges.heroUrl, DATA)));
   for (const c of challenges) {
     const patch: Partial<typeof schema.challenges.$inferInsert> = {};
     if (isData(c.coverUrl)) patch.coverUrl = (await uploadDataUrlToBlob(c.coverUrl!, "challenge")) ?? undefined;
@@ -484,13 +493,39 @@ export async function migrateGameImagesToBlob(db: DB) {
     if (Object.keys(patch).length) await db.update(schema.challenges).set(patch).where(eq(schema.challenges.id, c.id));
   }
 
-  const users = await db.select({ id: schema.users.id, avatarUrl: schema.users.avatarUrl, bannerUrl: schema.users.bannerUrl }).from(schema.users);
+  const users = await db.select({ id: schema.users.id, avatarUrl: schema.users.avatarUrl, bannerUrl: schema.users.bannerUrl })
+    .from(schema.users)
+    .where(or(like(schema.users.avatarUrl, DATA), like(schema.users.bannerUrl, DATA)));
   for (const u of users) {
     const patch: Partial<typeof schema.users.$inferInsert> = {};
     if (isData(u.avatarUrl)) patch.avatarUrl = (await uploadDataUrlToBlob(u.avatarUrl!, "profile")) ?? undefined;
     if (isData(u.bannerUrl)) patch.bannerUrl = (await uploadDataUrlToBlob(u.bannerUrl!, "profile")) ?? undefined;
     if (Object.keys(patch).length) await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));
   }
+}
+
+// Runs the idempotent maintenance steps (house ads, planet skins, image→Blob
+// migration) AT MOST ONCE per database per maintenance version — gated by a
+// single tiny platform_settings read. This keeps steady-state cold boots from
+// re-scanning tables (the original cause of the Neon data-transfer blowout).
+// Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
+const MAINT_VERSION = "2026-07-14.1";
+
+export async function runBootMaintenance(db: DB) {
+  try {
+    const [row] = await db.select({ value: schema.platformSettings.value })
+      .from(schema.platformSettings).where(eq(schema.platformSettings.key, "boot_maintenance")).limit(1);
+    const done = (row?.value as { version?: string } | null)?.version;
+    if (done === MAINT_VERSION) return; // already applied on this DB — do nothing
+  } catch { /* settings table missing on a brand-new DB — fall through and run */ }
+
+  await seedHouseAds(db);
+  await ensurePlanetSkins(db);
+  await migrateGameImagesToBlob(db);
+
+  await db.insert(schema.platformSettings)
+    .values({ key: "boot_maintenance", value: { version: MAINT_VERSION } })
+    .onConflictDoUpdate({ target: schema.platformSettings.key, set: { value: { version: MAINT_VERSION }, updatedAt: new Date() } });
 }
 
 export async function seedHouseAds(db: DB) {
