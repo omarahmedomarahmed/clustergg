@@ -30,6 +30,7 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
   {
     section: "Competition",
     items: [
+      { href: "/admin/quests", label: "Quests" },
       { href: "/admin/badges", label: "Badges" },
       { href: "/admin/leaderboards", label: "Leaderboards" },
       { href: "/admin/trophies", label: "Trophies" },

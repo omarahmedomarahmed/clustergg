@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Admin/staff scopes (game logos, covers, etc.) require staff.
-  if (["game", "trophy", "partner", "creative", "content"].includes(scope) && !isStaff(user)) {
+  if (["game", "trophy", "partner", "creative", "content", "quest"].includes(scope) && !isStaff(user)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
