@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { requireAdmin, requireStaff } from "@/lib/auth";
+import { requireAdmin, requireStaff, hashPassword } from "@/lib/auth";
 import { uid, slugify } from "@/lib/utils";
 import { syncAccount } from "@/lib/sync";
+
+export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
 
 async function audit(adminId: string, action: string, targetType?: string, targetId?: string, meta?: Record<string, unknown>) {
   const db = await getDb();
@@ -32,6 +34,22 @@ export async function setUserRole(userId: string, role: "user" | "admin" | "bran
   await db.update(schema.users).set({ role }).where(eq(schema.users.id, userId));
   await audit(admin.id, "user.role_change", "user", userId, { role });
   revalidatePath("/admin/roles");
+}
+
+// Admin/staff password reset for any user (for people who lost access).
+export async function adminResetPassword(userId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const password = String(formData.get("password") ?? "");
+  if (password.length < 8) return { error: "Password must be at least 8 characters." };
+  const db = await getDb();
+  const [target] = await db.select({ id: schema.users.id, role: schema.users.role, email: schema.users.email })
+    .from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  if (!target) return { error: "User not found." };
+  // Only a superadmin may reset another superadmin's password.
+  if (target.role === "superadmin" && admin.role !== "superadmin") return { error: "Only a superadmin can reset that account." };
+  await db.update(schema.users).set({ passwordHash: hashPassword(password) }).where(eq(schema.users.id, userId));
+  await audit(admin.id, "user.password_reset", "user", userId);
+  return { ok: true, message: `Password updated. Share it with ${target.email}.` };
 }
 
 export async function adminUnlinkAccount(accountId: string) {

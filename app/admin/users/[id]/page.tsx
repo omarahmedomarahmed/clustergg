@@ -5,6 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import Avatar from "@/components/Avatar";
 import { BadgeIcon } from "@/components/BadgeChip";
 import { adminUnlinkAccount, adminResyncAccount, setUserStatus } from "@/app/actions/admin";
+import AdminPasswordReset from "@/components/AdminPasswordReset";
 import { getProvider } from "@/lib/providers/registry";
 import { timeAgo } from "@/lib/utils";
 
@@ -51,6 +52,12 @@ export default async function AdminUserDetail({ params }: { params: Promise<{ id
           )
         )}
       </div>
+
+      <section className="glass p-6">
+        <h2 className="font-bold mb-1 flex items-center gap-2">Reset password</h2>
+        <p className="text-xs text-muted mb-3">Set a new password for this user if they&apos;ve lost access, then share it with them.</p>
+        <AdminPasswordReset userId={user.id} />
+      </section>
 
       <section className="glass p-6">
         <h2 className="font-bold mb-4">Linked accounts ({accounts.length})</h2>
