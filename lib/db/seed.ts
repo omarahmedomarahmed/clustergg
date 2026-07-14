@@ -427,11 +427,22 @@ const HOUSE_TAGLINES: { title: string; from: string; to: string; click: string }
 // Higgsfield-generated per-game planet heroes. Sets each game's planetImageUrl
 // once (idempotent — only fills when null, so admin edits are never clobbered).
 const HF_CDN = "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082";
+// Superseded renders → migrate any DB row still pointing at them to the current skin.
+const SUPERSEDED_SKINS: Record<string, string> = {
+  // First LOL planet used the in-game Runeterra map; replaced with a real-world map.
+  [`${HF_CDN}/hf_20260713_214125_1f7f8ec6-ee58-4c5c-9c9b-3201f6bf47c6.png`]: "League of Legends",
+};
 const PLANET_SKINS: Record<string, string> = {
-  "League of Legends": `${HF_CDN}/hf_20260713_214125_1f7f8ec6-ee58-4c5c-9c9b-3201f6bf47c6.png`,
+  "League of Legends": `${HF_CDN}/hf_20260714_114614_b3a4ad5b-e49a-4fab-99fb-056fd13ab71f.png`,
   "VALORANT": `${HF_CDN}/hf_20260713_214139_cba722cd-6ede-4996-b8a7-ae0315304705.png`,
 };
 export async function ensurePlanetSkins(db: DB) {
+  // Replace superseded renders in place.
+  for (const [oldUrl, name] of Object.entries(SUPERSEDED_SKINS)) {
+    await db.update(schema.games).set({ planetImageUrl: PLANET_SKINS[name] })
+      .where(eq(schema.games.planetImageUrl, oldUrl));
+  }
+  // Set skins for games that don't have one yet (never clobbers admin uploads).
   for (const [name, url] of Object.entries(PLANET_SKINS)) {
     await db.update(schema.games).set({ planetImageUrl: url })
       .where(and(eq(schema.games.name, name), isNull(schema.games.planetImageUrl)));

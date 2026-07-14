@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
+import GameLogo from "@/components/GameLogo";
 import type { RegionStat } from "@/lib/regions";
 
 export type PlanetData = {
@@ -11,23 +12,21 @@ export type PlanetData = {
   accent: string;
   accent2: string;
   imageUrl: string;
+  logoUrl: string | null;
+  coverUrl: string | null;
   totalGamers: number;
   regions: RegionStat[];
 };
 
 // The interactive game planet: a floating sphere you can tilt (mouse parallax),
-// zoom (hover), and explore by clicking a region hotspot to see how many gamers
-// are there and who's on top. A toggle swaps the whole planet — same sphere,
-// different game skin, colors and data.
+// zoom (hover), and explore by clicking a region hotspot. The game logos on the
+// map switch planets — each links to that game's planet page.
 export default function PlanetHero({ planets, initialSlug }: { planets: PlanetData[]; initialSlug: string }) {
-  const startIdx = Math.max(0, planets.findIndex((p) => p.slug === initialSlug));
-  const [idx, setIdx] = useState(startIdx);
+  const p = planets.find((x) => x.slug === initialSlug) ?? planets[0];
   const [region, setRegion] = useState<RegionStat | null>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(false);
   const frame = useRef<HTMLDivElement>(null);
-
-  const p = planets[idx];
 
   function onMove(e: React.MouseEvent) {
     const el = frame.current;
@@ -38,13 +37,14 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
     setTilt({ x: Math.max(-1, Math.min(1, dx)), y: Math.max(-1, Math.min(1, dy)) });
   }
 
-  function selectPlanet(i: number) { setIdx(i); setRegion(null); }
-
   return (
     <section className="relative overflow-hidden">
-      {/* Space backdrop */}
-      <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 600px at 50% -10%, ${p.accent}22, transparent 60%), radial-gradient(900px 500px at 80% 120%, ${p.accent2}18, transparent 60%), #04051a` }} />
-      <div className="absolute inset-0 -z-10 opacity-40 bg-cover bg-center" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
+      {/* Space backdrop + the game cover as faint texture behind the sphere */}
+      <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 620px at 42% 20%, ${p.accent}1f, transparent 60%), radial-gradient(900px 500px at 85% 110%, ${p.accent2}14, transparent 60%), #04051a` }} />
+      {p.coverUrl && (
+        <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-[0.12]" style={{ backgroundImage: `url(${p.coverUrl})` }} />
+      )}
+      <div className="absolute inset-0 -z-10 opacity-30 bg-cover bg-center" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
 
       <div className="mx-auto max-w-6xl px-4 py-10 md:py-14 grid gap-8 lg:grid-cols-[1.1fr_1fr] items-center">
         {/* ===== Planet ===== */}
@@ -56,20 +56,33 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
           onMouseEnter={() => setZoom(true)}
           style={{ perspective: "1200px" }}
         >
-          {/* glow ring */}
-          <div className="absolute inset-[6%] rounded-full blur-2xl" style={{ background: `radial-gradient(circle, ${p.accent}55, transparent 70%)` }} />
+          {/* Soft glow that fades toward the planet (no hard ring) */}
+          <div className="absolute inset-0 rounded-full blur-3xl opacity-60" style={{ background: `radial-gradient(circle, transparent 52%, ${p.accent}33 62%, transparent 78%)` }} />
+
+          {/* Game logos on the map — switch planets (navigate) */}
+          {planets.length > 1 && (
+            <div className="absolute top-1 left-1 z-20 flex flex-col gap-2">
+              {planets.map((pl) => {
+                const active = pl.slug === p.slug;
+                return (
+                  <Link key={pl.slug} href={`/planets/${pl.slug}`} title={pl.name}
+                    className={`rounded-xl transition-all ${active ? "scale-110" : "opacity-55 hover:opacity-100 hover:scale-105"}`}>
+                    <GameLogo logoUrl={pl.logoUrl} name={pl.name} size={active ? 44 : 34} rounded="rounded-xl"
+                      className={active ? "ring-2 shadow-lg" : "ring-1 ring-violet-400/25"} />
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
           <div
             className="relative h-full w-full float-y transition-transform duration-300"
-            style={{
-              transform: `rotateY(${tilt.x * 8}deg) rotateX(${-tilt.y * 8}deg) scale(${zoom ? 1.04 : 1})`,
-              transformStyle: "preserve-3d",
-            }}
+            style={{ transform: `rotateY(${tilt.x * 8}deg) rotateX(${-tilt.y * 8}deg) scale(${zoom ? 1.04 : 1})`, transformStyle: "preserve-3d" }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={p.imageUrl} alt={`${p.name} planet`} className="h-full w-full rounded-full object-cover drop-shadow-2xl"
-              style={{ boxShadow: `0 0 80px -10px ${p.accent}88` }} />
-            {/* atmospheric rim */}
-            <div className="absolute inset-0 rounded-full pointer-events-none" style={{ boxShadow: `inset 0 0 60px 10px ${p.accent2}55, inset 0 0 20px 2px #000a` }} />
+            <img src={p.imageUrl} alt={`${p.name} planet`} className="h-full w-full rounded-full object-cover" />
+            {/* subtle inner shading for depth, no bright rim */}
+            <div className="absolute inset-0 rounded-full pointer-events-none" style={{ boxShadow: "inset 0 0 70px 8px rgba(0,0,0,0.55)" }} />
 
             {/* Region hotspots */}
             {p.regions.map((r) => {
@@ -100,18 +113,7 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
             <Icon name="planet" size={13} /> Interactive planet
           </div>
           <h1 className="text-3xl md:text-5xl font-bold">{p.name}</h1>
-          <p className="text-muted mt-2 max-w-md">Spin it, zoom in, and click a region to see how many gamers orbit there and who&apos;s on top.</p>
-
-          {/* Game toggle */}
-          <div className="mt-5 flex flex-wrap gap-2">
-            {planets.map((pl, i) => (
-              <button key={pl.slug} onClick={() => selectPlanet(i)}
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold border transition-colors ${i === idx ? "text-white" : "text-muted border-violet-400/25 hover:text-ink hover:border-violet-400/50"}`}
-                style={i === idx ? { borderColor: `${pl.accent}aa`, background: `${pl.accent}22`, color: "#fff" } : undefined}>
-                <span className="h-2 w-2 rounded-full" style={{ background: pl.accent }} /> {pl.name}
-              </button>
-            ))}
-          </div>
+          <p className="text-muted mt-2 max-w-md">Spin it, zoom in, and click a region to see how many gamers orbit there and who&apos;s on top. Switch planets with the logos on the globe.</p>
 
           {/* Region panel or overview */}
           <div className="mt-5 glass p-4 min-h-[132px]">
@@ -155,9 +157,18 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
             )}
           </div>
 
-          <Link href={`/planets/${p.slug}`} className="mt-5 inline-flex items-center gap-2 glow-btn pressable rounded-full px-6 py-2.5 text-sm font-semibold text-white">
-            Enter the {p.name} planet <Icon name="arrowRight" size={15} />
-          </Link>
+          {/* Switch planets */}
+          {planets.length > 1 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {planets.map((pl) => (
+                <Link key={pl.slug} href={`/planets/${pl.slug}`}
+                  className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold border transition-colors ${pl.slug === p.slug ? "text-white" : "text-muted border-violet-400/25 hover:text-ink"}`}
+                  style={pl.slug === p.slug ? { borderColor: `${pl.accent}aa`, background: `${pl.accent}22`, color: "#fff" } : undefined}>
+                  <GameLogo logoUrl={pl.logoUrl} name={pl.name} size={20} rounded="rounded-md" /> {pl.name}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </section>
