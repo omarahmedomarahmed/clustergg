@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
+import { CLUSTER_MASCOT_URL } from "@/components/ClusterMascot";
 
 export type OrbQuest = {
   key: string; name: string; color: string; accent2: string; icon: string;
@@ -45,10 +46,14 @@ export default function FloatingQuestOrb({ quests }: { quests: OrbQuest[] }) {
       )}
 
       <button onClick={() => setOpen((v) => !v)} aria-label="Quests"
-        className="relative flex h-14 w-14 items-center justify-center rounded-full text-white transition-transform hover:scale-105 active:scale-95"
-        style={{ background: "radial-gradient(circle at 35% 30%, #a78bfa, #6d28d9 60%, #3b0764)", boxShadow: "0 0 24px -4px #8b5cf6, inset 0 2px 6px rgba(255,255,255,0.25)" }}>
-        <span className="absolute inset-0 rounded-full animate-ping opacity-30" style={{ background: "#8b5cf6" }} />
-        <Icon name="trophy" size={24} />
+        className="relative flex h-15 w-15 items-center justify-center rounded-full transition-transform hover:scale-105 active:scale-95"
+        style={{ height: 60, width: 60, background: "radial-gradient(circle at 35% 30%, #a78bfa, #6d28d9 60%, #3b0764)", boxShadow: "0 0 24px -4px #8b5cf6, inset 0 2px 6px rgba(255,255,255,0.25)" }}>
+        <span className="absolute inset-0 rounded-full animate-ping opacity-25" style={{ background: "#8b5cf6" }} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={CLUSTER_MASCOT_URL} alt="Quests" className="h-11 w-11 object-contain float-y" />
+        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-cyan-400 text-[10px] font-bold text-[#04051a]">
+          <Icon name="trophy" size={11} />
+        </span>
       </button>
     </div>
   );

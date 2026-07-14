@@ -7,6 +7,7 @@ import GameLogo from "@/components/GameLogo";
 import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
 import BrandGlyph from "@/components/BrandGlyph";
+import ClusterMascot from "@/components/ClusterMascot";
 import { slimImg } from "@/lib/img";
 
 export default async function Nav() {
@@ -47,9 +48,8 @@ export default async function Nav() {
   return (
     <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
-        <Link href={user ? "/feed" : "/"} className="flex items-center gap-2.5 shrink-0" aria-label="Cluster home">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/logo.png" alt="Cluster" width={34} height={34} className="rounded-full pulse-glow" />
+        <Link href={user ? "/feed" : "/"} className="flex items-center gap-2 shrink-0" aria-label="Cluster home">
+          <ClusterMascot size={38} float title="Cluster — your cosmic guide" />
           <span className="hidden sm:inline text-lg font-bold tracking-wide grad-text">CLUSTER</span>
         </Link>
 

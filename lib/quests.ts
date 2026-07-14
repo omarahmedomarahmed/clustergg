@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
@@ -34,6 +34,16 @@ export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string
 ];
 
 export const ACTION_LABEL: Record<string, string> = Object.fromEntries(ACTION_CATALOG.map((a) => [a.key, a.label]));
+
+// Cosmic quest emblem art (Higgsfield nano_banana). Served directly from the
+// CDN like the planet skins; admins can replace any of these in /admin/quests.
+const HF = "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082";
+export const QUEST_EMBLEMS: Record<string, string> = {
+  conquest: `${HF}/hf_20260714_193856_ea53f06e-b44d-4473-b67c-b3c2a2a736c7.png`,
+  orbit: `${HF}/hf_20260714_193903_a1b522be-910a-49df-8904-b4fbbf832f97.png`,
+  ascension: `${HF}/hf_20260714_193907_7a60de0d-d719-4228-860e-6ec7b44b1b31.png`,
+  // signal emblem pending regeneration (daily gen limit) — falls back to its icon.
+};
 
 // ===== Default quests (seeded once; fully editable afterwards) =====
 type DefaultTier = { name: string; description: string; thresholdQp: number };
@@ -111,7 +121,7 @@ export async function seedQuests(db: DB) {
     const questId = uid();
     await db.insert(schema.quests).values({
       id: questId, key: q.key, name: q.name, tagline: q.tagline, lore: q.lore,
-      color: q.color, accent2: q.accent2, icon: q.icon,
+      color: q.color, accent2: q.accent2, icon: q.icon, logoUrl: QUEST_EMBLEMS[q.key] ?? null,
       actionWeights: weightsFor(q.key), dailyCaps: capsFor(q.key), sortOrder: q.sortOrder,
     }).onConflictDoNothing();
     let i = 0;
@@ -120,6 +130,15 @@ export async function seedQuests(db: DB) {
         id: uid(), questId, tierIndex: i++, name: t.name, description: t.description, thresholdQp: t.thresholdQp,
       });
     }
+  }
+}
+
+// Backfill emblem art onto default quests that don't have a logo yet — never
+// clobbers an admin upload. Idempotent; safe to run every boot-maintenance.
+export async function ensureQuestArt(db: DB) {
+  for (const [key, url] of Object.entries(QUEST_EMBLEMS)) {
+    await db.update(schema.quests).set({ logoUrl: url })
+      .where(and(eq(schema.quests.key, key), isNull(schema.quests.logoUrl)));
   }
 }
 
