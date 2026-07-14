@@ -1,13 +1,41 @@
 import { getDb, schema } from "@/lib/db";
 import { BadgeIcon } from "@/components/BadgeChip";
 import { saveBadge, deleteBadge } from "@/app/actions/admin";
+import BadgeCriteriaBuilder from "@/components/BadgeCriteriaBuilder";
+import { PROVIDERS } from "@/lib/providers/registry";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Badges" };
 
+// Turn a stored criteria object into a plain-English line for the badge list.
+function describeCriteria(c: Record<string, unknown>): string {
+  switch (c.type) {
+    case "account_linked":
+      return c.provider ? `Links ${PROVIDERS.find((p) => p.id === c.provider)?.name ?? c.provider}` : "Links any game account";
+    case "accounts_linked_count":
+      return `Links ${c.min ?? 1}+ game accounts`;
+    case "stat_threshold":
+      return `${c.metric}${c.game ? ` (${c.game})` : ""} reaches ${c.min ?? 0}`;
+    case "follower_count":
+      return `Reaches ${c.min ?? 1} followers`;
+    case "community_activity":
+      return `${c.posts_min ?? 0} posts · ${c.reactions_received_min ?? 0} likes received`;
+    case "expert_tier":
+      return `Earns ${c.tier} expert tier`;
+    case "challenge_result":
+      return c.placement === "top1" ? "Wins a challenge" : "Places top 3 in a challenge";
+    default:
+      return "Custom rule";
+  }
+}
+
 export default async function AdminBadgesPage() {
   const db = await getDb();
   const badges = await db.select().from(schema.badges);
+
+  const criteriaProviders = PROVIDERS
+    .filter((p) => p.capabilities.length > 0)
+    .map((p) => ({ id: p.id, name: p.name, game: p.game, metrics: p.capabilities.map((c) => ({ key: c.key, label: c.label })) }));
 
   return (
     <div>
@@ -25,14 +53,7 @@ export default async function AdminBadgesPage() {
           <select name="category" className="input-cosmic">
             {["platform", "game", "community", "challenge"].map((c) => <option key={c}>{c}</option>)}
           </select>
-          <textarea
-            name="criteria" rows={2} className="input-cosmic sm:col-span-2 font-mono text-xs"
-            defaultValue='{"type":"stat_threshold","metric":"blitz_rating","min":2000}'
-          />
-          <p className="text-xs text-muted sm:col-span-2">
-            Criteria types: account_linked, accounts_linked_count, stat_threshold, follower_count,
-            community_activity, expert_tier, challenge_result.
-          </p>
+          <BadgeCriteriaBuilder providers={criteriaProviders} />
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked className="accent-violet-500" /> Active</label>
           <div className="sm:col-span-2">
             <button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Create badge</button>
@@ -47,7 +68,7 @@ export default async function AdminBadgesPage() {
             <div className="min-w-0 flex-1">
               <div className="font-semibold">{b.name} {!b.isActive && <span className="text-xs text-rose-300">(inactive)</span>}</div>
               <div className="text-xs text-muted">{b.description}</div>
-              <code className="text-[10px] text-cyan-300/80 block mt-1 truncate">{JSON.stringify(b.criteria)}</code>
+              <div className="text-[11px] text-cyan-300/80 mt-1">{describeCriteria(b.criteria as Record<string, unknown>)}</div>
             </div>
             <form action={deleteBadge.bind(null, b.id)}>
               <button className="text-xs text-rose-300 hover:underline">Delete</button>
