@@ -457,13 +457,31 @@ export async function ensurePlanetSkins(db: DB) {
 export async function migrateGameImagesToBlob(db: DB) {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return;
   const { uploadDataUrlToBlob } = await import("@/lib/blob");
+  const isData = (s?: string | null) => !!s && s.startsWith("data:");
+
   const games = await db.select().from(schema.games);
   for (const g of games) {
     const patch: Partial<typeof schema.games.$inferInsert> = {};
-    if (g.logoUrl?.startsWith("data:")) patch.logoUrl = (await uploadDataUrlToBlob(g.logoUrl, "game")) ?? undefined;
-    if (g.coverUrl?.startsWith("data:")) patch.coverUrl = (await uploadDataUrlToBlob(g.coverUrl, "game")) ?? undefined;
-    if (g.planetImageUrl?.startsWith("data:")) patch.planetImageUrl = (await uploadDataUrlToBlob(g.planetImageUrl, "game")) ?? undefined;
+    if (isData(g.logoUrl)) patch.logoUrl = (await uploadDataUrlToBlob(g.logoUrl!, "game")) ?? undefined;
+    if (isData(g.coverUrl)) patch.coverUrl = (await uploadDataUrlToBlob(g.coverUrl!, "game")) ?? undefined;
+    if (isData(g.planetImageUrl)) patch.planetImageUrl = (await uploadDataUrlToBlob(g.planetImageUrl!, "game")) ?? undefined;
     if (Object.keys(patch).length) await db.update(schema.games).set(patch).where(eq(schema.games.id, g.id));
+  }
+
+  const challenges = await db.select().from(schema.challenges);
+  for (const c of challenges) {
+    const patch: Partial<typeof schema.challenges.$inferInsert> = {};
+    if (isData(c.coverUrl)) patch.coverUrl = (await uploadDataUrlToBlob(c.coverUrl!, "challenge")) ?? undefined;
+    if (isData(c.heroUrl)) patch.heroUrl = (await uploadDataUrlToBlob(c.heroUrl!, "challenge")) ?? undefined;
+    if (Object.keys(patch).length) await db.update(schema.challenges).set(patch).where(eq(schema.challenges.id, c.id));
+  }
+
+  const users = await db.select({ id: schema.users.id, avatarUrl: schema.users.avatarUrl, bannerUrl: schema.users.bannerUrl }).from(schema.users);
+  for (const u of users) {
+    const patch: Partial<typeof schema.users.$inferInsert> = {};
+    if (isData(u.avatarUrl)) patch.avatarUrl = (await uploadDataUrlToBlob(u.avatarUrl!, "profile")) ?? undefined;
+    if (isData(u.bannerUrl)) patch.bannerUrl = (await uploadDataUrlToBlob(u.bannerUrl!, "profile")) ?? undefined;
+    if (Object.keys(patch).length) await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));
   }
 }
 
