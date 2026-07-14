@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
+import { slimImg } from "@/lib/img";
 import type { RegionStat } from "@/lib/regions";
 
 export type PlanetData = {
@@ -41,8 +42,8 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
     <section className="relative overflow-hidden">
       {/* Space backdrop + the game cover as faint texture behind the sphere */}
       <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 620px at 42% 20%, ${p.accent}1f, transparent 60%), radial-gradient(900px 500px at 85% 110%, ${p.accent2}14, transparent 60%), #04051a` }} />
-      {p.coverUrl && (
-        <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-[0.12]" style={{ backgroundImage: `url(${p.coverUrl})` }} />
+      {slimImg(p.coverUrl, 400000) && (
+        <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-[0.12]" style={{ backgroundImage: `url(${slimImg(p.coverUrl, 400000)})` }} />
       )}
       <div className="absolute inset-0 -z-10 opacity-30 bg-cover bg-center" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
 
@@ -67,7 +68,7 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
                 return (
                   <Link key={pl.slug} href={`/planets/${pl.slug}`} title={pl.name}
                     className={`rounded-xl transition-all ${active ? "scale-110" : "opacity-55 hover:opacity-100 hover:scale-105"}`}>
-                    <GameLogo logoUrl={pl.logoUrl} name={pl.name} size={active ? 44 : 34} rounded="rounded-xl"
+                    <GameLogo logoUrl={slimImg(pl.logoUrl, 300000)} name={pl.name} size={active ? 44 : 34} rounded="rounded-xl"
                       className={active ? "ring-2 shadow-lg" : "ring-1 ring-violet-400/25"} />
                   </Link>
                 );
@@ -164,7 +165,7 @@ export default function PlanetHero({ planets, initialSlug }: { planets: PlanetDa
                 <Link key={pl.slug} href={`/planets/${pl.slug}`}
                   className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm font-semibold border transition-colors ${pl.slug === p.slug ? "text-white" : "text-muted border-violet-400/25 hover:text-ink"}`}
                   style={pl.slug === p.slug ? { borderColor: `${pl.accent}aa`, background: `${pl.accent}22`, color: "#fff" } : undefined}>
-                  <GameLogo logoUrl={pl.logoUrl} name={pl.name} size={20} rounded="rounded-md" /> {pl.name}
+                  <GameLogo logoUrl={slimImg(pl.logoUrl, 300000)} name={pl.name} size={20} rounded="rounded-md" /> {pl.name}
                 </Link>
               ))}
             </div>

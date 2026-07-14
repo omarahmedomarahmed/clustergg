@@ -15,6 +15,7 @@ import PlanetHero, { type PlanetData } from "@/components/PlanetHero";
 import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
 import { timeAgo } from "@/lib/utils";
+import { slimImg } from "@/lib/img";
 import { REGIONS, toRegion, type RegionStat, type RegionKey } from "@/lib/regions";
 
 // Palette per skinned game for the interactive hero.
@@ -139,7 +140,7 @@ export default async function PlanetPage({
 
   const tierByUser = new Map(expertRows.map((r) => [r.userId, r.tier]));
   const path = `/planets/${space.slug}`;
-  const cover = game?.coverUrl ?? cms["banner.games"];
+  const cover = slimImg(game?.coverUrl, 400000) ?? cms["banner.games"];
   const activeChallenges = challenges.filter((c) => c.status === "active");
 
   // Live standings for each challenge on this planet (its own leaderboard).
@@ -275,7 +276,7 @@ export default async function PlanetPage({
                       <div key={ch.id} className="glass overflow-hidden">
                         <Link href={`${path}/challenges/${ch.id}`} className="block relative h-32 group overflow-hidden">
                           <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                            style={{ backgroundImage: `url(${ch.coverUrl ?? cover})` }} />
+                            style={{ backgroundImage: `url(${slimImg(ch.coverUrl, 400000) ?? cover})` }} />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/50 to-transparent" />
                           <span className={`absolute top-3 right-3 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest rounded-full px-2.5 py-1 border ${ch.status === "active" ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10" : "border-violet-400/40 text-muted bg-black/40"}`}>
                             {ch.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
