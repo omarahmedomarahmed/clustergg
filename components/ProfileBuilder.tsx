@@ -6,7 +6,8 @@ import Avatar from "@/components/Avatar";
 import ImageUpload from "@/components/ImageUpload";
 import { saveProfileTheme } from "@/app/actions/connections";
 import {
-  ProfileTheme, resolveTheme, themeToVars, bgStyle, TEMPLATES, FONTS, CURSORS, SECTIONS, BG_PRESETS,
+  ProfileTheme, resolveTheme, themeToVars, bgStyle, coverStyle, cursorValue,
+  TEMPLATES, FONTS, CURSOR_KEYS, SECTIONS, BG_PRESETS, AVATAR_SHAPES, avatarClip,
 } from "@/lib/theme";
 
 export type PreviewData = {
@@ -32,8 +33,6 @@ type Props = {
 
 const CARD_STYLES = ["glass", "solid", "outline", "flat"] as const;
 const BUTTON_STYLES = ["neon", "solid", "outline", "glass", "pill"] as const;
-const AVATAR_SHAPES = ["circle", "rounded", "square"] as const;
-const CURSOR_KEYS = ["default", "spark", "ring", "arrow", "gamepad", "crosshair"];
 
 function Swatch({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
@@ -41,7 +40,19 @@ function Swatch({ label, value, onChange }: { label: string; value: string; onCh
       <span>{label}</span>
       <span className="flex items-center gap-2">
         <input type="color" value={value} onChange={(e) => onChange(e.target.value)} className="h-7 w-9 rounded cursor-pointer bg-transparent border border-violet-400/30" />
-        <input value={value} onChange={(e) => onChange(e.target.value)} className="input-cosmic !w-24 !py-1 text-xs font-mono" />
+        <input value={value} onChange={(e) => onChange(e.target.value)} className="input-cosmic !w-20 !py-1 text-xs font-mono" />
+      </span>
+    </label>
+  );
+}
+
+function Slider({ label, value, min, max, step = 1, onChange, suffix }: { label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void; suffix?: string }) {
+  return (
+    <label className="text-xs text-muted flex items-center justify-between gap-3">
+      <span>{label}</span>
+      <span className="flex items-center gap-2">
+        <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="accent-violet-500 w-32" />
+        <span className="w-10 text-right text-ink/80">{value}{suffix}</span>
       </span>
     </label>
   );
@@ -55,7 +66,7 @@ export default function ProfileBuilder({
   const [bio, setBio] = useState(initialBio);
   const [avatarUrl, setAvatarUrl] = useState(initialAvatar);
   const [bannerUrl, setBannerUrl] = useState(initialBanner);
-  const [tab, setTab] = useState<"theme" | "colors" | "layout" | "cursor" | "identity">("theme");
+  const [tab, setTab] = useState<"identity" | "theme" | "style">("identity");
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -89,18 +100,22 @@ export default function ProfileBuilder({
   });
 
   const vars = useMemo(() => themeToVars(theme) as React.CSSProperties, [theme]);
-  const previewCursor = theme.cursor?.startsWith("http") ? `url("${theme.cursor}") 4 4, auto` : CURSORS[theme.cursor] || "auto";
+  const previewCursor = cursorValue(theme.cursor, theme.cursorColor);
 
   const tabs = [
-    { k: "theme", label: "Templates", icon: "grid" },
-    { k: "colors", label: "Colors", icon: "spark" },
-    { k: "layout", label: "Layout", icon: "edit" },
-    { k: "cursor", label: "Cursor", icon: "target" },
     { k: "identity", label: "Identity", icon: "user" },
+    { k: "theme", label: "Theme", icon: "spark" },
+    { k: "style", label: "Style", icon: "edit" },
   ] as const;
 
-  // Real content per section, styled with the live theme so the preview is
-  // exactly what visitors see. Falls back to a gentle hint when empty.
+  // Avatar shape → style (border-radius for basic, clip-path for fancy).
+  const shapeStyle = (size: number): React.CSSProperties => {
+    const clip = avatarClip(theme.avatarShape);
+    const radius = theme.avatarShape === "circle" ? "9999px" : theme.avatarShape === "rounded" ? "22%" : theme.avatarShape === "square" ? "10%" : "0";
+    return { width: size, height: size, borderRadius: clip ? 0 : radius, clipPath: clip, WebkitClipPath: clip };
+  };
+
+  // Real content per section, styled with the live theme.
   const pd = previewData;
   const empty = (msg: string) => <div className="text-xs" style={{ color: theme.muted }}>{msg}</div>;
   const chip = (label: string, i: number) => (
@@ -116,7 +131,7 @@ export default function ProfileBuilder({
                 <div className="font-semibold truncate">{a.name}</div>
                 <div style={{ color: theme.muted }}>{a.provider}</div>
               </div>))}</div>
-          : empty("No accounts linked yet — connect a game above.");
+          : empty("No accounts linked yet — connect a game.");
       case "standings":
         return pd.standingsCount ? empty(`Ranked across ${pd.standingsCount} game account${pd.standingsCount > 1 ? "s" : ""}.`) : empty("Link a game to appear on leaderboards.");
       case "trophies":
@@ -129,55 +144,100 @@ export default function ProfileBuilder({
         return pd.postsCount ? empty(`${pd.postsCount} post${pd.postsCount > 1 ? "s" : ""} across your planets.`) : empty("No posts yet.");
       case "spaces":
         return pd.spaces.length ? <div className="flex flex-wrap gap-1.5">{pd.spaces.map((s, i) => chip(s.name, i))}</div> : empty("Join a planet to show it here.");
-      default:
-        return null;
+      default: return null;
     }
   };
 
+  const pill = (active: boolean) => `stat-tab ${active ? "stat-tab-active" : ""}`;
+
   return (
-    <div className="space-y-6">
-      {/* ===== Controls: full-width sticky banner, no horizontal scroll ===== */}
-      <div className="glass p-4 md:p-5 sticky top-16 z-30 border border-violet-400/25">
-        <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-          <div className="flex flex-wrap gap-2">
+    <div className="grid lg:grid-cols-[minmax(340px,380px)_1fr] gap-6 items-start">
+      {/* ===== Editor (left) ===== */}
+      <div className="glass p-4 md:p-5 lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex gap-1.5">
             {tabs.map((t) => (
               <button key={t.k} onClick={() => setTab(t.k)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium border transition-colors ${tab === t.k ? "border-cyan-400/70 bg-cyan-400/10 text-cyan-200" : "border-violet-400/25 text-muted hover:text-ink hover:border-violet-400/50"}`}>
-                <Icon name={t.icon} size={15} /> {t.label}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition-colors ${tab === t.k ? "border-cyan-400/70 bg-cyan-400/10 text-cyan-200" : "border-violet-400/25 text-muted hover:text-ink"}`}>
+                <Icon name={t.icon} size={14} /> {t.label}
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-3">
-            {saveError && <span className="text-xs text-rose-300">{saveError}</span>}
-            <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">
-              {pending ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
-            </button>
-          </div>
         </div>
 
-        {tab === "theme" && (
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2.5">
-            {TEMPLATES.map((t) => {
-              const rt = resolveTheme({ ...t.theme, template: t.key });
-              return (
-                <button key={t.key} onClick={() => applyTemplate(t.key)}
-                  className={`rounded-xl p-3 text-left border transition-all ${theme.template === t.key ? "border-cyan-400/70 scale-[1.02]" : "border-violet-400/20 hover:border-violet-400/50"}`}
-                  style={{ background: rt.bg }}>
-                  <div className="flex gap-1 mb-2">
-                    <span className="h-4 w-4 rounded-full" style={{ background: rt.accent }} />
-                    <span className="h-4 w-4 rounded-full" style={{ background: rt.accent2 }} />
-                    <span className="h-4 w-4 rounded-full" style={{ background: rt.panel, border: "1px solid rgba(255,255,255,.2)" }} />
-                  </div>
-                  <div className="text-xs font-semibold" style={{ color: rt.text }}>{t.name}</div>
-                </button>
-              );
-            })}
+        {/* ---------- IDENTITY ---------- */}
+        {tab === "identity" && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-muted">Flex title (under your name)</label>
+              <input value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} maxLength={60} placeholder="e.g. Blitz Grandmaster" className="input-cosmic mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-muted">Bio</label>
+              <textarea value={bio} onChange={(e) => { setBio(e.target.value); setSaved(false); }} rows={3} maxLength={400} className="input-cosmic mt-1" />
+            </div>
+
+            <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={480} quality={0.82} scope="profile" />
+            <div>
+              <label className="text-xs text-muted block mb-1.5">Avatar shape</label>
+              <div className="flex flex-wrap gap-1.5">
+                {AVATAR_SHAPES.map((s) => <button key={s} onClick={() => set("avatarShape", s)} className={`${pill(theme.avatarShape === s)} capitalize`}>{s}</button>)}
+              </div>
+            </div>
+            <Slider label="Avatar size" value={theme.avatarSize} min={80} max={200} onChange={(v) => set("avatarSize", v)} suffix="px" />
+
+            <div className="border-t border-violet-400/15 pt-4">
+              <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1280} quality={0.78} scope="profile" />
+              <div className="mt-2 space-y-2">
+                <Slider label="Cover height" value={theme.coverHeight} min={120} max={360} onChange={(v) => set("coverHeight", v)} suffix="px" />
+                <Slider label="Cover darken" value={theme.coverOverlay} min={0} max={90} onChange={(v) => set("coverOverlay", v)} suffix="%" />
+              </div>
+            </div>
+
+            <div className="border-t border-violet-400/15 pt-4">
+              <label className="text-xs text-muted block mb-1.5">Page background image</label>
+              <div className="grid grid-cols-5 gap-1.5 mb-2">
+                <button onClick={() => set("bgImage", null)} className={`h-9 rounded-lg border text-[9px] ${!theme.bgImage ? "border-cyan-400/70" : "border-violet-400/20"}`} style={{ background: theme.bg }}>None</button>
+                {BG_PRESETS.map((b) => (
+                  <button key={b.url} onClick={() => set("bgImage", b.url)} title={b.name}
+                    className={`h-9 rounded-lg border bg-cover bg-center ${theme.bgImage === b.url ? "border-cyan-400/70" : "border-violet-400/20"}`}
+                    style={{ backgroundImage: `url("${b.url}")` }} />
+                ))}
+              </div>
+              <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1280} quality={0.72} scope="profile" />
+              <div className="mt-2 space-y-2">
+                <Slider label="Background blur" value={theme.bgBlur} min={0} max={20} onChange={(v) => set("bgBlur", v)} suffix="px" />
+                <Slider label="Background darken" value={theme.bgOverlay} min={0} max={90} onChange={(v) => set("bgOverlay", v)} suffix="%" />
+              </div>
+            </div>
           </div>
         )}
 
-        {tab === "colors" && (
-          <div className="grid lg:grid-cols-[1fr_1.2fr] gap-x-8 gap-y-5 items-start">
-            <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+        {/* ---------- THEME ---------- */}
+        {tab === "theme" && (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-muted block mb-2">Templates</label>
+              <div className="grid grid-cols-2 gap-2">
+                {TEMPLATES.map((t) => {
+                  const rt = resolveTheme({ ...t.theme, template: t.key });
+                  return (
+                    <button key={t.key} onClick={() => applyTemplate(t.key)}
+                      className={`rounded-xl p-2.5 text-left border transition-all ${theme.template === t.key ? "border-cyan-400/70 scale-[1.02]" : "border-violet-400/20 hover:border-violet-400/50"}`}
+                      style={{ background: rt.bg }}>
+                      <div className="flex gap-1 mb-1.5">
+                        <span className="h-3.5 w-3.5 rounded-full" style={{ background: rt.accent }} />
+                        <span className="h-3.5 w-3.5 rounded-full" style={{ background: rt.accent2 }} />
+                        <span className="h-3.5 w-3.5 rounded-full" style={{ background: rt.panel, border: "1px solid rgba(255,255,255,.2)" }} />
+                      </div>
+                      <div className="text-[11px] font-semibold" style={{ color: rt.text }}>{t.name}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="border-t border-violet-400/15 pt-4 space-y-3">
+              <div className="text-xs uppercase tracking-widest text-muted">Recolor everything</div>
               <Swatch label="Page background" value={theme.bg} onChange={(v) => set("bg", v)} />
               <Swatch label="Card background" value={theme.panel} onChange={(v) => set("panel", v)} />
               <Swatch label="Accent" value={theme.accent} onChange={(v) => set("accent", v)} />
@@ -185,68 +245,42 @@ export default function ProfileBuilder({
               <Swatch label="Text" value={theme.text} onChange={(v) => set("text", v)} />
               <Swatch label="Muted text" value={theme.muted} onChange={(v) => set("muted", v)} />
             </div>
-            <div className="space-y-3">
-              <label className="text-xs text-muted block">Page background image</label>
-              <div className="grid grid-cols-5 gap-1.5">
-                <button onClick={() => set("bgImage", null)} className={`h-10 rounded-lg border text-[9px] ${!theme.bgImage ? "border-cyan-400/70" : "border-violet-400/20"}`} style={{ background: theme.bg }}>None</button>
-                {BG_PRESETS.map((b) => (
-                  <button key={b.url} onClick={() => set("bgImage", b.url)} title={b.name}
-                    className={`h-10 rounded-lg border bg-cover bg-center ${theme.bgImage === b.url ? "border-cyan-400/70" : "border-violet-400/20"}`}
-                    style={{ backgroundImage: `url("${b.url}")` }} />
-                ))}
-              </div>
-              <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1280} quality={0.72} scope="profile" hint="Upload your own background image (auto-optimized)." />
-              <label className="text-xs text-muted flex items-center justify-between gap-3">Background blur
-                <input type="range" min={0} max={20} value={theme.bgBlur} onChange={(e) => set("bgBlur", Number(e.target.value))} className="accent-violet-500 flex-1 max-w-48" />
-              </label>
-              <label className="text-xs text-muted flex items-center justify-between gap-3">Background darken (overlay)
-                <input type="range" min={0} max={90} value={theme.bgOverlay} onChange={(e) => set("bgOverlay", Number(e.target.value))} className="accent-violet-500 flex-1 max-w-48" />
-              </label>
-            </div>
           </div>
         )}
 
-        {tab === "layout" && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4 items-start">
+        {/* ---------- STYLE ---------- */}
+        {tab === "style" && (
+          <div className="space-y-4">
             <div>
               <label className="text-xs text-muted block mb-1.5">Card style</label>
               <div className="flex flex-wrap gap-1.5">
-                {CARD_STYLES.map((s) => <button key={s} onClick={() => set("cardStyle", s)} className={`stat-tab capitalize ${theme.cardStyle === s ? "stat-tab-active" : ""}`}>{s}</button>)}
+                {CARD_STYLES.map((s) => <button key={s} onClick={() => set("cardStyle", s)} className={`${pill(theme.cardStyle === s)} capitalize`}>{s}</button>)}
               </div>
             </div>
             <div>
               <label className="text-xs text-muted block mb-1.5">Button style</label>
               <div className="flex flex-wrap gap-1.5">
-                {BUTTON_STYLES.map((s) => <button key={s} onClick={() => set("buttonStyle", s)} className={`stat-tab capitalize ${theme.buttonStyle === s ? "stat-tab-active" : ""}`}>{s}</button>)}
+                {BUTTON_STYLES.map((s) => <button key={s} onClick={() => set("buttonStyle", s)} className={`${pill(theme.buttonStyle === s)} capitalize`}>{s}</button>)}
               </div>
             </div>
             <div>
               <label className="text-xs text-muted block mb-1.5">Font</label>
               <div className="flex flex-wrap gap-1.5">
-                {Object.keys(FONTS).map((f) => <button key={f} onClick={() => set("font", f)} className={`stat-tab capitalize ${theme.font === f ? "stat-tab-active" : ""}`}>{f}</button>)}
+                {Object.keys(FONTS).map((f) => <button key={f} onClick={() => set("font", f)} className={`${pill(theme.font === f)} capitalize`}>{f}</button>)}
               </div>
             </div>
-            <label className="text-xs text-muted flex items-center justify-between">Corner radius
-              <input type="range" min={0} max={28} value={theme.radius} onChange={(e) => set("radius", Number(e.target.value))} className="accent-violet-500 w-32" />
-            </label>
-            <div>
-              <label className="text-xs text-muted block mb-1.5">Avatar shape</label>
-              <div className="flex gap-1.5">
-                {AVATAR_SHAPES.map((s) => <button key={s} onClick={() => set("avatarShape", s)} className={`stat-tab capitalize ${theme.avatarShape === s ? "stat-tab-active" : ""}`}>{s}</button>)}
-              </div>
-            </div>
-            <div className="sm:col-span-2 lg:col-span-3">
+            <Slider label="Corner radius" value={theme.radius} min={0} max={28} onChange={(v) => set("radius", v)} suffix="px" />
+
+            <div className="border-t border-violet-400/15 pt-4">
               <label className="text-xs text-muted block mb-2">Sections — show, hide &amp; reorder</label>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+              <div className="space-y-1.5">
                 {theme.order.map((key, i) => {
                   const sec = SECTIONS.find((s) => s.key === key);
                   if (!sec) return null;
                   const on = theme.sections[key];
                   return (
                     <div key={key} className="flex items-center gap-2 rounded-lg border border-violet-400/15 px-2.5 py-1.5">
-                      <button onClick={() => toggleSection(key)} className={`text-xs ${on ? "text-emerald-300" : "text-muted"}`}>
-                        <Icon name={on ? "eye" : "x"} size={14} />
-                      </button>
+                      <button onClick={() => toggleSection(key)} className={`text-xs ${on ? "text-emerald-300" : "text-muted"}`}><Icon name={on ? "eye" : "x"} size={14} /></button>
                       <span className={`text-xs flex-1 ${on ? "" : "text-muted line-through"}`}>{sec.label}</span>
                       <button onClick={() => moveSection(key, -1)} disabled={i === 0} className="text-muted hover:text-ink disabled:opacity-30"><Icon name="arrowUp" size={13} /></button>
                       <button onClick={() => moveSection(key, 1)} disabled={i === theme.order.length - 1} className="text-muted hover:text-ink disabled:opacity-30"><Icon name="arrowDown" size={13} /></button>
@@ -255,80 +289,53 @@ export default function ProfileBuilder({
                 })}
               </div>
             </div>
-          </div>
-        )}
 
-        {tab === "cursor" && (
-          <div className="space-y-4">
-            <p className="text-xs text-muted">Anyone who opens your profile sees this cursor.</p>
-            <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2">
-              {CURSOR_KEYS.map((c) => (
-                <button key={c} onClick={() => set("cursor", c)}
-                  className={`rounded-lg border p-4 text-center capitalize text-xs ${theme.cursor === c ? "border-cyan-400/70 bg-cyan-400/10" : "border-violet-400/20"}`}
-                  style={{ cursor: c === "default" ? "auto" : (CURSORS[c] || "auto") }}>
-                  {c}
-                </button>
-              ))}
-            </div>
-            <div>
-              <label className="text-xs text-muted">Custom cursor image URL (32×32 PNG works best)</label>
-              <input value={theme.cursor.startsWith("http") ? theme.cursor : ""} onChange={(e) => set("cursor", e.target.value || "default")} placeholder="https://…" className="input-cosmic mt-1 text-xs" />
-            </div>
-          </div>
-        )}
-
-        {tab === "identity" && (
-          <div className="grid md:grid-cols-2 gap-x-8 gap-y-4 items-start">
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-muted">Flex title (under your name)</label>
-                <input value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} maxLength={60} placeholder="e.g. Blitz Grandmaster" className="input-cosmic mt-1" />
+            <div className="border-t border-violet-400/15 pt-4">
+              <label className="text-xs text-muted block mb-2">Custom cursor <span className="text-muted/70">(everyone sees it on your profile)</span></label>
+              <div className="grid grid-cols-4 gap-1.5 mb-2">
+                {CURSOR_KEYS.map((c) => (
+                  <button key={c} onClick={() => set("cursor", c)}
+                    className={`rounded-lg border py-2.5 text-center capitalize text-[11px] ${theme.cursor === c ? "border-cyan-400/70 bg-cyan-400/10" : "border-violet-400/20"}`}
+                    style={{ cursor: cursorValue(c, theme.cursorColor) }}>{c}</button>
+                ))}
               </div>
-              <div>
-                <label className="text-xs text-muted">Bio</label>
-                <textarea value={bio} onChange={(e) => { setBio(e.target.value); setSaved(false); }} rows={3} maxLength={400} className="input-cosmic mt-1" />
-              </div>
-            </div>
-            <div className="space-y-4">
-              <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={480} quality={0.82} scope="profile" hint="Square image works best." />
-              <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1280} quality={0.78} scope="profile" hint="Wide image shown behind your name." />
+              <Swatch label="Cursor color" value={theme.cursorColor} onChange={(v) => set("cursorColor", v)} />
+              <input value={theme.cursor.startsWith("http") ? theme.cursor : ""} onChange={(e) => set("cursor", e.target.value || "default")} placeholder="or paste a custom 32×32 PNG URL" className="input-cosmic mt-2 text-xs" />
             </div>
           </div>
         )}
       </div>
 
-      {/* ===== Live preview ===== */}
-      <div>
-        <div className="text-xs text-muted mb-2 flex items-center gap-2"><Icon name="eye" size={13} /> Live preview — this is exactly what visitors see at clustergg.com/u/{slug}</div>
+      {/* ===== Live preview (right) ===== */}
+      <div className="lg:sticky lg:top-16">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-xs text-muted flex items-center gap-2"><Icon name="eye" size={13} /> Live preview — clustergg.com/u/{slug}</div>
+          <div className="flex items-center gap-3">
+            {saveError && <span className="text-xs text-rose-300">{saveError}</span>}
+            <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">
+              {pending ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
+            </button>
+          </div>
+        </div>
         <div className="rounded-2xl overflow-hidden border border-violet-400/20">
-          <div
-            className="profile-root p-5"
-            style={{
-              ...vars,
-              cursor: previewCursor,
-              ...bgStyle(theme),
-            }}
-          >
+          <div className="profile-root" style={{ ...vars, cursor: previewCursor !== "auto" ? previewCursor : undefined, ...bgStyle(theme) }}>
             {/* Cover */}
-            <div className="h-28 rounded-xl mb-[-2.5rem] bg-cover bg-center" style={{ backgroundImage: bannerUrl ? `url("${bannerUrl}")` : `linear-gradient(92deg, ${theme.accent}, ${theme.accent2})` }} />
-            <div className="px-2">
-              <div className="relative flex items-end gap-3">
-                <div className={`p-avatar-${theme.avatarShape} overflow-hidden border-2`} style={{ borderColor: theme.accent, width: 72, height: 72 }}>
-                  <Avatar name={displayName} src={avatarUrl || null} size={72} className="!rounded-none" />
+            <div className="bg-cover bg-center" style={{ ...coverStyle(theme, bannerUrl || null), height: Math.round(theme.coverHeight * 0.62) }} />
+            <div className="px-5 pb-5" style={{ marginTop: -Math.round(theme.avatarSize * 0.4) }}>
+              <div className="flex items-end gap-3">
+                <div className="overflow-hidden border-2 shrink-0" style={{ ...shapeStyle(Math.round(theme.avatarSize * 0.62)), borderColor: theme.accent }}>
+                  <Avatar name={displayName} src={avatarUrl || null} size={Math.round(theme.avatarSize * 0.62)} className="!rounded-none" />
                 </div>
-                <div className="pb-1">
-                  <div className="text-xl font-bold" style={{ color: theme.text }}>{displayName}</div>
+                <div className="pb-1 min-w-0">
+                  <div className="text-xl font-bold truncate" style={{ color: theme.text }}>{displayName}</div>
                   {title && <div className="text-sm p-grad font-semibold" style={{ "--p-accent": theme.accent, "--p-accent2": theme.accent2 } as React.CSSProperties}>{title}</div>}
                 </div>
               </div>
               {bio && <p className="text-sm mt-3" style={{ color: theme.muted }}>{bio}</p>}
-
               <div className="flex gap-2 mt-3">
                 <button className={`p-btn p-btn-${theme.buttonStyle}`}>Follow</button>
                 <button className={`p-btn p-btn-${theme.buttonStyle === "neon" ? "glass" : "outline"}`}>Message</button>
               </div>
-
-              {/* Section previews in chosen order — real content, live-themed */}
               <div className="mt-5 space-y-3">
                 {theme.order.filter((k) => theme.sections[k]).map((key) => {
                   const sec = SECTIONS.find((s) => s.key === key)!;

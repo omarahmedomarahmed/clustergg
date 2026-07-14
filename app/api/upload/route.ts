@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser, isStaff } from "@/lib/auth";
-import { uid } from "@/lib/utils";
+import { uploadDataUrlToBlob } from "@/lib/blob";
 
 export const dynamic = "force-dynamic";
 
@@ -32,28 +32,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ url: dataUrl, hosted: false });
   }
 
-  const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
-    // No blob store configured — fall back to the data URL.
-    return NextResponse.json({ url: dataUrl, hosted: false });
-  }
-
-  try {
-    const match = /^data:(image\/[a-z+]+);base64,(.*)$/i.exec(dataUrl);
-    if (!match) return NextResponse.json({ url: dataUrl, hosted: false });
-    const contentType = match[1];
-    const ext = contentType.split("/")[1].replace("+xml", "").replace("jpeg", "jpg");
-    const buffer = Buffer.from(match[2], "base64");
-    const { put } = await import("@vercel/blob");
-    const { url } = await put(`uploads/${scope}/${uid()}.${ext}`, buffer, {
-      access: "public",
-      contentType,
-      token,
-      addRandomSuffix: false,
-    });
-    return NextResponse.json({ url, hosted: true });
-  } catch {
-    // Any blob failure → safe fallback so the user's upload still saves.
-    return NextResponse.json({ url: dataUrl, hosted: false });
-  }
+  const hosted = await uploadDataUrlToBlob(dataUrl, scope);
+  // Fall back to the data URL when Blob isn't configured or upload failed.
+  return NextResponse.json({ url: hosted ?? dataUrl, hosted: !!hosted });
 }

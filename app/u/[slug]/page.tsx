@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { getProvider } from "@/lib/providers/registry";
 import { syncUserAccountsIfStale } from "@/lib/sync";
-import { resolveTheme, themeToVars, bgStyle } from "@/lib/theme";
+import { resolveTheme, themeToVars, bgStyle, coverStyle, avatarClip } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
@@ -259,14 +259,14 @@ export default async function ProfilePage({ params }: Props) {
 
       {/* Cover */}
       <div className="relative">
-        <div className="h-52 md:h-64 bg-cover bg-center" style={{ backgroundImage: user.bannerUrl ? `url("${user.bannerUrl}")` : `linear-gradient(92deg, ${theme.accent}, ${theme.accent2})` }} />
+        <div className="bg-cover bg-center" style={{ ...coverStyle(theme, user.bannerUrl), height: theme.coverHeight }} />
         <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, transparent, ${theme.bg})` }} />
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 relative -mt-16">
+      <div className="mx-auto max-w-5xl px-4 relative" style={{ marginTop: -Math.round(theme.avatarSize * 0.42) }}>
         <div className="flex flex-wrap items-end gap-5">
-          <div className={`p-avatar-${theme.avatarShape} overflow-hidden border-2`} style={{ borderColor: theme.accent, width: 120, height: 120 }}>
-            <Avatar name={user.displayName} src={user.avatarUrl} size={120} className="!rounded-none" />
+          <div className="overflow-hidden border-2 shrink-0" style={{ borderColor: theme.accent, width: theme.avatarSize, height: theme.avatarSize, borderRadius: avatarClip(theme.avatarShape) ? 0 : (theme.avatarShape === "circle" ? "9999px" : theme.avatarShape === "rounded" ? "22%" : "10%"), clipPath: avatarClip(theme.avatarShape), WebkitClipPath: avatarClip(theme.avatarShape) }}>
+            <Avatar name={user.displayName} src={user.avatarUrl} size={theme.avatarSize} className="!rounded-none" />
           </div>
           <div className="min-w-0 flex-1 pb-1">
             <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2 flex-wrap" style={{ color: theme.text }}>

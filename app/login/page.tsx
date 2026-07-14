@@ -22,10 +22,6 @@ export default function LoginPage() {
         <p className="mt-5 text-sm text-muted text-center">
           New here? <Link href="/signup" className="text-cyan-300 hover:underline">Join the Cluster</Link>
         </p>
-        <p className="mt-3 text-xs text-muted/70 text-center">
-          Demo mode: try <code className="text-cyan-300/80">nova@demo.gg</code> / <code className="text-cyan-300/80">cluster-demo</code>
-          {" "}or admin <code className="text-amber-300/80">admin@clustergg.com</code> / <code className="text-amber-300/80">cluster-admin</code>
-        </p>
       </div>
     </div>
   );
