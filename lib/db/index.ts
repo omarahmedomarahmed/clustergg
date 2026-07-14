@@ -29,6 +29,8 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "profile_visibility" text NOT NULL DEFAULT 'public'`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "allow_messages_from" text NOT NULL DEFAULT 'everyone'`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_notifications" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_username" text`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "profile_views" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "show_in_nav" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_image_url" text`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_bg_url" text`,

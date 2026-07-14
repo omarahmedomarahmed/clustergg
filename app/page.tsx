@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
 import { getContent } from "@/lib/cms";
 import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import { BadgeIcon } from "@/components/BadgeChip";
@@ -9,6 +10,7 @@ import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
 import PlanetHero from "@/components/PlanetHero";
+import OAuthButtons from "@/components/OAuthButtons";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { timeAgo } from "@/lib/utils";
 
@@ -16,6 +18,7 @@ export const dynamic = "force-dynamic";
 
 export default async function LandingPage() {
   const db = await getDb();
+  const viewer = await getCurrentUser();
   const skinnedPlanets = await buildSkinnedPlanets(db);
   const c = await getContent([
     "hero.badge", "hero.title.line1", "hero.title.line2", "hero.subtitle",
@@ -106,13 +109,24 @@ export default async function LandingPage() {
           <p className="rise-in rise-in-2 mx-auto mt-6 max-w-2xl text-lg text-muted leading-relaxed">
             {c["hero.subtitle"]}
           </p>
-          <div className="rise-in rise-in-3 mt-10 flex flex-wrap items-center justify-center gap-4">
-            <Link href="/signup" className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white text-lg">
-              {c["hero.cta.primary"]} <Icon name="arrowRight" size={16} className="ml-1" />
-            </Link>
-            <Link href="/leaderboards" className="ghost-btn pressable rounded-full px-8 py-3.5 text-lg">
-              {c["hero.cta.secondary"]}
-            </Link>
+          <div className="rise-in rise-in-3 mt-10 flex flex-col items-center gap-4">
+            {viewer ? (
+              <Link href="/feed" className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white text-lg">
+                Enter your feed <Icon name="arrowRight" size={16} className="ml-1" />
+              </Link>
+            ) : (
+              <>
+                <div className="w-full max-w-xs"><OAuthButtons next="/onboarding" /></div>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Link href="/signup" className="ghost-btn pressable rounded-full px-6 py-2.5">
+                    {c["hero.cta.primary"]} <Icon name="arrowRight" size={15} className="ml-1" />
+                  </Link>
+                  <Link href="/leaderboards" className="ghost-btn pressable rounded-full px-6 py-2.5">
+                    {c["hero.cta.secondary"]}
+                  </Link>
+                </div>
+              </>
+            )}
           </div>
 
           <div className="rise-in rise-in-4 mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">

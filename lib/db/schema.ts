@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   status: text("status").notNull().default("active"), // active | suspended | banned
   isVerified: boolean("is_verified").notNull().default(false),
   primarySignupProvider: text("primary_signup_provider"),
+  discordUsername: text("discord_username"), // Discord handle — the gamer's universal identity, shown everywhere
+  profileViews: integer("profile_views").notNull().default(0), // public view counter (brag number)
   profileVisibility: text("profile_visibility").notNull().default("public"), // public | followers | private
   allowMessagesFrom: text("allow_messages_from").notNull().default("everyone"), // everyone | following | nobody
   emailNotifications: boolean("email_notifications").notNull().default(true),

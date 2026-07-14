@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
 import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
+import BrandGlyph from "@/components/BrandGlyph";
 import { slimImg } from "@/lib/img";
 
 export default async function Nav() {
@@ -92,10 +93,12 @@ export default async function Nav() {
             </>
           ) : (
             <>
-              <Link href="/login" className="text-sm text-muted hover:text-ink">Log in</Link>
-              <Link href="/signup" className="glow-btn pressable rounded-full px-4 py-1.5 text-sm font-semibold text-white">
-                Join the Cluster
-              </Link>
+              <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">Log in</Link>
+              <a href="/api/auth/discord?next=/onboarding" title="Sign in with Discord"
+                className="pressable inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white"
+                style={{ background: "#5865f2", boxShadow: "0 6px 18px -8px #5865f2" }}>
+                <BrandGlyph provider="discord" size={16} /> <span className="hidden sm:inline">Sign in with</span> Discord
+              </a>
             </>
           )}
           <MobileMenu links={mobileLinks} loggedIn={!!user} profileSlug={user?.slug ?? null} />

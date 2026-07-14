@@ -17,6 +17,7 @@ import { getContent } from "@/lib/cms";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
 import { buildSkinnedPlanets } from "@/lib/planets";
+import OAuthButtons from "@/components/OAuthButtons";
 
 export const dynamic = "force-dynamic";
 
@@ -260,8 +261,9 @@ export default async function PlanetPage({
                   </div>
                 </form>
               ) : (
-                <div className="glass p-4 mb-6 text-center text-sm text-muted">
-                  <Link href="/login" className="text-cyan-300 underline">Log in</Link> to post on this planet.
+                <div className="glass p-5 mb-6 text-center">
+                  <div className="text-sm text-muted mb-3">Sign in with Discord to join {space.name} and post on this planet.</div>
+                  <div className="mx-auto max-w-xs"><OAuthButtons next={path} /></div>
                 </div>
               )}
               <div className="space-y-4">
