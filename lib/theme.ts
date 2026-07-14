@@ -22,11 +22,30 @@ export type ProfileTheme = {
   font: string;              // font family key
   radius: number;            // corner radius px
   cursor: string;            // cursor preset key or a custom image URL
+  cursorColor: string;       // tint for the built-in cursors
   coverUrl: string | null;   // profile cover/banner image
-  avatarShape: "circle" | "rounded" | "square";
+  coverHeight: number;       // cover banner height px
+  coverOverlay: number;      // 0-90 % dark overlay over the cover image
+  avatarShape: AvatarShape;
+  avatarSize: number;        // avatar diameter px
   sections: Record<string, boolean>;  // visibility
   order: string[];           // section order
 };
+
+export type AvatarShape = "circle" | "rounded" | "square" | "heart" | "star" | "lightning" | "hexagon";
+export const AVATAR_SHAPES: AvatarShape[] = ["circle", "rounded", "square", "hexagon", "heart", "star", "lightning"];
+
+// Scalable clip-path polygons (% so they resize with the avatar). circle /
+// rounded / square use border-radius instead.
+const CLIP: Partial<Record<AvatarShape, string>> = {
+  heart: "polygon(50% 100%, 14% 66%, 0% 38%, 8% 16%, 30% 10%, 50% 27%, 70% 10%, 92% 16%, 100% 38%, 86% 66%)",
+  star: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)",
+  lightning: "polygon(52% 0%, 18% 56%, 44% 56%, 28% 100%, 84% 40%, 52% 40%)",
+  hexagon: "polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%)",
+};
+export function avatarClip(shape: AvatarShape): string | undefined {
+  return CLIP[shape];
+}
 
 export const SECTIONS = [
   { key: "accounts", label: "Connected accounts" },
@@ -46,22 +65,28 @@ export const FONTS: Record<string, string> = {
   round: "'Trebuchet MS', 'Segoe UI', sans-serif",
 };
 
-// Built-in cursors (data-URI SVGs so they need no external assets). Custom URLs
-// (http...) are used verbatim.
-export const CURSORS: Record<string, string> = {
-  default: "",
-  none: "",
-  crosshair: "crosshair",
-  pointer2: "pointer",
-  // A glowing dot cursor
-  spark: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Ccircle cx='12' cy='12' r='5' fill='%2322d3ee'/%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='%238b5cf6' stroke-width='1.5'/%3E%3C/svg%3E") 12 12, auto`,
-  // A neon ring
-  ring: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Ccircle cx='14' cy='14' r='9' fill='none' stroke='%23e879f9' stroke-width='2'/%3E%3Ccircle cx='14' cy='14' r='2' fill='%23e879f9'/%3E%3C/svg%3E") 14 14, auto`,
-  // A retro arrow
-  arrow: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpath d='M4 2l14 8-6 1.5L14 18l-3 1-2-6-5 1z' fill='%2322d3ee' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") 4 2, auto`,
-  // A game controller
-  gamepad: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28'%3E%3Crect x='4' y='9' width='20' height='11' rx='5' fill='%238b5cf6'/%3E%3Ccircle cx='10' cy='14' r='1.5' fill='%23fff'/%3E%3Ccircle cx='19' cy='13' r='1.3' fill='%2322d3ee'/%3E%3C/svg%3E") 14 14, auto`,
-};
+// Cursor presets — recolorable. Custom URLs (http…) are used verbatim.
+export const CURSOR_KEYS = ["default", "crosshair", "spark", "ring", "arrow", "gamepad", "dot", "sword"];
+const enc = (c: string) => c.replace("#", "%23");
+
+// Build the CSS cursor value for a preset key in the chosen color.
+export function cursorValue(key: string, color = "#22d3ee"): string {
+  if (!key || key === "default") return "auto";
+  if (key === "crosshair") return "crosshair";
+  if (key.startsWith("http")) return `url("${key}") 8 8, auto`;
+  const c = enc(color);
+  const svg = (w: number, h: number, body: string) =>
+    `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'%3E${body}%3C/svg%3E")`;
+  switch (key) {
+    case "spark": return `${svg(24, 24, `%3Ccircle cx='12' cy='12' r='5' fill='${c}'/%3E%3Ccircle cx='12' cy='12' r='10' fill='none' stroke='${c}' stroke-width='1.5' opacity='0.6'/%3E`)} 12 12, auto`;
+    case "ring": return `${svg(28, 28, `%3Ccircle cx='14' cy='14' r='9' fill='none' stroke='${c}' stroke-width='2'/%3E%3Ccircle cx='14' cy='14' r='2' fill='${c}'/%3E`)} 14 14, auto`;
+    case "arrow": return `${svg(24, 24, `%3Cpath d='M4 2l14 8-6 1.5L14 18l-3 1-2-6-5 1z' fill='${c}' stroke='%23000' stroke-width='1'/%3E`)} 4 2, auto`;
+    case "gamepad": return `${svg(28, 28, `%3Crect x='4' y='9' width='20' height='11' rx='5' fill='${c}'/%3E%3Ccircle cx='10' cy='14' r='1.5' fill='%23fff'/%3E%3Ccircle cx='19' cy='13' r='1.3' fill='%23fff'/%3E`)} 14 14, auto`;
+    case "dot": return `${svg(16, 16, `%3Ccircle cx='8' cy='8' r='6' fill='${c}'/%3E`)} 8 8, auto`;
+    case "sword": return `${svg(28, 28, `%3Cpath d='M4 24l3-3 12-12 3-5-5 3-12 12-3 3z' fill='${c}' stroke='%23000' stroke-width='0.8'/%3E`)} 4 24, auto`;
+    default: return "auto";
+  }
+}
 
 // One-click background images for the builder (Higgsfield-generated + brand art).
 const CDN = "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082";
@@ -128,8 +153,12 @@ export const DEFAULT_THEME: ProfileTheme = {
   font: "grotesk",
   radius: 16,
   cursor: "default",
+  cursorColor: "#22d3ee",
   coverUrl: null,
+  coverHeight: 224,
+  coverOverlay: 0,
   avatarShape: "circle",
+  avatarSize: 128,
   sections: Object.fromEntries(SECTIONS.map((s) => [s.key, true])),
   order: SECTIONS.map((s) => s.key),
 };
@@ -159,11 +188,18 @@ export function bgStyle(t: ProfileTheme): CSSProperties {
   };
 }
 
+// Cover style (image + dark overlay) shared by builder preview and public page.
+export function coverStyle(t: ProfileTheme, coverUrl: string | null): CSSProperties {
+  const a = Math.max(0, Math.min(90, t.coverOverlay ?? 0)) / 100;
+  const overlay = a > 0 ? `linear-gradient(rgba(0,0,0,${a}), rgba(0,0,0,${a})), ` : "";
+  return coverUrl
+    ? { backgroundImage: `${overlay}url("${coverUrl}")`, backgroundSize: "cover", backgroundPosition: "center" }
+    : { backgroundImage: `linear-gradient(92deg, ${t.accent}, ${t.accent2})` };
+}
+
 // CSS custom properties applied to the profile root element.
 export function themeToVars(t: ProfileTheme): Record<string, string> {
-  const cursor = t.cursor?.startsWith("http")
-    ? `url("${t.cursor}") 4 4, auto`
-    : (CURSORS[t.cursor] ?? "");
+  const cursor = cursorValue(t.cursor, t.cursorColor);
   return {
     "--p-bg": t.bg,
     "--p-panel": t.panel,
@@ -173,6 +209,6 @@ export function themeToVars(t: ProfileTheme): Record<string, string> {
     "--p-muted": t.muted,
     "--p-radius": `${t.radius}px`,
     "--p-font": FONTS[t.font] ?? FONTS.grotesk,
-    ...(cursor ? { cursor } : {}),
+    ...(cursor && cursor !== "auto" ? { cursor } : {}),
   };
 }

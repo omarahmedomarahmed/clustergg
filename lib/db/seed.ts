@@ -438,6 +438,24 @@ export async function ensurePlanetSkins(db: DB) {
   }
 }
 
+// One-time cleanup: any game image still stored as a big inline data URL (from
+// before Blob was configured) is re-hosted to Blob and replaced with a short
+// URL — so logos show in the nav (the slim-image guard hid oversized inline
+// data URLs) and list pages stay light. Idempotent: once converted they're
+// plain URLs and skipped. No-op when Blob isn't configured.
+export async function migrateGameImagesToBlob(db: DB) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+  const { uploadDataUrlToBlob } = await import("@/lib/blob");
+  const games = await db.select().from(schema.games);
+  for (const g of games) {
+    const patch: Partial<typeof schema.games.$inferInsert> = {};
+    if (g.logoUrl?.startsWith("data:")) patch.logoUrl = (await uploadDataUrlToBlob(g.logoUrl, "game")) ?? undefined;
+    if (g.coverUrl?.startsWith("data:")) patch.coverUrl = (await uploadDataUrlToBlob(g.coverUrl, "game")) ?? undefined;
+    if (g.planetImageUrl?.startsWith("data:")) patch.planetImageUrl = (await uploadDataUrlToBlob(g.planetImageUrl, "game")) ?? undefined;
+    if (Object.keys(patch).length) await db.update(schema.games).set(patch).where(eq(schema.games.id, g.id));
+  }
+}
+
 export async function seedHouseAds(db: DB) {
   const [exists] = await db.select({ id: schema.brands.id }).from(schema.brands)
     .where(eq(schema.brands.id, HOUSE_BRAND_ID)).limit(1);

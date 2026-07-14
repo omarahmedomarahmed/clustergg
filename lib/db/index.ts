@@ -54,9 +54,10 @@ async function ensureProvisioned(db: DB) {
     // our house ads exist (idempotent) so no ad placement is ever empty.
     await runColumnMigrations(db);
     try {
-      const { seedHouseAds, ensurePlanetSkins } = await import("./seed");
+      const { seedHouseAds, ensurePlanetSkins, migrateGameImagesToBlob } = await import("./seed");
       await seedHouseAds(db);
       await ensurePlanetSkins(db);
+      await migrateGameImagesToBlob(db);
     } catch { /* non-fatal — ads/skins just won't backfill this boot */ }
     return;
   }
