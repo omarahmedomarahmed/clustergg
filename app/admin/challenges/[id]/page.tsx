@@ -31,8 +31,11 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
         <div className="text-xs uppercase tracking-widest text-cyan-300">{challenge.status} · {challenge.format}</div>
         <h1 className="text-2xl font-bold mt-1">{challenge.title}</h1>
         <p className="text-sm text-muted mt-1">
-          {challenge.game} via {challenge.provider} · ends {timeAgo(challenge.endAt)} ·
-          points: {JSON.stringify(challenge.pointsEngine)}
+          {challenge.game} via {challenge.provider} · ends {timeAgo(challenge.endAt)} · scoring:{" "}
+          {Object.entries((challenge.pointsEngine ?? {}) as Record<string, number>)
+            .filter(([, v]) => v)
+            .map(([k, v]) => `${v}× ${k.replace(/_/g, " ")}`)
+            .join(", ") || "participation only"}
         </p>
       </div>
 

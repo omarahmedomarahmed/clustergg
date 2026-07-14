@@ -32,6 +32,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "show_in_nav" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_image_url" text`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_bg_url" text`,
+  `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_pins" jsonb NOT NULL DEFAULT '{}'::jsonb`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cadence" text NOT NULL DEFAULT 'custom'`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "hero_type" text NOT NULL DEFAULT 'image'`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "hero_url" text`,

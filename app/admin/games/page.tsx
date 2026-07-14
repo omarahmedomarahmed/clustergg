@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { asc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { saveGame, deleteGame } from "@/app/actions/admin";
@@ -78,9 +79,14 @@ export default async function AdminGamesPage() {
                 </div>
               )}
               <GameForm game={g} />
-              <form action={deleteGame.bind(null, g.id)} className="mt-3">
-                <button className="text-xs text-rose-300 hover:underline">Delete game</button>
-              </form>
+              <div className="mt-3 flex items-center gap-4">
+                {g.planetImageUrl && (
+                  <Link href={`/admin/games/${g.id}/planet`} className="text-xs text-cyan-300 hover:underline">Edit planet region pins →</Link>
+                )}
+                <form action={deleteGame.bind(null, g.id)}>
+                  <button className="text-xs text-rose-300 hover:underline">Delete game</button>
+                </form>
+              </div>
             </div>
           </details>
         ))}

@@ -377,6 +377,10 @@ export const games = pgTable("games", {
   coverUrl: text("cover_url"),
   planetImageUrl: text("planet_image_url"), // per-game interactive planet hero skin
   planetBgUrl: text("planet_bg_url"),       // per-game space background behind the globe
+  // Per-game overrides for the globe region markers (position/label/color),
+  // keyed by macro-region so staff can align pins to each planet's artwork.
+  planetPins: jsonb("planet_pins").$type<Record<string, { x: number; y: number; color: string; label: string }>>()
+    .notNull().default({}),
   coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
     .notNull().default({ zoom: 1, x: 50, y: 50 }),
   sortOrder: integer("sort_order").notNull().default(0),

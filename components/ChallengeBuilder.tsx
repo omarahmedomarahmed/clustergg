@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Icon from "@/components/Icon";
+import CoverFramer from "@/components/CoverFramer";
 import { saveChallenge } from "@/app/actions/admin";
 
 export type BuilderProvider = {
@@ -35,45 +36,69 @@ const CADENCES = [
   { key: "custom", label: "Custom", desc: "Pick exact dates" },
 ];
 
+// Starter ideas — one click fills the shape of a common challenge.
+const IDEAS = [
+  { name: "Weekly Wins Race", cadence: "weekly", format: "top3", title: "Weekly Wins Race", desc: "Rack up the most wins this week. Top 3 take the podium." },
+  { name: "Daily Grind", cadence: "daily", format: "top1", title: "Daily Grind", desc: "Whoever gains the most today wins it all." },
+  { name: "Monthly Marathon", cadence: "monthly", format: "top3", title: "Monthly Marathon", desc: "A month-long climb. Consistency is king." },
+  { name: "First to Target", cadence: "weekly", format: "threshold_race", title: "Threshold Sprint", desc: "First to hit the target points wins. Go fast." },
+];
+
+const OPS = [">=", ">", "<=", "<", "=="];
+
 export default function ChallengeBuilder({
   providers, spaces, trophies,
 }: { providers: BuilderProvider[]; spaces: BuilderSpace[]; trophies: BuilderTrophy[] }) {
   const [providerId, setProviderId] = useState(providers[0]?.id ?? "");
   const [cadence, setCadence] = useState("weekly");
+  const [format, setFormat] = useState("top3");
   const [heroType, setHeroType] = useState("image");
-  const [points, setPoints] = useState(() => JSON.stringify(recommendPoints(providers[0]?.capabilities ?? [])));
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [pointsMap, setPointsMap] = useState<Record<string, number>>(() => recommendPoints(providers[0]?.capabilities ?? []));
+  const [conditions, setConditions] = useState<{ metric: string; op: string; value: number }[]>([]);
 
   const provider = useMemo(() => providers.find((p) => p.id === providerId), [providers, providerId]);
+  const caps = provider?.capabilities ?? [];
   const matchingSpaces = useMemo(() => {
     const match = spaces.filter((s) => s.game === provider?.game);
     return match.length ? [...match, ...spaces.filter((s) => s.game !== provider?.game)] : spaces;
   }, [spaces, provider]);
 
-  const applyRecommendation = () => {
-    if (provider) setPoints(JSON.stringify(recommendPoints(provider.capabilities)));
+  const changeProvider = (id: string) => {
+    setProviderId(id);
+    const p = providers.find((x) => x.id === id);
+    setPointsMap(recommendPoints(p?.capabilities ?? []));
+    setConditions([]);
   };
+  const applyIdea = (i: typeof IDEAS[number]) => { setCadence(i.cadence); setFormat(i.format); setTitle(i.title); setDescription(i.desc); };
+  const setPts = (key: string, v: number) => setPointsMap((m) => ({ ...m, [key]: v }));
 
+  const pointsJson = JSON.stringify(Object.fromEntries(Object.entries(pointsMap).filter(([, v]) => v > 0)));
+  const conditionsJson = JSON.stringify(conditions.filter((c) => c.metric));
   const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
   return (
     <form action={saveChallenge} className="space-y-5">
+      {/* Ideas */}
+      <div>
+        <div className="text-xs uppercase tracking-widest text-muted mb-2">Start from an idea (optional)</div>
+        <div className="flex flex-wrap gap-2">
+          {IDEAS.map((i) => (
+            <button key={i.name} type="button" onClick={() => applyIdea(i)} className="ghost-btn pressable rounded-full px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5">
+              <Icon name="spark" size={12} className="text-cyan-300" /> {i.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Step 1: game */}
       <div>
-        <div className="text-xs uppercase tracking-widest text-muted mb-2">1 · Pick the game & data source</div>
+        <div className="text-xs uppercase tracking-widest text-muted mb-2">1 · Pick the game &amp; data source</div>
         <div className="grid sm:grid-cols-2 gap-3">
-          <select
-            name="provider" required value={providerId}
-            onChange={(e) => {
-              setProviderId(e.target.value);
-              const p = providers.find((x) => x.id === e.target.value);
-              if (p) setPoints(JSON.stringify(recommendPoints(p.capabilities)));
-            }}
-            className="input-cosmic"
-          >
+          <select name="provider" required value={providerId} onChange={(e) => changeProvider(e.target.value)} className="input-cosmic">
             {providers.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.game}){p.live ? " — live" : " — needs API key"}
-              </option>
+              <option key={p.id} value={p.id}>{p.name} ({p.game}){p.live ? " — live" : " — needs API key"}</option>
             ))}
           </select>
           <select name="spaceId" required className="input-cosmic">
@@ -81,28 +106,14 @@ export default function ChallengeBuilder({
           </select>
         </div>
         <input type="hidden" name="game" value={provider?.game ?? ""} />
-        {provider && (
-          <div className="mt-3 glass !rounded-lg p-3">
-            <div className="text-[10px] uppercase tracking-widest text-cyan-300 mb-2 flex items-center gap-1.5">
-              <Icon name="satellite" size={11} /> Trackable via the {provider.name} API
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {provider.capabilities.map((cp) => (
-                <span key={cp.key} className="text-[11px] rounded-full border border-violet-400/25 px-2 py-0.5 text-muted">
-                  <code className="text-cyan-300/90">{cp.key}</code> — {cp.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Step 2: identity */}
       <div>
         <div className="text-xs uppercase tracking-widest text-muted mb-2">2 · Name the event</div>
         <div className="grid gap-3">
-          <input name="title" required placeholder="Title (e.g. Blitz Supernova — Weekly Wins Race)" className="input-cosmic" />
-          <textarea name="description" rows={2} placeholder="Description players see on the event page" className="input-cosmic" />
+          <input name="title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (e.g. Blitz Supernova — Weekly Wins Race)" className="input-cosmic" />
+          <textarea name="description" rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description players see on the event page" className="input-cosmic" />
         </div>
       </div>
 
@@ -111,14 +122,7 @@ export default function ChallengeBuilder({
         <div className="text-xs uppercase tracking-widest text-muted mb-2">3 · Time window</div>
         <div className="flex flex-wrap gap-2 mb-3">
           {CADENCES.map((cd) => (
-            <button
-              key={cd.key} type="button"
-              onClick={() => setCadence(cd.key)}
-              className={`stat-tab ${cadence === cd.key ? "stat-tab-active" : ""}`}
-              title={cd.desc}
-            >
-              {cd.label}
-            </button>
+            <button key={cd.key} type="button" onClick={() => setCadence(cd.key)} className={`stat-tab ${cadence === cd.key ? "stat-tab-active" : ""}`} title={cd.desc}>{cd.label}</button>
           ))}
         </div>
         <input type="hidden" name="cadence" value={cadence} />
@@ -131,40 +135,75 @@ export default function ChallengeBuilder({
               <input name="endAt" type="datetime-local" defaultValue={toLocal(new Date(Date.now() + 7 * 86400000))} className="input-cosmic mt-1" />
             </label>
           ) : (
-            <div className="text-xs text-muted self-end pb-3">
-              Ends automatically {cadence === "daily" ? "24 hours" : cadence === "weekly" ? "7 days" : "30 days"} after start.
-            </div>
+            <div className="text-xs text-muted self-end pb-3">Ends automatically {cadence === "daily" ? "24 hours" : cadence === "weekly" ? "7 days" : "30 days"} after start.</div>
           )}
         </div>
       </div>
 
-      {/* Step 4: scoring */}
+      {/* Step 4: scoring — visual, no JSON */}
       <div>
         <div className="flex items-center justify-between mb-2">
           <div className="text-xs uppercase tracking-widest text-muted">4 · Scoring engine</div>
-          <button type="button" onClick={applyRecommendation} className="ghost-btn pressable rounded-full px-3 py-1 text-[11px] inline-flex items-center gap-1.5">
+          <button type="button" onClick={() => setPointsMap(recommendPoints(caps))} className="ghost-btn pressable rounded-full px-3 py-1 text-[11px] inline-flex items-center gap-1.5">
             <Icon name="spark" size={11} /> Recommend for {provider?.game}
           </button>
         </div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <label className="text-xs text-muted sm:col-span-2">
-            Points per unit gained — JSON of metric → points (metrics above)
-            <textarea
-              name="pointsEngine" rows={2} value={points}
-              onChange={(e) => setPoints(e.target.value)}
-              className="input-cosmic font-mono text-xs mt-1"
-            />
+        <input type="hidden" name="pointsEngine" value={pointsJson} />
+        <input type="hidden" name="conditions" value={conditionsJson} />
+
+        <div className="glass !rounded-lg p-3 space-y-2">
+          <div className="text-[11px] text-muted">Award points each time a stat goes up (leave 0 to ignore):</div>
+          {caps.length === 0 ? (
+            <div className="text-xs text-muted">This provider exposes no trackable metrics.</div>
+          ) : caps.map((cp) => (
+            <label key={cp.key} className="flex items-center gap-3 text-sm">
+              <span className="flex-1 min-w-0 truncate">{cp.label} <span className="text-[10px] text-muted">({cp.key})</span></span>
+              <span className="text-xs text-muted">+</span>
+              <input type="number" min={0} value={pointsMap[cp.key] ?? 0} onChange={(e) => setPts(cp.key, Number(e.target.value))} className="input-cosmic !w-20 !py-1 text-sm" />
+              <span className="text-xs text-muted">pts</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="grid sm:grid-cols-2 gap-3 mt-3">
+          <label className="text-xs text-muted">Winner format
+            <select value={format} onChange={(e) => setFormat(e.target.value)} name="format" className="input-cosmic mt-1">
+              <option value="top3">Top 3 podium</option>
+              <option value="top1">Winner takes all</option>
+              <option value="threshold_race">Threshold race (first to target)</option>
+            </select>
           </label>
-          <select name="format" className="input-cosmic">
-            <option value="top3">Top 3 podium</option>
-            <option value="top1">Winner takes all</option>
-            <option value="threshold_race">Threshold race (first to target)</option>
-          </select>
-          <input name="thresholdTarget" type="number" placeholder="Target points (races only)" className="input-cosmic" />
-          <label className="text-xs text-muted sm:col-span-2">
-            Qualification conditions (optional) — JSON array of {"{metric, op, value}"} applied to stat deltas
-            <textarea name="conditions" rows={1} defaultValue="[]" className="input-cosmic font-mono text-xs mt-1" />
-          </label>
+          {format === "threshold_race" && (
+            <label className="text-xs text-muted">Target points
+              <input name="thresholdTarget" type="number" placeholder="e.g. 100" className="input-cosmic mt-1" />
+            </label>
+          )}
+        </div>
+
+        {/* Qualification conditions — visual */}
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs text-muted">Qualification conditions (optional)</span>
+            <button type="button" onClick={() => setConditions((c) => [...c, { metric: caps[0]?.key ?? "", op: ">=", value: 0 }])} className="text-xs text-cyan-300 hover:underline inline-flex items-center gap-1"><Icon name="spark" size={11} /> Add condition</button>
+          </div>
+          {conditions.length === 0 ? (
+            <div className="text-[11px] text-muted">No conditions — everyone who joins qualifies.</div>
+          ) : (
+            <div className="space-y-2">
+              {conditions.map((cond, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select value={cond.metric} onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, metric: e.target.value } : x))} className="input-cosmic !py-1 text-sm flex-1">
+                    {caps.map((cp) => <option key={cp.key} value={cp.key}>{cp.label}</option>)}
+                  </select>
+                  <select value={cond.op} onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, op: e.target.value } : x))} className="input-cosmic !py-1 !w-20 text-sm">
+                    {OPS.map((o) => <option key={o}>{o}</option>)}
+                  </select>
+                  <input type="number" value={cond.value} onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, value: Number(e.target.value) } : x))} className="input-cosmic !py-1 !w-24 text-sm" />
+                  <button type="button" onClick={() => setConditions((c) => c.filter((_, j) => j !== i))} className="text-rose-300 hover:text-rose-200"><Icon name="x" size={14} /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -180,19 +219,15 @@ export default function ChallengeBuilder({
           {heroType !== "image" && (
             <input name="heroUrl" placeholder={heroType === "video" ? "Video file URL (mp4)" : "Stream URL (youtube.com/… or twitch.tv/channel)"} className="input-cosmic" />
           )}
-          <input name="coverUrl" placeholder="Cover image URL (card + fallback hero)" className="input-cosmic" />
+          <div className="sm:col-span-2">
+            <CoverFramer name="coverUrl" maxDim={1400} label="Cover image (card + hero)" hint="Drag to reposition, slider to zoom." />
+          </div>
           <select name="trophyId" className="input-cosmic">
             <option value="">No trophy</option>
             {trophies.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.tier})</option>)}
           </select>
-          <div className="flex gap-2 items-center sm:col-span-2 flex-wrap">
-            <span className="text-xs text-muted">Cover framing:</span>
-            <label className="text-xs text-muted flex items-center gap-1.5">zoom <input name="coverZoom" type="number" step="0.05" min="1" max="3" defaultValue={1} className="input-cosmic !w-20 !py-1" /></label>
-            <label className="text-xs text-muted flex items-center gap-1.5">x% <input name="coverX" type="number" min="0" max="100" defaultValue={50} className="input-cosmic !w-20 !py-1" /></label>
-            <label className="text-xs text-muted flex items-center gap-1.5">y% <input name="coverY" type="number" min="0" max="100" defaultValue={50} className="input-cosmic !w-20 !py-1" /></label>
-          </div>
           <input name="prizeDescription" placeholder="Prize description" className="input-cosmic" />
-          <select name="status" className="input-cosmic">
+          <select name="status" className="input-cosmic sm:col-span-2">
             <option value="active">Publish now</option>
             <option value="draft">Draft (auto-activates at start time)</option>
           </select>
