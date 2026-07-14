@@ -8,6 +8,8 @@ import AdSlot from "@/components/AdSlot";
 import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
+import PlanetHero from "@/components/PlanetHero";
+import { buildSkinnedPlanets } from "@/lib/planets";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
 
@@ -55,6 +57,7 @@ export default async function FeedPage() {
       : db.select().from(schema.spaces).where(eq(schema.spaces.isActive, true)).limit(6),
   ]);
 
+  const skinnedPlanets = await buildSkinnedPlanets(db);
   const firstName = user.displayName.split(" ")[0];
   const stat = [
     { label: "Games linked", value: accounts.length, icon: "gamepad", href: "/profile" },
@@ -94,6 +97,16 @@ export default async function FeedPage() {
       <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
         {/* ===== Main column ===== */}
         <div className="min-w-0 space-y-8">
+          {/* Explore planets — interactive globe */}
+          {skinnedPlanets.length > 0 && (
+            <section>
+              <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="planet" size={18} className="text-cyan-300" /> Explore planets</h2>
+              <div className="rounded-2xl overflow-hidden border border-violet-400/15">
+                <PlanetHero planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} swap heading="Tap a game to explore its planet" />
+              </div>
+            </section>
+          )}
+
           {/* Live challenges */}
           {challenges.length > 0 && (
             <section>
