@@ -448,6 +448,33 @@ export async function deleteGame(gameId: string) {
   revalidatePath("/planets");
 }
 
+// Save per-game globe region pins (position/label/color overrides) from the
+// visual pin editor. Values arrive as a single JSON blob built client-side.
+export async function savePlanetPins(gameId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const db = await getDb();
+  let pins: Record<string, { x: number; y: number; color: string; label: string }> = {};
+  try {
+    const parsed = JSON.parse(String(formData.get("pins") ?? "{}"));
+    if (parsed && typeof parsed === "object") {
+      for (const [key, v] of Object.entries(parsed as Record<string, { x: number; y: number; color: string; label: string }>)) {
+        pins[key] = {
+          x: Math.max(0, Math.min(100, Number(v.x))),
+          y: Math.max(0, Math.min(100, Number(v.y))),
+          color: String(v.color || "").slice(0, 12),
+          label: String(v.label || "").slice(0, 40),
+        };
+      }
+    }
+  } catch { pins = {}; }
+  await db.update(schema.games).set({ planetPins: pins }).where(eq(schema.games.id, gameId));
+  await audit(admin.id, "game.planet_pins", "game", gameId);
+  revalidatePath("/admin/games");
+  revalidatePath("/planets");
+  revalidatePath("/");
+  return { ok: true, message: "Planet pins saved." };
+}
+
 // ---------- Partners ("Trusted by") ----------
 export async function savePartner(formData: FormData) {
   const admin = await requireStaff();

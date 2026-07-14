@@ -42,8 +42,20 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
   return skinned
     .filter((g) => slugByGame.has(g.name))
     .map((g) => {
+      const pins = (g.planetPins ?? {}) as Record<string, { x: number; y: number; color: string; label: string }>;
       const stats: Record<RegionKey, RegionStat> = Object.fromEntries(
-        REGIONS.map((r) => [r.key, { ...r, count: 0, gamers: [] as { name: string; slug: string }[] }]),
+        REGIONS.map((r) => {
+          const pin = pins[r.key];
+          return [r.key, {
+            ...r,
+            x: pin?.x ?? r.x,
+            y: pin?.y ?? r.y,
+            color: pin?.color || r.color,
+            label: pin?.label || r.label,
+            count: 0,
+            gamers: [] as { name: string; slug: string }[],
+          }];
+        }),
       ) as Record<RegionKey, RegionStat>;
       let total = 0;
       for (const a of accountRows) {
