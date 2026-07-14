@@ -15,6 +15,7 @@ export type PlanetData = {
   imageUrl: string;
   logoUrl: string | null;
   coverUrl: string | null;
+  bgUrl: string | null;
   totalGamers: number;
   regions: RegionStat[];
 };
@@ -43,12 +44,19 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
 
   return (
     <section className="relative overflow-hidden">
-      {/* Space backdrop + the game cover as faint texture behind the sphere */}
-      <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 620px at 42% 20%, ${p.accent}1f, transparent 60%), radial-gradient(900px 500px at 85% 110%, ${p.accent2}14, transparent 60%), #04051a` }} />
-      {slimImg(p.coverUrl, 400000) && (
-        <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-[0.12]" style={{ backgroundImage: `url(${slimImg(p.coverUrl, 400000)})` }} />
+      {/* Per-game themed space background art (falls back to gradient + cover). */}
+      <div className="absolute inset-0 -z-10" style={{ background: "#04051a" }} />
+      {p.bgUrl ? (
+        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.35), rgba(4,5,26,0.7)), url(${p.bgUrl})` }} />
+      ) : (
+        <>
+          <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 620px at 42% 20%, ${p.accent}1f, transparent 60%), radial-gradient(900px 500px at 85% 110%, ${p.accent2}14, transparent 60%)` }} />
+          {slimImg(p.coverUrl, 400000) && (
+            <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-[0.12]" style={{ backgroundImage: `url(${slimImg(p.coverUrl, 400000)})` }} />
+          )}
+          <div className="absolute inset-0 -z-10 opacity-30 bg-cover bg-center" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
+        </>
       )}
-      <div className="absolute inset-0 -z-10 opacity-30 bg-cover bg-center" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
 
       <div className="mx-auto max-w-6xl px-4 py-10 md:py-14 grid gap-8 lg:grid-cols-[1.1fr_1fr] items-center">
         {/* ===== Planet ===== */}

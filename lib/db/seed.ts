@@ -436,6 +436,10 @@ const PLANET_SKINS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_114614_b3a4ad5b-e49a-4fab-99fb-056fd13ab71f.png`,
   "VALORANT": `${HF_CDN}/hf_20260713_214139_cba722cd-6ede-4996-b8a7-ae0315304705.png`,
 };
+const PLANET_BGS: Record<string, string> = {
+  "League of Legends": `${HF_CDN}/hf_20260714_120620_3c2d92d2-00a7-4f38-ba68-7712e85b962d.png`,
+  "VALORANT": `${HF_CDN}/hf_20260714_120636_4b63d00d-68e5-4379-b419-a0bc8b423124.png`,
+};
 export async function ensurePlanetSkins(db: DB) {
   // Replace superseded renders in place.
   for (const [oldUrl, name] of Object.entries(SUPERSEDED_SKINS)) {
@@ -446,6 +450,10 @@ export async function ensurePlanetSkins(db: DB) {
   for (const [name, url] of Object.entries(PLANET_SKINS)) {
     await db.update(schema.games).set({ planetImageUrl: url })
       .where(and(eq(schema.games.name, name), isNull(schema.games.planetImageUrl)));
+  }
+  for (const [name, url] of Object.entries(PLANET_BGS)) {
+    await db.update(schema.games).set({ planetBgUrl: url })
+      .where(and(eq(schema.games.name, name), isNull(schema.games.planetBgUrl)));
   }
 }
 
