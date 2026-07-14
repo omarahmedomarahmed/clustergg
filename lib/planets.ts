@@ -64,6 +64,7 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
         imageUrl: g.planetImageUrl!,
         logoUrl: slimImg(g.logoUrl, 300000),
         coverUrl: slimImg(g.coverUrl, 400000),
+        bgUrl: g.planetBgUrl,
         totalGamers: total,
         regions: REGIONS.map((r) => stats[r.key]),
       };
