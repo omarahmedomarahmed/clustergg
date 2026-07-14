@@ -74,6 +74,8 @@ async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>): Promi
         accent: pal.accent,
         accent2: pal.accent2,
         imageUrl: g.planetImageUrl!,
+        logoUrl: g.logoUrl,
+        coverUrl: g.coverUrl,
         totalGamers: total,
         regions: REGIONS.map((r) => stats[r.key]),
       };
