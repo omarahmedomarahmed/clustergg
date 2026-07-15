@@ -115,15 +115,34 @@ export default async function FeedPage() {
                 <Link href="/planets" className="text-xs text-cyan-300 hover:underline">See all</Link>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
-                {challenges.map(({ c, space }) => (
-                  <Link key={c.id} href={`/planets/${space.slug}/challenges/${c.id}`} className="glass card-lift p-4 flex flex-col">
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-emerald-300 mb-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live · {c.game}
-                    </div>
-                    <div className="font-bold text-sm">{c.title}</div>
-                    <div className="text-xs text-muted mt-1 inline-flex items-center gap-1.5"><Icon name="clock" size={11} /> ends {timeAgo(c.endAt).replace(" ago", "")}</div>
-                  </Link>
-                ))}
+                {challenges.map(({ c, space }) => {
+                  const g = gameByName.get(c.game);
+                  const cover = slimImg(c.coverUrl, 500000) || slimImg(g?.coverUrl ?? null, 500000);
+                  return (
+                    <Link key={c.id} href={`/planets/${space.slug}/challenges/${c.id}`}
+                      className="group card-lift relative overflow-hidden rounded-2xl border border-violet-400/20 flex flex-col justify-end min-h-[150px] p-4">
+                      {/* Cover art background */}
+                      {cover ? (
+                        <div className="absolute inset-0 -z-10 bg-cover" style={{ backgroundImage: `url(${cover})`, backgroundPosition: `${c.coverAdjust?.x ?? 50}% ${c.coverAdjust?.y ?? 50}%` }} />
+                      ) : (
+                        <div className="absolute inset-0 -z-10" style={{ background: "radial-gradient(120% 120% at 0% 0%, #8b5cf633, transparent 60%), #0a0a1c" }} />
+                      )}
+                      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-[#04051a] via-[#04051a]/70 to-[#04051a]/10" />
+                      {/* Live + game chip */}
+                      <div className="absolute top-3 left-3 flex items-center gap-2">
+                        {g && <GameLogo logoUrl={slimImg(g.logoUrl, 300000)} name={c.game} size={30} rounded="rounded-lg" className="ring-1 ring-white/20 shadow-lg" />}
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-emerald-300">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live
+                        </span>
+                      </div>
+                      <div className="font-bold leading-tight drop-shadow">{c.title}</div>
+                      <div className="mt-1.5 flex items-center gap-3 text-xs">
+                        <span className="text-muted inline-flex items-center gap-1"><Icon name="clock" size={11} /> ends {timeAgo(c.endAt).replace(" ago", "")}</span>
+                        {c.prizeDescription && <span className="text-amber-300 inline-flex items-center gap-1 truncate"><Icon name="trophy" size={11} /> {c.prizeDescription}</span>}
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             </section>
           )}
