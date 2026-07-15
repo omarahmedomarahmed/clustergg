@@ -114,7 +114,7 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
         {/* ===== Planet (big, centered) ===== */}
         <div
           ref={frame}
-          className="relative mx-auto aspect-square w-full max-w-[600px] select-none mt-6"
+          className="relative mx-auto aspect-square w-full max-w-[560px] md:max-w-[640px] select-none mt-6"
           onMouseMove={onMove}
           onMouseLeave={() => { setTilt({ x: 0, y: 0 }); setZoom(false); }}
           onMouseEnter={() => setZoom(true)}
