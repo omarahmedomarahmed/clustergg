@@ -448,6 +448,22 @@ export async function deleteGame(gameId: string) {
   revalidatePath("/planets");
 }
 
+// Upload/replace a game's planet globe skin + space background from the pin
+// editor — a reliable per-planet home for the globe art (the games form is busy).
+export async function savePlanetArt(gameId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const planetImageUrl = String(formData.get("planetImageUrl") ?? "").trim() || null;
+  const planetBgUrl = String(formData.get("planetBgUrl") ?? "").trim() || null;
+  await db.update(schema.games).set({ planetImageUrl, planetBgUrl }).where(eq(schema.games.id, gameId));
+  await audit(admin.id, "game.planet_art", "game", gameId);
+  revalidatePath("/admin/games");
+  revalidatePath(`/admin/games/${gameId}/planet`);
+  revalidatePath("/planets");
+  revalidatePath("/");
+  return { ok: true, message: "Planet globe art saved." };
+}
+
 // Save per-game globe region pins (position/label/color overrides) from the
 // visual pin editor. Values arrive as a single JSON blob built client-side.
 export async function savePlanetPins(gameId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {

@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
+import BrandGlyph from "@/components/BrandGlyph";
 import LinkAccountForm, { type ProviderInfo } from "@/components/LinkAccountForm";
 
 export type AccountCard = {
@@ -57,6 +58,13 @@ export default function ProfileAccounts({
       {/* Inline connect (own profile) */}
       {isOwner && connect && (
         <div className="mb-5 rounded-2xl p-4" style={{ background: mix(8), border: `1px solid ${mix(25)}` }}>
+          {/* Discord = your universal identity — always first. */}
+          <div className="text-sm font-semibold mb-2" style={{ color: c.text }}>Your identity</div>
+          <a href="/api/auth/discord?intent=link&next=/profile"
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white mb-4"
+            style={{ background: "#5865f2", boxShadow: "0 6px 18px -8px #5865f2" }}>
+            <BrandGlyph provider="discord" size={16} /> Connect Discord
+          </a>
           <div className="text-sm font-semibold mb-3" style={{ color: c.text }}>Pick a game to connect</div>
           <LinkAccountForm providers={providers} gameLogos={gameLogos} />
         </div>

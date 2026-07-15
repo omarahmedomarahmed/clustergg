@@ -6,6 +6,7 @@ import { ACTION_CATALOG } from "@/lib/quests";
 import { saveQuest, deleteQuest, saveTier, deleteTier } from "@/app/actions/quests-admin";
 import ImageUpload from "@/components/ImageUpload";
 import Icon from "@/components/Icon";
+import SubmitButton from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Edit quest" };
@@ -62,7 +63,7 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
 
         <div className="flex items-center gap-4 flex-wrap">
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked={quest.isActive} className="accent-violet-500" /> Active</label>
-          <button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Save quest</button>
+          <SubmitButton className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Save quest</SubmitButton>
         </div>
       </form>
 
@@ -84,7 +85,7 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
                 <label className="text-xs text-muted col-span-2">Story / how to earn<textarea name="description" rows={2} defaultValue={t.description} className="input-cosmic !py-1.5 mt-1" /></label>
               </div>
               <div className="flex sm:flex-col gap-2">
-                <button className="glow-btn rounded-full px-4 py-1.5 text-xs font-semibold text-white">Save</button>
+                <SubmitButton className="glow-btn rounded-full px-4 py-1.5 text-xs font-semibold text-white">Save</SubmitButton>
                 <button formAction={deleteTier.bind(null, quest.id, t.id)} className="rounded-full px-4 py-1.5 text-xs border border-rose-400/40 text-rose-300">Delete</button>
               </div>
             </form>
@@ -96,7 +97,7 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
           <label className="text-xs text-muted">New tier name<input name="name" placeholder="e.g. Diamond" className="input-cosmic !py-1.5 mt-1" /></label>
           <label className="text-xs text-muted">Threshold QP<input name="thresholdQp" type="number" min={0} defaultValue={0} className="input-cosmic !py-1.5 mt-1" /></label>
           <label className="text-xs text-muted">Order<input name="tierIndex" type="number" defaultValue={tiers.length} className="input-cosmic !py-1.5 mt-1" /></label>
-          <button className="ghost-btn rounded-full px-4 py-2 text-xs font-semibold">+ Add tier</button>
+          <SubmitButton pendingText="Adding…" className="ghost-btn rounded-full px-4 py-2 text-xs font-semibold">+ Add tier</SubmitButton>
         </form>
       </div>
 

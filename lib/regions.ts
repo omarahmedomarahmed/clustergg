@@ -45,8 +45,29 @@ export function toRegion(providerRegion?: string | null, country?: string | null
   return null;
 }
 
-export type RegionStat = { key: RegionKey; label: string; short: string; color: string; x: number; y: number; count: number; gamers: { name: string; slug: string }[] };
+export type RegionStat = { key: string; label: string; short: string; color: string; x: number; y: number; count: number; gamers: { name: string; slug: string }[] };
 
 export function emptyRegionStats(): RegionStat[] {
   return REGIONS.map((r) => ({ ...r, count: 0, gamers: [] }));
 }
+
+// Human labels for the real server/region codes providers return through their
+// APIs (Riot platform routes, VALORANT/other affinities, etc.). Anything not
+// listed falls back to the upper-cased code so new servers still render.
+export const REGION_LABELS: Record<string, string> = {
+  na: "North America", na1: "North America", nam: "North America",
+  br: "Brazil", br1: "Brazil", lan: "LAN", la1: "LAN", las: "LAS", la2: "LAS", latam: "Latin America",
+  euw: "EU West", euw1: "EU West", eune: "EU Nordic & East", eun1: "EU Nordic & East", eu: "Europe",
+  tr: "Türkiye", tr1: "Türkiye", ru: "Russia",
+  kr: "Korea", jp: "Japan", jp1: "Japan",
+  oce: "Oceania", oc1: "Oceania", sea: "SE Asia", ap: "Asia-Pacific",
+  sg: "Singapore", sg2: "Singapore", th2: "Thailand", tw: "Taiwan", tw2: "Taiwan", vn: "Vietnam", vn2: "Vietnam", ph2: "Philippines",
+};
+
+export function prettyRegion(code: string): string {
+  const c = code.trim().toLowerCase();
+  return REGION_LABELS[c] ?? code.trim().toUpperCase();
+}
+
+// Distinct colors for auto-assigned real-region pins before an admin recolors.
+export const REGION_PALETTE = ["#38bdf8", "#34d399", "#a78bfa", "#fbbf24", "#f472b6", "#f87171", "#22d3ee", "#c084fc", "#4ade80", "#fb923c"];

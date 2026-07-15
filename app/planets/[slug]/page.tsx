@@ -120,6 +120,11 @@ export default async function PlanetPage({
                 {p.name} {isProviderLive(p) ? "· live" : "· key ready"}
               </span>
             ))}
+            {game && (
+              <Link href="/profile" className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">
+                Link my {game.name} account
+              </Link>
+            )}
             {viewer && <JoinSpaceButton spaceId={space.id} isMember={membership.length > 0} path={path} />}
           </div>
         </>
