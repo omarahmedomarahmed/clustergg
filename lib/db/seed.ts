@@ -509,7 +509,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-14.3";
+const MAINT_VERSION = "2026-07-15.1";
 
 export async function runBootMaintenance(db: DB) {
   try {

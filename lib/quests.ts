@@ -42,7 +42,14 @@ export const QUEST_EMBLEMS: Record<string, string> = {
   conquest: `${HF}/hf_20260714_193856_ea53f06e-b44d-4473-b67c-b3c2a2a736c7.png`,
   orbit: `${HF}/hf_20260714_193903_a1b522be-910a-49df-8904-b4fbbf832f97.png`,
   ascension: `${HF}/hf_20260714_193907_7a60de0d-d719-4228-860e-6ec7b44b1b31.png`,
-  // signal emblem pending regeneration (daily gen limit) — falls back to its icon.
+  signal: `${HF}/hf_20260715_113609_7865c988-053e-4808-bc82-3451222db943.png`,
+};
+// Gamified cosmic card backgrounds per quest (subtle, dark, text-safe).
+export const QUEST_CARD_BGS: Record<string, string> = {
+  conquest: `${HF}/hf_20260715_113645_4eb3d18c-2808-4d26-a38e-359ca5e78dbc.png`,
+  orbit: `${HF}/hf_20260715_113649_4dcef232-cee5-4d48-b950-0d3f4907289a.png`,
+  ascension: `${HF}/hf_20260715_113657_a4ea0800-d986-4490-aa9d-209106e6d192.png`,
+  signal: `${HF}/hf_20260715_113701_940a9b02-30e1-413e-9a91-dabb9acb6f8f.png`,
 };
 
 // ===== Default quests (seeded once; fully editable afterwards) =====
@@ -121,7 +128,8 @@ export async function seedQuests(db: DB) {
     const questId = uid();
     await db.insert(schema.quests).values({
       id: questId, key: q.key, name: q.name, tagline: q.tagline, lore: q.lore,
-      color: q.color, accent2: q.accent2, icon: q.icon, logoUrl: QUEST_EMBLEMS[q.key] ?? null,
+      color: q.color, accent2: q.accent2, icon: q.icon,
+      logoUrl: QUEST_EMBLEMS[q.key] ?? null, cardBgUrl: QUEST_CARD_BGS[q.key] ?? null,
       actionWeights: weightsFor(q.key), dailyCaps: capsFor(q.key), sortOrder: q.sortOrder,
     }).onConflictDoNothing();
     let i = 0;
@@ -139,6 +147,10 @@ export async function ensureQuestArt(db: DB) {
   for (const [key, url] of Object.entries(QUEST_EMBLEMS)) {
     await db.update(schema.quests).set({ logoUrl: url })
       .where(and(eq(schema.quests.key, key), isNull(schema.quests.logoUrl)));
+  }
+  for (const [key, url] of Object.entries(QUEST_CARD_BGS)) {
+    await db.update(schema.quests).set({ cardBgUrl: url })
+      .where(and(eq(schema.quests.key, key), isNull(schema.quests.cardBgUrl)));
   }
 }
 
