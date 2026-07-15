@@ -10,6 +10,7 @@ import ProfileHub from "@/components/ProfileHub";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
+import BrandGlyph from "@/components/BrandGlyph";
 import { unlinkGameAccount, resyncGameAccount } from "@/app/actions/connections";
 import { timeAgo } from "@/lib/utils";
 
@@ -115,6 +116,20 @@ export default async function OwnProfilePage() {
           })}
         </div>
       )}
+
+      {/* Discord = the universal identity, shown alongside game accounts. */}
+      <div className="rounded-xl border border-[#5865f2]/30 bg-[#5865f2]/8 p-4 mb-6 flex flex-wrap items-center gap-3">
+        <BrandGlyph provider="discord" size={22} />
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-sm">Discord identity</div>
+          <div className="text-xs text-muted">{user.discordUsername ? `Connected as ${user.discordUsername}` : "Your universal gamer identity — connect it once."}</div>
+        </div>
+        <a href="/api/auth/discord?intent=link&next=/profile"
+          className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white"
+          style={{ background: "#5865f2" }}>
+          <BrandGlyph provider="discord" size={15} /> {user.discordUsername ? "Reconnect" : "Connect Discord"}
+        </a>
+      </div>
 
       <div className="text-sm font-semibold mb-3 text-muted">Add a game</div>
       <LinkAccountForm providers={providerInfoList()} gameLogos={gameLogos} />
