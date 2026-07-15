@@ -3,6 +3,7 @@ import { asc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { createQuest } from "@/app/actions/quests-admin";
 import Icon from "@/components/Icon";
+import SubmitButton from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Quests" };
@@ -28,7 +29,7 @@ export default async function AdminQuestsPage() {
           <label className="flex items-center gap-2 text-sm text-muted">Color <input type="color" name="color" defaultValue="#8b5cf6" className="h-8 w-10 rounded bg-transparent border border-white/10" /></label>
           <label className="flex items-center gap-2 text-sm text-muted">Accent <input type="color" name="accent2" defaultValue="#22d3ee" className="h-8 w-10 rounded bg-transparent border border-white/10" /></label>
           <select name="icon" className="input-cosmic sm:col-span-2">{ICONS.map((i) => <option key={i} value={i}>{i}</option>)}</select>
-          <div className="sm:col-span-2"><button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Create quest</button></div>
+          <div className="sm:col-span-2"><SubmitButton pendingText="Creating…" className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Create quest</SubmitButton></div>
         </form>
       </div>
 

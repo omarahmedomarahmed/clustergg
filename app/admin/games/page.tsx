@@ -5,6 +5,7 @@ import { saveGame, deleteGame } from "@/app/actions/admin";
 import GameLogo from "@/components/GameLogo";
 import ImageUpload from "@/components/ImageUpload";
 import CoverFramer from "@/components/CoverFramer";
+import SubmitButton from "@/components/SubmitButton";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Games" };
@@ -32,9 +33,9 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
         </label>
       </div>
       <div className="sm:col-span-2">
-        <button className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">
+        <SubmitButton className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">
           {game ? "Save" : "Add game"}
-        </button>
+        </SubmitButton>
       </div>
     </form>
   );
