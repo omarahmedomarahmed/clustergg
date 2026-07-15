@@ -80,9 +80,7 @@ export default async function AdminGamesPage() {
               )}
               <GameForm game={g} />
               <div className="mt-3 flex items-center gap-4">
-                {g.planetImageUrl && (
-                  <Link href={`/admin/games/${g.id}/planet`} className="text-xs text-cyan-300 hover:underline">Edit planet region pins →</Link>
-                )}
+                <Link href={`/admin/games/${g.id}/planet`} className="text-xs text-cyan-300 hover:underline">Planet globe art &amp; region pins →</Link>
                 <form action={deleteGame.bind(null, g.id)}>
                   <button className="text-xs text-rose-300 hover:underline">Delete game</button>
                 </form>

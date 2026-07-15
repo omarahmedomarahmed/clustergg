@@ -5,6 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { REGIONS } from "@/lib/regions";
 import PlanetPinEditor, { type EditablePin } from "@/components/PlanetPinEditor";
+import PlanetArtForm from "@/components/PlanetArtForm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Planet pins" };
@@ -40,14 +41,20 @@ export default async function AdminPlanetPinsPage({ params }: { params: Promise<
         </p>
       </div>
 
+      {/* Globe art — upload/replace the planet skin + its space background here. */}
+      <div className="glass p-6">
+        <h2 className="font-bold mb-3">Globe art</h2>
+        <PlanetArtForm gameId={game.id} planetImageUrl={game.planetImageUrl} planetBgUrl={game.planetBgUrl} />
+      </div>
+
       {game.planetImageUrl ? (
         <div className="glass p-6">
+          <h2 className="font-bold mb-3">Region pins</h2>
           <PlanetPinEditor gameId={game.id} imageUrl={game.planetImageUrl} bgUrl={game.planetBgUrl} pins={pins} />
         </div>
       ) : (
         <div className="glass p-6 text-sm text-muted">
-          This game has no planet skin yet. Add a <span className="text-cyan-300">Planet skin</span> image on the{" "}
-          <Link href="/admin/games" className="underline">games catalog</Link> first, then come back to place its region pins.
+          Upload a <span className="text-cyan-300">Planet skin</span> above to unlock the interactive globe and its region pins.
         </div>
       )}
     </div>
