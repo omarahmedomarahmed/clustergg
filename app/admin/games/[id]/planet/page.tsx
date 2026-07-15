@@ -36,8 +36,9 @@ export default async function AdminPlanetPinsPage({ params }: { params: Promise<
         <Link href="/admin/games" className="text-xs text-cyan-300 hover:underline">← Games catalog</Link>
         <h1 className="text-2xl font-bold mt-1">{game.name} · planet pins</h1>
         <p className="text-sm text-muted mt-1">
-          Align the six region markers to this planet&apos;s artwork. Gamer counts per region come
-          automatically from linked accounts — you only place, name and color the pins.
+          Pins map to this game&apos;s <span className="text-cyan-300">real servers/regions</span> pulled from linked
+          accounts via the provider APIs (e.g. EUW1, NA1, KR). Drag to place, rename and recolor each — gamer
+          counts per server are live. Before any accounts exist, generic regions show as a starting point.
         </p>
       </div>
 
