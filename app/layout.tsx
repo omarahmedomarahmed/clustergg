@@ -6,6 +6,7 @@ import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import CookieConsent from "@/components/CookieConsent";
 import QuestOrbMount from "@/components/QuestOrbMount";
+import RouteProgress from "@/components/RouteProgress";
 
 const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk" });
 
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={grotesk.variable}>
       <body className="nebula-bg min-h-screen antialiased">
+        <RouteProgress />
         <Starfield />
         <div className="relative z-10 flex min-h-screen flex-col">
           <Nav />
