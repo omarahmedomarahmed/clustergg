@@ -47,7 +47,7 @@ export default async function PlanetPage({
   const cms = await getContent(["banner.games", "banner.arena"]);
 
   const [posts, membership, challenges, boards, players, expertRows] = await Promise.all([
-    db.select({ post: schema.posts, author: schema.users })
+    db.select({ post: schema.posts, author: schema.publicUserColumns })
       .from(schema.posts)
       .innerJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
       .where(and(eq(schema.posts.spaceId, space.id), sql`${schema.posts.deletedAt} IS NULL`))
@@ -65,7 +65,7 @@ export default async function PlanetPage({
           eq(schema.leaderboards.game, game.name), eq(schema.leaderboards.isActive, true)))
       : Promise.resolve([]),
     providerIds.length
-      ? db.selectDistinct({ user: schema.users, inGameName: schema.linkedGameAccounts.inGameName })
+      ? db.selectDistinct({ user: schema.publicUserColumns, inGameName: schema.linkedGameAccounts.inGameName })
           .from(schema.linkedGameAccounts)
           .innerJoin(schema.users, eq(schema.linkedGameAccounts.userId, schema.users.id))
           .where(and(inArray(schema.linkedGameAccounts.provider, providerIds), eq(schema.users.status, "active")))
