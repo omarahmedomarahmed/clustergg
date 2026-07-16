@@ -116,8 +116,8 @@ async function db_entries(board: Board, limit: number) {
   return db.select({
     value: schema.statCurrent.metricValue,
     rankLabel: schema.statCurrent.rankLabel,
-    user: schema.users,
-    account: schema.linkedGameAccounts,
+    user: schema.publicUserColumns,
+    account: { inGameName: schema.linkedGameAccounts.inGameName },
   })
     .from(schema.statCurrent)
     .innerJoin(schema.linkedGameAccounts, eq(schema.statCurrent.linkedAccountId, schema.linkedGameAccounts.id))

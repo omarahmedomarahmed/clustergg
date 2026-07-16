@@ -6,6 +6,10 @@ import {
 const id = () => text("id").primaryKey();
 const now = (name: string) => timestamp(name, { withTimezone: true, mode: "date" }).defaultNow().notNull();
 
+// Forward declaration note: `publicUserColumns` (the light projection used
+// everywhere a user is only shown as an avatar + name + slug) is defined at the
+// bottom of this file, after the `users` table.
+
 // ===== Users & auth =====
 export const users = pgTable("users", {
   id: id(),
@@ -494,3 +498,36 @@ export const userQuestTiers = pgTable("user_quest_tiers", {
   questTierId: text("quest_tier_id").notNull().references(() => questTiers.id, { onDelete: "cascade" }),
   awardedAt: now("awarded_at"),
 }, (t) => [uniqueIndex("uqt_user_tier_idx").on(t.userId, t.questTierId)]);
+
+// ===== Light user projection =====
+// The `users` row carries three heavy columns — `avatarUrl`/`bannerUrl` (which
+// can be inline base64 data URLs when Vercel Blob isn't configured) and `theme`
+// (a JSONB profile-builder blob). The vast majority of places that join a user
+// only render a small avatar + display name + slug. Selecting the whole row on
+// those hot, high-fan-out joins (post authors, comment authors, planet players,
+// leaderboards, message threads, …) is what made Neon data-transfer explode.
+//
+// Use `publicUserColumns` as the projection for any user join that just needs
+// to link + show an avatar. It omits `bannerUrl` and `theme` entirely and keeps
+// `avatarUrl` (genuinely rendered). `PublicUser` is the resulting row type.
+export const publicUserColumns = {
+  id: users.id,
+  displayName: users.displayName,
+  slug: users.slug,
+  avatarUrl: users.avatarUrl,
+  role: users.role,
+  isVerified: users.isVerified,
+  title: users.title,
+  discordUsername: users.discordUsername,
+} as const;
+
+export type PublicUser = {
+  id: string;
+  displayName: string;
+  slug: string;
+  avatarUrl: string | null;
+  role: string;
+  isVerified: boolean;
+  title: string | null;
+  discordUsername: string | null;
+};

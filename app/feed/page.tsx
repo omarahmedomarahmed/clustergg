@@ -29,7 +29,7 @@ export default async function FeedPage() {
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
     db.select({ c: count() }).from(schema.userBadges).where(eq(schema.userBadges.userId, user.id)),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followingId, user.id)),
-    db.select().from(schema.games).where(eq(schema.games.isActive, true)),
+    db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games).where(eq(schema.games.isActive, true)),
   ]);
 
   const mySpaceIds = mySpaceRows.map((r) => r.s.id);
@@ -42,7 +42,7 @@ export default async function FeedPage() {
 
   const [posts, challenges, suggested] = await Promise.all([
     filters.length
-      ? db.select({ post: schema.posts, author: schema.users, space: schema.spaces })
+      ? db.select({ post: schema.posts, author: schema.publicUserColumns, space: schema.spaces })
           .from(schema.posts)
           .innerJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
           .innerJoin(schema.spaces, eq(schema.posts.spaceId, schema.spaces.id))

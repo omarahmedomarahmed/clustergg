@@ -49,7 +49,55 @@ export const getSession = cache(async (): Promise<SessionPayload | null> => {
 
 export type CurrentUser = typeof schema.users.$inferSelect;
 
+// The two heaviest user columns are `bannerUrl` (can be a base64 data URL when
+// Vercel Blob isn't configured) and `theme` (a JSONB profile-builder blob).
+// `getCurrentUser` runs on EVERY request (Nav, layout, most pages) but almost
+// none of them render the banner or the theme — only the profile editor and the
+// public profile page do, and the public page fetches its own target row. So we
+// project every OTHER column here and leave `bannerUrl`/`theme` out of the
+// per-request fetch. This alone removes megabytes of Neon data-transfer per page
+// view on databases whose avatars/banners are stored inline. Pages that truly
+// need the banner/theme call `getCurrentUserFull()`.
+const LIGHT_USER_COLUMNS = {
+  id: schema.users.id,
+  email: schema.users.email,
+  passwordHash: schema.users.passwordHash,
+  displayName: schema.users.displayName,
+  slug: schema.users.slug,
+  avatarUrl: schema.users.avatarUrl,
+  bio: schema.users.bio,
+  country: schema.users.country,
+  title: schema.users.title,
+  role: schema.users.role,
+  status: schema.users.status,
+  isVerified: schema.users.isVerified,
+  primarySignupProvider: schema.users.primarySignupProvider,
+  discordUsername: schema.users.discordUsername,
+  profileViews: schema.users.profileViews,
+  profileVisibility: schema.users.profileVisibility,
+  allowMessagesFrom: schema.users.allowMessagesFrom,
+  emailNotifications: schema.users.emailNotifications,
+  createdAt: schema.users.createdAt,
+  lastLoginAt: schema.users.lastLoginAt,
+} as const;
+
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const session = await getSession();
+  if (!session) return null;
+  const db = await getDb();
+  const rows = await db.select(LIGHT_USER_COLUMNS).from(schema.users)
+    .where(eq(schema.users.id, session.uid)).limit(1);
+  const row = rows[0] ?? null;
+  if (!row) return null;
+  if (row.status !== "active") return null;
+  // Fill the omitted heavy columns with safe placeholders so the returned shape
+  // still matches `CurrentUser` for callers that reference them structurally.
+  return { ...row, bannerUrl: null, theme: {} } as CurrentUser;
+});
+
+// Full row incl. bannerUrl + theme — only for the profile editor. Not cached
+// with the light fetch so the two never collide.
+export const getCurrentUserFull = cache(async (): Promise<CurrentUser | null> => {
   const session = await getSession();
   if (!session) return null;
   const db = await getDb();

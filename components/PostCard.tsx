@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import type { PublicUser } from "@/lib/db/schema";
 import Avatar from "@/components/Avatar";
 import ReactionBar from "@/components/ReactionBar";
 import CommentThread from "@/components/CommentThread";
@@ -8,7 +9,7 @@ import { timeAgo } from "@/lib/utils";
 import Icon from "@/components/Icon";
 
 type Post = typeof schema.posts.$inferSelect;
-type User = typeof schema.users.$inferSelect;
+type User = PublicUser;
 
 export default async function PostCard({
   post, author, viewerId, path, expertTier, spaceName,
@@ -23,7 +24,7 @@ export default async function PostCard({
   const db = await getDb();
   const [reactionRows, commentRows] = await Promise.all([
     db.select().from(schema.postReactions).where(eq(schema.postReactions.postId, post.id)),
-    db.select({ comment: schema.comments, author: schema.users })
+    db.select({ comment: schema.comments, author: schema.publicUserColumns })
       .from(schema.comments)
       .innerJoin(schema.users, eq(schema.comments.authorId, schema.users.id))
       .where(and(eq(schema.comments.postId, post.id), sql`${schema.comments.deletedAt} IS NULL`))

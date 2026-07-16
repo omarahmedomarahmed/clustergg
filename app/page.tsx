@@ -32,15 +32,25 @@ export default async function LandingPage() {
   ]);
 
   const [activeChallenges, games, badges, partners, statCounts, tickerRows] = await Promise.all([
-    db.select({ challenge: schema.challenges, space: schema.spaces })
+    db.select({
+      challenge: {
+        id: schema.challenges.id, title: schema.challenges.title, game: schema.challenges.game,
+        cadence: schema.challenges.cadence, endAt: schema.challenges.endAt, coverUrl: schema.challenges.coverUrl,
+        description: schema.challenges.description, prizeDescription: schema.challenges.prizeDescription,
+      },
+      space: { slug: schema.spaces.slug },
+    })
       .from(schema.challenges)
       .innerJoin(schema.spaces, eq(schema.challenges.spaceId, schema.spaces.id))
       .where(eq(schema.challenges.status, "active"))
       .orderBy(asc(schema.challenges.endAt)).limit(3),
-    db.select().from(schema.games).where(eq(schema.games.isActive, true))
+    db.select({ id: schema.games.id, name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl })
+      .from(schema.games).where(eq(schema.games.isActive, true))
       .orderBy(asc(schema.games.sortOrder)).limit(12),
-    db.select().from(schema.badges).where(eq(schema.badges.isActive, true)).limit(6),
-    db.select().from(schema.partners).where(eq(schema.partners.isActive, true)).orderBy(asc(schema.partners.sortOrder)),
+    db.select({ id: schema.badges.id, name: schema.badges.name, icon: schema.badges.icon, description: schema.badges.description })
+      .from(schema.badges).where(eq(schema.badges.isActive, true)).limit(6),
+    db.select({ id: schema.partners.id, name: schema.partners.name, logoUrl: schema.partners.logoUrl, url: schema.partners.url })
+      .from(schema.partners).where(eq(schema.partners.isActive, true)).orderBy(asc(schema.partners.sortOrder)),
     db.select({
       users: sql<number>`(SELECT COUNT(*) FROM users)`,
       accounts: sql<number>`(SELECT COUNT(*) FROM linked_game_accounts)`,
@@ -49,8 +59,8 @@ export default async function LandingPage() {
     }).from(schema.users).limit(1),
     db.select({
       points: schema.challengeParticipants.currentPoints,
-      user: schema.users,
-      challenge: schema.challenges,
+      user: { displayName: schema.users.displayName, slug: schema.users.slug, avatarUrl: schema.users.avatarUrl },
+      challenge: { title: schema.challenges.title, game: schema.challenges.game },
     })
       .from(schema.challengeParticipants)
       .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
@@ -66,7 +76,7 @@ export default async function LandingPage() {
     const rows = await db.select({
       challengeId: schema.challengeParticipants.challengeId,
       points: schema.challengeParticipants.currentPoints,
-      user: schema.users,
+      user: { displayName: schema.users.displayName, slug: schema.users.slug, avatarUrl: schema.users.avatarUrl },
     })
       .from(schema.challengeParticipants)
       .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
