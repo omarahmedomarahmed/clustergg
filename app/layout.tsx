@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import CookieConsent from "@/components/CookieConsent";
 import QuestOrbMount from "@/components/QuestOrbMount";
 import RouteProgress from "@/components/RouteProgress";
+import AdSlot from "@/components/AdSlot";
 
 const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk" });
 
@@ -39,6 +40,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Starfield />
         <div className="relative z-10 flex min-h-screen flex-col">
           <Nav />
+          {/* Global top ad strip — shown at the top of every page, right under
+              the nav, pushing page content down. Renders nothing until a
+              creative is served. Editable via Admin → Ads. */}
+          <div className="w-full px-4 pt-2">
+            <AdSlot placement="top_banner" />
+          </div>
           <main className="flex-1">{children}</main>
           <Footer />
         </div>
