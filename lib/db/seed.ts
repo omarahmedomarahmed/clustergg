@@ -463,8 +463,8 @@ export async function ensurePlanetSkins(db: DB) {
 // data URLs) and list pages stay light. Idempotent: once converted they're
 // plain URLs and skipped. No-op when Blob isn't configured.
 export async function migrateGameImagesToBlob(db: DB) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
-  const { uploadDataUrlToBlob } = await import("@/lib/blob");
+  const { uploadDataUrlToBlob, blobConfigured } = await import("@/lib/blob");
+  if (!blobConfigured()) return;
   const isData = (s?: string | null) => !!s && s.startsWith("data:");
   const DATA = "data:%";
 
@@ -509,7 +509,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-15.1";
+const MAINT_VERSION = "2026-07-16.1";
 
 export async function runBootMaintenance(db: DB) {
   try {
