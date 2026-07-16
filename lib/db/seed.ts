@@ -463,8 +463,8 @@ export async function ensurePlanetSkins(db: DB) {
 // data URLs) and list pages stay light. Idempotent: once converted they're
 // plain URLs and skipped. No-op when Blob isn't configured.
 export async function migrateGameImagesToBlob(db: DB) {
-  const { uploadDataUrlToBlob, resolveBlobToken } = await import("@/lib/blob");
-  if (!resolveBlobToken()) return;
+  const { uploadDataUrlToBlob, blobConfigured } = await import("@/lib/blob");
+  if (!blobConfigured()) return;
   const isData = (s?: string | null) => !!s && s.startsWith("data:");
   const DATA = "data:%";
 
