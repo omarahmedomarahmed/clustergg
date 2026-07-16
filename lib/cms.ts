@@ -30,6 +30,11 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "banner.games": BANNER_ART.games,
   "banner.profileDefault": BANNER_ART.profileDefault,
   "footer.tagline": "Every game. One identity. Link your accounts, flex your ranks, and climb the galaxy.",
+  // Platform logo (shown in the nav + footer), admin-editable with framing.
+  "brand.logo": "/assets/logo.png",
+  "brand.logo.zoom": "1",
+  "brand.logo.x": "50",
+  "brand.logo.y": "50",
 };
 
 export async function getContent(keys: string[]): Promise<Record<string, string>> {

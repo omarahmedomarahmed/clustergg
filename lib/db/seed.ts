@@ -521,7 +521,9 @@ export async function runBootMaintenance(db: DB) {
 
   await seedHouseAds(db);
   await ensurePlanetSkins(db);
-  await migrateGameImagesToBlob(db);
+  // (migrateGameImagesToBlob is run unconditionally every boot from
+  // ensureProvisioned — not gated here — so it self-heals if Blob became
+  // available after this version flag was already set.)
   try { const { seedQuests, ensureQuestArt } = await import("@/lib/quests"); await seedQuests(db); await ensureQuestArt(db); } catch { /* non-fatal */ }
 
   await db.insert(schema.platformSettings)
@@ -566,4 +568,37 @@ export async function seedHouseAds(db: DB) {
       id: uid(), campaignId: campId, creativeId: crId, placementId: p.id, weight: 1, priority: 0,
     });
   }
+}
+
+// Idempotent: ensure the global top-banner placement exists and (on an already
+// seeded DB where seedHouseAds early-returns) has a house creative to fill it.
+// Runs every boot; a couple of guarded inserts, cheap once present.
+export async function ensureTopBannerAd(db: DB) {
+  await db.insert(schema.adPlacements).values({
+    id: uid(), key: "top_banner", pageScope: "Global top banner (all pages)", device: "both",
+    width: 970, height: 60, mobileWidth: 360, mobileHeight: 60,
+  }).onConflictDoNothing();
+
+  const [placement] = await db.select().from(schema.adPlacements).where(eq(schema.adPlacements.key, "top_banner")).limit(1);
+  if (!placement) return;
+
+  const [brand] = await db.select({ id: schema.brands.id }).from(schema.brands).where(eq(schema.brands.id, HOUSE_BRAND_ID)).limit(1);
+  if (!brand) return; // fresh DB: seedHouseAds will create the creative for every placement
+  const [camp] = await db.select({ id: schema.adCampaigns.id }).from(schema.adCampaigns).where(eq(schema.adCampaigns.brandId, HOUSE_BRAND_ID)).limit(1);
+  if (!camp) return;
+
+  const [link] = await db.select({ id: schema.adCampaignCreatives.id }).from(schema.adCampaignCreatives)
+    .where(and(eq(schema.adCampaignCreatives.campaignId, camp.id), eq(schema.adCampaignCreatives.placementId, placement.id))).limit(1);
+  if (link) return; // already has a creative
+
+  const t = HOUSE_TAGLINES[0];
+  const crId = uid();
+  await db.insert(schema.adCreatives).values({
+    id: crId, brandId: HOUSE_BRAND_ID, name: "Cluster · top_banner", type: "image",
+    fileUrl: svgAd(placement.width, placement.height, t.from, t.to, "CLUSTER", t.title),
+    clickUrl: t.click, width: placement.width, height: placement.height, status: "approved",
+  });
+  await db.insert(schema.adCampaignCreatives).values({
+    id: uid(), campaignId: camp.id, creativeId: crId, placementId: placement.id, weight: 1, priority: 0,
+  });
 }

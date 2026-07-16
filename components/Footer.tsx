@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getContent } from "@/lib/cms";
+import BrandLogo from "@/components/BrandLogo";
 
 export default async function Footer() {
   const c = await getContent(["footer.tagline"]);
@@ -8,8 +9,7 @@ export default async function Footer() {
       <div className="mx-auto max-w-6xl px-4 py-12 grid gap-8 sm:grid-cols-3 text-sm">
         <div>
           <div className="flex items-center gap-2 mb-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/assets/logo.png" alt="" width={28} height={28} className="rounded-full" />
+            <BrandLogo size={28} />
             <span className="font-bold grad-text">CLUSTER</span>
           </div>
           <p className="text-muted leading-relaxed">{c["footer.tagline"]}</p>

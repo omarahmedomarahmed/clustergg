@@ -1,10 +1,14 @@
 import { BRAND_KIT } from "@/lib/assets";
 import Icon from "@/components/Icon";
+import { getContent } from "@/lib/cms";
+import LogoEditor from "@/components/LogoEditor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Brand Kit" };
 
-export default function BrandKitPage() {
+export default async function BrandKitPage() {
+  const c = await getContent(["brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y"]);
+
   return (
     <div>
       <h1 className="text-2xl font-bold mb-2">Brand & Marketing Kit</h1>
@@ -13,6 +17,17 @@ export default function BrandKitPage() {
         full-resolution, or use Download. Templates leave space for you to drop in challenge
         details, names and dates in Canva / Photoshop / Figma.
       </p>
+
+      <section className="glass p-6 mb-10">
+        <h2 className="font-bold text-lg mb-1 flex items-center gap-2"><Icon name="spark" size={16} className="text-cyan-300" /> Platform logo</h2>
+        <p className="text-sm text-muted mb-5">The mark shown in the nav and footer across the whole site. Upload and frame it — changes apply everywhere instantly.</p>
+        <LogoEditor
+          defaultUrl={c["brand.logo"] || "/assets/logo.png"}
+          defaultZoom={Number(c["brand.logo.zoom"]) || 1}
+          defaultX={Number(c["brand.logo.x"] ?? 50)}
+          defaultY={Number(c["brand.logo.y"] ?? 50)}
+        />
+      </section>
 
       {BRAND_KIT.map((group) => (
         <section key={group.group} className="mb-10">

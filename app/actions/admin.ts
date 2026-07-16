@@ -9,6 +9,23 @@ import { syncAccount } from "@/lib/sync";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
 
+// Platform logo (nav + footer) — image + framing, saved to the CMS. Applies
+// site-wide immediately via a layout revalidation.
+export async function saveBrandLogo(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const { setContent } = await import("@/lib/cms");
+  const url = String(formData.get("logoUrl") ?? "").trim();
+  if (!url) return { error: "Upload a logo image first." };
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, Number.isFinite(v) ? v : min));
+  await setContent("brand.logo", url);
+  await setContent("brand.logo.zoom", String(clamp(Number(formData.get("zoom")), 0.5, 3)));
+  await setContent("brand.logo.x", String(clamp(Number(formData.get("x")), 0, 100)));
+  await setContent("brand.logo.y", String(clamp(Number(formData.get("y")), 0, 100)));
+  await audit(admin.id, "brand.logo_update", "content", "brand.logo");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Platform logo updated everywhere." };
+}
+
 async function audit(adminId: string, action: string, targetType?: string, targetId?: string, meta?: Record<string, unknown>) {
   const db = await getDb();
   await db.insert(schema.auditLog).values({ id: uid(), adminId, action, targetType, targetId, meta: meta ?? {} });

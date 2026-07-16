@@ -7,6 +7,7 @@ import GameLogo from "@/components/GameLogo";
 import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
 import BrandGlyph from "@/components/BrandGlyph";
+import BrandLogo from "@/components/BrandLogo";
 import { slimImg } from "@/lib/img";
 
 export default async function Nav() {
@@ -53,8 +54,7 @@ export default async function Nav() {
     <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
         <Link href={user ? "/feed" : "/"} className="flex items-center gap-2.5 shrink-0" aria-label="Cluster home">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/assets/logo.png" alt="Cluster" width={34} height={34} className="rounded-full pulse-glow" />
+          <BrandLogo size={34} className="pulse-glow" />
           <span className="hidden sm:inline text-lg font-bold tracking-wide grad-text">CLUSTER</span>
         </Link>
 
