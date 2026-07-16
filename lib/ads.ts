@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { and, eq, gte, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import { schema } from "@/lib/db";
 
@@ -35,11 +35,21 @@ export async function serveAds(db: DB, placementKey: string, device: string): Pr
   if (placement.device !== "both" && placement.device !== device) return null;
 
   const now = new Date();
+  // Project only the columns we return. Crucially we do NOT fetch
+  // `adCreatives.fileUrl` here (it can be a large inline data URL) — we first
+  // rank/slice to the few creatives actually shown, then fetch their fileUrls in
+  // a second, tiny query. This stops us from pulling every eligible creative's
+  // full art on every ad-slot request (a hot path on almost every page).
   const rows = await db.select({
-    cc: schema.adCampaignCreatives,
-    creative: schema.adCreatives,
-    campaign: schema.adCampaigns,
-    brand: schema.brands,
+    ccId: schema.adCampaignCreatives.id,
+    creativeId: schema.adCreatives.id,
+    priority: schema.adCampaignCreatives.priority,
+    weight: schema.adCampaignCreatives.weight,
+    type: schema.adCreatives.type,
+    clickUrl: schema.adCreatives.clickUrl,
+    durationSeconds: schema.adCreatives.durationSeconds,
+    brandName: schema.brands.name,
+    targetDevice: schema.adCampaigns.targetDevice,
   })
     .from(schema.adCampaignCreatives)
     .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id))
@@ -55,24 +65,33 @@ export async function serveAds(db: DB, placementKey: string, device: string): Pr
     ));
 
   const eligible = rows
-    .filter((r) => r.campaign.targetDevice === "both" || r.campaign.targetDevice === device)
-    .sort((a, b) => b.cc.priority - a.cc.priority || b.cc.weight - a.cc.weight)
+    .filter((r) => r.targetDevice === "both" || r.targetDevice === device)
+    .sort((a, b) => b.priority - a.priority || b.weight - a.weight)
     .slice(0, placement.maxCreativesInRotation);
 
   if (eligible.length === 0) return null;
+
+  // Now fetch fileUrls for ONLY the creatives we're actually returning.
+  const creativeIds = [...new Set(eligible.map((r) => r.creativeId))];
+  const fileRows = creativeIds.length
+    ? await db.select({ id: schema.adCreatives.id, fileUrl: schema.adCreatives.fileUrl })
+        .from(schema.adCreatives).where(inArray(schema.adCreatives.id, creativeIds))
+    : [];
+  const fileById = new Map(fileRows.map((f) => [f.id, f.fileUrl]));
+
   return {
     key: placement.key,
     width: placement.width,
     height: placement.height,
     rotationIntervalSeconds: placement.rotationIntervalSeconds,
     creatives: eligible.map((r) => ({
-      campaignCreativeId: r.cc.id,
-      creativeId: r.creative.id,
-      type: r.creative.type,
-      fileUrl: r.creative.fileUrl,
-      clickUrl: r.creative.clickUrl,
-      brandName: r.brand.name,
-      durationSeconds: r.creative.durationSeconds,
+      campaignCreativeId: r.ccId,
+      creativeId: r.creativeId,
+      type: r.type,
+      fileUrl: fileById.get(r.creativeId) ?? "",
+      clickUrl: r.clickUrl,
+      brandName: r.brandName,
+      durationSeconds: r.durationSeconds,
     })),
   };
 }

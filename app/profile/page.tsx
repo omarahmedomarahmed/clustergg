@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUserFull } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { providerInfoList } from "@/lib/providers/serialize";
 import { getProvider } from "@/lib/providers/registry";
@@ -25,7 +25,7 @@ const STATUS_STYLE: Record<string, string> = {
 const STATUS_LABEL: Record<string, string> = { needs_reconnect: "reconnect needed" };
 
 export default async function OwnProfilePage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUserFull();
   if (!user) redirect("/login");
   const db = await getDb();
   const accounts = await db.select().from(schema.linkedGameAccounts)
@@ -45,7 +45,7 @@ export default async function OwnProfilePage() {
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(12),
     db.select({ c: sql<number>`count(*)` }).from(schema.posts)
       .where(and(eq(schema.posts.authorId, user.id), sql`${schema.posts.deletedAt} IS NULL`)),
-    db.select().from(schema.games),
+    db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl }).from(schema.games),
   ]);
 
   // Resolve a game logo for each provider (provider.game === game.name).

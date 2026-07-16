@@ -19,7 +19,12 @@ export default async function Nav() {
     unread = Number(row?.c ?? 0);
   }
   // Games pinned to the nav by an admin (Admin → Games → "Show in nav").
-  const navGames = await db.select().from(schema.games)
+  // Project only the columns the nav renders — never pull the heavy planet
+  // art / cover / pins columns here (this runs on EVERY page request).
+  const navGames = await db.select({
+    id: schema.games.id, name: schema.games.name, slug: schema.games.slug,
+    logoUrl: schema.games.logoUrl,
+  }).from(schema.games)
     .where(and(eq(schema.games.isActive, true), eq(schema.games.showInNav, true)))
     .orderBy(asc(schema.games.sortOrder)).limit(8);
 
