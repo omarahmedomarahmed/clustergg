@@ -41,20 +41,21 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
           <label className="text-xs text-muted sm:col-span-2">Fallback icon<select name="icon" defaultValue={quest.icon} className="input-cosmic mt-1">{ICONS.map((i) => <option key={i} value={i}>{i}</option>)}</select></label>
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-3">
+        <div className="grid sm:grid-cols-2 gap-3">
           <ImageUpload name="logoUrl" defaultValue={quest.logoUrl ?? ""} label="Quest emblem" aspect="1/1" rounded="rounded-xl" maxDim={512} scope="quest" hint="Square logo shown on cards + orb." />
-          <ImageUpload name="cardBgUrl" defaultValue={quest.cardBgUrl ?? ""} label="Floating-card background" aspect="16/9" maxDim={1200} scope="quest" hint="Themed art behind the quest card." />
-          <ImageUpload name="coverUrl" defaultValue={quest.coverUrl ?? ""} label="Cover banner" aspect="16/9" maxDim={1600} scope="quest" hint="Wide banner (optional)." />
+          <ImageUpload name="cardBgUrl" defaultValue={quest.cardBgUrl ?? ""} label="Card / hero space background" aspect="16/9" maxDim={1400} scope="quest" hint="Themed space art behind the card + quest map hero." />
+          <ImageUpload name="mapArtUrl" defaultValue={quest.mapArtUrl ?? ""} label="Quest map art (treasure map)" aspect="16/9" maxDim={1800} scope="quest" hint="The map shown as the standalone quest-page hero; place tier pins on it below." />
+          <ImageUpload name="coverUrl" defaultValue={quest.coverUrl ?? ""} label="Cover banner (optional)" aspect="16/9" maxDim={1600} scope="quest" hint="Wide banner." />
         </div>
 
         {/* Action weights + caps */}
         <div>
-          <div className="text-xs uppercase tracking-widest text-muted mb-2">Quest Points per action (0 = ignored) · daily cap</div>
+          <div className="text-xs uppercase tracking-widest text-muted mb-2">Cluster Points (CP) per action (0 = ignored) · daily cap</div>
           <div className="grid sm:grid-cols-2 gap-2">
             {ACTION_CATALOG.map((a) => (
               <div key={a.key} className="flex items-center gap-2 rounded-lg border border-violet-400/15 px-3 py-2">
                 <span className="text-sm flex-1 min-w-0 truncate" title={a.key}>{a.label}</span>
-                <label className="text-[10px] text-muted">QP<input name={`weight:${a.key}`} type="number" min={0} defaultValue={weights[a.key] ?? 0} className="input-cosmic !py-1 w-16 ml-1" /></label>
+                <label className="text-[10px] text-muted">CP<input name={`weight:${a.key}`} type="number" min={0} defaultValue={weights[a.key] ?? 0} className="input-cosmic !py-1 w-16 ml-1" /></label>
                 <label className="text-[10px] text-muted">cap<input name={`cap:${a.key}`} type="number" min={0} defaultValue={caps[a.key] ?? 0} className="input-cosmic !py-1 w-16 ml-1" /></label>
               </div>
             ))}
@@ -79,9 +80,11 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
               <ImageUpload name="iconUrl" defaultValue={t.iconUrl ?? ""} label="Badge art" aspect="1/1" rounded="rounded-full" maxDim={512} scope="quest" hint="" />
               <div className="grid grid-cols-2 gap-2">
                 <label className="text-xs text-muted">Name<input name="name" defaultValue={t.name} className="input-cosmic !py-1.5 mt-1" /></label>
-                <label className="text-xs text-muted">Threshold QP<input name="thresholdQp" type="number" min={0} defaultValue={t.thresholdQp} className="input-cosmic !py-1.5 mt-1" /></label>
+                <label className="text-xs text-muted">Threshold CP<input name="thresholdQp" type="number" min={0} defaultValue={t.thresholdQp} className="input-cosmic !py-1.5 mt-1" /></label>
                 <label className="text-xs text-muted">Order<input name="tierIndex" type="number" defaultValue={t.tierIndex} className="input-cosmic !py-1.5 mt-1" /></label>
                 <label className="flex items-center gap-2 text-xs text-muted mt-5">Accent<input type="color" name="color" defaultValue={t.color ?? quest.color} className="h-7 w-9 rounded bg-transparent border border-white/10" /></label>
+                <label className="text-xs text-muted">Map pin X %<input name="mapX" type="number" min={0} max={100} defaultValue={t.mapX} className="input-cosmic !py-1.5 mt-1" /></label>
+                <label className="text-xs text-muted">Map pin Y %<input name="mapY" type="number" min={0} max={100} defaultValue={t.mapY} className="input-cosmic !py-1.5 mt-1" /></label>
                 <label className="text-xs text-muted col-span-2">Story / how to earn<textarea name="description" rows={2} defaultValue={t.description} className="input-cosmic !py-1.5 mt-1" /></label>
               </div>
               <div className="flex sm:flex-col gap-2">
@@ -95,7 +98,7 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
         {/* Add tier */}
         <form action={saveTier.bind(null, quest.id)} className="mt-4 rounded-xl border border-dashed border-violet-400/25 p-3 grid sm:grid-cols-4 gap-2 items-end">
           <label className="text-xs text-muted">New tier name<input name="name" placeholder="e.g. Diamond" className="input-cosmic !py-1.5 mt-1" /></label>
-          <label className="text-xs text-muted">Threshold QP<input name="thresholdQp" type="number" min={0} defaultValue={0} className="input-cosmic !py-1.5 mt-1" /></label>
+          <label className="text-xs text-muted">Threshold CP<input name="thresholdQp" type="number" min={0} defaultValue={0} className="input-cosmic !py-1.5 mt-1" /></label>
           <label className="text-xs text-muted">Order<input name="tierIndex" type="number" defaultValue={tiers.length} className="input-cosmic !py-1.5 mt-1" /></label>
           <SubmitButton pendingText="Adding…" className="ghost-btn rounded-full px-4 py-2 text-xs font-semibold">+ Add tier</SubmitButton>
         </form>

@@ -59,6 +59,7 @@ export async function saveQuest(questId: string, formData: FormData) {
     logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
     cardBgUrl: String(formData.get("cardBgUrl") ?? "").trim() || null,
     coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
+    mapArtUrl: String(formData.get("mapArtUrl") ?? "").trim() || null,
     actionWeights: weights,
     dailyCaps: caps,
     sortOrder: Number(formData.get("sortOrder")) || 0,
@@ -83,6 +84,7 @@ export async function saveTier(questId: string, formData: FormData) {
   const admin = await requireStaff();
   const db = await getDb();
   const tierId = String(formData.get("tierId") ?? "");
+  const clamp = (v: number) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 50));
   const values = {
     name: String(formData.get("name") ?? "").trim() || "Tier",
     description: String(formData.get("description") ?? "").trim(),
@@ -90,6 +92,8 @@ export async function saveTier(questId: string, formData: FormData) {
     iconUrl: String(formData.get("iconUrl") ?? "").trim() || null,
     color: String(formData.get("color") ?? "").trim() || null,
     tierIndex: Number(formData.get("tierIndex")) || 0,
+    mapX: clamp(Number(formData.get("mapX"))),
+    mapY: clamp(Number(formData.get("mapY"))),
   };
   if (tierId) {
     await db.update(schema.questTiers).set(values).where(eq(schema.questTiers.id, tierId));

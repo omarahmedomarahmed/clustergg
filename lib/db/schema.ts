@@ -447,6 +447,7 @@ export const quests = pgTable("quests", {
   logoUrl: text("logo_url"),
   cardBgUrl: text("card_bg_url"),              // gamified floating-card background
   coverUrl: text("cover_url"),
+  mapArtUrl: text("map_art_url"),              // treasure-map art for the quest hero
   actionWeights: jsonb("action_weights").$type<Record<string, number>>().notNull().default({}),
   dailyCaps: jsonb("daily_caps").$type<Record<string, number>>().notNull().default({}),
   sortOrder: integer("sort_order").notNull().default(0),
@@ -464,6 +465,8 @@ export const questTiers = pgTable("quest_tiers", {
   thresholdQp: integer("threshold_qp").notNull().default(100),
   iconUrl: text("icon_url"),                    // uploaded badge art
   color: text("color"),                          // optional tier accent
+  mapX: integer("map_x").notNull().default(50),  // pin position on the quest map (%)
+  mapY: integer("map_y").notNull().default(50),
   isActive: boolean("is_active").notNull().default(true),
 }, (t) => [index("qt_quest_idx").on(t.questId, t.tierIndex)]);
 

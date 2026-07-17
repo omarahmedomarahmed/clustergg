@@ -99,6 +99,9 @@ const COLUMN_MIGRATIONS = [
     "awarded_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "uqt_user_tier_idx" ON "user_quest_tiers" ("user_id","quest_tier_id")`,
+  `ALTER TABLE "quests" ADD COLUMN IF NOT EXISTS "map_art_url" text`,
+  `ALTER TABLE "quest_tiers" ADD COLUMN IF NOT EXISTS "map_x" integer NOT NULL DEFAULT 50`,
+  `ALTER TABLE "quest_tiers" ADD COLUMN IF NOT EXISTS "map_y" integer NOT NULL DEFAULT 50`,
 ];
 
 async function runColumnMigrations(db: DB) {
