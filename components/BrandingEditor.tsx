@@ -31,15 +31,17 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 // Admin editor for the wide wordmark logo, per-placement display mode, and the
 // loading-screen appearance. Complements LogoEditor (the square mark).
 export default function BrandingEditor({
-  defaultWordmark, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo,
+  defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo,
 }: {
   defaultWordmark: string;
+  defaultWordmarkZoom: number;
   defaultNavMode: Mode;
   defaultFooterMode: Mode;
   defaultLoadingColor: string;
   defaultLoadingLogo: string;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
+  const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
   const [navMode, setNavMode] = useState<Mode>(defaultNavMode);
   const [footerMode, setFooterMode] = useState<Mode>(defaultFooterMode);
   const [loadingColor, setLoadingColor] = useState(defaultLoadingColor);
@@ -56,11 +58,15 @@ export default function BrandingEditor({
           <ImageUpload name="wordmark" value={wordmark} onChange={setWordmark}
             aspect="4/1" rounded="rounded-lg" maxDim={640} scope="content"
             hint="Transparent PNG works best. Wide lockup — around 4:1." />
+          <label className="mt-3 block text-xs text-muted">Wordmark size <span className="text-cyan-300">{wmZoom.toFixed(2)}×</span>
+            <input type="range" min={0.5} max={3} step={0.05} value={wmZoom} onChange={(e) => setWmZoom(Number(e.target.value))} className="w-full accent-violet-500" />
+          </label>
+          <input type="hidden" name="wordmarkZoom" value={wmZoom} />
           {wordmark && (
-            <div className="mt-4 flex items-center gap-4 rounded-xl bg-[#04051a] p-4">
-              <span className="text-[10px] uppercase tracking-widest text-muted">Preview</span>
+            <div className="mt-4 flex items-center gap-4 rounded-xl bg-[#04051a] p-4 overflow-x-auto">
+              <span className="text-[10px] uppercase tracking-widest text-muted shrink-0">Nav preview</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={wordmark} alt="Cluster" className="h-6 w-auto object-contain" />
+              <img src={wordmark} alt="Cluster" className="w-auto object-contain" style={{ height: 38 * wmZoom }} />
             </div>
           )}
         </div>

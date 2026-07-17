@@ -36,6 +36,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.logo.x": "50",
   "brand.logo.y": "50",
   "brand.wordmark": "",                     // wide CLUSTER wordmark (empty = gradient text)
+  "brand.wordmark.zoom": "1",               // wide wordmark scale multiplier
   "brand.nav.mode": "both",                 // mark | wordmark | both
   "brand.footer.mode": "both",
   // Loading screen (rotating circle) — editable color + optional inner logo.

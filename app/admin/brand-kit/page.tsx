@@ -13,7 +13,7 @@ const asMode = (v: string | undefined): Mode => (v === "mark" || v === "wordmark
 export default async function BrandKitPage() {
   const c = await getContent([
     "brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y",
-    "brand.wordmark", "brand.nav.mode", "brand.footer.mode",
+    "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.footer.mode",
     "brand.loading.color", "brand.loading.logo",
   ]);
 
@@ -42,6 +42,7 @@ export default async function BrandKitPage() {
         <p className="text-sm text-muted mb-5">Upload the wide CLUSTER wordmark, choose what shows in the nav and footer, and style the loading orbit. Applies everywhere instantly.</p>
         <BrandingEditor
           defaultWordmark={c["brand.wordmark"] || ""}
+          defaultWordmarkZoom={Number(c["brand.wordmark.zoom"]) || 1}
           defaultNavMode={asMode(c["brand.nav.mode"])}
           defaultFooterMode={asMode(c["brand.footer.mode"])}
           defaultLoadingColor={c["brand.loading.color"] || "#8b5cf6"}

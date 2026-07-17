@@ -33,6 +33,8 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   const { setContent } = await import("@/lib/cms");
   const mode = (v: FormDataEntryValue | null) => (["mark", "wordmark", "both"].includes(String(v)) ? String(v) : "both");
   await setContent("brand.wordmark", String(formData.get("wordmark") ?? "").trim());
+  const wmZoom = Number(formData.get("wordmarkZoom"));
+  await setContent("brand.wordmark.zoom", String(Math.max(0.5, Math.min(3, Number.isFinite(wmZoom) ? wmZoom : 1))));
   await setContent("brand.nav.mode", mode(formData.get("navMode")));
   await setContent("brand.footer.mode", mode(formData.get("footerMode")));
   await setContent("brand.loading.color", String(formData.get("loadingColor") ?? "#8b5cf6").trim() || "#8b5cf6");
