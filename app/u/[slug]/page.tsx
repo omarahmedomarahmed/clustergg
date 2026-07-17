@@ -99,6 +99,7 @@ export default async function ProfilePage({ params }: Props) {
 
   const profileQuests = await getUserQuests(db, user.id);
   const games = await db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games);
+  const gameCover = new Map(games.map((g) => [g.name, g.coverUrl]));
   const accountAvatar = (a: typeof accounts[number]): string | null => {
     const pd = a.providerData as Record<string, unknown> | null;
     const av = pd && (pd.avatar ?? pd.avatarUrl ?? pd.image);
@@ -193,14 +194,32 @@ export default async function ProfilePage({ params }: Props) {
         return (
           <section key={key}>
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="zap" size={19} style={{ color: theme.accent }} /> Competing now</h2>
-            <div className="space-y-2">
-              {activeChallenges.map(({ p, c }) => (
-                <div key={p.id} className={`${cardCls} flex items-center gap-3`}>
-                  <Icon name="flame" size={20} style={{ color: theme.accent }} />
-                  <div className="min-w-0 flex-1"><div className="font-semibold text-sm truncate" style={{ color: theme.text }}>{c.title}</div><div className="text-xs p-muted">{c.game} · ends {timeAgo(c.endAt).replace(" ago", "")}</div></div>
-                  <div className="font-bold" style={{ color: theme.accent2 }}>{p.currentPoints} pts</div>
-                </div>
-              ))}
+            <div className="grid sm:grid-cols-2 gap-3">
+              {activeChallenges.map(({ p, c }) => {
+                const cover = slimImg(c.coverUrl) ?? slimImg(gameCover.get(c.game) ?? null);
+                return (
+                  <div key={p.id} className={`${cardCls} relative overflow-hidden !p-0`}>
+                    <div className="h-24 relative overflow-hidden">
+                      {cover ? (
+                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
+                      ) : (
+                        <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${theme.accent}44, ${theme.accent2}33)` }} />
+                      )}
+                      <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,5,26,0.92), rgba(4,5,26,0.25))" }} />
+                      <div className="absolute top-2 left-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 px-2 py-0.5 text-[9px] uppercase tracking-widest text-emerald-200">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live
+                      </div>
+                      <div className="absolute bottom-2 left-3 right-3">
+                        <div className="font-bold text-sm truncate drop-shadow" style={{ color: "#fff" }}>{c.title}</div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-white/70">{c.game} · ends {timeAgo(c.endAt).replace(" ago", "")}</span>
+                          <span className="font-bold" style={{ color: theme.accent2 }}>{p.currentPoints} pts</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </section>
         );
@@ -223,11 +242,22 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.spaces || spaceRows.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="users" size={19} style={{ color: theme.accent }} /> My spaces</h2>
-            <div className="flex flex-wrap gap-2">
-              {spaceRows.map(({ s }) => (
-                <Link key={s.id} href={`/planets/${s.slug}`} className="text-sm rounded-full px-3 py-1.5" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 30%, transparent)`, color: theme.text }}>{s.name}</Link>
-              ))}
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="planet" size={19} style={{ color: theme.accent }} /> My planets</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {spaceRows.map(({ s }) => {
+                const cover = slimImg(s.game ? gameCover.get(s.game) ?? null : null);
+                return (
+                  <Link key={s.id} href={`/planets/${s.slug}`} className="relative block h-20 overflow-hidden rounded-xl group" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 25%, transparent)` }}>
+                    {cover ? (
+                      <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url(${cover})` }} />
+                    ) : (
+                      <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${theme.accent}55, ${theme.accent2}33)` }} />
+                    )}
+                    <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,5,26,0.9), rgba(4,5,26,0.15))" }} />
+                    <div className="absolute bottom-2 left-3 right-3 font-bold text-sm truncate text-white drop-shadow">{s.name}</div>
+                  </Link>
+                );
+              })}
             </div>
           </section>
         );
