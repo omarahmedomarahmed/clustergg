@@ -2,12 +2,20 @@ import { BRAND_KIT } from "@/lib/assets";
 import Icon from "@/components/Icon";
 import { getContent } from "@/lib/cms";
 import LogoEditor from "@/components/LogoEditor";
+import BrandingEditor from "@/components/BrandingEditor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Brand Kit" };
 
+type Mode = "mark" | "wordmark" | "both";
+const asMode = (v: string | undefined): Mode => (v === "mark" || v === "wordmark" ? v : "both");
+
 export default async function BrandKitPage() {
-  const c = await getContent(["brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y"]);
+  const c = await getContent([
+    "brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y",
+    "brand.wordmark", "brand.nav.mode", "brand.footer.mode",
+    "brand.loading.color", "brand.loading.logo",
+  ]);
 
   return (
     <div>
@@ -26,6 +34,18 @@ export default async function BrandKitPage() {
           defaultZoom={Number(c["brand.logo.zoom"]) || 1}
           defaultX={Number(c["brand.logo.x"] ?? 50)}
           defaultY={Number(c["brand.logo.y"] ?? 50)}
+        />
+      </section>
+
+      <section className="glass p-6 mb-10">
+        <h2 className="font-bold text-lg mb-1 flex items-center gap-2"><Icon name="spark" size={16} className="text-cyan-300" /> Wordmark, placement & loading screen</h2>
+        <p className="text-sm text-muted mb-5">Upload the wide CLUSTER wordmark, choose what shows in the nav and footer, and style the loading orbit. Applies everywhere instantly.</p>
+        <BrandingEditor
+          defaultWordmark={c["brand.wordmark"] || ""}
+          defaultNavMode={asMode(c["brand.nav.mode"])}
+          defaultFooterMode={asMode(c["brand.footer.mode"])}
+          defaultLoadingColor={c["brand.loading.color"] || "#8b5cf6"}
+          defaultLoadingLogo={c["brand.loading.logo"] || ""}
         />
       </section>
 

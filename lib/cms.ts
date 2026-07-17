@@ -31,10 +31,16 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "banner.profileDefault": BANNER_ART.profileDefault,
   "footer.tagline": "Every game. One identity. Link your accounts, flex your ranks, and climb the galaxy.",
   // Platform logo (shown in the nav + footer), admin-editable with framing.
-  "brand.logo": "/assets/logo.png",
+  "brand.logo": "/assets/logo.png",       // square letter-mark
   "brand.logo.zoom": "1",
   "brand.logo.x": "50",
   "brand.logo.y": "50",
+  "brand.wordmark": "",                     // wide CLUSTER wordmark (empty = gradient text)
+  "brand.nav.mode": "both",                 // mark | wordmark | both
+  "brand.footer.mode": "both",
+  // Loading screen (rotating circle) — editable color + optional inner logo.
+  "brand.loading.color": "#8b5cf6",
+  "brand.loading.logo": "",
 };
 
 export async function getContent(keys: string[]): Promise<Record<string, string>> {
