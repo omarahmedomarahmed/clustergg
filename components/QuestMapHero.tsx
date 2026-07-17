@@ -78,6 +78,23 @@ export default function QuestMapHero({
           </div>
         )}
 
+        {/* Quest identity + how-to-earn — ABOVE the map art */}
+        <div className="mx-auto max-w-3xl text-center mb-5">
+          <h1 className="text-3xl md:text-5xl font-bold grad-text">{q.name}</h1>
+          <p className="text-muted mt-1.5">{q.tagline}</p>
+          {q.lore && <p className="text-sm text-muted/90 mt-2 max-w-xl mx-auto leading-relaxed">{q.lore}</p>}
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
+            <span className="inline-flex items-center gap-1.5 font-semibold" style={{ color: q.accent2 }}>
+              <Icon name="spark" size={15} /> {q.qp.toLocaleString()} CP earned
+            </span>
+            <span className="text-muted">·</span>
+            <span className="text-muted">
+              {q.currentTierIndex >= 0 ? `${tiers[q.currentTierIndex].name} unlocked` : "Just starting"}
+              {q.nextTier ? ` — ${(q.nextTier.thresholdQp - q.qp).toLocaleString()} CP to ${q.nextTier.name}` : " — max tier reached!"}
+            </span>
+          </div>
+        </div>
+
         {/* The map */}
         <div className="relative mx-auto w-full max-w-4xl aspect-[16/9] rounded-3xl overflow-hidden border border-white/10 shadow-2xl"
           style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }}>
@@ -112,10 +129,14 @@ export default function QuestMapHero({
             );
           })}
 
-          {/* You-are-here marker */}
-          <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10 float-y" style={{ left: `${youX}%`, top: `${Math.max(6, youY - 10)}%` }}>
-            <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ background: q.accent2, boxShadow: `0 0 14px 2px ${q.accent2}` }}>
-              <Icon name="rocket" size={13} />
+          {/* You-are-here rocket — rides the trail at the exact CP position */}
+          <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10" style={{ left: `${youX}%`, top: `${youY}%` }}>
+            <span className="relative flex h-7 w-7 items-center justify-center rounded-full text-white float-y" style={{ background: q.accent2, boxShadow: `0 0 16px 3px ${q.accent2}` }}>
+              <Icon name="rocket" size={14} />
+              <span className="absolute inset-0 rounded-full animate-ping" style={{ background: `${q.accent2}66` }} />
+            </span>
+            <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-bold" style={{ color: q.accent2 }}>
+              {q.qp.toLocaleString()} CP
             </span>
           </div>
 
@@ -146,15 +167,14 @@ export default function QuestMapHero({
           )}
         </div>
 
-        {/* Your quest log line */}
-        <div className="mx-auto max-w-4xl mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-          <span className="font-bold text-lg grad-text">{q.name}</span>
-          <span className="text-muted">{q.tagline}</span>
-          <span className="inline-flex items-center gap-1.5" style={{ color: q.accent2 }}>
-            <Icon name="spark" size={14} /> {q.qp.toLocaleString()} CP
-          </span>
-          <span className="text-muted">·</span>
-          <span className="text-muted">{q.currentTierIndex >= 0 ? `${tiers[q.currentTierIndex].name} unlocked` : "Just starting"}{q.nextTier ? ` — ${(q.nextTier.thresholdQp - q.qp).toLocaleString()} CP to ${q.nextTier.name}` : " — max tier!"}</span>
+        {/* Tier legend under the map — quick milestone ladder */}
+        <div className="mx-auto max-w-4xl mt-4 flex flex-wrap items-center justify-center gap-2">
+          {tiers.map((t) => (
+            <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
+              style={{ borderColor: t.earned ? `${t.color || q.color}88` : "rgba(255,255,255,0.12)", color: t.earned ? (t.color || q.color) : "#8b8ba7", background: t.earned ? `${t.color || q.color}14` : "transparent" }}>
+              {t.earned ? "✓" : "○"} {t.name} · {t.thresholdQp.toLocaleString()} CP
+            </span>
+          ))}
         </div>
       </div>
     </section>
