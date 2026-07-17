@@ -6,6 +6,7 @@ import GameLogo from "@/components/GameLogo";
 import ImageUpload from "@/components/ImageUpload";
 import CoverFramer from "@/components/CoverFramer";
 import SubmitButton from "@/components/SubmitButton";
+import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Games" };
@@ -53,11 +54,15 @@ export default async function AdminGamesPage() {
         Upload images straight from your device — they&apos;re optimized automatically.
       </p>
 
-      <div className="glass p-6 mb-8">
-        <h2 className="font-bold mb-4">Add game</h2>
-        <GameForm />
-      </div>
+      <details className="glass p-6 mb-6 group">
+        <summary className="font-bold cursor-pointer list-none flex items-center gap-2">
+          <Icon name="spark" size={16} className="text-cyan-300" /> Add a new game
+          <span className="ml-auto text-xs text-muted group-open:hidden">Open form</span>
+        </summary>
+        <div className="mt-4 border-t border-violet-400/15 pt-4"><GameForm /></div>
+      </details>
 
+      <div className="text-xs uppercase tracking-widest text-muted mb-3">{games.length} games</div>
       <div className="space-y-4">
         {games.map((g) => (
           <details key={g.id} className="glass overflow-hidden">

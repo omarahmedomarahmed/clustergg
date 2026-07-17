@@ -3,6 +3,7 @@ import { desc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import ChallengeBuilder from "@/components/ChallengeBuilder";
+import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -31,15 +32,21 @@ export default async function AdminChallengesPage() {
         scoring engine, and publishes a glorified event page with live standings.
       </p>
 
-      <div className="glass p-6 mb-8">
-        <ChallengeBuilder
-          providers={builderProviders}
-          spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
-          trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
-        />
-      </div>
+      <details className="glass p-6 mb-6 group">
+        <summary className="font-bold cursor-pointer list-none flex items-center gap-2">
+          <Icon name="spark" size={16} className="text-cyan-300" /> Launch a new challenge
+          <span className="ml-auto text-xs text-muted group-open:hidden">Open builder</span>
+        </summary>
+        <div className="mt-4 border-t border-violet-400/15 pt-4">
+          <ChallengeBuilder
+            providers={builderProviders}
+            spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
+            trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
+          />
+        </div>
+      </details>
 
-      <h2 className="text-xl font-bold mb-4">All challenges</h2>
+      <h2 className="text-xl font-bold mb-4">All challenges ({challenges.length})</h2>
       <div className="glass overflow-x-auto">
         <table className="w-full table-cosmic min-w-[640px]">
           <thead><tr><th>Title</th><th>Game</th><th>Cadence</th><th>Format</th><th>Status</th><th>Ends</th><th></th></tr></thead>
