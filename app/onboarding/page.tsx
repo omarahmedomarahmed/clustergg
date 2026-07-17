@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { providerInfoList } from "@/lib/providers/serialize";
 import { resolveGameLogo } from "@/lib/game-logos";
+import { getContent } from "@/lib/cms";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import FollowButton from "@/components/FollowButton";
 import Avatar from "@/components/Avatar";
@@ -23,8 +24,11 @@ export default async function OnboardingPage() {
       .orderBy(desc(schema.users.createdAt)).limit(4),
     db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl }).from(schema.games),
   ]);
+  const hiddenConnect = (await getContent(["connect.hidden"]))["connect.hidden"]
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  const providers = providerInfoList(hiddenConnect);
   const gameLogos: Record<string, string | null> = {};
-  for (const info of providerInfoList()) gameLogos[info.id] = resolveGameLogo(games, info.game);
+  for (const info of providers) gameLogos[info.id] = resolveGameLogo(games, info.game);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -55,7 +59,7 @@ export default async function OnboardingPage() {
         <p className="text-sm text-muted mb-4 ml-10">
           Green providers verify instantly against real APIs — try Chess.com, Lichess, Dota 2, Speedrun.com or Roblox.
         </p>
-        <LinkAccountForm providers={providerInfoList()} gameLogos={gameLogos} />
+        <LinkAccountForm providers={providers} gameLogos={gameLogos} />
       </section>
 
       <section className="glass p-6 mb-6">

@@ -41,6 +41,8 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // Loading screen (rotating circle) — editable color + optional inner logo.
   "brand.loading.color": "#8b5cf6",
   "brand.loading.logo": "",
+  // Connect/onboarding: comma-separated provider ids the admin has hidden.
+  "connect.hidden": "",
 };
 
 export async function getContent(keys: string[]): Promise<Record<string, string>> {

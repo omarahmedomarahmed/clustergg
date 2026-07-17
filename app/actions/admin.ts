@@ -42,6 +42,20 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   return { ok: true, message: "Branding updated everywhere." };
 }
 
+// Which connect/onboarding providers are shown. The form posts a `visible`
+// checkbox per provider id; anything in `all` but not checked becomes hidden.
+export async function saveConnectVisibility(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const { setContent } = await import("@/lib/cms");
+  const all = String(formData.get("allIds") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const visible = new Set(formData.getAll("visible").map((v) => String(v)));
+  const hidden = all.filter((id) => !visible.has(id));
+  await setContent("connect.hidden", hidden.join(","));
+  await audit(admin.id, "connect.visibility_update", "content", "connect.hidden", { hidden });
+  revalidatePath("/", "layout");
+  return { ok: true, message: `Saved — ${all.length - hidden.length} shown, ${hidden.length} hidden.` };
+}
+
 async function audit(adminId: string, action: string, targetType?: string, targetId?: string, meta?: Record<string, unknown>) {
   const db = await getDb();
   await db.insert(schema.auditLog).values({ id: uid(), adminId, action, targetType, targetId, meta: meta ?? {} });
