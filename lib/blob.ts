@@ -24,7 +24,13 @@ type PutOpts = {
   contentType?: string;
   addRandomSuffix?: boolean;
   token?: string;
+  cacheControlMaxAge?: number;
 };
+
+// Every uploaded asset gets a unique, content-stable URL (uid path, no random
+// suffix), so it's safe to cache it in the browser essentially forever. This is
+// what stops art re-downloading on every visit and draining data transfer.
+const ONE_YEAR = 60 * 60 * 24 * 365;
 
 // Server-side: store a base64 data URL in Vercel Blob and return a short hosted
 // URL. Returns null when the input isn't a data URL or the upload fails, so
@@ -58,7 +64,7 @@ export async function uploadDataUrlToBlob(dataUrl: string, scope: string): Promi
     // auto-resolve the connected store via the deployment's OIDC token — the
     // canonical connected-store flow. (Passing an undefined oidcToken would
     // break that resolution, which is why we don't set it manually.)
-    const opts: PutOpts = { access: "public", contentType, addRandomSuffix: false };
+    const opts: PutOpts = { access: "public", contentType, addRandomSuffix: false, cacheControlMaxAge: ONE_YEAR };
     const token = resolveBlobToken();
     if (token) opts.token = token;
 

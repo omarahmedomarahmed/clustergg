@@ -15,6 +15,17 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return Object.entries(ASSETS).map(([source, destination]) => ({ source, destination }));
   },
+  // Brand art / static images rarely change — let browsers keep them for a year
+  // so they don't re-download on every navigation (pages stay dynamic; images
+  // don't). Uploaded art is separately cached long-lived at the Blob layer.
+  async headers() {
+    return [
+      {
+        source: "/assets/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+    ];
+  },
   serverExternalPackages: ["@electric-sql/pglite"],
   outputFileTracingIncludes: {
     "/**": ["./node_modules/@electric-sql/pglite/dist/**"],
