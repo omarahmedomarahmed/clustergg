@@ -111,6 +111,11 @@ export default function QuestMapHero({
           {/* readability veil */}
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.15), rgba(4,5,26,0.45))" }} />
 
+          {/* How-to-play label — the milestones are the guide */}
+          <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
+            <Icon name="spark" size={11} style={{ color: q.accent2 }} /> How to play — tap a milestone
+          </div>
+
           {/* Path line connecting the milestones */}
           <svg className="absolute inset-0 h-full w-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
             <polyline
