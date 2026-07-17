@@ -31,7 +31,6 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
     section: "Competition",
     items: [
       { href: "/admin/quests", label: "Quests" },
-      { href: "/admin/badges", label: "Badges" },
       { href: "/admin/leaderboards", label: "Leaderboards" },
       { href: "/admin/trophies", label: "Trophies" },
     ],
@@ -40,7 +39,10 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
     section: "Website (CMS)",
     items: [
       { href: "/admin/content", label: "Site content" },
+      { href: "/admin/backgrounds", label: "Page backgrounds" },
+      { href: "/admin/cards", label: "Card backgrounds" },
       { href: "/admin/games", label: "Games catalog" },
+      { href: "/admin/connect", label: "Connect providers" },
       { href: "/admin/partners", label: "Partners" },
     ],
   },

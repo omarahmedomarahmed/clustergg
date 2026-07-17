@@ -8,12 +8,13 @@ import { getProvider } from "@/lib/providers/registry";
 import { providerInfoList } from "@/lib/providers/serialize";
 import { resolveGame } from "@/lib/game-logos";
 import { syncUserAccountsIfStale } from "@/lib/sync";
+import { getContent } from "@/lib/cms";
+import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { slimImg } from "@/lib/img";
 import { resolveTheme, themeToVars, bgStyle, coverStyle, avatarClip } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
-import { BadgeIcon } from "@/components/BadgeChip";
 import FollowButton from "@/components/FollowButton";
 import AdSlot from "@/components/AdSlot";
 import ProfileAccounts from "@/components/ProfileAccounts";
@@ -78,11 +79,8 @@ export default async function ProfilePage({ params }: Props) {
   const vars = themeToVars(theme) as React.CSSProperties;
   const cardCls = `p-card p-card-${theme.cardStyle}`;
 
-  const [accounts, badgeRows, [followerRow], [followingRow], isFollowingRow, recentPosts, participations, allBoards, spaceRows] = await Promise.all([
+  const [accounts, [followerRow], [followingRow], isFollowingRow, recentPosts, participations, allBoards, spaceRows] = await Promise.all([
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
-    db.select({ badge: schema.badges }).from(schema.userBadges)
-      .innerJoin(schema.badges, eq(schema.userBadges.badgeId, schema.badges.id))
-      .where(eq(schema.userBadges.userId, user.id)).orderBy(desc(schema.userBadges.awardedAt)),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followingId, user.id)),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followerId, user.id)),
     viewer ? db.select().from(schema.follows).where(and(eq(schema.follows.followerId, viewer.id), eq(schema.follows.followingId, user.id))).limit(1) : Promise.resolve([]),
@@ -134,6 +132,7 @@ export default async function ProfilePage({ params }: Props) {
   const activeChallenges = participations.filter(({ c }) => c.status === "active");
 
   const S = theme.sections;
+  const accountCardBg = cardBgStyle(buildCardBgMap(await getContent(cardBgCmsKeys)), "account");
 
   // Serializable account cards for the interactive <ProfileAccounts>.
   const accountsData = accounts.map((a) => {
@@ -169,6 +168,7 @@ export default async function ProfilePage({ params }: Props) {
               isOwner={isOwner}
               providers={providerInfoList()}
               gameLogos={accountGameLogos}
+              accountCardBg={accountCardBg}
             />
           </div>
         );
@@ -187,21 +187,7 @@ export default async function ProfilePage({ params }: Props) {
             </div>
           </section>
         );
-      case "badges":
-        if (!S.badges || badgeRows.length === 0) return null;
-        return (
-          <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="medal" size={19} style={{ color: theme.accent }} /> Badges</h2>
-            <div className={`${cardCls} flex flex-wrap gap-5`}>
-              {badgeRows.map(({ badge }) => (
-                <div key={badge.id} className="flex flex-col items-center w-20 text-center group" title={badge.description}>
-                  <div className="transition-transform group-hover:scale-110"><BadgeIcon icon={badge.icon} size={52} /></div>
-                  <span className="mt-1.5 text-[11px] p-muted">{badge.name}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        );
+      // "badges" section retired — Quests / Cluster Points replaced it.
       case "challenges":
         if (!S.challenges || activeChallenges.length === 0) return null;
         return (

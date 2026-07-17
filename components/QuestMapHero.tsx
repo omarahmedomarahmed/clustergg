@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
+import TopBannerAd from "@/components/TopBannerAd";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
@@ -50,7 +51,10 @@ export default function QuestMapHero({
         <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 620px at 30% 10%, ${q.color}26, transparent 60%), radial-gradient(900px 500px at 90% 110%, ${q.accent2}1a, transparent 60%)` }} />
       )}
 
-      <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
+      {/* Sponsor strip — over the quest backdrop, not the plain site backdrop */}
+      <TopBannerAd className="pt-3 pb-1" />
+
+      <div className="mx-auto max-w-6xl px-4 pt-4 pb-8 md:pb-10">
         {/* Quest toggle — glorified cards, navigate between quest maps */}
         {tabs.length > 1 && (
           <div className="flex flex-wrap justify-center gap-2 mb-5">

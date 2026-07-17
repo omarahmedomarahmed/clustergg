@@ -4,6 +4,8 @@ import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { markAllNotificationsRead } from "@/app/actions/social";
+import { getContent } from "@/lib/cms";
+import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { timeAgo } from "@/lib/utils";
 import Icon from "@/components/Icon";
 
@@ -22,6 +24,7 @@ export default async function NotificationsPage() {
     .where(eq(schema.notifications.userId, user.id))
     .orderBy(desc(schema.notifications.createdAt))
     .limit(50);
+  const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
@@ -42,6 +45,7 @@ export default async function NotificationsPage() {
               key={n.id}
               href={n.href ?? "#"}
               className={`glass glass-hover flex items-start gap-3 p-4 ${n.readAt ? "opacity-60" : "!border-cyan-400/40"}`}
+              style={{ background: cardBgStyle(cardBg, "notification") }}
             >
               <Icon name={GLYPH[n.type] ?? "bell"} size={20} className="text-violet-300 mt-0.5" />
               <div className="min-w-0">

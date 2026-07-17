@@ -56,7 +56,7 @@ export default async function AdminChallengesPage() {
                   </span>
                 </td>
                 <td className="text-xs text-muted">{timeAgo(c.endAt)}</td>
-                <td><Link href={`/admin/challenges/${c.id}`} className="text-xs text-cyan-300 hover:underline">Live tracker</Link></td>
+                <td><Link href={`/admin/challenges/${c.id}`} className="text-xs text-cyan-300 hover:underline">Edit / track</Link></td>
               </tr>
             ))}
           </tbody>

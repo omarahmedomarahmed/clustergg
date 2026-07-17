@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { providerInfoList } from "@/lib/providers/serialize";
 import { getProvider } from "@/lib/providers/registry";
 import { resolveGameLogo } from "@/lib/game-logos";
+import { getContent } from "@/lib/cms";
 import ProfileBuilder from "@/components/ProfileBuilder";
 import ProfileHub from "@/components/ProfileHub";
 import LinkAccountForm from "@/components/LinkAccountForm";
@@ -33,11 +34,8 @@ export default async function OwnProfilePage() {
     .where(eq(schema.linkedGameAccounts.userId, user.id));
 
   // Compact, real data so the builder preview shows the actual profile — real
-  // accounts, challenges, badges, planets — not placeholder cards.
-  const [badgeRows, participations, spaceRows, postCountRow, games] = await Promise.all([
-    db.select({ badge: schema.badges }).from(schema.userBadges)
-      .innerJoin(schema.badges, eq(schema.userBadges.badgeId, schema.badges.id))
-      .where(eq(schema.userBadges.userId, user.id)).orderBy(desc(schema.userBadges.awardedAt)).limit(12),
+  // accounts, challenges, planets — not placeholder cards.
+  const [participations, spaceRows, postCountRow, games] = await Promise.all([
     db.select({ p: schema.challengeParticipants, c: schema.challenges }).from(schema.challengeParticipants)
       .innerJoin(schema.challenges, eq(schema.challengeParticipants.challengeId, schema.challenges.id))
       .where(eq(schema.challengeParticipants.userId, user.id)).orderBy(desc(schema.challengeParticipants.joinedAt)).limit(8),
@@ -49,16 +47,21 @@ export default async function OwnProfilePage() {
     db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl }).from(schema.games),
   ]);
 
+  // Admin-hidden connect providers are dropped from the picker.
+  const hiddenConnect = (await getContent(["connect.hidden"]))["connect.hidden"]
+    .split(",").map((s) => s.trim()).filter(Boolean);
+  const providers = providerInfoList(hiddenConnect);
+
   // Resolve a game logo for each provider, tolerant of name differences.
   const gameLogos: Record<string, string | null> = {};
-  for (const info of providerInfoList()) gameLogos[info.id] = resolveGameLogo(games, info.game);
+  for (const info of providers) gameLogos[info.id] = resolveGameLogo(games, info.game);
   const accountLogo = (provider: string) => resolveGameLogo(games, getProvider(provider)?.game ?? "");
 
   const previewData = {
     accounts: accounts.map((a) => ({ name: a.inGameName, provider: getProvider(a.provider)?.name ?? a.provider })),
     trophies: participations.filter(({ p, c }) => c.status === "completed" && p.finalPlacement && p.finalPlacement <= 3)
       .map(({ c }) => ({ title: c.title, game: c.game })),
-    badges: badgeRows.map(({ badge }) => ({ name: badge.name })),
+    badges: [] as { name: string }[],
     challenges: participations.filter(({ c }) => c.status === "active").map(({ c }) => ({ title: c.title, game: c.game })),
     spaces: spaceRows.map(({ s }) => ({ name: s.name })),
     postsCount: Number(postCountRow[0]?.c ?? 0),
@@ -132,7 +135,7 @@ export default async function OwnProfilePage() {
       </div>
 
       <div className="text-sm font-semibold mb-3 text-muted">Add a game</div>
-      <LinkAccountForm providers={providerInfoList()} gameLogos={gameLogos} />
+      <LinkAccountForm providers={providers} gameLogos={gameLogos} />
     </section>
   );
 

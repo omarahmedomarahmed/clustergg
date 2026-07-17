@@ -14,6 +14,15 @@ export type BuilderProvider = {
 };
 export type BuilderSpace = { id: string; name: string; game: string | null };
 export type BuilderTrophy = { id: string; name: string; tier: string; imageUrl: string };
+// An existing challenge to edit (all fields pre-filled). Omitted when creating.
+export type ChallengeEdit = {
+  id: string; spaceId: string; provider: string; game: string; title: string; description: string;
+  format: string; cadence: string; heroType: string; heroUrl: string | null;
+  pointsEngine: Record<string, number>; conditions: { metric: string; op: string; value: number }[];
+  thresholdTarget: number | null; startAt: string; endAt: string;
+  coverUrl: string | null; coverAdjust: { zoom: number; x: number; y: number };
+  trophyId: string | null; status: string; prizeDescription: string | null;
+};
 
 // Points recommendation: reward the primary "win-like" metric heavily, add a
 // small participation reward on a volume metric when the API exposes one.
@@ -47,16 +56,17 @@ const IDEAS = [
 const OPS = [">=", ">", "<=", "<", "=="];
 
 export default function ChallengeBuilder({
-  providers, spaces, trophies,
-}: { providers: BuilderProvider[]; spaces: BuilderSpace[]; trophies: BuilderTrophy[] }) {
-  const [providerId, setProviderId] = useState(providers[0]?.id ?? "");
-  const [cadence, setCadence] = useState("weekly");
-  const [format, setFormat] = useState("top3");
-  const [heroType, setHeroType] = useState("image");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [pointsMap, setPointsMap] = useState<Record<string, number>>(() => recommendPoints(providers[0]?.capabilities ?? []));
-  const [conditions, setConditions] = useState<{ metric: string; op: string; value: number }[]>([]);
+  providers, spaces, trophies, challenge,
+}: { providers: BuilderProvider[]; spaces: BuilderSpace[]; trophies: BuilderTrophy[]; challenge?: ChallengeEdit }) {
+  const editing = !!challenge;
+  const [providerId, setProviderId] = useState(challenge?.provider ?? providers[0]?.id ?? "");
+  const [cadence, setCadence] = useState(challenge?.cadence ?? "weekly");
+  const [format, setFormat] = useState(challenge?.format ?? "top3");
+  const [heroType, setHeroType] = useState(challenge?.heroType ?? "image");
+  const [title, setTitle] = useState(challenge?.title ?? "");
+  const [description, setDescription] = useState(challenge?.description ?? "");
+  const [pointsMap, setPointsMap] = useState<Record<string, number>>(() => challenge?.pointsEngine ?? recommendPoints(providers[0]?.capabilities ?? []));
+  const [conditions, setConditions] = useState<{ metric: string; op: string; value: number }[]>(challenge?.conditions ?? []);
 
   const provider = useMemo(() => providers.find((p) => p.id === providerId), [providers, providerId]);
   const caps = provider?.capabilities ?? [];
@@ -80,6 +90,7 @@ export default function ChallengeBuilder({
 
   return (
     <form action={saveChallenge} className="space-y-5">
+      {editing && <input type="hidden" name="challengeId" value={challenge.id} />}
       {/* Ideas */}
       <div>
         <div className="text-xs uppercase tracking-widest text-muted mb-2">Start from an idea (optional)</div>
@@ -101,7 +112,7 @@ export default function ChallengeBuilder({
               <option key={p.id} value={p.id}>{p.name} ({p.game}){p.live ? " — live" : " — needs API key"}</option>
             ))}
           </select>
-          <select name="spaceId" required className="input-cosmic">
+          <select name="spaceId" required defaultValue={challenge?.spaceId} className="input-cosmic">
             {matchingSpaces.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </div>
@@ -128,11 +139,11 @@ export default function ChallengeBuilder({
         <input type="hidden" name="cadence" value={cadence} />
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="text-xs text-muted">Starts
-            <input name="startAt" type="datetime-local" defaultValue={toLocal(new Date())} className="input-cosmic mt-1" />
+            <input name="startAt" type="datetime-local" defaultValue={toLocal(challenge ? new Date(challenge.startAt) : new Date())} className="input-cosmic mt-1" />
           </label>
           {cadence === "custom" ? (
             <label className="text-xs text-muted">Ends
-              <input name="endAt" type="datetime-local" defaultValue={toLocal(new Date(Date.now() + 7 * 86400000))} className="input-cosmic mt-1" />
+              <input name="endAt" type="datetime-local" defaultValue={toLocal(challenge ? new Date(challenge.endAt) : new Date(Date.now() + 7 * 86400000))} className="input-cosmic mt-1" />
             </label>
           ) : (
             <div className="text-xs text-muted self-end pb-3">Ends automatically {cadence === "daily" ? "24 hours" : cadence === "weekly" ? "7 days" : "30 days"} after start.</div>
@@ -175,7 +186,7 @@ export default function ChallengeBuilder({
           </label>
           {format === "threshold_race" && (
             <label className="text-xs text-muted">Target points
-              <input name="thresholdTarget" type="number" placeholder="e.g. 100" className="input-cosmic mt-1" />
+              <input name="thresholdTarget" type="number" placeholder="e.g. 100" defaultValue={challenge?.thresholdTarget ?? undefined} className="input-cosmic mt-1" />
             </label>
           )}
         </div>
@@ -217,25 +228,27 @@ export default function ChallengeBuilder({
             <option value="stream">Hero: live stream embed (YouTube/Twitch)</option>
           </select>
           {heroType !== "image" && (
-            <input name="heroUrl" placeholder={heroType === "video" ? "Video file URL (mp4)" : "Stream URL (youtube.com/… or twitch.tv/channel)"} className="input-cosmic" />
+            <input name="heroUrl" placeholder={heroType === "video" ? "Video file URL (mp4)" : "Stream URL (youtube.com/… or twitch.tv/channel)"} defaultValue={challenge?.heroUrl ?? undefined} className="input-cosmic" />
           )}
           <div className="sm:col-span-2">
-            <CoverFramer name="coverUrl" maxDim={1400} label="Cover image (card + hero)" hint="Drag to reposition, slider to zoom." />
+            <CoverFramer name="coverUrl" maxDim={1400} defaultUrl={challenge?.coverUrl ?? ""} defaultAdjust={challenge?.coverAdjust} label="Cover image (card + hero)" hint="Drag to reposition, slider to zoom." />
           </div>
-          <select name="trophyId" className="input-cosmic">
+          <select name="trophyId" defaultValue={challenge?.trophyId ?? ""} className="input-cosmic">
             <option value="">No trophy</option>
             {trophies.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.tier})</option>)}
           </select>
-          <input name="prizeDescription" placeholder="Prize description" className="input-cosmic" />
-          <select name="status" className="input-cosmic sm:col-span-2">
-            <option value="active">Publish now</option>
+          <input name="prizeDescription" placeholder="Prize description" defaultValue={challenge?.prizeDescription ?? undefined} className="input-cosmic" />
+          <select name="status" defaultValue={challenge?.status ?? "active"} className="input-cosmic sm:col-span-2">
+            <option value="active">Active (publish now)</option>
             <option value="draft">Draft (auto-activates at start time)</option>
+            {editing && <option value="completed">Completed (closed)</option>}
+            {editing && <option value="cancelled">Cancelled</option>}
           </select>
         </div>
       </div>
 
       <button className="glow-btn pressable rounded-full px-8 py-2.5 font-semibold text-white inline-flex items-center gap-2">
-        <Icon name="rocket" size={15} /> Launch challenge
+        <Icon name="rocket" size={15} /> {editing ? "Save changes" : "Launch challenge"}
       </button>
     </form>
   );

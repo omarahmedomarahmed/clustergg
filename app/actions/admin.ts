@@ -42,6 +42,50 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   return { ok: true, message: "Branding updated everywhere." };
 }
 
+// Which connect/onboarding providers are shown. The form posts a `visible`
+// checkbox per provider id; anything in `all` but not checked becomes hidden.
+export async function saveConnectVisibility(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const { setContent } = await import("@/lib/cms");
+  const all = String(formData.get("allIds") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const visible = new Set(formData.getAll("visible").map((v) => String(v)));
+  const hidden = all.filter((id) => !visible.has(id));
+  await setContent("connect.hidden", hidden.join(","));
+  await audit(admin.id, "connect.visibility_update", "content", "connect.hidden", { hidden });
+  revalidatePath("/", "layout");
+  return { ok: true, message: `Saved — ${all.length - hidden.length} shown, ${hidden.length} hidden.` };
+}
+
+// Per-page background images. One combined form posts `bg__<key>` for each
+// editable page; empty clears back to the default nebula.
+export async function savePageBackgrounds(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const { setContent } = await import("@/lib/cms");
+  const { PAGE_BG_KEYS } = await import("@/lib/page-bg");
+  for (const key of PAGE_BG_KEYS) {
+    await setContent(`page.bg.${key}`, String(formData.get(`bg__${key}`) ?? "").trim());
+  }
+  await audit(admin.id, "page.backgrounds_update", "content", "page.bg");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Page backgrounds saved." };
+}
+
+// Per-card-type artwork + overlay. One combined form posts `art__<type>` (url)
+// and `dim__<type>` (0-100) for each card type.
+export async function saveCardBackgrounds(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const { setContent } = await import("@/lib/cms");
+  const { CARD_BG_KEYS } = await import("@/lib/card-bg");
+  const clamp = (v: number) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 55));
+  for (const key of CARD_BG_KEYS) {
+    await setContent(`card.bg.${key}`, String(formData.get(`art__${key}`) ?? "").trim());
+    await setContent(`card.bg.${key}.dim`, String(clamp(Number(formData.get(`dim__${key}`)))));
+  }
+  await audit(admin.id, "card.backgrounds_update", "content", "card.bg");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Card backgrounds saved." };
+}
+
 async function audit(adminId: string, action: string, targetType?: string, targetId?: string, meta?: Record<string, unknown>) {
   const db = await getDb();
   await db.insert(schema.auditLog).values({ id: uid(), adminId, action, targetType, targetId, meta: meta ?? {} });
@@ -268,6 +312,7 @@ export async function saveChallenge(formData: FormData) {
   if (challengeId) {
     await db.update(schema.challenges).set(values).where(eq(schema.challenges.id, challengeId));
     await audit(admin.id, "challenge.update", "challenge", challengeId);
+    revalidatePath(`/admin/challenges/${challengeId}`);
   } else {
     await db.insert(schema.challenges).values({ id: uid(), createdBy: admin.id, ...values });
     await audit(admin.id, "challenge.create", "challenge", values.title);

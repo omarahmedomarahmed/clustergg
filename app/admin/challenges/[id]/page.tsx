@@ -2,7 +2,10 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { setParticipantStatus } from "@/app/actions/admin";
+import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
+import ChallengeBuilder, { type ChallengeEdit } from "@/components/ChallengeBuilder";
 import Avatar from "@/components/Avatar";
+import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +16,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
   const [challenge] = await db.select().from(schema.challenges).where(eq(schema.challenges.id, id)).limit(1);
   if (!challenge) notFound();
 
-  const [participants, events] = await Promise.all([
+  const [participants, events, spaces, trophies] = await Promise.all([
     db.select({ p: schema.challengeParticipants, u: schema.users, a: schema.linkedGameAccounts })
       .from(schema.challengeParticipants)
       .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
@@ -23,7 +26,24 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     db.select().from(schema.challengeEvents)
       .where(eq(schema.challengeEvents.challengeId, id))
       .orderBy(desc(schema.challengeEvents.createdAt)).limit(30),
+    db.select().from(schema.spaces),
+    db.select().from(schema.trophies),
   ]);
+
+  const builderProviders = PROVIDERS
+    .filter((p) => !p.identityOnly && p.capabilities.length > 0)
+    .map((p) => ({ id: p.id, name: p.name, game: p.game, live: isProviderLive(p), capabilities: p.capabilities.map((c) => ({ key: c.key, label: c.label, higherIsBetter: c.higherIsBetter })) }));
+
+  const editData: ChallengeEdit = {
+    id: challenge.id, spaceId: challenge.spaceId, provider: challenge.provider, game: challenge.game,
+    title: challenge.title, description: challenge.description ?? "", format: challenge.format,
+    cadence: challenge.cadence, heroType: challenge.heroType ?? "image", heroUrl: challenge.heroUrl,
+    pointsEngine: (challenge.pointsEngine ?? {}) as Record<string, number>,
+    conditions: ((challenge.rules as { conditions?: { metric: string; op: string; value: number }[] })?.conditions) ?? [],
+    thresholdTarget: challenge.thresholdTarget, startAt: challenge.startAt.toISOString(), endAt: challenge.endAt.toISOString(),
+    coverUrl: challenge.coverUrl, coverAdjust: (challenge.coverAdjust ?? { zoom: 1, x: 50, y: 50 }) as { zoom: number; x: number; y: number },
+    trophyId: challenge.trophyId, status: challenge.status, prizeDescription: challenge.prizeDescription,
+  };
 
   return (
     <div className="space-y-6">
@@ -38,6 +58,21 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             .join(", ") || "participation only"}
         </p>
       </div>
+
+      <details className="glass p-6 group">
+        <summary className="cursor-pointer font-bold flex items-center gap-2 list-none">
+          <Icon name="edit" size={16} className="text-cyan-300" /> Edit challenge
+          <span className="ml-auto text-xs text-muted group-open:hidden">Open editor</span>
+        </summary>
+        <div className="mt-5 border-t border-violet-500/15 pt-5">
+          <ChallengeBuilder
+            challenge={editData}
+            providers={builderProviders}
+            spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
+            trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
+          />
+        </div>
+      </details>
 
       <section>
         <h2 className="font-bold mb-3">Participants ({participants.length})</h2>
