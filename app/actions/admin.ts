@@ -312,6 +312,7 @@ export async function saveChallenge(formData: FormData) {
   if (challengeId) {
     await db.update(schema.challenges).set(values).where(eq(schema.challenges.id, challengeId));
     await audit(admin.id, "challenge.update", "challenge", challengeId);
+    revalidatePath(`/admin/challenges/${challengeId}`);
   } else {
     await db.insert(schema.challenges).values({ id: uid(), createdBy: admin.id, ...values });
     await audit(admin.id, "challenge.create", "challenge", values.title);
