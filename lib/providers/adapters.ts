@@ -617,5 +617,7 @@ export const ADAPTERS: Record<string, Adapter> = {
   "riot-lol": riotLol, "riot-valorant": riotValorant,
   fortnite, hypixel, pubg, faceit, clashofclans, clashroyale, brawlstars,
   xbox, osu, apex, "mobile-legends": mobileLegends,
-  "Battle.net": battlenet, "Epic Games": epic, "Discord":discord,
+  battlenet: identityOnly("Battle.net"),
+  epic: identityOnly("Epic Games"),
+  discord: identityOnly("Discord"),
 };
