@@ -24,7 +24,7 @@ export type PlanetData = {
 // The interactive game planet: a floating sphere you can tilt (mouse parallax),
 // zoom (hover), and explore by clicking a region hotspot. Logos switch planets —
 // on a planet page they navigate; in `swap` mode (home/feed) they swap in place.
-export default function PlanetHero({ planets, initialSlug, swap = false, heading }: { planets: PlanetData[]; initialSlug: string; swap?: boolean; heading?: string }) {
+export default function PlanetHero({ planets, initialSlug, swap = false, heading, toggle }: { planets: PlanetData[]; initialSlug: string; swap?: boolean; heading?: string; toggle?: React.ReactNode }) {
   const start = Math.max(0, planets.findIndex((x) => x.slug === initialSlug));
   const [idx, setIdx] = useState(start);
   const p = planets[idx] ?? planets[0];
@@ -107,7 +107,10 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
       {/* Sponsor strip — sits over the hero art, not the plain backdrop */}
       <TopBannerAd className="pt-3" />
 
-      <div className="mx-auto max-w-4xl px-4 pt-6 pb-10 md:pb-14 flex flex-col items-center text-center">
+      {/* In-hero planet⇄quest toggle */}
+      {toggle && <div className="pt-4">{toggle}</div>}
+
+      <div className="mx-auto max-w-4xl px-4 pt-5 pb-10 md:pb-14 flex flex-col items-center text-center">
         {/* Heading */}
         <div className="text-[11px] uppercase tracking-widest text-cyan-300 mb-2 inline-flex items-center gap-1.5">
           <Icon name="planet" size={13} /> {heading ?? "Interactive planet"}

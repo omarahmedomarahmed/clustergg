@@ -11,12 +11,13 @@ import AdSlot from "@/components/AdSlot";
 import LeaderboardWidget from "@/components/LeaderboardWidget";
 import PostCard from "@/components/PostCard";
 import JoinSpaceButton from "@/components/JoinSpaceButton";
-import PlanetHero from "@/components/PlanetHero";
+import HeroStage from "@/components/HeroStage";
 import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
 import { buildSkinnedPlanets } from "@/lib/planets";
+import { getQuestHeroData } from "@/lib/quest-hero";
 import OAuthButtons from "@/components/OAuthButtons";
 
 export const dynamic = "force-dynamic";
@@ -107,12 +108,13 @@ export default async function PlanetPage({
   // cover hero otherwise).
   const hasSkin = !!game?.planetImageUrl;
   const skinnedPlanets = hasSkin ? await buildSkinnedPlanets(db) : [];
+  const questHero = hasSkin && skinnedPlanets.length > 0 ? await getQuestHeroData(db, viewer?.id ?? null) : null;
 
   return (
     <div>
       {hasSkin && skinnedPlanets.length > 0 ? (
         <>
-          <PlanetHero planets={skinnedPlanets} initialSlug={space.slug} />
+          <HeroStage planets={skinnedPlanets} initialSlug={space.slug} quest={questHero} swap={false} />
           <div className="mx-auto max-w-6xl px-4 -mt-2 mb-4 flex flex-wrap items-center gap-3">
             <p className="text-muted text-sm mr-auto">{space.description}</p>
             {gameProviders.map((p) => (
