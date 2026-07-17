@@ -132,13 +132,23 @@ export async function seedQuests(db: DB) {
       logoUrl: QUEST_EMBLEMS[q.key] ?? null, cardBgUrl: QUEST_CARD_BGS[q.key] ?? null,
       actionWeights: weightsFor(q.key), dailyCaps: capsFor(q.key), sortOrder: q.sortOrder,
     }).onConflictDoNothing();
+    const n = q.tiers.length;
     let i = 0;
     for (const t of q.tiers) {
+      const [x, y] = mapPos(i, n);
       await db.insert(schema.questTiers).values({
-        id: uid(), questId, tierIndex: i++, name: t.name, description: t.description, thresholdQp: t.thresholdQp,
+        id: uid(), questId, tierIndex: i, name: t.name, description: t.description, thresholdQp: t.thresholdQp, mapX: x, mapY: y,
       });
+      i++;
     }
   }
+}
+
+// Spread tier pins along a gentle left→right winding path across the map.
+function mapPos(i: number, n: number): [number, number] {
+  const x = Math.round(12 + 76 * (n > 1 ? i / (n - 1) : 0.5));
+  const y = i % 2 === 0 ? 40 : 64;
+  return [x, y];
 }
 
 // Backfill emblem art onto default quests that don't have a logo yet — never
@@ -151,6 +161,18 @@ export async function ensureQuestArt(db: DB) {
   for (const [key, url] of Object.entries(QUEST_CARD_BGS)) {
     await db.update(schema.quests).set({ cardBgUrl: url })
       .where(and(eq(schema.quests.key, key), isNull(schema.quests.cardBgUrl)));
+  }
+  // Spread map pins for any quest whose tiers are all still at the default
+  // center (50/50) — so the standalone map hero shows a real path, not a stack.
+  const quests = await db.select({ id: schema.quests.id }).from(schema.quests);
+  for (const q of quests) {
+    const tiers = await db.select().from(schema.questTiers).where(eq(schema.questTiers.questId, q.id)).orderBy(schema.questTiers.tierIndex);
+    if (tiers.length > 1 && tiers.every((t) => t.mapX === 50 && t.mapY === 50)) {
+      for (let i = 0; i < tiers.length; i++) {
+        const [x, y] = mapPos(i, tiers.length);
+        await db.update(schema.questTiers).set({ mapX: x, mapY: y }).where(eq(schema.questTiers.id, tiers[i].id));
+      }
+    }
   }
 }
 
@@ -228,12 +250,20 @@ async function unlockTiers(db: DB, userId: string, questId: string, questName: s
 }
 
 // ===== Read models =====
-export type QuestTierView = { id: string; name: string; description: string; thresholdQp: number; iconUrl: string | null; color: string | null; earned: boolean };
+export type QuestGamer = { name: string; slug: string; avatarUrl: string | null; qp?: number };
+export type QuestTierView = { id: string; name: string; description: string; thresholdQp: number; iconUrl: string | null; color: string | null; mapX: number; mapY: number; earned: boolean; holders: number };
 export type QuestView = {
   id: string; key: string; name: string; tagline: string; lore: string; color: string; accent2: string; icon: string;
-  logoUrl: string | null; cardBgUrl: string | null; coverUrl: string | null;
+  logoUrl: string | null; cardBgUrl: string | null; coverUrl: string | null; mapArtUrl: string | null;
   qp: number; tiers: QuestTierView[]; currentTierIndex: number; nextTier: QuestTierView | null;
 };
+
+async function tierHolderCountMap(db: DB, tierIds: string[]): Promise<Map<string, number>> {
+  if (tierIds.length === 0) return new Map();
+  const rows = await db.select({ tierId: schema.userQuestTiers.questTierId, c: sql<number>`count(*)` })
+    .from(schema.userQuestTiers).where(inArray(schema.userQuestTiers.questTierId, tierIds)).groupBy(schema.userQuestTiers.questTierId);
+  return new Map(rows.map((r) => [r.tierId, Number(r.c)]));
+}
 
 export async function getUserQuests(db: DB, userId: string | null): Promise<QuestView[]> {
   const quests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true)).orderBy(schema.quests.sortOrder);
@@ -244,21 +274,60 @@ export async function getUserQuests(db: DB, userId: string | null): Promise<Ques
     userId ? db.select().from(schema.userQuestProgress).where(and(eq(schema.userQuestProgress.userId, userId), inArray(schema.userQuestProgress.questId, questIds))) : Promise.resolve([]),
     userId ? db.select({ tierId: schema.userQuestTiers.questTierId }).from(schema.userQuestTiers).where(eq(schema.userQuestTiers.userId, userId)) : Promise.resolve([]),
   ]);
+  const holders = await tierHolderCountMap(db, tiers.map((t) => t.id));
   const qpByQuest = new Map(progress.map((p) => [p.questId, p.qp]));
   const earnedSet = new Set(earned.map((e) => e.tierId));
 
   return quests.map((q) => {
     const qp = qpByQuest.get(q.id) ?? 0;
     const qTiers = tiers.filter((t) => t.questId === q.id).sort((a, b) => a.tierIndex - b.tierIndex)
-      .map((t): QuestTierView => ({ id: t.id, name: t.name, description: t.description, thresholdQp: t.thresholdQp, iconUrl: t.iconUrl, color: t.color, earned: earnedSet.has(t.id) || qp >= t.thresholdQp }));
+      .map((t): QuestTierView => ({ id: t.id, name: t.name, description: t.description, thresholdQp: t.thresholdQp, iconUrl: t.iconUrl, color: t.color, mapX: t.mapX, mapY: t.mapY, earned: earnedSet.has(t.id) || qp >= t.thresholdQp, holders: holders.get(t.id) ?? 0 }));
     const currentTierIndex = qTiers.reduce((acc, t, i) => (qp >= t.thresholdQp ? i : acc), -1);
     const nextTier = qTiers.find((t) => qp < t.thresholdQp) ?? null;
     return {
       id: q.id, key: q.key, name: q.name, tagline: q.tagline, lore: q.lore, color: q.color, accent2: q.accent2, icon: q.icon,
-      logoUrl: q.logoUrl, cardBgUrl: q.cardBgUrl, coverUrl: q.coverUrl,
+      logoUrl: q.logoUrl, cardBgUrl: q.cardBgUrl, coverUrl: q.coverUrl, mapArtUrl: q.mapArtUrl,
       qp, tiers: qTiers, currentTierIndex, nextTier,
     };
   });
+}
+
+// Top questers per quest (CP leaderboard), keyed by quest id.
+export async function getQuestTops(db: DB, questIds: string[], perQuest = 8): Promise<Map<string, QuestGamer[]>> {
+  const out = new Map<string, QuestGamer[]>();
+  if (questIds.length === 0) return out;
+  const rows = await db.select({ questId: schema.userQuestProgress.questId, qp: schema.userQuestProgress.qp, name: schema.users.displayName, slug: schema.users.slug, avatarUrl: schema.users.avatarUrl })
+    .from(schema.userQuestProgress).innerJoin(schema.users, eq(schema.userQuestProgress.userId, schema.users.id))
+    .where(and(inArray(schema.userQuestProgress.questId, questIds), eq(schema.users.status, "active")))
+    .orderBy(desc(schema.userQuestProgress.qp)).limit(perQuest * questIds.length);
+  for (const r of rows) {
+    const list = out.get(r.questId) ?? [];
+    if (list.length < perQuest) { list.push({ name: r.name, slug: r.slug, avatarUrl: r.avatarUrl, qp: r.qp }); out.set(r.questId, list); }
+  }
+  return out;
+}
+
+// Full detail for one quest's standalone page: the view, who reached each tier
+// (map step), and the quest's CP leaderboard — plus the light list of all
+// quests for the hero toggle.
+export async function getQuestByKey(db: DB, key: string, userId: string | null) {
+  const all = await getUserQuests(db, userId);
+  const quest = all.find((q) => q.key === key);
+  if (!quest) return null;
+  const tierIds = quest.tiers.map((t) => t.id);
+  const [holderRows, tops] = await Promise.all([
+    tierIds.length ? db.select({ tierId: schema.userQuestTiers.questTierId, name: schema.users.displayName, slug: schema.users.slug, avatarUrl: schema.users.avatarUrl, at: schema.userQuestTiers.awardedAt })
+      .from(schema.userQuestTiers).innerJoin(schema.users, eq(schema.userQuestTiers.userId, schema.users.id))
+      .where(and(inArray(schema.userQuestTiers.questTierId, tierIds), eq(schema.users.status, "active")))
+      .orderBy(desc(schema.userQuestTiers.awardedAt)).limit(200) : Promise.resolve([]),
+    getQuestTops(db, [quest.id], 20),
+  ]);
+  const tierHolders: Record<string, QuestGamer[]> = {};
+  for (const r of holderRows) {
+    const list = tierHolders[r.tierId] ?? [];
+    if (list.length < 12) { list.push({ name: r.name, slug: r.slug, avatarUrl: r.avatarUrl }); tierHolders[r.tierId] = list; }
+  }
+  return { quest, allQuests: all, tierHolders, leaderboard: tops.get(quest.id) ?? [] };
 }
 
 // Leaderboard: how many gamers have unlocked each quest's tiers, top questers.

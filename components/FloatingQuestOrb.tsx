@@ -37,7 +37,7 @@ export default function FloatingQuestOrb({ quests }: { quests: OrbQuest[] }) {
                 <div className="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden">
                   <div className="h-full rounded-full" style={{ width: `${q.pct}%`, background: `linear-gradient(90deg, ${q.color}, ${q.accent2})` }} />
                 </div>
-                <div className="mt-1 text-[10px] text-muted">{q.qp.toLocaleString()} QP{q.nextTierName ? ` · next: ${q.nextTierName}` : " · maxed"}</div>
+                <div className="mt-1 text-[10px] text-muted">{q.qp.toLocaleString()} CP{q.nextTierName ? ` · next: ${q.nextTierName}` : " · maxed"}</div>
               </Link>
             ))}
           </div>
