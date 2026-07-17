@@ -60,7 +60,7 @@ export default async function ChallengePage({
   ]);
 
   const joined = myParticipation.length > 0;
-  const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const embed = challenge.heroType === "stream" && challenge.heroUrl ? streamEmbed(challenge.heroUrl) : null;
   const coverUrl = challenge.coverUrl ?? cms["banner.arena"];
 
@@ -127,7 +127,12 @@ export default async function ChallengePage({
               {[
                 { label: "Game", value: challenge.game, icon: "gamepad" },
                 { label: "Starts", value: fmtDate(challenge.startAt), icon: "clock" },
-                { label: "Ends", value: challenge.status === "active" ? <Countdown endsAt={challenge.endAt.toISOString()} /> : fmtDate(challenge.endAt), icon: "flame" },
+                { label: "Ends", value: (
+                  <span className="flex flex-col">
+                    <span>{fmtDate(challenge.endAt)}</span>
+                    {challenge.status === "active" && <span className="text-[10px] font-bold text-amber-300"><Countdown endsAt={challenge.endAt.toISOString()} prefix="in " /></span>}
+                  </span>
+                ), icon: "flame" },
                 { label: "Scoring", value: Object.entries(challenge.pointsEngine ?? {}).map(([k, v]) => `+${v}/${k}`).join(" ") || "—", icon: "chart" },
               ].map((cell) => (
                 <div key={cell.label} className="rounded-lg border border-violet-400/15 p-3">
