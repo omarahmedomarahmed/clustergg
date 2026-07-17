@@ -21,13 +21,13 @@ export default async function FeedPage() {
   if (!user) redirect("/login");
   const db = await getDb();
 
-  const [mySpaceRows, myFollowing, accounts, [badgeRow], [followerRow], activeGames] = await Promise.all([
+  const [mySpaceRows, myFollowing, accounts, [cpRow], [followerRow], activeGames] = await Promise.all([
     db.select({ s: schema.spaces }).from(schema.spaceMembers)
       .innerJoin(schema.spaces, eq(schema.spaceMembers.spaceId, schema.spaces.id))
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(10),
     db.select({ id: schema.follows.followingId }).from(schema.follows).where(eq(schema.follows.followerId, user.id)),
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
-    db.select({ c: count() }).from(schema.userBadges).where(eq(schema.userBadges.userId, user.id)),
+    db.select({ c: sql<number>`COALESCE(SUM(${schema.userQuestProgress.qp}), 0)` }).from(schema.userQuestProgress).where(eq(schema.userQuestProgress.userId, user.id)),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followingId, user.id)),
     db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games).where(eq(schema.games.isActive, true)),
   ]);
@@ -61,7 +61,7 @@ export default async function FeedPage() {
   const firstName = user.displayName.split(" ")[0];
   const stat = [
     { label: "Games linked", value: accounts.length, icon: "gamepad", href: "/profile" },
-    { label: "Badges", value: Number(badgeRow?.c ?? 0), icon: "medal", href: `/u/${user.slug}` },
+    { label: "Cluster Points", value: Number(cpRow?.c ?? 0), icon: "spark", href: "/quests" },
     { label: "Followers", value: Number(followerRow?.c ?? 0), icon: "users", href: `/u/${user.slug}/followers` },
   ];
 

@@ -34,11 +34,8 @@ export default async function OwnProfilePage() {
     .where(eq(schema.linkedGameAccounts.userId, user.id));
 
   // Compact, real data so the builder preview shows the actual profile — real
-  // accounts, challenges, badges, planets — not placeholder cards.
-  const [badgeRows, participations, spaceRows, postCountRow, games] = await Promise.all([
-    db.select({ badge: schema.badges }).from(schema.userBadges)
-      .innerJoin(schema.badges, eq(schema.userBadges.badgeId, schema.badges.id))
-      .where(eq(schema.userBadges.userId, user.id)).orderBy(desc(schema.userBadges.awardedAt)).limit(12),
+  // accounts, challenges, planets — not placeholder cards.
+  const [participations, spaceRows, postCountRow, games] = await Promise.all([
     db.select({ p: schema.challengeParticipants, c: schema.challenges }).from(schema.challengeParticipants)
       .innerJoin(schema.challenges, eq(schema.challengeParticipants.challengeId, schema.challenges.id))
       .where(eq(schema.challengeParticipants.userId, user.id)).orderBy(desc(schema.challengeParticipants.joinedAt)).limit(8),
@@ -64,7 +61,7 @@ export default async function OwnProfilePage() {
     accounts: accounts.map((a) => ({ name: a.inGameName, provider: getProvider(a.provider)?.name ?? a.provider })),
     trophies: participations.filter(({ p, c }) => c.status === "completed" && p.finalPlacement && p.finalPlacement <= 3)
       .map(({ c }) => ({ title: c.title, game: c.game })),
-    badges: badgeRows.map(({ badge }) => ({ name: badge.name })),
+    badges: [] as { name: string }[],
     challenges: participations.filter(({ c }) => c.status === "active").map(({ c }) => ({ title: c.title, game: c.game })),
     spaces: spaceRows.map(({ s }) => ({ name: s.name })),
     postsCount: Number(postCountRow[0]?.c ?? 0),

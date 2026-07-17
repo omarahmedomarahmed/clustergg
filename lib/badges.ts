@@ -12,7 +12,14 @@ import { uid } from "@/lib/utils";
 //   { type: "challenge_result", placement: "top1" | "top3" }  (awarded by challenge finalizer)
 //   { type: "expert_tier", tier: "contributor" | "helper" | "expert" }
 
+// The legacy badge system is retired — Quests / Cluster Points are the platform
+// gamification now. Awarding is disabled (no new badges are created) while
+// existing badge data is preserved. These functions are kept as no-ops so their
+// many callers don't need to change. See Admin → Quests for the live system.
+const BADGES_AWARDING_ENABLED = false;
+
 export async function evaluateBadgesForUser(db: DB, userId: string): Promise<string[]> {
+  if (!BADGES_AWARDING_ENABLED) return [];
   const allBadges = await db.select().from(schema.badges).where(eq(schema.badges.isActive, true));
   const owned = await db.select({ badgeId: schema.userBadges.badgeId })
     .from(schema.userBadges).where(eq(schema.userBadges.userId, userId));
@@ -82,6 +89,7 @@ export async function evaluateBadgesForUser(db: DB, userId: string): Promise<str
 }
 
 export async function grantBadgeByCode(db: DB, userId: string, code: string, context?: string) {
+  if (!BADGES_AWARDING_ENABLED) return;
   const [badge] = await db.select().from(schema.badges).where(eq(schema.badges.code, code)).limit(1);
   if (!badge) return;
   await db.insert(schema.userBadges)
