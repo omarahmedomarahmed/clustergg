@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
+import TopBannerAd from "@/components/TopBannerAd";
 import { slimImg } from "@/lib/img";
 import type { RegionStat } from "@/lib/regions";
 
@@ -103,7 +104,10 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
         </>
       )}
 
-      <div className="mx-auto max-w-4xl px-4 py-10 md:py-14 flex flex-col items-center text-center">
+      {/* Sponsor strip — sits over the hero art, not the plain backdrop */}
+      <TopBannerAd className="pt-3" />
+
+      <div className="mx-auto max-w-4xl px-4 pt-6 pb-10 md:pb-14 flex flex-col items-center text-center">
         {/* Heading */}
         <div className="text-[11px] uppercase tracking-widest text-cyan-300 mb-2 inline-flex items-center gap-1.5">
           <Icon name="planet" size={13} /> {heading ?? "Interactive planet"}
