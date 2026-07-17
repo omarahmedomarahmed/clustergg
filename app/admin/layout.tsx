@@ -40,6 +40,7 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
     section: "Website (CMS)",
     items: [
       { href: "/admin/content", label: "Site content" },
+      { href: "/admin/backgrounds", label: "Page backgrounds" },
       { href: "/admin/games", label: "Games catalog" },
       { href: "/admin/connect", label: "Connect providers" },
       { href: "/admin/partners", label: "Partners" },

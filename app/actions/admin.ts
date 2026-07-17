@@ -56,6 +56,20 @@ export async function saveConnectVisibility(_prev: ActionState, formData: FormDa
   return { ok: true, message: `Saved — ${all.length - hidden.length} shown, ${hidden.length} hidden.` };
 }
 
+// Per-page background images. One combined form posts `bg__<key>` for each
+// editable page; empty clears back to the default nebula.
+export async function savePageBackgrounds(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const { setContent } = await import("@/lib/cms");
+  const { PAGE_BG_KEYS } = await import("@/lib/page-bg");
+  for (const key of PAGE_BG_KEYS) {
+    await setContent(`page.bg.${key}`, String(formData.get(`bg__${key}`) ?? "").trim());
+  }
+  await audit(admin.id, "page.backgrounds_update", "content", "page.bg");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Page backgrounds saved." };
+}
+
 async function audit(adminId: string, action: string, targetType?: string, targetId?: string, meta?: Record<string, unknown>) {
   const db = await getDb();
   await db.insert(schema.auditLog).values({ id: uid(), adminId, action, targetType, targetId, meta: meta ?? {} });
