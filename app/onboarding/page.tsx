@@ -4,6 +4,7 @@ import { desc, eq, ne } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { providerInfoList } from "@/lib/providers/serialize";
+import { resolveGameLogo } from "@/lib/game-logos";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import FollowButton from "@/components/FollowButton";
 import Avatar from "@/components/Avatar";
@@ -16,11 +17,14 @@ export default async function OnboardingPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const db = await getDb();
-  const [accounts, suggestions] = await Promise.all([
+  const [accounts, suggestions, games] = await Promise.all([
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
     db.select().from(schema.users).where(ne(schema.users.id, user.id))
       .orderBy(desc(schema.users.createdAt)).limit(4),
+    db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl }).from(schema.games),
   ]);
+  const gameLogos: Record<string, string | null> = {};
+  for (const info of providerInfoList()) gameLogos[info.id] = resolveGameLogo(games, info.game);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -51,7 +55,7 @@ export default async function OnboardingPage() {
         <p className="text-sm text-muted mb-4 ml-10">
           Green providers verify instantly against real APIs — try Chess.com, Lichess, Dota 2, Speedrun.com or Roblox.
         </p>
-        <LinkAccountForm providers={providerInfoList()} />
+        <LinkAccountForm providers={providerInfoList()} gameLogos={gameLogos} />
       </section>
 
       <section className="glass p-6 mb-6">

@@ -31,12 +31,27 @@ type PutOpts = {
 // callers can fall back to the original value.
 export async function uploadDataUrlToBlob(dataUrl: string, scope: string): Promise<string | null> {
   if (!dataUrl?.startsWith("data:image/") || !blobConfigured()) return null;
-  const m = /^data:(image\/[a-z+]+);base64,(.*)$/i.exec(dataUrl);
-  if (!m) return null;
+
+  let contentType: string;
+  let ext: string;
+  let buffer: Buffer;
+  const b64 = /^data:(image\/[a-z0-9.+-]+);base64,(.*)$/is.exec(dataUrl);
+  if (b64) {
+    contentType = b64[1];
+    ext = contentType.split("/")[1].replace("+xml", "").replace("jpeg", "jpg").replace("svg", "svg");
+    buffer = Buffer.from(b64[2], "base64");
+  } else {
+    // Non-base64 (utf8 / percent-encoded) SVG data URLs, e.g. the house ads.
+    const svg = /^data:(image\/svg\+xml)[^,]*,(.*)$/is.exec(dataUrl);
+    if (!svg) return null;
+    contentType = "image/svg+xml";
+    ext = "svg";
+    let payload = svg[2];
+    try { payload = decodeURIComponent(payload); } catch { /* already decoded */ }
+    buffer = Buffer.from(payload, "utf8");
+  }
+
   try {
-    const contentType = m[1];
-    const ext = contentType.split("/")[1].replace("+xml", "").replace("jpeg", "jpg");
-    const buffer = Buffer.from(m[2], "base64");
     const { put } = await import("@vercel/blob");
 
     // Classic token when present; otherwise pass NO auth and let the SDK

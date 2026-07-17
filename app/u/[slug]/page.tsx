@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { getProvider } from "@/lib/providers/registry";
 import { providerInfoList } from "@/lib/providers/serialize";
+import { resolveGame } from "@/lib/game-logos";
 import { syncUserAccountsIfStale } from "@/lib/sync";
 import { slimImg } from "@/lib/img";
 import { resolveTheme, themeToVars, bgStyle, coverStyle, avatarClip } from "@/lib/theme";
@@ -99,9 +100,7 @@ export default async function ProfilePage({ params }: Props) {
   ]);
 
   const profileQuests = await getUserQuests(db, user.id);
-  const games = await db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games);
-  const logoByGameName = new Map(games.map((g) => [g.name, g.logoUrl]));
-  const coverByGameName = new Map(games.map((g) => [g.name, g.coverUrl]));
+  const games = await db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games);
   const accountAvatar = (a: typeof accounts[number]): string | null => {
     const pd = a.providerData as Record<string, unknown> | null;
     const av = pd && (pd.avatar ?? pd.avatarUrl ?? pd.image);
@@ -148,15 +147,15 @@ export default async function ProfilePage({ params }: Props) {
       providerName: p?.name ?? a.provider,
       gameName: p?.game ?? "",
       verified: a.verified,
-      logoUrl: slimImg(logoByGameName.get(p?.game ?? "") ?? null, 300000),
-      coverUrl: slimImg(coverByGameName.get(p?.game ?? "") ?? null, 400000),
+      logoUrl: slimImg(resolveGame(games, p?.game ?? "")?.logoUrl ?? null, 300000),
+      coverUrl: slimImg(resolveGame(games, p?.game ?? "")?.coverUrl ?? null, 400000),
       avatar: accountAvatar(a),
       stats: aStats.slice(0, 6).map((s) => ({ label: caps.find((c) => c.key === s.metricKey)?.label ?? s.metricKey, value: s.rankLabel ?? fmtNum(s.metricValue) })),
       standings: (S.standings ? st.slice(0, 3) : []).map((x) => ({ rank: x.rank, total: x.total, label: x.title.split("·")[1]?.trim() ?? x.metricKey, game: x.game, metricKey: x.metricKey })),
     };
   });
   const accountGameLogos: Record<string, string | null> = {};
-  for (const info of providerInfoList()) accountGameLogos[info.id] = slimImg(logoByGameName.get(info.game) ?? null, 300000);
+  for (const info of providerInfoList()) accountGameLogos[info.id] = slimImg(resolveGame(games, info.game)?.logoUrl ?? null, 300000);
 
   const sectionNode = (key: string): React.ReactNode => {
     switch (key) {

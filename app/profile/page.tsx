@@ -5,6 +5,7 @@ import { getCurrentUserFull } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { providerInfoList } from "@/lib/providers/serialize";
 import { getProvider } from "@/lib/providers/registry";
+import { resolveGameLogo } from "@/lib/game-logos";
 import ProfileBuilder from "@/components/ProfileBuilder";
 import ProfileHub from "@/components/ProfileHub";
 import LinkAccountForm from "@/components/LinkAccountForm";
@@ -45,14 +46,13 @@ export default async function OwnProfilePage() {
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(12),
     db.select({ c: sql<number>`count(*)` }).from(schema.posts)
       .where(and(eq(schema.posts.authorId, user.id), sql`${schema.posts.deletedAt} IS NULL`)),
-    db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl }).from(schema.games),
+    db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl }).from(schema.games),
   ]);
 
-  // Resolve a game logo for each provider (provider.game === game.name).
-  const logoByGameName = new Map(games.map((g) => [g.name, g.logoUrl]));
+  // Resolve a game logo for each provider, tolerant of name differences.
   const gameLogos: Record<string, string | null> = {};
-  for (const info of providerInfoList()) gameLogos[info.id] = logoByGameName.get(info.game) ?? null;
-  const accountLogo = (provider: string) => logoByGameName.get(getProvider(provider)?.game ?? "") ?? null;
+  for (const info of providerInfoList()) gameLogos[info.id] = resolveGameLogo(games, info.game);
+  const accountLogo = (provider: string) => resolveGameLogo(games, getProvider(provider)?.game ?? "");
 
   const previewData = {
     accounts: accounts.map((a) => ({ name: a.inGameName, provider: getProvider(a.provider)?.name ?? a.provider })),
