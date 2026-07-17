@@ -4,7 +4,7 @@ import { desc, eq, ne } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { providerInfoList } from "@/lib/providers/serialize";
-import { resolveGameLogo } from "@/lib/game-logos";
+import { resolveGameLogo, resolveGameCover } from "@/lib/game-logos";
 import { getContent } from "@/lib/cms";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import FollowButton from "@/components/FollowButton";
@@ -22,13 +22,15 @@ export default async function OnboardingPage() {
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
     db.select().from(schema.users).where(ne(schema.users.id, user.id))
       .orderBy(desc(schema.users.createdAt)).limit(4),
-    db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl }).from(schema.games),
+    db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games),
   ]);
   const hiddenConnect = (await getContent(["connect.hidden"]))["connect.hidden"]
     .split(",").map((s) => s.trim()).filter(Boolean);
   const providers = providerInfoList(hiddenConnect);
   const gameLogos: Record<string, string | null> = {};
-  for (const info of providers) gameLogos[info.id] = resolveGameLogo(games, info.game);
+  const gameCovers: Record<string, string | null> = {};
+  for (const info of providers) { gameLogos[info.id] = resolveGameLogo(games, info.game); gameCovers[info.id] = resolveGameCover(games, info.game); }
+  const linkedAccounts = accounts.map((a) => ({ provider: a.provider, name: a.inGameName }));
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -59,7 +61,7 @@ export default async function OnboardingPage() {
         <p className="text-sm text-muted mb-4 ml-10">
           Green providers verify instantly against real APIs — try Chess.com, Lichess, Dota 2, Speedrun.com or Roblox.
         </p>
-        <LinkAccountForm providers={providers} gameLogos={gameLogos} />
+        <LinkAccountForm providers={providers} gameLogos={gameLogos} gameCovers={gameCovers} linked={linkedAccounts} next="/onboarding" />
       </section>
 
       <section className="glass p-6 mb-6">

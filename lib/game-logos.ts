@@ -25,3 +25,10 @@ export function resolveGameLogo(
 ): string | null {
   return resolveGame(games, gameName)?.logoUrl ?? null;
 }
+
+export function resolveGameCover(
+  games: { name: string; slug?: string; coverUrl: string | null }[],
+  gameName: string,
+): string | null {
+  return resolveGame(games, gameName)?.coverUrl ?? null;
+}

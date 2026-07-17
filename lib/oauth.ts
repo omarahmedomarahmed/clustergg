@@ -142,11 +142,19 @@ export function isOAuthAvailable(providerId: string): boolean {
   return !!p && p.authType === "oauth" && isProviderLive(p);
 }
 
-// Providers offered as sign-in buttons, Discord always first.
-export const SIGNIN_PROVIDERS = ["discord", "steam", "epic", "battlenet"] as const;
+// Providers offered as sign-in buttons, Discord always first. Steam is no longer
+// an OAuth login (it stays available as a linkable game account below).
+export const SIGNIN_PROVIDERS = ["discord", "epic", "battlenet"] as const;
 
 export function availableSigninProviders(): string[] {
   return SIGNIN_PROVIDERS.filter(isOAuthAvailable);
+}
+
+// Providers that link a game account via OAuth (not an identifier/API lookup) —
+// clicking them on the connect picker routes through /api/auth/<id>?intent=link.
+export const OAUTH_LINK_PROVIDERS = ["discord", "steam", "epic", "battlenet"] as const;
+export function isOAuthLinkProvider(id: string): boolean {
+  return (OAUTH_LINK_PROVIDERS as readonly string[]).includes(id);
 }
 
 // Exchange an authorization code for an access token (OAuth2 providers).
