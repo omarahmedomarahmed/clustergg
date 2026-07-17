@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getQuestByKey } from "@/lib/quests";
+import { getQuestByKey, getTotalCp } from "@/lib/quests";
 import QuestMapHero from "@/components/QuestMapHero";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
@@ -22,11 +22,12 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   if (!detail) notFound();
 
   const { quest, allQuests, tierHolders, leaderboard } = detail;
+  const totalCp = await getTotalCp(db, user?.id ?? null);
   const tabs = allQuests.map((q) => ({ key: q.key, name: q.name, color: q.color, logoUrl: q.logoUrl, icon: q.icon, mapArtUrl: q.mapArtUrl }));
 
   return (
     <div>
-      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" />
+      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} />
 
       {/* Per-quest CP leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">

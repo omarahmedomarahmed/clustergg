@@ -44,6 +44,11 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h3 className="font-bold text-lg truncate group-hover:underline">{q.name}</h3>
+            {q.completions > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5" style={{ background: `${q.color}33`, color: q.color, border: `1px solid ${q.color}66` }} title={`Completed ${q.completions}×`}>
+                {q.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-3.5 w-3.5 object-contain" /> : <Icon name="trophy" size={11} />} ×{q.completions}
+              </span>
+            )}
             {q.currentTierIndex >= 0 && (
               <span className="text-[10px] font-bold uppercase tracking-wider rounded-full px-2 py-0.5" style={{ background: `${q.color}26`, color: q.color }}>{q.tiers[q.currentTierIndex].name}</span>
             )}

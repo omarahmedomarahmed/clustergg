@@ -3,18 +3,25 @@
 import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
+import CpIcon from "@/components/CpIcon";
 import type { NavQuest } from "@/lib/quests";
 
 // One wide quest card in the nav (art background, name, CP, progress). A dropdown
 // (the chevron) picks which quest is shown. The card body links to the quest map.
-export default function NavQuestCard({ quests }: { quests: NavQuest[] }) {
+export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; totalCp?: number }) {
   const [idx, setIdx] = useState(0);
   const [open, setOpen] = useState(false);
   if (quests.length === 0) return null;
   const q = quests[Math.min(idx, quests.length - 1)];
 
   return (
-    <div className="relative flex-1 min-w-0 max-w-md">
+    <div className="relative flex-1 min-w-0 max-w-md flex items-center gap-2">
+      {totalCp !== undefined && (
+        <Link href="/quests" title="Your total Cluster Points" className="hidden xl:inline-flex items-center gap-1 shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[11px] font-bold text-cyan-200 hover:border-cyan-400/40">
+          <CpIcon size={15} /> {totalCp.toLocaleString()}
+        </Link>
+      )}
+      <div className="relative flex-1 min-w-0">
       <div className="relative h-11 overflow-hidden rounded-xl border border-white/10 hover:border-cyan-400/40 transition-colors flex">
         {q.art ? (
           <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-45" style={{ backgroundImage: `url(${q.art})` }} />
@@ -71,6 +78,7 @@ export default function NavQuestCard({ quests }: { quests: NavQuest[] }) {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

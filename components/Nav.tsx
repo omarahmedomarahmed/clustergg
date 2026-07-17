@@ -9,7 +9,7 @@ import MobileMenu from "@/components/MobileMenu";
 import BrandGlyph from "@/components/BrandGlyph";
 import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
-import { getNavQuests } from "@/lib/quests";
+import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { getContent } from "@/lib/cms";
 import { slimImg } from "@/lib/img";
 
@@ -46,6 +46,7 @@ export default async function Nav() {
 
   // Quest cards fill the nav between the game logos and the right-hand controls.
   const navQuests = await getNavQuests(db, user?.id ?? null, 4);
+  const totalCp = user ? await getTotalCp(db, user.id) : 0;
   const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg"]);
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
@@ -88,7 +89,7 @@ export default async function Nav() {
         {/* One quest card (with a dropdown to switch) fills the nav space (lg+) */}
         {navQuests.length > 0 ? (
           <div className="hidden lg:flex flex-1 min-w-0 px-1 justify-center">
-            <NavQuestCard quests={navQuests} />
+            <NavQuestCard quests={navQuests} totalCp={totalCp} />
           </div>
         ) : (
           <div className="flex-1" />

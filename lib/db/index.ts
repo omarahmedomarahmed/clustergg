@@ -102,6 +102,8 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "quests" ADD COLUMN IF NOT EXISTS "map_art_url" text`,
   `ALTER TABLE "quest_tiers" ADD COLUMN IF NOT EXISTS "map_x" integer NOT NULL DEFAULT 50`,
   `ALTER TABLE "quest_tiers" ADD COLUMN IF NOT EXISTS "map_y" integer NOT NULL DEFAULT 50`,
+  `ALTER TABLE "user_quest_progress" ADD COLUMN IF NOT EXISTS "completions" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "user_quest_progress" ADD COLUMN IF NOT EXISTS "lifetime_qp" integer NOT NULL DEFAULT 0`,
 ];
 
 async function runColumnMigrations(db: DB) {

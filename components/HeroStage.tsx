@@ -29,5 +29,5 @@ export default function HeroStage({
 
   return mode === "planet" || !quest
     ? <PlanetHero planets={planets} initialSlug={initialSlug} swap={swap} heading={heading} toggle={toggle} />
-    : <QuestMapHero quest={quest.quest} tierHolders={quest.tierHolders} tabs={quest.tabs} toggle={toggle} variants={quest.variants} />;
+    : <QuestMapHero quest={quest.quest} tierHolders={quest.tierHolders} tabs={quest.tabs} toggle={toggle} variants={quest.variants} totalCp={quest.totalCp} />;
 }

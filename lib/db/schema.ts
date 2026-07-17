@@ -475,6 +475,10 @@ export const userQuestProgress = pgTable("user_quest_progress", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   questId: text("quest_id").notNull().references(() => quests.id, { onDelete: "cascade" }),
   qp: integer("qp").notNull().default(0),
+  // How many full times this quest has been completed (re-enrolled), and the
+  // lifetime CP earned across all completed cycles. Total CP = lifetimeQp + qp.
+  completions: integer("completions").notNull().default(0),
+  lifetimeQp: integer("lifetime_qp").notNull().default(0),
   updatedAt: now("updated_at"),
 }, (t) => [primaryKey({ columns: [t.userId, t.questId] })]);
 

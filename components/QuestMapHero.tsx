@@ -14,13 +14,14 @@ import type { QuestView, QuestGamer } from "@/lib/quests";
 // path as you progress (bronze → platinum), a per-quest space backdrop, and a
 // glorified toggle to switch to another quest's map.
 export default function QuestMapHero({
-  quest, tierHolders, tabs, toggle, backHref, variants,
+  quest, tierHolders, tabs, toggle, backHref, variants, totalCp,
 }: {
   quest: QuestView;
   tierHolders: Record<string, QuestGamer[]>;
   tabs: { key: string; name: string; color: string; logoUrl: string | null; icon: string; mapArtUrl: string | null }[];
   toggle?: React.ReactNode;
   backHref?: string;
+  totalCp?: number;
   // When provided, the quest tabs switch the map IN-FRAME (feed/home) instead
   // of navigating to the quest page.
   variants?: { key: string; quest: QuestView; tierHolders: Record<string, QuestGamer[]> }[];
@@ -65,12 +66,19 @@ export default function QuestMapHero({
       {/* Sponsor strip — over the quest backdrop, not the plain site backdrop */}
       <TopBannerAd className="pt-3 pb-1" />
 
-      {/* Back to all quests — lives ON the hero art */}
-      {backHref && (
-        <div className="mx-auto max-w-6xl px-4 pt-3">
-          <Link href={backHref} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/30 backdrop-blur px-3.5 py-1.5 text-xs font-semibold text-white hover:border-cyan-400/50 transition-colors">
-            <Icon name="arrowLeft" size={13} /> All quests
-          </Link>
+      {/* Back to all quests + total CP — live ON the hero art */}
+      {(backHref || totalCp !== undefined) && (
+        <div className="mx-auto max-w-6xl px-4 pt-3 flex items-center justify-between gap-3">
+          {backHref ? (
+            <Link href={backHref} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/30 backdrop-blur px-3.5 py-1.5 text-xs font-semibold text-white hover:border-cyan-400/50 transition-colors">
+              <Icon name="arrowLeft" size={13} /> All quests
+            </Link>
+          ) : <span />}
+          {totalCp !== undefined && (
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/40 backdrop-blur px-3.5 py-1.5 text-sm font-bold text-white">
+              <CpIcon size={20} /> {totalCp.toLocaleString()} <span className="text-muted font-semibold">total CP</span>
+            </span>
+          )}
         </div>
       )}
 

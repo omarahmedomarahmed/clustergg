@@ -246,8 +246,35 @@ export async function awardQuestAction(
         });
 
       await unlockTiers(db, userId, quest.id, quest.name);
+      await maybeCompleteQuest(db, userId, quest.id, quest.name);
     }
   } catch { /* gamification is non-fatal — never block the underlying action */ }
+}
+
+// When current-cycle QP passes the top tier, the quest is "completed": award a
+// completion (badge ×N), bank the CP into lifetimeQp, and re-enroll by carrying
+// the remainder into a fresh cycle — so total CP keeps stacking forever.
+async function maybeCompleteQuest(db: DB, userId: string, questId: string, questName: string) {
+  const [prog] = await db.select({ qp: schema.userQuestProgress.qp }).from(schema.userQuestProgress)
+    .where(and(eq(schema.userQuestProgress.userId, userId), eq(schema.userQuestProgress.questId, questId))).limit(1);
+  const [top] = await db.select({ t: schema.questTiers.thresholdQp }).from(schema.questTiers)
+    .where(and(eq(schema.questTiers.questId, questId), eq(schema.questTiers.isActive, true)))
+    .orderBy(desc(schema.questTiers.thresholdQp)).limit(1);
+  const maxThreshold = Number(top?.t ?? 0);
+  let qp = prog?.qp ?? 0;
+  if (maxThreshold <= 0 || qp < maxThreshold) return;
+
+  let completed = 0;
+  while (qp >= maxThreshold) { qp -= maxThreshold; completed++; }
+  await db.update(schema.userQuestProgress)
+    .set({ qp, completions: sql`${schema.userQuestProgress.completions} + ${completed}`, lifetimeQp: sql`${schema.userQuestProgress.lifetimeQp} + ${maxThreshold * completed}`, updatedAt: new Date() })
+    .where(and(eq(schema.userQuestProgress.userId, userId), eq(schema.userQuestProgress.questId, questId)));
+  await db.insert(schema.notifications).values({
+    id: uid(), userId, type: "badge",
+    title: `Quest complete: ${questName}! 🏆`,
+    body: `You finished ${questName}${completed > 1 ? ` ×${completed}` : ""} — re-enrolled from the start, and your total CP keeps stacking.`,
+    href: "/quests",
+  });
 }
 
 // Award any tier badges the user's current QP now clears.
@@ -281,6 +308,7 @@ export type QuestView = {
   id: string; key: string; name: string; tagline: string; lore: string; color: string; accent2: string; icon: string;
   logoUrl: string | null; cardBgUrl: string | null; coverUrl: string | null; mapArtUrl: string | null;
   qp: number; tiers: QuestTierView[]; currentTierIndex: number; nextTier: QuestTierView | null;
+  completions: number; totalCp: number;
 };
 
 async function tierHolderCountMap(db: DB, tierIds: string[]): Promise<Map<string, number>> {
@@ -294,27 +322,38 @@ export async function getUserQuests(db: DB, userId: string | null): Promise<Ques
   const quests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true)).orderBy(schema.quests.sortOrder);
   if (quests.length === 0) return [];
   const questIds = quests.map((q) => q.id);
-  const [tiers, progress, earned] = await Promise.all([
+  const [tiers, progress] = await Promise.all([
     db.select().from(schema.questTiers).where(and(inArray(schema.questTiers.questId, questIds), eq(schema.questTiers.isActive, true))),
     userId ? db.select().from(schema.userQuestProgress).where(and(eq(schema.userQuestProgress.userId, userId), inArray(schema.userQuestProgress.questId, questIds))) : Promise.resolve([]),
-    userId ? db.select({ tierId: schema.userQuestTiers.questTierId }).from(schema.userQuestTiers).where(eq(schema.userQuestTiers.userId, userId)) : Promise.resolve([]),
   ]);
   const holders = await tierHolderCountMap(db, tiers.map((t) => t.id));
-  const qpByQuest = new Map(progress.map((p) => [p.questId, p.qp]));
-  const earnedSet = new Set(earned.map((e) => e.tierId));
+  const progByQuest = new Map(progress.map((p) => [p.questId, p]));
 
   return quests.map((q) => {
-    const qp = qpByQuest.get(q.id) ?? 0;
+    const p = progByQuest.get(q.id);
+    const qp = p?.qp ?? 0;
+    // "Earned" reflects the CURRENT cycle (re-enroll resets the map); lifetime
+    // achievements are the quest badges (completions) shown on the profile.
     const qTiers = tiers.filter((t) => t.questId === q.id).sort((a, b) => a.tierIndex - b.tierIndex)
-      .map((t): QuestTierView => ({ id: t.id, name: t.name, description: t.description, thresholdQp: t.thresholdQp, iconUrl: t.iconUrl, color: t.color, mapX: t.mapX, mapY: t.mapY, earned: earnedSet.has(t.id) || qp >= t.thresholdQp, holders: holders.get(t.id) ?? 0 }));
+      .map((t): QuestTierView => ({ id: t.id, name: t.name, description: t.description, thresholdQp: t.thresholdQp, iconUrl: t.iconUrl, color: t.color, mapX: t.mapX, mapY: t.mapY, earned: qp >= t.thresholdQp, holders: holders.get(t.id) ?? 0 }));
     const currentTierIndex = qTiers.reduce((acc, t, i) => (qp >= t.thresholdQp ? i : acc), -1);
     const nextTier = qTiers.find((t) => qp < t.thresholdQp) ?? null;
+    const completions = p?.completions ?? 0;
     return {
       id: q.id, key: q.key, name: q.name, tagline: q.tagline, lore: q.lore, color: q.color, accent2: q.accent2, icon: q.icon,
       logoUrl: q.logoUrl, cardBgUrl: q.cardBgUrl, coverUrl: q.coverUrl, mapArtUrl: q.mapArtUrl,
       qp, tiers: qTiers, currentTierIndex, nextTier,
+      completions, totalCp: (p?.lifetimeQp ?? 0) + qp,
     };
   });
+}
+
+// A gamer's TOTAL Cluster Points across all quests (lifetime + current cycles).
+export async function getTotalCp(db: DB, userId: string | null): Promise<number> {
+  if (!userId) return 0;
+  const [row] = await db.select({ c: sql<number>`COALESCE(SUM(${schema.userQuestProgress.qp} + ${schema.userQuestProgress.lifetimeQp}), 0)` })
+    .from(schema.userQuestProgress).where(eq(schema.userQuestProgress.userId, userId));
+  return Number(row?.c ?? 0);
 }
 
 // Top questers per quest (CP leaderboard), keyed by quest id.

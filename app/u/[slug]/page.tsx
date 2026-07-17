@@ -21,6 +21,7 @@ import ProfileAccounts from "@/components/ProfileAccounts";
 import CopyLinkButton from "@/components/CopyLinkButton";
 import DiscordTag from "@/components/DiscordTag";
 import QuestCard from "@/components/QuestCard";
+import CpIcon from "@/components/CpIcon";
 import { getUserQuests } from "@/lib/quests";
 import { startConversation } from "@/app/actions/social";
 import { fmtNum, timeAgo } from "@/lib/utils";
@@ -322,11 +323,25 @@ export default async function ProfilePage({ params }: Props) {
 
         {profileQuests.length > 0 && (
           <div className="mt-8">
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
               <Icon name="trophy" size={16} style={{ color: theme.accent }} />
               <h2 className="text-lg font-bold" style={{ color: theme.text }}>Quests</h2>
+              {/* Gamer's TOTAL Cluster Points across all quests */}
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold" style={{ background: `color-mix(in srgb, ${theme.accent2} 18%, transparent)`, color: theme.accent2 }}>
+                <CpIcon size={18} /> {profileQuests.reduce((s, q) => s + q.totalCp, 0).toLocaleString()} total CP
+              </span>
               <Link href="/quests" className="text-xs p-muted hover:underline ml-auto">Leaderboard →</Link>
             </div>
+            {/* Completed-quest badges (icon ×N) */}
+            {profileQuests.some((q) => q.completions > 0) && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {profileQuests.filter((q) => q.completions > 0).map((q) => (
+                  <span key={q.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ borderColor: `${q.color}66`, background: `${q.color}1a`, color: q.color }} title={`${q.name} completed ${q.completions}×`}>
+                    {q.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-5 w-5 object-contain" /> : <Icon name="trophy" size={13} />} {q.name} ×{q.completions}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="grid sm:grid-cols-2 gap-4">
               {profileQuests.map((q) => <QuestCard key={q.id} quest={q} />)}
             </div>
