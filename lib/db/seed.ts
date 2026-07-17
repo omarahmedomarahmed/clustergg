@@ -435,10 +435,20 @@ const SUPERSEDED_SKINS: Record<string, string> = {
 const PLANET_SKINS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_114614_b3a4ad5b-e49a-4fab-99fb-056fd13ab71f.png`,
   "VALORANT": `${HF_CDN}/hf_20260713_214139_cba722cd-6ede-4996-b8a7-ae0315304705.png`,
+  "PUBG: Battlegrounds": `${HF_CDN}/hf_20260717_223923_4dedb116-a7d4-45c0-97ed-004de4aedaa9.png`,
+  "PUBG": `${HF_CDN}/hf_20260717_223923_4dedb116-a7d4-45c0-97ed-004de4aedaa9.png`,
+  "Dota 2": `${HF_CDN}/hf_20260717_223926_6bf3756b-3ee1-4629-98ae-e458dcddd180.png`,
+  "Fortnite": `${HF_CDN}/hf_20260717_223928_d55e9e97-d9a0-498a-a3f4-5cb6e430224f.png`,
+  "Counter-Strike 2": `${HF_CDN}/hf_20260717_223931_14be7cf0-ff69-41dc-87f9-77d113662a37.png`,
 };
 const PLANET_BGS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_120620_3c2d92d2-00a7-4f38-ba68-7712e85b962d.png`,
   "VALORANT": `${HF_CDN}/hf_20260714_120636_4b63d00d-68e5-4379-b419-a0bc8b423124.png`,
+  "PUBG: Battlegrounds": `${HF_CDN}/hf_20260717_224254_9bf2847f-9b30-40e6-89b1-7c0816a28962.png`,
+  "PUBG": `${HF_CDN}/hf_20260717_224254_9bf2847f-9b30-40e6-89b1-7c0816a28962.png`,
+  "Dota 2": `${HF_CDN}/hf_20260717_224257_d5b1ca32-3a9c-4434-a7e8-8aa256473b7a.png`,
+  "Fortnite": `${HF_CDN}/hf_20260717_224259_eef07acf-cc6f-44ed-b0f0-715f2c6eb1d3.png`,
+  "Counter-Strike 2": `${HF_CDN}/hf_20260717_224301_435984a4-647b-4da2-bdaa-906bae240009.png`,
 };
 export async function ensurePlanetSkins(db: DB) {
   // Replace superseded renders in place.
