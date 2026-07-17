@@ -31,7 +31,7 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 // Admin editor for the wide wordmark logo, per-placement display mode, and the
 // loading-screen appearance. Complements LogoEditor (the square mark).
 export default function BrandingEditor({
-  defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo,
+  defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultPlanetsIcon,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -39,9 +39,11 @@ export default function BrandingEditor({
   defaultFooterMode: Mode;
   defaultLoadingColor: string;
   defaultLoadingLogo: string;
+  defaultPlanetsIcon: string;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
+  const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
   const [navMode, setNavMode] = useState<Mode>(defaultNavMode);
   const [footerMode, setFooterMode] = useState<Mode>(defaultFooterMode);
   const [loadingColor, setLoadingColor] = useState(defaultLoadingColor);
@@ -69,6 +71,16 @@ export default function BrandingEditor({
               <img src={wordmark} alt="Cluster" className="w-auto object-contain" style={{ height: 38 * wmZoom }} />
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Nav "all planets" icon */}
+      <div>
+        <div className="font-semibold text-sm mb-1">Nav &ldquo;all planets&rdquo; icon</div>
+        <p className="text-xs text-muted mb-3">The button next to the game logos that links to all planets. Upload an image or leave empty for the default planet glyph.</p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
+          <ImageUpload name="planetsIcon" value={planetsIcon} onChange={setPlanetsIcon}
+            aspect="1/1" rounded="rounded-xl" maxDim={128} scope="content" hint="Square icon, shown at 40×40 in the nav." />
         </div>
       </div>
 

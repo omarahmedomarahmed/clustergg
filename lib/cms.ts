@@ -38,6 +38,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.wordmark": "",                     // wide CLUSTER wordmark (empty = gradient text)
   "brand.wordmark.zoom": "1",               // wide wordmark scale multiplier
   "brand.nav.mode": "both",                 // mark | wordmark | both
+  "brand.nav.planetsIcon": "",              // custom image for the nav "all planets" button
   "brand.footer.mode": "both",
   // Loading screen (rotating circle) — editable color + optional inner logo.
   "brand.loading.color": "#8b5cf6",

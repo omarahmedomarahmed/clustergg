@@ -330,6 +330,29 @@ export async function getQuestByKey(db: DB, key: string, userId: string | null) 
   return { quest, allQuests: all, tierHolders, leaderboard: tops.get(quest.id) ?? [] };
 }
 
+// Lean quest summary for the nav bar — name, CP, art and progress-to-next-tier
+// only (no tier-holder counts), so it's cheap enough to run on every page.
+export type NavQuest = { key: string; name: string; color: string; accent2: string; qp: number; art: string | null; pct: number; nextName: string };
+export async function getNavQuests(db: DB, userId: string | null, limit = 4): Promise<NavQuest[]> {
+  const quests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true)).orderBy(schema.quests.sortOrder).limit(limit);
+  if (quests.length === 0) return [];
+  const ids = quests.map((q) => q.id);
+  const [tiers, progress] = await Promise.all([
+    db.select().from(schema.questTiers).where(and(inArray(schema.questTiers.questId, ids), eq(schema.questTiers.isActive, true))),
+    userId ? db.select().from(schema.userQuestProgress).where(and(eq(schema.userQuestProgress.userId, userId), inArray(schema.userQuestProgress.questId, ids))) : Promise.resolve([]),
+  ]);
+  const qpBy = new Map(progress.map((p) => [p.questId, p.qp]));
+  return quests.map((q) => {
+    const qp = qpBy.get(q.id) ?? 0;
+    const qTiers = tiers.filter((t) => t.questId === q.id).sort((a, b) => a.tierIndex - b.tierIndex);
+    const next = qTiers.find((t) => qp < t.thresholdQp);
+    const prevT = [...qTiers].reverse().find((t) => qp >= t.thresholdQp)?.thresholdQp ?? 0;
+    const span = next ? next.thresholdQp - prevT : 1;
+    const pct = next ? Math.max(4, Math.min(100, Math.round(((qp - prevT) / span) * 100))) : 100;
+    return { key: q.key, name: q.name, color: q.color, accent2: q.accent2, qp, art: q.mapArtUrl || q.cardBgUrl || null, pct, nextName: next?.name ?? "Max" };
+  });
+}
+
 // Leaderboard: how many gamers have unlocked each quest's tiers, top questers.
 export async function getQuestLeaderboards(db: DB) {
   const quests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true)).orderBy(schema.quests.sortOrder);

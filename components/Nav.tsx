@@ -8,6 +8,8 @@ import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
 import BrandGlyph from "@/components/BrandGlyph";
 import BrandHeader from "@/components/BrandHeader";
+import { getNavQuests } from "@/lib/quests";
+import { getContent } from "@/lib/cms";
 import { slimImg } from "@/lib/img";
 
 export default async function Nav() {
@@ -41,6 +43,10 @@ export default async function Nav() {
     return s ? `/planets/${s}` : `/games/${g.slug}`; // fallback redirects to a planet
   };
 
+  // Quest cards fill the nav between the game logos and the right-hand controls.
+  const navQuests = await getNavQuests(db, user?.id ?? null, 4);
+  const planetsIcon = (await getContent(["brand.nav.planetsIcon"]))["brand.nav.planetsIcon"];
+
   // Nav is game-first: the only things in the bar are the game planets. Feed and
   // "all planets" live in the mobile drawer for reachability.
   const mobileLinks = [
@@ -57,8 +63,8 @@ export default async function Nav() {
           <BrandHeader placement="nav" />
         </Link>
 
-        {/* Game planets — the whole nav. Bigger, glorified logos. */}
-        <nav className="hidden md:flex items-center gap-2.5 flex-1 min-w-0 overflow-x-auto no-scrollbar">
+        {/* Game planets — bigger, glorified logos. */}
+        <nav className="hidden md:flex items-center gap-2.5 shrink-0">
           {navGames.map((g) => (
             <Link key={g.id} href={planetHref(g)} title={g.name}
               className="group shrink-0 relative rounded-xl transition-transform hover:scale-110">
@@ -68,10 +74,40 @@ export default async function Nav() {
             </Link>
           ))}
           <Link href="/planets" title="All planets"
-            className="shrink-0 flex h-10 w-10 items-center justify-center rounded-xl border border-violet-400/25 text-muted hover:text-cyan-300 hover:border-cyan-400/50 transition-colors">
-            <Icon name="planet" size={18} />
+            className="shrink-0 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 text-muted hover:text-cyan-300 hover:border-cyan-400/50 transition-colors">
+            {planetsIcon
+              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={planetsIcon} alt="All planets" className="h-full w-full object-cover" />
+              : <Icon name="planet" size={18} />}
           </Link>
         </nav>
+
+        {/* Quest cards fill the space up to the right-hand controls (lg+) */}
+        {navQuests.length > 0 ? (
+          <div className="hidden lg:flex items-stretch gap-2 flex-1 min-w-0 px-1">
+            {navQuests.map((q) => (
+              <Link key={q.key} href={`/quests/${q.key}`} title={`${q.name} · ${q.qp} CP`}
+                className="group relative flex-1 min-w-0 h-11 overflow-hidden rounded-lg border border-white/10 hover:border-cyan-400/40 transition-colors">
+                {q.art ? (
+                  <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-40 group-hover:opacity-55 transition-opacity" style={{ backgroundImage: `url(${q.art})` }} />
+                ) : (
+                  <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${q.color}33, ${q.accent2}22)` }} />
+                )}
+                <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.55), rgba(4,5,26,0.8))" }} />
+                <span className="relative flex h-full flex-col justify-center px-2 leading-tight">
+                  <span className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] font-bold truncate">{q.name}</span>
+                    <span className="text-[9px] font-semibold shrink-0" style={{ color: q.accent2 }}>{q.qp.toLocaleString()} CP</span>
+                  </span>
+                  <span className="mt-1 h-1 w-full rounded-full bg-white/10 overflow-hidden">
+                    <span className="block h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} />
+                  </span>
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="flex-1" />
+        )}
         <div className="md:hidden flex-1" />
 
         <div className="flex items-center gap-3 shrink-0">
@@ -80,6 +116,9 @@ export default async function Nav() {
           </Link>
           {user ? (
             <>
+              <Link href="/messages" className="hidden sm:flex text-muted hover:text-ink transition-colors" aria-label="Messages">
+                <Icon name="message" size={19} />
+              </Link>
               <Link href="/notifications" className="relative text-muted hover:text-ink transition-colors" aria-label="Notifications">
                 <Icon name="bell" size={19} />
                 {unread > 0 && (

@@ -13,7 +13,7 @@ const asMode = (v: string | undefined): Mode => (v === "mark" || v === "wordmark
 export default async function BrandKitPage() {
   const c = await getContent([
     "brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y",
-    "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.footer.mode",
+    "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.footer.mode",
     "brand.loading.color", "brand.loading.logo",
   ]);
 
@@ -47,6 +47,7 @@ export default async function BrandKitPage() {
           defaultFooterMode={asMode(c["brand.footer.mode"])}
           defaultLoadingColor={c["brand.loading.color"] || "#8b5cf6"}
           defaultLoadingLogo={c["brand.loading.logo"] || ""}
+          defaultPlanetsIcon={c["brand.nav.planetsIcon"] || ""}
         />
       </section>
 
