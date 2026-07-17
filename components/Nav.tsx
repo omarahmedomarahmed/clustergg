@@ -46,7 +46,9 @@ export default async function Nav() {
 
   // Quest cards fill the nav between the game logos and the right-hand controls.
   const navQuests = await getNavQuests(db, user?.id ?? null, 4);
-  const planetsIcon = (await getContent(["brand.nav.planetsIcon"]))["brand.nav.planetsIcon"];
+  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg"]);
+  const planetsIcon = brand["brand.nav.planetsIcon"];
+  const navBg = brand["brand.nav.bg"];
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and
   // "all planets" live in the mobile drawer for reachability.
@@ -58,7 +60,8 @@ export default async function Nav() {
   ];
 
   return (
-    <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl bg-cover bg-center"
+      style={navBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${navBg})` } : undefined}>
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
         <Link href={user ? "/feed" : "/"} className="shrink-0" aria-label="Cluster home">
           <BrandHeader placement="nav" />

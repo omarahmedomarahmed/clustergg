@@ -43,6 +43,11 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // Loading screen (rotating circle) — editable color + optional inner logo.
   "brand.loading.color": "#8b5cf6",
   "brand.loading.logo": "",
+  // Nav + footer background images, favicon (+ zoom).
+  "brand.nav.bg": "",
+  "brand.footer.bg": "",
+  "brand.favicon": "",
+  "brand.favicon.zoom": "1",
   // Connect/onboarding: comma-separated provider ids the admin has hidden.
   "connect.hidden": "",
 };

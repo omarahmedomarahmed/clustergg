@@ -40,6 +40,11 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.footer.mode", mode(formData.get("footerMode")));
   await setContent("brand.loading.color", String(formData.get("loadingColor") ?? "#8b5cf6").trim() || "#8b5cf6");
   await setContent("brand.loading.logo", String(formData.get("loadingLogo") ?? "").trim());
+  await setContent("brand.nav.bg", String(formData.get("navBg") ?? "").trim());
+  await setContent("brand.footer.bg", String(formData.get("footerBg") ?? "").trim());
+  await setContent("brand.favicon", String(formData.get("favicon") ?? "").trim());
+  const favZoom = Number(formData.get("faviconZoom"));
+  await setContent("brand.favicon.zoom", String(Math.max(1, Math.min(3, Number.isFinite(favZoom) ? favZoom : 1))));
   await audit(admin.id, "brand.branding_update", "content", "brand");
   revalidatePath("/", "layout");
   return { ok: true, message: "Branding updated everywhere." };

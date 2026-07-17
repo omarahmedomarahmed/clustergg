@@ -32,6 +32,7 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 // loading-screen appearance. Complements LogoEditor (the square mark).
 export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultPlanetsIcon,
+  defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -40,10 +41,18 @@ export default function BrandingEditor({
   defaultLoadingColor: string;
   defaultLoadingLogo: string;
   defaultPlanetsIcon: string;
+  defaultNavBg: string;
+  defaultFooterBg: string;
+  defaultFavicon: string;
+  defaultFaviconZoom: number;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
   const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
+  const [navBg, setNavBg] = useState(defaultNavBg);
+  const [footerBg, setFooterBg] = useState(defaultFooterBg);
+  const [favicon, setFavicon] = useState(defaultFavicon);
+  const [favZoom, setFavZoom] = useState(defaultFaviconZoom);
   const [navMode, setNavMode] = useState<Mode>(defaultNavMode);
   const [footerMode, setFooterMode] = useState<Mode>(defaultFooterMode);
   const [loadingColor, setLoadingColor] = useState(defaultLoadingColor);
@@ -81,6 +90,42 @@ export default function BrandingEditor({
         <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
           <ImageUpload name="planetsIcon" value={planetsIcon} onChange={setPlanetsIcon}
             aspect="1/1" rounded="rounded-xl" maxDim={128} scope="content" hint="Square icon, shown at 40×40 in the nav." />
+        </div>
+      </div>
+
+      {/* Nav + footer backgrounds + favicon */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
+          <div className="font-semibold text-sm mb-1">Nav bar background</div>
+          <p className="text-xs text-muted mb-3">Art behind the top nav (kept dark for readability). Empty = default.</p>
+          <ImageUpload name="navBg" value={navBg} onChange={setNavBg} aspect="8/1" maxDim={1920} scope="content" hint="Very wide, dark art." />
+        </div>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
+          <div className="font-semibold text-sm mb-1">Footer background</div>
+          <p className="text-xs text-muted mb-3">Art behind the footer. Empty = default.</p>
+          <ImageUpload name="footerBg" value={footerBg} onChange={setFooterBg} aspect="4/1" maxDim={1920} scope="content" hint="Wide, dark art." />
+        </div>
+      </div>
+
+      <div>
+        <div className="font-semibold text-sm mb-1">Favicon (browser tab icon)</div>
+        <p className="text-xs text-muted mb-3">Square icon shown in the browser tab. Use the zoom to crop in.</p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 grid gap-4 sm:grid-cols-[auto_1fr] items-start">
+          <div className="flex flex-col items-center gap-2">
+            <span className="relative h-12 w-12 overflow-hidden rounded-lg ring-1 ring-white/10 bg-black/40">
+              {favicon
+                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={favicon} alt="" className="h-full w-full object-cover" style={{ transform: `scale(${favZoom})` }} />
+                : <span className="flex h-full w-full items-center justify-center text-muted text-[10px]">none</span>}
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-muted">Preview</span>
+          </div>
+          <div className="space-y-3">
+            <ImageUpload name="favicon" value={favicon} onChange={setFavicon} aspect="1/1" rounded="rounded-lg" maxDim={128} scope="content" hint="Square. PNG or SVG." />
+            <label className="block text-xs text-muted">Zoom <span className="text-cyan-300">{favZoom.toFixed(2)}×</span>
+              <input type="range" min={1} max={3} step={0.05} value={favZoom} onChange={(e) => setFavZoom(Number(e.target.value))} className="w-full accent-violet-500" />
+            </label>
+            <input type="hidden" name="faviconZoom" value={favZoom} />
+          </div>
         </div>
       </div>
 
