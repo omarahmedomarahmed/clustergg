@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, isNull, count } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin, requireStaff, hashPassword } from "@/lib/auth";
 import { uid, slugify } from "@/lib/utils";
@@ -207,6 +207,60 @@ export async function saveSpace(formData: FormData) {
     }).onConflictDoNothing();
     await audit(admin.id, "space.create", "space", values.name);
   }
+  revalidatePath("/admin/spaces");
+  revalidatePath("/planets");
+}
+
+// Delete a planet (space) and its posts/members. Blocked when it still has
+// challenges, so we never orphan competition data.
+export async function deleteSpace(spaceId: string) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const [ch] = await db.select({ c: count() }).from(schema.challenges).where(eq(schema.challenges.spaceId, spaceId));
+  if (Number(ch?.c ?? 0) > 0) return; // keep planets that still have challenges
+  await db.delete(schema.posts).where(eq(schema.posts.spaceId, spaceId));
+  await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, spaceId));
+  await db.delete(schema.spaces).where(eq(schema.spaces.id, spaceId));
+  await audit(admin.id, "space.delete", "space", spaceId);
+  revalidatePath("/admin/spaces");
+  revalidatePath("/planets");
+}
+
+// Create a planet for every active catalog game that doesn't have one yet, so
+// there's always a planet per game.
+export async function ensurePlanetsForGames() {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const games = await db.select().from(schema.games).where(eq(schema.games.isActive, true));
+  const spaces = await db.select({ game: schema.spaces.game }).from(schema.spaces);
+  const have = new Set(spaces.map((s) => s.game).filter(Boolean) as string[]);
+  for (const g of games) {
+    if (have.has(g.name)) continue;
+    await db.insert(schema.spaces).values({
+      id: uid(), slug: slugify(g.name), name: g.name, game: g.name,
+      description: g.description || `The ${g.name} planet — leaderboards, challenges and community.`,
+      createdBy: admin.id,
+    }).onConflictDoNothing();
+  }
+  await audit(admin.id, "planets.ensure_for_games", "space");
+  revalidatePath("/admin/spaces");
+  revalidatePath("/planets");
+}
+
+// Delete legacy planets that aren't tied to a catalog game (and have no
+// challenges) — the outdated "spaces" like hardware that were never games.
+export async function deleteLegacyPlanets() {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const empties = await db.select().from(schema.spaces).where(isNull(schema.spaces.game));
+  for (const s of empties) {
+    const [ch] = await db.select({ c: count() }).from(schema.challenges).where(eq(schema.challenges.spaceId, s.id));
+    if (Number(ch?.c ?? 0) > 0) continue;
+    await db.delete(schema.posts).where(eq(schema.posts.spaceId, s.id));
+    await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, s.id));
+    await db.delete(schema.spaces).where(eq(schema.spaces.id, s.id));
+  }
+  await audit(admin.id, "planets.delete_legacy", "space");
   revalidatePath("/admin/spaces");
   revalidatePath("/planets");
 }

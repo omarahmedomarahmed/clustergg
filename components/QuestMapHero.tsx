@@ -12,12 +12,13 @@ import type { QuestView, QuestGamer } from "@/lib/quests";
 // path as you progress (bronze → platinum), a per-quest space backdrop, and a
 // glorified toggle to switch to another quest's map.
 export default function QuestMapHero({
-  quest, tierHolders, tabs, toggle,
+  quest, tierHolders, tabs, toggle, backHref,
 }: {
   quest: QuestView;
   tierHolders: Record<string, QuestGamer[]>;
   tabs: { key: string; name: string; color: string; logoUrl: string | null; icon: string; mapArtUrl: string | null }[];
   toggle?: React.ReactNode;
+  backHref?: string;
 }) {
   const [sel, setSel] = useState<number | null>(null);
   const q = quest;
@@ -54,6 +55,15 @@ export default function QuestMapHero({
 
       {/* Sponsor strip — over the quest backdrop, not the plain site backdrop */}
       <TopBannerAd className="pt-3 pb-1" />
+
+      {/* Back to all quests — lives ON the hero art */}
+      {backHref && (
+        <div className="mx-auto max-w-6xl px-4 pt-3">
+          <Link href={backHref} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/30 backdrop-blur px-3.5 py-1.5 text-xs font-semibold text-white hover:border-cyan-400/50 transition-colors">
+            <Icon name="arrowLeft" size={13} /> All quests
+          </Link>
+        </div>
+      )}
 
       {/* In-hero planet⇄quest toggle */}
       {toggle && <div className="pt-3">{toggle}</div>}

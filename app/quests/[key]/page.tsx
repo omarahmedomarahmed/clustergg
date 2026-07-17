@@ -26,11 +26,7 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
 
   return (
     <div>
-      <div className="mx-auto max-w-6xl px-4 pt-4">
-        <Link href="/quests" className="text-xs text-cyan-300 hover:underline">← All quests</Link>
-      </div>
-
-      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} />
+      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" />
 
       {/* Per-quest CP leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">
