@@ -23,13 +23,20 @@ export default function NavQuestCard({ quests }: { quests: NavQuest[] }) {
         )}
         <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.5), rgba(4,5,26,0.8))" }} />
 
-        <Link href={`/quests/${q.key}`} className="relative flex-1 min-w-0 flex flex-col justify-center px-3 leading-tight">
-          <span className="flex items-center justify-between gap-2">
-            <span className="text-[12px] font-bold truncate">{q.name}</span>
-            <span className="text-[10px] font-semibold shrink-0" style={{ color: q.accent2 }}>{q.qp.toLocaleString()} CP</span>
+        <Link href={`/quests/${q.key}`} className="relative flex-1 min-w-0 flex items-center gap-2 px-2">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg ring-1 ring-white/15" style={{ background: `${q.color}33` }}>
+            {q.logoUrl
+              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-full w-full object-cover" />
+              : <Icon name="spark" size={14} style={{ color: q.color }} />}
           </span>
-          <span className="mt-1 h-1 w-full rounded-full bg-white/10 overflow-hidden">
-            <span className="block h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} />
+          <span className="min-w-0 flex-1 flex flex-col justify-center leading-tight">
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-[12px] font-bold truncate">{q.name}</span>
+              <span className="text-[10px] font-semibold shrink-0" style={{ color: q.accent2 }}>{q.qp.toLocaleString()} CP</span>
+            </span>
+            <span className="mt-1 h-1 w-full rounded-full bg-white/10 overflow-hidden">
+              <span className="block h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} />
+            </span>
           </span>
         </Link>
 
@@ -50,7 +57,11 @@ export default function NavQuestCard({ quests }: { quests: NavQuest[] }) {
                 className={`relative flex w-full items-center gap-2 overflow-hidden rounded-lg px-2 py-2 text-left ${i === idx ? "ring-1 ring-cyan-400/40" : "hover:bg-white/5"}`}>
                 {qq.art && <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `url(${qq.art})` }} />}
                 <span aria-hidden className="absolute inset-0" style={{ background: "rgba(4,5,26,0.7)" }} />
-                <span className="relative h-6 w-6 shrink-0 rounded-md" style={{ background: `${qq.color}55` }} />
+                <span className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md ring-1 ring-white/10" style={{ background: `${qq.color}55` }}>
+                  {qq.logoUrl
+                    ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={qq.logoUrl} alt="" className="h-full w-full object-cover" />
+                    : <Icon name="spark" size={13} style={{ color: qq.color }} />}
+                </span>
                 <span className="relative min-w-0 flex-1">
                   <span className="block text-xs font-bold truncate">{qq.name}</span>
                   <span className="block text-[10px]" style={{ color: qq.accent2 }}>{qq.qp.toLocaleString()} CP · {qq.pct}%</span>

@@ -332,7 +332,7 @@ export async function getQuestByKey(db: DB, key: string, userId: string | null) 
 
 // Lean quest summary for the nav bar — name, CP, art and progress-to-next-tier
 // only (no tier-holder counts), so it's cheap enough to run on every page.
-export type NavQuest = { key: string; name: string; color: string; accent2: string; qp: number; art: string | null; pct: number; nextName: string };
+export type NavQuest = { key: string; name: string; color: string; accent2: string; qp: number; art: string | null; logoUrl: string | null; pct: number; nextName: string };
 export async function getNavQuests(db: DB, userId: string | null, limit = 4): Promise<NavQuest[]> {
   const quests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true)).orderBy(schema.quests.sortOrder).limit(limit);
   if (quests.length === 0) return [];
@@ -349,7 +349,7 @@ export async function getNavQuests(db: DB, userId: string | null, limit = 4): Pr
     const prevT = [...qTiers].reverse().find((t) => qp >= t.thresholdQp)?.thresholdQp ?? 0;
     const span = next ? next.thresholdQp - prevT : 1;
     const pct = next ? Math.max(4, Math.min(100, Math.round(((qp - prevT) / span) * 100))) : 100;
-    return { key: q.key, name: q.name, color: q.color, accent2: q.accent2, qp, art: q.mapArtUrl || q.cardBgUrl || null, pct, nextName: next?.name ?? "Max" };
+    return { key: q.key, name: q.name, color: q.color, accent2: q.accent2, qp, art: q.mapArtUrl || q.cardBgUrl || null, logoUrl: q.logoUrl, pct, nextName: next?.name ?? "Max" };
   });
 }
 

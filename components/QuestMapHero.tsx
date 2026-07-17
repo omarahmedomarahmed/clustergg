@@ -12,16 +12,23 @@ import type { QuestView, QuestGamer } from "@/lib/quests";
 // path as you progress (bronze → platinum), a per-quest space backdrop, and a
 // glorified toggle to switch to another quest's map.
 export default function QuestMapHero({
-  quest, tierHolders, tabs, toggle, backHref,
+  quest, tierHolders, tabs, toggle, backHref, variants,
 }: {
   quest: QuestView;
   tierHolders: Record<string, QuestGamer[]>;
   tabs: { key: string; name: string; color: string; logoUrl: string | null; icon: string; mapArtUrl: string | null }[];
   toggle?: React.ReactNode;
   backHref?: string;
+  // When provided, the quest tabs switch the map IN-FRAME (feed/home) instead
+  // of navigating to the quest page.
+  variants?: { key: string; quest: QuestView; tierHolders: Record<string, QuestGamer[]> }[];
 }) {
   const [sel, setSel] = useState<number | null>(null);
-  const q = quest;
+  const [activeKey, setActiveKey] = useState(quest.key);
+  const inFrame = !!variants && variants.length > 0;
+  const active = inFrame ? (variants!.find((v) => v.key === activeKey) ?? variants![0]) : null;
+  const q = active ? active.quest : quest;
+  const holders = active ? active.tierHolders : tierHolders;
   const tiers = q.tiers;
 
   // "You are here" marker: interpolate along the path between the last earned
@@ -73,17 +80,20 @@ export default function QuestMapHero({
         {tabs.length > 1 && (
           <div className="flex flex-wrap justify-center gap-2 mb-5">
             {tabs.map((t) => {
-              const active = t.key === q.key;
-              return (
-                <Link key={t.key} href={`/quests/${t.key}`}
-                  className={`group inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 transition-all ${active ? "scale-105" : "opacity-70 hover:opacity-100"}`}
-                  style={{ borderColor: `${t.color}${active ? "cc" : "44"}`, background: active ? `${t.color}22` : "rgba(255,255,255,0.03)" }}>
+              const on = t.key === q.key;
+              const inner = (
+                <>
                   <span className="flex h-7 w-7 items-center justify-center rounded-lg overflow-hidden shrink-0" style={{ background: `${t.color}22` }}>
                     {t.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={t.logoUrl} alt="" className="h-6 w-6 object-contain" /> : <Icon name={t.icon} size={14} style={{ color: t.color }} />}
                   </span>
                   <span className="text-sm font-semibold">{t.name}</span>
-                </Link>
+                </>
               );
+              const cls = `group inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 transition-all ${on ? "scale-105" : "opacity-70 hover:opacity-100"}`;
+              const style = { borderColor: `${t.color}${on ? "cc" : "44"}`, background: on ? `${t.color}22` : "rgba(255,255,255,0.03)" };
+              return inFrame
+                ? <button key={t.key} onClick={() => { setActiveKey(t.key); setSel(null); }} className={cls} style={style}>{inner}</button>
+                : <Link key={t.key} href={`/quests/${t.key}`} className={cls} style={style}>{inner}</Link>;
             })}
           </div>
         )}
@@ -170,9 +180,9 @@ export default function QuestMapHero({
               </div>
               <div className="text-xs text-muted mt-1">{tiers[sel].description || `Reach ${tiers[sel].thresholdQp.toLocaleString()} Cluster Points.`}</div>
               <div className="mt-1.5 text-xs"><b style={{ color: q.accent2 }}>{tiers[sel].thresholdQp.toLocaleString()} CP</b> · {tiers[sel].holders.toLocaleString()} reached this step</div>
-              {(tierHolders[tiers[sel].id]?.length ?? 0) > 0 && (
+              {(holders[tiers[sel].id]?.length ?? 0) > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {tierHolders[tiers[sel].id].map((g) => (
+                  {holders[tiers[sel].id].map((g) => (
                     <Link key={g.slug} href={`/u/${g.slug}`} className="flex items-center gap-1.5 rounded-full bg-white/5 pl-1 pr-2.5 py-1 text-xs hover:bg-white/10">
                       <Avatar name={g.name} src={g.avatarUrl} size={20} /> <span className="truncate max-w-[120px]">{g.name}</span>
                     </Link>
