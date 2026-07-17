@@ -1,7 +1,8 @@
 import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PROVIDERS } from "@/lib/providers/registry";
-import { REGIONS, toRegion, prettyRegion, REGION_PALETTE, type RegionStat, type RegionKey } from "@/lib/regions";
+import { prettyRegion, REGION_PALETTE, type RegionStat } from "@/lib/regions";
+import { regionsForGame } from "@/lib/game-regions";
 import { slimImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
 
@@ -86,22 +87,15 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
       const pins = (g.planetPins ?? {}) as PinMap;
       const gameRows = accountRows.filter((a) => providerToGame.get(a.provider) === g.name);
 
-      // Prefer real API server-regions from account data. Fall back to the
-      // macro-regions only when no linked accounts carry a region code yet.
+      // Prefer real API server-regions from account data. Fall back to THIS
+      // GAME's own servers (EUW1, KR, KRJP, …) — never generic macro-regions —
+      // when no linked accounts carry a region code yet.
       let regions = computeRealRegions(gameRows, pins);
       if (regions.length === 0) {
-        const stats = Object.fromEntries(REGIONS.map((r) => {
-          const pin = pins[r.key];
-          return [r.key, { ...r, x: pin?.x ?? r.x, y: pin?.y ?? r.y, color: pin?.color || r.color, label: pin?.label || r.label, count: 0, gamers: [] as { name: string; slug: string }[] }];
-        })) as Record<RegionKey, RegionStat>;
-        for (const a of gameRows) {
-          const key = toRegion(a.region, a.country);
-          if (!key) continue;
-          const s = stats[key];
-          s.count++;
-          if (s.gamers.length < 5 && !s.gamers.some((x) => x.slug === a.slug)) s.gamers.push({ name: a.name, slug: a.slug });
-        }
-        regions = REGIONS.map((r) => stats[r.key]);
+        regions = regionsForGame(g.name).map((r) => {
+          const pin = pins[r.code];
+          return { key: r.code, label: pin?.label || r.label, short: r.short, color: pin?.color || r.color, x: pin?.x ?? r.x, y: pin?.y ?? r.y, count: 0, gamers: [] as { name: string; slug: string }[] };
+        });
       }
       const total = regions.reduce((sum, r) => sum + r.count, 0);
       const pal = PLANET_PALETTE[g.name] ?? { accent: "#8b5cf6", accent2: "#22d3ee" };
