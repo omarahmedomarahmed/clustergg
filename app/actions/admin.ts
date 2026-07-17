@@ -26,6 +26,22 @@ export async function saveBrandLogo(_prev: ActionState, formData: FormData): Pro
   return { ok: true, message: "Platform logo updated everywhere." };
 }
 
+// Wordmark logo, per-placement display mode (mark / wordmark / both), and the
+// loading-screen color + inner logo.
+export async function saveBranding(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const { setContent } = await import("@/lib/cms");
+  const mode = (v: FormDataEntryValue | null) => (["mark", "wordmark", "both"].includes(String(v)) ? String(v) : "both");
+  await setContent("brand.wordmark", String(formData.get("wordmark") ?? "").trim());
+  await setContent("brand.nav.mode", mode(formData.get("navMode")));
+  await setContent("brand.footer.mode", mode(formData.get("footerMode")));
+  await setContent("brand.loading.color", String(formData.get("loadingColor") ?? "#8b5cf6").trim() || "#8b5cf6");
+  await setContent("brand.loading.logo", String(formData.get("loadingLogo") ?? "").trim());
+  await audit(admin.id, "brand.branding_update", "content", "brand");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Branding updated everywhere." };
+}
+
 async function audit(adminId: string, action: string, targetType?: string, targetId?: string, meta?: Record<string, unknown>) {
   const db = await getDb();
   await db.insert(schema.auditLog).values({ id: uid(), adminId, action, targetType, targetId, meta: meta ?? {} });
