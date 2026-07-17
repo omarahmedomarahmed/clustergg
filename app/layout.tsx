@@ -43,8 +43,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {/* Global top ad strip — shown at the top of every page, right under
               the nav, pushing page content down. Renders nothing until a
               creative is served. Editable via Admin → Ads. */}
-          <div className="w-full px-4 pt-2">
-            <AdSlot placement="top_banner" />
+          <div className="pointer-events-none absolute left-0 right-0 top-16 z-40 flex justify-center bg-transparent">
+	          <div className="pointer-events-auto w-full px-4 pt-2">
+		          <AdSlot placement="top_banner" />
           </div>
           <main className="flex-1">{children}</main>
           <Footer />
