@@ -213,9 +213,24 @@ export default async function PlanetPage({
             {/* Leaderboard #1 — connected-account standings for this game */}
             {game && boards.length > 0 && (
               <section>
-                <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Icon name="chart" size={20} className="text-cyan-300" /> {game.name} leaderboard</h2>
-                <p className="text-xs text-muted mb-4">Live standings from API-verified accounts. Switch stats below.</p>
-                <LeaderboardWidget boards={boards} activeMetric={stat} basePath={path} limit={25} />
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="chart" size={20} className="text-cyan-300" /> {game.name} leaderboards</h2>
+                  <Link href={`/leaderboards?game=${encodeURIComponent(game.name)}`} className="text-xs text-cyan-300 hover:underline shrink-0">All leaderboards →</Link>
+                </div>
+                <p className="text-xs text-muted mb-4">Live standings from API-verified accounts — each board side by side.</p>
+                {/* Glorified cards, one board each, over the game's cover art */}
+                <div className="grid md:grid-cols-2 gap-5">
+                  {boards.map((b) => (
+                    <div key={b.id} className="relative overflow-hidden rounded-2xl border border-white/10 p-4">
+                      {slimImg(game.coverUrl) && <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${slimImg(game.coverUrl)})` }} />}
+                      <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.7), rgba(4,5,26,0.9))" }} />
+                      <div className="relative">
+                        <div className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="chart" size={15} className="text-cyan-300" /> {b.title}</div>
+                        <LeaderboardWidget boards={[b]} basePath={path} limit={10} compact />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </section>
             )}
 
