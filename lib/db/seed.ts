@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql as dsql } from "drizzle-orm";
+import { and, eq, isNull, lt, sql as dsql } from "drizzle-orm";
 import type { DB } from "./index";
 import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
@@ -583,6 +583,25 @@ export async function seedHouseAds(db: DB) {
 // Idempotent: ensure the global top-banner placement exists and (on an already
 // seeded DB where seedHouseAds early-returns) has a house creative to fill it.
 // Runs every boot; a couple of guarded inserts, cheap once present.
+// Recurring (daily/weekly/monthly) challenges that are still "active" but whose
+// end time has passed roll their window forward to now, so they always show a
+// real live countdown instead of "ends just now". Custom-cadence challenges
+// keep their explicit dates. Cheap + filtered; runs every boot.
+export async function refreshStaleChallengeWindows(db: DB) {
+  const now = new Date();
+  const cadenceDays: Record<string, number> = { daily: 1, weekly: 7, monthly: 30 };
+  const rows = await db.select({ id: schema.challenges.id, cadence: schema.challenges.cadence })
+    .from(schema.challenges)
+    .where(and(eq(schema.challenges.status, "active"), lt(schema.challenges.endAt, now)));
+  for (const r of rows) {
+    const days = cadenceDays[r.cadence];
+    if (!days) continue;
+    await db.update(schema.challenges)
+      .set({ startAt: now, endAt: new Date(now.getTime() + days * 86400000) })
+      .where(eq(schema.challenges.id, r.id));
+  }
+}
+
 export async function ensureTopBannerAd(db: DB) {
   await db.insert(schema.adPlacements).values({
     id: uid(), key: "top_banner", pageScope: "Global top banner (all pages)", device: "both",

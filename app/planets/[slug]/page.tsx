@@ -12,6 +12,7 @@ import LeaderboardWidget from "@/components/LeaderboardWidget";
 import PostCard from "@/components/PostCard";
 import JoinSpaceButton from "@/components/JoinSpaceButton";
 import HeroStage from "@/components/HeroStage";
+import Countdown from "@/components/Countdown";
 import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
 import { timeAgo } from "@/lib/utils";
@@ -176,22 +177,35 @@ export default async function PlanetPage({
       <div className="mx-auto max-w-6xl px-4">
         <AdSlot placement="games_top_banner" className="mb-10" />
 
-        {/* Live challenge banners */}
-        {activeChallenges.map((c) => (
-          <Link
-            key={c.id}
-            href={`${path}/challenges/${c.id}`}
-            className="glass card-lift mb-6 flex flex-wrap items-center gap-4 p-5 !border-cyan-400/40"
-          >
-            <Icon name="zap" size={28} className="text-amber-300 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-widest text-cyan-300">Live challenge · ends {timeAgo(c.endAt).replace(" ago", "")}</div>
-              <div className="font-bold">{c.title}</div>
-              <div className="text-xs text-muted truncate">{c.prizeDescription}</div>
-            </div>
-            <span className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">Compete</span>
-          </Link>
-        ))}
+        {/* Live challenge banners — with cover art + live countdown */}
+        {activeChallenges.map((c) => {
+          const cover = slimImg(c.coverUrl) ?? slimImg(game?.coverUrl ?? null);
+          return (
+            <Link
+              key={c.id}
+              href={`${path}/challenges/${c.id}`}
+              className="card-lift mb-6 relative block overflow-hidden rounded-2xl border border-cyan-400/40"
+            >
+              <div className="relative min-h-[7rem] flex flex-wrap items-center gap-4 p-5">
+                {cover ? (
+                  <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
+                ) : (
+                  <div className="absolute inset-0 bg-cover bg-center opacity-50" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
+                )}
+                <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.92), rgba(4,5,26,0.6))" }} />
+                <Icon name="zap" size={28} className="relative text-amber-300 shrink-0" />
+                <div className="relative min-w-0 flex-1">
+                  <div className="text-[10px] uppercase tracking-widest text-cyan-300 inline-flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live challenge · <Countdown endsAt={c.endAt.toISOString()} prefix="ends in " />
+                  </div>
+                  <div className="font-bold text-lg drop-shadow">{c.title}</div>
+                  <div className="text-xs text-white/70 truncate">{c.prizeDescription}</div>
+                </div>
+                <span className="relative glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">Compete</span>
+              </div>
+            </Link>
+          );
+        })}
 
         <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
           <div className="min-w-0 space-y-12">

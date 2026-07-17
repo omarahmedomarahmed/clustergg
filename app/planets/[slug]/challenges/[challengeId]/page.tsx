@@ -7,6 +7,7 @@ import { getProvider } from "@/lib/providers/registry";
 import { getContent } from "@/lib/cms";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
+import Countdown from "@/components/Countdown";
 import LiveChallengeBoard from "@/components/LiveChallengeBoard";
 import { joinChallenge } from "@/app/actions/social";
 
@@ -108,6 +109,11 @@ export default async function ChallengePage({
             <span className="text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1">
               {challenge.format === "top1" ? "Winner takes all" : challenge.format === "top3" ? "Top 3 podium" : "Threshold race"}
             </span>
+            {challenge.status === "active" && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-200 border border-amber-400/50 bg-amber-500/10 rounded-full px-3 py-1">
+                <Icon name="clock" size={12} /> <Countdown endsAt={challenge.endAt.toISOString()} prefix="ends in " />
+              </span>
+            )}
           </div>
           <h1 className="text-3xl md:text-5xl font-bold drop-shadow-lg">{challenge.title}</h1>
         </div>
@@ -121,7 +127,7 @@ export default async function ChallengePage({
               {[
                 { label: "Game", value: challenge.game, icon: "gamepad" },
                 { label: "Starts", value: fmtDate(challenge.startAt), icon: "clock" },
-                { label: "Ends", value: fmtDate(challenge.endAt), icon: "flame" },
+                { label: "Ends", value: challenge.status === "active" ? <Countdown endsAt={challenge.endAt.toISOString()} /> : fmtDate(challenge.endAt), icon: "flame" },
                 { label: "Scoring", value: Object.entries(challenge.pointsEngine ?? {}).map(([k, v]) => `+${v}/${k}`).join(" ") || "—", icon: "chart" },
               ].map((cell) => (
                 <div key={cell.label} className="rounded-lg border border-violet-400/15 p-3">
