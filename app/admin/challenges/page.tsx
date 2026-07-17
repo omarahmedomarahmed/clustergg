@@ -11,10 +11,11 @@ export const metadata = { title: "Admin · Challenges" };
 
 export default async function AdminChallengesPage() {
   const db = await getDb();
-  const [spaces, challenges, trophies] = await Promise.all([
+  const [spaces, challenges, trophies, quests] = await Promise.all([
     db.select().from(schema.spaces),
     db.select().from(schema.challenges).orderBy(desc(schema.challenges.createdAt)).limit(50),
     db.select().from(schema.trophies),
+    db.select({ id: schema.quests.id, name: schema.quests.name, logoUrl: schema.quests.logoUrl }).from(schema.quests).orderBy(schema.quests.sortOrder),
   ]);
 
   const builderProviders = PROVIDERS
@@ -42,6 +43,7 @@ export default async function AdminChallengesPage() {
             providers={builderProviders}
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
             trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
+            quests={quests}
           />
         </div>
       </details>

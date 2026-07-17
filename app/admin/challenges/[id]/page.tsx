@@ -16,7 +16,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
   const [challenge] = await db.select().from(schema.challenges).where(eq(schema.challenges.id, id)).limit(1);
   if (!challenge) notFound();
 
-  const [participants, events, spaces, trophies] = await Promise.all([
+  const [participants, events, spaces, trophies, quests] = await Promise.all([
     db.select({ p: schema.challengeParticipants, u: schema.users, a: schema.linkedGameAccounts })
       .from(schema.challengeParticipants)
       .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
@@ -28,6 +28,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
       .orderBy(desc(schema.challengeEvents.createdAt)).limit(30),
     db.select().from(schema.spaces),
     db.select().from(schema.trophies),
+    db.select({ id: schema.quests.id, name: schema.quests.name, logoUrl: schema.quests.logoUrl }).from(schema.quests).orderBy(schema.quests.sortOrder),
   ]);
 
   const builderProviders = PROVIDERS
@@ -43,6 +44,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     thresholdTarget: challenge.thresholdTarget, startAt: challenge.startAt.toISOString(), endAt: challenge.endAt.toISOString(),
     coverUrl: challenge.coverUrl, coverAdjust: (challenge.coverAdjust ?? { zoom: 1, x: 50, y: 50 }) as { zoom: number; x: number; y: number },
     trophyId: challenge.trophyId, status: challenge.status, prizeDescription: challenge.prizeDescription,
+    gateQuestId: challenge.gateQuestId, gateMinBadges: challenge.gateMinBadges ?? 0,
   };
 
   return (
@@ -70,6 +72,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             providers={builderProviders}
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
             trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
+            quests={quests}
           />
         </div>
       </details>

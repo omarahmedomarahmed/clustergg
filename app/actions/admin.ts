@@ -360,6 +360,8 @@ export async function saveChallenge(formData: FormData) {
     rules: { conditions },
     pointsEngine,
     thresholdTarget: Number(formData.get("thresholdTarget")) || null,
+    gateQuestId: String(formData.get("gateQuestId") ?? "").trim() || null,
+    gateMinBadges: Math.max(0, Number(formData.get("gateMinBadges")) || 0),
     startAt,
     endAt,
     cadence,

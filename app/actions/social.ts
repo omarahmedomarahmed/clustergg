@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/auth";
 import { uid } from "@/lib/utils";
 import { evaluateBadgesForUser } from "@/lib/badges";
 import { recomputeExpertScores } from "@/lib/experts";
-import { awardQuestAction } from "@/lib/quests";
+import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
 
 // ---------- Follows ----------
 export async function toggleFollow(targetUserId: string, path: string) {
@@ -202,6 +202,12 @@ export async function joinChallenge(challengeId: string, linkedAccountId: string
     eq(schema.linkedGameAccounts.userId, me.id),
   )).limit(1);
   if (!account || account.provider !== challenge.provider) return;
+
+  // Quest-badge entry gate: require N completion badges of a given quest.
+  if (challenge.gateQuestId && challenge.gateMinBadges > 0) {
+    const have = await getQuestCompletions(db, me.id, challenge.gateQuestId);
+    if (have < challenge.gateMinBadges) return; // page already hides the button
+  }
 
   // Snapshot current stats as the baseline: only activity AFTER joining counts.
   const stats = await db.select().from(schema.statCurrent)

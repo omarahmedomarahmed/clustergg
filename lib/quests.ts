@@ -348,6 +348,13 @@ export async function getUserQuests(db: DB, userId: string | null): Promise<Ques
   });
 }
 
+// How many completion badges a gamer holds for a single quest (0 if none).
+export async function getQuestCompletions(db: DB, userId: string, questId: string): Promise<number> {
+  const [row] = await db.select({ c: schema.userQuestProgress.completions }).from(schema.userQuestProgress)
+    .where(and(eq(schema.userQuestProgress.userId, userId), eq(schema.userQuestProgress.questId, questId))).limit(1);
+  return Number(row?.c ?? 0);
+}
+
 // A gamer's TOTAL Cluster Points across all quests (lifetime + current cycles).
 export async function getTotalCp(db: DB, userId: string | null): Promise<number> {
   if (!userId) return 0;

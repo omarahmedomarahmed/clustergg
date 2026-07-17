@@ -255,6 +255,9 @@ export const challenges = pgTable("challenges", {
     .notNull().default({ conditions: [] }),
   pointsEngine: jsonb("points_engine").$type<Record<string, number>>().notNull().default({}),
   thresholdTarget: integer("threshold_target"),
+  // Entry gate: require N completion badges of a given quest to join.
+  gateQuestId: text("gate_quest_id"),
+  gateMinBadges: integer("gate_min_badges").notNull().default(0),
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
   endAt: timestamp("end_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("draft"), // draft | active | completed | cancelled
