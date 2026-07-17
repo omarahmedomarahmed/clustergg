@@ -8,6 +8,7 @@ import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
 import BrandGlyph from "@/components/BrandGlyph";
 import BrandHeader from "@/components/BrandHeader";
+import NavQuestCard from "@/components/NavQuestCard";
 import { getNavQuests } from "@/lib/quests";
 import { getContent } from "@/lib/cms";
 import { slimImg } from "@/lib/img";
@@ -81,29 +82,10 @@ export default async function Nav() {
           </Link>
         </nav>
 
-        {/* Quest cards fill the space up to the right-hand controls (lg+) */}
+        {/* One quest card (with a dropdown to switch) fills the nav space (lg+) */}
         {navQuests.length > 0 ? (
-          <div className="hidden lg:flex items-stretch gap-2 flex-1 min-w-0 px-1">
-            {navQuests.map((q) => (
-              <Link key={q.key} href={`/quests/${q.key}`} title={`${q.name} · ${q.qp} CP`}
-                className="group relative flex-1 min-w-0 h-11 overflow-hidden rounded-lg border border-white/10 hover:border-cyan-400/40 transition-colors">
-                {q.art ? (
-                  <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-40 group-hover:opacity-55 transition-opacity" style={{ backgroundImage: `url(${q.art})` }} />
-                ) : (
-                  <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${q.color}33, ${q.accent2}22)` }} />
-                )}
-                <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.55), rgba(4,5,26,0.8))" }} />
-                <span className="relative flex h-full flex-col justify-center px-2 leading-tight">
-                  <span className="flex items-center justify-between gap-1">
-                    <span className="text-[11px] font-bold truncate">{q.name}</span>
-                    <span className="text-[9px] font-semibold shrink-0" style={{ color: q.accent2 }}>{q.qp.toLocaleString()} CP</span>
-                  </span>
-                  <span className="mt-1 h-1 w-full rounded-full bg-white/10 overflow-hidden">
-                    <span className="block h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} />
-                  </span>
-                </span>
-              </Link>
-            ))}
+          <div className="hidden lg:flex flex-1 min-w-0 px-1 justify-center">
+            <NavQuestCard quests={navQuests} />
           </div>
         ) : (
           <div className="flex-1" />
