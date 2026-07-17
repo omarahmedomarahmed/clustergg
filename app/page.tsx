@@ -13,6 +13,7 @@ import HomeHero, { type QuestHeroData } from "@/components/HomeHero";
 import OAuthButtons from "@/components/OAuthButtons";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { getUserQuests } from "@/lib/quests";
+import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -121,6 +122,7 @@ export default async function LandingPage() {
   const counts = statCounts[0] ?? { users: 0, accounts: 0, challenges: 0, games: 0 };
   const ticker = tickerRows.length > 0 ? [...tickerRows, ...tickerRows] : [];
   const statProviders = PROVIDERS.filter((p) => !p.identityOnly);
+  const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
 
   return (
     <div className="overflow-x-clip">
@@ -244,6 +246,7 @@ export default async function LandingPage() {
                     key={challenge.id}
                     href={`/planets/${space.slug}/challenges/${challenge.id}`}
                     className="event-card glass card-lift overflow-hidden group relative block"
+                    style={{ background: cardBgStyle(cardBg, "challenge") }}
                   >
                     <div className="h-40 relative overflow-hidden">
                       <div
@@ -312,7 +315,7 @@ export default async function LandingPage() {
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
           {games.map((g, i) => (
-            <Link key={g.id} href={`/games/${g.slug}`} className="glass card-lift p-4 text-center group" style={{ animationDelay: `${i * 0.3}s` }}>
+            <Link key={g.id} href={`/games/${g.slug}`} className="glass card-lift p-4 text-center group" style={{ animationDelay: `${i * 0.3}s`, background: cardBgStyle(cardBg, "game") }}>
               <div className="flex justify-center transition-transform duration-300 group-hover:scale-110">
                 <GameLogo logoUrl={g.logoUrl} name={g.name} size={52} />
               </div>

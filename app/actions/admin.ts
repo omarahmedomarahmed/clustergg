@@ -70,6 +70,22 @@ export async function savePageBackgrounds(_prev: ActionState, formData: FormData
   return { ok: true, message: "Page backgrounds saved." };
 }
 
+// Per-card-type artwork + overlay. One combined form posts `art__<type>` (url)
+// and `dim__<type>` (0-100) for each card type.
+export async function saveCardBackgrounds(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const { setContent } = await import("@/lib/cms");
+  const { CARD_BG_KEYS } = await import("@/lib/card-bg");
+  const clamp = (v: number) => Math.max(0, Math.min(100, Number.isFinite(v) ? v : 55));
+  for (const key of CARD_BG_KEYS) {
+    await setContent(`card.bg.${key}`, String(formData.get(`art__${key}`) ?? "").trim());
+    await setContent(`card.bg.${key}.dim`, String(clamp(Number(formData.get(`dim__${key}`)))));
+  }
+  await audit(admin.id, "card.backgrounds_update", "content", "card.bg");
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Card backgrounds saved." };
+}
+
 async function audit(adminId: string, action: string, targetType?: string, targetId?: string, meta?: Record<string, unknown>) {
   const db = await getDb();
   await db.insert(schema.auditLog).values({ id: uid(), adminId, action, targetType, targetId, meta: meta ?? {} });

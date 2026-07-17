@@ -28,13 +28,15 @@ export type ThemeColors = {
 // collapsed cards (logo + tag) that expand to full stats over the game's cover
 // art. On your own profile, "Connect a game" opens the picker inline.
 export default function ProfileAccounts({
-  accounts, colors, isOwner, providers, gameLogos,
+  accounts, colors, isOwner, providers, gameLogos, accountCardBg,
 }: {
   accounts: AccountCard[];
   colors: ThemeColors;
   isOwner: boolean;
   providers: ProviderInfo[];
   gameLogos: Record<string, string | null>;
+  /** Admin-set artwork for collapsed account cards (CSS background). */
+  accountCardBg?: string;
 }) {
   const [open, setOpen] = useState<string | null>(accounts.length === 1 ? accounts[0].id : null);
   const [connect, setConnect] = useState(false);
@@ -101,7 +103,7 @@ export default function ProfileAccounts({
                   {active && a.coverUrl && (
                     <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(3,4,15,0.82), rgba(3,4,15,0.9)), url(${a.coverUrl})` }} />
                   )}
-                  {!active && <div className="absolute inset-0" style={{ background: mix(6) }} />}
+                  {!active && <div className="absolute inset-0 bg-cover bg-center" style={{ background: accountCardBg ?? mix(6) }} />}
                   <button onClick={() => setOpen(active ? null : a.id)} className="relative w-full flex items-center gap-3 p-3.5 text-left">
                     {a.avatar ? (
                       // eslint-disable-next-line @next/next/no-img-element
