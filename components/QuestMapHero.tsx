@@ -5,6 +5,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import TopBannerAd from "@/components/TopBannerAd";
+import ZoomPan from "@/components/ZoomPan";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
@@ -115,16 +116,13 @@ export default function QuestMapHero({
           </div>
         </div>
 
-        {/* The map */}
-        <div className="relative mx-auto w-full max-w-4xl aspect-[16/9] rounded-3xl overflow-hidden border border-white/10 shadow-2xl"
-          style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }}>
+        {/* The map — drag to pan, wheel/buttons to zoom */}
+        <div className="relative mx-auto w-full max-w-4xl aspect-[16/9] rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
+          <ZoomPan className="absolute inset-0" max={5}>
+          {/* map art */}
+          <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
           {/* readability veil */}
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.15), rgba(4,5,26,0.45))" }} />
-
-          {/* How-to-play label — the milestones are the guide */}
-          <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white">
-            <Icon name="spark" size={11} style={{ color: q.accent2 }} /> How to play — tap a milestone
-          </div>
 
           {/* Path line connecting the milestones */}
           <svg className="absolute inset-0 h-full w-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -163,6 +161,12 @@ export default function QuestMapHero({
             <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-bold" style={{ color: q.accent2 }}>
               {q.qp.toLocaleString()} CP
             </span>
+          </div>
+          </ZoomPan>
+
+          {/* How-to-play label — fixed over the map */}
+          <div className="absolute top-3 left-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white pointer-events-none">
+            <Icon name="spark" size={11} style={{ color: q.accent2 }} /> How to play — drag &amp; zoom, tap a milestone
           </div>
 
           {/* Milestone detail — overlay panel on click (over the quest art) */}
