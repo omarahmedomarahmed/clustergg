@@ -118,7 +118,7 @@ export default function QuestMapHero({
 
         {/* The map — drag to pan, wheel/buttons to zoom */}
         <div className="relative mx-auto w-full max-w-4xl aspect-[16/9] rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
-          <ZoomPan className="absolute inset-0" max={5}>
+          <ZoomPan className="h-full w-full" max={5}>
           {/* map art */}
           <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
           {/* readability veil */}
