@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
@@ -38,12 +38,23 @@ export const ACTION_LABEL: Record<string, string> = Object.fromEntries(ACTION_CA
 // Cosmic quest emblem art (Higgsfield nano_banana). Served directly from the
 // CDN like the planet skins; admins can replace any of these in /admin/quests.
 const HF = "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082";
+// Glorified unified-style quest badges (hexagonal cosmic medals).
 export const QUEST_EMBLEMS: Record<string, string> = {
-  conquest: `${HF}/hf_20260714_193856_ea53f06e-b44d-4473-b67c-b3c2a2a736c7.png`,
-  orbit: `${HF}/hf_20260714_193903_a1b522be-910a-49df-8904-b4fbbf832f97.png`,
-  ascension: `${HF}/hf_20260714_193907_7a60de0d-d719-4228-860e-6ec7b44b1b31.png`,
-  signal: `${HF}/hf_20260715_113609_7865c988-053e-4808-bc82-3451222db943.png`,
+  conquest: `${HF}/hf_20260717_223341_7969f811-bb66-45b0-b589-756f32d7c034.png`,
+  orbit: `${HF}/hf_20260717_223622_deb3e6f8-a5ac-4ac4-a321-1b19d0facbfb.png`,
+  ascension: `${HF}/hf_20260717_223625_d4b96822-41d1-4b3b-a0f0-dd9bae1d7ca7.png`,
+  signal: `${HF}/hf_20260717_223627_90984c2b-6b28-41f0-8e65-558acb2adfa0.png`,
 };
+// The previous emblems — replaced automatically by the new badges (admin
+// uploads are preserved since they won't match these).
+const OLD_QUEST_EMBLEMS: string[] = [
+  `${HF}/hf_20260714_193856_ea53f06e-b44d-4473-b67c-b3c2a2a736c7.png`,
+  `${HF}/hf_20260714_193903_a1b522be-910a-49df-8904-b4fbbf832f97.png`,
+  `${HF}/hf_20260714_193907_7a60de0d-d719-4228-860e-6ec7b44b1b31.png`,
+  `${HF}/hf_20260715_113609_7865c988-053e-4808-bc82-3451222db943.png`,
+];
+// Big glorified Cluster Points (CP) currency icon — shown wherever CP appears.
+export const CP_ICON = `${HF}/hf_20260717_223629_251d5972-a1bc-4e38-8724-1ea35bf10f18.png`;
 // Gamified cosmic card backgrounds per quest (subtle, dark, text-safe).
 export const QUEST_CARD_BGS: Record<string, string> = {
   conquest: `${HF}/hf_20260715_113645_4eb3d18c-2808-4d26-a38e-359ca5e78dbc.png`,
@@ -163,8 +174,10 @@ function mapPos(i: number, n: number): [number, number] {
 // clobbers an admin upload. Idempotent; safe to run every boot-maintenance.
 export async function ensureQuestArt(db: DB) {
   for (const [key, url] of Object.entries(QUEST_EMBLEMS)) {
+    // Set the new badge where there's no logo OR the logo is a previous default
+    // (so we upgrade the art without clobbering an admin's own upload).
     await db.update(schema.quests).set({ logoUrl: url })
-      .where(and(eq(schema.quests.key, key), isNull(schema.quests.logoUrl)));
+      .where(and(eq(schema.quests.key, key), or(isNull(schema.quests.logoUrl), inArray(schema.quests.logoUrl, OLD_QUEST_EMBLEMS))));
   }
   for (const [key, url] of Object.entries(QUEST_CARD_BGS)) {
     await db.update(schema.quests).set({ cardBgUrl: url })

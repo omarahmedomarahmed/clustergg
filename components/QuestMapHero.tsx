@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import TopBannerAd from "@/components/TopBannerAd";
 import ZoomPan from "@/components/ZoomPan";
+import CpIcon from "@/components/CpIcon";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
@@ -105,8 +106,8 @@ export default function QuestMapHero({
           <p className="text-muted mt-1.5">{q.tagline}</p>
           {q.lore && <p className="text-sm text-muted/90 mt-2 max-w-xl mx-auto leading-relaxed">{q.lore}</p>}
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
-            <span className="inline-flex items-center gap-1.5 font-semibold" style={{ color: q.accent2 }}>
-              <Icon name="spark" size={15} /> {q.qp.toLocaleString()} CP earned
+            <span className="inline-flex items-center gap-1.5 font-semibold text-base" style={{ color: q.accent2 }}>
+              <CpIcon size={22} /> {q.qp.toLocaleString()} CP earned
             </span>
             <span className="text-muted">·</span>
             <span className="text-muted">
