@@ -9,9 +9,10 @@ import GameLogo from "@/components/GameLogo";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
-import PlanetHero from "@/components/PlanetHero";
+import HomeHero, { type QuestHeroData } from "@/components/HomeHero";
 import OAuthButtons from "@/components/OAuthButtons";
 import { buildSkinnedPlanets } from "@/lib/planets";
+import { getUserQuests } from "@/lib/quests";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,32 @@ export default async function LandingPage() {
   const db = await getDb();
   const viewer = await getCurrentUser();
   const skinnedPlanets = await buildSkinnedPlanets(db);
+
+  // Quest hero data — the homepage toggle can swap the planet globe for the
+  // primary quest's treasure map without leaving the page.
+  const questHero: QuestHeroData | null = await (async () => {
+    const quests = await getUserQuests(db, viewer?.id ?? null);
+    if (quests.length === 0) return null;
+    const primary = quests[0];
+    const tierIds = primary.tiers.map((t) => t.id);
+    const tierHolders: Record<string, { name: string; slug: string; avatarUrl: string | null }[]> = {};
+    if (tierIds.length) {
+      const rows = await db.select({
+        tierId: schema.userQuestTiers.questTierId,
+        name: schema.users.displayName, slug: schema.users.slug, avatarUrl: schema.users.avatarUrl,
+      })
+        .from(schema.userQuestTiers)
+        .innerJoin(schema.users, eq(schema.userQuestTiers.userId, schema.users.id))
+        .where(and(inArray(schema.userQuestTiers.questTierId, tierIds), eq(schema.users.status, "active")))
+        .orderBy(desc(schema.userQuestTiers.awardedAt)).limit(120);
+      for (const r of rows) {
+        const list = tierHolders[r.tierId] ?? [];
+        if (list.length < 12) { list.push({ name: r.name, slug: r.slug, avatarUrl: r.avatarUrl }); tierHolders[r.tierId] = list; }
+      }
+    }
+    const tabs = quests.map((q) => ({ key: q.key, name: q.name, color: q.color, logoUrl: q.logoUrl, icon: q.icon, mapArtUrl: q.mapArtUrl }));
+    return { quest: primary, tierHolders, tabs };
+  })();
   const c = await getContent([
     "hero.badge", "hero.title.line1", "hero.title.line2", "hero.subtitle",
     "hero.cta.primary", "hero.cta.secondary", "hero.image",
@@ -97,9 +124,9 @@ export default async function LandingPage() {
 
   return (
     <div className="overflow-x-clip">
-      {/* ===== INTERACTIVE GLOBE HERO ===== */}
+      {/* ===== INTERACTIVE HERO — planet globe ⇄ quest map toggle ===== */}
       {skinnedPlanets.length > 0 && (
-        <PlanetHero planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} swap heading="The Cluster galaxy — pick a game" />
+        <HomeHero planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="The Cluster galaxy — pick a game" quest={questHero} />
       )}
 
       {/* ===== HERO ===== */}
