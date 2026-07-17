@@ -176,17 +176,19 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
             })}
           </div>
 
-          {/* Overlay panel — appears ON the globe when a pin or the globe is clicked */}
+          {/* Overlay panel — appears ON the globe (over the planet art) */}
           {(region || expanded) && (
-            <div className="absolute inset-x-3 bottom-3 z-30 rounded-2xl border border-white/15 bg-[#04051a]/85 backdrop-blur-xl p-4 text-left shadow-2xl">
+            <div className="absolute inset-x-3 bottom-3 z-30 rounded-2xl border border-white/15 backdrop-blur-xl p-4 text-left shadow-2xl bg-cover bg-center"
+              style={{ background: (p.bgUrl || p.coverUrl) ? `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.9)), url(${p.bgUrl || p.coverUrl}) center/cover` : "rgba(4,5,26,0.85)" }}>
               {panelContent}
             </div>
           )}
         </div>
 
-        {/* Stats box below the globe (default state) */}
+        {/* Stats box below the globe (default state) — over the planet art */}
         {!(region || expanded) && (
-          <div className="mt-5 glass p-4 w-full max-w-md text-left">
+          <div className="mt-5 rounded-2xl border border-violet-400/20 p-4 w-full max-w-md text-left bg-cover bg-center"
+            style={{ background: (p.bgUrl || p.coverUrl) ? `linear-gradient(rgba(4,5,26,0.8), rgba(4,5,26,0.9)), url(${p.bgUrl || p.coverUrl}) center/cover` : "rgba(10,10,28,0.5)" }}>
             {panelContent}
           </div>
         )}

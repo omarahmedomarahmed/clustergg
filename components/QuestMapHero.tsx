@@ -140,9 +140,10 @@ export default function QuestMapHero({
             </span>
           </div>
 
-          {/* Milestone detail — overlay panel on click */}
+          {/* Milestone detail — overlay panel on click (over the quest art) */}
           {sel !== null && tiers[sel] && (
-            <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/15 bg-[#04051a]/90 backdrop-blur-xl p-4 text-left">
+            <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/15 backdrop-blur-xl p-4 text-left bg-cover bg-center"
+              style={{ background: (q.mapArtUrl || q.cardBgUrl) ? `linear-gradient(rgba(4,5,26,0.84), rgba(4,5,26,0.92)), url(${q.mapArtUrl || q.cardBgUrl}) center/cover` : "rgba(4,5,26,0.9)" }}>
               <div className="flex items-center justify-between">
                 <div className="font-bold flex items-center gap-2" style={{ color: tiers[sel].color || q.color }}>
                   {tiers[sel].name}
