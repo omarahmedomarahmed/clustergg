@@ -3,7 +3,7 @@ import { getContent } from "@/lib/cms";
 // The platform logo shown in the nav + footer. Reads the admin-editable logo
 // image + framing (zoom/position) from the CMS so staff can restyle it site-wide
 // without a deploy. Rendered inside a fixed round frame with object-fit cover.
-export default async function BrandLogo({ size = 34, className = "" }: { size?: number; className?: string }) {
+export default async function BrandLogo({ size = 48, className = "" }: { size?: number; className?: string }) {
   const c = await getContent(["brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y"]);
   const url = c["brand.logo"] || "/assets/logo.png";
   const zoom = Number(c["brand.logo.zoom"]) || 1;
