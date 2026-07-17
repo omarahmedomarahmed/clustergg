@@ -32,7 +32,7 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 // loading-screen appearance. Complements LogoEditor (the square mark).
 export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultPlanetsIcon,
-  defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom,
+  defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -45,9 +45,11 @@ export default function BrandingEditor({
   defaultFooterBg: string;
   defaultFavicon: string;
   defaultFaviconZoom: number;
+  defaultCpIcon: string;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
+  const [cpIcon, setCpIcon] = useState(defaultCpIcon);
   const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
   const [navBg, setNavBg] = useState(defaultNavBg);
   const [footerBg, setFooterBg] = useState(defaultFooterBg);
@@ -80,6 +82,16 @@ export default function BrandingEditor({
               <img src={wordmark} alt="Cluster" className="w-auto object-contain" style={{ height: 38 * wmZoom }} />
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Cluster Points (CP) coin icon */}
+      <div>
+        <div className="font-semibold text-sm mb-1">Cluster Points (CP) coin icon</div>
+        <p className="text-xs text-muted mb-3">The currency icon shown next to every CP value across the platform.</p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 flex items-center gap-4">
+          {cpIcon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={cpIcon} alt="" className="h-12 w-12 object-contain shrink-0" />}
+          <div className="flex-1"><ImageUpload name="cpIcon" value={cpIcon} onChange={setCpIcon} aspect="1/1" rounded="rounded-xl" maxDim={256} scope="content" hint="Square coin/gem art on a dark or transparent background." /></div>
         </div>
       </div>
 

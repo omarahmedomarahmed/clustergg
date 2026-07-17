@@ -43,6 +43,8 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.nav.bg", String(formData.get("navBg") ?? "").trim());
   await setContent("brand.footer.bg", String(formData.get("footerBg") ?? "").trim());
   await setContent("brand.favicon", String(formData.get("favicon") ?? "").trim());
+  const cpIcon = String(formData.get("cpIcon") ?? "").trim();
+  if (cpIcon) await setContent("brand.cpIcon", cpIcon);
   const favZoom = Number(formData.get("faviconZoom"));
   await setContent("brand.favicon.zoom", String(Math.max(1, Math.min(3, Number.isFinite(favZoom) ? favZoom : 1))));
   await audit(admin.id, "brand.branding_update", "content", "brand");

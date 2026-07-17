@@ -55,13 +55,14 @@ export const viewport: Viewport = { themeColor: "#04051a" };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Per-page custom backgrounds (Admin → Page backgrounds). Fetched once here
   // and handed to a client picker so navigation never re-fetches.
-  const bgContent = await getContent(pageBgCmsKeys).catch(() => ({} as Record<string, string>));
+  const bgContent = await getContent([...pageBgCmsKeys, "brand.cpIcon"]).catch(() => ({} as Record<string, string>));
   const bgMap: Record<string, string> = {};
   for (const k of PAGE_BG_KEYS) bgMap[k] = bgContent[`page.bg.${k}`] || "";
+  const cpIcon = bgContent["brand.cpIcon"];
 
   return (
     <html lang="en" className={grotesk.variable}>
-      <body className="nebula-bg min-h-screen antialiased">
+      <body className="nebula-bg min-h-screen antialiased" style={cpIcon ? ({ ["--cp-icon" as string]: `url(${cpIcon})` }) : undefined}>
         <RouteProgress />
         <PageBackground map={bgMap} />
         <Starfield />

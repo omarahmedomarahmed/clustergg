@@ -15,7 +15,7 @@ export default async function BrandKitPage() {
     "brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y",
     "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.footer.mode",
     "brand.loading.color", "brand.loading.logo",
-    "brand.nav.bg", "brand.footer.bg", "brand.favicon", "brand.favicon.zoom",
+    "brand.nav.bg", "brand.footer.bg", "brand.favicon", "brand.favicon.zoom", "brand.cpIcon",
   ]);
 
   return (
@@ -53,6 +53,7 @@ export default async function BrandKitPage() {
           defaultFooterBg={c["brand.footer.bg"] || ""}
           defaultFavicon={c["brand.favicon"] || ""}
           defaultFaviconZoom={Number(c["brand.favicon.zoom"]) || 1}
+          defaultCpIcon={c["brand.cpIcon"] || ""}
         />
       </section>
 
