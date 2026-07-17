@@ -51,6 +51,14 @@ export const QUEST_CARD_BGS: Record<string, string> = {
   ascension: `${HF}/hf_20260715_113657_a4ea0800-d986-4490-aa9d-209106e6d192.png`,
   signal: `${HF}/hf_20260715_113701_940a9b02-30e1-413e-9a91-dabb9acb6f8f.png`,
 };
+// Flat-earth-in-space 3D quest MAP art (one themed world per quest), used as the
+// treasure-map hero background. Each is a different theme + color.
+export const QUEST_MAP_ART: Record<string, string> = {
+  conquest: `${HF}/hf_20260717_223300_12943977-905f-4e3e-9c9e-c13b988d95d9.png`,
+  orbit: `${HF}/hf_20260717_223301_8726e058-02b7-439c-a7f0-d598bbcfa036.png`,
+  ascension: `${HF}/hf_20260717_223318_e48ad818-64ca-4910-9f3d-39ac838d9967.png`,
+  signal: `${HF}/hf_20260717_223321_558cd40f-903d-440b-ae2f-2b01bb01cffd.png`,
+};
 
 // ===== Default quests (seeded once; fully editable afterwards) =====
 type DefaultTier = { name: string; description: string; thresholdQp: number };
@@ -161,6 +169,10 @@ export async function ensureQuestArt(db: DB) {
   for (const [key, url] of Object.entries(QUEST_CARD_BGS)) {
     await db.update(schema.quests).set({ cardBgUrl: url })
       .where(and(eq(schema.quests.key, key), isNull(schema.quests.cardBgUrl)));
+  }
+  for (const [key, url] of Object.entries(QUEST_MAP_ART)) {
+    await db.update(schema.quests).set({ mapArtUrl: url })
+      .where(and(eq(schema.quests.key, key), isNull(schema.quests.mapArtUrl)));
   }
   // Spread map pins for any quest whose tiers are all still at the default
   // center (50/50) — so the standalone map hero shows a real path, not a stack.
