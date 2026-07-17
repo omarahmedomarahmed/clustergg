@@ -1,4 +1,4 @@
-import { and, eq, isNull, like, or } from "drizzle-orm";
+import { and, eq, isNull, sql as dsql } from "drizzle-orm";
 import type { DB } from "./index";
 import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
@@ -462,45 +462,55 @@ export async function ensurePlanetSkins(db: DB) {
 // URL — so logos show in the nav (the slim-image guard hid oversized inline
 // data URLs) and list pages stay light. Idempotent: once converted they're
 // plain URLs and skipped. No-op when Blob isn't configured.
+// Every table/column that can hold an uploaded image. Anything stored as an
+// inline data: URL here gets re-hosted to Blob and replaced with a short URL.
+const IMAGE_COLUMNS: { table: string; col: string; scope: string }[] = [
+  { table: "games", col: "logo_url", scope: "game" },
+  { table: "games", col: "cover_url", scope: "game" },
+  { table: "games", col: "planet_image_url", scope: "game" },
+  { table: "games", col: "planet_bg_url", scope: "game" },
+  { table: "challenges", col: "cover_url", scope: "challenge" },
+  { table: "challenges", col: "hero_url", scope: "challenge" },
+  { table: "users", col: "avatar_url", scope: "profile" },
+  { table: "users", col: "banner_url", scope: "profile" },
+  { table: "quests", col: "logo_url", scope: "quest" },
+  { table: "quests", col: "card_bg_url", scope: "quest" },
+  { table: "quests", col: "cover_url", scope: "quest" },
+  { table: "quest_tiers", col: "icon_url", scope: "quest" },
+  { table: "badges", col: "icon", scope: "badge" },
+  { table: "trophies", col: "image_url", scope: "trophy" },
+  { table: "partners", col: "logo_url", scope: "partner" },
+  { table: "brands", col: "logo_url", scope: "brand" },
+  { table: "ad_creatives", col: "file_url", scope: "creative" },
+];
+
+function rows(result: unknown): Record<string, unknown>[] {
+  if (Array.isArray(result)) return result as Record<string, unknown>[];
+  return (result as { rows?: Record<string, unknown>[] })?.rows ?? [];
+}
+
+// Sweep EVERY image column across the whole DB: any base64/SVG data: URL is
+// re-hosted to Blob and replaced with a short URL. Runs every boot; the SQL
+// filter (LIKE 'data:image/%') means it returns zero rows and transfers ~nothing
+// once the DB is clean, so it's safe to run continuously and self-heals.
 export async function migrateGameImagesToBlob(db: DB) {
   const { uploadDataUrlToBlob, blobConfigured } = await import("@/lib/blob");
   if (!blobConfigured()) return;
-  const isData = (s?: string | null) => !!s && s.startsWith("data:");
-  const DATA = "data:%";
 
-  // Only ever read rows that still hold an inline data URL — filtering in SQL so
-  // once everything is migrated these queries return zero rows and transfer
-  // (almost) nothing. Reading whole tables on every cold boot was the main
-  // source of Neon data-transfer, so keep these scans as narrow as possible.
-  const games = await db.select({ id: schema.games.id, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl, planetImageUrl: schema.games.planetImageUrl })
-    .from(schema.games)
-    .where(or(like(schema.games.logoUrl, DATA), like(schema.games.coverUrl, DATA), like(schema.games.planetImageUrl, DATA)));
-  for (const g of games) {
-    const patch: Partial<typeof schema.games.$inferInsert> = {};
-    if (isData(g.logoUrl)) patch.logoUrl = (await uploadDataUrlToBlob(g.logoUrl!, "game")) ?? undefined;
-    if (isData(g.coverUrl)) patch.coverUrl = (await uploadDataUrlToBlob(g.coverUrl!, "game")) ?? undefined;
-    if (isData(g.planetImageUrl)) patch.planetImageUrl = (await uploadDataUrlToBlob(g.planetImageUrl!, "game")) ?? undefined;
-    if (Object.keys(patch).length) await db.update(schema.games).set(patch).where(eq(schema.games.id, g.id));
-  }
-
-  const challenges = await db.select({ id: schema.challenges.id, coverUrl: schema.challenges.coverUrl, heroUrl: schema.challenges.heroUrl })
-    .from(schema.challenges)
-    .where(or(like(schema.challenges.coverUrl, DATA), like(schema.challenges.heroUrl, DATA)));
-  for (const c of challenges) {
-    const patch: Partial<typeof schema.challenges.$inferInsert> = {};
-    if (isData(c.coverUrl)) patch.coverUrl = (await uploadDataUrlToBlob(c.coverUrl!, "challenge")) ?? undefined;
-    if (isData(c.heroUrl)) patch.heroUrl = (await uploadDataUrlToBlob(c.heroUrl!, "challenge")) ?? undefined;
-    if (Object.keys(patch).length) await db.update(schema.challenges).set(patch).where(eq(schema.challenges.id, c.id));
-  }
-
-  const users = await db.select({ id: schema.users.id, avatarUrl: schema.users.avatarUrl, bannerUrl: schema.users.bannerUrl })
-    .from(schema.users)
-    .where(or(like(schema.users.avatarUrl, DATA), like(schema.users.bannerUrl, DATA)));
-  for (const u of users) {
-    const patch: Partial<typeof schema.users.$inferInsert> = {};
-    if (isData(u.avatarUrl)) patch.avatarUrl = (await uploadDataUrlToBlob(u.avatarUrl!, "profile")) ?? undefined;
-    if (isData(u.bannerUrl)) patch.bannerUrl = (await uploadDataUrlToBlob(u.bannerUrl!, "profile")) ?? undefined;
-    if (Object.keys(patch).length) await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));
+  for (const t of IMAGE_COLUMNS) {
+    try {
+      const tbl = dsql.identifier(t.table);
+      const col = dsql.identifier(t.col);
+      const found = rows(await db.execute(
+        dsql`SELECT id, ${col} AS v FROM ${tbl} WHERE ${col} LIKE 'data:image/%' LIMIT 200`,
+      ));
+      for (const r of found) {
+        const hosted = await uploadDataUrlToBlob(String(r.v ?? ""), t.scope);
+        if (hosted) {
+          await db.execute(dsql`UPDATE ${tbl} SET ${col} = ${hosted} WHERE id = ${String(r.id)}`);
+        }
+      }
+    } catch { /* one table failing must not block the others */ }
   }
 }
 
