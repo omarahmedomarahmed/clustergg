@@ -43,6 +43,7 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.loading.logo", String(formData.get("loadingLogo") ?? "").trim());
   await setContent("brand.loading.phrases", String(formData.get("loadingPhrases") ?? "").trim() || "Traversing the cluster…");
   if (formData.has("orbIcon")) await setContent("brand.orb.icon", String(formData.get("orbIcon") ?? "").trim());
+  if (formData.has("orbColor")) await setContent("brand.orb.color", String(formData.get("orbColor") ?? "#8b5cf6").trim() || "#8b5cf6");
   if (formData.has("questRocket")) await setContent("brand.quest.rocket", String(formData.get("questRocket") ?? "").trim());
   await setContent("brand.nav.bg", String(formData.get("navBg") ?? "").trim());
   await setContent("brand.footer.bg", String(formData.get("footerBg") ?? "").trim());

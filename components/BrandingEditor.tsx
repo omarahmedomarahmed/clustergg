@@ -32,7 +32,7 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 // loading-screen appearance. Complements LogoEditor (the square mark).
 export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
-  defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultQuestRocket,
+  defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultOrbColor, defaultQuestRocket,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -48,12 +48,14 @@ export default function BrandingEditor({
   defaultFaviconZoom: number;
   defaultCpIcon: string;
   defaultOrbIcon: string;
+  defaultOrbColor: string;
   defaultQuestRocket: string;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
   const [cpIcon, setCpIcon] = useState(defaultCpIcon);
   const [orbIcon, setOrbIcon] = useState(defaultOrbIcon);
+  const [orbColor, setOrbColor] = useState(defaultOrbColor || "#8b5cf6");
   const [questRocket, setQuestRocket] = useState(defaultQuestRocket);
   const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
   const [navBg, setNavBg] = useState(defaultNavBg);
@@ -107,10 +109,13 @@ export default function BrandingEditor({
         <div className="font-semibold text-sm mb-1">Floating quest orb icon</div>
         <p className="text-xs text-muted mb-3">The icon on the floating orb (bottom-right of every page). Leave empty to use the CP coin.</p>
         <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 flex items-center gap-4">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full shrink-0" style={{ background: "radial-gradient(circle at 35% 30%, #a78bfa, #6d28d9 60%, #3b0764)" }}>
+          <span className="flex h-12 w-12 items-center justify-center rounded-full shrink-0" style={{ background: `radial-gradient(circle at 35% 30%, ${orbColor}, ${orbColor}bb 60%, ${orbColor}66)` }}>
             {orbIcon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={orbIcon} alt="" className="h-8 w-8 object-contain" />}
           </span>
           <div className="flex-1"><ImageUpload name="orbIcon" value={orbIcon} onChange={setOrbIcon} aspect="1/1" rounded="rounded-full" maxDim={256} scope="content" hint="Square icon; shows on the glowing orb. Empty = CP coin." /></div>
+          <label className="text-xs text-muted flex flex-col items-center gap-1">Orb color
+            <input type="color" name="orbColor" value={orbColor} onChange={(e) => setOrbColor(e.target.value)} className="h-9 w-12 cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
+          </label>
         </div>
       </div>
 
