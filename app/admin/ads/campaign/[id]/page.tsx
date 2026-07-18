@@ -6,6 +6,7 @@ import { getCampaignReadiness, getCampaignAnalytics } from "@/lib/brands";
 import { saveCampaign } from "@/app/actions/admin";
 import AdminCreativeSlot from "@/components/AdminCreativeSlot";
 import AdminCampaignActions from "@/components/AdminCampaignActions";
+import CampaignAnalyticsLive from "@/components/CampaignAnalyticsLive";
 import ImageUpload from "@/components/ImageUpload";
 import Icon from "@/components/Icon";
 
@@ -31,8 +32,6 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
     getCampaignReadiness(db, id),
     getCampaignAnalytics(db, id, 30),
   ]);
-  const num = (n: number) => n.toLocaleString();
-  const byPageForPlacement = new Map(analytics.byPage.map((p) => [p.path, p.impressions]));
 
   return (
     <div className="space-y-6">
@@ -76,39 +75,16 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
         </form>
       </details>
 
-      {/* Analytics at the top — placement rows link to a page where the ad shows */}
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="chart" size={18} className="text-cyan-300" /> Analytics (30 days)</h2>
-          <Link href={`/admin/ads/campaign/${id}`} className="ghost-btn pressable rounded-full px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5"><Icon name="satellite" size={13} /> Refresh</Link>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-          <Stat label="Impressions" value={num(analytics.impressions)} />
-          <Stat label="Clicks" value={num(analytics.clicks)} />
-          <Stat label="CTR" value={`${(analytics.ctr * 100).toFixed(2)}%`} />
-          <Stat label="Placements live" value={`${readiness.filled}/${readiness.total}`} />
-        </div>
-        <div className="glass overflow-x-auto">
-          <table className="w-full table-cosmic min-w-[560px]">
-            <thead><tr><th>Placement</th><th>Page</th><th>Impressions</th><th>Clicks</th><th>CTR</th></tr></thead>
-            <tbody>
-              {analytics.byPlacement.length === 0 && <tr><td colSpan={5} className="text-sm text-muted p-4">No impressions yet.</td></tr>}
-              {analytics.byPlacement.map((r) => {
-                const path = pageForPlacement(r.key);
-                return (
-                  <tr key={r.key} className="hover:bg-white/5">
-                    <td><Link href={path} target="_blank" className="font-semibold text-sm text-cyan-300 hover:underline inline-flex items-center gap-1.5"><Icon name="link" size={12} /> {r.key}</Link></td>
-                    <td className="text-xs text-muted">{r.pageScope}</td>
-                    <td className="text-cyan-200 font-bold">{num(r.impressions)}{byPageForPlacement.size ? "" : ""}</td>
-                    <td>{num(r.clicks)}</td>
-                    <td className="text-xs">{r.impressions ? ((r.clicks / r.impressions) * 100).toFixed(1) : "0.0"}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      {/* Analytics at the top — ajax-refreshable, placement rows link to a page where the ad shows */}
+      <CampaignAnalyticsLive
+        campaignId={id}
+        initial={{
+          impressions: analytics.impressions, clicks: analytics.clicks, ctr: analytics.ctr,
+          filled: readiness.filled, total: readiness.total,
+          byPlacement: analytics.byPlacement,
+        }}
+        pageForPlacement={Object.fromEntries(analytics.byPlacement.map((r) => [r.key, pageForPlacement(r.key)]))}
+      />
 
       {/* Creatives by placement — collapsed slots */}
       <section>
@@ -126,15 +102,6 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
           ))}
         </div>
       </section>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="glass p-4 text-center">
-      <div className="text-2xl font-bold text-cyan-200">{value}</div>
-      <div className="text-[10px] uppercase tracking-widest text-muted mt-1">{label}</div>
     </div>
   );
 }
