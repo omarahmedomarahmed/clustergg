@@ -310,19 +310,18 @@ export default async function ProfilePage({ params }: Props) {
       {/* Fixed background layer — smooth scroll (no background-attachment:fixed repaint) */}
       {theme.bgImage && <div aria-hidden className="fixed inset-0 -z-10" style={bgLayerStyle(theme)} />}
 
-      {/* Top ad banner */}
-      <div className="mx-auto max-w-5xl px-4 pt-4"><AdSlot placement="top_banner" /></div>
-
       {adminView && (
         <div className="bg-amber-500/15 border-b border-amber-400/40 text-amber-200 text-sm text-center py-2 px-4">
           <Icon name="shield" size={14} className="inline mr-1.5" /> Admin view — <Link href={`/admin/users/${user.id}`} className="underline">manage this user in Mission Control</Link>
         </div>
       )}
 
-      {/* Cover */}
+      {/* Cover — with the top ad banner overlaid ON the cover art (so no other
+          background peeks out behind the ad) */}
       <div className="relative">
         <div className="bg-cover bg-center" style={{ ...coverStyle(theme, user.bannerUrl), height: theme.coverHeight }} />
         <div className="absolute inset-0" style={{ background: `linear-gradient(to bottom, transparent, ${theme.bg})` }} />
+        <div className="absolute top-0 inset-x-0 z-10 mx-auto max-w-5xl px-4 pt-3"><AdSlot placement="top_banner" /></div>
       </div>
 
       <div className="mx-auto max-w-5xl px-4 relative" style={{ marginTop: -Math.round(theme.avatarSize * 0.42) }}>
