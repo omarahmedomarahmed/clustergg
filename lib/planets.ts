@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PROVIDERS } from "@/lib/providers/registry";
 import { prettyRegion, REGION_PALETTE, type RegionStat } from "@/lib/regions";
@@ -58,8 +58,11 @@ export const PLANET_PALETTE: Record<string, { accent: string; accent2: string }>
 // Interactive-hero data for every game that has a planet skin: region gamer
 // counts + top gamers, from linked accounts mapped to macro-regions.
 export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>): Promise<PlanetData[]> {
+  // Ordered by the catalog sort order (same as the nav game logos), so the globe
+  // toggle's default game + order is admin-controlled via Games → sort order.
   const skinned = await db.select().from(schema.games)
-    .where(and(eq(schema.games.isActive, true), isNotNull(schema.games.planetImageUrl)));
+    .where(and(eq(schema.games.isActive, true), isNotNull(schema.games.planetImageUrl)))
+    .orderBy(asc(schema.games.sortOrder));
   if (skinned.length === 0) return [];
 
   const names = skinned.map((g) => g.name);

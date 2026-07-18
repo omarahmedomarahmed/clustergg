@@ -9,7 +9,6 @@ import { providerInfoList } from "@/lib/providers/serialize";
 import { resolveGame } from "@/lib/game-logos";
 import { syncUserAccountsIfStale } from "@/lib/sync";
 import { getContent } from "@/lib/cms";
-import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { slimImg } from "@/lib/img";
 import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
@@ -140,7 +139,6 @@ export default async function ProfilePage({ params }: Props) {
   const slugBySpaceId = new Map(chSpaces.map((s) => [s.id, s.slug]));
 
   const S = theme.sections;
-  const accountCardBg = cardBgStyle(buildCardBgMap(await getContent(cardBgCmsKeys)), "account");
 
   // Serializable account cards for the interactive <ProfileAccounts>.
   const accountsData = accounts.map((a) => {
@@ -176,7 +174,6 @@ export default async function ProfilePage({ params }: Props) {
               isOwner={isOwner}
               providers={providerInfoList()}
               gameLogos={accountGameLogos}
-              accountCardBg={accountCardBg}
             />
           </div>
         );
