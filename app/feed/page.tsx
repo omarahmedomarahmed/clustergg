@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { and, count, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUserFull } from "@/lib/auth";
 import PostCard from "@/components/PostCard";
 import AdSlot from "@/components/AdSlot";
 import Avatar from "@/components/Avatar";
@@ -15,6 +15,7 @@ import { buildSkinnedPlanets } from "@/lib/planets";
 import { getQuestHeroData } from "@/lib/quest-hero";
 import { getTotalCp, getUserQuests } from "@/lib/quests";
 import { getProvider } from "@/lib/providers/registry";
+import { resolveTheme, themeToVars, bgLayerStyle } from "@/lib/theme";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
 
@@ -22,9 +23,11 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
 
 export default async function FeedPage() {
-  const user = await getCurrentUser();
+  const user = await getCurrentUserFull();
   if (!user) redirect("/login");
   const db = await getDb();
+  // The feed adopts the gamer's own profile theme so it feels like their page.
+  const theme = resolveTheme(user.theme);
 
   const [mySpaceRows, myFollowing, accounts, totalCp, [followerRow], [questRow], [postRow], [joinedRow], activeGames, gameSpaces, myParticipations] = await Promise.all([
     db.select({ s: schema.spaces }).from(schema.spaceMembers)
@@ -129,8 +132,11 @@ export default async function FeedPage() {
   const dashboardWidgets = (Array.isArray(prefs.dashboard) ? prefs.dashboard : []) as Widget[];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      {/* ===== Gamer control panel ===== */}
+    <div className="profile-root relative" style={{ ...(themeToVars(theme) as React.CSSProperties), background: theme.bgImage ? "transparent" : undefined }}>
+      {/* The gamer's own profile background — feed feels like their page */}
+      {theme.bgImage && <div aria-hidden className="fixed inset-0 -z-10" style={bgLayerStyle(theme)} />}
+      <div className="mx-auto max-w-6xl px-4 py-8">
+      {/* ===== Gamer control panel (themed with the gamer's profile) ===== */}
       <FeedControlPanel
         me={{ displayName: user.displayName, slug: user.slug, avatarUrl: user.avatarUrl, bannerUrl: user.bannerUrl ?? null, title: user.title ?? null }}
         accounts={panelAccounts}
@@ -138,6 +144,7 @@ export default async function FeedPage() {
         activeChallenges={panelChallenges}
         games={panelGames}
         prefs={{ stats: prefs.stats ?? [], challenges: prefs.challenges ?? [], leaderboards: prefs.leaderboards ?? [] }}
+        theme={{ accent: theme.accent, accent2: theme.accent2, coverUrl: user.bannerUrl ?? theme.bgImage ?? null }}
       />
 
       {/* Drag-and-drop tracker dashboard */}
@@ -276,6 +283,7 @@ export default async function FeedPage() {
 
           <AdSlot placement="feed_sidebar" />
         </aside>
+      </div>
       </div>
     </div>
   );

@@ -44,11 +44,15 @@ function timeLeft(iso: string): string {
 }
 
 export default function FeedControlPanel({
-  me, accounts, statValues, activeChallenges, games, prefs,
+  me, accounts, statValues, activeChallenges, games, prefs, theme,
 }: {
   me: PanelMe; accounts: PanelAccount[]; statValues: Record<string, number>;
   activeChallenges: PanelChallenge[]; games: PanelGame[]; prefs: PanelPrefs;
+  theme?: { accent?: string; accent2?: string; coverUrl?: string | null };
 }) {
+  const accent = theme?.accent || "#22d3ee";
+  const accent2 = theme?.accent2 || "#8b5cf6";
+  const coverUrl = theme?.coverUrl ?? me.bannerUrl;
   const [editing, setEditing] = useState(false);
   const [stats, setStats] = useState<string[]>(prefs.stats.length ? prefs.stats : DEFAULT_STATS);
   const [followedCh, setFollowedCh] = useState<string[]>(prefs.challenges ?? []);
@@ -72,13 +76,13 @@ export default function FeedControlPanel({
 
   return (
     <div className="glass relative overflow-hidden mb-6">
-      {/* Cover banner */}
+      {/* Cover banner (the gamer's own profile cover) */}
       <div className="relative h-28 md:h-32">
-        {me.bannerUrl ? (
+        {coverUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={me.bannerUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <div className="absolute inset-0" style={{ background: "radial-gradient(120% 140% at 15% 0%, #8b5cf655, transparent 60%), radial-gradient(120% 140% at 100% 100%, #22d3ee44, transparent 60%), #0a0a1c" }} />
+          <div className="absolute inset-0" style={{ background: `radial-gradient(120% 140% at 15% 0%, ${accent2}55, transparent 60%), radial-gradient(120% 140% at 100% 100%, ${accent}44, transparent 60%), #0a0a1c` }} />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1c] via-[#0a0a1c]/40 to-transparent" />
         <button onClick={() => setEditing((v) => !v)}
@@ -93,7 +97,7 @@ export default function FeedControlPanel({
           <Avatar name={me.displayName} src={me.avatarUrl} size={72} className="ring-4 ring-[#0a0a1c] rounded-2xl" />
           <div className="min-w-0 flex-1 pb-1">
             <h1 className="text-xl md:text-2xl font-bold truncate">{me.displayName}</h1>
-            {me.title && <p className="text-xs text-cyan-300 font-semibold truncate">{me.title}</p>}
+            {me.title && <p className="text-xs font-semibold truncate" style={{ color: accent }}>{me.title}</p>}
           </div>
           <div className="hidden sm:flex flex-wrap gap-2 pb-1">
             <Link href="/profile" className="glow-btn pressable rounded-full px-4 py-2 text-xs font-semibold text-white inline-flex items-center gap-1.5"><Icon name="link" size={13} /> Connect</Link>
@@ -120,7 +124,7 @@ export default function FeedControlPanel({
               return (
                 <Link key={key} href={s.href(me.slug)} className="rounded-xl border border-violet-400/15 bg-black/25 p-3 text-center hover:border-violet-400/40 transition-colors">
                   <div className="mx-auto mb-1 flex items-center justify-center h-4">
-                    {key === "cp" ? <CpIcon size={16} /> : <Icon name={s.icon} size={15} className="text-cyan-300" />}
+                    {key === "cp" ? <CpIcon size={16} /> : <Icon name={s.icon} size={15} style={{ color: accent }} />}
                   </div>
                   <div className="text-lg font-bold">{(statValues[key] ?? 0).toLocaleString()}</div>
                   <div className="text-[10px] uppercase tracking-widest text-muted truncate">{s.label}</div>
