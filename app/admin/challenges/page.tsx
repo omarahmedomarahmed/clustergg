@@ -21,8 +21,8 @@ export default async function AdminChallengesPage() {
   const builderProviders = PROVIDERS
     .filter((p) => !p.identityOnly && p.capabilities.length > 0)
     .map((p) => ({
-      id: p.id, name: p.name, game: p.game, live: isProviderLive(p),
-      capabilities: p.capabilities.map((c) => ({ key: c.key, label: c.label, higherIsBetter: c.higherIsBetter })),
+      id: p.id, name: p.name, game: p.game, live: isProviderLive(p), authType: p.authType, docsUrl: p.docsUrl,
+      capabilities: p.capabilities.map((c) => ({ key: c.key, label: c.label, unit: c.unit, higherIsBetter: c.higherIsBetter })),
     }));
 
   return (

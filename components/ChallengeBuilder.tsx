@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import CoverFramer from "@/components/CoverFramer";
+import MetricsGuide from "@/components/MetricsGuide";
 import { saveChallenge } from "@/app/actions/admin";
 
 export type BuilderProvider = {
@@ -10,7 +11,9 @@ export type BuilderProvider = {
   name: string;
   game: string;
   live: boolean;
-  capabilities: { key: string; label: string; higherIsBetter?: boolean }[];
+  authType?: string;
+  docsUrl?: string;
+  capabilities: { key: string; label: string; unit?: string; higherIsBetter?: boolean }[];
 };
 export type BuilderSpace = { id: string; name: string; game: string | null };
 export type BuilderTrophy = { id: string; name: string; tier: string; imageUrl: string };
@@ -164,6 +167,13 @@ export default function ChallengeBuilder({
         </div>
         <input type="hidden" name="pointsEngine" value={pointsJson} />
         <input type="hidden" name="conditions" value={conditionsJson} />
+
+        {provider && (
+          <div className="mb-3">
+            <MetricsGuide providerName={provider.name} game={provider.game} live={provider.live}
+              authType={provider.authType} docsUrl={provider.docsUrl} capabilities={caps} />
+          </div>
+        )}
 
         <div className="glass !rounded-lg p-3 space-y-2">
           <div className="text-[11px] text-muted">Award points each time a stat goes up (leave 0 to ignore):</div>
