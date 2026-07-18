@@ -105,7 +105,7 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
         )}
         <div className="grid md:grid-cols-2 gap-2.5">
           {readiness.slots.map((s) => (
-            <AdminCreativeSlot key={s.placementId} campaignId={id}
+            <AdminCreativeSlot key={s.placementId} campaignId={id} liveUrl={pageForPlacement(s.key)}
               slot={{ placementId: s.placementId, key: s.key, pageScope: s.pageScope, width: s.width, height: s.height, creativeType: s.creativeType, fileUrl: s.fileUrl, clickUrl: s.clickUrl }} />
           ))}
         </div>

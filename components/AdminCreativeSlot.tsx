@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import Icon from "@/components/Icon";
 import { downscale } from "@/lib/downscale";
 import { uploadImage } from "@/lib/upload-client";
@@ -13,9 +14,11 @@ export type AdminSlot = {
 
 // One placement's creative on the campaign page: a collapsed thumbnail that
 // expands to upload/replace the creative (image or looping-video URL) with a
-// zoom preview. Mirrors the brand portal uploader but admin-side.
-export default function AdminCreativeSlot({ campaignId, slot }: { campaignId: string; slot: AdminSlot }) {
+// zoom preview. A popup shows the creative full size; a link opens the live
+// placement. Mirrors the brand portal uploader but admin-side.
+export default function AdminCreativeSlot({ campaignId, slot, liveUrl }: { campaignId: string; slot: AdminSlot; liveUrl?: string }) {
   const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState(false);
   const [mode, setMode] = useState<"image" | "video">(slot.creativeType === "video" ? "video" : "image");
   const [videoUrl, setVideoUrl] = useState(slot.creativeType === "video" ? slot.fileUrl ?? "" : "");
   const [clickUrl, setClickUrl] = useState(slot.clickUrl ?? "");
@@ -42,22 +45,46 @@ export default function AdminCreativeSlot({ campaignId, slot }: { campaignId: st
 
   return (
     <div className={`rounded-xl border ${filled ? "border-emerald-400/25 bg-emerald-500/[0.04]" : "border-amber-400/25 bg-amber-500/[0.04]"}`}>
-      {/* Collapsed header */}
-      <button onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2.5 p-2.5 text-left">
-        <span className="relative h-9 w-14 shrink-0 overflow-hidden rounded bg-black/40 ring-1 ring-white/10">
+      {/* Collapsed header — small icon + actions (no nested interactive els) */}
+      <div className="flex w-full items-center gap-2.5 p-2.5">
+        <button onClick={() => filled ? setPreview(true) : setOpen(true)} title={filled ? "View full size" : "Add creative"}
+          className="relative h-9 w-14 shrink-0 overflow-hidden rounded bg-black/40 ring-1 ring-white/10 group">
           {slot.fileUrl ? (
             slot.creativeType === "video"
               ? <video src={slot.fileUrl} className="h-full w-full object-cover" muted />
               : /* eslint-disable-next-line @next/next/no-img-element */ <img src={slot.fileUrl} alt="" className="h-full w-full object-cover" />
           ) : <span className="flex h-full w-full items-center justify-center text-muted"><Icon name="monitor" size={12} /></span>}
-        </span>
-        <span className="min-w-0 flex-1">
+          {filled && <span className="absolute inset-0 hidden group-hover:flex items-center justify-center bg-black/50 text-white"><Icon name="eye" size={13} /></span>}
+        </button>
+        <button onClick={() => setOpen((v) => !v)} className="min-w-0 flex-1 text-left">
           <span className="block text-xs font-bold truncate">{slot.key}</span>
           <span className="block text-[10px] text-muted truncate">{slot.width}×{slot.height} · {slot.pageScope}</span>
-        </span>
+        </button>
+        {filled && <button onClick={() => setPreview(true)} title="Open full size" className="text-muted hover:text-cyan-300"><Icon name="eye" size={14} /></button>}
+        {liveUrl && <Link href={liveUrl} target="_blank" title="Open the live placement" className="text-muted hover:text-cyan-300"><Icon name="link" size={13} /></Link>}
         <span className={`text-[10px] font-bold ${filled ? "text-emerald-300" : "text-amber-300"}`}>{filled ? "✓" : "todo"}</span>
-        <Icon name={open ? "chevronDown" : "chevronRight"} size={13} className="text-muted" />
-      </button>
+        <button onClick={() => setOpen((v) => !v)} className="text-muted"><Icon name={open ? "chevronDown" : "chevronRight"} size={13} /></button>
+      </div>
+
+      {/* Full-size popup */}
+      {preview && slot.fileUrl && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 p-4" onClick={() => setPreview(false)}>
+          <div onClick={(e) => e.stopPropagation()} className="max-w-3xl w-full">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-sm font-bold text-white">{slot.key} <span className="text-muted font-normal">· {slot.width}×{slot.height}</span></div>
+              <div className="flex items-center gap-3">
+                {liveUrl && <Link href={liveUrl} target="_blank" className="text-xs text-cyan-300 inline-flex items-center gap-1"><Icon name="link" size={12} /> live placement</Link>}
+                <button onClick={() => setPreview(false)} className="text-white/80 hover:text-white"><Icon name="x" size={18} /></button>
+              </div>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/15 bg-black/50" style={{ aspectRatio: `${slot.width} / ${slot.height}` }}>
+              {slot.creativeType === "video"
+                ? <video src={slot.fileUrl} className="h-full w-full object-contain" autoPlay muted loop controls />
+                : /* eslint-disable-next-line @next/next/no-img-element */ <img src={slot.fileUrl} alt="" className="h-full w-full object-contain" />}
+            </div>
+          </div>
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-white/10 p-3 space-y-2">
