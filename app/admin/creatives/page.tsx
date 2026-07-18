@@ -3,6 +3,7 @@ import { getDb, schema } from "@/lib/db";
 import { saveCreative } from "@/app/actions/admin";
 import ImageUpload from "@/components/ImageUpload";
 import CreativesManager from "@/components/CreativesManager";
+import BulkCreativeUpload from "@/components/BulkCreativeUpload";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Creatives" };
@@ -41,8 +42,10 @@ export default async function AdminCreativesPage() {
       <h1 className="text-2xl font-bold mb-1">Ad creatives</h1>
       <p className="text-sm text-muted mb-6">Filter by brand, expand a creative to review it, and link it to any placement — the placement loops every creative linked to it.</p>
 
+      <BulkCreativeUpload brands={brands.map((b) => ({ id: b.id, name: b.name }))} />
+
       <div className="glass p-6 mb-8">
-        <h2 className="font-bold mb-1">Upload creative</h2>
+        <h2 className="font-bold mb-1">Upload a single creative (with framing)</h2>
         <p className="text-xs text-muted mb-4">
           Upload the image straight from your device. For video, use &quot;paste a link&quot; — video creatives are rejected above 5 seconds (hard cap).
         </p>

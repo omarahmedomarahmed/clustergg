@@ -569,6 +569,29 @@ export async function saveCreative(formData: FormData) {
   revalidatePath("/admin/creatives");
 }
 
+// Create many creatives in one save from a list of already-uploaded Blob URLs
+// (bulk multi-file upload on the creatives page). Each becomes its own creative.
+export async function saveCreativesBulk(formData: FormData) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const brandId = String(formData.get("brandId") ?? "");
+  let items: { url: string; name: string; type?: string }[] = [];
+  try { items = JSON.parse(String(formData.get("items") ?? "[]")); } catch { items = []; }
+  if (!brandId || items.length === 0) return;
+  const rows = items
+    .filter((it) => it.url && it.url.trim())
+    .map((it) => ({
+      id: uid(), brandId, status: "pending_review" as const,
+      name: (it.name || "Creative").slice(0, 120),
+      type: it.type === "video" ? "video" : "image",
+      fileUrl: it.url.trim(), clickUrl: null, width: null, height: null, durationSeconds: null,
+    }));
+  if (rows.length === 0) return;
+  await db.insert(schema.adCreatives).values(rows);
+  await audit(admin.id, "creative.bulk_create", "creative", `${rows.length} creatives`);
+  revalidatePath("/admin/creatives");
+}
+
 export async function reviewCreative(creativeId: string, approve: boolean) {
   const admin = await requireAdmin();
   const db = await getDb();
