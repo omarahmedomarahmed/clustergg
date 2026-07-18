@@ -84,8 +84,8 @@ export default async function AdminAdsMasterPage() {
                       <div key={c.id} className="rounded-xl border border-white/10 p-3">
                         <div className="flex items-center justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold truncate">{c.name}</div>
-                            <div className="text-[11px] text-muted">{rd ? `${rd.filled}/${rd.total} placements ready` : "—"}</div>
+                            <Link href={`/admin/ads/campaign/${c.id}`} className="text-sm font-semibold truncate hover:text-cyan-300">{c.name}</Link>
+                            <div className="text-[11px] text-muted">{rd ? `${rd.filled}/${rd.total} placements ready` : "—"} · <Link href={`/admin/ads/campaign/${c.id}`} className="text-cyan-300 hover:underline">manage</Link></div>
                           </div>
                           <AdminCampaignActions campaignId={c.id} status={c.status} ready={rd?.ready ?? false} />
                         </div>

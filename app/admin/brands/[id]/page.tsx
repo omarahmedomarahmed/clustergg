@@ -74,15 +74,15 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
 
       <div className="glass overflow-x-auto">
         <table className="w-full table-cosmic">
-          <thead><tr><th>Campaign</th><th>Window</th><th>Budget</th><th>Targeting</th><th>Status</th></tr></thead>
+          <thead><tr><th>Campaign</th><th>Window</th><th>Budget</th><th>Status</th><th></th></tr></thead>
           <tbody>
             {campaigns.map((c) => (
               <tr key={c.id}>
                 <td className="font-semibold text-sm">{c.name}</td>
                 <td className="text-xs text-muted">{c.startDate.toLocaleDateString()} → {c.endDate.toLocaleDateString()} ({timeAgo(c.endDate).includes("ago") ? "ended" : "running"})</td>
                 <td className="text-sm">{c.budget ? `$${c.budget}` : "—"}</td>
-                <td className="text-xs text-muted">{c.targetGeo ?? "all geo"} · {c.targetDevice}</td>
                 <td><span className={`text-xs ${c.status === "active" ? "text-emerald-300" : "text-amber-300"}`}>● {c.status}</span></td>
+                <td><a href={`/admin/ads/campaign/${c.id}`} className="text-xs text-cyan-300 hover:underline">Manage creatives & analytics →</a></td>
               </tr>
             ))}
           </tbody>

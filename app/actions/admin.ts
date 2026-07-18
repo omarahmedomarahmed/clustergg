@@ -488,16 +488,48 @@ export async function saveCampaign(brandId: string, formData: FormData) {
     targetGeo: String(formData.get("targetGeo") ?? "").trim() || null,
     targetDevice: String(formData.get("targetDevice") ?? "both"),
     status: String(formData.get("status") ?? "active"),
+    coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
+    logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
   };
   if (!values.name) return;
   if (campaignId) {
     await db.update(schema.adCampaigns).set(values).where(eq(schema.adCampaigns.id, campaignId));
     await audit(admin.id, "campaign.update", "campaign", campaignId);
+    revalidatePath(`/admin/ads/campaign/${campaignId}`);
   } else {
     await db.insert(schema.adCampaigns).values({ id: uid(), brandId, ...values });
     await audit(admin.id, "campaign.create", "campaign", values.name);
   }
   revalidatePath(`/admin/brands/${brandId}`);
+}
+
+// Admin: upload (or replace) the creative for one placement of a campaign in a
+// single step — the campaign-page equivalent of the brand portal's uploader.
+export async function adminUploadCreativeToPlacement(campaignId: string, formData: FormData) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const placementId = String(formData.get("placementId") ?? "");
+  const fileUrl = String(formData.get("fileUrl") ?? "").trim();
+  const type = String(formData.get("type") ?? "image");
+  const clickUrl = String(formData.get("clickUrl") ?? "").trim() || null;
+  if (!placementId || !fileUrl) return { error: "Pick a placement and upload a creative." };
+  const [campaign] = await db.select().from(schema.adCampaigns).where(eq(schema.adCampaigns.id, campaignId)).limit(1);
+  const [placement] = await db.select().from(schema.adPlacements).where(eq(schema.adPlacements.id, placementId)).limit(1);
+  if (!campaign || !placement) return { error: "Unknown campaign or placement." };
+
+  const creativeId = uid();
+  await db.insert(schema.adCreatives).values({
+    id: creativeId, brandId: campaign.brandId, name: `${placement.key}`, type,
+    fileUrl, clickUrl, width: placement.width, height: placement.height,
+    durationSeconds: type === "video" ? 5 : null, status: "approved",
+  });
+  await db.delete(schema.adCampaignCreatives).where(and(
+    eq(schema.adCampaignCreatives.campaignId, campaignId),
+    eq(schema.adCampaignCreatives.placementId, placementId)));
+  await db.insert(schema.adCampaignCreatives).values({ id: uid(), campaignId, creativeId, placementId, weight: 1, priority: 0 });
+  await audit(admin.id, "creative.upload", "campaign", campaignId);
+  revalidatePath(`/admin/ads/campaign/${campaignId}`);
+  return { ok: true };
 }
 
 export async function saveCreative(formData: FormData) {

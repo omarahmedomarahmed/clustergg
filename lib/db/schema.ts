@@ -364,6 +364,8 @@ export const adCampaigns = pgTable("ad_campaigns", {
   status: text("status").notNull().default("active"), // active | paused | completed
   // A campaign only starts serving once launched (all placement creatives in).
   launchedAt: timestamp("launched_at", { withTimezone: true, mode: "date" }),
+  coverUrl: text("cover_url"),   // campaign cover (falls back to the brand cover)
+  logoUrl: text("logo_url"),     // campaign logo (falls back to the brand logo)
   createdAt: now("created_at"),
 });
 
