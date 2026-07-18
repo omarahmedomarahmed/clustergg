@@ -108,54 +108,98 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
   onWidth: (n: number) => void; onCfg: (p: Record<string, string>) => void; onRemove: () => void;
 }) {
   const c = widget.config;
-  const body = useMemo(() => {
+  const [exp, setExp] = useState(false);
+
+  const { compact, expanded, fullHref } = useMemo(() => {
     if (widget.type === "quest") {
       const q = sources.quests.find((x) => x.key === c.questKey) ?? sources.quests[0];
-      if (!q) return <Empty label="No quests" />;
-      return (
-        <Link href={`/quests/${q.key}`} className="block">
-          <div className="flex items-center gap-2">
-            {q.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-7 w-7 object-contain" /> : <Icon name="trophy" size={16} style={{ color: q.color }} />}
-            <div className="min-w-0"><div className="text-sm font-bold truncate">{q.name}</div><div className="text-[10px] text-muted">{q.tierName}</div></div>
+      if (!q) return { compact: <Empty label="No quests" />, expanded: null, fullHref: "/quests" };
+      return {
+        fullHref: `/quests/${q.key}`,
+        compact: (
+          <>
+            <div className="flex items-center gap-2">
+              {q.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-7 w-7 object-contain" /> : <Icon name="trophy" size={16} style={{ color: q.color }} />}
+              <div className="min-w-0"><div className="text-sm font-bold truncate">{q.name}</div><div className="text-[10px] text-muted">{q.tierName}</div></div>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} /></div>
+            <div className="mt-1.5 flex items-center gap-1 text-xs font-bold" style={{ color: q.color }}><CpIcon size={12} /> {q.qp.toLocaleString()} CP</div>
+          </>
+        ),
+        expanded: (
+          <div className="text-xs text-muted space-y-1">
+            <div>Current tier: <b className="text-ink">{q.tierName}</b></div>
+            <div className="flex items-center gap-1">Total earned: <CpIcon size={11} /> <b className="text-ink">{q.totalCp.toLocaleString()} CP</b></div>
+            <div>Progress to next tier: <b className="text-ink">{q.pct}%</b></div>
           </div>
-          <div className="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} /></div>
-          <div className="mt-1.5 flex items-center gap-1 text-xs font-bold" style={{ color: q.color }}><CpIcon size={12} /> {q.qp.toLocaleString()} CP</div>
-        </Link>
-      );
+        ),
+      };
     }
     if (widget.type === "cp") {
       const isTotal = (c.scope ?? "total") === "total";
       const val = isTotal ? sources.cpTotal : (sources.cpByQuest[c.scope] ?? 0);
       const q = sources.quests.find((x) => x.key === c.scope);
-      return (
-        <Link href="/quests" className="block text-center py-1">
-          <div className="flex items-center justify-center gap-2"><CpIcon size={26} /><span className="text-3xl font-bold grad-text">{val.toLocaleString()}</span></div>
-          <div className="text-[10px] uppercase tracking-widest text-muted mt-1">{isTotal ? "Total Cluster Points" : `${q?.name ?? "Quest"} CP`}</div>
-        </Link>
-      );
+      return {
+        fullHref: "/quests",
+        compact: (
+          <div className="text-center py-1">
+            <div className="flex items-center justify-center gap-2"><CpIcon size={26} /><span className="text-3xl font-bold grad-text">{val.toLocaleString()}</span></div>
+            <div className="text-[10px] uppercase tracking-widest text-muted mt-1">{isTotal ? "Total Cluster Points" : `${q?.name ?? "Quest"} CP`}</div>
+          </div>
+        ),
+        expanded: isTotal ? (
+          <div className="space-y-1">
+            {sources.quests.map((qq) => (
+              <div key={qq.key} className="flex items-center justify-between text-xs">
+                <span className="truncate" style={{ color: qq.color }}>{qq.name}</span>
+                <span className="font-bold inline-flex items-center gap-1"><CpIcon size={10} /> {qq.totalCp.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        ) : <div className="text-xs text-muted">{q?.name ?? "Quest"} lifetime CP.</div>,
+      };
     }
     if (widget.type === "stat") {
       const s = sources.stats.find((x) => x.accountId === c.accountId && x.metricKey === c.metricKey) ?? sources.stats[0];
-      if (!s) return <Empty label="No connected stats" />;
-      return (
-        <div className="flex items-center gap-3">
-          <GameLogo logoUrl={s.logoUrl} name={s.game} size={38} rounded="rounded-lg" className="ring-1 ring-white/15" />
-          <div className="min-w-0">
-            <div className="text-2xl font-bold">{s.value.toLocaleString()}</div>
-            <div className="text-[10px] text-muted truncate">{s.metricLabel} · {s.inGameName}</div>
+      if (!s) return { compact: <Empty label="No connected stats" />, expanded: null, fullHref: "/profile" };
+      return {
+        fullHref: "/profile",
+        compact: (
+          <div className="flex items-center gap-3">
+            <GameLogo logoUrl={s.logoUrl} name={s.game} size={38} rounded="rounded-lg" className="ring-1 ring-white/15" />
+            <div className="min-w-0">
+              <div className="text-2xl font-bold">{s.value.toLocaleString()}</div>
+              <div className="text-[10px] text-muted truncate">{s.metricLabel} · {s.inGameName}</div>
+            </div>
           </div>
-        </div>
-      );
+        ),
+        expanded: (
+          <div className="text-xs text-muted space-y-1">
+            <div>Game: <b className="text-ink">{s.game}</b></div>
+            <div>Account: <b className="text-ink">{s.inGameName}</b></div>
+            <div>Metric: <b className="text-ink">{s.metricLabel}</b> — {s.value.toLocaleString()}</div>
+          </div>
+        ),
+      };
     }
     // leaderboard
     const lb = sources.leaderboards.find((x) => x.game === c.game && x.metricKey === c.metricKey) ?? sources.leaderboards.find((x) => x.game === c.game) ?? sources.leaderboards[0];
-    if (!lb) return <Empty label="No leaderboards" />;
-    return (
-      <Link href={lb.slug ? `/planets/${lb.slug}?stat=${encodeURIComponent(lb.metricKey)}` : `/leaderboards?game=${encodeURIComponent(lb.game)}`} className="flex items-center gap-3">
-        <GameLogo logoUrl={lb.logoUrl} name={lb.game} size={38} rounded="rounded-lg" className="ring-1 ring-white/15" />
-        <div className="min-w-0"><div className="text-sm font-bold truncate">{lb.title}</div><div className="text-[10px] text-muted">View leaderboard →</div></div>
-      </Link>
-    );
+    if (!lb) return { compact: <Empty label="No leaderboards" />, expanded: null, fullHref: "/leaderboards" };
+    return {
+      fullHref: lb.slug ? `/planets/${lb.slug}?stat=${encodeURIComponent(lb.metricKey)}` : `/leaderboards?game=${encodeURIComponent(lb.game)}`,
+      compact: (
+        <div className="flex items-center gap-3">
+          <GameLogo logoUrl={lb.logoUrl} name={lb.game} size={38} rounded="rounded-lg" className="ring-1 ring-white/15" />
+          <div className="min-w-0"><div className="text-sm font-bold truncate">{lb.title}</div><div className="text-[10px] text-muted">Tap to preview</div></div>
+        </div>
+      ),
+      expanded: (
+        <div className="text-xs text-muted space-y-1">
+          <div>Game: <b className="text-ink">{lb.game}</b></div>
+          <div>Ranked by: <b className="text-ink">{lb.metricKey.replace(/_/g, " ")}</b></div>
+        </div>
+      ),
+    };
   }, [widget, sources, c]);
 
   return (
@@ -170,7 +214,16 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
           <button onClick={onRemove} className="text-rose-300 hover:text-rose-200"><Icon name="x" size={13} /></button>
         </div>
       )}
-      {body}
+      {/* Click expands in place — no navigation */}
+      <button type="button" onClick={() => !editing && setExp((v) => !v)} className="block w-full text-left" disabled={editing}>
+        {compact}
+      </button>
+      {exp && !editing && expanded && (
+        <div className="mt-3 border-t border-white/10 pt-3">
+          {expanded}
+          <Link href={fullHref} className="mt-2 inline-flex items-center gap-1 text-[11px] text-cyan-300 hover:underline"><Icon name="arrowRight" size={11} /> Open full page</Link>
+        </div>
+      )}
       {editing && <WidgetConfig widget={widget} sources={sources} onCfg={onCfg} />}
     </div>
   );
