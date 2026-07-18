@@ -10,6 +10,20 @@ import { syncAccount } from "@/lib/sync";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
 
+// Re-host every Higgsfield/cloudfront + inline data-URL image onto our own Vercel
+// Blob storage, so Neon only ever stores short Blob links (kills the data-transfer
+// bloat). Idempotent — safe to run any time from the storage audit page.
+export async function rehostAllImagesNow(): Promise<ActionState> {
+  await requireAdmin();
+  const db = await getDb();
+  const { blobConfigured } = await import("@/lib/blob");
+  if (!blobConfigured()) return { error: "Vercel Blob isn't configured (missing BLOB_READ_WRITE_TOKEN)." };
+  const { rehostImagesToBlob } = await import("@/lib/db/seed");
+  await rehostImagesToBlob(db);
+  revalidatePath("/admin/storage");
+  return { ok: true, message: "Re-hosted all external + inline images to Blob." };
+}
+
 // Platform logo (nav + footer) — image + framing, saved to the CMS. Applies
 // site-wide immediately via a layout revalidation.
 export async function saveBrandLogo(_prev: ActionState, formData: FormData): Promise<ActionState> {

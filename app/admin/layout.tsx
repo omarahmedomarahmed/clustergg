@@ -65,7 +65,10 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
   {
     section: "Platform",
     adminOnly: true,
-    items: [{ href: "/admin/settings", label: "Settings" }],
+    items: [
+      { href: "/admin/storage", label: "Image storage" },
+      { href: "/admin/settings", label: "Settings" },
+    ],
   },
 ];
 
