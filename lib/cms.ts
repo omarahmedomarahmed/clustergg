@@ -57,6 +57,8 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.favicon.zoom": "1",
   // Connect/onboarding: comma-separated provider ids the admin has hidden.
   "connect.hidden": "",
+  // RBAC: comma-separated admin areas delegated to the staff role (see lib/permissions).
+  "staff.access": "",
   // The Cluster Points currency icon art (editable; defaults to the generated one).
   "brand.cpIcon": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260717_223629_251d5972-a1bc-4e38-8724-1ea35bf10f18.png",
 };

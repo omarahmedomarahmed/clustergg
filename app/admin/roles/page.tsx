@@ -1,7 +1,9 @@
 import { desc, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
+import { getCurrentUser, isAdmin } from "@/lib/auth";
+import { getStaffGrants } from "@/lib/permissions";
 import Avatar from "@/components/Avatar";
+import StaffAccessEditor from "@/components/StaffAccessEditor";
 import { setUserRole } from "@/app/actions/admin";
 
 export const dynamic = "force-dynamic";
@@ -10,10 +12,14 @@ export const metadata = { title: "Admin · Roles" };
 export default async function AdminRolesPage() {
   const me = await getCurrentUser();
   const db = await getDb();
-  const privileged = await db.select().from(schema.users)
-    .where(inArray(schema.users.role, ["admin", "superadmin", "brand", "staff"]))
-    .orderBy(desc(schema.users.createdAt));
+  const [privileged, grants] = await Promise.all([
+    db.select().from(schema.users)
+      .where(inArray(schema.users.role, ["admin", "superadmin", "brand", "staff"]))
+      .orderBy(desc(schema.users.createdAt)),
+    getStaffGrants(),
+  ]);
   const isSuper = me?.role === "superadmin";
+  const admin = isAdmin(me);
 
   return (
     <div>
@@ -63,6 +69,12 @@ export default async function AdminRolesPage() {
           </tbody>
         </table>
       </div>
+
+      {admin && (
+        <div className="mb-8">
+          <StaffAccessEditor granted={grants} />
+        </div>
+      )}
 
       {isSuper && (
         <p className="text-xs text-muted">

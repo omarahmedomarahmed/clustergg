@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull, count } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin, requireStaff, hashPassword } from "@/lib/auth";
+import { requireArea, setStaffGrants } from "@/lib/permissions";
 import { uid, slugify } from "@/lib/utils";
 import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
 import { syncAccount } from "@/lib/sync";
@@ -14,7 +15,7 @@ export type ActionState = { ok?: boolean; error?: string; message?: string } | u
 // Blob storage, so Neon only ever stores short Blob links (kills the data-transfer
 // bloat). Idempotent — safe to run any time from the storage audit page.
 export async function rehostAllImagesNow(): Promise<ActionState> {
-  await requireAdmin();
+  await requireArea("storage");
   const db = await getDb();
   const { blobConfigured } = await import("@/lib/blob");
   if (!blobConfigured()) return { error: "Vercel Blob isn't configured (missing BLOB_READ_WRITE_TOKEN)." };
@@ -140,6 +141,17 @@ export async function setUserRole(userId: string, role: "user" | "admin" | "bran
   await db.update(schema.users).set({ role }).where(eq(schema.users.id, userId));
   await audit(admin.id, "user.role_change", "user", userId, { role });
   revalidatePath("/admin/roles");
+}
+
+// Admin configures which delegated areas the staff role can access. Admin-only.
+export async function saveStaffAccess(formData: FormData): Promise<ActionState> {
+  const admin = await requireAdmin();
+  const areas = formData.getAll("areas").map((a) => String(a));
+  await setStaffGrants(areas);
+  await audit(admin.id, "staff.access_change", "role", "staff", { areas });
+  revalidatePath("/admin/roles");
+  revalidatePath("/admin");
+  return { ok: true, message: "Staff access updated." };
 }
 
 // Admin/staff password reset for any user (for people who lost access).
@@ -416,7 +428,7 @@ export async function setParticipantStatus(participantId: string, status: "activ
 
 // ---------- Brands / campaigns / creatives ----------
 export async function saveBrand(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const brandId = String(formData.get("brandId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -448,7 +460,7 @@ export async function saveBrand(formData: FormData) {
 
 // Rotate a brand's portal access key (invalidates the old shared link).
 export async function regenerateBrandKey(brandId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const key = newAccessKey();
   await db.update(schema.brands).set({ accessKey: key }).where(eq(schema.brands.id, brandId));
@@ -460,7 +472,7 @@ export async function regenerateBrandKey(brandId: string) {
 
 // Launch a campaign — only if every placement has a creative assigned.
 export async function launchCampaign(campaignId: string) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const { ready } = await getCampaignReadiness(db, campaignId);
   if (!ready) return { error: "Every placement needs a creative before launch." };
@@ -471,7 +483,7 @@ export async function launchCampaign(campaignId: string) {
 }
 
 export async function setCampaignStatus(campaignId: string, status: "active" | "paused" | "draft" | "completed") {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   await db.update(schema.adCampaigns).set({ status }).where(eq(schema.adCampaigns.id, campaignId));
   await audit(admin.id, `campaign.${status}`, "campaign", campaignId);
@@ -480,7 +492,7 @@ export async function setCampaignStatus(campaignId: string, status: "active" | "
 
 // Admin reply in the shared brand inbox.
 export async function adminSendBrandMessage(brandId: string, formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const body = String(formData.get("body") ?? "").trim();
   if (!body) return;
@@ -491,7 +503,7 @@ export async function adminSendBrandMessage(brandId: string, formData: FormData)
 }
 
 export async function saveCampaign(brandId: string, formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const campaignId = String(formData.get("campaignId") ?? "");
   const values = {
@@ -547,7 +559,7 @@ export async function adminUploadCreativeToPlacement(campaignId: string, formDat
 }
 
 export async function saveCreative(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const durationRaw = Number(formData.get("durationSeconds")) || null;
   const type = String(formData.get("type") ?? "image");
@@ -572,7 +584,7 @@ export async function saveCreative(formData: FormData) {
 // Create many creatives in one save from a list of already-uploaded Blob URLs
 // (bulk multi-file upload on the creatives page). Each becomes its own creative.
 export async function saveCreativesBulk(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const brandId = String(formData.get("brandId") ?? "");
   let items: { url: string; name: string; type?: string }[] = [];
@@ -593,7 +605,7 @@ export async function saveCreativesBulk(formData: FormData) {
 }
 
 export async function reviewCreative(creativeId: string, approve: boolean) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   await db.update(schema.adCreatives).set({ status: approve ? "approved" : "rejected" })
     .where(eq(schema.adCreatives.id, creativeId));
@@ -602,7 +614,7 @@ export async function reviewCreative(creativeId: string, approve: boolean) {
 }
 
 export async function assignCreative(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const values = {
     campaignId: String(formData.get("campaignId") ?? ""),
@@ -629,7 +641,7 @@ export async function assignCreative(formData: FormData) {
 }
 
 export async function removeAssignment(id: string) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   await db.delete(schema.adCampaignCreatives).where(eq(schema.adCampaignCreatives.id, id));
   await audit(admin.id, "campaign_creative.remove", "campaign_creative", id);
@@ -639,7 +651,7 @@ export async function removeAssignment(id: string) {
 }
 
 export async function savePlacement(formData: FormData) {
-  const admin = await requireAdmin();
+  const admin = await requireArea("ads");
   const db = await getDb();
   const placementId = String(formData.get("placementId") ?? "");
   const values = {

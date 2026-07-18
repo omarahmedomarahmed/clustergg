@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin, isStaff } from "@/lib/auth";
+import { areaAllowed, getStaffGrants } from "@/lib/permissions";
 import Icon from "@/components/Icon";
 
-// Grouped so each thing is edited in exactly one place: Design owns all
-// look/theme/art, Games & Planets owns the game catalog + communities,
-// Competition owns challenges/quests/trophies, Community owns people, Ads and
-// Platform stay admin-only.
-const NAV: { section: string; adminOnly?: boolean; items: { href: string; label: string; adminOnly?: boolean }[] }[] = [
+// Grouped so each thing is edited in exactly one place. Items/sections carry an
+// optional `area`: undefined = staff-default; "ads"/"storage"/"audit" = grantable
+// (admin can delegate to staff on /admin/roles); "roles"/"settings" = admin-only.
+const NAV: { section: string; area?: string; items: { href: string; label: string; area?: string }[] }[] = [
   {
     section: "Overview",
     items: [
       { href: "/admin", label: "Dashboard" },
-      { href: "/admin/audit-log", label: "Audit log", adminOnly: true },
+      { href: "/admin/audit-log", label: "Audit log", area: "audit" },
     ],
   },
   {
@@ -47,13 +47,13 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
     section: "Community",
     items: [
       { href: "/admin/users", label: "Users" },
-      { href: "/admin/roles", label: "Roles", adminOnly: true },
+      { href: "/admin/roles", label: "Roles & staff access", area: "roles" },
       { href: "/admin/linked-accounts", label: "Linked accounts" },
     ],
   },
   {
     section: "Ads (offline sales)",
-    adminOnly: true,
+    area: "ads",
     items: [
       { href: "/admin/brands", label: "Brands" },
       { href: "/admin/creatives", label: "Creatives" },
@@ -64,10 +64,9 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
   },
   {
     section: "Platform",
-    adminOnly: true,
     items: [
-      { href: "/admin/storage", label: "Image storage" },
-      { href: "/admin/settings", label: "Settings" },
+      { href: "/admin/storage", label: "Image storage", area: "storage" },
+      { href: "/admin/settings", label: "Settings", area: "settings" },
     ],
   },
 ];
@@ -77,10 +76,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   if (!user) redirect("/login");
   if (!isStaff(user)) redirect("/feed");
   const admin = isAdmin(user);
+  const grants = admin ? [] : await getStaffGrants();
 
   const nav = NAV
-    .filter((g) => admin || !g.adminOnly)
-    .map((g) => ({ ...g, items: g.items.filter((i) => admin || !i.adminOnly) }))
+    .filter((g) => areaAllowed(admin, g.area, grants))
+    .map((g) => ({ ...g, items: g.items.filter((i) => areaAllowed(admin, i.area, grants)) }))
     .filter((g) => g.items.length > 0);
 
   return (
@@ -92,7 +92,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
           {!admin && (
             <div className="text-[10px] text-muted border border-amber-400/25 rounded-lg p-2">
-              Staff access: edit planets, games, challenges, content, badges, trophies &amp; leaderboards. Ads, roles &amp; settings stay admin-only.
+              Staff access: edit planets, games, challenges, content, badges, trophies &amp; leaderboards
+              {grants.length > 0 ? `, plus ${grants.join(", ")} (granted by an admin)` : ""}. Roles &amp; settings stay admin-only.
             </div>
           )}
           {nav.map((group) => (
