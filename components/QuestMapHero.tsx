@@ -125,9 +125,11 @@ export default function QuestMapHero({
           </div>
         </div>
 
-        {/* The map — drag to pan, wheel/buttons to zoom */}
-        <div className="relative mx-auto w-full max-w-4xl aspect-[16/9] rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
-          <ZoomPan className="h-full w-full" max={5}>
+        {/* The map — floating (no card frame): drag to pan, wheel/buttons to
+            zoom. The art starts zoomed in and overflows onto the background
+            instead of being cropped inside a card. */}
+        <div className="relative mx-auto w-full max-w-4xl aspect-[16/9]">
+          <ZoomPan className="h-full w-full" max={6} initial={1.3}>
           {/* map art */}
           <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
           {/* readability veil */}
@@ -173,9 +175,10 @@ export default function QuestMapHero({
           </div>
           </ZoomPan>
 
-          {/* How-to-play label — fixed over the map */}
-          <div className="absolute top-3 left-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white pointer-events-none">
-            <Icon name="spark" size={11} style={{ color: q.accent2 }} /> How to play — drag &amp; zoom, tap a milestone
+          {/* How-to-play label — fixed over the map (top-right; zoom controls
+              occupy the top-left) */}
+          <div className="absolute top-3 right-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white pointer-events-none">
+            <Icon name="spark" size={11} style={{ color: q.accent2 }} /> Drag &amp; zoom · tap a milestone
           </div>
 
           {/* Milestone detail — overlay panel on click (over the quest art) */}
