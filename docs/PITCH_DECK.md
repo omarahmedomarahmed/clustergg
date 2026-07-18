@@ -48,7 +48,7 @@ copy, and **Visual** notes what to show. Keep 1 idea per slide._
 - **Visual:** grid of the 24 provider logos labeled "Integrated."
 
 ## Slide 8 — Business model
-- **Brand ads** — banner + 5s video placements across planets, feed, leaderboards and profiles (full offline-sales admin already built).
+- **Brand ads** — banner + 5s video placements across planets, feed, leaderboards and profiles. Full offline-sales admin **and a self-serve brand portal** are already built: brands get a key-gated dashboard with live analytics and upload their own creatives.
 - **Discord ad network (next):** let Discord server owners **monetize their members** by running our sponsored placements where our bot lives; revenue share with servers.
 - **Future:** premium gamer profiles, tournament tooling, sponsor challenges.
 
@@ -85,3 +85,4 @@ copy, and **Visual** notes what to show. Keep 1 idea per slide._
 - A live challenge with a ticking countdown and real standings.
 - The `/leaderboards` game toggle over game cover art.
 - The admin Mission Control (games, planets, challenges, quests, ads, brand kit).
+- The `/brands/{slug}` brand portal: animated analytics + self-serve creative upload.

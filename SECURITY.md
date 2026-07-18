@@ -24,19 +24,32 @@ the production checklist, and how to re-run the checks so we stay production-gra
 
 ## 2. Authorization model
 
-Three guards, enforced **server-side** in every mutating path:
+Guards, enforced **server-side** in every mutating path:
 
 - `requireUser()` — any signed-in gamer. Used by all self-service actions
   (profile, connections, posts, follows, messages, challenge joins).
 - `requireStaff()` — staff/admin. Used by content, games, planets, challenges,
   quests, leaderboards, trophies, brand kit, backgrounds.
-- `requireAdmin()` — admin only. Used by roles, user status, ad sales
-  (brands/campaigns/creatives/placements), platform settings.
+- `requireAdmin()` — admin only. Used by roles, user status, platform settings.
+- `requireArea("ads" | "storage" | "audit")` — **delegated RBAC** (`lib/permissions.ts`).
+  Admins always pass; staff pass only if an admin has granted that area on
+  `/admin/roles`. Grants are stored in the CMS key `staff.access`. The ad-sales
+  actions (brands/campaigns/creatives/placements) and the image-storage re-host
+  use this guard, so a grant actually confers edit power — not just visibility.
+  `roles` and `settings` are **never** grantable (hardcoded in `lib/areas.ts`).
 
 **Audited result:** 100% of `app/actions/*` mutations begin with one of these
 guards, and every user-scoped mutation additionally constrains by owner id
-(no IDOR). Admin route segments are also gated at the layout level, so even
-un-actioned admin pages are unreachable by non-staff.
+(no IDOR). Admin route segments are also gated at the layout level via
+`areaAllowed(...)`, so even un-actioned admin pages are unreachable by users
+lacking the area. Sessions are JWTs (`jose`) in an httpOnly `cluster_session`
+cookie signed with `AUTH_SECRET`; passwords are bcrypt.
+
+**Media/data-transfer hardening:** uploaded art is stored on Vercel Blob, never
+inline in the DB. The theme save-path sanitizes any pasted `data:image` (moving
+it to Blob) so a large base64 background can't land in a row and be re-read on
+every profile/feed load. `/admin/storage` audits every stored image's source +
+size for ongoing hygiene.
 
 ---
 
@@ -62,8 +75,8 @@ post/reaction actions all resolve the target row constrained by `me.id`
 
 ### 3.3 SQL injection — VERIFIED SAFE
 All queries go through Drizzle with bound parameters. The only raw/dynamic SQL
-(the boot-time image→Blob sweep) interpolates **table/column identifiers from a
-hardcoded `IMAGE_COLUMNS` list**, never request input.
+(the boot-time image→Blob sweep in `lib/db/seed.ts` and the `COLUMN_MIGRATIONS`
+DDL in `lib/db/index.ts`) uses hardcoded literals only — never request input.
 
 ### 3.4 Bootstrap & cron gating — ACTION REQUIRED IN PROD
 `/api/setup` and `/api/cron/*` gate on `SETUP_TOKEN` / `CRON_SECRET` **when

@@ -37,7 +37,10 @@ competitions, or monetize.
 - **Leaderboards** — per-game, API-verified rankings; a galaxy leaderboards page
   toggles games and shows every board side by side.
 - **Ads** — house + brand banner/video placements across the app, with a full
-  offline-sales admin (brands, campaigns, creatives, placements, analytics).
+  offline-sales admin (brands, campaigns, creatives, placements, analytics) and a
+  glorified **brand portal** at `/brands/{slug}` that brands open with an access
+  key (no account): animated totals, trend sparklines, marketing intelligence,
+  per-campaign analytics, and self-serve creative upload.
 
 ## 4. Tech stack
 
@@ -89,10 +92,18 @@ challenges and leaderboards are built on real, verifiable metrics.
 | Profile `/u/{slug}` | Customized profile: connected accounts, challenge cards, planets, quests, stats |
 | Feed `/feed` | Gamer dashboard: stats, explore planets+quests, live challenges, feed |
 | Onboarding `/onboarding` | Connect any provider (API/OAuth), existing accounts, covers |
-| Admin `/admin/*` | Mission Control: games, planets, challenges, quests, leaderboards, ads, brand kit, backgrounds |
+| Admin `/admin/*` | Mission Control: games, planets, challenges, quests, leaderboards, ads, brand kit, backgrounds, image-storage audit, roles & staff-access |
+| Brand portal `/brands/{slug}` | Key-gated brand dashboard: animated totals, trends, marketing intelligence, per-campaign analytics, creative upload |
 
 ## 8. Status
 
-MVP is **production-ready**: full gamer flows, admin CMS, ads back office, quests,
-challenges, leaderboards, and a security-audited posture (see `SECURITY.md`).
-Pre-revenue on brand ads; early community; growing.
+MVP is **production-ready**: full gamer flows, admin CMS, ads back office + brand
+portal, quests, challenges, leaderboards, delegated staff access (RBAC), a
+Blob-backed media pipeline (Neon stores only links), and a security-audited
+posture (see `SECURITY.md`). Pre-revenue on brand ads; early community; growing.
+
+## 9. Companion docs
+
+Engineering: [`ENGINEERING_HANDOVER.md`](./ENGINEERING_HANDOVER.md). Operations:
+[`STAFF_OPERATIONS.md`](./STAFF_OPERATIONS.md). Security: [`../SECURITY.md`](../SECURITY.md).
+Setup & deploy: [`../SETUP_GUIDE.md`](../SETUP_GUIDE.md), [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
