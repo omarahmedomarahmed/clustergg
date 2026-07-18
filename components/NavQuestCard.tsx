@@ -4,15 +4,24 @@ import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import CpIcon from "@/components/CpIcon";
+import { markQuestsSeen } from "@/app/actions/social";
 import type { NavQuest } from "@/lib/quests";
 
 // One wide quest card in the nav (art background, name, CP, progress). A dropdown
 // (the chevron) picks which quest is shown. The card body links to the quest map.
+// A red dot flags quests where the gamer has earned new CP since they last looked.
 export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; totalCp?: number }) {
   const [idx, setIdx] = useState(0);
   const [open, setOpen] = useState(false);
+  const [seen, setSeen] = useState(false);
   if (quests.length === 0) return null;
   const q = quests[Math.min(idx, quests.length - 1)];
+  const anyEarned = quests.some((x) => x.earned) && !seen;
+
+  const openMenu = () => {
+    setOpen((v) => !v);
+    if (!seen) { setSeen(true); markQuestsSeen().catch(() => {}); }
+  };
 
   return (
     <div className="relative flex-1 min-w-0 max-w-md flex items-center gap-2">
@@ -43,11 +52,14 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
         </Link>
 
         {quests.length > 1 && (
-          <button type="button" onClick={() => setOpen((v) => !v)} aria-label="Switch quest"
+          <button type="button" onClick={openMenu} aria-label="Switch quest"
             className="relative flex w-9 shrink-0 items-center justify-center border-l border-white/10 text-white/70 hover:text-white">
             <Icon name={open ? "chevronDown" : "chevronRight"} size={16} />
+            {anyEarned && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-[#04051a] animate-pulse" />}
           </button>
         )}
+        {/* Red dot for new CP even in the single-quest layout */}
+        {quests.length === 1 && anyEarned && <span className="absolute right-1.5 top-1.5 z-10 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-[#04051a] animate-pulse" />}
       </div>
 
       {open && quests.length > 1 && (
@@ -65,7 +77,9 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
                     : <Icon name="spark" size={13} style={{ color: qq.color }} />}
                 </span>
                 <span className="relative min-w-0 flex-1">
-                  <span className="block text-xs font-bold truncate">{qq.name}</span>
+                  <span className="flex items-center gap-1.5 text-xs font-bold truncate">{qq.name}
+                    {qq.earned && <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" title="New CP earned" />}
+                  </span>
                   <span className="block text-[10px]" style={{ color: qq.accent2 }}>{qq.qp.toLocaleString()} CP · {qq.pct}%</span>
                 </span>
               </button>
