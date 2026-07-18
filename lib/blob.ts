@@ -57,20 +57,59 @@ export async function uploadDataUrlToBlob(dataUrl: string, scope: string): Promi
     buffer = Buffer.from(payload, "utf8");
   }
 
+  return putBuffer(buffer, contentType, ext, scope);
+}
+
+// Low-level: store a raw buffer in Vercel Blob and return a short hosted URL, or
+// null on failure / when Blob isn't configured.
+export async function putBuffer(buffer: Buffer, contentType: string, ext: string, scope: string): Promise<string | null> {
+  if (!blobConfigured()) return null;
   try {
     const { put } = await import("@vercel/blob");
-
     // Classic token when present; otherwise pass NO auth and let the SDK
     // auto-resolve the connected store via the deployment's OIDC token — the
-    // canonical connected-store flow. (Passing an undefined oidcToken would
-    // break that resolution, which is why we don't set it manually.)
+    // canonical connected-store flow.
     const opts: PutOpts = { access: "public", contentType, addRandomSuffix: false, cacheControlMaxAge: ONE_YEAR };
     const token = resolveBlobToken();
     if (token) opts.token = token;
-
     const { url } = await put(`uploads/${scope}/${uid()}.${ext}`, buffer, opts as unknown as Parameters<typeof put>[2]);
     return url;
   } catch {
     return null;
   }
+}
+
+const OUR_BLOB_HOST = /\.public\.blob\.vercel-storage\.com/i;
+
+// Re-host an EXTERNAL image URL (e.g. a Higgsfield cloudfront link) into our own
+// Vercel Blob so we serve it from our storage. Returns the new URL, or the
+// original when it's already ours / not fetchable / Blob isn't configured.
+export async function uploadUrlToBlob(url: string, scope: string): Promise<string> {
+  if (!url || !/^https:\/\//i.test(url) || OUR_BLOB_HOST.test(url) || !blobConfigured()) return url;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return url;
+    const contentType = (res.headers.get("content-type") || "image/png").split(";")[0];
+    if (!contentType.startsWith("image/")) return url;
+    const ext = contentType.split("/")[1].replace("+xml", "").replace("jpeg", "jpg");
+    const buffer = Buffer.from(await res.arrayBuffer());
+    const hosted = await putBuffer(buffer, contentType, ext, scope);
+    return hosted ?? url;
+  } catch {
+    return url;
+  }
+}
+
+// Sanitize a JSON-ish object's string values in place: any `data:image/...`
+// value is uploaded to Blob and replaced with a short URL. Used to keep the
+// profile-builder `theme` blob from carrying megabytes of base64 into the DB.
+export async function rehostDataUrlsInObject(obj: Record<string, unknown>, scope: string): Promise<boolean> {
+  let changed = false;
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === "string" && v.startsWith("data:image/")) {
+      const hosted = await uploadDataUrlToBlob(v, scope);
+      if (hosted) { obj[k] = hosted; changed = true; }
+    }
+  }
+  return changed;
 }

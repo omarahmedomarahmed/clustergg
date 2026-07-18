@@ -181,6 +181,11 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
 export async function saveProfileTheme(theme: Record<string, unknown>, extras: { title?: string; bio?: string; avatarUrl?: string; bannerUrl?: string }) {
   const me = await requireUser();
   const db = await getDb();
+  // NEVER store a base64 data URL inside the theme JSONB — a single background
+  // image can be megabytes, and it gets re-read (and re-transferred from Neon)
+  // on every profile/feed load. Re-host any inline images to Blob first.
+  const { rehostDataUrlsInObject } = await import("@/lib/blob");
+  await rehostDataUrlsInObject(theme, "theme");
   const patch: Record<string, unknown> = { theme };
   if (extras.title !== undefined) patch.title = extras.title.slice(0, 60) || null;
   if (extras.bio !== undefined) patch.bio = extras.bio.slice(0, 400) || null;

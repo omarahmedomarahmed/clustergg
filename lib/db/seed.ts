@@ -454,6 +454,67 @@ const PLANET_BGS: Record<string, string> = {
   "Counter-Strike 2": `${HF_CDN}/hf_20260717_224301_435984a4-647b-4da2-bdaa-906bae240009.png`,
   "Chess": `${HF_CDN}/hf_20260718_004014_550032cb-9efb-4a43-8ae8-a1ea21a123b4.png`,
 };
+// ===== Image re-hosting: move inline base64 + external CDN art into our Blob =====
+// The real Neon data-transfer fix: any base64 `data:image` stored INSIDE a row
+// (notably the profile-builder `theme` JSONB, which can be megabytes) is
+// re-transferred from Neon on every read. Re-host those to Blob. We also move
+// Higgsfield/cloudfront links to our Blob so we serve art from our own storage.
+// Idempotent + cheap once done (the LIKE filters return 0 rows). Non-fatal.
+export async function rehostImagesToBlob(db: DB) {
+  const { uploadUrlToBlob, rehostDataUrlsInObject, blobConfigured } = await import("@/lib/blob");
+  if (!blobConfigured()) return; // nothing to do without Blob (never inline-store instead)
+  const isExternal = (u: string | null | undefined) => !!u && /^https:\/\//i.test(u) && !/\.public\.blob\.vercel-storage\.com/i.test(u) && /cloudfront\.net|higgsfield/i.test(u);
+
+  // 1) Users: inline data:image values inside theme (the 2MB culprit) + avatar/banner.
+  const heavyUsers = await db.select({ id: schema.users.id, theme: schema.users.theme, avatarUrl: schema.users.avatarUrl, bannerUrl: schema.users.bannerUrl })
+    .from(schema.users).where(dsql`theme::text LIKE '%data:image%' OR avatar_url LIKE 'data:image%' OR banner_url LIKE 'data:image%'`);
+  for (const u of heavyUsers) {
+    const patch: Record<string, unknown> = {};
+    const theme = (u.theme ?? {}) as Record<string, unknown>;
+    if (await rehostDataUrlsInObject(theme, "theme")) patch.theme = theme;
+    if (u.avatarUrl?.startsWith("data:image")) { const { uploadDataUrlToBlob } = await import("@/lib/blob"); const h = await uploadDataUrlToBlob(u.avatarUrl, "avatar"); if (h) patch.avatarUrl = h; }
+    if (u.bannerUrl?.startsWith("data:image")) { const { uploadDataUrlToBlob } = await import("@/lib/blob"); const h = await uploadDataUrlToBlob(u.bannerUrl, "banner"); if (h) patch.bannerUrl = h; }
+    if (Object.keys(patch).length) await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));
+  }
+
+  // 2) Games: external CDN art → our Blob.
+  const games = await db.select().from(schema.games);
+  for (const g of games) {
+    const patch: Record<string, unknown> = {};
+    if (isExternal(g.logoUrl)) patch.logoUrl = await uploadUrlToBlob(g.logoUrl!, "game");
+    if (isExternal(g.coverUrl)) patch.coverUrl = await uploadUrlToBlob(g.coverUrl!, "game");
+    if (isExternal(g.planetImageUrl)) patch.planetImageUrl = await uploadUrlToBlob(g.planetImageUrl!, "game");
+    if (isExternal(g.planetBgUrl)) patch.planetBgUrl = await uploadUrlToBlob(g.planetBgUrl!, "game");
+    if (Object.keys(patch).length) await db.update(schema.games).set(patch).where(eq(schema.games.id, g.id));
+  }
+
+  // 3) Quests + tiers.
+  const quests = await db.select().from(schema.quests);
+  for (const q of quests) {
+    const patch: Record<string, unknown> = {};
+    if (isExternal(q.logoUrl)) patch.logoUrl = await uploadUrlToBlob(q.logoUrl!, "quest");
+    if (isExternal(q.cardBgUrl)) patch.cardBgUrl = await uploadUrlToBlob(q.cardBgUrl!, "quest");
+    if (isExternal(q.mapArtUrl)) patch.mapArtUrl = await uploadUrlToBlob(q.mapArtUrl!, "quest");
+    if (Object.keys(patch).length) await db.update(schema.quests).set(patch).where(eq(schema.quests.id, q.id));
+  }
+  const tiers = await db.select({ id: schema.questTiers.id, iconUrl: schema.questTiers.iconUrl }).from(schema.questTiers);
+  for (const t of tiers) if (isExternal(t.iconUrl)) await db.update(schema.questTiers).set({ iconUrl: await uploadUrlToBlob(t.iconUrl!, "quest") }).where(eq(schema.questTiers.id, t.id));
+
+  // 4) CMS content values (brand.cpIcon, brand.orb.icon, planet/quest defaults…).
+  const contentRows = await db.select().from(schema.platformSettings).where(dsql`value::text LIKE '%cloudfront.net%' OR value::text LIKE '%higgsfield%'`);
+  for (const row of contentRows) {
+    const v = typeof row.value === "string" ? row.value : null;
+    if (v && isExternal(v)) await db.update(schema.platformSettings).set({ value: await uploadUrlToBlob(v, "content") }).where(eq(schema.platformSettings.key, row.key));
+  }
+
+  // 5) Ad creatives.
+  const creatives = await db.select({ id: schema.adCreatives.id, fileUrl: schema.adCreatives.fileUrl }).from(schema.adCreatives).where(dsql`file_url LIKE '%cloudfront.net%' OR file_url LIKE 'data:image%'`);
+  for (const cr of creatives) {
+    if (cr.fileUrl.startsWith("data:image")) { const { uploadDataUrlToBlob } = await import("@/lib/blob"); const h = await uploadDataUrlToBlob(cr.fileUrl, "creative"); if (h) await db.update(schema.adCreatives).set({ fileUrl: h }).where(eq(schema.adCreatives.id, cr.id)); }
+    else if (isExternal(cr.fileUrl)) await db.update(schema.adCreatives).set({ fileUrl: await uploadUrlToBlob(cr.fileUrl, "creative") }).where(eq(schema.adCreatives.id, cr.id));
+  }
+}
+
 // Backfill portal slug + access key for any brand created before those columns
 // existed, so every brand has a shareable /brands/<slug> portal. Idempotent.
 export async function ensureBrandKeys(db: DB) {
