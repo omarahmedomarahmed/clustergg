@@ -62,14 +62,28 @@ export const QUEST_CARD_BGS: Record<string, string> = {
   ascension: `${HF}/hf_20260715_113657_a4ea0800-d986-4490-aa9d-209106e6d192.png`,
   signal: `${HF}/hf_20260715_113701_940a9b02-30e1-413e-9a91-dabb9acb6f8f.png`,
 };
-// Flat-earth-in-space 3D quest MAP art (one themed world per quest), used as the
-// treasure-map hero background. Each is a different theme + color.
+// Flat-earth 3D quest MAP art (one themed world per quest), used as the
+// treasure-map hero. Background-REMOVED (transparent) so the page's own space
+// background shows behind the floating map, per the brief. Each is a themed world.
 export const QUEST_MAP_ART: Record<string, string> = {
-  conquest: `${HF}/hf_20260717_223300_12943977-905f-4e3e-9c9e-c13b988d95d9.png`,
-  orbit: `${HF}/hf_20260717_223301_8726e058-02b7-439c-a7f0-d598bbcfa036.png`,
-  ascension: `${HF}/hf_20260717_223318_e48ad818-64ca-4910-9f3d-39ac838d9967.png`,
-  signal: `${HF}/hf_20260717_223321_558cd40f-903d-440b-ae2f-2b01bb01cffd.png`,
+  conquest: `${HF}/hf_20260718_162555_8d13e694-bdd8-41bd-8360-0d1d20c1abfc.png`,
+  orbit: `${HF}/hf_20260718_162600_f4c2d883-7673-4e36-9b34-dd900b24c841.png`,
+  ascension: `${HF}/hf_20260718_163045_7327cc89-ffcb-4a8e-8a43-c009912d42d9.png`,
+  signal: `${HF}/hf_20260718_163048_d3642044-d3b7-4ad3-a41c-88a63b515085.png`,
 };
+// Previous map arts (the space-background versions) + their Blob-rehosted forms —
+// replaced automatically by the transparent versions. Admin uploads that aren't
+// in this list are preserved.
+const OLD_QUEST_MAPS: string[] = [
+  `${HF}/hf_20260717_223300_12943977-905f-4e3e-9c9e-c13b988d95d9.png`,
+  `${HF}/hf_20260717_223301_8726e058-02b7-439c-a7f0-d598bbcfa036.png`,
+  `${HF}/hf_20260717_223318_e48ad818-64ca-4910-9f3d-39ac838d9967.png`,
+  `${HF}/hf_20260717_223321_558cd40f-903d-440b-ae2f-2b01bb01cffd.png`,
+  "https://k97i8qtht2q1jooh.public.blob.vercel-storage.com/uploads/quest/1AXVB8Q1upPepaf2.png",
+  "https://k97i8qtht2q1jooh.public.blob.vercel-storage.com/uploads/quest/mAwM4hbLnEBcoefs.png",
+  "https://k97i8qtht2q1jooh.public.blob.vercel-storage.com/uploads/quest/tGZbt6sc-47O5gmd.png",
+  "https://k97i8qtht2q1jooh.public.blob.vercel-storage.com/uploads/quest/zrNCa78zgvvMoP2k.png",
+];
 
 // ===== Default quests (seeded once; fully editable afterwards) =====
 type DefaultTier = { name: string; description: string; thresholdQp: number };
@@ -184,8 +198,10 @@ export async function ensureQuestArt(db: DB) {
       .where(and(eq(schema.quests.key, key), isNull(schema.quests.cardBgUrl)));
   }
   for (const [key, url] of Object.entries(QUEST_MAP_ART)) {
+    // Upgrade to the transparent map where there's none OR the current art is a
+    // previous default / its Blob-rehosted form (admin uploads are preserved).
     await db.update(schema.quests).set({ mapArtUrl: url })
-      .where(and(eq(schema.quests.key, key), isNull(schema.quests.mapArtUrl)));
+      .where(and(eq(schema.quests.key, key), or(isNull(schema.quests.mapArtUrl), inArray(schema.quests.mapArtUrl, OLD_QUEST_MAPS))));
   }
   // Spread map pins for any quest whose tiers are all still at the default
   // center (50/50) — so the standalone map hero shows a real path, not a stack.

@@ -432,15 +432,24 @@ const SUPERSEDED_SKINS: Record<string, string> = {
   // First LOL planet used the in-game Runeterra map; replaced with a real-world map.
   [`${HF_CDN}/hf_20260713_214125_1f7f8ec6-ee58-4c5c-9c9b-3201f6bf47c6.png`]: "League of Legends",
 };
+// PUBG + Fortnite use background-REMOVED floating globes (transparent) so they
+// match the framed look of the LoL/VALORANT planets over the page background.
+const PUBG_GLOBE = `${HF_CDN}/hf_20260718_155141_0b30c787-62a6-49a3-8313-81c92464e0a3.png`;
+const FORTNITE_GLOBE = `${HF_CDN}/hf_20260718_155155_75051287-899b-4c82-ae31-0603744b5efd.png`;
 const PLANET_SKINS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_114614_b3a4ad5b-e49a-4fab-99fb-056fd13ab71f.png`,
   "VALORANT": `${HF_CDN}/hf_20260713_214139_cba722cd-6ede-4996-b8a7-ae0315304705.png`,
-  "PUBG: Battlegrounds": `${HF_CDN}/hf_20260717_223923_4dedb116-a7d4-45c0-97ed-004de4aedaa9.png`,
-  "PUBG": `${HF_CDN}/hf_20260717_223923_4dedb116-a7d4-45c0-97ed-004de4aedaa9.png`,
+  "PUBG: Battlegrounds": PUBG_GLOBE,
+  "PUBG": PUBG_GLOBE,
   "Dota 2": `${HF_CDN}/hf_20260717_223926_6bf3756b-3ee1-4629-98ae-e458dcddd180.png`,
-  "Fortnite": `${HF_CDN}/hf_20260717_223928_d55e9e97-d9a0-498a-a3f4-5cb6e430224f.png`,
+  "Fortnite": FORTNITE_GLOBE,
   "Counter-Strike 2": `${HF_CDN}/hf_20260717_223931_14be7cf0-ff69-41dc-87f9-77d113662a37.png`,
   "Chess": `${HF_CDN}/hf_20260718_020410_c77327de-7a2e-4354-b26a-98aa0bb4aeb0.png`,
+};
+// Force PUBG + Fortnite onto the background-free globes on existing DBs (the user
+// asked for both specifically), replacing whatever skin they currently hold.
+const FORCE_GLOBES: Record<string, string> = {
+  "PUBG": PUBG_GLOBE, "PUBG: Battlegrounds": PUBG_GLOBE, "Fortnite": FORTNITE_GLOBE,
 };
 // Superseded chess globe (first, static render) — replaced by the animated one.
 const SUPERSEDED_CHESS = `${HF_CDN}/hf_20260718_004005_7cbd4afc-202f-4acb-b558-519546ffd94c.png`;
@@ -576,6 +585,10 @@ export async function ensurePlanetSkins(db: DB) {
   // Upgrade the first (static) chess globe to the animated render.
   await db.update(schema.games).set({ planetImageUrl: PLANET_SKINS["Chess"] })
     .where(eq(schema.games.planetImageUrl, SUPERSEDED_CHESS));
+  // Force PUBG + Fortnite onto the background-free floating globes (by name).
+  for (const [name, url] of Object.entries(FORCE_GLOBES)) {
+    await db.update(schema.games).set({ planetImageUrl: url }).where(eq(schema.games.name, name));
+  }
   // Set skins for games that don't have one yet (never clobbers admin uploads).
   for (const [name, url] of Object.entries(PLANET_SKINS)) {
     await db.update(schema.games).set({ planetImageUrl: url })
@@ -649,7 +662,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-17.3-questart";
+const MAINT_VERSION = "2026-07-18.1-nobg-art";
 
 export async function runBootMaintenance(db: DB) {
   try {

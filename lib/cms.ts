@@ -48,8 +48,16 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // Floating quest orb icon (bottom-right). Empty = default CP coin.
   "brand.orb.icon": "",
   "brand.orb.color": "#8b5cf6",
-  // "You are here" marker image on the quest map. Empty = default rocket orb.
+  // "You are here" marker image on the quest map. Empty = the gamified astronaut
+  // (below), which faces the direction it's travelling. Set to override with a
+  // single static marker image.
   "brand.quest.rocket": "",
+  // Gamified astronaut marker — one consistent figure in four poses. The marker
+  // uses left/right when moving toward the next milestone, front at the finish.
+  "brand.quest.astronaut.front": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260718_155414_f0fa69a2-5889-449b-9eb0-b242a5b07aa2.png",
+  "brand.quest.astronaut.left": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260718_160245_a37623dc-1afa-4be5-959d-024783ea12cc.png",
+  "brand.quest.astronaut.right": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260718_162543_ddcab2ca-0347-4f0b-84d7-920d967eab7a.png",
+  "brand.quest.astronaut.back": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260718_162547_f9ac9fc5-26d0-431a-8e59-969d53b3fe65.png",
   // Nav + footer background images, favicon (+ zoom).
   "brand.nav.bg": "",
   "brand.footer.bg": "",
