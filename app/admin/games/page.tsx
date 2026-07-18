@@ -27,6 +27,22 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
           hint="Drag the image to reposition and use the zoom slider — the frame is exactly how it appears on the planet header." />
       </div>
       <GameMetricsEditor initial={game?.customMetrics ?? []} />
+      {/* Per-planet theme + layout */}
+      <div className="sm:col-span-2 grid sm:grid-cols-3 gap-3 rounded-xl border border-violet-400/15 bg-black/20 p-3">
+        <label className="text-xs text-muted">Accent color
+          <input type="color" name="accent" defaultValue={game?.accent ?? "#8b5cf6"} className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
+        </label>
+        <label className="text-xs text-muted">Secondary accent
+          <input type="color" name="accent2" defaultValue={game?.accent2 ?? "#22d3ee"} className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
+        </label>
+        <label className="text-xs text-muted">Hero layout
+          <select name="planetLayout" defaultValue={game?.planetLayout ?? "auto"} className="input-cosmic mt-1">
+            <option value="auto">Auto (globe if skin set)</option>
+            <option value="globe">Interactive globe</option>
+            <option value="cover">Cover banner</option>
+          </select>
+        </label>
+      </div>
       <div className="flex gap-4 sm:col-span-2 items-center flex-wrap pt-1">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="showInNav" defaultChecked={game?.showInNav ?? false} className="accent-cyan-500" /> Show logo in nav

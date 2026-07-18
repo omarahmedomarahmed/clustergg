@@ -123,6 +123,9 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "brand_msg_idx" ON "brand_messages" ("brand_id","created_at")`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "custom_metrics" jsonb NOT NULL DEFAULT '[]'::jsonb`,
+  `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "accent" text`,
+  `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "accent2" text`,
+  `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_layout" text NOT NULL DEFAULT 'auto'`,
 ];
 
 async function runColumnMigrations(db: DB) {

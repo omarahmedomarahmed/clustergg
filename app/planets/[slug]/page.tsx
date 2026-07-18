@@ -106,8 +106,11 @@ export default async function PlanetPage({
   }
 
   // Interactive planet hero for games that have a skin (falls back to the flat
-  // cover hero otherwise).
-  const hasSkin = !!game?.planetImageUrl;
+  // cover hero otherwise). Admin can force the layout per planet.
+  const layout = game?.planetLayout ?? "auto";
+  const hasSkin = layout === "cover" ? false : (layout === "globe" ? !!game?.planetImageUrl : !!game?.planetImageUrl);
+  const pAccent = game?.accent || "#8b5cf6";
+  const pAccent2 = game?.accent2 || "#22d3ee";
   const skinnedPlanets = hasSkin ? await buildSkinnedPlanets(db) : [];
   const questHero = hasSkin && skinnedPlanets.length > 0 ? await getQuestHeroData(db, viewer?.id ?? null) : null;
 
@@ -141,13 +144,13 @@ export default async function PlanetPage({
             backgroundPosition: game ? `${game.coverAdjust.x}% ${game.coverAdjust.y}%` : "center",
           }}
         />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a]/30 via-[#04051a]/70 to-[#04051a]" />
+        <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1000px 500px at 20% -10%, ${pAccent}26, transparent 60%), linear-gradient(to bottom, rgba(4,5,26,0.3), rgba(4,5,26,0.7) 60%, #04051a)` }} />
         <div className="mx-auto max-w-6xl px-4 pt-20 pb-12 flex flex-wrap items-end gap-5">
           {game
             ? <GameLogo logoUrl={game.logoUrl} name={game.name} size={84} className="pulse-glow" />
-            : <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-violet-400/30 bg-gradient-to-br from-violet-600/30 to-cyan-600/20"><Icon name="planet" size={38} className="text-violet-200" /></div>}
+            : <div className="flex h-20 w-20 items-center justify-center rounded-2xl border" style={{ borderColor: `${pAccent}55`, background: `linear-gradient(135deg, ${pAccent}4d, ${pAccent2}33)` }}><Icon name="planet" size={38} className="text-violet-200" /></div>}
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] uppercase tracking-widest text-cyan-300 mb-1 inline-flex items-center gap-1.5">
+            <div className="text-[11px] uppercase tracking-widest mb-1 inline-flex items-center gap-1.5" style={{ color: pAccent2 }}>
               <Icon name="planet" size={12} /> Planet
             </div>
             <h1 className="text-3xl md:text-5xl font-bold">{space.name}</h1>

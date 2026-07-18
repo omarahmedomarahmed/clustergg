@@ -417,6 +417,10 @@ export const games = pgTable("games", {
   // "integrated" from the UI — its metrics flow into leaderboards/challenges).
   customMetrics: jsonb("custom_metrics").$type<{ key: string; label: string; unit?: string; higherIsBetter?: boolean }[]>()
     .notNull().default([]),
+  // Per-planet theme + layout control.
+  accent: text("accent"),                              // primary accent color (hero glow/gradient)
+  accent2: text("accent2"),                            // secondary accent
+  planetLayout: text("planet_layout").notNull().default("auto"), // auto | globe | cover
   sortOrder: integer("sort_order").notNull().default(0),
   showInNav: boolean("show_in_nav").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),

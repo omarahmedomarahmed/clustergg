@@ -642,6 +642,9 @@ export async function saveGame(formData: FormData) {
     showInNav: formData.get("showInNav") === "on",
     isActive: formData.get("isActive") === "on",
     customMetrics: parseCustomMetrics(String(formData.get("customMetrics") ?? "[]")),
+    accent: String(formData.get("accent") ?? "").trim() || null,
+    accent2: String(formData.get("accent2") ?? "").trim() || null,
+    planetLayout: ["auto", "globe", "cover"].includes(String(formData.get("planetLayout"))) ? String(formData.get("planetLayout")) : "auto",
   };
   if (!values.name) return;
   if (gameId) {
