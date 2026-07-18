@@ -32,7 +32,7 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 // loading-screen appearance. Complements LogoEditor (the square mark).
 export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
-  defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon,
+  defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultQuestRocket,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -48,11 +48,13 @@ export default function BrandingEditor({
   defaultFaviconZoom: number;
   defaultCpIcon: string;
   defaultOrbIcon: string;
+  defaultQuestRocket: string;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
   const [cpIcon, setCpIcon] = useState(defaultCpIcon);
   const [orbIcon, setOrbIcon] = useState(defaultOrbIcon);
+  const [questRocket, setQuestRocket] = useState(defaultQuestRocket);
   const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
   const [navBg, setNavBg] = useState(defaultNavBg);
   const [footerBg, setFooterBg] = useState(defaultFooterBg);
@@ -109,6 +111,16 @@ export default function BrandingEditor({
             {orbIcon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={orbIcon} alt="" className="h-8 w-8 object-contain" />}
           </span>
           <div className="flex-1"><ImageUpload name="orbIcon" value={orbIcon} onChange={setOrbIcon} aspect="1/1" rounded="rounded-full" maxDim={256} scope="content" hint="Square icon; shows on the glowing orb. Empty = CP coin." /></div>
+        </div>
+      </div>
+
+      {/* Quest-map "you are here" marker */}
+      <div>
+        <div className="font-semibold text-sm mb-1">Quest map marker (rocket)</div>
+        <p className="text-xs text-muted mb-3">The &quot;you are here&quot; marker that rides the quest map trail. Leave empty for the default rocket orb.</p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 flex items-center gap-4">
+          {questRocket && /* eslint-disable-next-line @next/next/no-img-element */ <img src={questRocket} alt="" className="h-12 w-12 object-contain shrink-0" />}
+          <div className="flex-1"><ImageUpload name="questRocket" value={questRocket} onChange={setQuestRocket} aspect="1/1" rounded="rounded-xl" maxDim={256} scope="content" hint="Small marker image (rocket, ship, avatar…)." /></div>
         </div>
       </div>
 

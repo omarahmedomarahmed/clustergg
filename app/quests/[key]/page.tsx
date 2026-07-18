@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getQuestByKey, getTotalCp, getCpLedger } from "@/lib/quests";
+import { getContent } from "@/lib/cms";
 import QuestMapHero from "@/components/QuestMapHero";
 import CpLedger from "@/components/CpLedger";
 import Avatar from "@/components/Avatar";
@@ -23,15 +24,17 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   if (!detail) notFound();
 
   const { quest, allQuests, tierHolders, leaderboard } = detail;
-  const [totalCp, questLedger] = await Promise.all([
+  const [totalCp, questLedger, brand] = await Promise.all([
     getTotalCp(db, user?.id ?? null),
     getCpLedger(db, user?.id ?? null, { questId: quest.id, limit: 120 }),
+    getContent(["brand.quest.rocket"]),
   ]);
+  const rocketUrl = brand["brand.quest.rocket"] || undefined;
   const tabs = allQuests.map((q) => ({ key: q.key, name: q.name, color: q.color, logoUrl: q.logoUrl, icon: q.icon, mapArtUrl: q.mapArtUrl }));
 
   return (
     <div>
-      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} />
+      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} rocketUrl={rocketUrl} />
 
       {/* Per-quest CP leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">

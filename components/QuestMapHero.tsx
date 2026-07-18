@@ -14,7 +14,7 @@ import type { QuestView, QuestGamer } from "@/lib/quests";
 // path as you progress (bronze → platinum), a per-quest space backdrop, and a
 // glorified toggle to switch to another quest's map.
 export default function QuestMapHero({
-  quest, tierHolders, tabs, toggle, backHref, variants, totalCp,
+  quest, tierHolders, tabs, toggle, backHref, variants, totalCp, rocketUrl,
 }: {
   quest: QuestView;
   tierHolders: Record<string, QuestGamer[]>;
@@ -22,6 +22,7 @@ export default function QuestMapHero({
   toggle?: React.ReactNode;
   backHref?: string;
   totalCp?: number;
+  rocketUrl?: string;
   // When provided, the quest tabs switch the map IN-FRAME (feed/home) instead
   // of navigating to the quest page.
   variants?: { key: string; quest: QuestView; tierHolders: Record<string, QuestGamer[]> }[];
@@ -183,12 +184,20 @@ export default function QuestMapHero({
             );
           })}
 
-          {/* You-are-here rocket — rides the trail at the exact CP position */}
+          {/* You-are-here marker — rides the trail at the exact CP position.
+              Fixed (no float); admin can replace it with a custom image. */}
           <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10" style={{ left: `${youX}%`, top: `${youY}%` }}>
-            <span className="relative flex h-7 w-7 items-center justify-center rounded-full text-white float-y" style={{ background: q.accent2, boxShadow: `0 0 16px 3px ${q.accent2}` }}>
-              <Icon name="rocket" size={14} />
-              <span className="absolute inset-0 rounded-full animate-ping" style={{ background: `${q.accent2}66` }} />
-            </span>
+            {rocketUrl ? (
+              <span className="relative block h-9 w-9">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={rocketUrl} alt="" className="h-full w-full object-contain drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]" />
+              </span>
+            ) : (
+              <span className="relative flex h-7 w-7 items-center justify-center rounded-full text-white" style={{ background: q.accent2, boxShadow: `0 0 16px 3px ${q.accent2}` }}>
+                <Icon name="rocket" size={14} />
+                <span className="absolute inset-0 rounded-full animate-ping" style={{ background: `${q.accent2}66` }} />
+              </span>
+            )}
             <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-bold" style={{ color: q.accent2 }}>
               {q.qp.toLocaleString()} CP
             </span>
