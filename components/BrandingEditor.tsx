@@ -31,7 +31,7 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 // Admin editor for the wide wordmark logo, per-placement display mode, and the
 // loading-screen appearance. Complements LogoEditor (the square mark).
 export default function BrandingEditor({
-  defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultPlanetsIcon,
+  defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
   defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon,
 }: {
   defaultWordmark: string;
@@ -40,6 +40,7 @@ export default function BrandingEditor({
   defaultFooterMode: Mode;
   defaultLoadingColor: string;
   defaultLoadingLogo: string;
+  defaultLoadingPhrases: string;
   defaultPlanetsIcon: string;
   defaultNavBg: string;
   defaultFooterBg: string;
@@ -59,6 +60,8 @@ export default function BrandingEditor({
   const [footerMode, setFooterMode] = useState<Mode>(defaultFooterMode);
   const [loadingColor, setLoadingColor] = useState(defaultLoadingColor);
   const [loadingLogo, setLoadingLogo] = useState(defaultLoadingLogo);
+  const [loadingPhrases, setLoadingPhrases] = useState(defaultLoadingPhrases);
+  const phraseList = loadingPhrases.split("\n").map((s) => s.trim()).filter(Boolean);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(saveBranding, undefined);
 
   return (
@@ -187,11 +190,21 @@ export default function BrandingEditor({
                 aspect="1/1" rounded="rounded-full" maxDim={256} scope="content"
                 hint="Small square mark. Leave empty for a glowing orb." />
             </div>
+            <div>
+              <div className="text-xs text-muted mb-1.5">Loading phrases — one per line (cycles every second)</div>
+              <textarea value={loadingPhrases} onChange={(e) => setLoadingPhrases(e.target.value)} rows={5}
+                className="w-full rounded-lg border border-violet-400/25 bg-black/30 px-3 py-2 text-sm outline-none focus:border-cyan-400/50 font-mono"
+                placeholder={"Traversing the cluster…\nAligning the constellations…"} />
+              {phraseList.length > 0 && (
+                <div className="mt-1.5 text-[11px] text-muted">{phraseList.length} phrase{phraseList.length > 1 ? "s" : ""} · first: <span className="grad-text font-semibold">{phraseList[0]}</span></div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       <input type="hidden" name="loadingColor" value={loadingColor} />
+      <input type="hidden" name="loadingPhrases" value={loadingPhrases} />
       <div className="flex items-center gap-3">
         <button disabled={pending} className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">
           {pending ? "Saving…" : "Save branding"}
