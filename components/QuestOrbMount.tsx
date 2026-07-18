@@ -12,12 +12,14 @@ export default async function QuestOrbMount() {
   let quests;
   let orbIcon = "";
   let orbColor = "#8b5cf6";
+  let orbSize = 56;
   try {
     const db = await getDb();
     quests = await getUserQuests(db, user.id);
-    const c = await getContent(["brand.orb.icon", "brand.orb.color"]);
+    const c = await getContent(["brand.orb.icon", "brand.orb.color", "brand.orb.size"]);
     orbIcon = c["brand.orb.icon"] || "";
     orbColor = c["brand.orb.color"] || "#8b5cf6";
+    orbSize = Math.max(44, Math.min(120, Number(c["brand.orb.size"]) || 56));
   } catch { return null; }
 
   const orb: OrbQuest[] = quests.map((q) => {
@@ -33,5 +35,5 @@ export default async function QuestOrbMount() {
     };
   });
 
-  return <FloatingQuestOrb quests={orb} icon={orbIcon || undefined} color={orbColor} />;
+  return <FloatingQuestOrb quests={orb} icon={orbIcon || undefined} color={orbColor} size={orbSize} />;
 }

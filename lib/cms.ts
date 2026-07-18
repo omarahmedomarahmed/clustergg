@@ -57,6 +57,8 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // Floating quest orb icon (bottom-right). Empty = default CP coin.
   "brand.orb.icon": "",
   "brand.orb.color": "#8b5cf6",
+  // Size of the floating quest orb in px (44–120).
+  "brand.orb.size": "56",
   // "You are here" marker image on the quest map. Empty = the gamified astronaut
   // (below), which faces the direction it's travelling. Set to override with a
   // single static marker image.
