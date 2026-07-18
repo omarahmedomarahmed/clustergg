@@ -108,8 +108,8 @@ export default function QuestMapHero({
           </div>
         )}
 
-        {/* Quest identity + how-to-earn — ABOVE the map art */}
-        <div className="mx-auto max-w-3xl text-center mb-5">
+        {/* Quest identity + how-to-earn — ABOVE the map art (kept above it) */}
+        <div className="relative z-20 mx-auto max-w-3xl text-center mb-5">
           <h1 className="text-3xl md:text-5xl font-bold grad-text">{q.name}</h1>
           <p className="text-muted mt-1.5">{q.tagline}</p>
           {q.lore && <p className="text-sm text-muted/90 mt-2 max-w-xl mx-auto leading-relaxed">{q.lore}</p>}
@@ -126,10 +126,10 @@ export default function QuestMapHero({
         </div>
 
         {/* The map — floating (no card frame): drag to pan, wheel/buttons to
-            zoom. The art starts zoomed in and overflows onto the background
-            instead of being cropped inside a card. */}
-        <div className="relative mx-auto w-full max-w-4xl aspect-[16/9]">
-          <ZoomPan className="h-full w-full" max={6} initial={1.3}>
+            zoom. Sits BEHIND the surrounding text (z-0), starts zoomed in,
+            overflows onto the background, and gently bobs up/down like a planet. */}
+        <div className="relative z-0 mx-auto w-full max-w-4xl aspect-[16/9] float-y">
+          <ZoomPan className="h-full w-full" max={4} initial={1.3}>
           {/* map art */}
           <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
           {/* readability veil */}
@@ -209,8 +209,8 @@ export default function QuestMapHero({
           )}
         </div>
 
-        {/* Tier legend under the map — quick milestone ladder */}
-        <div className="mx-auto max-w-4xl mt-4 flex flex-wrap items-center justify-center gap-2">
+        {/* Tier legend under the map — quick milestone ladder (above the art) */}
+        <div className="relative z-20 mx-auto max-w-4xl mt-4 flex flex-wrap items-center justify-center gap-2">
           {tiers.map((t) => (
             <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
               style={{ borderColor: t.earned ? `${t.color || q.color}88` : "rgba(255,255,255,0.12)", color: t.earned ? (t.color || q.color) : "#8b8ba7", background: t.earned ? `${t.color || q.color}14` : "transparent" }}>
