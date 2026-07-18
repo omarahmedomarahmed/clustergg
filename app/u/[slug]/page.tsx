@@ -322,22 +322,22 @@ export default async function ProfilePage({ params }: Props) {
       </div>
 
       <div className="mx-auto max-w-5xl px-4 relative" style={{ marginTop: -Math.round(theme.avatarSize * 0.42) }}>
-        <div className="flex flex-wrap items-end gap-5">
-          <div className="overflow-hidden border-2 shrink-0" style={{ borderColor: theme.accent, width: theme.avatarSize, height: theme.avatarSize, borderRadius: avatarClip(theme.avatarShape) ? 0 : (theme.avatarShape === "circle" ? "9999px" : theme.avatarShape === "rounded" ? "22%" : "10%"), clipPath: avatarClip(theme.avatarShape), WebkitClipPath: avatarClip(theme.avatarShape) }}>
-            <Avatar name={user.displayName} src={user.avatarUrl} size={theme.avatarSize} className="!rounded-none" />
+        <div className="flex flex-col items-center text-center sm:flex-row sm:flex-wrap sm:items-end sm:text-left gap-4 sm:gap-5">
+          <div className="overflow-hidden border-2 shrink-0" style={{ borderColor: theme.accent, width: `min(${theme.avatarSize}px, 38vw)`, height: `min(${theme.avatarSize}px, 38vw)`, borderRadius: avatarClip(theme.avatarShape) ? 0 : (theme.avatarShape === "circle" ? "9999px" : theme.avatarShape === "rounded" ? "22%" : "10%"), clipPath: avatarClip(theme.avatarShape), WebkitClipPath: avatarClip(theme.avatarShape) }}>
+            <Avatar name={user.displayName} src={user.avatarUrl} size={theme.avatarSize} className="!rounded-none !h-full !w-full" />
           </div>
-          <div className="min-w-0 flex-1 pb-1">
-            <h1 className="text-3xl md:text-4xl font-bold flex items-center gap-2 flex-wrap" style={{ color: theme.text }}>
+          <div className="min-w-0 w-full sm:flex-1 sm:w-auto pb-1">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center justify-center sm:justify-start gap-2 flex-wrap break-words" style={{ color: theme.text }}>
               {user.displayName}
               {user.isVerified && <Icon name="check" size={20} strokeWidth={3} style={{ color: theme.accent2 }} />}
             </h1>
-            {user.title && <div className="text-lg font-semibold p-grad">{user.title}</div>}
-            {user.discordUsername && <div className="mt-1.5"><DiscordTag username={user.discordUsername} size="md" /></div>}
-            <div className="flex items-center gap-2 text-sm p-muted mt-1.5">
-              <span>clustergg.com/u/{user.slug}</span><CopyLinkButton path={`/u/${user.slug}`} />
+            {user.title && <div className="text-base sm:text-lg font-semibold p-grad">{user.title}</div>}
+            {user.discordUsername && <div className="mt-1.5 flex justify-center sm:justify-start"><DiscordTag username={user.discordUsername} size="md" /></div>}
+            <div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm p-muted mt-1.5">
+              <span className="truncate">clustergg.com/u/{user.slug}</span><CopyLinkButton path={`/u/${user.slug}`} />
             </div>
           </div>
-          <div className="flex gap-3 pb-1">
+          <div className="flex gap-3 pb-1 w-full sm:w-auto justify-center">
             {isOwner ? (
               <Link href="/profile" className={`p-btn p-btn-${theme.buttonStyle}`}><Icon name="edit" size={14} /> Customize</Link>
             ) : viewer ? (
