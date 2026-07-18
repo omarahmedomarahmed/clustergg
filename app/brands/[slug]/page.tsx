@@ -1,11 +1,11 @@
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { getBrandBySlugOrId, getBrandPortalData, getCampaignReadiness, getCampaignAnalytics, getBrandInbox } from "@/lib/brands";
+import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness, getBrandInbox } from "@/lib/brands";
 import BrandCreativeUploader from "@/components/BrandCreativeUploader";
 import BrandMessageForm from "@/components/BrandMessageForm";
+import BrandAnalyticsPanel from "@/components/BrandAnalyticsPanel";
 import AnimatedNumber from "@/components/AnimatedNumber";
-import Sparkline from "@/components/Sparkline";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -75,7 +75,7 @@ export default async function BrandPortalPage({
     }
     const [readiness, analytics] = await Promise.all([
       getCampaignReadiness(db, campaign.id),
-      getCampaignAnalytics(db, campaign.id),
+      getBrandAnalytics(db, brand.id, { campaignId: campaign.id, days: 90 }),
     ]);
     return (
       <div className="min-h-screen">
@@ -93,12 +93,9 @@ export default async function BrandPortalPage({
             <Stat label="Placements ready" value={`${readiness.filled}/${readiness.total}`} accent={readiness.ready ? "#34d399" : "#fbbf24"} />
           </div>
 
-          {analytics.byDay.length > 1 && (
-            <div className="glass p-5">
-              <div className="text-[10px] uppercase tracking-widest text-muted mb-2">Daily impressions</div>
-              <Sparkline points={analytics.byDay.map((d) => d.impressions)} />
-            </div>
-          )}
+          {/* Interactive chart + placement table (refreshes in place) at the top */}
+          <BrandAnalyticsPanel brandId={brand.id} keyStr={key} campaignId={campaign.id} initial={analytics}
+            title="Performance over time" filename={`campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}`} />
 
           {/* Creative slots */}
           <section>
@@ -115,37 +112,16 @@ export default async function BrandPortalPage({
             </div>
           </section>
 
-          {/* Per-placement analytics */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="chart" size={18} className="text-cyan-300" /> Placement analytics</h2>
-              <a href={`${base}&campaign=${campaign.id}`} className="ghost-btn pressable rounded-full px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5"><Icon name="satellite" size={13} /> Refresh</a>
-            </div>
-            <div className="glass overflow-x-auto">
-              <table className="w-full table-cosmic min-w-[520px]">
-                <thead><tr><th>Placement</th><th>Page</th><th>Impressions</th><th>Clicks</th><th>CTR</th></tr></thead>
-                <tbody>
-                  {analytics.byPlacement.length === 0 && <tr><td colSpan={5} className="text-muted text-sm p-4">No impressions yet — they appear once your campaign is live.</td></tr>}
-                  {analytics.byPlacement.map((r) => (
-                    <tr key={r.key}>
-                      <td className="font-semibold text-sm">{r.key}</td>
-                      <td className="text-xs text-muted">{r.pageScope}</td>
-                      <td className="text-cyan-200 font-bold">{num(r.impressions)}</td>
-                      <td>{num(r.clicks)}</td>
-                      <td className="text-xs">{r.impressions ? ((r.clicks / r.impressions) * 100).toFixed(1) : "0.0"}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
         </div>
       </div>
     );
   }
 
   // ---- Overview: all campaigns + brand-wide intelligence ----
-  const data = await getBrandPortalData(db, brand.id);
+  const [data, brandAnalytics] = await Promise.all([
+    getBrandPortalData(db, brand.id),
+    getBrandAnalytics(db, brand.id, { days: 90 }),
+  ]);
   const shown = data.campaigns.filter((c) => filter === "all" || c.status === filter);
   const chip = (f: string, label: string) => (
     <a href={`${base}&filter=${f}`} className={`rounded-full border px-3 py-1 text-xs transition ${filter === f ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-200" : "border-white/12 text-muted hover:border-white/25"}`}>{label}</a>
@@ -172,17 +148,9 @@ export default async function BrandPortalPage({
               <AnimStat label="Live campaigns" value={data.totals.active} />
             </div>
 
-            {/* Trend */}
-            {data.intel.byDay.length > 1 && (
-              <div className="glass p-5">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-[10px] uppercase tracking-widest text-muted">Impressions — all campaigns (30d)</div>
-                  <div className="text-[10px] uppercase tracking-widest text-cyan-300">clicks below</div>
-                </div>
-                <Sparkline points={data.intel.byDay.map((d) => d.impressions)} />
-                <Sparkline points={data.intel.byDay.map((d) => d.clicks)} stroke="#a78bfa" fill="rgba(167,139,250,0.12)" height={50} />
-              </div>
-            )}
+            {/* Interactive chart (all campaigns) + placement table — refreshes in place */}
+            <BrandAnalyticsPanel brandId={brand.id} keyStr={key} initial={brandAnalytics}
+              title="Impressions & clicks — all campaigns" filename={`${brand.slug}-analytics`} />
 
             {/* Marketing intelligence */}
             <section>

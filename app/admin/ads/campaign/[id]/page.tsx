@@ -7,6 +7,7 @@ import { saveCampaign } from "@/app/actions/admin";
 import AdminCreativeSlot from "@/components/AdminCreativeSlot";
 import AdminCampaignActions from "@/components/AdminCampaignActions";
 import CampaignAnalyticsLive from "@/components/CampaignAnalyticsLive";
+import AdChart from "@/components/AdChart";
 import ImageUpload from "@/components/ImageUpload";
 import Icon from "@/components/Icon";
 
@@ -28,9 +29,10 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
   const [campaign] = await db.select().from(schema.adCampaigns).where(eq(schema.adCampaigns.id, id)).limit(1);
   if (!campaign) notFound();
   const [brand] = await db.select().from(schema.brands).where(eq(schema.brands.id, campaign.brandId)).limit(1);
-  const [readiness, analytics] = await Promise.all([
+  const [readiness, analytics, analytics90] = await Promise.all([
     getCampaignReadiness(db, id),
     getCampaignAnalytics(db, id, 30),
+    getCampaignAnalytics(db, id, 90),
   ]);
 
   return (
@@ -75,7 +77,13 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
         </form>
       </details>
 
-      {/* Analytics at the top — ajax-refreshable, placement rows link to a page where the ad shows */}
+      {/* Visual chart at the very top, then the placement table below (ajax-refreshable) */}
+      <section>
+        <h2 className="font-bold text-lg flex items-center gap-2 mb-3"><Icon name="chart" size={18} className="text-cyan-300" /> Performance over time</h2>
+        <AdChart data={analytics90.byDay} filename={`campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}`} />
+      </section>
+
+      {/* Placement analytics table — ajax-refreshable, rows link to a page where the ad shows */}
       <CampaignAnalyticsLive
         campaignId={id}
         initial={{
