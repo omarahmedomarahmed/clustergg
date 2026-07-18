@@ -440,6 +440,7 @@ const PLANET_SKINS: Record<string, string> = {
   "Dota 2": `${HF_CDN}/hf_20260717_223926_6bf3756b-3ee1-4629-98ae-e458dcddd180.png`,
   "Fortnite": `${HF_CDN}/hf_20260717_223928_d55e9e97-d9a0-498a-a3f4-5cb6e430224f.png`,
   "Counter-Strike 2": `${HF_CDN}/hf_20260717_223931_14be7cf0-ff69-41dc-87f9-77d113662a37.png`,
+  "Chess": `${HF_CDN}/hf_20260718_004005_7cbd4afc-202f-4acb-b558-519546ffd94c.png`,
 };
 const PLANET_BGS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_120620_3c2d92d2-00a7-4f38-ba68-7712e85b962d.png`,
@@ -449,7 +450,28 @@ const PLANET_BGS: Record<string, string> = {
   "Dota 2": `${HF_CDN}/hf_20260717_224257_d5b1ca32-3a9c-4434-a7e8-8aa256473b7a.png`,
   "Fortnite": `${HF_CDN}/hf_20260717_224259_eef07acf-cc6f-44ed-b0f0-715f2c6eb1d3.png`,
   "Counter-Strike 2": `${HF_CDN}/hf_20260717_224301_435984a4-647b-4da2-bdaa-906bae240009.png`,
+  "Chess": `${HF_CDN}/hf_20260718_004014_550032cb-9efb-4a43-8ae8-a1ea21a123b4.png`,
 };
+// Backfill portal slug + access key for any brand created before those columns
+// existed, so every brand has a shareable /brands/<slug> portal. Idempotent.
+export async function ensureBrandKeys(db: DB) {
+  const rows = await db.select({ id: schema.brands.id, name: schema.brands.name, slug: schema.brands.slug, accessKey: schema.brands.accessKey }).from(schema.brands);
+  const { newAccessKey } = await import("@/lib/brands");
+  const { slugify } = await import("@/lib/utils");
+  const taken = new Set(rows.map((r) => r.slug).filter(Boolean) as string[]);
+  for (const b of rows) {
+    if (b.slug && b.accessKey) continue;
+    let slug = b.slug ?? "";
+    if (!slug) {
+      const base = slugify(b.name) || "brand";
+      slug = base; let n = 2;
+      while (taken.has(slug)) slug = `${base}-${n++}`;
+      taken.add(slug);
+    }
+    await db.update(schema.brands).set({ slug, accessKey: b.accessKey ?? newAccessKey() }).where(eq(schema.brands.id, b.id));
+  }
+}
+
 export async function ensurePlanetSkins(db: DB) {
   // Replace superseded renders in place.
   for (const [oldUrl, name] of Object.entries(SUPERSEDED_SKINS)) {

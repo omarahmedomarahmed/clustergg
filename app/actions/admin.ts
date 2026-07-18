@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, isNull, count } from "drizzle-orm";
+import { and, eq, isNull, count } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin, requireStaff, hashPassword } from "@/lib/auth";
 import { uid, slugify } from "@/lib/utils";
+import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
 import { syncAccount } from "@/lib/sync";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
@@ -401,21 +402,75 @@ export async function saveBrand(formData: FormData) {
   const admin = await requireAdmin();
   const db = await getDb();
   const brandId = String(formData.get("brandId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
   const values = {
-    name: String(formData.get("name") ?? "").trim(),
+    name,
+    about: String(formData.get("about") ?? "").trim() || null,
+    logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
+    coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
     industry: String(formData.get("industry") ?? "other"),
     contactEmail: String(formData.get("contactEmail") ?? "").trim() || null,
     status: String(formData.get("status") ?? "active"),
   };
-  if (!values.name) return;
   if (brandId) {
     await db.update(schema.brands).set(values).where(eq(schema.brands.id, brandId));
     await audit(admin.id, "brand.update", "brand", brandId);
+    revalidatePath(`/admin/brands/${brandId}`);
   } else {
-    await db.insert(schema.brands).values({ id: uid(), ...values });
+    // New brand gets a unique portal slug + an access key automatically.
+    const base = slugify(name) || "brand";
+    let slug = base, n = 2;
+    while ((await db.select({ id: schema.brands.id }).from(schema.brands).where(eq(schema.brands.slug, slug)).limit(1)).length) slug = `${base}-${n++}`;
+    await db.insert(schema.brands).values({ id: uid(), slug, accessKey: newAccessKey(), ...values });
     await audit(admin.id, "brand.create", "brand", values.name);
   }
   revalidatePath("/admin/brands");
+  revalidatePath("/admin/ads");
+}
+
+// Rotate a brand's portal access key (invalidates the old shared link).
+export async function regenerateBrandKey(brandId: string) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const key = newAccessKey();
+  await db.update(schema.brands).set({ accessKey: key }).where(eq(schema.brands.id, brandId));
+  await audit(admin.id, "brand.key_reset", "brand", brandId);
+  revalidatePath(`/admin/brands/${brandId}`);
+  revalidatePath("/admin/ads");
+  return key;
+}
+
+// Launch a campaign — only if every placement has a creative assigned.
+export async function launchCampaign(campaignId: string) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const { ready } = await getCampaignReadiness(db, campaignId);
+  if (!ready) return { error: "Every placement needs a creative before launch." };
+  await db.update(schema.adCampaigns).set({ status: "active", launchedAt: new Date() }).where(eq(schema.adCampaigns.id, campaignId));
+  await audit(admin.id, "campaign.launch", "campaign", campaignId);
+  revalidatePath("/admin/ads");
+  return { ok: true };
+}
+
+export async function setCampaignStatus(campaignId: string, status: "active" | "paused" | "draft" | "completed") {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  await db.update(schema.adCampaigns).set({ status }).where(eq(schema.adCampaigns.id, campaignId));
+  await audit(admin.id, `campaign.${status}`, "campaign", campaignId);
+  revalidatePath("/admin/ads");
+}
+
+// Admin reply in the shared brand inbox.
+export async function adminSendBrandMessage(brandId: string, formData: FormData) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return;
+  await db.insert(schema.brandMessages).values({ id: uid(), brandId, sender: "admin", body, readByAdmin: true });
+  await audit(admin.id, "brand.message", "brand", brandId);
+  revalidatePath(`/admin/brands/${brandId}`);
+  revalidatePath("/admin/ads");
 }
 
 export async function saveCampaign(brandId: string, formData: FormData) {

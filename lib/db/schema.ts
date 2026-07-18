@@ -302,12 +302,28 @@ export const challengeEvents = pgTable("challenge_events", {
 export const brands = pgTable("brands", {
   id: id(),
   name: text("name").notNull(),
+  slug: text("slug").unique(),          // portal URL: /brands/<slug>
+  accessKey: text("access_key"),        // key that unlocks the brand portal
   logoUrl: text("logo_url"),
+  coverUrl: text("cover_url"),          // brand portal cover art
+  about: text("about"),                 // shown on the portal (creative brief etc.)
   industry: text("industry").notNull().default("other"),
   contactEmail: text("contact_email"),
   status: text("status").notNull().default("active"), // active | paused
   createdAt: now("created_at"),
 });
+
+// Shared brand <-> admin inbox, shown on both the brand portal and the master
+// ads dashboard. `sender` is "brand" or "admin".
+export const brandMessages = pgTable("brand_messages", {
+  id: id(),
+  brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  sender: text("sender").notNull(), // brand | admin
+  body: text("body").notNull(),
+  readByAdmin: boolean("read_by_admin").notNull().default(false),
+  readByBrand: boolean("read_by_brand").notNull().default(false),
+  createdAt: now("created_at"),
+}, (t) => [index("brand_msg_idx").on(t.brandId, t.createdAt)]);
 
 export const adPlacements = pgTable("ad_placements", {
   id: id(),
@@ -346,6 +362,8 @@ export const adCampaigns = pgTable("ad_campaigns", {
   targetGeo: text("target_geo"),
   targetDevice: text("target_device").notNull().default("both"),
   status: text("status").notNull().default("active"), // active | paused | completed
+  // A campaign only starts serving once launched (all placement creatives in).
+  launchedAt: timestamp("launched_at", { withTimezone: true, mode: "date" }),
   createdAt: now("created_at"),
 });
 

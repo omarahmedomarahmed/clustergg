@@ -107,6 +107,21 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "gate_quest_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "gate_min_badges" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "feed_prefs" jsonb NOT NULL DEFAULT '{}'::jsonb`,
+  `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "slug" text`,
+  `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "access_key" text`,
+  `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "cover_url" text`,
+  `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "about" text`,
+  `ALTER TABLE "ad_campaigns" ADD COLUMN IF NOT EXISTS "launched_at" timestamp with time zone`,
+  `CREATE TABLE IF NOT EXISTS "brand_messages" (
+    "id" text PRIMARY KEY NOT NULL,
+    "brand_id" text NOT NULL,
+    "sender" text NOT NULL,
+    "body" text NOT NULL,
+    "read_by_admin" boolean NOT NULL DEFAULT false,
+    "read_by_brand" boolean NOT NULL DEFAULT false,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "brand_msg_idx" ON "brand_messages" ("brand_id","created_at")`,
 ];
 
 async function runColumnMigrations(db: DB) {
@@ -125,7 +140,7 @@ async function ensureProvisioned(db: DB) {
     // table scans — this is what keeps Neon data-transfer from ballooning.
     await runColumnMigrations(db);
     try {
-      const { runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, refreshStaleChallengeWindows } = await import("./seed");
+      const { runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, refreshStaleChallengeWindows, ensureBrandKeys } = await import("./seed");
       await runBootMaintenance(db);
       // Runs EVERY boot (not version-gated): converts any images still stored as
       // base64 data URLs to Blob. Cheap once done (SQL LIKE 'data:%' → 0 rows),
@@ -133,6 +148,7 @@ async function ensureProvisioned(db: DB) {
       await migrateGameImagesToBlob(db);
       await ensureTopBannerAd(db);
       await refreshStaleChallengeWindows(db);
+      await ensureBrandKeys(db);
     } catch { /* non-fatal — ads/skins just won't backfill this boot */ }
     return;
   }
@@ -147,13 +163,13 @@ async function ensureProvisioned(db: DB) {
     }
   }
   await runColumnMigrations(db);
-  const { seed, runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, refreshStaleChallengeWindows } = await import("./seed");
+  const { seed, runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, refreshStaleChallengeWindows, ensureBrandKeys } = await import("./seed");
   try {
     await seed(db, { demo: false });
   } catch (e) {
     if (!/duplicate key|already exists/i.test(String(e))) throw e;
   }
-  try { await runBootMaintenance(db); await migrateGameImagesToBlob(db); await ensureTopBannerAd(db); await refreshStaleChallengeWindows(db); } catch { /* non-fatal */ }
+  try { await runBootMaintenance(db); await migrateGameImagesToBlob(db); await ensureTopBannerAd(db); await refreshStaleChallengeWindows(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
 }
 
 async function createDb(): Promise<DB> {
