@@ -17,15 +17,25 @@ import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
 export async function saveFeedPrefs(prefsJson: string) {
   const me = await requireUser();
   const db = await getDb();
-  let prefs: { stats?: string[]; challenges?: string[]; leaderboards?: string[] } = {};
+  // Preserve any existing keys (e.g. dashboard) not present in this partial save.
+  const [cur] = await db.select({ feedPrefs: schema.users.feedPrefs }).from(schema.users).where(eq(schema.users.id, me.id)).limit(1);
+  const existing = (cur?.feedPrefs ?? {}) as Record<string, unknown>;
+  let prefs: Record<string, unknown> = { ...existing };
   try {
     const p = JSON.parse(prefsJson);
-    prefs = {
-      stats: Array.isArray(p.stats) ? p.stats.filter((x: unknown) => typeof x === "string").slice(0, 12) : [],
-      challenges: Array.isArray(p.challenges) ? p.challenges.filter((x: unknown) => typeof x === "string").slice(0, 24) : [],
-      leaderboards: Array.isArray(p.leaderboards) ? p.leaderboards.filter((x: unknown) => typeof x === "string").slice(0, 24) : [],
-    };
-  } catch { prefs = {}; }
+    if (Array.isArray(p.stats)) prefs.stats = p.stats.filter((x: unknown) => typeof x === "string").slice(0, 12);
+    if (Array.isArray(p.challenges)) prefs.challenges = p.challenges.filter((x: unknown) => typeof x === "string").slice(0, 24);
+    if (Array.isArray(p.leaderboards)) prefs.leaderboards = p.leaderboards.filter((x: unknown) => typeof x === "string").slice(0, 24);
+    // Dashboard: array of widgets { id, type, w, config }.
+    if (Array.isArray(p.dashboard)) {
+      prefs.dashboard = p.dashboard.slice(0, 40).map((w: Record<string, unknown>) => ({
+        id: String(w.id ?? "").slice(0, 40),
+        type: ["quest", "cp", "stat", "leaderboard"].includes(String(w.type)) ? w.type : "quest",
+        w: Math.max(1, Math.min(4, Number(w.w) || 1)),
+        config: (w.config && typeof w.config === "object") ? w.config : {},
+      })).filter((w: { id: string }) => w.id);
+    }
+  } catch { /* keep existing */ }
   await db.update(schema.users).set({ feedPrefs: prefs }).where(eq(schema.users.id, me.id));
   revalidatePath("/feed");
 }

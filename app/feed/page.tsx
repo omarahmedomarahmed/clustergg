@@ -10,9 +10,10 @@ import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import HeroStage from "@/components/HeroStage";
 import FeedControlPanel from "@/components/FeedControlPanel";
+import FeedDashboard, { type Widget } from "@/components/FeedDashboard";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { getQuestHeroData } from "@/lib/quest-hero";
-import { getTotalCp } from "@/lib/quests";
+import { getTotalCp, getUserQuests } from "@/lib/quests";
 import { getProvider } from "@/lib/providers/registry";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
@@ -73,7 +74,7 @@ export default async function FeedPage() {
   const questHero = await getQuestHeroData(db, user.id);
 
   // ===== Control-panel data =====
-  const prefs = (user.feedPrefs ?? {}) as { stats?: string[]; challenges?: string[]; leaderboards?: string[] };
+  const prefs = (user.feedPrefs ?? {}) as { stats?: string[]; challenges?: string[]; leaderboards?: string[]; dashboard?: unknown[] };
   const panelAccounts = accounts.map((a) => {
     const p = getProvider(a.provider);
     const gameName = p?.game ?? null;
@@ -103,6 +104,30 @@ export default async function FeedPage() {
     challenges: Number(joinedRow?.c ?? 0), posts: Number(postRow?.c ?? 0),
   };
 
+  // ===== Dashboard-builder sources =====
+  const dashQuestViews = await getUserQuests(db, user.id);
+  const dashQuests = dashQuestViews.map((q) => ({
+    key: q.key, name: q.name, color: q.color, logoUrl: q.logoUrl,
+    qp: q.qp, totalCp: q.totalCp, pct: q.nextTier ? Math.max(4, Math.min(100, Math.round((q.qp / q.nextTier.thresholdQp) * 100))) : 100,
+    tierName: q.currentTierIndex >= 0 ? q.tiers[q.currentTierIndex].name : "Just starting",
+  }));
+  const cpByQuest: Record<string, number> = Object.fromEntries(dashQuestViews.map((q) => [q.key, q.totalCp]));
+  const boards = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.isActive, true));
+  const dashLeaderboards = boards.map((b) => {
+    const g = gameByName.get(b.game);
+    return { game: b.game, metricKey: b.metricKey, title: b.title, slug: slugByGame.get(b.game) ?? null, logoUrl: slimImg(g?.logoUrl ?? null, 300000), coverUrl: slimImg(g?.coverUrl ?? null, 500000) };
+  });
+  const accIds = accounts.map((a) => a.id);
+  const statCur = accIds.length ? await db.select().from(schema.statCurrent).where(inArray(schema.statCurrent.linkedAccountId, accIds)) : [];
+  const acctById = new Map(accounts.map((a) => [a.id, a]));
+  const dashStats = statCur.map((s) => {
+    const a = acctById.get(s.linkedAccountId);
+    const gameName = a ? (getProvider(a.provider)?.game ?? null) : null;
+    const g = gameName ? gameByName.get(gameName) : undefined;
+    return { accountId: s.linkedAccountId, game: gameName ?? s.game, logoUrl: slimImg(g?.logoUrl ?? null, 300000), metricKey: s.metricKey, metricLabel: s.metricKey.replace(/_/g, " "), value: s.metricValue, inGameName: a?.inGameName ?? "" };
+  });
+  const dashboardWidgets = (Array.isArray(prefs.dashboard) ? prefs.dashboard : []) as Widget[];
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       {/* ===== Gamer control panel ===== */}
@@ -113,6 +138,12 @@ export default async function FeedPage() {
         activeChallenges={panelChallenges}
         games={panelGames}
         prefs={{ stats: prefs.stats ?? [], challenges: prefs.challenges ?? [], leaderboards: prefs.leaderboards ?? [] }}
+      />
+
+      {/* Drag-and-drop tracker dashboard */}
+      <FeedDashboard
+        sources={{ quests: dashQuests, leaderboards: dashLeaderboards, stats: dashStats, cpTotal: totalCp, cpByQuest }}
+        initial={dashboardWidgets}
       />
 
       <AdSlot placement="feed_top_banner" className="mb-8" />
