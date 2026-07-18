@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, count, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { getCurrentUser, isStaff } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import Icon from "@/components/Icon";
@@ -9,6 +9,7 @@ import MobileMenu from "@/components/MobileMenu";
 import BrandGlyph from "@/components/BrandGlyph";
 import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
+import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { getContent } from "@/lib/cms";
 import { slimImg } from "@/lib/img";
@@ -17,10 +18,42 @@ export default async function Nav() {
   const user = await getCurrentUser();
   const db = await getDb();
   let unread = 0;
+  let navNotifs: NavNotif[] = [];
+  let navConvos: NavConvo[] = [];
   if (user) {
-    const [row] = await db.select({ c: count() }).from(schema.notifications)
-      .where(and(eq(schema.notifications.userId, user.id), isNull(schema.notifications.readAt)));
+    const [[row], recentNotifs, myConvoRows] = await Promise.all([
+      db.select({ c: count() }).from(schema.notifications)
+        .where(and(eq(schema.notifications.userId, user.id), isNull(schema.notifications.readAt))),
+      db.select().from(schema.notifications).where(eq(schema.notifications.userId, user.id))
+        .orderBy(desc(schema.notifications.createdAt)).limit(8),
+      db.select({ conversationId: schema.conversationParticipants.conversationId, lastReadAt: schema.conversationParticipants.lastReadAt })
+        .from(schema.conversationParticipants).where(eq(schema.conversationParticipants.userId, user.id)),
+    ]);
     unread = Number(row?.c ?? 0);
+    navNotifs = recentNotifs.map((n) => ({ id: n.id, type: n.type, title: n.title, body: n.body, href: n.href, read: !!n.readAt, at: n.createdAt.toISOString() }));
+
+    // Recent conversations (top 5 by last activity) with the other participant + last message.
+    const convIds = myConvoRows.map((c) => c.conversationId);
+    if (convIds.length) {
+      const lastReadBy = new Map(myConvoRows.map((c) => [c.conversationId, c.lastReadAt]));
+      const convos = await db.select().from(schema.conversations)
+        .where(inArray(schema.conversations.id, convIds)).orderBy(desc(schema.conversations.lastMessageAt)).limit(5);
+      navConvos = await Promise.all(convos.map(async (c) => {
+        const [[other], [lastMsg]] = await Promise.all([
+          db.select({ name: schema.users.displayName, avatarUrl: schema.users.avatarUrl })
+            .from(schema.conversationParticipants).innerJoin(schema.users, eq(schema.conversationParticipants.userId, schema.users.id))
+            .where(and(eq(schema.conversationParticipants.conversationId, c.id), ne(schema.conversationParticipants.userId, user.id))).limit(1),
+          db.select({ body: schema.messages.body, senderId: schema.messages.senderId }).from(schema.messages)
+            .where(eq(schema.messages.conversationId, c.id)).orderBy(desc(schema.messages.createdAt)).limit(1),
+        ]);
+        const lr = lastReadBy.get(c.id);
+        return {
+          id: c.id, name: other?.name ?? "Gamer", avatarUrl: other?.avatarUrl ?? null,
+          snippet: lastMsg?.body ?? "New conversation", at: c.lastMessageAt.toISOString(),
+          unread: !!lastMsg && lastMsg.senderId !== user.id && (!lr || lr < c.lastMessageAt),
+        };
+      }));
+    }
   }
   // Games pinned to the nav by an admin (Admin → Games → "Show in nav").
   // Project only the columns the nav renders — never pull the heavy planet
@@ -97,22 +130,9 @@ export default async function Nav() {
         <div className="md:hidden flex-1" />
 
         <div className="flex items-center gap-3 shrink-0">
-          <Link href="/search" aria-label="Search" className="hidden sm:flex text-muted hover:text-ink transition-colors">
-            <Icon name="search" size={19} />
-          </Link>
           {user ? (
             <>
-              <Link href="/messages" className="hidden sm:flex text-muted hover:text-ink transition-colors" aria-label="Messages">
-                <Icon name="message" size={19} />
-              </Link>
-              <Link href="/notifications" className="relative text-muted hover:text-ink transition-colors" aria-label="Notifications">
-                <Icon name="bell" size={19} />
-                {unread > 0 && (
-                  <span className="absolute -right-2 -top-1.5 rounded-full bg-fuchsia-500 px-1.5 text-[10px] font-bold text-white">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </Link>
+              <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />
               <UserMenu
                 displayName={user.displayName}
                 avatarUrl={user.avatarUrl}
@@ -122,6 +142,9 @@ export default async function Nav() {
             </>
           ) : (
             <>
+              <Link href="/search" aria-label="Search" className="hidden sm:flex text-muted hover:text-ink transition-colors">
+                <Icon name="search" size={19} />
+              </Link>
               <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">Log in</Link>
               <a href="/api/auth/discord?next=/onboarding" title="Sign in with Discord"
                 className="pressable inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white"

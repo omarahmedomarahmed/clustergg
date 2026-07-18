@@ -16,11 +16,6 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
 
   return (
     <div className="relative flex-1 min-w-0 max-w-md flex items-center gap-2">
-      {totalCp !== undefined && (
-        <Link href="/quests" title="Your total Cluster Points" className="hidden xl:inline-flex items-center gap-1 shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[11px] font-bold text-cyan-200 hover:border-cyan-400/40">
-          <CpIcon size={15} /> {totalCp.toLocaleString()}
-        </Link>
-      )}
       <div className="relative flex-1 min-w-0">
       <div className="relative h-11 overflow-hidden rounded-xl border border-white/10 hover:border-cyan-400/40 transition-colors flex">
         {q.art ? (
@@ -79,6 +74,11 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
         </>
       )}
       </div>
+      {totalCp !== undefined && (
+        <Link href="/quests" title="Your total Cluster Points" className="hidden xl:inline-flex items-center gap-1 shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[11px] font-bold text-cyan-200 hover:border-cyan-400/40">
+          <CpIcon size={15} /> {totalCp.toLocaleString()}
+        </Link>
+      )}
     </div>
   );
 }
