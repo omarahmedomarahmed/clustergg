@@ -465,15 +465,20 @@ export async function rehostImagesToBlob(db: DB) {
   if (!blobConfigured()) return; // nothing to do without Blob (never inline-store instead)
   const isExternal = (u: string | null | undefined) => !!u && /^https:\/\//i.test(u) && !/\.public\.blob\.vercel-storage\.com/i.test(u) && /cloudfront\.net|higgsfield/i.test(u);
 
-  // 1) Users: inline data:image values inside theme (the 2MB culprit) + avatar/banner.
+  // 1) Users: inline data:image values inside theme (the 2MB culprit) + avatar/banner
+  //    (both inline data: URLs AND external cloudfront/higgsfield links). Discord
+  //    avatars (cdn.discordapp.com) are left alone — tiny + hosted elsewhere.
   const heavyUsers = await db.select({ id: schema.users.id, theme: schema.users.theme, avatarUrl: schema.users.avatarUrl, bannerUrl: schema.users.bannerUrl })
-    .from(schema.users).where(dsql`theme::text LIKE '%data:image%' OR avatar_url LIKE 'data:image%' OR banner_url LIKE 'data:image%'`);
+    .from(schema.users).where(dsql`theme::text LIKE '%data:image%' OR theme::text ILIKE '%cloudfront.net%' OR theme::text ILIKE '%higgsfield%' OR avatar_url LIKE 'data:image%' OR banner_url LIKE 'data:image%' OR avatar_url ~* 'cloudfront\\.net|higgsfield' OR banner_url ~* 'cloudfront\\.net|higgsfield'`);
+  const { uploadDataUrlToBlob } = await import("@/lib/blob");
   for (const u of heavyUsers) {
     const patch: Record<string, unknown> = {};
     const theme = (u.theme ?? {}) as Record<string, unknown>;
     if (await rehostDataUrlsInObject(theme, "theme")) patch.theme = theme;
-    if (u.avatarUrl?.startsWith("data:image")) { const { uploadDataUrlToBlob } = await import("@/lib/blob"); const h = await uploadDataUrlToBlob(u.avatarUrl, "avatar"); if (h) patch.avatarUrl = h; }
-    if (u.bannerUrl?.startsWith("data:image")) { const { uploadDataUrlToBlob } = await import("@/lib/blob"); const h = await uploadDataUrlToBlob(u.bannerUrl, "banner"); if (h) patch.bannerUrl = h; }
+    if (u.avatarUrl?.startsWith("data:image")) { const h = await uploadDataUrlToBlob(u.avatarUrl, "avatar"); if (h) patch.avatarUrl = h; }
+    else if (isExternal(u.avatarUrl)) { const h = await uploadUrlToBlob(u.avatarUrl!, "avatar"); if (h) patch.avatarUrl = h; }
+    if (u.bannerUrl?.startsWith("data:image")) { const h = await uploadDataUrlToBlob(u.bannerUrl, "banner"); if (h) patch.bannerUrl = h; }
+    else if (isExternal(u.bannerUrl)) { const h = await uploadUrlToBlob(u.bannerUrl!, "banner"); if (h) patch.bannerUrl = h; }
     if (Object.keys(patch).length) await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));
   }
 
@@ -495,6 +500,7 @@ export async function rehostImagesToBlob(db: DB) {
     if (isExternal(q.logoUrl)) patch.logoUrl = await uploadUrlToBlob(q.logoUrl!, "quest");
     if (isExternal(q.cardBgUrl)) patch.cardBgUrl = await uploadUrlToBlob(q.cardBgUrl!, "quest");
     if (isExternal(q.mapArtUrl)) patch.mapArtUrl = await uploadUrlToBlob(q.mapArtUrl!, "quest");
+    if (isExternal(q.coverUrl)) patch.coverUrl = await uploadUrlToBlob(q.coverUrl!, "quest");
     if (Object.keys(patch).length) await db.update(schema.quests).set(patch).where(eq(schema.quests.id, q.id));
   }
   const tiers = await db.select({ id: schema.questTiers.id, iconUrl: schema.questTiers.iconUrl }).from(schema.questTiers);
@@ -510,9 +516,35 @@ export async function rehostImagesToBlob(db: DB) {
   // 5) Ad creatives.
   const creatives = await db.select({ id: schema.adCreatives.id, fileUrl: schema.adCreatives.fileUrl }).from(schema.adCreatives).where(dsql`file_url LIKE '%cloudfront.net%' OR file_url LIKE 'data:image%'`);
   for (const cr of creatives) {
-    if (cr.fileUrl.startsWith("data:image")) { const { uploadDataUrlToBlob } = await import("@/lib/blob"); const h = await uploadDataUrlToBlob(cr.fileUrl, "creative"); if (h) await db.update(schema.adCreatives).set({ fileUrl: h }).where(eq(schema.adCreatives.id, cr.id)); }
+    if (cr.fileUrl.startsWith("data:image")) { const h = await uploadDataUrlToBlob(cr.fileUrl, "creative"); if (h) await db.update(schema.adCreatives).set({ fileUrl: h }).where(eq(schema.adCreatives.id, cr.id)); }
     else if (isExternal(cr.fileUrl)) await db.update(schema.adCreatives).set({ fileUrl: await uploadUrlToBlob(cr.fileUrl, "creative") }).where(eq(schema.adCreatives.id, cr.id));
   }
+
+  // 6) Trophies (badge art rendered on Higgsfield).
+  const trophies = await db.select({ id: schema.trophies.id, imageUrl: schema.trophies.imageUrl }).from(schema.trophies);
+  for (const t of trophies) if (isExternal(t.imageUrl)) await db.update(schema.trophies).set({ imageUrl: await uploadUrlToBlob(t.imageUrl!, "trophy") }).where(eq(schema.trophies.id, t.id));
+
+  // 7) Challenges: cover + hero banners.
+  const challenges = await db.select({ id: schema.challenges.id, coverUrl: schema.challenges.coverUrl, heroUrl: schema.challenges.heroUrl }).from(schema.challenges);
+  for (const c of challenges) {
+    const patch: Record<string, unknown> = {};
+    if (isExternal(c.coverUrl)) patch.coverUrl = await uploadUrlToBlob(c.coverUrl!, "challenge");
+    if (isExternal(c.heroUrl)) patch.heroUrl = await uploadUrlToBlob(c.heroUrl!, "challenge");
+    if (Object.keys(patch).length) await db.update(schema.challenges).set(patch).where(eq(schema.challenges.id, c.id));
+  }
+
+  // 8) Brands: portal logo + cover.
+  const brands = await db.select({ id: schema.brands.id, logoUrl: schema.brands.logoUrl, coverUrl: schema.brands.coverUrl }).from(schema.brands);
+  for (const b of brands) {
+    const patch: Record<string, unknown> = {};
+    if (isExternal(b.logoUrl)) patch.logoUrl = await uploadUrlToBlob(b.logoUrl!, "brand");
+    if (isExternal(b.coverUrl)) patch.coverUrl = await uploadUrlToBlob(b.coverUrl!, "brand");
+    if (Object.keys(patch).length) await db.update(schema.brands).set(patch).where(eq(schema.brands.id, b.id));
+  }
+
+  // 9) Partners ("Trusted by" logos).
+  const partners = await db.select({ id: schema.partners.id, logoUrl: schema.partners.logoUrl }).from(schema.partners);
+  for (const p of partners) if (isExternal(p.logoUrl)) await db.update(schema.partners).set({ logoUrl: await uploadUrlToBlob(p.logoUrl!, "partner") }).where(eq(schema.partners.id, p.id));
 }
 
 // Backfill portal slug + access key for any brand created before those columns
