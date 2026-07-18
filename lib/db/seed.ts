@@ -440,8 +440,10 @@ const PLANET_SKINS: Record<string, string> = {
   "Dota 2": `${HF_CDN}/hf_20260717_223926_6bf3756b-3ee1-4629-98ae-e458dcddd180.png`,
   "Fortnite": `${HF_CDN}/hf_20260717_223928_d55e9e97-d9a0-498a-a3f4-5cb6e430224f.png`,
   "Counter-Strike 2": `${HF_CDN}/hf_20260717_223931_14be7cf0-ff69-41dc-87f9-77d113662a37.png`,
-  "Chess": `${HF_CDN}/hf_20260718_004005_7cbd4afc-202f-4acb-b558-519546ffd94c.png`,
+  "Chess": `${HF_CDN}/hf_20260718_020410_c77327de-7a2e-4354-b26a-98aa0bb4aeb0.png`,
 };
+// Superseded chess globe (first, static render) — replaced by the animated one.
+const SUPERSEDED_CHESS = `${HF_CDN}/hf_20260718_004005_7cbd4afc-202f-4acb-b558-519546ffd94c.png`;
 const PLANET_BGS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_120620_3c2d92d2-00a7-4f38-ba68-7712e85b962d.png`,
   "VALORANT": `${HF_CDN}/hf_20260714_120636_4b63d00d-68e5-4379-b419-a0bc8b423124.png`,
@@ -478,6 +480,9 @@ export async function ensurePlanetSkins(db: DB) {
     await db.update(schema.games).set({ planetImageUrl: PLANET_SKINS[name] })
       .where(eq(schema.games.planetImageUrl, oldUrl));
   }
+  // Upgrade the first (static) chess globe to the animated render.
+  await db.update(schema.games).set({ planetImageUrl: PLANET_SKINS["Chess"] })
+    .where(eq(schema.games.planetImageUrl, SUPERSEDED_CHESS));
   // Set skins for games that don't have one yet (never clobbers admin uploads).
   for (const [name, url] of Object.entries(PLANET_SKINS)) {
     await db.update(schema.games).set({ planetImageUrl: url })
