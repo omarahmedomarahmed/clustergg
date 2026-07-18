@@ -9,8 +9,8 @@ import Icon from "@/components/Icon";
 // zooms toward the cursor and locks page scroll while the pointer is over the
 // art. Children keep their percentage positions so pins/paths move together.
 export default function ZoomPan({
-  children, className = "", min = 1, max = 6, initial = 1.5,
-}: { children: React.ReactNode; className?: string; min?: number; max?: number; initial?: number }) {
+  children, className = "", min = 1, max = 6, initial = 1.5, wheel = true, pan = true,
+}: { children: React.ReactNode; className?: string; min?: number; max?: number; initial?: number; wheel?: boolean; pan?: boolean }) {
   const box = useRef<HTMLDivElement | null>(null);
   const [t, setT] = useState({ scale: initial, x: 0, y: 0 });
   const drag = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null);
@@ -28,9 +28,10 @@ export default function ZoomPan({
   const zoomButton = (factor: number) => zoomAt(factor, 0, 0);
 
   // Wheel zoom via a native non-passive listener so we can block page scroll.
+  // Disabled when `wheel` is false (page scroll behaves normally; use buttons).
   useEffect(() => {
     const el = box.current;
-    if (!el) return;
+    if (!el || !wheel) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const r = el.getBoundingClientRect();
@@ -40,7 +41,7 @@ export default function ZoomPan({
     };
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
-  }, [min, max]);
+  }, [min, max, wheel]);
 
   const btn = "flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-black/55 backdrop-blur text-white text-lg leading-none hover:border-cyan-400/50 transition-colors";
 
@@ -48,9 +49,9 @@ export default function ZoomPan({
     <div
       ref={box}
       className={`relative ${className}`}
-      style={{ cursor: drag.current ? "grabbing" : "grab", touchAction: "none" }}
-      onPointerDown={(e) => { drag.current = { x: e.clientX, y: e.clientY, ox: t.x, oy: t.y }; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
-      onPointerMove={(e) => { if (drag.current) setT((p) => ({ ...p, x: drag.current!.ox + (e.clientX - drag.current!.x), y: drag.current!.oy + (e.clientY - drag.current!.y) })); }}
+      style={{ cursor: pan ? (drag.current ? "grabbing" : "grab") : "default", touchAction: pan ? "none" : "auto" }}
+      onPointerDown={(e) => { if (!pan) return; drag.current = { x: e.clientX, y: e.clientY, ox: t.x, oy: t.y }; (e.target as HTMLElement).setPointerCapture?.(e.pointerId); }}
+      onPointerMove={(e) => { if (pan && drag.current) setT((p) => ({ ...p, x: drag.current!.ox + (e.clientX - drag.current!.x), y: drag.current!.oy + (e.clientY - drag.current!.y) })); }}
       onPointerUp={() => { drag.current = null; }}
       onPointerCancel={() => { drag.current = null; }}
     >
