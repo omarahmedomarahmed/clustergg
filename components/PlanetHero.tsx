@@ -185,13 +185,21 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
           )}
         </div>
 
-        {/* Stats box below the globe (default state) — over the planet art */}
-        {!(region || expanded) && (
-          <div className="mt-5 rounded-2xl border border-violet-400/20 p-4 w-full max-w-md text-left bg-cover bg-center"
-            style={{ background: (p.bgUrl || p.coverUrl) ? `linear-gradient(rgba(4,5,26,0.8), rgba(4,5,26,0.9)), url(${p.bgUrl || p.coverUrl}) center/cover` : "rgba(10,10,28,0.5)" }}>
-            {panelContent}
-          </div>
-        )}
+        {/* Stats box below the globe — ALWAYS rendered with a stable min-height,
+            so selecting a region doesn't change the section height (which would
+            make the fixed background art appear to zoom in/out). */}
+        <div className="mt-5 w-full max-w-md min-h-[132px]">
+          {!(region || expanded) ? (
+            <div className="rounded-2xl border border-violet-400/20 p-4 text-left bg-cover bg-center"
+              style={{ background: (p.bgUrl || p.coverUrl) ? `linear-gradient(rgba(4,5,26,0.8), rgba(4,5,26,0.9)), url(${p.bgUrl || p.coverUrl}) center/cover` : "rgba(10,10,28,0.5)" }}>
+              {panelContent}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-white/10 p-4 text-center text-xs text-muted">
+              Region details are on the globe above. Tap another pin or the globe to switch.
+            </div>
+          )}
+        </div>
 
         {/* Switch planets */}
         {planets.length > 1 && (
