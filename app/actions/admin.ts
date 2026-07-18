@@ -447,6 +447,7 @@ export async function saveBrand(formData: FormData) {
     about: String(formData.get("about") ?? "").trim() || null,
     logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
     coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
+    portalBgUrl: String(formData.get("portalBgUrl") ?? "").trim() || null,
     industry: String(formData.get("industry") ?? "other"),
     contactEmail: String(formData.get("contactEmail") ?? "").trim() || null,
     status: String(formData.get("status") ?? "active"),

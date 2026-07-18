@@ -51,6 +51,19 @@ export async function portalUploadCreative(brandId: string, key: string, formDat
   return { ok: true };
 }
 
+// Brand updates its own portal appearance: logo, cover, background art. Each URL
+// is already hosted (uploaded via the key-gated /api/brands/upload).
+export async function portalSaveAppearance(brandId: string, key: string, formData: FormData) {
+  const { db, brand } = await requireBrand(brandId, key);
+  const patch: Record<string, string | null> = {};
+  for (const [field, col] of [["logoUrl", "logoUrl"], ["coverUrl", "coverUrl"], ["portalBgUrl", "portalBgUrl"]] as const) {
+    if (formData.has(field)) patch[col] = String(formData.get(field) ?? "").trim() || null;
+  }
+  if (Object.keys(patch).length) await db.update(schema.brands).set(patch).where(eq(schema.brands.id, brandId));
+  revalidatePath(`/brands/${brand.slug}`);
+  return { ok: true };
+}
+
 // Brand posts a message into the shared inbox.
 export async function portalSendMessage(brandId: string, key: string, formData: FormData) {
   const { db, brand } = await requireBrand(brandId, key);
