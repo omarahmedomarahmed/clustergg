@@ -33,6 +33,7 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
   defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultOrbColor, defaultQuestRocket,
+  defaultLoadingInterval = 3, defaultLoadingAstronaut = "", defaultLoadingBg = "", defaultLoadingWordmark = true, defaultLoadingOrbSize = 80,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -50,9 +51,13 @@ export default function BrandingEditor({
   defaultOrbIcon: string;
   defaultOrbColor: string;
   defaultQuestRocket: string;
+  defaultLoadingInterval?: number;
+  defaultLoadingAstronaut?: string;
+  defaultLoadingBg?: string;
+  defaultLoadingWordmark?: boolean;
+  defaultLoadingOrbSize?: number;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
-  const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
   const [cpIcon, setCpIcon] = useState(defaultCpIcon);
   const [orbIcon, setOrbIcon] = useState(defaultOrbIcon);
   const [orbColor, setOrbColor] = useState(defaultOrbColor || "#8b5cf6");
@@ -61,12 +66,15 @@ export default function BrandingEditor({
   const [navBg, setNavBg] = useState(defaultNavBg);
   const [footerBg, setFooterBg] = useState(defaultFooterBg);
   const [favicon, setFavicon] = useState(defaultFavicon);
-  const [favZoom, setFavZoom] = useState(defaultFaviconZoom);
   const [navMode, setNavMode] = useState<Mode>(defaultNavMode);
   const [footerMode, setFooterMode] = useState<Mode>(defaultFooterMode);
   const [loadingColor, setLoadingColor] = useState(defaultLoadingColor);
   const [loadingLogo, setLoadingLogo] = useState(defaultLoadingLogo);
   const [loadingPhrases, setLoadingPhrases] = useState(defaultLoadingPhrases);
+  const [loadingInterval, setLoadingInterval] = useState(defaultLoadingInterval);
+  const [loadingAstronaut, setLoadingAstronaut] = useState(defaultLoadingAstronaut);
+  const [loadingBg, setLoadingBg] = useState(defaultLoadingBg);
+  const [loadingOrbSize, setLoadingOrbSize] = useState(defaultLoadingOrbSize);
   const phraseList = loadingPhrases.split("\n").map((s) => s.trim()).filter(Boolean);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(saveBranding, undefined);
 
@@ -75,20 +83,18 @@ export default function BrandingEditor({
       {/* Wordmark logo */}
       <div>
         <div className="font-semibold text-sm mb-1">Wordmark logo (wide)</div>
-        <p className="text-xs text-muted mb-3">The wide CLUSTER logo. When set, it replaces the gradient &ldquo;CLUSTER&rdquo; text next to the mark.</p>
+        <p className="text-xs text-muted mb-3">The wide CLUSTER logo. When set, it replaces the gradient &ldquo;CLUSTER&rdquo; text next to the mark. Use the single zoom slider under the preview to crop into the middle of the art (removes the empty space above/below a centred wordmark) — the crop is baked and shown big and wide in the nav.</p>
         <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
           <ImageUpload name="wordmark" value={wordmark} onChange={setWordmark}
-            aspect="4/1" rounded="rounded-lg" maxDim={640} scope="content"
-            hint="Transparent PNG works best. Wide lockup — around 4:1." />
-          <label className="mt-3 block text-xs text-muted">Wordmark size <span className="text-cyan-300">{wmZoom.toFixed(2)}×</span>
-            <input type="range" min={0.5} max={3} step={0.05} value={wmZoom} onChange={(e) => setWmZoom(Number(e.target.value))} className="w-full accent-violet-500" />
-          </label>
-          <input type="hidden" name="wordmarkZoom" value={wmZoom} />
+            aspect="4/1" rounded="rounded-lg" maxDim={720} scope="content" previewWidth={280}
+            hint="Transparent PNG works best. Wide lockup — around 4:1. Zoom in to fill the frame with the letters." />
+          {/* Display size stays at 1× — the nav renders the wordmark large by default. */}
+          <input type="hidden" name="wordmarkZoom" value="1" />
           {wordmark && (
             <div className="mt-4 flex items-center gap-4 rounded-xl bg-[#04051a] p-4 overflow-x-auto">
               <span className="text-[10px] uppercase tracking-widest text-muted shrink-0">Nav preview</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={wordmark} alt="Cluster" className="w-auto object-contain" style={{ height: 38 * wmZoom }} />
+              <img src={wordmark} alt="Cluster" className="w-auto object-contain" style={{ height: 54 }} />
             </div>
           )}
         </div>
@@ -155,22 +161,20 @@ export default function BrandingEditor({
 
       <div>
         <div className="font-semibold text-sm mb-1">Favicon (browser tab icon)</div>
-        <p className="text-xs text-muted mb-3">Square icon shown in the browser tab. Use the zoom to crop in.</p>
+        <p className="text-xs text-muted mb-3">Square icon shown in the browser tab. Use the single zoom slider under the preview to crop in — the crop is baked into the saved icon.</p>
         <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 grid gap-4 sm:grid-cols-[auto_1fr] items-start">
           <div className="flex flex-col items-center gap-2">
             <span className="relative h-12 w-12 overflow-hidden rounded-lg ring-1 ring-white/10 bg-black/40">
               {favicon
-                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={favicon} alt="" className="h-full w-full object-cover" style={{ transform: `scale(${favZoom})` }} />
+                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={favicon} alt="" className="h-full w-full object-cover" />
                 : <span className="flex h-full w-full items-center justify-center text-muted text-[10px]">none</span>}
             </span>
-            <span className="text-[10px] uppercase tracking-widest text-muted">Preview</span>
+            <span className="text-[10px] uppercase tracking-widest text-muted">Tab preview</span>
           </div>
           <div className="space-y-3">
-            <ImageUpload name="favicon" value={favicon} onChange={setFavicon} aspect="1/1" rounded="rounded-lg" maxDim={128} scope="content" hint="Square. PNG or SVG." />
-            <label className="block text-xs text-muted">Zoom <span className="text-cyan-300">{favZoom.toFixed(2)}×</span>
-              <input type="range" min={1} max={3} step={0.05} value={favZoom} onChange={(e) => setFavZoom(Number(e.target.value))} className="w-full accent-violet-500" />
-            </label>
-            <input type="hidden" name="faviconZoom" value={favZoom} />
+            <ImageUpload name="favicon" value={favicon} onChange={setFavicon} aspect="1/1" rounded="rounded-lg" maxDim={128} scope="content" hint="Square. PNG or SVG. Zoom to crop in." />
+            {/* Zoom is baked into the icon, so the tab always uses it directly. */}
+            <input type="hidden" name="faviconZoom" value="1" />
           </div>
         </div>
       </div>
@@ -230,6 +234,39 @@ export default function BrandingEditor({
                 <div className="mt-1.5 text-[11px] text-muted">{phraseList.length} phrase{phraseList.length > 1 ? "s" : ""} · first: <span className="grad-text font-semibold">{phraseList[0]}</span></div>
               )}
             </div>
+
+            {/* Rotation timing */}
+            <label className="block text-xs text-muted">Phrase rotation every <span className="text-cyan-300">{loadingInterval}s</span>
+              <input type="range" min={1} max={20} step={1} value={loadingInterval} onChange={(e) => setLoadingInterval(Number(e.target.value))} className="w-full accent-violet-500" />
+            </label>
+            <input type="hidden" name="loadingInterval" value={loadingInterval} />
+
+            {/* Orb size */}
+            <label className="block text-xs text-muted">Orb size <span className="text-cyan-300">{loadingOrbSize}px</span>
+              <input type="range" min={72} max={200} step={2} value={loadingOrbSize} onChange={(e) => setLoadingOrbSize(Number(e.target.value))} className="w-full accent-violet-500" />
+            </label>
+            <input type="hidden" name="loadingOrbSize" value={loadingOrbSize} />
+
+            {/* Astronaut on the loading screen */}
+            <div>
+              <div className="text-xs text-muted mb-1.5">Gamified astronaut (above the orb) — empty to hide</div>
+              <ImageUpload name="loadingAstronaut" value={loadingAstronaut} onChange={setLoadingAstronaut}
+                aspect="1/1" rounded="rounded-xl" maxDim={512} scope="content" hint="The mascot shown floating on the loading screen." />
+            </div>
+
+            {/* Loading background art */}
+            <div>
+              <div className="text-xs text-muted mb-1.5">Loading screen background image (empty = dark blur)</div>
+              <ImageUpload name="loadingBg" value={loadingBg} onChange={setLoadingBg}
+                aspect="16/9" maxDim={1920} scope="content" hint="Full-screen cosmic art behind the orb." />
+            </div>
+
+            {/* Wordmark toggle */}
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <input type="checkbox" name="loadingWordmark" defaultChecked={defaultLoadingWordmark} className="accent-violet-500 h-4 w-4" />
+              Show the Cluster wordmark at the bottom of the loading screen
+            </label>
+            <p className="text-[11px] text-muted">Tip: assign an ad creative to the <b>loading_screen</b> placement (Admin → Placements) to run an ad here.</p>
           </div>
         </div>
       </div>

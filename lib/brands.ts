@@ -179,6 +179,45 @@ export async function getBrandPortalData(db: DB, brandId: string, days = 30): Pr
   };
 }
 
+export type BrandAnalytics = {
+  impressions: number; clicks: number; ctr: number;
+  byDay: { day: string; impressions: number; clicks: number }[];
+  byPlacement: { key: string; pageScope: string; impressions: number; clicks: number }[];
+};
+
+// Analytics for the brand portal: one campaign (campaignId) or the whole brand
+// (all its campaigns merged). Powers the interactive chart + placement table and
+// the in-place ajax refresh endpoint.
+export async function getBrandAnalytics(db: DB, brandId: string, opts: { campaignId?: string; days?: number } = {}): Promise<BrandAnalytics> {
+  const days = opts.days ?? 90;
+  let campaignIds: string[];
+  if (opts.campaignId) {
+    const [c] = await db.select({ id: schema.adCampaigns.id }).from(schema.adCampaigns)
+      .where(and(eq(schema.adCampaigns.id, opts.campaignId), eq(schema.adCampaigns.brandId, brandId))).limit(1);
+    campaignIds = c ? [c.id] : [];
+  } else {
+    const rows = await db.select({ id: schema.adCampaigns.id }).from(schema.adCampaigns).where(eq(schema.adCampaigns.brandId, brandId));
+    campaignIds = rows.map((r) => r.id);
+  }
+  const empty: BrandAnalytics = { impressions: 0, clicks: 0, ctr: 0, byDay: [], byPlacement: [] };
+  if (campaignIds.length === 0) return empty;
+
+  const parts = await Promise.all(campaignIds.map((id) => getCampaignAnalytics(db, id, days)));
+  const day = new Map<string, { impressions: number; clicks: number }>();
+  const plc = new Map<string, { key: string; pageScope: string; impressions: number; clicks: number }>();
+  let imp = 0, clk = 0;
+  for (const a of parts) {
+    imp += a.impressions; clk += a.clicks;
+    for (const d of a.byDay) { const e = day.get(d.day) ?? { impressions: 0, clicks: 0 }; e.impressions += d.impressions; e.clicks += d.clicks; day.set(d.day, e); }
+    for (const p of a.byPlacement) { const e = plc.get(p.key) ?? { key: p.key, pageScope: p.pageScope, impressions: 0, clicks: 0 }; e.impressions += p.impressions; e.clicks += p.clicks; plc.set(p.key, e); }
+  }
+  return {
+    impressions: imp, clicks: clk, ctr: imp ? clk / imp : 0,
+    byDay: [...day.entries()].map(([d, v]) => ({ day: d, ...v })).sort((a, b) => a.day.localeCompare(b.day)),
+    byPlacement: [...plc.values()].sort((a, b) => b.impressions - a.impressions),
+  };
+}
+
 export async function getBrandBySlugOrId(db: DB, slugOrId: string) {
   const [byId] = await db.select().from(schema.brands).where(eq(schema.brands.id, slugOrId)).limit(1);
   if (byId) return byId;

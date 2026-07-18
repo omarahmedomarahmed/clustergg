@@ -57,6 +57,14 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.loading.color", String(formData.get("loadingColor") ?? "#8b5cf6").trim() || "#8b5cf6");
   await setContent("brand.loading.logo", String(formData.get("loadingLogo") ?? "").trim());
   await setContent("brand.loading.phrases", String(formData.get("loadingPhrases") ?? "").trim() || "Traversing the cluster…");
+  // Loading screen: rotation timing, astronaut, background, wordmark, orb size.
+  const lInt = Number(formData.get("loadingInterval"));
+  await setContent("brand.loading.interval", String(Math.max(1, Math.min(20, Number.isFinite(lInt) && lInt > 0 ? lInt : 3))));
+  if (formData.has("loadingAstronaut")) await setContent("brand.loading.astronaut", String(formData.get("loadingAstronaut") ?? "").trim());
+  if (formData.has("loadingBg")) await setContent("brand.loading.bg", String(formData.get("loadingBg") ?? "").trim());
+  await setContent("brand.loading.wordmark", formData.get("loadingWordmark") === "on" ? "1" : "0");
+  const orbSize = Number(formData.get("loadingOrbSize"));
+  await setContent("brand.loading.orbSize", String(Math.max(72, Math.min(200, Number.isFinite(orbSize) && orbSize > 0 ? orbSize : 80))));
   if (formData.has("orbIcon")) await setContent("brand.orb.icon", String(formData.get("orbIcon") ?? "").trim());
   if (formData.has("orbColor")) await setContent("brand.orb.color", String(formData.get("orbColor") ?? "#8b5cf6").trim() || "#8b5cf6");
   if (formData.has("questRocket")) await setContent("brand.quest.rocket", String(formData.get("questRocket") ?? "").trim());

@@ -14,16 +14,17 @@ export default async function BrandHeader({ placement = "nav" }: { placement?: "
   const wordmark = c["brand.wordmark"];
   const wmZoom = Number(c["brand.wordmark.zoom"]) || 1;
 
-  // Big, glorified marks — the square C mark now matches the game-logo size and
-  // the wordmark is much larger, scaled further by the admin's zoom.
+  // Big, glorified marks — the square C mark matches the game-logo size and the
+  // wordmark renders large and wide by default (the admin crops it to fill the
+  // frame in the brand kit). `wmZoom` stays an optional extra multiplier.
   const markSize = placement === "nav" ? 44 : 34;
-  const wmHeight = (placement === "nav" ? 38 : 28) * wmZoom;
+  const wmHeight = (placement === "nav" ? 54 : 40) * wmZoom;
 
   const showMark = mode !== "wordmark";
   const word = mode === "mark"
     ? null
     : wordmark
-      ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={wordmark} alt="Cluster" style={{ height: wmHeight }} className="w-auto object-contain" />)
+      ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={wordmark} alt="Cluster" style={{ height: wmHeight }} className={`w-auto object-contain ${placement === "nav" ? "max-w-[160px] sm:max-w-[260px]" : "max-w-[220px]"}`} />)
       : <span className={`${placement === "nav" ? "hidden sm:inline text-2xl" : "text-lg"} font-bold tracking-wide grad-text`}>CLUSTER</span>;
 
   return (

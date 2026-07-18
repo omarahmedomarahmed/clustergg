@@ -15,6 +15,7 @@ export default async function BrandKitPage() {
     "brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y",
     "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.footer.mode",
     "brand.loading.color", "brand.loading.logo", "brand.loading.phrases",
+    "brand.loading.interval", "brand.loading.astronaut", "brand.loading.bg", "brand.loading.wordmark", "brand.loading.orbSize",
     "brand.nav.bg", "brand.footer.bg", "brand.favicon", "brand.favicon.zoom", "brand.cpIcon", "brand.orb.icon", "brand.orb.color", "brand.quest.rocket",
   ]);
 
@@ -58,6 +59,11 @@ export default async function BrandKitPage() {
           defaultOrbIcon={c["brand.orb.icon"] || ""}
           defaultOrbColor={c["brand.orb.color"] || "#8b5cf6"}
           defaultQuestRocket={c["brand.quest.rocket"] || ""}
+          defaultLoadingInterval={Number(c["brand.loading.interval"]) || 3}
+          defaultLoadingAstronaut={c["brand.loading.astronaut"] ?? ""}
+          defaultLoadingBg={c["brand.loading.bg"] || ""}
+          defaultLoadingWordmark={(c["brand.loading.wordmark"] ?? "1") !== "0"}
+          defaultLoadingOrbSize={Number(c["brand.loading.orbSize"]) || 80}
         />
       </section>
 

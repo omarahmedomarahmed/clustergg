@@ -7,6 +7,7 @@ import Avatar from "@/components/Avatar";
 import TopBannerAd from "@/components/TopBannerAd";
 import ZoomPan from "@/components/ZoomPan";
 import CpIcon from "@/components/CpIcon";
+import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
@@ -184,20 +185,27 @@ export default function QuestMapHero({
             );
           })}
 
-          {/* You-are-here marker — rides the trail at the exact CP position.
-              Fixed (no float); admin can replace it with a custom image. */}
+          {/* You-are-here marker — the gamified astronaut, riding the trail at the
+              exact CP position and FACING the way it's travelling toward the next
+              milestone (front at the finish). Admin can override with a single
+              static image via brand.quest.rocket. Fixed (no float). */}
           <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10" style={{ left: `${youX}%`, top: `${youY}%` }}>
-            {rocketUrl ? (
-              <span className="relative block h-9 w-9">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={rocketUrl} alt="" className="h-full w-full object-contain drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]" />
-              </span>
-            ) : (
-              <span className="relative flex h-7 w-7 items-center justify-center rounded-full text-white" style={{ background: q.accent2, boxShadow: `0 0 16px 3px ${q.accent2}` }}>
-                <Icon name="rocket" size={14} />
-                <span className="absolute inset-0 rounded-full animate-ping" style={{ background: `${q.accent2}66` }} />
-              </span>
-            )}
+            {(() => {
+              // Direction toward the next milestone: right if it's further along, else left.
+              const facing: "front" | "left" | "right" = to ? (to.mapX >= youX ? "right" : "left") : "front";
+              const markerUrl = rocketUrl || QUEST_ASTRONAUT[facing];
+              return markerUrl ? (
+                <span className="relative block h-14 w-14 md:h-16 md:w-16">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={markerUrl} alt="you are here" className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(34,211,238,0.7)]" />
+                </span>
+              ) : (
+                <span className="relative flex h-7 w-7 items-center justify-center rounded-full text-white" style={{ background: q.accent2, boxShadow: `0 0 16px 3px ${q.accent2}` }}>
+                  <Icon name="rocket" size={14} />
+                  <span className="absolute inset-0 rounded-full animate-ping" style={{ background: `${q.accent2}66` }} />
+                </span>
+              );
+            })()}
             <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-bold" style={{ color: q.accent2 }}>
               {q.qp.toLocaleString()} CP
             </span>
