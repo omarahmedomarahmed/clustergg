@@ -16,6 +16,8 @@ import { getQuestHeroData } from "@/lib/quest-hero";
 import { getTotalCp, getUserQuests } from "@/lib/quests";
 import { getProvider } from "@/lib/providers/registry";
 import { resolveTheme, themeToVars, bgLayerStyle } from "@/lib/theme";
+import { getContent } from "@/lib/cms";
+import { cardBgCmsKeys, buildCardBgMap, cardBgStyle } from "@/lib/card-bg";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
 
@@ -130,6 +132,7 @@ export default async function FeedPage() {
     return { accountId: s.linkedAccountId, game: gameName ?? s.game, logoUrl: slimImg(g?.logoUrl ?? null, 300000), metricKey: s.metricKey, metricLabel: s.metricKey.replace(/_/g, " "), value: s.metricValue, inGameName: a?.inGameName ?? "" };
   });
   const dashboardWidgets = (Array.isArray(prefs.dashboard) ? prefs.dashboard : []) as Widget[];
+  const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
 
   return (
     <div className="profile-root relative" style={{ ...(themeToVars(theme) as React.CSSProperties), background: theme.bgImage ? "transparent" : undefined }}>
@@ -238,7 +241,7 @@ export default async function FeedPage() {
         {/* ===== Rail ===== */}
         <aside className="space-y-6">
           {/* My planets */}
-          <div className="glass p-5">
+          <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_myplanets") }}>
             <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="planet" size={15} className="text-cyan-300" /> My planets</h3>
             {mySpaceRows.length === 0 ? (
               <p className="text-xs text-muted">You haven&apos;t joined any planets yet.</p>
@@ -261,7 +264,7 @@ export default async function FeedPage() {
           </div>
 
           {/* Explore planets */}
-          <div className="glass p-5">
+          <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_explore") }}>
             <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="rocket" size={15} className="text-violet-300" /> Explore planets</h3>
             <div className="space-y-2">
               {suggested.map((s) => {
