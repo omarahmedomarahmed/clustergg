@@ -108,6 +108,77 @@ export async function getAdsMasterTotals(db: DB, days = 30) {
   return { impressions, clicks, ctr: impressions ? clicks / impressions : 0, brands: Number(brandCount?.c ?? 0), liveCampaigns: Number(liveCampaigns?.c ?? 0) };
 }
 
+export type BrandCampaignSummary = {
+  id: string; name: string; status: string; startDate: Date; endDate: Date;
+  budget: number | null; coverUrl: string | null; logoUrl: string | null;
+  impressions: number; clicks: number; ctr: number;
+  filled: number; total: number; ready: boolean;
+};
+
+export type BrandPortalData = {
+  campaigns: BrandCampaignSummary[];
+  totals: { impressions: number; clicks: number; ctr: number; active: number; total: number };
+  intel: {
+    topPlacement: { key: string; impressions: number } | null;
+    topCountry: { country: string; impressions: number } | null;
+    topPage: { path: string; impressions: number } | null;
+    bestDay: { day: string; impressions: number } | null;
+    byDay: { day: string; impressions: number; clicks: number }[];
+  };
+};
+
+// Everything the glorified brand portal needs in one call: every campaign with
+// its own rolled-up numbers + readiness, brand-wide totals, and the marketing
+// intelligence (best placement / country / page / day) across all campaigns.
+export async function getBrandPortalData(db: DB, brandId: string, days = 30): Promise<BrandPortalData> {
+  const campaigns = await db.select().from(schema.adCampaigns)
+    .where(eq(schema.adCampaigns.brandId, brandId))
+    .orderBy(desc(schema.adCampaigns.createdAt));
+
+  const perCampaign = await Promise.all(campaigns.map(async (c) => {
+    const [analytics, readiness] = await Promise.all([
+      getCampaignAnalytics(db, c.id, days),
+      getCampaignReadiness(db, c.id),
+    ]);
+    return { c, analytics, readiness };
+  }));
+
+  const summaries: BrandCampaignSummary[] = perCampaign.map(({ c, analytics, readiness }) => ({
+    id: c.id, name: c.name, status: c.status, startDate: c.startDate, endDate: c.endDate,
+    budget: c.budget, coverUrl: c.coverUrl, logoUrl: c.logoUrl,
+    impressions: analytics.impressions, clicks: analytics.clicks, ctr: analytics.ctr,
+    filled: readiness.filled, total: readiness.total, ready: readiness.ready,
+  }));
+
+  const totImp = summaries.reduce((s, c) => s + c.impressions, 0);
+  const totClk = summaries.reduce((s, c) => s + c.clicks, 0);
+
+  // Merge the per-campaign slices for brand-wide intelligence.
+  const plc = new Map<string, number>(), ctry = new Map<string, number>(), page = new Map<string, number>(), day = new Map<string, { impressions: number; clicks: number }>();
+  for (const { analytics } of perCampaign) {
+    for (const p of analytics.byPlacement) plc.set(p.key, (plc.get(p.key) ?? 0) + p.impressions);
+    for (const c of analytics.byCountry) ctry.set(c.country, (ctry.get(c.country) ?? 0) + c.impressions);
+    for (const p of analytics.byPage) page.set(p.path, (page.get(p.path) ?? 0) + p.impressions);
+    for (const d of analytics.byDay) { const e = day.get(d.day) ?? { impressions: 0, clicks: 0 }; e.impressions += d.impressions; e.clicks += d.clicks; day.set(d.day, e); }
+  }
+  const top = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+  const tp = top(plc), tc = top(ctry), tg = top(page);
+  const byDay = [...day.entries()].map(([d, v]) => ({ day: d, ...v })).sort((a, b) => a.day.localeCompare(b.day));
+  const bestDay = [...byDay].sort((a, b) => b.impressions - a.impressions)[0] ?? null;
+
+  return {
+    campaigns: summaries,
+    totals: { impressions: totImp, clicks: totClk, ctr: totImp ? totClk / totImp : 0, active: summaries.filter((c) => c.status === "active").length, total: summaries.length },
+    intel: {
+      topPlacement: tp ? { key: tp[0], impressions: tp[1] } : null,
+      topCountry: tc ? { country: tc[0], impressions: tc[1] } : null,
+      topPage: tg ? { path: tg[0], impressions: tg[1] } : null,
+      bestDay: bestDay ? { day: bestDay.day, impressions: bestDay.impressions } : null,
+      byDay,
+    },
+  };
+}
+
 export async function getBrandBySlugOrId(db: DB, slugOrId: string) {
   const [byId] = await db.select().from(schema.brands).where(eq(schema.brands.id, slugOrId)).limit(1);
   if (byId) return byId;

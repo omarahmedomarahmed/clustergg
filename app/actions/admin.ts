@@ -10,6 +10,20 @@ import { syncAccount } from "@/lib/sync";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
 
+// Re-host every Higgsfield/cloudfront + inline data-URL image onto our own Vercel
+// Blob storage, so Neon only ever stores short Blob links (kills the data-transfer
+// bloat). Idempotent — safe to run any time from the storage audit page.
+export async function rehostAllImagesNow(): Promise<ActionState> {
+  await requireAdmin();
+  const db = await getDb();
+  const { blobConfigured } = await import("@/lib/blob");
+  if (!blobConfigured()) return { error: "Vercel Blob isn't configured (missing BLOB_READ_WRITE_TOKEN)." };
+  const { rehostImagesToBlob } = await import("@/lib/db/seed");
+  await rehostImagesToBlob(db);
+  revalidatePath("/admin/storage");
+  return { ok: true, message: "Re-hosted all external + inline images to Blob." };
+}
+
 // Platform logo (nav + footer) — image + framing, saved to the CMS. Applies
 // site-wide immediately via a layout revalidation.
 export async function saveBrandLogo(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -43,6 +57,8 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.loading.logo", String(formData.get("loadingLogo") ?? "").trim());
   await setContent("brand.loading.phrases", String(formData.get("loadingPhrases") ?? "").trim() || "Traversing the cluster…");
   if (formData.has("orbIcon")) await setContent("brand.orb.icon", String(formData.get("orbIcon") ?? "").trim());
+  if (formData.has("orbColor")) await setContent("brand.orb.color", String(formData.get("orbColor") ?? "#8b5cf6").trim() || "#8b5cf6");
+  if (formData.has("questRocket")) await setContent("brand.quest.rocket", String(formData.get("questRocket") ?? "").trim());
   await setContent("brand.nav.bg", String(formData.get("navBg") ?? "").trim());
   await setContent("brand.footer.bg", String(formData.get("footerBg") ?? "").trim());
   await setContent("brand.favicon", String(formData.get("favicon") ?? "").trim());
@@ -486,16 +502,48 @@ export async function saveCampaign(brandId: string, formData: FormData) {
     targetGeo: String(formData.get("targetGeo") ?? "").trim() || null,
     targetDevice: String(formData.get("targetDevice") ?? "both"),
     status: String(formData.get("status") ?? "active"),
+    coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
+    logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
   };
   if (!values.name) return;
   if (campaignId) {
     await db.update(schema.adCampaigns).set(values).where(eq(schema.adCampaigns.id, campaignId));
     await audit(admin.id, "campaign.update", "campaign", campaignId);
+    revalidatePath(`/admin/ads/campaign/${campaignId}`);
   } else {
     await db.insert(schema.adCampaigns).values({ id: uid(), brandId, ...values });
     await audit(admin.id, "campaign.create", "campaign", values.name);
   }
   revalidatePath(`/admin/brands/${brandId}`);
+}
+
+// Admin: upload (or replace) the creative for one placement of a campaign in a
+// single step — the campaign-page equivalent of the brand portal's uploader.
+export async function adminUploadCreativeToPlacement(campaignId: string, formData: FormData) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const placementId = String(formData.get("placementId") ?? "");
+  const fileUrl = String(formData.get("fileUrl") ?? "").trim();
+  const type = String(formData.get("type") ?? "image");
+  const clickUrl = String(formData.get("clickUrl") ?? "").trim() || null;
+  if (!placementId || !fileUrl) return { error: "Pick a placement and upload a creative." };
+  const [campaign] = await db.select().from(schema.adCampaigns).where(eq(schema.adCampaigns.id, campaignId)).limit(1);
+  const [placement] = await db.select().from(schema.adPlacements).where(eq(schema.adPlacements.id, placementId)).limit(1);
+  if (!campaign || !placement) return { error: "Unknown campaign or placement." };
+
+  const creativeId = uid();
+  await db.insert(schema.adCreatives).values({
+    id: creativeId, brandId: campaign.brandId, name: `${placement.key}`, type,
+    fileUrl, clickUrl, width: placement.width, height: placement.height,
+    durationSeconds: type === "video" ? 5 : null, status: "approved",
+  });
+  await db.delete(schema.adCampaignCreatives).where(and(
+    eq(schema.adCampaignCreatives.campaignId, campaignId),
+    eq(schema.adCampaignCreatives.placementId, placementId)));
+  await db.insert(schema.adCampaignCreatives).values({ id: uid(), campaignId, creativeId, placementId, weight: 1, priority: 0 });
+  await audit(admin.id, "creative.upload", "campaign", campaignId);
+  revalidatePath(`/admin/ads/campaign/${campaignId}`);
+  return { ok: true };
 }
 
 export async function saveCreative(formData: FormData) {
@@ -521,6 +569,29 @@ export async function saveCreative(formData: FormData) {
   revalidatePath("/admin/creatives");
 }
 
+// Create many creatives in one save from a list of already-uploaded Blob URLs
+// (bulk multi-file upload on the creatives page). Each becomes its own creative.
+export async function saveCreativesBulk(formData: FormData) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const brandId = String(formData.get("brandId") ?? "");
+  let items: { url: string; name: string; type?: string }[] = [];
+  try { items = JSON.parse(String(formData.get("items") ?? "[]")); } catch { items = []; }
+  if (!brandId || items.length === 0) return;
+  const rows = items
+    .filter((it) => it.url && it.url.trim())
+    .map((it) => ({
+      id: uid(), brandId, status: "pending_review" as const,
+      name: (it.name || "Creative").slice(0, 120),
+      type: it.type === "video" ? "video" : "image",
+      fileUrl: it.url.trim(), clickUrl: null, width: null, height: null, durationSeconds: null,
+    }));
+  if (rows.length === 0) return;
+  await db.insert(schema.adCreatives).values(rows);
+  await audit(admin.id, "creative.bulk_create", "creative", `${rows.length} creatives`);
+  revalidatePath("/admin/creatives");
+}
+
 export async function reviewCreative(creativeId: string, approve: boolean) {
   const admin = await requireAdmin();
   const db = await getDb();
@@ -541,9 +612,20 @@ export async function assignCreative(formData: FormData) {
     priority: Number(formData.get("priority")) || 0,
   };
   if (!values.campaignId || !values.creativeId || !values.placementId) return;
+  // Don't double-assign the same creative to the same placement in the same campaign.
+  const [dupe] = await db.select({ id: schema.adCampaignCreatives.id }).from(schema.adCampaignCreatives)
+    .where(and(
+      eq(schema.adCampaignCreatives.campaignId, values.campaignId),
+      eq(schema.adCampaignCreatives.creativeId, values.creativeId),
+      eq(schema.adCampaignCreatives.placementId, values.placementId),
+    )).limit(1);
+  if (dupe) return;
   await db.insert(schema.adCampaignCreatives).values({ id: uid(), ...values });
   await audit(admin.id, "campaign_creative.assign", "campaign_creative", values.creativeId);
   revalidatePath("/admin/ads/schedule");
+  revalidatePath("/admin/creatives");
+  revalidatePath("/admin/placements");
+  revalidatePath(`/admin/ads/campaign/${values.campaignId}`);
 }
 
 export async function removeAssignment(id: string) {
@@ -552,6 +634,8 @@ export async function removeAssignment(id: string) {
   await db.delete(schema.adCampaignCreatives).where(eq(schema.adCampaignCreatives.id, id));
   await audit(admin.id, "campaign_creative.remove", "campaign_creative", id);
   revalidatePath("/admin/ads/schedule");
+  revalidatePath("/admin/creatives");
+  revalidatePath("/admin/placements");
 }
 
 export async function savePlacement(formData: FormData) {

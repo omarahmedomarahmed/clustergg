@@ -14,7 +14,7 @@ import type { QuestView, QuestGamer } from "@/lib/quests";
 // path as you progress (bronze → platinum), a per-quest space backdrop, and a
 // glorified toggle to switch to another quest's map.
 export default function QuestMapHero({
-  quest, tierHolders, tabs, toggle, backHref, variants, totalCp,
+  quest, tierHolders, tabs, toggle, backHref, variants, totalCp, rocketUrl,
 }: {
   quest: QuestView;
   tierHolders: Record<string, QuestGamer[]>;
@@ -22,11 +22,13 @@ export default function QuestMapHero({
   toggle?: React.ReactNode;
   backHref?: string;
   totalCp?: number;
+  rocketUrl?: string;
   // When provided, the quest tabs switch the map IN-FRAME (feed/home) instead
   // of navigating to the quest page.
   variants?: { key: string; quest: QuestView; tierHolders: Record<string, QuestGamer[]> }[];
 }) {
   const [sel, setSel] = useState<number | null>(null);
+  const [howto, setHowto] = useState(false);
   const [activeKey, setActiveKey] = useState(quest.key);
   const inFrame = !!variants && variants.length > 0;
   const active = inFrame ? (variants!.find((v) => v.key === activeKey) ?? variants![0]) : null;
@@ -66,19 +68,12 @@ export default function QuestMapHero({
       {/* Sponsor strip — over the quest backdrop, not the plain site backdrop */}
       <TopBannerAd className="pt-3 pb-1" />
 
-      {/* Back to all quests + total CP — live ON the hero art */}
-      {(backHref || totalCp !== undefined) && (
-        <div className="mx-auto max-w-6xl px-4 pt-3 flex items-center justify-between gap-3">
-          {backHref ? (
-            <Link href={backHref} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/30 backdrop-blur px-3.5 py-1.5 text-xs font-semibold text-white hover:border-cyan-400/50 transition-colors">
-              <Icon name="arrowLeft" size={13} /> All quests
-            </Link>
-          ) : <span />}
-          {totalCp !== undefined && (
-            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/40 backdrop-blur px-3.5 py-1.5 text-sm font-bold text-white">
-              <CpIcon size={20} /> {totalCp.toLocaleString()} <span className="text-muted font-semibold">total CP</span>
-            </span>
-          )}
+      {/* Back to all quests — live ON the hero art */}
+      {backHref && (
+        <div className="mx-auto max-w-6xl px-4 pt-3">
+          <Link href={backHref} className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/30 backdrop-blur px-3.5 py-1.5 text-xs font-semibold text-white hover:border-cyan-400/50 transition-colors">
+            <Icon name="arrowLeft" size={13} /> All quests
+          </Link>
         </div>
       )}
 
@@ -108,11 +103,19 @@ export default function QuestMapHero({
           </div>
         )}
 
-        {/* Quest identity + how-to-earn — ABOVE the map art (kept above it) */}
+        {/* Total CP — BELOW the toggle */}
+        {totalCp !== undefined && (
+          <div className="flex justify-center mb-4">
+            <Link href="/quests" className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-black/40 backdrop-blur px-4 py-1.5 text-sm font-bold text-white hover:border-cyan-400/40">
+              <CpIcon size={20} /> {totalCp.toLocaleString()} <span className="text-muted font-semibold">total CP</span>
+            </Link>
+          </div>
+        )}
+
+        {/* Quest identity — description now lives in the "How to play" overlay */}
         <div className="relative z-20 mx-auto max-w-3xl text-center mb-5">
           <h1 className="text-3xl md:text-5xl font-bold grad-text">{q.name}</h1>
           <p className="text-muted mt-1.5">{q.tagline}</p>
-          {q.lore && <p className="text-sm text-muted/90 mt-2 max-w-xl mx-auto leading-relaxed">{q.lore}</p>}
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
             <span className="inline-flex items-center gap-1.5 font-semibold text-base" style={{ color: q.accent2 }}>
               <CpIcon size={22} /> {q.qp.toLocaleString()} CP earned
@@ -125,11 +128,29 @@ export default function QuestMapHero({
           </div>
         </div>
 
-        {/* The map — floating (no card frame): drag to pan, wheel/buttons to
-            zoom. Sits BEHIND the surrounding text (z-0), starts zoomed in,
-            overflows onto the background, and gently bobs up/down like a planet. */}
+        {/* Glorified milestone ladder — the 4 tiers with their art + CP, ON TOP of the map */}
+        <div className="relative z-20 mx-auto max-w-4xl mb-4 grid grid-cols-4 gap-2 md:gap-3">
+          {tiers.map((t, i) => (
+            <button key={t.id} onClick={() => setSel(sel === i ? null : i)}
+              className={`group relative flex flex-col items-center gap-1.5 rounded-2xl border p-2.5 transition-all ${t.earned ? "" : "opacity-70"}`}
+              style={{ borderColor: t.earned ? `${(t.color || q.color)}88` : "rgba(255,255,255,0.12)", background: t.earned ? `${(t.color || q.color)}14` : "rgba(4,5,26,0.5)" }}>
+              <span className="flex items-center justify-center rounded-xl" style={{ width: 48, height: 48, background: t.earned ? `${(t.color || q.color)}26` : "rgba(255,255,255,0.05)", boxShadow: t.earned ? `0 0 18px -4px ${t.color || q.color}` : "none" }}>
+                {t.iconUrl
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={t.iconUrl} alt="" className="h-9 w-9 object-contain" style={{ filter: t.earned ? "none" : "grayscale(1)" }} />
+                  : <Icon name={q.icon} size={22} style={{ color: t.earned ? (t.color || q.color) : "#6b7280" }} />}
+              </span>
+              <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-wide truncate w-full text-center" style={{ color: t.earned ? (t.color || q.color) : "#8b8ba7" }}>{t.name}</span>
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-muted"><CpIcon size={10} /> {t.thresholdQp.toLocaleString()}</span>
+              {t.earned && <span className="absolute top-1 right-1 text-emerald-300 text-[10px]">✓</span>}
+            </button>
+          ))}
+        </div>
+
+        {/* The map — fit (zoomed out) by default; zoom ONLY via the on-map
+            controls (no scroll-zoom, no drag). Sits BEHIND the surrounding text
+            (z-0) and gently bobs up/down like a planet. */}
         <div className="relative z-0 mx-auto w-full max-w-4xl aspect-[16/9] float-y">
-          <ZoomPan className="h-full w-full" max={4} initial={1.3}>
+          <ZoomPan className="h-full w-full" max={4} initial={1} wheel={false} pan={false}>
           {/* map art */}
           <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
           {/* readability veil */}
@@ -163,23 +184,44 @@ export default function QuestMapHero({
             );
           })}
 
-          {/* You-are-here rocket — rides the trail at the exact CP position */}
+          {/* You-are-here marker — rides the trail at the exact CP position.
+              Fixed (no float); admin can replace it with a custom image. */}
           <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10" style={{ left: `${youX}%`, top: `${youY}%` }}>
-            <span className="relative flex h-7 w-7 items-center justify-center rounded-full text-white float-y" style={{ background: q.accent2, boxShadow: `0 0 16px 3px ${q.accent2}` }}>
-              <Icon name="rocket" size={14} />
-              <span className="absolute inset-0 rounded-full animate-ping" style={{ background: `${q.accent2}66` }} />
-            </span>
+            {rocketUrl ? (
+              <span className="relative block h-9 w-9">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={rocketUrl} alt="" className="h-full w-full object-contain drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]" />
+              </span>
+            ) : (
+              <span className="relative flex h-7 w-7 items-center justify-center rounded-full text-white" style={{ background: q.accent2, boxShadow: `0 0 16px 3px ${q.accent2}` }}>
+                <Icon name="rocket" size={14} />
+                <span className="absolute inset-0 rounded-full animate-ping" style={{ background: `${q.accent2}66` }} />
+              </span>
+            )}
             <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-bold" style={{ color: q.accent2 }}>
               {q.qp.toLocaleString()} CP
             </span>
           </div>
           </ZoomPan>
 
-          {/* How-to-play label — fixed over the map (top-right; zoom controls
-              occupy the top-left) */}
-          <div className="absolute top-3 right-3 z-20 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white pointer-events-none">
-            <Icon name="spark" size={11} style={{ color: q.accent2 }} /> Drag &amp; zoom · tap a milestone
-          </div>
+          {/* How-to-play button — opens an overlay with the quest description */}
+          <button type="button" onClick={() => setHowto((v) => !v)}
+            className="absolute top-3 right-3 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/55 backdrop-blur px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest text-white hover:border-cyan-400/50 transition-colors">
+            <Icon name="spark" size={12} style={{ color: q.accent2 }} /> How to play
+          </button>
+          {howto && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center p-4" onClick={() => setHowto(false)}>
+              <div onClick={(e) => e.stopPropagation()} className="max-w-lg w-full rounded-2xl border border-white/15 backdrop-blur-xl p-5 bg-cover bg-center shadow-2xl"
+                style={{ background: (q.mapArtUrl || q.cardBgUrl) ? `linear-gradient(rgba(4,5,26,0.88), rgba(4,5,26,0.94)), url(${q.mapArtUrl || q.cardBgUrl}) center/cover` : "rgba(4,5,26,0.94)" }}>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-bold text-lg grad-text">{q.name} — How to play</h3>
+                  <button onClick={() => setHowto(false)} className="text-muted hover:text-ink"><Icon name="x" size={16} /></button>
+                </div>
+                <p className="text-sm text-muted leading-relaxed">{q.lore || q.tagline}</p>
+                <div className="mt-3 text-xs text-muted">Earn Cluster Points by playing across the Cluster — pass each milestone to level up this quest.</div>
+              </div>
+            </div>
+          )}
 
           {/* Milestone detail — overlay panel on click (over the quest art) */}
           {sel !== null && tiers[sel] && (

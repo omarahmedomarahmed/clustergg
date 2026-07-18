@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { getBrandBySlugOrId, getCampaignReadiness, getCampaignAnalytics, getBrandInbox } from "@/lib/brands";
+import { getBrandBySlugOrId, getBrandPortalData, getCampaignReadiness, getCampaignAnalytics, getBrandInbox } from "@/lib/brands";
 import BrandCreativeUploader from "@/components/BrandCreativeUploader";
 import BrandMessageForm from "@/components/BrandMessageForm";
+import AnimatedNumber from "@/components/AnimatedNumber";
+import Sparkline from "@/components/Sparkline";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -15,15 +17,17 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function BrandPortalPage({
   params, searchParams,
-}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string }> }) {
+}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; campaign?: string; filter?: string }> }) {
   const { slug } = await params;
-  const { key = "" } = await searchParams;
+  const { key = "", campaign: campaignId = "", filter = "all" } = await searchParams;
   const db = await getDb();
   const brand = await getBrandBySlugOrId(db, slug);
   if (!brand) notFound();
 
   const unlocked = !!brand.accessKey && brand.accessKey === key;
   const cover = brand.coverUrl;
+  const base = `/brands/${brand.slug}?key=${encodeURIComponent(key)}`;
+  const num = (n: number) => n.toLocaleString();
 
   // Locked: ask for the key + show the creative-requirements teaser.
   if (!unlocked) {
@@ -60,85 +64,177 @@ export default async function BrandPortalPage({
     );
   }
 
-  // Unlocked: campaign readiness + analytics + inbox.
-  const [campaign] = await db.select().from(schema.adCampaigns).where(eq(schema.adCampaigns.brandId, brand.id)).orderBy(desc(schema.adCampaigns.createdAt)).limit(1);
-  const [readiness, analytics, inbox] = await Promise.all([
-    campaign ? getCampaignReadiness(db, campaign.id) : Promise.resolve(null),
-    campaign ? getCampaignAnalytics(db, campaign.id) : Promise.resolve(null),
-    getBrandInbox(db, brand.id),
-  ]);
+  const inbox = await getBrandInbox(db, brand.id);
 
-  const refreshHref = `/brands/${brand.slug}?key=${encodeURIComponent(key)}`;
-  const num = (n: number) => n.toLocaleString();
+  // ---- Per-campaign drill-down view ----
+  if (campaignId) {
+    const [campaign] = await db.select().from(schema.adCampaigns)
+      .where(eq(schema.adCampaigns.id, campaignId)).limit(1);
+    if (!campaign || campaign.brandId !== brand.id) {
+      return <div className="min-h-screen mx-auto max-w-5xl px-4 py-10"><a href={base} className="text-cyan-300">← Back to portal</a><div className="glass p-6 mt-4 text-muted">Campaign not found.</div></div>;
+    }
+    const [readiness, analytics] = await Promise.all([
+      getCampaignReadiness(db, campaign.id),
+      getCampaignAnalytics(db, campaign.id),
+    ]);
+    return (
+      <div className="min-h-screen">
+        <PortalHeader name={brand.name} logo={campaign.logoUrl || brand.logoUrl} cover={campaign.coverUrl || cover} subtitle={campaign.name} />
+        <div className="mx-auto max-w-5xl px-4 py-8 space-y-8">
+          <div className="flex items-center justify-between">
+            <a href={base} className="ghost-btn pressable rounded-full px-4 py-2 text-sm inline-flex items-center gap-1.5"><Icon name="arrowLeft" size={14} /> All campaigns</a>
+            <span className={`text-xs font-semibold ${campaign.status === "active" ? "text-emerald-300" : "text-amber-300"}`}>● {campaign.status}</span>
+          </div>
+
+          <div className="grid sm:grid-cols-4 gap-3">
+            <AnimStat label="Impressions (30d)" value={analytics.impressions} />
+            <AnimStat label="Clicks (30d)" value={analytics.clicks} />
+            <AnimStat label="CTR" value={analytics.ctr * 100} suffix="%" decimals={2} />
+            <Stat label="Placements ready" value={`${readiness.filled}/${readiness.total}`} accent={readiness.ready ? "#34d399" : "#fbbf24"} />
+          </div>
+
+          {analytics.byDay.length > 1 && (
+            <div className="glass p-5">
+              <div className="text-[10px] uppercase tracking-widest text-muted mb-2">Daily impressions</div>
+              <Sparkline points={analytics.byDay.map((d) => d.impressions)} />
+            </div>
+          )}
+
+          {/* Creative slots */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="grid" size={18} className="text-violet-300" /> Creatives by placement</h2>
+              <span className={`text-xs font-semibold ${readiness.ready ? "text-emerald-300" : "text-amber-300"}`}>{readiness.filled}/{readiness.total} ready{readiness.ready ? " — campaign can go live" : ""}</span>
+            </div>
+            <p className="text-xs text-muted mb-4">Your campaign shows in every placement. Each shows for ~5 seconds every minute alongside other brands. Upload one creative per placement below.</p>
+            <div className="grid md:grid-cols-2 gap-3">
+              {readiness.slots.map((s) => (
+                <BrandCreativeUploader key={s.placementId} brandId={brand.id} keyStr={key}
+                  slot={{ placementId: s.placementId, key: s.key, pageScope: s.pageScope, width: s.width, height: s.height, creativeType: s.creativeType, fileUrl: s.fileUrl, clickUrl: s.clickUrl }} />
+              ))}
+            </div>
+          </section>
+
+          {/* Per-placement analytics */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="chart" size={18} className="text-cyan-300" /> Placement analytics</h2>
+              <a href={`${base}&campaign=${campaign.id}`} className="ghost-btn pressable rounded-full px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5"><Icon name="satellite" size={13} /> Refresh</a>
+            </div>
+            <div className="glass overflow-x-auto">
+              <table className="w-full table-cosmic min-w-[520px]">
+                <thead><tr><th>Placement</th><th>Page</th><th>Impressions</th><th>Clicks</th><th>CTR</th></tr></thead>
+                <tbody>
+                  {analytics.byPlacement.length === 0 && <tr><td colSpan={5} className="text-muted text-sm p-4">No impressions yet — they appear once your campaign is live.</td></tr>}
+                  {analytics.byPlacement.map((r) => (
+                    <tr key={r.key}>
+                      <td className="font-semibold text-sm">{r.key}</td>
+                      <td className="text-xs text-muted">{r.pageScope}</td>
+                      <td className="text-cyan-200 font-bold">{num(r.impressions)}</td>
+                      <td>{num(r.clicks)}</td>
+                      <td className="text-xs">{r.impressions ? ((r.clicks / r.impressions) * 100).toFixed(1) : "0.0"}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  // ---- Overview: all campaigns + brand-wide intelligence ----
+  const data = await getBrandPortalData(db, brand.id);
+  const shown = data.campaigns.filter((c) => filter === "all" || c.status === filter);
+  const chip = (f: string, label: string) => (
+    <a href={`${base}&filter=${f}`} className={`rounded-full border px-3 py-1 text-xs transition ${filter === f ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-200" : "border-white/12 text-muted hover:border-white/25"}`}>{label}</a>
+  );
 
   return (
     <div className="min-h-screen">
-      <PortalHeader name={brand.name} logo={brand.logoUrl} cover={cover} subtitle={campaign ? campaign.name : "No live campaign yet"} />
+      <PortalHeader name={brand.name} logo={brand.logoUrl} cover={cover} subtitle={`${data.totals.total} campaign${data.totals.total === 1 ? "" : "s"} · ${data.totals.active} live`} />
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-8">
         {brand.about && <div className="glass p-5 text-sm text-muted">{brand.about}</div>}
 
-        {!campaign ? (
+        {data.totals.total === 0 ? (
           <div className="glass p-6">
-            <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="rocket" size={18} className="text-cyan-300" /> Your campaign isn&apos;t set up yet</h2>
+            <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="rocket" size={18} className="text-cyan-300" /> Your first campaign isn&apos;t set up yet</h2>
             <p className="text-sm text-muted mt-1">Message us below and we&apos;ll create your campaign — then you can upload creatives for every placement right here.</p>
           </div>
         ) : (
           <>
-            {/* Status + analytics summary */}
-            <div className="grid sm:grid-cols-4 gap-3">
-              <Stat label="Status" value={campaign.status === "active" ? "Live" : campaign.status} accent={campaign.status === "active" ? "#34d399" : "#fbbf24"} />
-              <Stat label="Impressions (30d)" value={num(analytics?.impressions ?? 0)} />
-              <Stat label="Clicks (30d)" value={num(analytics?.clicks ?? 0)} />
-              <Stat label="CTR" value={`${((analytics?.ctr ?? 0) * 100).toFixed(2)}%`} />
+            {/* Brand-wide animated totals */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <AnimStat label="Impressions (30d)" value={data.totals.impressions} />
+              <AnimStat label="Clicks (30d)" value={data.totals.clicks} />
+              <AnimStat label="CTR" value={data.totals.ctr * 100} suffix="%" decimals={2} />
+              <AnimStat label="Live campaigns" value={data.totals.active} />
             </div>
 
-            {/* Creative slots */}
-            <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="grid" size={18} className="text-violet-300" /> Creatives by placement</h2>
-                {readiness && <span className={`text-xs font-semibold ${readiness.ready ? "text-emerald-300" : "text-amber-300"}`}>{readiness.filled}/{readiness.total} ready{readiness.ready ? " — campaign can go live" : ""}</span>}
+            {/* Trend */}
+            {data.intel.byDay.length > 1 && (
+              <div className="glass p-5">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-[10px] uppercase tracking-widest text-muted">Impressions — all campaigns (30d)</div>
+                  <div className="text-[10px] uppercase tracking-widest text-cyan-300">clicks below</div>
+                </div>
+                <Sparkline points={data.intel.byDay.map((d) => d.impressions)} />
+                <Sparkline points={data.intel.byDay.map((d) => d.clicks)} stroke="#a78bfa" fill="rgba(167,139,250,0.12)" height={50} />
               </div>
-              <p className="text-xs text-muted mb-4">Your campaign shows in every placement. Each shows for ~5 seconds every minute alongside other brands. Upload one creative per placement below.</p>
-              <div className="grid md:grid-cols-2 gap-3">
-                {readiness?.slots.map((s) => (
-                  <BrandCreativeUploader key={s.placementId} brandId={brand.id} keyStr={key}
-                    slot={{ placementId: s.placementId, key: s.key, pageScope: s.pageScope, width: s.width, height: s.height, creativeType: s.creativeType, fileUrl: s.fileUrl, clickUrl: s.clickUrl }} />
-                ))}
+            )}
+
+            {/* Marketing intelligence */}
+            <section>
+              <h2 className="font-bold text-lg flex items-center gap-2 mb-3"><Icon name="spark" size={18} className="text-amber-300" /> Marketing intelligence</h2>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <Intel icon="pin" label="Top placement" value={data.intel.topPlacement?.key ?? "—"} sub={data.intel.topPlacement ? `${num(data.intel.topPlacement.impressions)} impressions` : "No data yet"} />
+                <Intel icon="globe" label="Top country" value={data.intel.topCountry?.country ?? "—"} sub={data.intel.topCountry ? `${num(data.intel.topCountry.impressions)} impressions` : "No data yet"} />
+                <Intel icon="link" label="Top page" value={data.intel.topPage?.path ?? "—"} sub={data.intel.topPage ? `${num(data.intel.topPage.impressions)} impressions` : "No data yet"} />
+                <Intel icon="clock" label="Best day" value={data.intel.bestDay?.day ?? "—"} sub={data.intel.bestDay ? `${num(data.intel.bestDay.impressions)} impressions` : "No data yet"} />
               </div>
             </section>
 
-            {/* Per-placement analytics */}
+            {/* Campaigns — filter + clickable cards → per-campaign analytics */}
             <section>
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="chart" size={18} className="text-cyan-300" /> Placement analytics</h2>
-                <a href={refreshHref} className="ghost-btn pressable rounded-full px-3.5 py-1.5 text-xs inline-flex items-center gap-1.5"><Icon name="satellite" size={13} /> Refresh</a>
-              </div>
-              <div className="glass overflow-x-auto">
-                <table className="w-full table-cosmic min-w-[520px]">
-                  <thead><tr><th>Placement</th><th>Page</th><th>Impressions</th><th>Clicks</th><th>CTR</th></tr></thead>
-                  <tbody>
-                    {(analytics?.byPlacement ?? []).length === 0 && <tr><td colSpan={5} className="text-muted text-sm p-4">No impressions yet — they appear once your campaign is live.</td></tr>}
-                    {analytics?.byPlacement.map((r) => (
-                      <tr key={r.key}>
-                        <td className="font-semibold text-sm">{r.key}</td>
-                        <td className="text-xs text-muted">{r.pageScope}</td>
-                        <td className="text-cyan-200 font-bold">{num(r.impressions)}</td>
-                        <td>{num(r.clicks)}</td>
-                        <td className="text-xs">{r.impressions ? ((r.clicks / r.impressions) * 100).toFixed(1) : "0.0"}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {(analytics?.byPage.length ?? 0) > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {analytics!.byPage.slice(0, 12).map((p) => (
-                    <a key={p.path} href={p.path} target="_blank" rel="noopener" className="inline-flex items-center gap-1.5 rounded-full border border-white/12 px-2.5 py-1 text-[11px] hover:border-cyan-400/40">
-                      <Icon name="link" size={11} className="text-muted" /> {p.path} · {num(p.impressions)}
-                    </a>
-                  ))}
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="rocket" size={18} className="text-cyan-300" /> Your campaigns</h2>
+                <div className="flex flex-wrap gap-1.5">
+                  {chip("all", `All (${data.totals.total})`)}
+                  {chip("active", "Live")}
+                  {chip("paused", "Paused")}
+                  {chip("draft", "Draft")}
+                  {chip("completed", "Ended")}
                 </div>
-              )}
+              </div>
+              {shown.length === 0 && <div className="glass p-6 text-center text-muted">No campaigns in this filter.</div>}
+              <div className="grid md:grid-cols-2 gap-3">
+                {shown.map((c) => (
+                  <a key={c.id} href={`${base}&campaign=${c.id}`} className="glass overflow-hidden group hover:ring-1 hover:ring-cyan-400/40 transition">
+                    <div className="h-20 relative">
+                      {(c.coverUrl || cover) ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={c.coverUrl || cover || ""} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition" />
+                      ) : <div className="absolute inset-0" style={{ background: "radial-gradient(120% 140% at 10% 0%, #8b5cf655, transparent 60%), #0a0a1c" }} />}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1c] to-transparent" />
+                      <div className="absolute bottom-2 left-3 right-3 flex items-center gap-2">
+                        {(c.logoUrl || brand.logoUrl) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={c.logoUrl || brand.logoUrl || ""} alt="" className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20 bg-black/40" />}
+                        <div className="font-bold truncate">{c.name}</div>
+                        <span className={`ml-auto text-[10px] font-semibold ${c.status === "active" ? "text-emerald-300" : "text-amber-300"}`}>● {c.status}</span>
+                      </div>
+                    </div>
+                    <div className="p-3 grid grid-cols-3 gap-2 text-center">
+                      <MiniStat label="Impr." value={num(c.impressions)} />
+                      <MiniStat label="Clicks" value={num(c.clicks)} />
+                      <MiniStat label="CTR" value={`${(c.ctr * 100).toFixed(1)}%`} />
+                    </div>
+                    <div className="px-3 pb-3 flex items-center justify-between">
+                      <span className={`text-[11px] ${c.ready ? "text-emerald-300" : "text-amber-300"}`}>{c.filled}/{c.total} placements ready</span>
+                      <span className="text-[11px] text-cyan-300 inline-flex items-center gap-1 group-hover:gap-2 transition-all">Open analytics <Icon name="arrowRight" size={12} /></span>
+                    </div>
+                  </a>
+                ))}
+              </div>
             </section>
           </>
         )}
@@ -188,6 +284,34 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
     <div className="glass p-4 text-center">
       <div className="text-2xl font-bold" style={accent ? { color: accent } : undefined}>{value}</div>
       <div className="text-[10px] uppercase tracking-widest text-muted mt-1">{label}</div>
+    </div>
+  );
+}
+
+function AnimStat({ label, value, suffix = "", decimals = 0 }: { label: string; value: number; suffix?: string; decimals?: number }) {
+  return (
+    <div className="glass p-4 text-center">
+      <AnimatedNumber value={value} suffix={suffix} decimals={decimals} className="text-2xl font-bold text-cyan-200" />
+      <div className="text-[10px] uppercase tracking-widest text-muted mt-1">{label}</div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-sm font-bold text-cyan-100">{value}</div>
+      <div className="text-[9px] uppercase tracking-widest text-muted">{label}</div>
+    </div>
+  );
+}
+
+function Intel({ icon, label, value, sub }: { icon: string; label: string; value: string; sub: string }) {
+  return (
+    <div className="glass p-4">
+      <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-muted"><Icon name={icon} size={13} className="text-amber-300" /> {label}</div>
+      <div className="text-lg font-bold mt-1.5 truncate">{value}</div>
+      <div className="text-[11px] text-muted truncate">{sub}</div>
     </div>
   );
 }

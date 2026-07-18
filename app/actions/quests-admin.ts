@@ -105,6 +105,32 @@ export async function saveTier(questId: string, formData: FormData) {
   revalidatePath("/quests");
 }
 
+export type TierPinState = { ok?: boolean; error?: string; message?: string } | undefined;
+
+// Bulk-save milestone pin positions after dragging them across the quest map.
+// Accepts a JSON map of { tierId: { x, y } }.
+export async function saveTierPins(questId: string, _prev: TierPinState, formData: FormData): Promise<TierPinState> {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const clamp = (v: number) => Math.max(0, Math.min(100, Number.isFinite(v) ? Math.round(v) : 50));
+  let pins: Record<string, { x: number; y: number }> = {};
+  try {
+    const parsed = JSON.parse(String(formData.get("pins") ?? "{}"));
+    if (parsed && typeof parsed === "object") pins = parsed;
+  } catch { pins = {}; }
+  const entries = Object.entries(pins);
+  if (entries.length === 0) return { error: "Nothing to save." };
+  for (const [tierId, v] of entries) {
+    await db.update(schema.questTiers)
+      .set({ mapX: clamp(Number(v?.x)), mapY: clamp(Number(v?.y)) })
+      .where(eq(schema.questTiers.id, tierId));
+  }
+  await audit(admin.id, "quest.tier_pins", questId);
+  revalidatePath(`/admin/quests/${questId}`);
+  revalidatePath("/quests");
+  return { ok: true, message: "Milestone positions saved." };
+}
+
 export async function deleteTier(questId: string, tierId: string) {
   const admin = await requireStaff();
   const db = await getDb();

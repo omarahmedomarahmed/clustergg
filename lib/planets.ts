@@ -1,8 +1,8 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PROVIDERS } from "@/lib/providers/registry";
 import { prettyRegion, REGION_PALETTE, type RegionStat } from "@/lib/regions";
-import { regionsForGame } from "@/lib/game-regions";
+import { regionsForGame, sameGame, defaultRegionCode } from "@/lib/game-regions";
 import { slimImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
 
@@ -13,10 +13,12 @@ type RegionRow = { region: string | null; name: string; slug: string };
 // (account.region), so pins map to actual game servers (EUW1, NA1, KR, …) — not
 // generic macro-regions. Positions come from the admin's saved pins; unplaced
 // servers are auto-spread around the globe so they're immediately draggable.
-export function computeRealRegions(rows: RegionRow[], pins: PinMap): RegionStat[] {
+export function computeRealRegions(rows: RegionRow[], pins: PinMap, fallbackCode?: string): RegionStat[] {
   const byCode = new Map<string, { count: number; gamers: { name: string; slug: string }[] }>();
   for (const a of rows) {
-    const code = (a.region ?? "").trim().toLowerCase();
+    // Accounts whose provider didn't return a region still get placed — on the
+    // game's default region — so their gamer never silently disappears.
+    const code = (a.region ?? "").trim().toLowerCase() || (fallbackCode ?? "");
     if (!code) continue;
     let e = byCode.get(code);
     if (!e) { e = { count: 0, gamers: [] }; byCode.set(code, e); }
@@ -56,8 +58,11 @@ export const PLANET_PALETTE: Record<string, { accent: string; accent2: string }>
 // Interactive-hero data for every game that has a planet skin: region gamer
 // counts + top gamers, from linked accounts mapped to macro-regions.
 export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>): Promise<PlanetData[]> {
+  // Ordered by the catalog sort order (same as the nav game logos), so the globe
+  // toggle's default game + order is admin-controlled via Games → sort order.
   const skinned = await db.select().from(schema.games)
-    .where(and(eq(schema.games.isActive, true), isNotNull(schema.games.planetImageUrl)));
+    .where(and(eq(schema.games.isActive, true), isNotNull(schema.games.planetImageUrl)))
+    .orderBy(asc(schema.games.sortOrder));
   if (skinned.length === 0) return [];
 
   const names = skinned.map((g) => g.name);
@@ -65,8 +70,10 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
     .from(schema.spaces).where(and(eq(schema.spaces.isActive, true), inArray(schema.spaces.game, names)));
   const slugByGame = new Map(spaceRows.filter((s) => s.game).map((s) => [s.game as string, s.slug]));
 
+  // Match providers to catalog games by normalized name, so "PUBG" (catalog)
+  // still picks up the "PUBG: Battlegrounds" provider (and vice versa).
   const providerToGame = new Map<string, string>();
-  for (const g of skinned) for (const p of PROVIDERS.filter((pr) => pr.game === g.name)) providerToGame.set(p.id, g.name);
+  for (const g of skinned) for (const p of PROVIDERS.filter((pr) => sameGame(pr.game, g.name))) providerToGame.set(p.id, g.name);
   const providerIds = [...providerToGame.keys()];
 
   const accountRows = providerIds.length
@@ -90,7 +97,7 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
       // Prefer real API server-regions from account data. Fall back to THIS
       // GAME's own servers (EUW1, KR, KRJP, …) — never generic macro-regions —
       // when no linked accounts carry a region code yet.
-      let regions = computeRealRegions(gameRows, pins);
+      let regions = computeRealRegions(gameRows, pins, defaultRegionCode(g.name));
       if (regions.length === 0) {
         regions = regionsForGame(g.name).map((r) => {
           const pin = pins[r.code];

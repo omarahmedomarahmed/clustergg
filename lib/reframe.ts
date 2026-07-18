@@ -3,14 +3,34 @@
 // enlarged crop, no per-renderer adjust params needed. This is what makes the
 // zoom "actually work" for logos, icons, planet art, favicons, etc.
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+function imgFromSrc(src: string, crossOrigin: boolean): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous"; // allow canvas export for CORS-enabled hosts
+    if (crossOrigin) img.crossOrigin = "anonymous"; // allow canvas export for CORS-enabled hosts
     img.onload = () => resolve(img);
     img.onerror = reject;
     img.src = src;
   });
+}
+
+// Load an image so it can be drawn to a canvas AND exported (no taint). For
+// remote http(s) URLs the browser may have a non-CORS copy cached, which taints
+// the canvas even with crossOrigin set — so we fetch the bytes ourselves and load
+// them from a same-origin blob: URL, which never taints. data: URLs load directly.
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  if (/^https?:\/\//i.test(src)) {
+    try {
+      const res = await fetch(src, { mode: "cors", cache: "reload" });
+      if (res.ok) {
+        const blob = await res.blob();
+        const obj = URL.createObjectURL(blob);
+        try { return await imgFromSrc(obj, false); }
+        finally { setTimeout(() => URL.revokeObjectURL(obj), 10000); }
+      }
+    } catch { /* fall through to crossOrigin <img> */ }
+    return imgFromSrc(src, true);
+  }
+  return imgFromSrc(src, false);
 }
 
 // zoom: 1..N (1 = cover-fit). x/y: 0..100 percent (50 = centered), matching CSS

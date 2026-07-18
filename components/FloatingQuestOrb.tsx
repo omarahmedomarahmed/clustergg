@@ -13,7 +13,7 @@ export type OrbQuest = {
 // The always-present, glorified Quest orb. Game-agnostic → shown on every page.
 // Click toggles a popover of quest cards (each showing that quest's background
 // art). The orb icon defaults to the CP coin and is admin-editable.
-export default function FloatingQuestOrb({ quests, icon }: { quests: OrbQuest[]; icon?: string }) {
+export default function FloatingQuestOrb({ quests, icon, color = "#8b5cf6" }: { quests: OrbQuest[]; icon?: string; color?: string }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -64,8 +64,8 @@ export default function FloatingQuestOrb({ quests, icon }: { quests: OrbQuest[];
 
       <button onClick={() => setOpen((v) => !v)} aria-label="Quests"
         className="relative flex items-center justify-center rounded-full text-white transition-transform hover:scale-105 active:scale-95 overflow-hidden"
-        style={{ height: 56, width: 56, background: "radial-gradient(circle at 35% 30%, #a78bfa, #6d28d9 60%, #3b0764)", boxShadow: "0 0 24px -4px #8b5cf6, inset 0 2px 6px rgba(255,255,255,0.25)" }}>
-        <span className="absolute inset-0 rounded-full animate-ping opacity-25" style={{ background: "#8b5cf6" }} />
+        style={{ height: 56, width: 56, background: `radial-gradient(circle at 35% 30%, ${color}, ${color}bb 60%, ${color}66)`, boxShadow: `0 0 24px -4px ${color}, inset 0 2px 6px rgba(255,255,255,0.25)` }}>
+        <span className="absolute inset-0 rounded-full animate-ping opacity-25" style={{ background: color }} />
         {icon
           ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={icon} alt="Quests" className="relative h-8 w-8 object-contain" />
           : <CpIcon size={30} />}

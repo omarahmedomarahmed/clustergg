@@ -7,7 +7,6 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "game", label: "Game cards", note: "Game tiles on the home galaxy and planet lists." },
   { key: "challenge", label: "Challenge cards", note: "Live challenge / event cards." },
   { key: "notification", label: "Notification cards", note: "Rows on the notifications page." },
-  { key: "account", label: "Connected-account cards", note: "Collapsed linked-game cards on profiles." },
   { key: "feed_myplanets", label: "Feed · My planets card", note: "Right-rail 'My planets' card on the feed." },
   { key: "feed_explore", label: "Feed · Explore planets card", note: "Right-rail 'Explore planets' card on the feed." },
 ];

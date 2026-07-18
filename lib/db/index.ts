@@ -112,6 +112,8 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "cover_url" text`,
   `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "about" text`,
   `ALTER TABLE "ad_campaigns" ADD COLUMN IF NOT EXISTS "launched_at" timestamp with time zone`,
+  `ALTER TABLE "ad_campaigns" ADD COLUMN IF NOT EXISTS "cover_url" text`,
+  `ALTER TABLE "ad_campaigns" ADD COLUMN IF NOT EXISTS "logo_url" text`,
   `CREATE TABLE IF NOT EXISTS "brand_messages" (
     "id" text PRIMARY KEY NOT NULL,
     "brand_id" text NOT NULL,

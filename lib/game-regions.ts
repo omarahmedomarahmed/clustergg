@@ -86,6 +86,18 @@ const DEFAULT_REGIONS: GameRegion[] = [
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
+// True when two game names refer to the same game ("PUBG" ≡ "PUBG: Battlegrounds").
+export function sameGame(a: string, b: string): boolean {
+  const x = norm(a), y = norm(b);
+  return x === y || x.startsWith(y) || y.startsWith(x);
+}
+
+// The game's primary/default region code — used to bucket accounts whose region
+// code is missing so those gamers still appear on the planet.
+export function defaultRegionCode(gameName: string): string {
+  return regionsForGame(gameName)[0]?.code ?? "na";
+}
+
 export function regionsForGame(gameName: string): GameRegion[] {
   const t = norm(gameName);
   if (BY_GAME[t]) return BY_GAME[t];
