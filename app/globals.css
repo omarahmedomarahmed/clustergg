@@ -109,7 +109,10 @@ html, body {
   font-family: var(--p-font);
   min-height: 100vh;
 }
-.profile-root.has-bg-image { background-size: cover; background-position: center; background-attachment: fixed; }
+/* Background image is rendered on a separate position:fixed layer (see the
+   public profile page) — not via background-attachment:fixed here, which caused
+   slow/janky scrolling on long, heavily-customized profiles. */
+.profile-root.has-bg-image { background-color: transparent; }
 .profile-root .p-muted { color: var(--p-muted); }
 .profile-root .p-accent { color: var(--p-accent); }
 

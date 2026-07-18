@@ -11,7 +11,7 @@ import { syncUserAccountsIfStale } from "@/lib/sync";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { slimImg } from "@/lib/img";
-import { resolveTheme, themeToVars, bgStyle, coverStyle, avatarClip } from "@/lib/theme";
+import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
@@ -132,6 +132,12 @@ export default async function ProfilePage({ params }: Props) {
   const trophyIds = trophyWins.map(({ c }) => c.trophyId).filter((x): x is string => !!x);
   if (trophyIds.length) { const rows = await db.select().from(schema.trophies).where(inArray(schema.trophies.id, trophyIds)); for (const t of rows) trophyArt.set(t.id, t.imageUrl); }
   const activeChallenges = participations.filter(({ c }) => c.status === "active");
+  // Resolve each challenge's planet slug so its card links to the challenge page.
+  const challengeSpaceIds = [...new Set(participations.map(({ c }) => c.spaceId))];
+  const chSpaces = challengeSpaceIds.length
+    ? await db.select({ id: schema.spaces.id, slug: schema.spaces.slug }).from(schema.spaces).where(inArray(schema.spaces.id, challengeSpaceIds))
+    : [];
+  const slugBySpaceId = new Map(chSpaces.map((s) => [s.id, s.slug]));
 
   const S = theme.sections;
   const accountCardBg = cardBgStyle(buildCardBgMap(await getContent(cardBgCmsKeys)), "account");
@@ -198,8 +204,10 @@ export default async function ProfilePage({ params }: Props) {
             <div className="grid sm:grid-cols-2 gap-3">
               {activeChallenges.map(({ p, c }) => {
                 const cover = slimImg(c.coverUrl) ?? slimImg(gameCover.get(c.game) ?? null);
+                const chSlug = slugBySpaceId.get(c.spaceId);
+                const href = chSlug ? `/planets/${chSlug}/challenges/${c.id}` : `/planets`;
                 return (
-                  <div key={p.id} className={`${cardCls} relative overflow-hidden !p-0`}>
+                  <Link key={p.id} href={href} className={`${cardCls} relative overflow-hidden !p-0 block hover:brightness-110 transition-[filter]`}>
                     <div className="h-24 relative overflow-hidden">
                       {cover ? (
                         <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
@@ -218,7 +226,7 @@ export default async function ProfilePage({ params }: Props) {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
@@ -262,6 +270,34 @@ export default async function ProfilePage({ params }: Props) {
             </div>
           </section>
         );
+      case "quests":
+        if (!S.quests || profileQuests.length === 0) return null;
+        return (
+          <section key={key}>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              <Icon name="trophy" size={16} style={{ color: theme.accent }} />
+              <h2 className="text-lg font-bold" style={{ color: theme.text }}>Quests</h2>
+              {/* Gamer's TOTAL Cluster Points across all quests */}
+              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold" style={{ background: `color-mix(in srgb, ${theme.accent2} 18%, transparent)`, color: theme.accent2 }}>
+                <CpIcon size={18} /> {profileQuests.reduce((s, q) => s + q.totalCp, 0).toLocaleString()} total CP
+              </span>
+              <Link href="/quests" className="text-xs p-muted hover:underline ml-auto">Leaderboard →</Link>
+            </div>
+            {/* Completed-quest badges (icon ×N) */}
+            {profileQuests.some((q) => q.completions > 0) && (
+              <div className="flex flex-wrap gap-2 mb-4">
+                {profileQuests.filter((q) => q.completions > 0).map((q) => (
+                  <span key={q.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ borderColor: `${q.color}66`, background: `${q.color}1a`, color: q.color }} title={`${q.name} completed ${q.completions}×`}>
+                    {q.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-5 w-5 object-contain" /> : <Icon name="trophy" size={13} />} {q.name} ×{q.completions}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="grid sm:grid-cols-2 gap-4">
+              {profileQuests.map((q) => <QuestCard key={q.id} quest={q} />)}
+            </div>
+          </section>
+        );
       default: return null;
     }
   };
@@ -269,8 +305,14 @@ export default async function ProfilePage({ params }: Props) {
   return (
     <div
       className={`profile-root ${theme.bgImage ? "has-bg-image" : ""}`}
-      style={{ ...vars, ...bgStyle(theme) }}
+      style={{ ...vars, background: theme.bgImage ? "transparent" : theme.bg, minHeight: "100vh" }}
     >
+      {/* Fixed background layer — smooth scroll (no background-attachment:fixed repaint) */}
+      {theme.bgImage && <div aria-hidden className="fixed inset-0 -z-10" style={bgLayerStyle(theme)} />}
+
+      {/* Top ad banner */}
+      <div className="mx-auto max-w-5xl px-4 pt-4"><AdSlot placement="top_banner" /></div>
+
       {adminView && (
         <div className="bg-amber-500/15 border-b border-amber-400/40 text-amber-200 text-sm text-center py-2 px-4">
           <Icon name="shield" size={14} className="inline mr-1.5" /> Admin view — <Link href={`/admin/users/${user.id}`} className="underline">manage this user in Mission Control</Link>
@@ -320,33 +362,6 @@ export default async function ProfilePage({ params }: Props) {
           <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">views</span></span>
           {bestStanding && S.standings && <span style={{ color: theme.accent }}><Icon name="chart" size={14} className="inline mr-1" /> Top {Math.max(1, Math.round((bestStanding.rank / bestStanding.total) * 100))}% · {bestStanding.title}</span>}
         </div>
-
-        {profileQuests.length > 0 && (
-          <div className="mt-8">
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              <Icon name="trophy" size={16} style={{ color: theme.accent }} />
-              <h2 className="text-lg font-bold" style={{ color: theme.text }}>Quests</h2>
-              {/* Gamer's TOTAL Cluster Points across all quests */}
-              <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold" style={{ background: `color-mix(in srgb, ${theme.accent2} 18%, transparent)`, color: theme.accent2 }}>
-                <CpIcon size={18} /> {profileQuests.reduce((s, q) => s + q.totalCp, 0).toLocaleString()} total CP
-              </span>
-              <Link href="/quests" className="text-xs p-muted hover:underline ml-auto">Leaderboard →</Link>
-            </div>
-            {/* Completed-quest badges (icon ×N) */}
-            {profileQuests.some((q) => q.completions > 0) && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {profileQuests.filter((q) => q.completions > 0).map((q) => (
-                  <span key={q.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-bold" style={{ borderColor: `${q.color}66`, background: `${q.color}1a`, color: q.color }} title={`${q.name} completed ${q.completions}×`}>
-                    {q.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-5 w-5 object-contain" /> : <Icon name="trophy" size={13} />} {q.name} ×{q.completions}
-                  </span>
-                ))}
-              </div>
-            )}
-            <div className="grid sm:grid-cols-2 gap-4">
-              {profileQuests.map((q) => <QuestCard key={q.id} quest={q} />)}
-            </div>
-          </div>
-        )}
 
         <div className="mt-8 space-y-10 pb-16">
           {theme.order.map((key) => sectionNode(key))}
