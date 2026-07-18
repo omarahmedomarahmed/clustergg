@@ -575,9 +575,20 @@ export async function assignCreative(formData: FormData) {
     priority: Number(formData.get("priority")) || 0,
   };
   if (!values.campaignId || !values.creativeId || !values.placementId) return;
+  // Don't double-assign the same creative to the same placement in the same campaign.
+  const [dupe] = await db.select({ id: schema.adCampaignCreatives.id }).from(schema.adCampaignCreatives)
+    .where(and(
+      eq(schema.adCampaignCreatives.campaignId, values.campaignId),
+      eq(schema.adCampaignCreatives.creativeId, values.creativeId),
+      eq(schema.adCampaignCreatives.placementId, values.placementId),
+    )).limit(1);
+  if (dupe) return;
   await db.insert(schema.adCampaignCreatives).values({ id: uid(), ...values });
   await audit(admin.id, "campaign_creative.assign", "campaign_creative", values.creativeId);
   revalidatePath("/admin/ads/schedule");
+  revalidatePath("/admin/creatives");
+  revalidatePath("/admin/placements");
+  revalidatePath(`/admin/ads/campaign/${values.campaignId}`);
 }
 
 export async function removeAssignment(id: string) {
@@ -586,6 +597,8 @@ export async function removeAssignment(id: string) {
   await db.delete(schema.adCampaignCreatives).where(eq(schema.adCampaignCreatives.id, id));
   await audit(admin.id, "campaign_creative.remove", "campaign_creative", id);
   revalidatePath("/admin/ads/schedule");
+  revalidatePath("/admin/creatives");
+  revalidatePath("/admin/placements");
 }
 
 export async function savePlacement(formData: FormData) {

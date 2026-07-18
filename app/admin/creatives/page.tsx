@@ -1,24 +1,45 @@
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { saveCreative, reviewCreative } from "@/app/actions/admin";
+import { saveCreative } from "@/app/actions/admin";
 import ImageUpload from "@/components/ImageUpload";
+import CreativesManager from "@/components/CreativesManager";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Creatives" };
 
 export default async function AdminCreativesPage() {
   const db = await getDb();
-  const [creatives, brands] = await Promise.all([
+  const [rows, brands, campaigns, placements, assignRows] = await Promise.all([
     db.select({ c: schema.adCreatives, b: schema.brands })
       .from(schema.adCreatives)
       .innerJoin(schema.brands, eq(schema.adCreatives.brandId, schema.brands.id))
       .orderBy(desc(schema.adCreatives.createdAt)),
-    db.select().from(schema.brands),
+    db.select().from(schema.brands).orderBy(schema.brands.name),
+    db.select().from(schema.adCampaigns),
+    db.select().from(schema.adPlacements),
+    db.select({
+      id: schema.adCampaignCreatives.id,
+      creativeId: schema.adCampaignCreatives.creativeId,
+      placementId: schema.adCampaignCreatives.placementId,
+      campaignId: schema.adCampaignCreatives.campaignId,
+      placementKey: schema.adPlacements.key,
+      campaignName: schema.adCampaigns.name,
+      campaignStatus: schema.adCampaigns.status,
+    }).from(schema.adCampaignCreatives)
+      .innerJoin(schema.adPlacements, eq(schema.adCampaignCreatives.placementId, schema.adPlacements.id))
+      .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id)),
   ]);
+
+  const creatives = rows.map(({ c, b }) => ({
+    id: c.id, name: c.name, type: c.type, status: c.status, fileUrl: c.fileUrl,
+    width: c.width, height: c.height, durationSeconds: c.durationSeconds,
+    brandId: c.brandId, brandName: b.name,
+  }));
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Ad creatives</h1>
+      <h1 className="text-2xl font-bold mb-1">Ad creatives</h1>
+      <p className="text-sm text-muted mb-6">Filter by brand, expand a creative to review it, and link it to any placement — the placement loops every creative linked to it.</p>
 
       <div className="glass p-6 mb-8">
         <h2 className="font-bold mb-1">Upload creative</h2>
@@ -49,38 +70,13 @@ export default async function AdminCreativesPage() {
         </form>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        {creatives.map(({ c, b }) => (
-          <div key={c.id} className="glass p-4">
-            <div className="flex items-center justify-between gap-2">
-              <div className="font-semibold text-sm truncate">{c.name}</div>
-              <span className={`text-xs shrink-0 ${
-                c.status === "approved" ? "text-emerald-300" : c.status === "rejected" ? "text-rose-300" : "text-amber-300"}`}>
-                ● {c.status}
-              </span>
-            </div>
-            <div className="text-xs text-muted mt-0.5">{b.name} · {c.type} · {c.width}×{c.height}{c.durationSeconds ? ` · ${c.durationSeconds}s` : ""}</div>
-            <div className="mt-3 rounded-lg overflow-hidden border border-violet-400/15 bg-black/30" style={{ aspectRatio: `${c.width ?? 4} / ${c.height ?? 1}` , maxHeight: 120 }}>
-              {c.type === "image" ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={c.fileUrl} alt={c.name} className="w-full h-full object-contain" />
-              ) : (
-                <video src={c.fileUrl} className="w-full h-full object-contain" muted />
-              )}
-            </div>
-            {c.status === "pending_review" && (
-              <div className="mt-3 flex gap-2">
-                <form action={reviewCreative.bind(null, c.id, true)}>
-                  <button className="text-xs glow-btn rounded-full px-4 py-1.5 font-semibold text-white">Approve</button>
-                </form>
-                <form action={reviewCreative.bind(null, c.id, false)}>
-                  <button className="text-xs rounded-full px-4 py-1.5 border border-rose-400/40 text-rose-300">Reject</button>
-                </form>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+      <CreativesManager
+        creatives={creatives}
+        brands={brands.map((b) => ({ id: b.id, name: b.name }))}
+        campaigns={campaigns.map((c) => ({ id: c.id, name: c.name, brandId: c.brandId, status: c.status }))}
+        placements={placements.map((p) => ({ id: p.id, key: p.key, width: p.width, height: p.height }))}
+        assignments={assignRows}
+      />
     </div>
   );
 }
