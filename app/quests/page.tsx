@@ -4,6 +4,7 @@ import { getUserQuests, getQuestTops, getCpLedger } from "@/lib/quests";
 import QuestCard from "@/components/QuestCard";
 import CpLedger from "@/components/CpLedger";
 import CpIcon from "@/components/CpIcon";
+import AdSlot from "@/components/AdSlot";
 import OAuthButtons from "@/components/OAuthButtons";
 import Icon from "@/components/Icon";
 
@@ -77,6 +78,11 @@ export default async function QuestsPage() {
           <CpLedger entries={ledger} quests={quests.map((q) => ({ key: q.key, name: q.name, color: q.color }))} title="Your complete CP history" />
         </div>
       )}
+
+      {/* Sponsor banner at the bottom of the quests page */}
+      <div className="mt-10">
+        <AdSlot placement="quests_footer" className="mx-auto" />
+      </div>
     </div>
   );
 }

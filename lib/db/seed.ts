@@ -662,7 +662,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-18.1-nobg-art";
+const MAINT_VERSION = "2026-07-18.2-nobg-art-placements";
 
 export async function runBootMaintenance(db: DB) {
   try {
@@ -674,14 +674,21 @@ export async function runBootMaintenance(db: DB) {
 
   await seedHouseAds(db);
   await ensurePlanetSkins(db);
-  // Ad inventory slot on the loading screen (admin can assign a creative to it).
-  const [loadSlot] = await db.select({ id: schema.adPlacements.id }).from(schema.adPlacements)
-    .where(eq(schema.adPlacements.key, "loading_screen")).limit(1);
-  if (!loadSlot) {
-    await db.insert(schema.adPlacements).values({
-      id: uid(), key: "loading_screen", pageScope: "Loading screen (between pages)",
-      device: "both", width: 728, height: 90, mobileWidth: 320, mobileHeight: 100,
-    });
+  // Ad inventory slots that pages reference (idempotent — insert if missing).
+  const extraPlacements = [
+    { key: "loading_screen", pageScope: "Loading screen (between pages)", width: 728, height: 90 },
+    { key: "quests_footer", pageScope: "Bottom of the quests page", width: 728, height: 90 },
+    { key: "messages_footer", pageScope: "Bottom of a conversation", width: 728, height: 90 },
+  ];
+  for (const p of extraPlacements) {
+    const [ex] = await db.select({ id: schema.adPlacements.id }).from(schema.adPlacements)
+      .where(eq(schema.adPlacements.key, p.key)).limit(1);
+    if (!ex) {
+      await db.insert(schema.adPlacements).values({
+        id: uid(), key: p.key, pageScope: p.pageScope, device: "both",
+        width: p.width, height: p.height, mobileWidth: 320, mobileHeight: 100,
+      });
+    }
   }
   // (migrateGameImagesToBlob is run unconditionally every boot from
   // ensureProvisioned — not gated here — so it self-heals if Blob became
