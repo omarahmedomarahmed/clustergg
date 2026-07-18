@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCampaignReadiness, getCampaignAnalytics } from "@/lib/brands";
+import { saveCampaign } from "@/app/actions/admin";
 import AdminCreativeSlot from "@/components/AdminCreativeSlot";
 import AdminCampaignActions from "@/components/AdminCampaignActions";
+import ImageUpload from "@/components/ImageUpload";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -55,6 +57,24 @@ export default async function AdminCampaignPage({ params }: { params: Promise<{ 
           </div>
         </div>
       </div>
+
+      {/* Campaign branding — cover + logo uploads (default to the brand's) */}
+      <details className="glass p-5 group">
+        <summary className="cursor-pointer font-bold list-none flex items-center gap-2"><Icon name="edit" size={15} className="text-cyan-300" /> Campaign branding &amp; settings<span className="ml-auto text-xs text-muted group-open:hidden">Edit</span></summary>
+        <form action={saveCampaign.bind(null, campaign.brandId)} className="mt-4 border-t border-white/10 pt-4 grid sm:grid-cols-2 gap-3">
+          <input type="hidden" name="campaignId" value={campaign.id} />
+          <input name="name" required defaultValue={campaign.name} placeholder="Campaign name" className="input-cosmic" />
+          <select name="status" defaultValue={campaign.status} className="input-cosmic">
+            <option value="draft">Draft</option><option value="active">Active</option><option value="paused">Paused</option><option value="completed">Completed</option>
+          </select>
+          <input type="hidden" name="startDate" value={campaign.startDate.toISOString()} />
+          <input type="hidden" name="endDate" value={campaign.endDate.toISOString()} />
+          <input type="hidden" name="targetDevice" value={campaign.targetDevice} />
+          <div><div className="text-xs text-muted mb-1">Campaign logo (default: brand logo)</div><ImageUpload name="logoUrl" defaultValue={campaign.logoUrl ?? ""} aspect="1/1" rounded="rounded-xl" maxDim={400} scope="creative" hint="Square logo." /></div>
+          <div><div className="text-xs text-muted mb-1">Campaign cover (default: brand cover)</div><ImageUpload name="coverUrl" defaultValue={campaign.coverUrl ?? ""} aspect="16/9" maxDim={1400} scope="creative" hint="Wide cover for this campaign." /></div>
+          <div className="sm:col-span-2"><button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Save campaign</button></div>
+        </form>
+      </details>
 
       {/* Analytics at the top — placement rows link to a page where the ad shows */}
       <section>

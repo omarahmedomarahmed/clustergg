@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import { saveCampaign, saveBrand, adminSendBrandMessage } from "@/app/actions/admin";
 import { getBrandInbox } from "@/lib/brands";
 import AdminBrandKey from "@/components/AdminBrandKey";
+import ImageUpload from "@/components/ImageUpload";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -37,8 +38,8 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
           <select name="industry" defaultValue={brand.industry} className="input-cosmic">
             {["hardware", "retail", "tech", "f&b", "other"].map((i) => <option key={i}>{i}</option>)}
           </select>
-          <input name="logoUrl" defaultValue={brand.logoUrl ?? ""} placeholder="Logo image URL" className="input-cosmic" />
-          <input name="coverUrl" defaultValue={brand.coverUrl ?? ""} placeholder="Portal cover image URL" className="input-cosmic" />
+          <div><div className="text-xs text-muted mb-1">Brand logo</div><ImageUpload name="logoUrl" defaultValue={brand.logoUrl ?? ""} aspect="1/1" rounded="rounded-xl" maxDim={400} scope="creative" hint="Square brand logo." /></div>
+          <div><div className="text-xs text-muted mb-1">Portal cover</div><ImageUpload name="coverUrl" defaultValue={brand.coverUrl ?? ""} aspect="16/9" maxDim={1400} scope="creative" hint="Wide cover shown on the brand portal." /></div>
           <input name="contactEmail" type="email" defaultValue={brand.contactEmail ?? ""} placeholder="Contact email" className="input-cosmic" />
           <select name="status" defaultValue={brand.status} className="input-cosmic">
             <option value="active">Active</option>
