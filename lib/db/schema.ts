@@ -413,6 +413,10 @@ export const games = pgTable("games", {
     .notNull().default({}),
   coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
     .notNull().default({ zoom: 1, x: 50, y: 50 }),
+  // Admin-defined trackable metrics for a game (so a brand-new game can be
+  // "integrated" from the UI — its metrics flow into leaderboards/challenges).
+  customMetrics: jsonb("custom_metrics").$type<{ key: string; label: string; unit?: string; higherIsBetter?: boolean }[]>()
+    .notNull().default([]),
   sortOrder: integer("sort_order").notNull().default(0),
   showInNav: boolean("show_in_nav").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),

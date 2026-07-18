@@ -606,6 +606,22 @@ export async function deleteLeaderboard(lbId: string) {
 }
 
 // ---------- Games catalog ----------
+function parseCustomMetrics(raw: string): { key: string; label: string; unit?: string; higherIsBetter?: boolean }[] {
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((m) => m && typeof m.label === "string" && m.label.trim())
+      .slice(0, 24)
+      .map((m) => ({
+        key: String(m.key ?? m.label).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "metric",
+        label: String(m.label).trim().slice(0, 60),
+        unit: m.unit ? String(m.unit).trim().slice(0, 16) : undefined,
+        higherIsBetter: m.higherIsBetter !== false,
+      }));
+  } catch { return []; }
+}
+
 export async function saveGame(formData: FormData) {
   const admin = await requireStaff();
   const db = await getDb();
@@ -625,6 +641,7 @@ export async function saveGame(formData: FormData) {
     sortOrder: Number(formData.get("sortOrder")) || 0,
     showInNav: formData.get("showInNav") === "on",
     isActive: formData.get("isActive") === "on",
+    customMetrics: parseCustomMetrics(String(formData.get("customMetrics") ?? "[]")),
   };
   if (!values.name) return;
   if (gameId) {

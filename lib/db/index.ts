@@ -122,6 +122,7 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "brand_msg_idx" ON "brand_messages" ("brand_id","created_at")`,
+  `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "custom_metrics" jsonb NOT NULL DEFAULT '[]'::jsonb`,
 ];
 
 async function runColumnMigrations(db: DB) {

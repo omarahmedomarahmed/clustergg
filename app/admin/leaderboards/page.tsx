@@ -10,7 +10,10 @@ export const metadata = { title: "Admin · Leaderboards" };
 
 export default async function AdminLeaderboardsPage() {
   const db = await getDb();
-  const boards = await db.select().from(schema.leaderboards);
+  const [boards, gamesList] = await Promise.all([
+    db.select().from(schema.leaderboards),
+    db.select({ name: schema.games.name, customMetrics: schema.games.customMetrics }).from(schema.games),
+  ]);
 
   // Trackable metrics grouped by game — so the form only offers a game's own stats.
   const metricsByGame: Record<string, MetricOpt[]> = {};
@@ -18,6 +21,13 @@ export default async function AdminLeaderboardsPage() {
     if (!p.capabilities.length) continue;
     const arr = metricsByGame[p.game] ?? (metricsByGame[p.game] = []);
     for (const c of p.capabilities) if (!arr.some((x) => x.key === c.key)) arr.push({ key: c.key, label: c.label });
+  }
+  // Admin-defined custom metrics (games integrated from the UI).
+  for (const g of gamesList) {
+    const cm = (g.customMetrics ?? []) as { key: string; label: string }[];
+    if (!cm.length) continue;
+    const arr = metricsByGame[g.name] ?? (metricsByGame[g.name] = []);
+    for (const c of cm) if (!arr.some((x) => x.key === c.key)) arr.push({ key: c.key, label: c.label });
   }
   // Keep any game/metric already saved on a board selectable, even if its
   // provider exposes no capabilities in the registry.

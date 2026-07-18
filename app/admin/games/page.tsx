@@ -5,6 +5,7 @@ import { saveGame, deleteGame } from "@/app/actions/admin";
 import GameLogo from "@/components/GameLogo";
 import ImageUpload from "@/components/ImageUpload";
 import CoverFramer from "@/components/CoverFramer";
+import GameMetricsEditor from "@/components/GameMetricsEditor";
 import SubmitButton from "@/components/SubmitButton";
 import Icon from "@/components/Icon";
 
@@ -25,6 +26,7 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
         <CoverFramer name="coverUrl" defaultUrl={game?.coverUrl ?? ""} defaultAdjust={game?.coverAdjust} maxDim={1200}
           hint="Drag the image to reposition and use the zoom slider — the frame is exactly how it appears on the planet header." />
       </div>
+      <GameMetricsEditor initial={game?.customMetrics ?? []} />
       <div className="flex gap-4 sm:col-span-2 items-center flex-wrap pt-1">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="showInNav" defaultChecked={game?.showInNav ?? false} className="accent-cyan-500" /> Show logo in nav
