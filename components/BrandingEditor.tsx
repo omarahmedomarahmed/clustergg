@@ -33,6 +33,7 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
   defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultOrbColor, defaultQuestRocket,
+  defaultLoadingInterval = 3, defaultLoadingAstronaut = "", defaultLoadingBg = "", defaultLoadingWordmark = true, defaultLoadingOrbSize = 80,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -50,6 +51,11 @@ export default function BrandingEditor({
   defaultOrbIcon: string;
   defaultOrbColor: string;
   defaultQuestRocket: string;
+  defaultLoadingInterval?: number;
+  defaultLoadingAstronaut?: string;
+  defaultLoadingBg?: string;
+  defaultLoadingWordmark?: boolean;
+  defaultLoadingOrbSize?: number;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [cpIcon, setCpIcon] = useState(defaultCpIcon);
@@ -65,6 +71,10 @@ export default function BrandingEditor({
   const [loadingColor, setLoadingColor] = useState(defaultLoadingColor);
   const [loadingLogo, setLoadingLogo] = useState(defaultLoadingLogo);
   const [loadingPhrases, setLoadingPhrases] = useState(defaultLoadingPhrases);
+  const [loadingInterval, setLoadingInterval] = useState(defaultLoadingInterval);
+  const [loadingAstronaut, setLoadingAstronaut] = useState(defaultLoadingAstronaut);
+  const [loadingBg, setLoadingBg] = useState(defaultLoadingBg);
+  const [loadingOrbSize, setLoadingOrbSize] = useState(defaultLoadingOrbSize);
   const phraseList = loadingPhrases.split("\n").map((s) => s.trim()).filter(Boolean);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(saveBranding, undefined);
 
@@ -224,6 +234,39 @@ export default function BrandingEditor({
                 <div className="mt-1.5 text-[11px] text-muted">{phraseList.length} phrase{phraseList.length > 1 ? "s" : ""} · first: <span className="grad-text font-semibold">{phraseList[0]}</span></div>
               )}
             </div>
+
+            {/* Rotation timing */}
+            <label className="block text-xs text-muted">Phrase rotation every <span className="text-cyan-300">{loadingInterval}s</span>
+              <input type="range" min={1} max={20} step={1} value={loadingInterval} onChange={(e) => setLoadingInterval(Number(e.target.value))} className="w-full accent-violet-500" />
+            </label>
+            <input type="hidden" name="loadingInterval" value={loadingInterval} />
+
+            {/* Orb size */}
+            <label className="block text-xs text-muted">Orb size <span className="text-cyan-300">{loadingOrbSize}px</span>
+              <input type="range" min={72} max={200} step={2} value={loadingOrbSize} onChange={(e) => setLoadingOrbSize(Number(e.target.value))} className="w-full accent-violet-500" />
+            </label>
+            <input type="hidden" name="loadingOrbSize" value={loadingOrbSize} />
+
+            {/* Astronaut on the loading screen */}
+            <div>
+              <div className="text-xs text-muted mb-1.5">Gamified astronaut (above the orb) — empty to hide</div>
+              <ImageUpload name="loadingAstronaut" value={loadingAstronaut} onChange={setLoadingAstronaut}
+                aspect="1/1" rounded="rounded-xl" maxDim={512} scope="content" hint="The mascot shown floating on the loading screen." />
+            </div>
+
+            {/* Loading background art */}
+            <div>
+              <div className="text-xs text-muted mb-1.5">Loading screen background image (empty = dark blur)</div>
+              <ImageUpload name="loadingBg" value={loadingBg} onChange={setLoadingBg}
+                aspect="16/9" maxDim={1920} scope="content" hint="Full-screen cosmic art behind the orb." />
+            </div>
+
+            {/* Wordmark toggle */}
+            <label className="flex items-center gap-2 text-sm text-muted">
+              <input type="checkbox" name="loadingWordmark" defaultChecked={defaultLoadingWordmark} className="accent-violet-500 h-4 w-4" />
+              Show the Cluster wordmark at the bottom of the loading screen
+            </label>
+            <p className="text-[11px] text-muted">Tip: assign an ad creative to the <b>loading_screen</b> placement (Admin → Placements) to run an ad here.</p>
           </div>
         </div>
       </div>

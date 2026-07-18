@@ -674,6 +674,15 @@ export async function runBootMaintenance(db: DB) {
 
   await seedHouseAds(db);
   await ensurePlanetSkins(db);
+  // Ad inventory slot on the loading screen (admin can assign a creative to it).
+  const [loadSlot] = await db.select({ id: schema.adPlacements.id }).from(schema.adPlacements)
+    .where(eq(schema.adPlacements.key, "loading_screen")).limit(1);
+  if (!loadSlot) {
+    await db.insert(schema.adPlacements).values({
+      id: uid(), key: "loading_screen", pageScope: "Loading screen (between pages)",
+      device: "both", width: 728, height: 90, mobileWidth: 320, mobileHeight: 100,
+    });
+  }
   // (migrateGameImagesToBlob is run unconditionally every boot from
   // ensureProvisioned — not gated here — so it self-heals if Blob became
   // available after this version flag was already set.)

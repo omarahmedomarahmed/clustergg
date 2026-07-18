@@ -2,15 +2,15 @@
 
 import { useEffect, useState } from "react";
 
-// Cycles the loading phrases every second. The list comes from the CMS
-// (brand.loading.phrases), so admins control the copy.
-export default function LoadingPhrases({ phrases }: { phrases: string[] }) {
+// Cycles the loading phrases on an admin-set interval. The list + timing come
+// from the CMS (brand.loading.phrases / brand.loading.interval).
+export default function LoadingPhrases({ phrases, intervalMs = 3000 }: { phrases: string[]; intervalMs?: number }) {
   const [i, setI] = useState(0);
   useEffect(() => {
     if (phrases.length < 2) return;
-    const t = setInterval(() => setI((v) => (v + 1) % phrases.length), 1000);
+    const t = setInterval(() => setI((v) => (v + 1) % phrases.length), Math.max(400, intervalMs));
     return () => clearInterval(t);
-  }, [phrases.length]);
+  }, [phrases.length, intervalMs]);
   return (
     <div key={i} className="mt-4 text-sm font-semibold tracking-wide grad-text loading-phrase">
       {phrases[i] ?? "Loading…"}

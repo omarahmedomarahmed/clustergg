@@ -45,6 +45,15 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.loading.color": "#8b5cf6",
   "brand.loading.logo": "",
   "brand.loading.phrases": "Traversing the cluster…\nAligning the constellations…\nCharging warp coils…\nSyncing your galaxy…\nPolishing trophies…\nCounting Cluster Points…",
+  // Seconds between loading phrases (admin-editable; 1–20).
+  "brand.loading.interval": "3",
+  // Gamified astronaut on the loading screen. Empty = hidden; defaults to the mascot.
+  "brand.loading.astronaut": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260718_155414_f0fa69a2-5889-449b-9eb0-b242a5b07aa2.png",
+  // Loading-screen background art (empty = dark blur). Show the wordmark at the bottom.
+  "brand.loading.bg": "",
+  "brand.loading.wordmark": "1",
+  // Orb size in px (72–200) — the whole orb is editable via these keys + color/logo.
+  "brand.loading.orbSize": "80",
   // Floating quest orb icon (bottom-right). Empty = default CP coin.
   "brand.orb.icon": "",
   "brand.orb.color": "#8b5cf6",
