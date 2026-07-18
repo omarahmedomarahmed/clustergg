@@ -49,6 +49,7 @@ export function avatarClip(shape: AvatarShape): string | undefined {
 
 export const SECTIONS = [
   { key: "accounts", label: "Connected accounts" },
+  { key: "quests", label: "Quests & Cluster Points" },
   { key: "standings", label: "Leaderboard standings" },
   { key: "trophies", label: "Trophy case" },
   { key: "badges", label: "Badges" },
@@ -167,15 +168,23 @@ export function resolveTheme(raw: unknown): ProfileTheme {
   const t = (raw && typeof raw === "object" ? raw : {}) as Partial<ProfileTheme>;
   const tmpl = TEMPLATES.find((x) => x.key === t.template)?.theme ?? {};
   const merged = { ...DEFAULT_THEME, ...tmpl, ...t };
+  const savedOrder = Array.isArray(t.order) && t.order.length ? t.order : DEFAULT_THEME.order;
+  // Append any newly-added default sections (e.g. "quests") that a saved order
+  // predates, so existing gamers still get them (they can then reorder).
+  const order = [...savedOrder, ...DEFAULT_THEME.order.filter((k) => !savedOrder.includes(k))];
   return {
     ...merged,
     sections: { ...DEFAULT_THEME.sections, ...(t.sections ?? {}) },
-    order: Array.isArray(t.order) && t.order.length ? t.order : DEFAULT_THEME.order,
+    order,
   };
 }
 
 // Background style (image + dark overlay for readability) shared by the builder
-// preview and the public profile so they render identically.
+// preview and the public profile so they render identically. NOTE: we do NOT
+// use `background-attachment: fixed` — on a long, heavily-customized page that
+// forces a full-viewport repaint on every scroll frame (the reported "slow /
+// delayed scrolling"). The public page instead renders `bgLayerStyle` on a
+// separate `position: fixed` layer, which the compositor handles jank-free.
 export function bgStyle(t: ProfileTheme): CSSProperties {
   if (!t.bgImage) return {};
   const a = Math.max(0, Math.min(90, t.bgOverlay ?? 0)) / 100;
@@ -184,7 +193,20 @@ export function bgStyle(t: ProfileTheme): CSSProperties {
     backgroundImage: `${overlay}url("${t.bgImage}")`,
     backgroundSize: "cover",
     backgroundPosition: "center",
-    backgroundAttachment: "fixed",
+  };
+}
+
+// The fixed full-viewport background layer for the public profile: same image +
+// overlay, but meant for a `position: fixed; inset: 0` element behind the
+// content so scrolling stays smooth.
+export function bgLayerStyle(t: ProfileTheme): CSSProperties {
+  if (!t.bgImage) return {};
+  const a = Math.max(0, Math.min(90, t.bgOverlay ?? 0)) / 100;
+  const overlay = a > 0 ? `linear-gradient(rgba(0,0,0,${a}), rgba(0,0,0,${a})), ` : "";
+  return {
+    backgroundImage: `${overlay}url("${t.bgImage}")`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
   };
 }
 

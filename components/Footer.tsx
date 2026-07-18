@@ -3,9 +3,11 @@ import { getContent } from "@/lib/cms";
 import BrandHeader from "@/components/BrandHeader";
 
 export default async function Footer() {
-  const c = await getContent(["footer.tagline"]);
+  const c = await getContent(["footer.tagline", "brand.footer.bg"]);
+  const footerBg = c["brand.footer.bg"];
   return (
-    <footer className="relative z-10 mt-20 border-t border-violet-500/15">
+    <footer className="relative z-10 mt-20 border-t border-violet-500/15 bg-cover bg-center"
+      style={footerBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.86), rgba(4,5,26,0.92)), url(${footerBg})` } : undefined}>
       <div className="mx-auto max-w-6xl px-4 py-12 grid gap-8 sm:grid-cols-3 text-sm">
         <div>
           <div className="mb-3"><BrandHeader placement="footer" /></div>

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
@@ -38,18 +38,37 @@ export const ACTION_LABEL: Record<string, string> = Object.fromEntries(ACTION_CA
 // Cosmic quest emblem art (Higgsfield nano_banana). Served directly from the
 // CDN like the planet skins; admins can replace any of these in /admin/quests.
 const HF = "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082";
+// Glorified unified-style quest badges (hexagonal cosmic medals).
 export const QUEST_EMBLEMS: Record<string, string> = {
-  conquest: `${HF}/hf_20260714_193856_ea53f06e-b44d-4473-b67c-b3c2a2a736c7.png`,
-  orbit: `${HF}/hf_20260714_193903_a1b522be-910a-49df-8904-b4fbbf832f97.png`,
-  ascension: `${HF}/hf_20260714_193907_7a60de0d-d719-4228-860e-6ec7b44b1b31.png`,
-  signal: `${HF}/hf_20260715_113609_7865c988-053e-4808-bc82-3451222db943.png`,
+  conquest: `${HF}/hf_20260717_223341_7969f811-bb66-45b0-b589-756f32d7c034.png`,
+  orbit: `${HF}/hf_20260717_223622_deb3e6f8-a5ac-4ac4-a321-1b19d0facbfb.png`,
+  ascension: `${HF}/hf_20260717_223625_d4b96822-41d1-4b3b-a0f0-dd9bae1d7ca7.png`,
+  signal: `${HF}/hf_20260717_223627_90984c2b-6b28-41f0-8e65-558acb2adfa0.png`,
 };
+// The previous emblems — replaced automatically by the new badges (admin
+// uploads are preserved since they won't match these).
+const OLD_QUEST_EMBLEMS: string[] = [
+  `${HF}/hf_20260714_193856_ea53f06e-b44d-4473-b67c-b3c2a2a736c7.png`,
+  `${HF}/hf_20260714_193903_a1b522be-910a-49df-8904-b4fbbf832f97.png`,
+  `${HF}/hf_20260714_193907_7a60de0d-d719-4228-860e-6ec7b44b1b31.png`,
+  `${HF}/hf_20260715_113609_7865c988-053e-4808-bc82-3451222db943.png`,
+];
+// Big glorified Cluster Points (CP) currency icon — shown wherever CP appears.
+export const CP_ICON = `${HF}/hf_20260717_223629_251d5972-a1bc-4e38-8724-1ea35bf10f18.png`;
 // Gamified cosmic card backgrounds per quest (subtle, dark, text-safe).
 export const QUEST_CARD_BGS: Record<string, string> = {
   conquest: `${HF}/hf_20260715_113645_4eb3d18c-2808-4d26-a38e-359ca5e78dbc.png`,
   orbit: `${HF}/hf_20260715_113649_4dcef232-cee5-4d48-b950-0d3f4907289a.png`,
   ascension: `${HF}/hf_20260715_113657_a4ea0800-d986-4490-aa9d-209106e6d192.png`,
   signal: `${HF}/hf_20260715_113701_940a9b02-30e1-413e-9a91-dabb9acb6f8f.png`,
+};
+// Flat-earth-in-space 3D quest MAP art (one themed world per quest), used as the
+// treasure-map hero background. Each is a different theme + color.
+export const QUEST_MAP_ART: Record<string, string> = {
+  conquest: `${HF}/hf_20260717_223300_12943977-905f-4e3e-9c9e-c13b988d95d9.png`,
+  orbit: `${HF}/hf_20260717_223301_8726e058-02b7-439c-a7f0-d598bbcfa036.png`,
+  ascension: `${HF}/hf_20260717_223318_e48ad818-64ca-4910-9f3d-39ac838d9967.png`,
+  signal: `${HF}/hf_20260717_223321_558cd40f-903d-440b-ae2f-2b01bb01cffd.png`,
 };
 
 // ===== Default quests (seeded once; fully editable afterwards) =====
@@ -155,12 +174,18 @@ function mapPos(i: number, n: number): [number, number] {
 // clobbers an admin upload. Idempotent; safe to run every boot-maintenance.
 export async function ensureQuestArt(db: DB) {
   for (const [key, url] of Object.entries(QUEST_EMBLEMS)) {
+    // Set the new badge where there's no logo OR the logo is a previous default
+    // (so we upgrade the art without clobbering an admin's own upload).
     await db.update(schema.quests).set({ logoUrl: url })
-      .where(and(eq(schema.quests.key, key), isNull(schema.quests.logoUrl)));
+      .where(and(eq(schema.quests.key, key), or(isNull(schema.quests.logoUrl), inArray(schema.quests.logoUrl, OLD_QUEST_EMBLEMS))));
   }
   for (const [key, url] of Object.entries(QUEST_CARD_BGS)) {
     await db.update(schema.quests).set({ cardBgUrl: url })
       .where(and(eq(schema.quests.key, key), isNull(schema.quests.cardBgUrl)));
+  }
+  for (const [key, url] of Object.entries(QUEST_MAP_ART)) {
+    await db.update(schema.quests).set({ mapArtUrl: url })
+      .where(and(eq(schema.quests.key, key), isNull(schema.quests.mapArtUrl)));
   }
   // Spread map pins for any quest whose tiers are all still at the default
   // center (50/50) — so the standalone map hero shows a real path, not a stack.
@@ -221,8 +246,35 @@ export async function awardQuestAction(
         });
 
       await unlockTiers(db, userId, quest.id, quest.name);
+      await maybeCompleteQuest(db, userId, quest.id, quest.name);
     }
   } catch { /* gamification is non-fatal — never block the underlying action */ }
+}
+
+// When current-cycle QP passes the top tier, the quest is "completed": award a
+// completion (badge ×N), bank the CP into lifetimeQp, and re-enroll by carrying
+// the remainder into a fresh cycle — so total CP keeps stacking forever.
+async function maybeCompleteQuest(db: DB, userId: string, questId: string, questName: string) {
+  const [prog] = await db.select({ qp: schema.userQuestProgress.qp }).from(schema.userQuestProgress)
+    .where(and(eq(schema.userQuestProgress.userId, userId), eq(schema.userQuestProgress.questId, questId))).limit(1);
+  const [top] = await db.select({ t: schema.questTiers.thresholdQp }).from(schema.questTiers)
+    .where(and(eq(schema.questTiers.questId, questId), eq(schema.questTiers.isActive, true)))
+    .orderBy(desc(schema.questTiers.thresholdQp)).limit(1);
+  const maxThreshold = Number(top?.t ?? 0);
+  let qp = prog?.qp ?? 0;
+  if (maxThreshold <= 0 || qp < maxThreshold) return;
+
+  let completed = 0;
+  while (qp >= maxThreshold) { qp -= maxThreshold; completed++; }
+  await db.update(schema.userQuestProgress)
+    .set({ qp, completions: sql`${schema.userQuestProgress.completions} + ${completed}`, lifetimeQp: sql`${schema.userQuestProgress.lifetimeQp} + ${maxThreshold * completed}`, updatedAt: new Date() })
+    .where(and(eq(schema.userQuestProgress.userId, userId), eq(schema.userQuestProgress.questId, questId)));
+  await db.insert(schema.notifications).values({
+    id: uid(), userId, type: "badge",
+    title: `Quest complete: ${questName}! 🏆`,
+    body: `You finished ${questName}${completed > 1 ? ` ×${completed}` : ""} — re-enrolled from the start, and your total CP keeps stacking.`,
+    href: "/quests",
+  });
 }
 
 // Award any tier badges the user's current QP now clears.
@@ -256,6 +308,7 @@ export type QuestView = {
   id: string; key: string; name: string; tagline: string; lore: string; color: string; accent2: string; icon: string;
   logoUrl: string | null; cardBgUrl: string | null; coverUrl: string | null; mapArtUrl: string | null;
   qp: number; tiers: QuestTierView[]; currentTierIndex: number; nextTier: QuestTierView | null;
+  completions: number; totalCp: number;
 };
 
 async function tierHolderCountMap(db: DB, tierIds: string[]): Promise<Map<string, number>> {
@@ -269,27 +322,68 @@ export async function getUserQuests(db: DB, userId: string | null): Promise<Ques
   const quests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true)).orderBy(schema.quests.sortOrder);
   if (quests.length === 0) return [];
   const questIds = quests.map((q) => q.id);
-  const [tiers, progress, earned] = await Promise.all([
+  const [tiers, progress] = await Promise.all([
     db.select().from(schema.questTiers).where(and(inArray(schema.questTiers.questId, questIds), eq(schema.questTiers.isActive, true))),
     userId ? db.select().from(schema.userQuestProgress).where(and(eq(schema.userQuestProgress.userId, userId), inArray(schema.userQuestProgress.questId, questIds))) : Promise.resolve([]),
-    userId ? db.select({ tierId: schema.userQuestTiers.questTierId }).from(schema.userQuestTiers).where(eq(schema.userQuestTiers.userId, userId)) : Promise.resolve([]),
   ]);
   const holders = await tierHolderCountMap(db, tiers.map((t) => t.id));
-  const qpByQuest = new Map(progress.map((p) => [p.questId, p.qp]));
-  const earnedSet = new Set(earned.map((e) => e.tierId));
+  const progByQuest = new Map(progress.map((p) => [p.questId, p]));
 
   return quests.map((q) => {
-    const qp = qpByQuest.get(q.id) ?? 0;
+    const p = progByQuest.get(q.id);
+    const qp = p?.qp ?? 0;
+    // "Earned" reflects the CURRENT cycle (re-enroll resets the map); lifetime
+    // achievements are the quest badges (completions) shown on the profile.
     const qTiers = tiers.filter((t) => t.questId === q.id).sort((a, b) => a.tierIndex - b.tierIndex)
-      .map((t): QuestTierView => ({ id: t.id, name: t.name, description: t.description, thresholdQp: t.thresholdQp, iconUrl: t.iconUrl, color: t.color, mapX: t.mapX, mapY: t.mapY, earned: earnedSet.has(t.id) || qp >= t.thresholdQp, holders: holders.get(t.id) ?? 0 }));
+      .map((t): QuestTierView => ({ id: t.id, name: t.name, description: t.description, thresholdQp: t.thresholdQp, iconUrl: t.iconUrl, color: t.color, mapX: t.mapX, mapY: t.mapY, earned: qp >= t.thresholdQp, holders: holders.get(t.id) ?? 0 }));
     const currentTierIndex = qTiers.reduce((acc, t, i) => (qp >= t.thresholdQp ? i : acc), -1);
     const nextTier = qTiers.find((t) => qp < t.thresholdQp) ?? null;
+    const completions = p?.completions ?? 0;
     return {
       id: q.id, key: q.key, name: q.name, tagline: q.tagline, lore: q.lore, color: q.color, accent2: q.accent2, icon: q.icon,
       logoUrl: q.logoUrl, cardBgUrl: q.cardBgUrl, coverUrl: q.coverUrl, mapArtUrl: q.mapArtUrl,
       qp, tiers: qTiers, currentTierIndex, nextTier,
+      completions, totalCp: (p?.lifetimeQp ?? 0) + qp,
     };
   });
+}
+
+// How many completion badges a gamer holds for a single quest (0 if none).
+export async function getQuestCompletions(db: DB, userId: string, questId: string): Promise<number> {
+  const [row] = await db.select({ c: schema.userQuestProgress.completions }).from(schema.userQuestProgress)
+    .where(and(eq(schema.userQuestProgress.userId, userId), eq(schema.userQuestProgress.questId, questId))).limit(1);
+  return Number(row?.c ?? 0);
+}
+
+// A gamer's TOTAL Cluster Points across all quests (lifetime + current cycles).
+export async function getTotalCp(db: DB, userId: string | null): Promise<number> {
+  if (!userId) return 0;
+  const [row] = await db.select({ c: sql<number>`COALESCE(SUM(${schema.userQuestProgress.qp} + ${schema.userQuestProgress.lifetimeQp}), 0)` })
+    .from(schema.userQuestProgress).where(eq(schema.userQuestProgress.userId, userId));
+  return Number(row?.c ?? 0);
+}
+
+// ===== CP ledger (history log) =====
+export type CpLedgerEntry = {
+  id: string; questId: string; questKey: string; questName: string; color: string; logoUrl: string | null;
+  actionKey: string; label: string; qp: number; at: string;
+};
+// Every CP award for a gamer (when + why), newest first. Optionally scoped to
+// one quest. Backed by questEvents; the "why" comes from the action label.
+export async function getCpLedger(db: DB, userId: string | null, opts?: { questId?: string; limit?: number }): Promise<CpLedgerEntry[]> {
+  if (!userId) return [];
+  const wheres = [eq(schema.questEvents.userId, userId)];
+  if (opts?.questId) wheres.push(eq(schema.questEvents.questId, opts.questId));
+  const rows = await db.select({
+    id: schema.questEvents.id, questId: schema.questEvents.questId, actionKey: schema.questEvents.actionKey,
+    qp: schema.questEvents.qpAwarded, at: schema.questEvents.createdAt,
+    key: schema.quests.key, name: schema.quests.name, color: schema.quests.color, logoUrl: schema.quests.logoUrl,
+  }).from(schema.questEvents).innerJoin(schema.quests, eq(schema.questEvents.questId, schema.quests.id))
+    .where(and(...wheres)).orderBy(desc(schema.questEvents.createdAt)).limit(opts?.limit ?? 120);
+  return rows.map((r) => ({
+    id: r.id, questId: r.questId, questKey: r.key, questName: r.name, color: r.color, logoUrl: r.logoUrl,
+    actionKey: r.actionKey, label: ACTION_LABEL[r.actionKey] ?? r.actionKey, qp: r.qp, at: r.at.toISOString(),
+  }));
 }
 
 // Top questers per quest (CP leaderboard), keyed by quest id.
@@ -328,6 +422,29 @@ export async function getQuestByKey(db: DB, key: string, userId: string | null) 
     if (list.length < 12) { list.push({ name: r.name, slug: r.slug, avatarUrl: r.avatarUrl }); tierHolders[r.tierId] = list; }
   }
   return { quest, allQuests: all, tierHolders, leaderboard: tops.get(quest.id) ?? [] };
+}
+
+// Lean quest summary for the nav bar — name, CP, art and progress-to-next-tier
+// only (no tier-holder counts), so it's cheap enough to run on every page.
+export type NavQuest = { key: string; name: string; color: string; accent2: string; qp: number; art: string | null; logoUrl: string | null; pct: number; nextName: string };
+export async function getNavQuests(db: DB, userId: string | null, limit = 4): Promise<NavQuest[]> {
+  const quests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true)).orderBy(schema.quests.sortOrder).limit(limit);
+  if (quests.length === 0) return [];
+  const ids = quests.map((q) => q.id);
+  const [tiers, progress] = await Promise.all([
+    db.select().from(schema.questTiers).where(and(inArray(schema.questTiers.questId, ids), eq(schema.questTiers.isActive, true))),
+    userId ? db.select().from(schema.userQuestProgress).where(and(eq(schema.userQuestProgress.userId, userId), inArray(schema.userQuestProgress.questId, ids))) : Promise.resolve([]),
+  ]);
+  const qpBy = new Map(progress.map((p) => [p.questId, p.qp]));
+  return quests.map((q) => {
+    const qp = qpBy.get(q.id) ?? 0;
+    const qTiers = tiers.filter((t) => t.questId === q.id).sort((a, b) => a.tierIndex - b.tierIndex);
+    const next = qTiers.find((t) => qp < t.thresholdQp);
+    const prevT = [...qTiers].reverse().find((t) => qp >= t.thresholdQp)?.thresholdQp ?? 0;
+    const span = next ? next.thresholdQp - prevT : 1;
+    const pct = next ? Math.max(4, Math.min(100, Math.round(((qp - prevT) / span) * 100))) : 100;
+    return { key: q.key, name: q.name, color: q.color, accent2: q.accent2, qp, art: q.mapArtUrl || q.cardBgUrl || null, logoUrl: q.logoUrl, pct, nextName: next?.name ?? "Max" };
+  });
 }
 
 // Leaderboard: how many gamers have unlocked each quest's tiers, top questers.

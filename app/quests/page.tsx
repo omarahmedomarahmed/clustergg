@@ -1,7 +1,9 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getUserQuests, getQuestTops } from "@/lib/quests";
+import { getUserQuests, getQuestTops, getCpLedger } from "@/lib/quests";
 import QuestCard from "@/components/QuestCard";
+import CpLedger from "@/components/CpLedger";
+import CpIcon from "@/components/CpIcon";
 import OAuthButtons from "@/components/OAuthButtons";
 import Icon from "@/components/Icon";
 
@@ -12,7 +14,11 @@ export default async function QuestsPage() {
   const user = await getCurrentUser();
   const db = await getDb();
   const quests = await getUserQuests(db, user?.id ?? null);
-  const tops = await getQuestTops(db, quests.map((q) => q.id), 8);
+  const [tops, ledger] = await Promise.all([
+    getQuestTops(db, quests.map((q) => q.id), 8),
+    getCpLedger(db, user?.id ?? null, { limit: 200 }),
+  ]);
+  const totalCp = quests.reduce((s, q) => s + q.totalCp, 0);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -31,12 +37,45 @@ export default async function QuestsPage() {
         </div>
       )}
 
+      {/* Total CP + per-quest breakdown */}
+      {user && quests.length > 0 && (
+        <div className="glass p-5 md:p-6 mb-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div className="text-[11px] uppercase tracking-widest text-muted">Your total Cluster Points</div>
+              <div className="flex items-center gap-2.5 mt-1">
+                <CpIcon size={34} />
+                <span className="text-4xl font-bold grad-text">{totalCp.toLocaleString()}</span>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {quests.map((q) => (
+                <div key={q.id} className="rounded-xl border px-3 py-2 min-w-[104px]" style={{ borderColor: `${q.color}44`, background: `${q.color}12` }}>
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: q.color }}>
+                    {q.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-4 w-4 object-contain" /> : <Icon name="spark" size={11} />}
+                    {q.name}{q.completions > 0 && <span className="text-[9px] opacity-80">×{q.completions}</span>}
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-1 text-sm font-bold"><CpIcon size={13} /> {q.totalCp.toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {quests.length > 0 ? (
         <div className="grid md:grid-cols-2 gap-5">
           {quests.map((q) => <QuestCard key={q.id} quest={q} top={tops.get(q.id) ?? []} />)}
         </div>
       ) : (
         <div className="glass p-10 text-center text-muted">Quests are being forged — check back shortly.</div>
+      )}
+
+      {/* Full CP history log across every quest, with filters */}
+      {user && ledger.length > 0 && (
+        <div className="mt-8">
+          <CpLedger entries={ledger} quests={quests.map((q) => ({ key: q.key, name: q.name, color: q.color }))} title="Your complete CP history" />
+        </div>
       )}
     </div>
   );

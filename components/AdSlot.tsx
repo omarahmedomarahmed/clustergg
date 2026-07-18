@@ -31,7 +31,15 @@ export default function AdSlot({ placement, className = "" }: { placement: strin
     let alive = true;
     fetch(`/api/ads/serve?placement=${encodeURIComponent(placement)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (alive && d?.creatives?.length) setServed(d); })
+      .then((d) => {
+        if (alive && d?.creatives?.length) {
+          setServed(d);
+          // Stagger placements: two slots on the same page start on a different
+          // brand so a visitor sees different advertisers simultaneously.
+          let h = 0; for (let i = 0; i < placement.length; i++) h = (h * 31 + placement.charCodeAt(i)) | 0;
+          setIdx(Math.abs(h) % d.creatives.length);
+        }
+      })
       .catch(() => {});
     return () => { alive = false; };
   }, [placement]);
@@ -116,9 +124,10 @@ export default function AdSlot({ placement, className = "" }: { placement: strin
             key={creative.campaignCreativeId}
             src={creative.fileUrl}
             className="w-full h-full object-cover"
-            autoPlay muted playsInline
-            // Hard 5s cap: advance rotation regardless of source length.
-            onTimeUpdate={(e) => {
+            autoPlay muted playsInline loop={served.creatives.length < 2}
+            // With multiple creatives, advance rotation after ~5s. A lone video
+            // just loops (loop attr above).
+            onTimeUpdate={served.creatives.length < 2 ? undefined : (e) => {
               if (e.currentTarget.currentTime >= 5) {
                 e.currentTarget.pause();
                 setIdx((i) => (served.creatives.length ? (i + 1) % served.creatives.length : 0));

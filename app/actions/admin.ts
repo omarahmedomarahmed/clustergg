@@ -1,10 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, count } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin, requireStaff, hashPassword } from "@/lib/auth";
 import { uid, slugify } from "@/lib/utils";
+import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
 import { syncAccount } from "@/lib/sync";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
@@ -33,10 +34,22 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   const { setContent } = await import("@/lib/cms");
   const mode = (v: FormDataEntryValue | null) => (["mark", "wordmark", "both"].includes(String(v)) ? String(v) : "both");
   await setContent("brand.wordmark", String(formData.get("wordmark") ?? "").trim());
+  const wmZoom = Number(formData.get("wordmarkZoom"));
+  await setContent("brand.wordmark.zoom", String(Math.max(0.5, Math.min(3, Number.isFinite(wmZoom) ? wmZoom : 1))));
   await setContent("brand.nav.mode", mode(formData.get("navMode")));
+  await setContent("brand.nav.planetsIcon", String(formData.get("planetsIcon") ?? "").trim());
   await setContent("brand.footer.mode", mode(formData.get("footerMode")));
   await setContent("brand.loading.color", String(formData.get("loadingColor") ?? "#8b5cf6").trim() || "#8b5cf6");
   await setContent("brand.loading.logo", String(formData.get("loadingLogo") ?? "").trim());
+  await setContent("brand.loading.phrases", String(formData.get("loadingPhrases") ?? "").trim() || "Traversing the cluster…");
+  if (formData.has("orbIcon")) await setContent("brand.orb.icon", String(formData.get("orbIcon") ?? "").trim());
+  await setContent("brand.nav.bg", String(formData.get("navBg") ?? "").trim());
+  await setContent("brand.footer.bg", String(formData.get("footerBg") ?? "").trim());
+  await setContent("brand.favicon", String(formData.get("favicon") ?? "").trim());
+  const cpIcon = String(formData.get("cpIcon") ?? "").trim();
+  if (cpIcon) await setContent("brand.cpIcon", cpIcon);
+  const favZoom = Number(formData.get("faviconZoom"));
+  await setContent("brand.favicon.zoom", String(Math.max(1, Math.min(3, Number.isFinite(favZoom) ? favZoom : 1))));
   await audit(admin.id, "brand.branding_update", "content", "brand");
   revalidatePath("/", "layout");
   return { ok: true, message: "Branding updated everywhere." };
@@ -208,6 +221,60 @@ export async function saveSpace(formData: FormData) {
   revalidatePath("/planets");
 }
 
+// Delete a planet (space) and its posts/members. Blocked when it still has
+// challenges, so we never orphan competition data.
+export async function deleteSpace(spaceId: string) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const [ch] = await db.select({ c: count() }).from(schema.challenges).where(eq(schema.challenges.spaceId, spaceId));
+  if (Number(ch?.c ?? 0) > 0) return; // keep planets that still have challenges
+  await db.delete(schema.posts).where(eq(schema.posts.spaceId, spaceId));
+  await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, spaceId));
+  await db.delete(schema.spaces).where(eq(schema.spaces.id, spaceId));
+  await audit(admin.id, "space.delete", "space", spaceId);
+  revalidatePath("/admin/spaces");
+  revalidatePath("/planets");
+}
+
+// Create a planet for every active catalog game that doesn't have one yet, so
+// there's always a planet per game.
+export async function ensurePlanetsForGames() {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const games = await db.select().from(schema.games).where(eq(schema.games.isActive, true));
+  const spaces = await db.select({ game: schema.spaces.game }).from(schema.spaces);
+  const have = new Set(spaces.map((s) => s.game).filter(Boolean) as string[]);
+  for (const g of games) {
+    if (have.has(g.name)) continue;
+    await db.insert(schema.spaces).values({
+      id: uid(), slug: slugify(g.name), name: g.name, game: g.name,
+      description: g.description || `The ${g.name} planet — leaderboards, challenges and community.`,
+      createdBy: admin.id,
+    }).onConflictDoNothing();
+  }
+  await audit(admin.id, "planets.ensure_for_games", "space");
+  revalidatePath("/admin/spaces");
+  revalidatePath("/planets");
+}
+
+// Delete legacy planets that aren't tied to a catalog game (and have no
+// challenges) — the outdated "spaces" like hardware that were never games.
+export async function deleteLegacyPlanets() {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const empties = await db.select().from(schema.spaces).where(isNull(schema.spaces.game));
+  for (const s of empties) {
+    const [ch] = await db.select({ c: count() }).from(schema.challenges).where(eq(schema.challenges.spaceId, s.id));
+    if (Number(ch?.c ?? 0) > 0) continue;
+    await db.delete(schema.posts).where(eq(schema.posts.spaceId, s.id));
+    await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, s.id));
+    await db.delete(schema.spaces).where(eq(schema.spaces.id, s.id));
+  }
+  await audit(admin.id, "planets.delete_legacy", "space");
+  revalidatePath("/admin/spaces");
+  revalidatePath("/planets");
+}
+
 export async function reviewSpaceRequest(requestId: string, approve: boolean, note: string) {
   const admin = await requireStaff();
   const db = await getDb();
@@ -296,6 +363,8 @@ export async function saveChallenge(formData: FormData) {
     rules: { conditions },
     pointsEngine,
     thresholdTarget: Number(formData.get("thresholdTarget")) || null,
+    gateQuestId: String(formData.get("gateQuestId") ?? "").trim() || null,
+    gateMinBadges: Math.max(0, Number(formData.get("gateMinBadges")) || 0),
     startAt,
     endAt,
     cadence,
@@ -334,21 +403,75 @@ export async function saveBrand(formData: FormData) {
   const admin = await requireAdmin();
   const db = await getDb();
   const brandId = String(formData.get("brandId") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return;
   const values = {
-    name: String(formData.get("name") ?? "").trim(),
+    name,
+    about: String(formData.get("about") ?? "").trim() || null,
+    logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
+    coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
     industry: String(formData.get("industry") ?? "other"),
     contactEmail: String(formData.get("contactEmail") ?? "").trim() || null,
     status: String(formData.get("status") ?? "active"),
   };
-  if (!values.name) return;
   if (brandId) {
     await db.update(schema.brands).set(values).where(eq(schema.brands.id, brandId));
     await audit(admin.id, "brand.update", "brand", brandId);
+    revalidatePath(`/admin/brands/${brandId}`);
   } else {
-    await db.insert(schema.brands).values({ id: uid(), ...values });
+    // New brand gets a unique portal slug + an access key automatically.
+    const base = slugify(name) || "brand";
+    let slug = base, n = 2;
+    while ((await db.select({ id: schema.brands.id }).from(schema.brands).where(eq(schema.brands.slug, slug)).limit(1)).length) slug = `${base}-${n++}`;
+    await db.insert(schema.brands).values({ id: uid(), slug, accessKey: newAccessKey(), ...values });
     await audit(admin.id, "brand.create", "brand", values.name);
   }
   revalidatePath("/admin/brands");
+  revalidatePath("/admin/ads");
+}
+
+// Rotate a brand's portal access key (invalidates the old shared link).
+export async function regenerateBrandKey(brandId: string) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const key = newAccessKey();
+  await db.update(schema.brands).set({ accessKey: key }).where(eq(schema.brands.id, brandId));
+  await audit(admin.id, "brand.key_reset", "brand", brandId);
+  revalidatePath(`/admin/brands/${brandId}`);
+  revalidatePath("/admin/ads");
+  return key;
+}
+
+// Launch a campaign — only if every placement has a creative assigned.
+export async function launchCampaign(campaignId: string) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const { ready } = await getCampaignReadiness(db, campaignId);
+  if (!ready) return { error: "Every placement needs a creative before launch." };
+  await db.update(schema.adCampaigns).set({ status: "active", launchedAt: new Date() }).where(eq(schema.adCampaigns.id, campaignId));
+  await audit(admin.id, "campaign.launch", "campaign", campaignId);
+  revalidatePath("/admin/ads");
+  return { ok: true };
+}
+
+export async function setCampaignStatus(campaignId: string, status: "active" | "paused" | "draft" | "completed") {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  await db.update(schema.adCampaigns).set({ status }).where(eq(schema.adCampaigns.id, campaignId));
+  await audit(admin.id, `campaign.${status}`, "campaign", campaignId);
+  revalidatePath("/admin/ads");
+}
+
+// Admin reply in the shared brand inbox.
+export async function adminSendBrandMessage(brandId: string, formData: FormData) {
+  const admin = await requireAdmin();
+  const db = await getDb();
+  const body = String(formData.get("body") ?? "").trim();
+  if (!body) return;
+  await db.insert(schema.brandMessages).values({ id: uid(), brandId, sender: "admin", body, readByAdmin: true });
+  await audit(admin.id, "brand.message", "brand", brandId);
+  revalidatePath(`/admin/brands/${brandId}`);
+  revalidatePath("/admin/ads");
 }
 
 export async function saveCampaign(brandId: string, formData: FormData) {
@@ -484,6 +607,22 @@ export async function deleteLeaderboard(lbId: string) {
 }
 
 // ---------- Games catalog ----------
+function parseCustomMetrics(raw: string): { key: string; label: string; unit?: string; higherIsBetter?: boolean }[] {
+  try {
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .filter((m) => m && typeof m.label === "string" && m.label.trim())
+      .slice(0, 24)
+      .map((m) => ({
+        key: String(m.key ?? m.label).trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "metric",
+        label: String(m.label).trim().slice(0, 60),
+        unit: m.unit ? String(m.unit).trim().slice(0, 16) : undefined,
+        higherIsBetter: m.higherIsBetter !== false,
+      }));
+  } catch { return []; }
+}
+
 export async function saveGame(formData: FormData) {
   const admin = await requireStaff();
   const db = await getDb();
@@ -503,6 +642,10 @@ export async function saveGame(formData: FormData) {
     sortOrder: Number(formData.get("sortOrder")) || 0,
     showInNav: formData.get("showInNav") === "on",
     isActive: formData.get("isActive") === "on",
+    customMetrics: parseCustomMetrics(String(formData.get("customMetrics") ?? "[]")),
+    accent: String(formData.get("accent") ?? "").trim() || null,
+    accent2: String(formData.get("accent2") ?? "").trim() || null,
+    planetLayout: ["auto", "globe", "cover"].includes(String(formData.get("planetLayout"))) ? String(formData.get("planetLayout")) : "auto",
   };
   if (!values.name) return;
   if (gameId) {

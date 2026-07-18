@@ -102,6 +102,10 @@ html, body {
 .rise-in-1 { animation-delay: .08s; } .rise-in-2 { animation-delay: .16s; }
 .rise-in-3 { animation-delay: .24s; } .rise-in-4 { animation-delay: .32s; }
 
+/* Loading-screen phrase: gentle fade-in each time it swaps (every second) */
+@keyframes loadingPhraseIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.loading-phrase { animation: loadingPhraseIn 0.4s ease-out; }
+
 /* ---------- Themed gamer profile (scoped to .profile-root) ---------- */
 .profile-root {
   background-color: var(--p-bg);
@@ -109,7 +113,10 @@ html, body {
   font-family: var(--p-font);
   min-height: 100vh;
 }
-.profile-root.has-bg-image { background-size: cover; background-position: center; background-attachment: fixed; }
+/* Background image is rendered on a separate position:fixed layer (see the
+   public profile page) — not via background-attachment:fixed here, which caused
+   slow/janky scrolling on long, heavily-customized profiles. */
+.profile-root.has-bg-image { background-color: transparent; }
 .profile-root .p-muted { color: var(--p-muted); }
 .profile-root .p-accent { color: var(--p-accent); }
 

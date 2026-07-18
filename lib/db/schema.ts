@@ -34,6 +34,9 @@ export const users = pgTable("users", {
   // Full profile customization ("profile builder"): theme, layout, cursor,
   // section order & visibility. Rendered as inline CSS vars on the public page.
   theme: jsonb("theme").$type<Record<string, unknown>>().notNull().default({}),
+  // Feed control-panel prefs: which stat tiles to show + which challenges /
+  // game-leaderboards the gamer follows (pinned to the top of their feed).
+  feedPrefs: jsonb("feed_prefs").$type<{ stats?: string[]; challenges?: string[]; leaderboards?: string[] }>().notNull().default({}),
   createdAt: now("created_at"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
 }, (t) => [index("users_slug_idx").on(t.slug)]);
@@ -255,6 +258,9 @@ export const challenges = pgTable("challenges", {
     .notNull().default({ conditions: [] }),
   pointsEngine: jsonb("points_engine").$type<Record<string, number>>().notNull().default({}),
   thresholdTarget: integer("threshold_target"),
+  // Entry gate: require N completion badges of a given quest to join.
+  gateQuestId: text("gate_quest_id"),
+  gateMinBadges: integer("gate_min_badges").notNull().default(0),
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
   endAt: timestamp("end_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("draft"), // draft | active | completed | cancelled
@@ -296,12 +302,28 @@ export const challengeEvents = pgTable("challenge_events", {
 export const brands = pgTable("brands", {
   id: id(),
   name: text("name").notNull(),
+  slug: text("slug").unique(),          // portal URL: /brands/<slug>
+  accessKey: text("access_key"),        // key that unlocks the brand portal
   logoUrl: text("logo_url"),
+  coverUrl: text("cover_url"),          // brand portal cover art
+  about: text("about"),                 // shown on the portal (creative brief etc.)
   industry: text("industry").notNull().default("other"),
   contactEmail: text("contact_email"),
   status: text("status").notNull().default("active"), // active | paused
   createdAt: now("created_at"),
 });
+
+// Shared brand <-> admin inbox, shown on both the brand portal and the master
+// ads dashboard. `sender` is "brand" or "admin".
+export const brandMessages = pgTable("brand_messages", {
+  id: id(),
+  brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  sender: text("sender").notNull(), // brand | admin
+  body: text("body").notNull(),
+  readByAdmin: boolean("read_by_admin").notNull().default(false),
+  readByBrand: boolean("read_by_brand").notNull().default(false),
+  createdAt: now("created_at"),
+}, (t) => [index("brand_msg_idx").on(t.brandId, t.createdAt)]);
 
 export const adPlacements = pgTable("ad_placements", {
   id: id(),
@@ -340,6 +362,8 @@ export const adCampaigns = pgTable("ad_campaigns", {
   targetGeo: text("target_geo"),
   targetDevice: text("target_device").notNull().default("both"),
   status: text("status").notNull().default("active"), // active | paused | completed
+  // A campaign only starts serving once launched (all placement creatives in).
+  launchedAt: timestamp("launched_at", { withTimezone: true, mode: "date" }),
   createdAt: now("created_at"),
 });
 
@@ -389,6 +413,14 @@ export const games = pgTable("games", {
     .notNull().default({}),
   coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
     .notNull().default({ zoom: 1, x: 50, y: 50 }),
+  // Admin-defined trackable metrics for a game (so a brand-new game can be
+  // "integrated" from the UI — its metrics flow into leaderboards/challenges).
+  customMetrics: jsonb("custom_metrics").$type<{ key: string; label: string; unit?: string; higherIsBetter?: boolean }[]>()
+    .notNull().default([]),
+  // Per-planet theme + layout control.
+  accent: text("accent"),                              // primary accent color (hero glow/gradient)
+  accent2: text("accent2"),                            // secondary accent
+  planetLayout: text("planet_layout").notNull().default("auto"), // auto | globe | cover
   sortOrder: integer("sort_order").notNull().default(0),
   showInNav: boolean("show_in_nav").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
@@ -475,6 +507,10 @@ export const userQuestProgress = pgTable("user_quest_progress", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   questId: text("quest_id").notNull().references(() => quests.id, { onDelete: "cascade" }),
   qp: integer("qp").notNull().default(0),
+  // How many full times this quest has been completed (re-enrolled), and the
+  // lifetime CP earned across all completed cycles. Total CP = lifetimeQp + qp.
+  completions: integer("completions").notNull().default(0),
+  lifetimeQp: integer("lifetime_qp").notNull().default(0),
   updatedAt: now("updated_at"),
 }, (t) => [primaryKey({ columns: [t.userId, t.questId] })]);
 

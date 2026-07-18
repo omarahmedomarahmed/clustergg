@@ -1,13 +1,12 @@
 import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
+import { isOAuthLinkProvider } from "@/lib/oauth";
 import type { ProviderInfo } from "@/components/LinkAccountForm";
 
-// The connect-eligible providers, before any admin hide list is applied. This
-// is the full universe an admin can choose to show or hide on the connect /
-// onboarding pickers.
+// The connect-eligible providers, before any admin hide list is applied. Every
+// provider — API-based, OAuth, and identity-only — is offered so gamers can link
+// their whole identity; admins choose which to show via the hide list.
 export function connectableProviders() {
-  return PROVIDERS
-    .filter((p) => !["discord", "epic", "battlenet", "psn", "activision"].includes(p.id))
-    .filter((p) => !p.identityOnly || p.id === "riot-valorant");
+  return PROVIDERS;
 }
 
 // `hidden` is the set of provider ids an admin has switched off for the connect
@@ -17,6 +16,7 @@ export function providerInfoList(hidden: string[] = []): ProviderInfo[] {
   return connectableProviders()
     .filter((p) => !hide.has(p.id))
     .map((p) => ({
+      oauth: isOAuthLinkProvider(p.id),
       id: p.id,
       name: p.name,
       game: p.game,

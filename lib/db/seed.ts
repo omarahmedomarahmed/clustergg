@@ -1,4 +1,4 @@
-import { and, eq, isNull, sql as dsql } from "drizzle-orm";
+import { and, eq, isNull, lt, sql as dsql } from "drizzle-orm";
 import type { DB } from "./index";
 import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
@@ -435,17 +435,54 @@ const SUPERSEDED_SKINS: Record<string, string> = {
 const PLANET_SKINS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_114614_b3a4ad5b-e49a-4fab-99fb-056fd13ab71f.png`,
   "VALORANT": `${HF_CDN}/hf_20260713_214139_cba722cd-6ede-4996-b8a7-ae0315304705.png`,
+  "PUBG: Battlegrounds": `${HF_CDN}/hf_20260717_223923_4dedb116-a7d4-45c0-97ed-004de4aedaa9.png`,
+  "PUBG": `${HF_CDN}/hf_20260717_223923_4dedb116-a7d4-45c0-97ed-004de4aedaa9.png`,
+  "Dota 2": `${HF_CDN}/hf_20260717_223926_6bf3756b-3ee1-4629-98ae-e458dcddd180.png`,
+  "Fortnite": `${HF_CDN}/hf_20260717_223928_d55e9e97-d9a0-498a-a3f4-5cb6e430224f.png`,
+  "Counter-Strike 2": `${HF_CDN}/hf_20260717_223931_14be7cf0-ff69-41dc-87f9-77d113662a37.png`,
+  "Chess": `${HF_CDN}/hf_20260718_020410_c77327de-7a2e-4354-b26a-98aa0bb4aeb0.png`,
 };
+// Superseded chess globe (first, static render) — replaced by the animated one.
+const SUPERSEDED_CHESS = `${HF_CDN}/hf_20260718_004005_7cbd4afc-202f-4acb-b558-519546ffd94c.png`;
 const PLANET_BGS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_120620_3c2d92d2-00a7-4f38-ba68-7712e85b962d.png`,
   "VALORANT": `${HF_CDN}/hf_20260714_120636_4b63d00d-68e5-4379-b419-a0bc8b423124.png`,
+  "PUBG: Battlegrounds": `${HF_CDN}/hf_20260717_224254_9bf2847f-9b30-40e6-89b1-7c0816a28962.png`,
+  "PUBG": `${HF_CDN}/hf_20260717_224254_9bf2847f-9b30-40e6-89b1-7c0816a28962.png`,
+  "Dota 2": `${HF_CDN}/hf_20260717_224257_d5b1ca32-3a9c-4434-a7e8-8aa256473b7a.png`,
+  "Fortnite": `${HF_CDN}/hf_20260717_224259_eef07acf-cc6f-44ed-b0f0-715f2c6eb1d3.png`,
+  "Counter-Strike 2": `${HF_CDN}/hf_20260717_224301_435984a4-647b-4da2-bdaa-906bae240009.png`,
+  "Chess": `${HF_CDN}/hf_20260718_004014_550032cb-9efb-4a43-8ae8-a1ea21a123b4.png`,
 };
+// Backfill portal slug + access key for any brand created before those columns
+// existed, so every brand has a shareable /brands/<slug> portal. Idempotent.
+export async function ensureBrandKeys(db: DB) {
+  const rows = await db.select({ id: schema.brands.id, name: schema.brands.name, slug: schema.brands.slug, accessKey: schema.brands.accessKey }).from(schema.brands);
+  const { newAccessKey } = await import("@/lib/brands");
+  const { slugify } = await import("@/lib/utils");
+  const taken = new Set(rows.map((r) => r.slug).filter(Boolean) as string[]);
+  for (const b of rows) {
+    if (b.slug && b.accessKey) continue;
+    let slug = b.slug ?? "";
+    if (!slug) {
+      const base = slugify(b.name) || "brand";
+      slug = base; let n = 2;
+      while (taken.has(slug)) slug = `${base}-${n++}`;
+      taken.add(slug);
+    }
+    await db.update(schema.brands).set({ slug, accessKey: b.accessKey ?? newAccessKey() }).where(eq(schema.brands.id, b.id));
+  }
+}
+
 export async function ensurePlanetSkins(db: DB) {
   // Replace superseded renders in place.
   for (const [oldUrl, name] of Object.entries(SUPERSEDED_SKINS)) {
     await db.update(schema.games).set({ planetImageUrl: PLANET_SKINS[name] })
       .where(eq(schema.games.planetImageUrl, oldUrl));
   }
+  // Upgrade the first (static) chess globe to the animated render.
+  await db.update(schema.games).set({ planetImageUrl: PLANET_SKINS["Chess"] })
+    .where(eq(schema.games.planetImageUrl, SUPERSEDED_CHESS));
   // Set skins for games that don't have one yet (never clobbers admin uploads).
   for (const [name, url] of Object.entries(PLANET_SKINS)) {
     await db.update(schema.games).set({ planetImageUrl: url })
@@ -519,7 +556,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-17.1";
+const MAINT_VERSION = "2026-07-17.3-questart";
 
 export async function runBootMaintenance(db: DB) {
   try {
@@ -583,6 +620,25 @@ export async function seedHouseAds(db: DB) {
 // Idempotent: ensure the global top-banner placement exists and (on an already
 // seeded DB where seedHouseAds early-returns) has a house creative to fill it.
 // Runs every boot; a couple of guarded inserts, cheap once present.
+// Recurring (daily/weekly/monthly) challenges that are still "active" but whose
+// end time has passed roll their window forward to now, so they always show a
+// real live countdown instead of "ends just now". Custom-cadence challenges
+// keep their explicit dates. Cheap + filtered; runs every boot.
+export async function refreshStaleChallengeWindows(db: DB) {
+  const now = new Date();
+  const cadenceDays: Record<string, number> = { daily: 1, weekly: 7, monthly: 30 };
+  const rows = await db.select({ id: schema.challenges.id, cadence: schema.challenges.cadence })
+    .from(schema.challenges)
+    .where(and(eq(schema.challenges.status, "active"), lt(schema.challenges.endAt, now)));
+  for (const r of rows) {
+    const days = cadenceDays[r.cadence];
+    if (!days) continue;
+    await db.update(schema.challenges)
+      .set({ startAt: now, endAt: new Date(now.getTime() + days * 86400000) })
+      .where(eq(schema.challenges.id, r.id));
+  }
+}
+
 export async function ensureTopBannerAd(db: DB) {
   await db.insert(schema.adPlacements).values({
     id: uid(), key: "top_banner", pageScope: "Global top banner (all pages)", device: "both",

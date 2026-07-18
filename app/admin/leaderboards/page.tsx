@@ -1,63 +1,88 @@
 import { getDb, schema } from "@/lib/db";
-import { saveLeaderboard, deleteLeaderboard } from "@/app/actions/admin";
-import { PROVIDERS } from "@/lib/providers/registry";
+import { deleteLeaderboard } from "@/app/actions/admin";
+import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
+import Icon from "@/components/Icon";
+import LeaderboardForm, { type MetricOpt } from "@/components/LeaderboardForm";
+import MetricsGuide from "@/components/MetricsGuide";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Leaderboards" };
 
 export default async function AdminLeaderboardsPage() {
   const db = await getDb();
-  const boards = await db.select().from(schema.leaderboards);
-  const metricOptions = PROVIDERS.flatMap((p) =>
-    p.capabilities.map((c) => ({ game: p.game, key: c.key, label: `${p.game} · ${c.label}` })));
+  const [boards, gamesList] = await Promise.all([
+    db.select().from(schema.leaderboards),
+    db.select({ name: schema.games.name, customMetrics: schema.games.customMetrics }).from(schema.games),
+  ]);
+
+  // Trackable metrics grouped by game — so the form only offers a game's own stats.
+  const metricsByGame: Record<string, MetricOpt[]> = {};
+  for (const p of PROVIDERS) {
+    if (!p.capabilities.length) continue;
+    const arr = metricsByGame[p.game] ?? (metricsByGame[p.game] = []);
+    for (const c of p.capabilities) if (!arr.some((x) => x.key === c.key)) arr.push({ key: c.key, label: c.label });
+  }
+  // Admin-defined custom metrics (games integrated from the UI).
+  for (const g of gamesList) {
+    const cm = (g.customMetrics ?? []) as { key: string; label: string }[];
+    if (!cm.length) continue;
+    const arr = metricsByGame[g.name] ?? (metricsByGame[g.name] = []);
+    for (const c of cm) if (!arr.some((x) => x.key === c.key)) arr.push({ key: c.key, label: c.label });
+  }
+  // Keep any game/metric already saved on a board selectable, even if its
+  // provider exposes no capabilities in the registry.
+  for (const b of boards) {
+    const arr = metricsByGame[b.game] ?? (metricsByGame[b.game] = []);
+    if (!arr.some((x) => x.key === b.metricKey)) arr.push({ key: b.metricKey, label: b.metricKey });
+  }
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Leaderboards</h1>
+      <h1 className="text-2xl font-bold mb-1">Leaderboards</h1>
+      <p className="text-sm text-muted mb-5">Create and edit ranked boards. Pick a game and only that game&apos;s trackable metrics appear.</p>
 
-      <div className="glass p-6 mb-8">
-        <h2 className="font-bold mb-4">Create leaderboard</h2>
-        <form action={saveLeaderboard} className="grid sm:grid-cols-2 gap-3">
-          <input name="game" required placeholder="Game (e.g. Chess)" className="input-cosmic" list="games" />
-          <datalist id="games">
-            {[...new Set(metricOptions.map((m) => m.game))].map((g) => <option key={g} value={g} />)}
-          </datalist>
-          <input name="metricKey" required placeholder="metric_key (e.g. blitz_rating)" className="input-cosmic" list="metrics" />
-          <datalist id="metrics">
-            {[...new Set(metricOptions.map((m) => m.key))].map((k) => <option key={k} value={k} />)}
-          </datalist>
-          <input name="title" required placeholder="Title (e.g. Chess · Blitz Rating)" className="input-cosmic" />
-          <input name="unit" placeholder="Unit (e.g. elo)" className="input-cosmic" />
-          <select name="sortDir" className="input-cosmic">
-            <option value="desc">Highest first</option>
-            <option value="asc">Lowest first</option>
-          </select>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isActive" defaultChecked className="accent-violet-500" /> Active</label>
-          <div className="sm:col-span-2">
-            <button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Create</button>
-          </div>
-        </form>
-      </div>
+      <details className="glass p-6 mb-6 group">
+        <summary className="font-bold cursor-pointer list-none flex items-center gap-2">
+          <Icon name="spark" size={16} className="text-cyan-300" /> Create a leaderboard
+          <span className="ml-auto text-xs text-muted group-open:hidden">Open form</span>
+        </summary>
+        <div className="mt-4 border-t border-violet-400/15 pt-4"><LeaderboardForm metricsByGame={metricsByGame} /></div>
+      </details>
 
-      <div className="glass overflow-x-auto">
-        <table className="w-full table-cosmic">
-          <thead><tr><th>Title</th><th>Game</th><th>Metric</th><th>Active</th><th></th></tr></thead>
-          <tbody>
-            {boards.map((b) => (
-              <tr key={b.id}>
-                <td className="font-semibold text-sm">{b.title}</td>
-                <td className="text-sm text-muted">{b.game}</td>
-                <td className="font-mono text-xs text-cyan-300">{b.metricKey}</td>
-                <td className="text-sm">{b.isActive ? "✓" : "—"}</td>
-                <td>
-                  <form action={deleteLeaderboard.bind(null, b.id)}>
-                    <button className="text-xs text-rose-300 hover:underline">Delete</button>
-                  </form>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Metrics guide — exactly what each game's API pulls */}
+      <details className="glass p-6 mb-6 group">
+        <summary className="font-bold cursor-pointer list-none flex items-center gap-2">
+          <Icon name="satellite" size={16} className="text-cyan-300" /> Metrics guide — what each game tracks
+          <span className="ml-auto text-xs text-muted group-open:hidden">Open reference</span>
+        </summary>
+        <div className="mt-4 border-t border-violet-400/15 pt-4 grid md:grid-cols-2 gap-2">
+          {PROVIDERS.filter((p) => p.capabilities.length > 0).map((p) => (
+            <MetricsGuide key={p.id} providerName={p.name} game={p.game} live={isProviderLive(p)} authType={p.authType} docsUrl={p.docsUrl}
+              capabilities={p.capabilities.map((c) => ({ key: c.key, label: c.label, unit: c.unit, higherIsBetter: c.higherIsBetter }))} />
+          ))}
+        </div>
+      </details>
+
+      <div className="text-xs uppercase tracking-widest text-muted mb-3">{boards.length} leaderboards</div>
+      <div className="space-y-3">
+        {boards.map((b) => (
+          <details key={b.id} className="glass overflow-hidden">
+            <summary className="flex items-center gap-3 p-4 cursor-pointer list-none">
+              <Icon name="chart" size={18} className="text-cyan-300 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-sm">{b.title} {!b.isActive && <span className="text-xs text-rose-300">(hidden)</span>}</div>
+                <div className="text-xs text-muted truncate">{b.game} · <span className="font-mono text-cyan-300">{b.metricKey}</span></div>
+              </div>
+              <span className="text-xs text-cyan-300">Edit</span>
+            </summary>
+            <div className="border-t border-violet-400/15 p-5 space-y-3">
+              <LeaderboardForm board={{ id: b.id, game: b.game, metricKey: b.metricKey, title: b.title, unit: b.unit, sortDir: b.sortDir, isActive: b.isActive }} metricsByGame={metricsByGame} />
+              <form action={deleteLeaderboard.bind(null, b.id)}>
+                <button className="text-xs text-rose-300 hover:underline">Delete leaderboard</button>
+              </form>
+            </div>
+          </details>
+        ))}
       </div>
     </div>
   );

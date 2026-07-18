@@ -3,16 +3,18 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getContent } from "@/lib/cms";
-import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import GameLogo from "@/components/GameLogo";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
-import HomeHero, { type QuestHeroData } from "@/components/HomeHero";
+import HeroStage from "@/components/HeroStage";
+import QuestCard from "@/components/QuestCard";
 import OAuthButtons from "@/components/OAuthButtons";
 import { buildSkinnedPlanets } from "@/lib/planets";
-import { getUserQuests } from "@/lib/quests";
+import { getQuestHeroData } from "@/lib/quest-hero";
+import { getUserQuests, getQuestTops } from "@/lib/quests";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
+import { slimImg } from "@/lib/img";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -24,29 +26,10 @@ export default async function LandingPage() {
 
   // Quest hero data — the homepage toggle can swap the planet globe for the
   // primary quest's treasure map without leaving the page.
-  const questHero: QuestHeroData | null = await (async () => {
-    const quests = await getUserQuests(db, viewer?.id ?? null);
-    if (quests.length === 0) return null;
-    const primary = quests[0];
-    const tierIds = primary.tiers.map((t) => t.id);
-    const tierHolders: Record<string, { name: string; slug: string; avatarUrl: string | null }[]> = {};
-    if (tierIds.length) {
-      const rows = await db.select({
-        tierId: schema.userQuestTiers.questTierId,
-        name: schema.users.displayName, slug: schema.users.slug, avatarUrl: schema.users.avatarUrl,
-      })
-        .from(schema.userQuestTiers)
-        .innerJoin(schema.users, eq(schema.userQuestTiers.userId, schema.users.id))
-        .where(and(inArray(schema.userQuestTiers.questTierId, tierIds), eq(schema.users.status, "active")))
-        .orderBy(desc(schema.userQuestTiers.awardedAt)).limit(120);
-      for (const r of rows) {
-        const list = tierHolders[r.tierId] ?? [];
-        if (list.length < 12) { list.push({ name: r.name, slug: r.slug, avatarUrl: r.avatarUrl }); tierHolders[r.tierId] = list; }
-      }
-    }
-    const tabs = quests.map((q) => ({ key: q.key, name: q.name, color: q.color, logoUrl: q.logoUrl, icon: q.icon, mapArtUrl: q.mapArtUrl }));
-    return { quest: primary, tierHolders, tabs };
-  })();
+  const questHero = await getQuestHeroData(db, viewer?.id ?? null);
+  // Full quests + CP tops for the "Chart your quests" card grid.
+  const homeQuests = await getUserQuests(db, viewer?.id ?? null);
+  const questTops = await getQuestTops(db, homeQuests.map((q) => q.id), 6);
   const c = await getContent([
     "hero.badge", "hero.title.line1", "hero.title.line2", "hero.subtitle",
     "hero.cta.primary", "hero.cta.secondary", "hero.image",
@@ -71,7 +54,7 @@ export default async function LandingPage() {
       .innerJoin(schema.spaces, eq(schema.challenges.spaceId, schema.spaces.id))
       .where(eq(schema.challenges.status, "active"))
       .orderBy(asc(schema.challenges.endAt)).limit(3),
-    db.select({ id: schema.games.id, name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl })
+    db.select({ id: schema.games.id, name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl, coverAdjust: schema.games.coverAdjust })
       .from(schema.games).where(eq(schema.games.isActive, true))
       .orderBy(asc(schema.games.sortOrder)).limit(12),
     db.select({ id: schema.partners.id, name: schema.partners.name, logoUrl: schema.partners.logoUrl, url: schema.partners.url })
@@ -118,14 +101,13 @@ export default async function LandingPage() {
 
   const counts = statCounts[0] ?? { users: 0, accounts: 0, challenges: 0, games: 0 };
   const ticker = tickerRows.length > 0 ? [...tickerRows, ...tickerRows] : [];
-  const statProviders = PROVIDERS.filter((p) => !p.identityOnly);
   const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
 
   return (
     <div className="overflow-x-clip">
       {/* ===== INTERACTIVE HERO — planet globe ⇄ quest map toggle ===== */}
       {skinnedPlanets.length > 0 && (
-        <HomeHero planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="The Cluster galaxy — pick a game" quest={questHero} />
+        <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="The Cluster galaxy — pick a game" quest={questHero} />
       )}
 
       {/* ===== HERO ===== */}
@@ -310,59 +292,45 @@ export default async function LandingPage() {
           </div>
           <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">All planets</Link>
         </div>
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-          {games.map((g, i) => (
-            <Link key={g.id} href={`/games/${g.slug}`} className="glass card-lift p-4 text-center group" style={{ animationDelay: `${i * 0.3}s`, background: cardBgStyle(cardBg, "game") }}>
-              <div className="flex justify-center transition-transform duration-300 group-hover:scale-110">
-                <GameLogo logoUrl={g.logoUrl} name={g.name} size={52} />
-              </div>
-              <div className="mt-2.5 text-xs font-semibold truncate">{g.name}</div>
-            </Link>
-          ))}
-        </div>
-
-        {/* Provider status strip */}
-        <div className="mt-10 glass p-4 flex flex-wrap items-center gap-2">
-          <span className="text-[10px] uppercase tracking-widest text-muted mr-2 inline-flex items-center gap-1.5">
-            <Icon name="satellite" size={12} /> API network
-          </span>
-          {statProviders.map((p) => {
-            const live = isProviderLive(p);
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {games.map((g, i) => {
+            const cover = slimImg(g.coverUrl);
             return (
-              <span key={p.id} title={p.name} className={`inline-flex items-center gap-1.5 text-[11px] rounded-full px-2.5 py-1 border ${live ? "border-emerald-400/35 text-emerald-300" : "border-violet-400/20 text-muted"}`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${live ? "bg-emerald-400 animate-pulse" : "bg-amber-400/60"}`} />
-                {p.name}
-              </span>
+              <Link key={g.id} href={`/games/${g.slug}`} className="glass card-lift overflow-hidden group relative" style={{ animationDelay: `${i * 0.3}s` }}>
+                <div className="h-28 relative overflow-hidden">
+                  {cover ? (
+                    <div className="absolute inset-0 bg-cover transition-transform duration-500 group-hover:scale-110"
+                      style={{ backgroundImage: `url(${cover})`, backgroundPosition: `${g.coverAdjust?.x ?? 50}% ${g.coverAdjust?.y ?? 50}%` }} />
+                  ) : (
+                    <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/30 to-transparent" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="transition-transform duration-300 group-hover:scale-110 drop-shadow-2xl">
+                      <GameLogo logoUrl={g.logoUrl} name={g.name} size={54} rounded="rounded-2xl" className="ring-1 ring-white/15" />
+                    </span>
+                  </div>
+                </div>
+                <div className="p-2.5 text-center text-xs font-semibold truncate">{g.name}</div>
+              </Link>
             );
           })}
         </div>
       </section>
 
-      {/* ===== QUESTS ===== */}
-      {questHero && questHero.tabs.length > 0 && (
+      {/* ===== QUESTS — same card layout as /quests ===== */}
+      {homeQuests.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 pb-20">
           <div className="text-center">
             <h2 className="text-3xl md:text-4xl font-bold">
               Chart your <span className="grad-text">Quests</span>
             </h2>
             <p className="text-muted mt-3 max-w-lg mx-auto">
-              Everything you do earns Cluster Points across a handful of galaxy-spanning quests. Climb each map from Bronze to Platinum.
+              Everything you do earns Cluster Points across galaxy-spanning quests. Climb each map from Bronze to Platinum.
             </p>
           </div>
-          <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {questHero.tabs.map((q, i) => (
-              <Link key={q.key} href={`/quests/${q.key}`} className="glass card-lift p-5 text-center group float-y" style={{ animationDelay: `${i * 0.4}s` }}>
-                <div className="flex justify-center">
-                  <span className="flex h-16 w-16 items-center justify-center rounded-2xl transition-transform group-hover:scale-110"
-                    style={{ background: `${q.color}22`, border: `1px solid ${q.color}55`, boxShadow: `0 0 22px -6px ${q.color}` }}>
-                    {q.logoUrl
-                      ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-11 w-11 object-contain" />
-                      : <Icon name={q.icon} size={30} style={{ color: q.color }} />}
-                  </span>
-                </div>
-                <div className="mt-3 text-sm font-bold">{q.name}</div>
-              </Link>
-            ))}
+          <div className="mt-10 grid md:grid-cols-2 gap-5">
+            {homeQuests.map((q) => <QuestCard key={q.id} quest={q} top={questTops.get(q.id) ?? []} />)}
           </div>
           <div className="mt-8 text-center">
             <Link href="/quests" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm inline-flex items-center gap-2">

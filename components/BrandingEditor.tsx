@@ -31,19 +31,39 @@ function ModePicker({ name, value, onChange }: { name: string; value: Mode; onCh
 // Admin editor for the wide wordmark logo, per-placement display mode, and the
 // loading-screen appearance. Complements LogoEditor (the square mark).
 export default function BrandingEditor({
-  defaultWordmark, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo,
+  defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
+  defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon,
 }: {
   defaultWordmark: string;
+  defaultWordmarkZoom: number;
   defaultNavMode: Mode;
   defaultFooterMode: Mode;
   defaultLoadingColor: string;
   defaultLoadingLogo: string;
+  defaultLoadingPhrases: string;
+  defaultPlanetsIcon: string;
+  defaultNavBg: string;
+  defaultFooterBg: string;
+  defaultFavicon: string;
+  defaultFaviconZoom: number;
+  defaultCpIcon: string;
+  defaultOrbIcon: string;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
+  const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
+  const [cpIcon, setCpIcon] = useState(defaultCpIcon);
+  const [orbIcon, setOrbIcon] = useState(defaultOrbIcon);
+  const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
+  const [navBg, setNavBg] = useState(defaultNavBg);
+  const [footerBg, setFooterBg] = useState(defaultFooterBg);
+  const [favicon, setFavicon] = useState(defaultFavicon);
+  const [favZoom, setFavZoom] = useState(defaultFaviconZoom);
   const [navMode, setNavMode] = useState<Mode>(defaultNavMode);
   const [footerMode, setFooterMode] = useState<Mode>(defaultFooterMode);
   const [loadingColor, setLoadingColor] = useState(defaultLoadingColor);
   const [loadingLogo, setLoadingLogo] = useState(defaultLoadingLogo);
+  const [loadingPhrases, setLoadingPhrases] = useState(defaultLoadingPhrases);
+  const phraseList = loadingPhrases.split("\n").map((s) => s.trim()).filter(Boolean);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(saveBranding, undefined);
 
   return (
@@ -56,13 +76,85 @@ export default function BrandingEditor({
           <ImageUpload name="wordmark" value={wordmark} onChange={setWordmark}
             aspect="4/1" rounded="rounded-lg" maxDim={640} scope="content"
             hint="Transparent PNG works best. Wide lockup — around 4:1." />
+          <label className="mt-3 block text-xs text-muted">Wordmark size <span className="text-cyan-300">{wmZoom.toFixed(2)}×</span>
+            <input type="range" min={0.5} max={3} step={0.05} value={wmZoom} onChange={(e) => setWmZoom(Number(e.target.value))} className="w-full accent-violet-500" />
+          </label>
+          <input type="hidden" name="wordmarkZoom" value={wmZoom} />
           {wordmark && (
-            <div className="mt-4 flex items-center gap-4 rounded-xl bg-[#04051a] p-4">
-              <span className="text-[10px] uppercase tracking-widest text-muted">Preview</span>
+            <div className="mt-4 flex items-center gap-4 rounded-xl bg-[#04051a] p-4 overflow-x-auto">
+              <span className="text-[10px] uppercase tracking-widest text-muted shrink-0">Nav preview</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={wordmark} alt="Cluster" className="h-6 w-auto object-contain" />
+              <img src={wordmark} alt="Cluster" className="w-auto object-contain" style={{ height: 38 * wmZoom }} />
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Cluster Points (CP) coin icon */}
+      <div>
+        <div className="font-semibold text-sm mb-1">Cluster Points (CP) coin icon</div>
+        <p className="text-xs text-muted mb-3">The currency icon shown next to every CP value across the platform.</p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 flex items-center gap-4">
+          {cpIcon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={cpIcon} alt="" className="h-12 w-12 object-contain shrink-0" />}
+          <div className="flex-1"><ImageUpload name="cpIcon" value={cpIcon} onChange={setCpIcon} aspect="1/1" rounded="rounded-xl" maxDim={256} scope="content" hint="Square coin/gem art on a dark or transparent background." /></div>
+        </div>
+      </div>
+
+      {/* Floating quest orb icon */}
+      <div>
+        <div className="font-semibold text-sm mb-1">Floating quest orb icon</div>
+        <p className="text-xs text-muted mb-3">The icon on the floating orb (bottom-right of every page). Leave empty to use the CP coin.</p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 flex items-center gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full shrink-0" style={{ background: "radial-gradient(circle at 35% 30%, #a78bfa, #6d28d9 60%, #3b0764)" }}>
+            {orbIcon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={orbIcon} alt="" className="h-8 w-8 object-contain" />}
+          </span>
+          <div className="flex-1"><ImageUpload name="orbIcon" value={orbIcon} onChange={setOrbIcon} aspect="1/1" rounded="rounded-full" maxDim={256} scope="content" hint="Square icon; shows on the glowing orb. Empty = CP coin." /></div>
+        </div>
+      </div>
+
+      {/* Nav "all planets" icon */}
+      <div>
+        <div className="font-semibold text-sm mb-1">Nav &ldquo;all planets&rdquo; icon</div>
+        <p className="text-xs text-muted mb-3">The button next to the game logos that links to all planets. Upload an image or leave empty for the default planet glyph.</p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
+          <ImageUpload name="planetsIcon" value={planetsIcon} onChange={setPlanetsIcon}
+            aspect="1/1" rounded="rounded-xl" maxDim={128} scope="content" hint="Square icon, shown at 40×40 in the nav." />
+        </div>
+      </div>
+
+      {/* Nav + footer backgrounds + favicon */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
+          <div className="font-semibold text-sm mb-1">Nav bar background</div>
+          <p className="text-xs text-muted mb-3">Art behind the top nav (kept dark for readability). Empty = default.</p>
+          <ImageUpload name="navBg" value={navBg} onChange={setNavBg} aspect="8/1" maxDim={1920} scope="content" hint="Very wide, dark art." />
+        </div>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
+          <div className="font-semibold text-sm mb-1">Footer background</div>
+          <p className="text-xs text-muted mb-3">Art behind the footer. Empty = default.</p>
+          <ImageUpload name="footerBg" value={footerBg} onChange={setFooterBg} aspect="4/1" maxDim={1920} scope="content" hint="Wide, dark art." />
+        </div>
+      </div>
+
+      <div>
+        <div className="font-semibold text-sm mb-1">Favicon (browser tab icon)</div>
+        <p className="text-xs text-muted mb-3">Square icon shown in the browser tab. Use the zoom to crop in.</p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 grid gap-4 sm:grid-cols-[auto_1fr] items-start">
+          <div className="flex flex-col items-center gap-2">
+            <span className="relative h-12 w-12 overflow-hidden rounded-lg ring-1 ring-white/10 bg-black/40">
+              {favicon
+                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={favicon} alt="" className="h-full w-full object-cover" style={{ transform: `scale(${favZoom})` }} />
+                : <span className="flex h-full w-full items-center justify-center text-muted text-[10px]">none</span>}
+            </span>
+            <span className="text-[10px] uppercase tracking-widest text-muted">Preview</span>
+          </div>
+          <div className="space-y-3">
+            <ImageUpload name="favicon" value={favicon} onChange={setFavicon} aspect="1/1" rounded="rounded-lg" maxDim={128} scope="content" hint="Square. PNG or SVG." />
+            <label className="block text-xs text-muted">Zoom <span className="text-cyan-300">{favZoom.toFixed(2)}×</span>
+              <input type="range" min={1} max={3} step={0.05} value={favZoom} onChange={(e) => setFavZoom(Number(e.target.value))} className="w-full accent-violet-500" />
+            </label>
+            <input type="hidden" name="faviconZoom" value={favZoom} />
+          </div>
         </div>
       </div>
 
@@ -112,11 +204,21 @@ export default function BrandingEditor({
                 aspect="1/1" rounded="rounded-full" maxDim={256} scope="content"
                 hint="Small square mark. Leave empty for a glowing orb." />
             </div>
+            <div>
+              <div className="text-xs text-muted mb-1.5">Loading phrases — one per line (cycles every second)</div>
+              <textarea value={loadingPhrases} onChange={(e) => setLoadingPhrases(e.target.value)} rows={5}
+                className="w-full rounded-lg border border-violet-400/25 bg-black/30 px-3 py-2 text-sm outline-none focus:border-cyan-400/50 font-mono"
+                placeholder={"Traversing the cluster…\nAligning the constellations…"} />
+              {phraseList.length > 0 && (
+                <div className="mt-1.5 text-[11px] text-muted">{phraseList.length} phrase{phraseList.length > 1 ? "s" : ""} · first: <span className="grad-text font-semibold">{phraseList[0]}</span></div>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       <input type="hidden" name="loadingColor" value={loadingColor} />
+      <input type="hidden" name="loadingPhrases" value={loadingPhrases} />
       <div className="flex items-center gap-3">
         <button disabled={pending} className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">
           {pending ? "Saving…" : "Save branding"}

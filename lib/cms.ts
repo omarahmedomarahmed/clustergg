@@ -36,13 +36,26 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.logo.x": "50",
   "brand.logo.y": "50",
   "brand.wordmark": "",                     // wide CLUSTER wordmark (empty = gradient text)
+  "brand.wordmark.zoom": "1",               // wide wordmark scale multiplier
   "brand.nav.mode": "both",                 // mark | wordmark | both
+  "brand.nav.planetsIcon": "",              // custom image for the nav "all planets" button
   "brand.footer.mode": "both",
-  // Loading screen (rotating circle) — editable color + optional inner logo.
+  // Loading screen (rotating circle) — editable color + optional inner logo +
+  // a rotating list of phrases (one per line) that cycles every second.
   "brand.loading.color": "#8b5cf6",
   "brand.loading.logo": "",
+  "brand.loading.phrases": "Traversing the cluster…\nAligning the constellations…\nCharging warp coils…\nSyncing your galaxy…\nPolishing trophies…\nCounting Cluster Points…",
+  // Floating quest orb icon (bottom-right). Empty = default CP coin.
+  "brand.orb.icon": "",
+  // Nav + footer background images, favicon (+ zoom).
+  "brand.nav.bg": "",
+  "brand.footer.bg": "",
+  "brand.favicon": "",
+  "brand.favicon.zoom": "1",
   // Connect/onboarding: comma-separated provider ids the admin has hidden.
   "connect.hidden": "",
+  // The Cluster Points currency icon art (editable; defaults to the generated one).
+  "brand.cpIcon": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260717_223629_251d5972-a1bc-4e38-8724-1ea35bf10f18.png",
 };
 
 export async function getContent(keys: string[]): Promise<Record<string, string>> {

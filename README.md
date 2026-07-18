@@ -6,6 +6,37 @@
 
 ---
 
+## 0. Status, running & docs
+
+The MVP is **built and production-ready**: gamer flows (profiles, connections,
+feed, planets, challenges, quests, leaderboards, messaging), a full admin CMS
+(content, backgrounds, card art, logos, favicon, per-page look), and an ads back
+office. It is security-audited — see **[`SECURITY.md`](./SECURITY.md)**.
+
+**Companion docs**
+- [`SECURITY.md`](./SECURITY.md) — security audit, fixes, production checklist, how to run the checks.
+- [`docs/PRODUCT_BRIEF.md`](./docs/PRODUCT_BRIEF.md) — technical product overview (slide content).
+- [`docs/PITCH_DECK.md`](./docs/PITCH_DECK.md) — slide-by-slide preseed pitch deck ($30k).
+- [`docs/GAMIFICATION_PLAN.md`](./docs/GAMIFICATION_PLAN.md) — quests/CP design.
+
+**Run locally**
+```bash
+npm install
+npm run dev            # http://localhost:3000 — runs on in-memory PGlite if no DATABASE_URL
+```
+With no `DATABASE_URL`, the app boots a seeded in-memory database (demo mode);
+set `DATABASE_URL` (Neon) + `BLOB_READ_WRITE_TOKEN` (public store) for real data.
+
+**Verify (production-grade gate — tsc + build green on `main`)**
+```bash
+npx tsc --noEmit       # type safety
+npm run build          # production build (also runs Next's checks)
+npm audit --production # dependency vulnerabilities (see SECURITY.md §3.7)
+```
+Required production env vars are listed in `SECURITY.md` §4.
+
+---
+
 ## 1. Product Summary
 
 A platform where gamers connect multiple game accounts (PC/console/mobile) + Discord, get a public shareable profile (`clustergg.com/u/{slug}`) showing linked accounts, ranks, stats, history, and earned badges. Users follow/message each other, join game-specific community **Spaces**, compete in **Challenges** built on real API data, and climb per-game **Leaderboards**. Monetized via banner/video ad placements sold to brands, with a full admin/brand-management back office.

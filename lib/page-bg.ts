@@ -14,6 +14,7 @@ export const PAGE_BG_PAGES: { key: string; label: string; note: string }[] = [
   { key: "onboarding", label: "Onboarding", note: "The welcome / connect flow." },
   { key: "messages", label: "Messages", note: "DMs and conversations." },
   { key: "notifications", label: "Notifications", note: "The notifications page." },
+  { key: "admin", label: "Admin (Mission Control)", note: "One background for the whole admin area." },
 ];
 
 export const PAGE_BG_KEYS = PAGE_BG_PAGES.map((p) => p.key);
@@ -36,6 +37,7 @@ export function pathToPageKey(pathname: string): string | null {
     onboarding: "onboarding",
     messages: "messages",
     notifications: "notifications",
+    admin: "admin",
   };
   return direct[seg] ?? null;
 }

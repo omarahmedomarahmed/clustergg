@@ -5,7 +5,9 @@ import { saveGame, deleteGame } from "@/app/actions/admin";
 import GameLogo from "@/components/GameLogo";
 import ImageUpload from "@/components/ImageUpload";
 import CoverFramer from "@/components/CoverFramer";
+import GameMetricsEditor from "@/components/GameMetricsEditor";
 import SubmitButton from "@/components/SubmitButton";
+import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Games" };
@@ -23,6 +25,23 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
       <div className="sm:col-span-2">
         <CoverFramer name="coverUrl" defaultUrl={game?.coverUrl ?? ""} defaultAdjust={game?.coverAdjust} maxDim={1200}
           hint="Drag the image to reposition and use the zoom slider — the frame is exactly how it appears on the planet header." />
+      </div>
+      <GameMetricsEditor initial={game?.customMetrics ?? []} />
+      {/* Per-planet theme + layout */}
+      <div className="sm:col-span-2 grid sm:grid-cols-3 gap-3 rounded-xl border border-violet-400/15 bg-black/20 p-3">
+        <label className="text-xs text-muted">Accent color
+          <input type="color" name="accent" defaultValue={game?.accent ?? "#8b5cf6"} className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
+        </label>
+        <label className="text-xs text-muted">Secondary accent
+          <input type="color" name="accent2" defaultValue={game?.accent2 ?? "#22d3ee"} className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
+        </label>
+        <label className="text-xs text-muted">Hero layout
+          <select name="planetLayout" defaultValue={game?.planetLayout ?? "auto"} className="input-cosmic mt-1">
+            <option value="auto">Auto (globe if skin set)</option>
+            <option value="globe">Interactive globe</option>
+            <option value="cover">Cover banner</option>
+          </select>
+        </label>
       </div>
       <div className="flex gap-4 sm:col-span-2 items-center flex-wrap pt-1">
         <label className="flex items-center gap-2 text-sm">
@@ -53,11 +72,15 @@ export default async function AdminGamesPage() {
         Upload images straight from your device — they&apos;re optimized automatically.
       </p>
 
-      <div className="glass p-6 mb-8">
-        <h2 className="font-bold mb-4">Add game</h2>
-        <GameForm />
-      </div>
+      <details className="glass p-6 mb-6 group">
+        <summary className="font-bold cursor-pointer list-none flex items-center gap-2">
+          <Icon name="spark" size={16} className="text-cyan-300" /> Add a new game
+          <span className="ml-auto text-xs text-muted group-open:hidden">Open form</span>
+        </summary>
+        <div className="mt-4 border-t border-violet-400/15 pt-4"><GameForm /></div>
+      </details>
 
+      <div className="text-xs uppercase tracking-widest text-muted mb-3">{games.length} games</div>
       <div className="space-y-4">
         {games.map((g) => (
           <details key={g.id} className="glass overflow-hidden">

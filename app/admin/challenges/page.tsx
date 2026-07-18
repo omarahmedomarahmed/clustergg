@@ -3,6 +3,7 @@ import { desc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import ChallengeBuilder from "@/components/ChallengeBuilder";
+import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -10,17 +11,18 @@ export const metadata = { title: "Admin · Challenges" };
 
 export default async function AdminChallengesPage() {
   const db = await getDb();
-  const [spaces, challenges, trophies] = await Promise.all([
+  const [spaces, challenges, trophies, quests] = await Promise.all([
     db.select().from(schema.spaces),
     db.select().from(schema.challenges).orderBy(desc(schema.challenges.createdAt)).limit(50),
     db.select().from(schema.trophies),
+    db.select({ id: schema.quests.id, name: schema.quests.name, logoUrl: schema.quests.logoUrl }).from(schema.quests).orderBy(schema.quests.sortOrder),
   ]);
 
   const builderProviders = PROVIDERS
     .filter((p) => !p.identityOnly && p.capabilities.length > 0)
     .map((p) => ({
-      id: p.id, name: p.name, game: p.game, live: isProviderLive(p),
-      capabilities: p.capabilities.map((c) => ({ key: c.key, label: c.label, higherIsBetter: c.higherIsBetter })),
+      id: p.id, name: p.name, game: p.game, live: isProviderLive(p), authType: p.authType, docsUrl: p.docsUrl,
+      capabilities: p.capabilities.map((c) => ({ key: c.key, label: c.label, unit: c.unit, higherIsBetter: c.higherIsBetter })),
     }));
 
   return (
@@ -31,15 +33,22 @@ export default async function AdminChallengesPage() {
         scoring engine, and publishes a glorified event page with live standings.
       </p>
 
-      <div className="glass p-6 mb-8">
-        <ChallengeBuilder
-          providers={builderProviders}
-          spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
-          trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
-        />
-      </div>
+      <details className="glass p-6 mb-6 group">
+        <summary className="font-bold cursor-pointer list-none flex items-center gap-2">
+          <Icon name="spark" size={16} className="text-cyan-300" /> Launch a new challenge
+          <span className="ml-auto text-xs text-muted group-open:hidden">Open builder</span>
+        </summary>
+        <div className="mt-4 border-t border-violet-400/15 pt-4">
+          <ChallengeBuilder
+            providers={builderProviders}
+            spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
+            trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
+            quests={quests}
+          />
+        </div>
+      </details>
 
-      <h2 className="text-xl font-bold mb-4">All challenges</h2>
+      <h2 className="text-xl font-bold mb-4">All challenges ({challenges.length})</h2>
       <div className="glass overflow-x-auto">
         <table className="w-full table-cosmic min-w-[640px]">
           <thead><tr><th>Title</th><th>Game</th><th>Cadence</th><th>Format</th><th>Status</th><th>Ends</th><th></th></tr></thead>

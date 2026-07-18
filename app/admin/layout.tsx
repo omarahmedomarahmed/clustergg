@@ -3,6 +3,10 @@ import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin, isStaff } from "@/lib/auth";
 import Icon from "@/components/Icon";
 
+// Grouped so each thing is edited in exactly one place: Design owns all
+// look/theme/art, Games & Planets owns the game catalog + communities,
+// Competition owns challenges/quests/trophies, Community owns people, Ads and
+// Platform stay admin-only.
 const NAV: { section: string; adminOnly?: boolean; items: { href: string; label: string; adminOnly?: boolean }[] }[] = [
   {
     section: "Overview",
@@ -12,11 +16,31 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
     ],
   },
   {
-    section: "Moderation",
+    section: "Design & content",
     items: [
+      { href: "/admin/content", label: "Site content" },
+      { href: "/admin/backgrounds", label: "Page backgrounds" },
+      { href: "/admin/cards", label: "Card backgrounds" },
+      { href: "/admin/brand-kit", label: "Logos & brand kit" },
+      { href: "/admin/partners", label: "Partners" },
+    ],
+  },
+  {
+    section: "Games & planets",
+    items: [
+      { href: "/admin/games", label: "Games catalog" },
+      { href: "/admin/connect", label: "Connect providers" },
       { href: "/admin/spaces", label: "Planets" },
       { href: "/admin/spaces/requests", label: "Planet requests" },
+    ],
+  },
+  {
+    section: "Competition",
+    items: [
       { href: "/admin/challenges", label: "Challenges" },
+      { href: "/admin/quests", label: "Quests" },
+      { href: "/admin/leaderboards", label: "Leaderboards" },
+      { href: "/admin/trophies", label: "Trophies" },
     ],
   },
   {
@@ -26,29 +50,6 @@ const NAV: { section: string; adminOnly?: boolean; items: { href: string; label:
       { href: "/admin/roles", label: "Roles", adminOnly: true },
       { href: "/admin/linked-accounts", label: "Linked accounts" },
     ],
-  },
-  {
-    section: "Competition",
-    items: [
-      { href: "/admin/quests", label: "Quests" },
-      { href: "/admin/leaderboards", label: "Leaderboards" },
-      { href: "/admin/trophies", label: "Trophies" },
-    ],
-  },
-  {
-    section: "Website (CMS)",
-    items: [
-      { href: "/admin/content", label: "Site content" },
-      { href: "/admin/backgrounds", label: "Page backgrounds" },
-      { href: "/admin/cards", label: "Card backgrounds" },
-      { href: "/admin/games", label: "Games catalog" },
-      { href: "/admin/connect", label: "Connect providers" },
-      { href: "/admin/partners", label: "Partners" },
-    ],
-  },
-  {
-    section: "Studio",
-    items: [{ href: "/admin/brand-kit", label: "Brand & marketing kit" }],
   },
   {
     section: "Ads (offline sales)",

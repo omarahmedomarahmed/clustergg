@@ -15,35 +15,54 @@ const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk" }
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://clustergg.com";
 
-export const metadata: Metadata = {
-  metadataBase: new URL(appUrl),
-  title: { default: "Cluster — Every game. One identity.", template: "%s · Cluster" },
-  description:
-    "Link every game account you own — Chess.com, Lichess, Dota 2, Steam, Riot, Fortnite and more — into one shareable gamer profile. Compete in challenges, earn cosmic badges, climb real leaderboards.",
-  openGraph: {
-    title: "Cluster — Every game. One identity.",
-    description: "One cosmic profile for every game you play. Real stats, real leaderboards, real challenges.",
-    url: appUrl,
-    siteName: "Cluster",
-    images: [{ url: "/assets/og.png", width: 1200, height: 675 }],
-    type: "website",
-  },
-  twitter: { card: "summary_large_image", images: ["/assets/og.png"] },
-  icons: { icon: "/assets/logo.png" },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  // Admin-editable favicon (+ zoom): a zoomed favicon is wrapped in an SVG that
+  // scales the uploaded image; zoom of 1 just uses the image directly.
+  const c = await getContent(["brand.favicon", "brand.favicon.zoom"]).catch(() => ({} as Record<string, string>));
+  const fav = c["brand.favicon"];
+  const favZoom = Math.max(1, Math.min(3, Number(c["brand.favicon.zoom"]) || 1));
+  let icon = "/assets/logo.png";
+  if (fav) {
+    if (favZoom !== 1) {
+      const s = 100 * favZoom;
+      const off = (100 - s) / 2;
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><image href="${fav}" x="${off}" y="${off}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid slice"/></svg>`;
+      icon = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+    } else {
+      icon = fav;
+    }
+  }
+  return {
+    metadataBase: new URL(appUrl),
+    title: { default: "Cluster — Every game. One identity.", template: "%s · Cluster" },
+    description:
+      "Link every game account you own — Chess.com, Lichess, Dota 2, Steam, Riot, Fortnite and more — into one shareable gamer profile. Compete in challenges, earn cosmic badges, climb real leaderboards.",
+    openGraph: {
+      title: "Cluster — Every game. One identity.",
+      description: "One cosmic profile for every game you play. Real stats, real leaderboards, real challenges.",
+      url: appUrl,
+      siteName: "Cluster",
+      images: [{ url: "/assets/og.png", width: 1200, height: 675 }],
+      type: "website",
+    },
+    twitter: { card: "summary_large_image", images: ["/assets/og.png"] },
+    icons: { icon },
+  };
+}
 
 export const viewport: Viewport = { themeColor: "#04051a" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Per-page custom backgrounds (Admin → Page backgrounds). Fetched once here
   // and handed to a client picker so navigation never re-fetches.
-  const bgContent = await getContent(pageBgCmsKeys).catch(() => ({} as Record<string, string>));
+  const bgContent = await getContent([...pageBgCmsKeys, "brand.cpIcon"]).catch(() => ({} as Record<string, string>));
   const bgMap: Record<string, string> = {};
   for (const k of PAGE_BG_KEYS) bgMap[k] = bgContent[`page.bg.${k}`] || "";
+  const cpIcon = bgContent["brand.cpIcon"];
 
   return (
     <html lang="en" className={grotesk.variable}>
-      <body className="nebula-bg min-h-screen antialiased">
+      <body className="nebula-bg min-h-screen antialiased" style={cpIcon ? ({ ["--cp-icon" as string]: `url(${cpIcon})` }) : undefined}>
         <RouteProgress />
         <PageBackground map={bgMap} />
         <Starfield />

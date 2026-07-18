@@ -5,7 +5,7 @@ import { getCurrentUserFull } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { providerInfoList } from "@/lib/providers/serialize";
 import { getProvider } from "@/lib/providers/registry";
-import { resolveGameLogo } from "@/lib/game-logos";
+import { resolveGameLogo, resolveGameCover } from "@/lib/game-logos";
 import { getContent } from "@/lib/cms";
 import ProfileBuilder from "@/components/ProfileBuilder";
 import ProfileHub from "@/components/ProfileHub";
@@ -44,7 +44,7 @@ export default async function OwnProfilePage() {
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(12),
     db.select({ c: sql<number>`count(*)` }).from(schema.posts)
       .where(and(eq(schema.posts.authorId, user.id), sql`${schema.posts.deletedAt} IS NULL`)),
-    db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl }).from(schema.games),
+    db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games),
   ]);
 
   // Admin-hidden connect providers are dropped from the picker.
@@ -52,9 +52,11 @@ export default async function OwnProfilePage() {
     .split(",").map((s) => s.trim()).filter(Boolean);
   const providers = providerInfoList(hiddenConnect);
 
-  // Resolve a game logo for each provider, tolerant of name differences.
+  // Resolve a game logo + cover for each provider, tolerant of name differences.
   const gameLogos: Record<string, string | null> = {};
-  for (const info of providers) gameLogos[info.id] = resolveGameLogo(games, info.game);
+  const gameCovers: Record<string, string | null> = {};
+  for (const info of providers) { gameLogos[info.id] = resolveGameLogo(games, info.game); gameCovers[info.id] = resolveGameCover(games, info.game); }
+  const linkedAccounts = accounts.map((a) => ({ provider: a.provider, name: a.inGameName }));
   const accountLogo = (provider: string) => resolveGameLogo(games, getProvider(provider)?.game ?? "");
 
   const previewData = {
@@ -135,7 +137,7 @@ export default async function OwnProfilePage() {
       </div>
 
       <div className="text-sm font-semibold mb-3 text-muted">Add a game</div>
-      <LinkAccountForm providers={providers} gameLogos={gameLogos} />
+      <LinkAccountForm providers={providers} gameLogos={gameLogos} gameCovers={gameCovers} linked={linkedAccounts} next="/profile" />
     </section>
   );
 

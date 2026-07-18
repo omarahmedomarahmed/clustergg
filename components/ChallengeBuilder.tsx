@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import CoverFramer from "@/components/CoverFramer";
+import MetricsGuide from "@/components/MetricsGuide";
 import { saveChallenge } from "@/app/actions/admin";
 
 export type BuilderProvider = {
@@ -10,10 +11,13 @@ export type BuilderProvider = {
   name: string;
   game: string;
   live: boolean;
-  capabilities: { key: string; label: string; higherIsBetter?: boolean }[];
+  authType?: string;
+  docsUrl?: string;
+  capabilities: { key: string; label: string; unit?: string; higherIsBetter?: boolean }[];
 };
 export type BuilderSpace = { id: string; name: string; game: string | null };
 export type BuilderTrophy = { id: string; name: string; tier: string; imageUrl: string };
+export type BuilderQuest = { id: string; name: string; logoUrl: string | null };
 // An existing challenge to edit (all fields pre-filled). Omitted when creating.
 export type ChallengeEdit = {
   id: string; spaceId: string; provider: string; game: string; title: string; description: string;
@@ -22,6 +26,7 @@ export type ChallengeEdit = {
   thresholdTarget: number | null; startAt: string; endAt: string;
   coverUrl: string | null; coverAdjust: { zoom: number; x: number; y: number };
   trophyId: string | null; status: string; prizeDescription: string | null;
+  gateQuestId: string | null; gateMinBadges: number;
 };
 
 // Points recommendation: reward the primary "win-like" metric heavily, add a
@@ -56,8 +61,8 @@ const IDEAS = [
 const OPS = [">=", ">", "<=", "<", "=="];
 
 export default function ChallengeBuilder({
-  providers, spaces, trophies, challenge,
-}: { providers: BuilderProvider[]; spaces: BuilderSpace[]; trophies: BuilderTrophy[]; challenge?: ChallengeEdit }) {
+  providers, spaces, trophies, quests = [], challenge,
+}: { providers: BuilderProvider[]; spaces: BuilderSpace[]; trophies: BuilderTrophy[]; quests?: BuilderQuest[]; challenge?: ChallengeEdit }) {
   const editing = !!challenge;
   const [providerId, setProviderId] = useState(challenge?.provider ?? providers[0]?.id ?? "");
   const [cadence, setCadence] = useState(challenge?.cadence ?? "weekly");
@@ -67,6 +72,7 @@ export default function ChallengeBuilder({
   const [description, setDescription] = useState(challenge?.description ?? "");
   const [pointsMap, setPointsMap] = useState<Record<string, number>>(() => challenge?.pointsEngine ?? recommendPoints(providers[0]?.capabilities ?? []));
   const [conditions, setConditions] = useState<{ metric: string; op: string; value: number }[]>(challenge?.conditions ?? []);
+  const [gateQuestId, setGateQuestId] = useState(challenge?.gateQuestId ?? "");
 
   const provider = useMemo(() => providers.find((p) => p.id === providerId), [providers, providerId]);
   const caps = provider?.capabilities ?? [];
@@ -162,6 +168,13 @@ export default function ChallengeBuilder({
         <input type="hidden" name="pointsEngine" value={pointsJson} />
         <input type="hidden" name="conditions" value={conditionsJson} />
 
+        {provider && (
+          <div className="mb-3">
+            <MetricsGuide providerName={provider.name} game={provider.game} live={provider.live}
+              authType={provider.authType} docsUrl={provider.docsUrl} capabilities={caps} />
+          </div>
+        )}
+
         <div className="glass !rounded-lg p-3 space-y-2">
           <div className="text-[11px] text-muted">Award points each time a stat goes up (leave 0 to ignore):</div>
           {caps.length === 0 ? (
@@ -216,6 +229,24 @@ export default function ChallengeBuilder({
             </div>
           )}
         </div>
+
+        {/* Quest-badge entry gate — restrict who can join by quest completions */}
+        {quests.length > 0 && (
+          <div className="mt-3">
+            <div className="text-xs text-muted mb-1.5">Quest-badge entry gate (optional)</div>
+            <div className="glass !rounded-lg p-3 flex flex-wrap items-center gap-3">
+              <span className="text-[11px] text-muted">Require</span>
+              <input name="gateMinBadges" type="number" min={0} defaultValue={challenge?.gateMinBadges ?? 0}
+                className="input-cosmic !w-20 !py-1 text-sm" />
+              <span className="text-[11px] text-muted">badge(s) of</span>
+              <select name="gateQuestId" value={gateQuestId} onChange={(e) => setGateQuestId(e.target.value)} className="input-cosmic !py-1 text-sm flex-1 min-w-[160px]">
+                <option value="">— no quest requirement —</option>
+                {quests.map((qq) => <option key={qq.id} value={qq.id}>{qq.name}</option>)}
+              </select>
+              <span className="text-[11px] text-muted w-full">A gamer earns 1 badge each time they complete this quest. Set 0 (or no quest) to let everyone join.</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Step 5: presentation */}

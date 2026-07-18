@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { buildSkinnedPlanets } from "@/lib/planets";
-import { REGIONS } from "@/lib/regions";
+import { regionsForGame } from "@/lib/game-regions";
 import PlanetPinEditor, { type EditablePin } from "@/components/PlanetPinEditor";
 import PlanetArtForm from "@/components/PlanetArtForm";
 
@@ -23,11 +23,13 @@ export default async function AdminPlanetPinsPage({ params }: { params: Promise<
   const planets = game.planetImageUrl ? await buildSkinnedPlanets(db) : [];
   const planet = planets.find((p) => p.name === game.name);
 
+  // Fall back to THIS GAME's own servers/regions (EUW1, KR, KRJP, …) — never the
+  // generic macro-regions — merged with any saved pin overrides.
   const pins: EditablePin[] = planet
     ? planet.regions.map((r) => ({ key: r.key, label: r.label, short: r.short, color: r.color, x: r.x, y: r.y, count: r.count }))
-    : REGIONS.map((r) => {
-        const o = pinOverrides[r.key];
-        return { key: r.key, label: o?.label || r.label, short: r.short, color: o?.color || r.color, x: o?.x ?? r.x, y: o?.y ?? r.y, count: 0 };
+    : regionsForGame(game.name).map((r) => {
+        const o = pinOverrides[r.code];
+        return { key: r.code, label: o?.label || r.label, short: r.short, color: o?.color || r.color, x: o?.x ?? r.x, y: o?.y ?? r.y, count: 0 };
       });
 
   return (

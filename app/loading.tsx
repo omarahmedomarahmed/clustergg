@@ -1,11 +1,15 @@
 import { getContent } from "@/lib/cms";
+import LoadingPhrases from "@/components/LoadingPhrases";
 
 // Global navigation fallback — shown while a new (dynamic) route segment loads.
-// The circle color and the logo inside it are admin-editable (Brand kit).
+// The circle color, inner logo, and the rotating phrases are admin-editable
+// (Brand kit).
 export default async function Loading() {
-  const c = await getContent(["brand.loading.color", "brand.loading.logo"]).catch(() => ({} as Record<string, string>));
+  const c = await getContent(["brand.loading.color", "brand.loading.logo", "brand.loading.phrases"]).catch(() => ({} as Record<string, string>));
   const color = c["brand.loading.color"] || "#8b5cf6";
   const logo = c["brand.loading.logo"];
+  const phrases = (c["brand.loading.phrases"] || "Traversing the cluster…")
+    .split("\n").map((s) => s.trim()).filter(Boolean);
 
   return (
     <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center bg-[#04051a]/70 backdrop-blur-sm">
@@ -21,7 +25,7 @@ export default async function Loading() {
         </div>
         <div className="absolute inset-0 rounded-full border" style={{ borderColor: `${color}44` }} />
       </div>
-      <div className="mt-4 text-sm font-semibold tracking-wide grad-text animate-pulse">Traversing the cluster…</div>
+      <LoadingPhrases phrases={phrases} />
     </div>
   );
 }

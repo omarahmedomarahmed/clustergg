@@ -1,0 +1,260 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
+import Icon from "@/components/Icon";
+import CpIcon from "@/components/CpIcon";
+import GameLogo from "@/components/GameLogo";
+import { saveFeedPrefs } from "@/app/actions/social";
+
+export type DashQuest = { key: string; name: string; color: string; logoUrl: string | null; qp: number; totalCp: number; pct: number; tierName: string };
+export type DashLeaderboard = { game: string; metricKey: string; title: string; slug: string | null; logoUrl: string | null; coverUrl: string | null };
+export type DashStat = { accountId: string; game: string; logoUrl: string | null; metricKey: string; metricLabel: string; value: number; inGameName: string };
+export type Widget = { id: string; type: "quest" | "cp" | "stat" | "leaderboard"; w: number; config: Record<string, string> };
+
+type Sources = { quests: DashQuest[]; leaderboards: DashLeaderboard[]; stats: DashStat[]; cpTotal: number; cpByQuest: Record<string, number> };
+
+const TYPES: { type: Widget["type"]; label: string; icon: string }[] = [
+  { type: "quest", label: "Quest tracker", icon: "trophy" },
+  { type: "cp", label: "CP total / quest", icon: "spark" },
+  { type: "stat", label: "Game stat", icon: "gamepad" },
+  { type: "leaderboard", label: "Leaderboard", icon: "chart" },
+];
+
+const rid = () => Math.random().toString(36).slice(2, 10);
+
+export default function FeedDashboard({ sources, initial }: { sources: Sources; initial: Widget[] }) {
+  const [editing, setEditing] = useState(false);
+  const [widgets, setWidgets] = useState<Widget[]>(initial);
+  const [drag, setDrag] = useState<number | null>(null);
+  const [pending, start] = useTransition();
+
+  const defaultConfig = (type: Widget["type"]): Record<string, string> => {
+    if (type === "quest") return { questKey: sources.quests[0]?.key ?? "" };
+    if (type === "cp") return { scope: "total" };
+    if (type === "stat") return sources.stats[0] ? { accountId: sources.stats[0].accountId, metricKey: sources.stats[0].metricKey } : {};
+    return sources.leaderboards[0] ? { game: sources.leaderboards[0].game, metricKey: sources.leaderboards[0].metricKey } : {};
+  };
+  const addWidget = (type: Widget["type"]) => setWidgets((w) => [...w, { id: rid(), type, w: 1, config: defaultConfig(type) }]);
+  const update = (id: string, patch: Partial<Widget>) => setWidgets((w) => w.map((x) => x.id === id ? { ...x, ...patch } : x));
+  const setCfg = (id: string, patch: Record<string, string>) => setWidgets((w) => w.map((x) => x.id === id ? { ...x, config: { ...x.config, ...patch } } : x));
+  const remove = (id: string) => setWidgets((w) => w.filter((x) => x.id !== id));
+
+  const reorder = (from: number, to: number) => setWidgets((w) => { const a = [...w]; const [m] = a.splice(from, 1); a.splice(to, 0, m); return a; });
+
+  const save = () => start(async () => { await saveFeedPrefs(JSON.stringify({ dashboard: widgets })); setEditing(false); });
+
+  const colSpan = (n: number) => ["", "sm:col-span-1", "sm:col-span-2", "sm:col-span-3", "sm:col-span-4"][Math.max(1, Math.min(4, n))];
+
+  if (widgets.length === 0 && !editing) {
+    return (
+      <div className="glass p-5 mb-6 flex items-center justify-between gap-3">
+        <div className="text-sm text-muted"><b className="text-ink">Build your dashboard</b> — drop quest trackers, CP history, game stats and leaderboards onto a canvas.</div>
+        <button onClick={() => setEditing(true)} className="glow-btn pressable rounded-full px-4 py-2 text-xs font-semibold text-white inline-flex items-center gap-1.5 shrink-0"><Icon name="plus" size={13} /> Build</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold flex items-center gap-2"><Icon name="grid" size={18} className="text-cyan-300" /> My dashboard</h2>
+        <div className="flex gap-2">
+          {editing && <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-4 py-1.5 text-xs font-semibold text-white inline-flex items-center gap-1.5"><Icon name="check" size={13} /> {pending ? "Saving…" : "Save"}</button>}
+          <button onClick={() => setEditing((v) => !v)} className="ghost-btn pressable rounded-full px-4 py-1.5 text-xs inline-flex items-center gap-1.5"><Icon name={editing ? "x" : "edit"} size={13} /> {editing ? "Done" : "Customize"}</button>
+        </div>
+      </div>
+
+      {/* Palette */}
+      {editing && (
+        <div className="glass p-3 mb-3">
+          <div className="text-[11px] uppercase tracking-widest text-muted mb-2">Drag or tap to add a widget</div>
+          <div className="flex flex-wrap gap-2">
+            {TYPES.map((t) => (
+              <button key={t.type} draggable onDragStart={(e) => e.dataTransfer.setData("wtype", t.type)}
+                onClick={() => addWidget(t.type)}
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/12 px-3 py-1.5 text-xs font-semibold hover:border-cyan-400/50 cursor-grab active:cursor-grabbing">
+                <Icon name={t.icon} size={13} className="text-cyan-300" /> {t.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Canvas */}
+      <div
+        onDragOver={(e) => { if (editing) e.preventDefault(); }}
+        onDrop={(e) => { const t = e.dataTransfer.getData("wtype") as Widget["type"]; if (t) addWidget(t); }}
+        className={`grid grid-cols-2 sm:grid-cols-4 gap-3 ${editing ? "min-h-[120px] rounded-2xl border border-dashed border-white/15 p-3" : ""}`}
+      >
+        {widgets.map((wg, i) => (
+          <div key={wg.id} className={`${colSpan(wg.w)} ${editing ? "cursor-move" : ""}`}
+            draggable={editing}
+            onDragStart={() => setDrag(i)}
+            onDragOver={(e) => { if (editing && drag !== null) e.preventDefault(); }}
+            onDrop={(e) => { if (editing && drag !== null && drag !== i) { e.stopPropagation(); reorder(drag, i); setDrag(null); } }}
+          >
+            <WidgetCard widget={wg} sources={sources} editing={editing} onWidth={(n) => update(wg.id, { w: n })} onCfg={(p) => setCfg(wg.id, p)} onRemove={() => remove(wg.id)} />
+          </div>
+        ))}
+        {editing && widgets.length === 0 && <div className="col-span-full text-center text-sm text-muted py-6">Drop widgets here.</div>}
+      </div>
+    </div>
+  );
+}
+
+function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
+  widget: Widget; sources: Sources; editing: boolean;
+  onWidth: (n: number) => void; onCfg: (p: Record<string, string>) => void; onRemove: () => void;
+}) {
+  const c = widget.config;
+  const [exp, setExp] = useState(false);
+
+  const { compact, expanded, fullHref } = useMemo(() => {
+    if (widget.type === "quest") {
+      const q = sources.quests.find((x) => x.key === c.questKey) ?? sources.quests[0];
+      if (!q) return { compact: <Empty label="No quests" />, expanded: null, fullHref: "/quests" };
+      return {
+        fullHref: `/quests/${q.key}`,
+        compact: (
+          <>
+            <div className="flex items-center gap-2">
+              {q.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-7 w-7 object-contain" /> : <Icon name="trophy" size={16} style={{ color: q.color }} />}
+              <div className="min-w-0"><div className="text-sm font-bold truncate">{q.name}</div><div className="text-[10px] text-muted">{q.tierName}</div></div>
+            </div>
+            <div className="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} /></div>
+            <div className="mt-1.5 flex items-center gap-1 text-xs font-bold" style={{ color: q.color }}><CpIcon size={12} /> {q.qp.toLocaleString()} CP</div>
+          </>
+        ),
+        expanded: (
+          <div className="text-xs text-muted space-y-1">
+            <div>Current tier: <b className="text-ink">{q.tierName}</b></div>
+            <div className="flex items-center gap-1">Total earned: <CpIcon size={11} /> <b className="text-ink">{q.totalCp.toLocaleString()} CP</b></div>
+            <div>Progress to next tier: <b className="text-ink">{q.pct}%</b></div>
+          </div>
+        ),
+      };
+    }
+    if (widget.type === "cp") {
+      const isTotal = (c.scope ?? "total") === "total";
+      const val = isTotal ? sources.cpTotal : (sources.cpByQuest[c.scope] ?? 0);
+      const q = sources.quests.find((x) => x.key === c.scope);
+      return {
+        fullHref: "/quests",
+        compact: (
+          <div className="text-center py-1">
+            <div className="flex items-center justify-center gap-2"><CpIcon size={26} /><span className="text-3xl font-bold grad-text">{val.toLocaleString()}</span></div>
+            <div className="text-[10px] uppercase tracking-widest text-muted mt-1">{isTotal ? "Total Cluster Points" : `${q?.name ?? "Quest"} CP`}</div>
+          </div>
+        ),
+        expanded: isTotal ? (
+          <div className="space-y-1">
+            {sources.quests.map((qq) => (
+              <div key={qq.key} className="flex items-center justify-between text-xs">
+                <span className="truncate" style={{ color: qq.color }}>{qq.name}</span>
+                <span className="font-bold inline-flex items-center gap-1"><CpIcon size={10} /> {qq.totalCp.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        ) : <div className="text-xs text-muted">{q?.name ?? "Quest"} lifetime CP.</div>,
+      };
+    }
+    if (widget.type === "stat") {
+      const s = sources.stats.find((x) => x.accountId === c.accountId && x.metricKey === c.metricKey) ?? sources.stats[0];
+      if (!s) return { compact: <Empty label="No connected stats" />, expanded: null, fullHref: "/profile" };
+      return {
+        fullHref: "/profile",
+        compact: (
+          <div className="flex items-center gap-3">
+            <GameLogo logoUrl={s.logoUrl} name={s.game} size={38} rounded="rounded-lg" className="ring-1 ring-white/15" />
+            <div className="min-w-0">
+              <div className="text-2xl font-bold">{s.value.toLocaleString()}</div>
+              <div className="text-[10px] text-muted truncate">{s.metricLabel} · {s.inGameName}</div>
+            </div>
+          </div>
+        ),
+        expanded: (
+          <div className="text-xs text-muted space-y-1">
+            <div>Game: <b className="text-ink">{s.game}</b></div>
+            <div>Account: <b className="text-ink">{s.inGameName}</b></div>
+            <div>Metric: <b className="text-ink">{s.metricLabel}</b> — {s.value.toLocaleString()}</div>
+          </div>
+        ),
+      };
+    }
+    // leaderboard
+    const lb = sources.leaderboards.find((x) => x.game === c.game && x.metricKey === c.metricKey) ?? sources.leaderboards.find((x) => x.game === c.game) ?? sources.leaderboards[0];
+    if (!lb) return { compact: <Empty label="No leaderboards" />, expanded: null, fullHref: "/leaderboards" };
+    return {
+      fullHref: lb.slug ? `/planets/${lb.slug}?stat=${encodeURIComponent(lb.metricKey)}` : `/leaderboards?game=${encodeURIComponent(lb.game)}`,
+      compact: (
+        <div className="flex items-center gap-3">
+          <GameLogo logoUrl={lb.logoUrl} name={lb.game} size={38} rounded="rounded-lg" className="ring-1 ring-white/15" />
+          <div className="min-w-0"><div className="text-sm font-bold truncate">{lb.title}</div><div className="text-[10px] text-muted">Tap to preview</div></div>
+        </div>
+      ),
+      expanded: (
+        <div className="text-xs text-muted space-y-1">
+          <div>Game: <b className="text-ink">{lb.game}</b></div>
+          <div>Ranked by: <b className="text-ink">{lb.metricKey.replace(/_/g, " ")}</b></div>
+        </div>
+      ),
+    };
+  }, [widget, sources, c]);
+
+  return (
+    <div className="glass p-3.5 h-full relative">
+      {editing && (
+        <div className="absolute top-1.5 right-1.5 flex items-center gap-1 z-10">
+          <div className="flex rounded-lg border border-white/12 overflow-hidden">
+            {[1, 2, 3, 4].map((n) => (
+              <button key={n} onClick={() => onWidth(n)} className={`px-1.5 text-[10px] font-bold ${widget.w === n ? "bg-cyan-500/25 text-cyan-200" : "text-muted hover:text-ink"}`}>{n}</button>
+            ))}
+          </div>
+          <button onClick={onRemove} className="text-rose-300 hover:text-rose-200"><Icon name="x" size={13} /></button>
+        </div>
+      )}
+      {/* Click expands in place — no navigation */}
+      <button type="button" onClick={() => !editing && setExp((v) => !v)} className="block w-full text-left" disabled={editing}>
+        {compact}
+      </button>
+      {exp && !editing && expanded && (
+        <div className="mt-3 border-t border-white/10 pt-3">
+          {expanded}
+          <Link href={fullHref} className="mt-2 inline-flex items-center gap-1 text-[11px] text-cyan-300 hover:underline"><Icon name="arrowRight" size={11} /> Open full page</Link>
+        </div>
+      )}
+      {editing && <WidgetConfig widget={widget} sources={sources} onCfg={onCfg} />}
+    </div>
+  );
+}
+
+function WidgetConfig({ widget, sources, onCfg }: { widget: Widget; sources: Sources; onCfg: (p: Record<string, string>) => void }) {
+  const c = widget.config;
+  const sel = "mt-2 w-full rounded-lg border border-white/12 bg-black/30 px-2 py-1 text-[11px] outline-none focus:border-cyan-400/50";
+  if (widget.type === "quest") return (
+    <select value={c.questKey ?? ""} onChange={(e) => onCfg({ questKey: e.target.value })} className={sel}>
+      {sources.quests.map((q) => <option key={q.key} value={q.key}>{q.name}</option>)}
+    </select>
+  );
+  if (widget.type === "cp") return (
+    <select value={c.scope ?? "total"} onChange={(e) => onCfg({ scope: e.target.value })} className={sel}>
+      <option value="total">Total CP</option>
+      {sources.quests.map((q) => <option key={q.key} value={q.key}>{q.name} CP</option>)}
+    </select>
+  );
+  if (widget.type === "stat") return (
+    <select value={`${c.accountId}::${c.metricKey}`} onChange={(e) => { const [accountId, metricKey] = e.target.value.split("::"); onCfg({ accountId, metricKey }); }} className={sel}>
+      {sources.stats.map((s) => <option key={`${s.accountId}::${s.metricKey}`} value={`${s.accountId}::${s.metricKey}`}>{s.game} · {s.metricLabel}</option>)}
+    </select>
+  );
+  return (
+    <select value={`${c.game}::${c.metricKey}`} onChange={(e) => { const [game, metricKey] = e.target.value.split("::"); onCfg({ game, metricKey }); }} className={sel}>
+      {sources.leaderboards.map((l) => <option key={`${l.game}::${l.metricKey}`} value={`${l.game}::${l.metricKey}`}>{l.title}</option>)}
+    </select>
+  );
+}
+
+function Empty({ label }: { label: string }) {
+  return <div className="text-xs text-muted py-3 text-center">{label}</div>;
+}

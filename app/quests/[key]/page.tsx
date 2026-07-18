@@ -2,8 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getQuestByKey } from "@/lib/quests";
+import { getQuestByKey, getTotalCp, getCpLedger } from "@/lib/quests";
 import QuestMapHero from "@/components/QuestMapHero";
+import CpLedger from "@/components/CpLedger";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 
@@ -22,15 +23,15 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   if (!detail) notFound();
 
   const { quest, allQuests, tierHolders, leaderboard } = detail;
+  const [totalCp, questLedger] = await Promise.all([
+    getTotalCp(db, user?.id ?? null),
+    getCpLedger(db, user?.id ?? null, { questId: quest.id, limit: 120 }),
+  ]);
   const tabs = allQuests.map((q) => ({ key: q.key, name: q.name, color: q.color, logoUrl: q.logoUrl, icon: q.icon, mapArtUrl: q.mapArtUrl }));
 
   return (
     <div>
-      <div className="mx-auto max-w-6xl px-4 pt-4">
-        <Link href="/quests" className="text-xs text-cyan-300 hover:underline">← All quests</Link>
-      </div>
-
-      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} />
+      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} />
 
       {/* Per-quest CP leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">
@@ -48,6 +49,13 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
             </Link>
           ))}
         </div>
+
+        {/* This quest's CP history */}
+        {questLedger.length > 0 && (
+          <div className="mt-6">
+            <CpLedger entries={questLedger} title={`${quest.name} CP history`} />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -11,12 +11,14 @@ import AdSlot from "@/components/AdSlot";
 import LeaderboardWidget from "@/components/LeaderboardWidget";
 import PostCard from "@/components/PostCard";
 import JoinSpaceButton from "@/components/JoinSpaceButton";
-import PlanetHero from "@/components/PlanetHero";
+import HeroStage from "@/components/HeroStage";
+import Countdown from "@/components/Countdown";
 import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
 import { buildSkinnedPlanets } from "@/lib/planets";
+import { getQuestHeroData } from "@/lib/quest-hero";
 import OAuthButtons from "@/components/OAuthButtons";
 
 export const dynamic = "force-dynamic";
@@ -104,15 +106,19 @@ export default async function PlanetPage({
   }
 
   // Interactive planet hero for games that have a skin (falls back to the flat
-  // cover hero otherwise).
-  const hasSkin = !!game?.planetImageUrl;
+  // cover hero otherwise). Admin can force the layout per planet.
+  const layout = game?.planetLayout ?? "auto";
+  const hasSkin = layout === "cover" ? false : (layout === "globe" ? !!game?.planetImageUrl : !!game?.planetImageUrl);
+  const pAccent = game?.accent || "#8b5cf6";
+  const pAccent2 = game?.accent2 || "#22d3ee";
   const skinnedPlanets = hasSkin ? await buildSkinnedPlanets(db) : [];
+  const questHero = hasSkin && skinnedPlanets.length > 0 ? await getQuestHeroData(db, viewer?.id ?? null) : null;
 
   return (
     <div>
       {hasSkin && skinnedPlanets.length > 0 ? (
         <>
-          <PlanetHero planets={skinnedPlanets} initialSlug={space.slug} />
+          <HeroStage planets={skinnedPlanets} initialSlug={space.slug} quest={questHero} swap={false} />
           <div className="mx-auto max-w-6xl px-4 -mt-2 mb-4 flex flex-wrap items-center gap-3">
             <p className="text-muted text-sm mr-auto">{space.description}</p>
             {gameProviders.map((p) => (
@@ -138,13 +144,13 @@ export default async function PlanetPage({
             backgroundPosition: game ? `${game.coverAdjust.x}% ${game.coverAdjust.y}%` : "center",
           }}
         />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a]/30 via-[#04051a]/70 to-[#04051a]" />
+        <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1000px 500px at 20% -10%, ${pAccent}26, transparent 60%), linear-gradient(to bottom, rgba(4,5,26,0.3), rgba(4,5,26,0.7) 60%, #04051a)` }} />
         <div className="mx-auto max-w-6xl px-4 pt-20 pb-12 flex flex-wrap items-end gap-5">
           {game
             ? <GameLogo logoUrl={game.logoUrl} name={game.name} size={84} className="pulse-glow" />
-            : <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-violet-400/30 bg-gradient-to-br from-violet-600/30 to-cyan-600/20"><Icon name="planet" size={38} className="text-violet-200" /></div>}
+            : <div className="flex h-20 w-20 items-center justify-center rounded-2xl border" style={{ borderColor: `${pAccent}55`, background: `linear-gradient(135deg, ${pAccent}4d, ${pAccent2}33)` }}><Icon name="planet" size={38} className="text-violet-200" /></div>}
           <div className="min-w-0 flex-1">
-            <div className="text-[11px] uppercase tracking-widest text-cyan-300 mb-1 inline-flex items-center gap-1.5">
+            <div className="text-[11px] uppercase tracking-widest mb-1 inline-flex items-center gap-1.5" style={{ color: pAccent2 }}>
               <Icon name="planet" size={12} /> Planet
             </div>
             <h1 className="text-3xl md:text-5xl font-bold">{space.name}</h1>
@@ -174,22 +180,35 @@ export default async function PlanetPage({
       <div className="mx-auto max-w-6xl px-4">
         <AdSlot placement="games_top_banner" className="mb-10" />
 
-        {/* Live challenge banners */}
-        {activeChallenges.map((c) => (
-          <Link
-            key={c.id}
-            href={`${path}/challenges/${c.id}`}
-            className="glass card-lift mb-6 flex flex-wrap items-center gap-4 p-5 !border-cyan-400/40"
-          >
-            <Icon name="zap" size={28} className="text-amber-300 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase tracking-widest text-cyan-300">Live challenge · ends {timeAgo(c.endAt).replace(" ago", "")}</div>
-              <div className="font-bold">{c.title}</div>
-              <div className="text-xs text-muted truncate">{c.prizeDescription}</div>
-            </div>
-            <span className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">Compete</span>
-          </Link>
-        ))}
+        {/* Live challenge banners — with cover art + live countdown */}
+        {activeChallenges.map((c) => {
+          const cover = slimImg(c.coverUrl) ?? slimImg(game?.coverUrl ?? null);
+          return (
+            <Link
+              key={c.id}
+              href={`${path}/challenges/${c.id}`}
+              className="card-lift mb-6 relative block overflow-hidden rounded-2xl border border-cyan-400/40"
+            >
+              <div className="relative min-h-[7rem] flex flex-wrap items-center gap-4 p-5">
+                {cover ? (
+                  <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
+                ) : (
+                  <div className="absolute inset-0 bg-cover bg-center opacity-50" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
+                )}
+                <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.92), rgba(4,5,26,0.6))" }} />
+                <Icon name="zap" size={28} className="relative text-amber-300 shrink-0" />
+                <div className="relative min-w-0 flex-1">
+                  <div className="text-[10px] uppercase tracking-widest text-cyan-300 inline-flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live challenge · <Countdown endsAt={c.endAt.toISOString()} prefix="ends in " />
+                  </div>
+                  <div className="font-bold text-lg drop-shadow">{c.title}</div>
+                  <div className="text-xs text-white/70 truncate">{c.prizeDescription}</div>
+                </div>
+                <span className="relative glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">Compete</span>
+              </div>
+            </Link>
+          );
+        })}
 
         <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
           <div className="min-w-0 space-y-12">
@@ -197,9 +216,24 @@ export default async function PlanetPage({
             {/* Leaderboard #1 — connected-account standings for this game */}
             {game && boards.length > 0 && (
               <section>
-                <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Icon name="chart" size={20} className="text-cyan-300" /> {game.name} leaderboard</h2>
-                <p className="text-xs text-muted mb-4">Live standings from API-verified accounts. Switch stats below.</p>
-                <LeaderboardWidget boards={boards} activeMetric={stat} basePath={path} limit={25} />
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="chart" size={20} className="text-cyan-300" /> {game.name} leaderboards</h2>
+                  <Link href={`/leaderboards?game=${encodeURIComponent(game.name)}`} className="text-xs text-cyan-300 hover:underline shrink-0">All leaderboards →</Link>
+                </div>
+                <p className="text-xs text-muted mb-4">Live standings from API-verified accounts — each board side by side.</p>
+                {/* Glorified cards, one board each, over the game's cover art */}
+                <div className="grid md:grid-cols-2 gap-5">
+                  {boards.map((b) => (
+                    <div key={b.id} className="relative overflow-hidden rounded-2xl border border-white/10 p-4">
+                      {slimImg(game.coverUrl) && <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${slimImg(game.coverUrl)})` }} />}
+                      <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.7), rgba(4,5,26,0.9))" }} />
+                      <div className="relative">
+                        <div className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="chart" size={15} className="text-cyan-300" /> {b.title}</div>
+                        <LeaderboardWidget boards={[b]} basePath={path} limit={10} compact />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </section>
             )}
 

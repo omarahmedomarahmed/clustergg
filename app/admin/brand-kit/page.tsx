@@ -13,8 +13,9 @@ const asMode = (v: string | undefined): Mode => (v === "mark" || v === "wordmark
 export default async function BrandKitPage() {
   const c = await getContent([
     "brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y",
-    "brand.wordmark", "brand.nav.mode", "brand.footer.mode",
-    "brand.loading.color", "brand.loading.logo",
+    "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.footer.mode",
+    "brand.loading.color", "brand.loading.logo", "brand.loading.phrases",
+    "brand.nav.bg", "brand.footer.bg", "brand.favicon", "brand.favicon.zoom", "brand.cpIcon", "brand.orb.icon",
   ]);
 
   return (
@@ -42,10 +43,19 @@ export default async function BrandKitPage() {
         <p className="text-sm text-muted mb-5">Upload the wide CLUSTER wordmark, choose what shows in the nav and footer, and style the loading orbit. Applies everywhere instantly.</p>
         <BrandingEditor
           defaultWordmark={c["brand.wordmark"] || ""}
+          defaultWordmarkZoom={Number(c["brand.wordmark.zoom"]) || 1}
           defaultNavMode={asMode(c["brand.nav.mode"])}
           defaultFooterMode={asMode(c["brand.footer.mode"])}
           defaultLoadingColor={c["brand.loading.color"] || "#8b5cf6"}
           defaultLoadingLogo={c["brand.loading.logo"] || ""}
+          defaultLoadingPhrases={c["brand.loading.phrases"] ?? "Traversing the cluster…"}
+          defaultPlanetsIcon={c["brand.nav.planetsIcon"] || ""}
+          defaultNavBg={c["brand.nav.bg"] || ""}
+          defaultFooterBg={c["brand.footer.bg"] || ""}
+          defaultFavicon={c["brand.favicon"] || ""}
+          defaultFaviconZoom={Number(c["brand.favicon.zoom"]) || 1}
+          defaultCpIcon={c["brand.cpIcon"] || ""}
+          defaultOrbIcon={c["brand.orb.icon"] || ""}
         />
       </section>
 

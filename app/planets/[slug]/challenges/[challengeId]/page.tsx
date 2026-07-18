@@ -7,8 +7,10 @@ import { getProvider } from "@/lib/providers/registry";
 import { getContent } from "@/lib/cms";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
+import Countdown from "@/components/Countdown";
 import LiveChallengeBoard from "@/components/LiveChallengeBoard";
 import { joinChallenge } from "@/app/actions/social";
+import { getQuestCompletions } from "@/lib/quests";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +61,20 @@ export default async function ChallengePage({
   ]);
 
   const joined = myParticipation.length > 0;
-  const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+  // Quest-badge entry gate: how many completion badges of a quest are required,
+  // and whether the viewer already holds enough.
+  let gate: { questName: string; logoUrl: string | null; need: number; have: number; ok: boolean } | null = null;
+  if (challenge.gateQuestId && challenge.gateMinBadges > 0) {
+    const [gq] = await db.select({ name: schema.quests.name, logoUrl: schema.quests.logoUrl })
+      .from(schema.quests).where(eq(schema.quests.id, challenge.gateQuestId)).limit(1);
+    if (gq) {
+      const have = viewer ? await getQuestCompletions(db, viewer.id, challenge.gateQuestId) : 0;
+      gate = { questName: gq.name, logoUrl: gq.logoUrl, need: challenge.gateMinBadges, have, ok: have >= challenge.gateMinBadges };
+    }
+  }
+
+  const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const embed = challenge.heroType === "stream" && challenge.heroUrl ? streamEmbed(challenge.heroUrl) : null;
   const coverUrl = challenge.coverUrl ?? cms["banner.arena"];
 
@@ -108,6 +123,11 @@ export default async function ChallengePage({
             <span className="text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1">
               {challenge.format === "top1" ? "Winner takes all" : challenge.format === "top3" ? "Top 3 podium" : "Threshold race"}
             </span>
+            {challenge.status === "active" && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-200 border border-amber-400/50 bg-amber-500/10 rounded-full px-3 py-1">
+                <Icon name="clock" size={12} /> <Countdown endsAt={challenge.endAt.toISOString()} prefix="ends in " />
+              </span>
+            )}
           </div>
           <h1 className="text-3xl md:text-5xl font-bold drop-shadow-lg">{challenge.title}</h1>
         </div>
@@ -121,7 +141,12 @@ export default async function ChallengePage({
               {[
                 { label: "Game", value: challenge.game, icon: "gamepad" },
                 { label: "Starts", value: fmtDate(challenge.startAt), icon: "clock" },
-                { label: "Ends", value: fmtDate(challenge.endAt), icon: "flame" },
+                { label: "Ends", value: (
+                  <span className="flex flex-col">
+                    <span>{fmtDate(challenge.endAt)}</span>
+                    {challenge.status === "active" && <span className="text-[10px] font-bold text-amber-300"><Countdown endsAt={challenge.endAt.toISOString()} prefix="in " /></span>}
+                  </span>
+                ), icon: "flame" },
                 { label: "Scoring", value: Object.entries(challenge.pointsEngine ?? {}).map(([k, v]) => `+${v}/${k}`).join(" ") || "—", icon: "chart" },
               ].map((cell) => (
                 <div key={cell.label} className="rounded-lg border border-violet-400/15 p-3">
@@ -147,8 +172,21 @@ export default async function ChallengePage({
                   You need a linked <b>{provider?.name}</b> account —{" "}
                   <Link href="/profile" className="text-cyan-300 underline">link it on your profile</Link>.
                 </div>
+              ) : gate && !gate.ok ? (
+                <div className="rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4 text-sm">
+                  <div className="flex items-center gap-2 font-semibold text-amber-200">
+                    {gate.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={gate.logoUrl} alt="" className="h-6 w-6 object-contain" /> : <Icon name="lock" size={15} />}
+                    Locked — earn {gate.need} <b>{gate.questName}</b> badge{gate.need > 1 ? "s" : ""} to enter
+                  </div>
+                  <p className="text-xs text-muted mt-1">You have {gate.have}/{gate.need}. Complete the <Link href="/quests" className="text-cyan-300 underline">{gate.questName} quest</Link> {gate.need - gate.have} more time{gate.need - gate.have > 1 ? "s" : ""} to unlock this challenge.</p>
+                </div>
               ) : (
                 <form action={joinChallenge.bind(null, challenge.id, myAccounts[0].id, path)}>
+                  {gate && (
+                    <div className="mb-2 inline-flex items-center gap-1.5 text-xs text-emerald-300 font-semibold">
+                      <Icon name="check" size={14} /> {gate.questName} badges {gate.have}/{gate.need} — you qualify
+                    </div>
+                  )}
                   <button className="glow-btn pressable rounded-full px-8 py-3 font-semibold text-white inline-flex items-center gap-2">
                     <Icon name="rocket" size={16} /> Join with {myAccounts[0].inGameName}
                   </button>
