@@ -7,6 +7,7 @@ import { saveQuest, deleteQuest, saveTier, deleteTier } from "@/app/actions/ques
 import ImageUpload from "@/components/ImageUpload";
 import Icon from "@/components/Icon";
 import SubmitButton from "@/components/SubmitButton";
+import QuestMapPinEditor from "@/components/QuestMapPinEditor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Edit quest" };
@@ -67,6 +68,19 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
           <SubmitButton className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Save quest</SubmitButton>
         </div>
       </form>
+
+      {/* Drag milestones across the quest map */}
+      {tiers.length > 0 && (
+        <div className="glass p-6">
+          <h2 className="font-bold mb-1 flex items-center gap-2"><Icon name="pin" size={16} className="text-violet-300" /> Milestone map placement</h2>
+          <QuestMapPinEditor
+            questId={quest.id}
+            mapArtUrl={quest.mapArtUrl ?? quest.cardBgUrl ?? ""}
+            accent={quest.color}
+            tiers={tiers.map((t) => ({ id: t.id, name: t.name, thresholdQp: t.thresholdQp, color: t.color ?? quest.color, iconUrl: t.iconUrl ?? null, x: t.mapX, y: t.mapY }))}
+          />
+        </div>
+      )}
 
       {/* Tiers (badges) */}
       <div className="glass p-6">
