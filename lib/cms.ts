@@ -45,6 +45,8 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.loading.color": "#8b5cf6",
   "brand.loading.logo": "",
   "brand.loading.phrases": "Traversing the cluster…\nAligning the constellations…\nCharging warp coils…\nSyncing your galaxy…\nPolishing trophies…\nCounting Cluster Points…",
+  // Floating quest orb icon (bottom-right). Empty = default CP coin.
+  "brand.orb.icon": "",
   // Nav + footer background images, favicon (+ zoom).
   "brand.nav.bg": "",
   "brand.footer.bg": "",

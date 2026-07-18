@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getUserQuests } from "@/lib/quests";
+import { getContent } from "@/lib/cms";
 import FloatingQuestOrb, { type OrbQuest } from "@/components/FloatingQuestOrb";
 
 // Server wrapper: loads the signed-in gamer's quest progress and renders the
@@ -9,9 +10,11 @@ export default async function QuestOrbMount() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) return null;
   let quests;
+  let orbIcon = "";
   try {
     const db = await getDb();
     quests = await getUserQuests(db, user.id);
+    orbIcon = (await getContent(["brand.orb.icon"]))["brand.orb.icon"] || "";
   } catch { return null; }
 
   const orb: OrbQuest[] = quests.map((q) => {
@@ -23,9 +26,9 @@ export default async function QuestOrbMount() {
     return {
       key: q.key, name: q.name, color: q.color, accent2: q.accent2, icon: q.icon, logoUrl: q.logoUrl,
       qp: q.qp, currentTierName: q.currentTierIndex >= 0 ? q.tiers[q.currentTierIndex].name : null,
-      nextTierName: q.nextTier?.name ?? null, pct,
+      nextTierName: q.nextTier?.name ?? null, pct, art: q.mapArtUrl || q.cardBgUrl || null,
     };
   });
 
-  return <FloatingQuestOrb quests={orb} />;
+  return <FloatingQuestOrb quests={orb} icon={orbIcon || undefined} />;
 }
