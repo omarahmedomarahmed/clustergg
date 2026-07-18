@@ -84,9 +84,23 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .filter((g) => g.items.length > 0);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 flex gap-8">
+    <div className="mx-auto max-w-7xl px-4 py-6 lg:py-8 lg:flex lg:gap-8">
+      {/* Mobile admin nav — horizontal scroll of every area (Mission Control on mobile) */}
+      <div className="lg:hidden mb-4 -mx-4 px-4">
+        <div className="flex items-center gap-2 mb-2 text-xs uppercase tracking-widest text-amber-300"><Icon name="shield" size={14} /> Mission Control</div>
+        <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none]">
+          {nav.flatMap((g) => g.items).map((item) => (
+            <Link key={item.href} href={item.href} className="shrink-0 rounded-full border border-white/12 px-3 py-1.5 text-xs text-muted hover:text-ink hover:border-cyan-400/40 whitespace-nowrap">
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
       <aside className="hidden lg:block w-52 shrink-0">
-        <div className="glass p-4 sticky top-20 space-y-5">
+        {/* Independently scrollable — hovering the rail scrolls only the rail
+            (overscroll-contain stops the wheel from chaining to the page). */}
+        <div className="glass p-4 sticky top-20 space-y-5 max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain">
           <div className="text-xs uppercase tracking-widest text-amber-300 flex items-center gap-2">
             <Icon name="shield" size={14} /> Mission Control
           </div>

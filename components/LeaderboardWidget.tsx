@@ -86,18 +86,21 @@ export default async function LeaderboardWidget({
                     const rank = compact ? i + 1 : i + 4;
                     return (
                       <tr key={`${e.user.id}-${rank}`}>
-                        <td className="w-14"><span className={`rank-chip ${rank <= 3 ? `rank-chip-${rank}` : ""}`}>{rank}</span></td>
+                        {/* Gamer image on the far LEFT */}
+                        <td className="w-12"><Link href={`/u/${e.user.slug}`}><Avatar name={e.user.displayName} src={e.user.avatarUrl} size={34} /></Link></td>
+                        {/* Gamer tag in the MIDDLE */}
                         <td>
-                          <Link href={`/u/${e.user.slug}`} className="flex items-center gap-2.5 hover:text-cyan-300">
-                            <Avatar name={e.user.displayName} src={e.user.avatarUrl} size={28} />
-                            <span className="font-semibold text-sm">{e.user.displayName}</span>
-                            <span className="text-xs text-muted hidden sm:inline">{e.account.inGameName}</span>
+                          <Link href={`/u/${e.user.slug}`} className="min-w-0 hover:text-cyan-300">
+                            <div className="font-semibold text-sm truncate">{e.user.displayName}</div>
+                            <div className="text-xs text-muted truncate">{e.account.inGameName}</div>
                           </Link>
                         </td>
-                        <td className="text-right font-bold text-cyan-200 text-sm">
+                        <td className="text-right font-bold text-cyan-200 text-sm whitespace-nowrap">
                           {e.rankLabel ?? fmtNum(e.value)}
                           {board.unit && !e.rankLabel && <span className="text-[10px] font-normal text-muted"> {board.unit}</span>}
                         </td>
+                        {/* Rank on the far RIGHT */}
+                        <td className="w-12 text-right"><span className={`rank-chip ${rank <= 3 ? `rank-chip-${rank}` : ""}`}>{rank}</span></td>
                       </tr>
                     );
                   })}
