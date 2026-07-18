@@ -27,6 +27,7 @@ export default function ImageUpload({
   hint,
   scope = "misc",
   zoomable = true,
+  previewWidth = 120,
 }: {
   name?: string;
   defaultValue?: string | null;
@@ -41,6 +42,8 @@ export default function ImageUpload({
   scope?: string;
   /** Show the zoom + reframe controls (default true). */
   zoomable?: boolean;
+  /** Width (px) of the framing preview box. Widen for wide lockups (wordmark). */
+  previewWidth?: number;
 }) {
   const controlled = onChange !== undefined;
   const [internal, setInternal] = useState(defaultValue ?? "");
@@ -52,7 +55,9 @@ export default function ImageUpload({
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Framing state. `orig` is the un-baked source we re-bake from on every commit.
-  const orig = useRef<string>(defaultValue ?? "");
+  // Seed it from whatever image we already have (controlled value or defaultValue)
+  // so zooming an *existing* image re-bakes from it instead of blanking out.
+  const orig = useRef<string>(defaultValue || controlledValue || "");
   const [zoom, setZoom] = useState(1);
   const [pos, setPos] = useState({ x: 50, y: 50 });
   const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
@@ -80,12 +85,16 @@ export default function ImageUpload({
   }
 
   // Re-bake the frame from the original and upload — the stored image is now the
-  // zoomed crop. Called when the admin finishes a zoom/drag gesture.
+  // zoomed crop. Called when the admin finishes a zoom/drag gesture. For an
+  // existing image (no captured original) we bake from the current value and pin
+  // it as the baseline so repeated gestures don't compound.
   async function commitFrame(nextZoom: number, nextPos: { x: number; y: number }) {
-    if (!orig.current || (nextZoom === 1 && nextPos.x === 50 && nextPos.y === 50 && !value)) return;
+    if (!orig.current && value) orig.current = value;
+    const source = orig.current;
+    if (!source || (nextZoom === 1 && nextPos.x === 50 && nextPos.y === 50 && !value)) return;
     setBusy(true);
     try {
-      const baked = await bakeFrame(orig.current, { zoom: nextZoom, x: nextPos.x, y: nextPos.y, outW, outH });
+      const baked = await bakeFrame(source, { zoom: nextZoom, x: nextPos.x, y: nextPos.y, outW, outH });
       setValue(await uploadImage(baked, scope));
     } catch { /* keep current */ } finally { setBusy(false); }
   }
@@ -112,16 +121,16 @@ export default function ImageUpload({
       <div className="flex items-start gap-3">
         <div
           className={`relative shrink-0 overflow-hidden border border-violet-400/25 bg-black/40 ${rounded} select-none touch-none`}
-          style={{ width: 120, aspectRatio: aspect, cursor: value && zoomable ? (drag.current ? "grabbing" : "grab") : "default" }}
+          style={{ width: previewWidth, aspectRatio: aspect, cursor: value && zoomable ? (drag.current ? "grabbing" : "grab") : "default" }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
         >
           {value ? (
-            // Live preview reflects zoom/pan (baked on commit). Uses the original
-            // when framing, else the current (already-baked) value.
-            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${(zoom !== 1 || pos.x !== 50 || pos.y !== 50) ? orig.current : value}")`, backgroundPosition: `${pos.x}% ${pos.y}%`, transform: `scale(${zoom})`, transformOrigin: "center" }} />
+            // Live preview reflects zoom/pan (baked on commit). Frames from the
+            // original (or the current value if that's all we have) so it never blanks.
+            <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url("${(zoom !== 1 || pos.x !== 50 || pos.y !== 50) ? (orig.current || value) : value}")`, backgroundPosition: `${pos.x}% ${pos.y}%`, transform: `scale(${zoom})`, transformOrigin: "center" }} />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-muted"><Icon name="monitor" size={20} /></div>
           )}

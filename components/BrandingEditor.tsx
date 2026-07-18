@@ -52,7 +52,6 @@ export default function BrandingEditor({
   defaultQuestRocket: string;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
-  const [wmZoom, setWmZoom] = useState(defaultWordmarkZoom);
   const [cpIcon, setCpIcon] = useState(defaultCpIcon);
   const [orbIcon, setOrbIcon] = useState(defaultOrbIcon);
   const [orbColor, setOrbColor] = useState(defaultOrbColor || "#8b5cf6");
@@ -61,7 +60,6 @@ export default function BrandingEditor({
   const [navBg, setNavBg] = useState(defaultNavBg);
   const [footerBg, setFooterBg] = useState(defaultFooterBg);
   const [favicon, setFavicon] = useState(defaultFavicon);
-  const [favZoom, setFavZoom] = useState(defaultFaviconZoom);
   const [navMode, setNavMode] = useState<Mode>(defaultNavMode);
   const [footerMode, setFooterMode] = useState<Mode>(defaultFooterMode);
   const [loadingColor, setLoadingColor] = useState(defaultLoadingColor);
@@ -75,20 +73,18 @@ export default function BrandingEditor({
       {/* Wordmark logo */}
       <div>
         <div className="font-semibold text-sm mb-1">Wordmark logo (wide)</div>
-        <p className="text-xs text-muted mb-3">The wide CLUSTER logo. When set, it replaces the gradient &ldquo;CLUSTER&rdquo; text next to the mark.</p>
+        <p className="text-xs text-muted mb-3">The wide CLUSTER logo. When set, it replaces the gradient &ldquo;CLUSTER&rdquo; text next to the mark. Use the single zoom slider under the preview to crop into the middle of the art (removes the empty space above/below a centred wordmark) — the crop is baked and shown big and wide in the nav.</p>
         <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
           <ImageUpload name="wordmark" value={wordmark} onChange={setWordmark}
-            aspect="4/1" rounded="rounded-lg" maxDim={640} scope="content"
-            hint="Transparent PNG works best. Wide lockup — around 4:1." />
-          <label className="mt-3 block text-xs text-muted">Wordmark size <span className="text-cyan-300">{wmZoom.toFixed(2)}×</span>
-            <input type="range" min={0.5} max={3} step={0.05} value={wmZoom} onChange={(e) => setWmZoom(Number(e.target.value))} className="w-full accent-violet-500" />
-          </label>
-          <input type="hidden" name="wordmarkZoom" value={wmZoom} />
+            aspect="4/1" rounded="rounded-lg" maxDim={720} scope="content" previewWidth={280}
+            hint="Transparent PNG works best. Wide lockup — around 4:1. Zoom in to fill the frame with the letters." />
+          {/* Display size stays at 1× — the nav renders the wordmark large by default. */}
+          <input type="hidden" name="wordmarkZoom" value="1" />
           {wordmark && (
             <div className="mt-4 flex items-center gap-4 rounded-xl bg-[#04051a] p-4 overflow-x-auto">
               <span className="text-[10px] uppercase tracking-widest text-muted shrink-0">Nav preview</span>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={wordmark} alt="Cluster" className="w-auto object-contain" style={{ height: 38 * wmZoom }} />
+              <img src={wordmark} alt="Cluster" className="w-auto object-contain" style={{ height: 54 }} />
             </div>
           )}
         </div>
@@ -155,22 +151,20 @@ export default function BrandingEditor({
 
       <div>
         <div className="font-semibold text-sm mb-1">Favicon (browser tab icon)</div>
-        <p className="text-xs text-muted mb-3">Square icon shown in the browser tab. Use the zoom to crop in.</p>
+        <p className="text-xs text-muted mb-3">Square icon shown in the browser tab. Use the single zoom slider under the preview to crop in — the crop is baked into the saved icon.</p>
         <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 grid gap-4 sm:grid-cols-[auto_1fr] items-start">
           <div className="flex flex-col items-center gap-2">
             <span className="relative h-12 w-12 overflow-hidden rounded-lg ring-1 ring-white/10 bg-black/40">
               {favicon
-                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={favicon} alt="" className="h-full w-full object-cover" style={{ transform: `scale(${favZoom})` }} />
+                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={favicon} alt="" className="h-full w-full object-cover" />
                 : <span className="flex h-full w-full items-center justify-center text-muted text-[10px]">none</span>}
             </span>
-            <span className="text-[10px] uppercase tracking-widest text-muted">Preview</span>
+            <span className="text-[10px] uppercase tracking-widest text-muted">Tab preview</span>
           </div>
           <div className="space-y-3">
-            <ImageUpload name="favicon" value={favicon} onChange={setFavicon} aspect="1/1" rounded="rounded-lg" maxDim={128} scope="content" hint="Square. PNG or SVG." />
-            <label className="block text-xs text-muted">Zoom <span className="text-cyan-300">{favZoom.toFixed(2)}×</span>
-              <input type="range" min={1} max={3} step={0.05} value={favZoom} onChange={(e) => setFavZoom(Number(e.target.value))} className="w-full accent-violet-500" />
-            </label>
-            <input type="hidden" name="faviconZoom" value={favZoom} />
+            <ImageUpload name="favicon" value={favicon} onChange={setFavicon} aspect="1/1" rounded="rounded-lg" maxDim={128} scope="content" hint="Square. PNG or SVG. Zoom to crop in." />
+            {/* Zoom is baked into the icon, so the tab always uses it directly. */}
+            <input type="hidden" name="faviconZoom" value="1" />
           </div>
         </div>
       </div>
