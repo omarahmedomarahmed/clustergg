@@ -34,6 +34,9 @@ export const users = pgTable("users", {
   // Full profile customization ("profile builder"): theme, layout, cursor,
   // section order & visibility. Rendered as inline CSS vars on the public page.
   theme: jsonb("theme").$type<Record<string, unknown>>().notNull().default({}),
+  // Feed control-panel prefs: which stat tiles to show + which challenges /
+  // game-leaderboards the gamer follows (pinned to the top of their feed).
+  feedPrefs: jsonb("feed_prefs").$type<{ stats?: string[]; challenges?: string[]; leaderboards?: string[] }>().notNull().default({}),
   createdAt: now("created_at"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
 }, (t) => [index("users_slug_idx").on(t.slug)]);

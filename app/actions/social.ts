@@ -10,6 +10,26 @@ import { evaluateBadgesForUser } from "@/lib/badges";
 import { recomputeExpertScores } from "@/lib/experts";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
 
+// ---------- Feed control panel ----------
+// Persist the gamer's feed dashboard prefs: which stat tiles show + which
+// challenges / game-leaderboards they follow. Sent as a JSON blob from the
+// FeedControlPanel client component.
+export async function saveFeedPrefs(prefsJson: string) {
+  const me = await requireUser();
+  const db = await getDb();
+  let prefs: { stats?: string[]; challenges?: string[]; leaderboards?: string[] } = {};
+  try {
+    const p = JSON.parse(prefsJson);
+    prefs = {
+      stats: Array.isArray(p.stats) ? p.stats.filter((x: unknown) => typeof x === "string").slice(0, 12) : [],
+      challenges: Array.isArray(p.challenges) ? p.challenges.filter((x: unknown) => typeof x === "string").slice(0, 24) : [],
+      leaderboards: Array.isArray(p.leaderboards) ? p.leaderboards.filter((x: unknown) => typeof x === "string").slice(0, 24) : [],
+    };
+  } catch { prefs = {}; }
+  await db.update(schema.users).set({ feedPrefs: prefs }).where(eq(schema.users.id, me.id));
+  revalidatePath("/feed");
+}
+
 // ---------- Follows ----------
 export async function toggleFollow(targetUserId: string, path: string) {
   const me = await requireUser();

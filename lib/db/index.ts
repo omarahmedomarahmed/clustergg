@@ -106,6 +106,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "user_quest_progress" ADD COLUMN IF NOT EXISTS "lifetime_qp" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "gate_quest_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "gate_min_badges" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "feed_prefs" jsonb NOT NULL DEFAULT '{}'::jsonb`,
 ];
 
 async function runColumnMigrations(db: DB) {
