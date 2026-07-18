@@ -30,8 +30,8 @@ export default function MobileMenu({
 
       {open && (
         <div className="fixed inset-0 z-[60]">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-0 h-full w-72 bg-[#070826]/98 border-l border-violet-500/25 backdrop-blur-xl p-5 flex flex-col animate-[rise-in_.25s_ease]">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-0 h-full w-72 bg-[#070826] border-l border-violet-500/25 p-5 flex flex-col animate-[rise-in_.25s_ease] shadow-2xl">
             <div className="flex items-center justify-between mb-6">
               <span className="text-sm font-bold tracking-widest grad-text">CLUSTER</span>
               <button
