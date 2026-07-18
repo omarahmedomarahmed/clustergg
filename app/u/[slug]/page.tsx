@@ -139,6 +139,8 @@ export default async function ProfilePage({ params }: Props) {
   const slugBySpaceId = new Map(chSpaces.map((s) => [s.id, s.slug]));
 
   const S = theme.sections;
+  // Card titles refer to the gamer by name (e.g. "Nova's quests") rather than "My …".
+  const poss = `${user.displayName}${user.displayName.endsWith("s") ? "'" : "'s"}`;
 
   // Serializable account cards for the interactive <ProfileAccounts>.
   const accountsData = accounts.map((a) => {
@@ -181,7 +183,7 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.trophies || trophyWins.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="trophy" size={19} style={{ color: theme.accent }} /> Trophy case</h2>
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="trophy" size={19} style={{ color: theme.accent }} /> {poss} trophy case</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {trophyWins.map(({ p, c }) => { const art = c.trophyId ? trophyArt.get(c.trophyId) : undefined; return (
                 <div key={p.id} className={`${cardCls} text-center`}>
@@ -197,7 +199,7 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.challenges || activeChallenges.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="zap" size={19} style={{ color: theme.accent }} /> Competing now</h2>
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="zap" size={19} style={{ color: theme.accent }} /> {poss} challenges</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               {activeChallenges.map(({ p, c }) => {
                 const cover = slimImg(c.coverUrl) ?? slimImg(gameCover.get(c.game) ?? null);
@@ -233,7 +235,7 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.activity || recentPosts.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="message" size={19} style={{ color: theme.accent }} /> Recent posts</h2>
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="message" size={19} style={{ color: theme.accent }} /> {poss} recent posts</h2>
             <div className="space-y-2">
               {recentPosts.map(({ post, space }) => (
                 <Link key={post.id} href={`/planets/${space.slug}`} className={`${cardCls} block`}>
@@ -248,7 +250,7 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.spaces || spaceRows.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="planet" size={19} style={{ color: theme.accent }} /> My planets</h2>
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="planet" size={19} style={{ color: theme.accent }} /> {poss} planets</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {spaceRows.map(({ s }) => {
                 const cover = slimImg(s.game ? gameCover.get(s.game) ?? null : null);
@@ -273,7 +275,7 @@ export default async function ProfilePage({ params }: Props) {
           <section key={key}>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <Icon name="trophy" size={16} style={{ color: theme.accent }} />
-              <h2 className="text-lg font-bold" style={{ color: theme.text }}>Quests</h2>
+              <h2 className="text-lg font-bold" style={{ color: theme.text }}>{poss} quests progress</h2>
               {/* Gamer's TOTAL Cluster Points across all quests */}
               <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold" style={{ background: `color-mix(in srgb, ${theme.accent2} 18%, transparent)`, color: theme.accent2 }}>
                 <CpIcon size={18} /> {profileQuests.reduce((s, q) => s + q.totalCp, 0).toLocaleString()} total CP

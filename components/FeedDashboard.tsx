@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import CpIcon from "@/components/CpIcon";
@@ -193,12 +193,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
           <div className="min-w-0"><div className="text-sm font-bold truncate">{lb.title}</div><div className="text-[10px] text-muted">Tap to preview</div></div>
         </div>
       ),
-      expanded: (
-        <div className="text-xs text-muted space-y-1">
-          <div>Game: <b className="text-ink">{lb.game}</b></div>
-          <div>Ranked by: <b className="text-ink">{lb.metricKey.replace(/_/g, " ")}</b></div>
-        </div>
-      ),
+      expanded: <LeaderboardLive game={lb.game} metric={lb.metricKey} />,
     };
   }, [widget, sources, c]);
 
@@ -257,4 +252,47 @@ function WidgetConfig({ widget, sources, onCfg }: { widget: Widget; sources: Sou
 
 function Empty({ label }: { label: string }) {
   return <div className="text-xs text-muted py-3 text-center">{label}</div>;
+}
+
+type LbEntry = { rank: number; name: string; slug: string; avatarUrl: string | null; inGameName: string; value: number; rankLabel: string | null };
+type LbData = { unit: string | null; total: number; entries: LbEntry[]; me: { rank: number; value: number; rankLabel: string | null } | null };
+
+// Live leaderboard inside a dashboard widget: real top entries for the selected
+// game + metric, plus the gamer's own standing pinned below.
+function LeaderboardLive({ game, metric }: { game: string; metric: string }) {
+  const [data, setData] = useState<LbData | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/leaderboard?game=${encodeURIComponent(game)}&metric=${encodeURIComponent(metric)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive) { if (d?.entries) setData(d); else setErr(true); } })
+      .catch(() => alive && setErr(true));
+    return () => { alive = false; };
+  }, [game, metric]);
+
+  if (err) return <div className="text-xs text-muted py-2">Couldn&apos;t load the leaderboard.</div>;
+  if (!data) return <div className="text-xs text-muted py-2">Loading standings…</div>;
+  const fmt = (v: number, rl: string | null) => rl ?? (v.toLocaleString() + (data.unit ? ` ${data.unit}` : ""));
+
+  return (
+    <div className="space-y-1.5">
+      {data.entries.length === 0 && <div className="text-xs text-muted">No ranked players yet.</div>}
+      {data.entries.map((e) => (
+        <Link key={e.slug} href={`/u/${e.slug}`} className="flex items-center gap-2 text-xs hover:text-cyan-300">
+          <span className="w-4 text-center font-bold text-muted">{e.rank}</span>
+          <GameLogo logoUrl={e.avatarUrl} name={e.name} size={20} rounded="rounded-full" />
+          <span className="min-w-0 flex-1 truncate">{e.name}</span>
+          <span className="font-bold text-cyan-200 shrink-0">{fmt(e.value, e.rankLabel)}</span>
+        </Link>
+      ))}
+      {data.me && (
+        <div className="mt-2 flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/[0.08] px-2 py-1.5 text-xs">
+          <span className="w-4 text-center font-bold text-cyan-300">{data.me.rank}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold">You{data.me.rank <= data.total ? ` · of ${data.total}` : ""}</span>
+          <span className="font-bold text-cyan-200 shrink-0">{fmt(data.me.value, data.me.rankLabel)}</span>
+        </div>
+      )}
+    </div>
+  );
 }
