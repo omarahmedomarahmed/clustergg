@@ -2,6 +2,10 @@
 
 Follow this top to bottom. Every step says exactly where to click and what to paste.
 
+> **New here?** Read the [README](./README.md) for what the product is, and once
+> you're running, [`docs/STAFF_OPERATIONS.md`](./docs/STAFF_OPERATIONS.md) is the
+> plain-language manual for running the platform. Developers: [`docs/ENGINEERING_HANDOVER.md`](./docs/ENGINEERING_HANDOVER.md).
+
 ---
 
 ## Part 1 — Connect your Neon database (pooled vs unpooled, explained)
@@ -165,28 +169,38 @@ bans. Revisit only with legal sign-off (plan §15).
 
 ## Part 4 — Running the platform (admin cheat-sheet)
 
-Everything below lives in **Mission Control** (your avatar → Mission Control):
+Everything below lives in **Mission Control** (your avatar → Mission Control). A full
+walkthrough of every page is in [`docs/STAFF_OPERATIONS.md`](./docs/STAFF_OPERATIONS.md).
 
 | What | Where |
 |---|---|
-| Edit any homepage text/button/background | **Site content** |
-| Game logos + cover images (zoom/crop framing) | **Games catalog** |
+| Edit any homepage/site text, buttons, loading-screen phrases | **Site content** |
+| Per-page background art | **Page backgrounds** |
+| Card background art (feed rails, etc.; dark overlay auto-applied) | **Card backgrounds** |
+| Logo mark, wordmark, favicon (zoom), nav/footer bg, CP coin, quest orb & rocket | **Logos & brand kit** |
 | "Trusted by" partner logos | **Partners** |
-| Build & publish challenges (per-game trackable stats + recommended scoring, daily/weekly/monthly, hero image/video/stream, trophy) | **Challenges** |
-| Watch a challenge live, disqualify cheaters | Challenges → Live tracker |
+| Game logos, covers, planet globe art, colors, metrics, **sort order** | **Games catalog** |
+| Which providers appear in onboarding | **Connect providers** |
+| Per-planet layout, page bg, card art, theme, drag region pins | **Planets** |
+| Build & publish challenges (per-game stats, weekday+hour+date, hero art, trophy) | **Challenges** |
+| Quests, CP-per-action, tier badges, drag milestones on the map | **Quests** |
+| Leaderboard definitions (metric filtered by game) | **Leaderboards** |
 | Trophy art library | **Trophies** |
-| Badges + award criteria | **Badges** |
-| Leaderboard definitions | **Leaderboards** |
-| Users: search, suspend, ban, **promote to staff** | **Users** |
-| Staff role = moderation of spaces/challenges only | **Roles** |
-| Ads: brands, creatives (review queue), placements, which ad shows where, engagement analytics | **Brands / Creatives / Placements / Ad schedule / Ad analytics** |
+| Users: search, suspend, ban, reset password | **Users** |
+| See roles; **admins delegate areas to staff** here | **Roles & staff access** |
+| Ads: brands, creatives, placements, per-campaign analytics & launch | **Brands / Creatives / Placements / Ad schedule / Ad analytics** |
+| Image health: source, size, re-host to Blob | **Image storage** |
 | Provider key status (green = live) | **Settings** |
 
-**Staff accounts:** find the user in Users → "Make staff". They keep their gamer profile;
-their account now also opens Mission Control with moderation-only powers.
+**Staff accounts:** find the user in Users → "Make staff" (superadmin promotes). They keep
+their gamer profile; their account also opens Mission Control. By default staff can edit
+content, planets, games, challenges, quests, trophies and leaderboards. An **admin** can
+grant staff the sensitive areas (ads, image storage, audit log) under **Roles & staff
+access** → *Staff role access*. Roles and Settings are never delegated.
 
-**Stat syncs:** automatic — profiles refresh on view (15-min cooldown) + a daily cron.
-Manual re-sync buttons exist on Linked accounts.
+**Stat syncs:** automatic — profiles refresh on view (cooldown) + a daily Vercel cron
+(`/api/cron/sync`, protected by `CRON_SECRET`). Manual re-sync buttons exist on Linked accounts.
 
-**Ads are sold offline:** nothing brand-related is public. The only public surface is the
-"Trusted by" logo slider you control in Partners.
+**Ads are sold offline:** nothing brand-related is public. Brands manage their own campaigns
+via a key-gated portal at `/brands/<slug>` (no account needed). The only public surface is
+the "Trusted by" logo slider you control in Partners.

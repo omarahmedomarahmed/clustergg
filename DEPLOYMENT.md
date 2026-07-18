@@ -2,6 +2,10 @@
 
 Live app: the Vercel project `clustergg` builds from this repo (`main` = production).
 
+> Companion docs: [`README`](./README.md) (overview), [`SETUP_GUIDE`](./SETUP_GUIDE.md)
+> (every env var + provider key, click-by-click), [`docs/ENGINEERING_HANDOVER`](./docs/ENGINEERING_HANDOVER.md)
+> (architecture), [`SECURITY`](./SECURITY.md) (authz + production checklist).
+
 ## How it runs
 
 - **Zero-config demo mode (default):** with no `DATABASE_URL`, the app boots an in-memory
@@ -18,6 +22,8 @@ Live app: the Vercel project `clustergg` builds from this repo (`main` = product
 2. In Vercel → Project → Settings → Environment Variables, set:
    - `DATABASE_URL` — Neon pooled connection string
    - `AUTH_SECRET` — long random string (`openssl rand -base64 32`)
+   - `BLOB_READ_WRITE_TOKEN` — a **Vercel Blob** public store token (Storage → Create → Blob). **Required for real image uploads** — all art is stored here so Neon only holds short links. Without it, uploads fall back to inline data URLs, which is fine for demo but must not be used in production (it bloats Neon egress — see the handover doc §4).
+   - `AD_ANALYTICS_SALT` — random string used to hash IPs in ad analytics
    - `SETUP_TOKEN` — random string protecting the setup endpoint
    - `CRON_SECRET` — random string (Vercel Cron sends it automatically)
 3. Redeploy, then initialize the schema once:
@@ -60,14 +66,20 @@ Provider status is visible at **/admin/settings** (green = live) and on the land
   Vercel Cron (`/api/cron/sync`, 06:00 UTC) that also finalizes ended challenges and
   recomputes Space expert tiers. Hobby plan allows daily; on Pro you can raise the cadence
   in `vercel.json`.
-- **Admin:** `/admin` — users, roles, linked-account monitor, badges, leaderboards, spaces
-  + moderation, space requests, challenge builder + live tracker, brands, campaigns,
-  creatives review, placements, ad schedule, ad analytics, audit log.
+- **Admin:** `/admin` — site content, page & card backgrounds, logos/brand-kit/favicon,
+  games catalog, connect providers, planets, challenge builder, quests + tiers, leaderboards,
+  trophies, users, roles & staff-access delegation, linked accounts, brands/campaigns/creatives/
+  placements/ad-schedule/analytics, **image storage audit**, settings, audit log. Access is
+  role-gated; admins can delegate ads/storage/audit to staff (see `SECURITY.md`).
 - **Ads:** creatives go through review; video is hard-capped at 5s (upload + playback);
-  impressions store hashed IPs only.
+  impressions store hashed IPs only. Brands self-serve via `/brands/<slug>?key=…` (no login).
+- **Media:** all uploaded art lives on Vercel Blob; Neon stores only links. The
+  **/admin/storage** page audits every image (source + size) and can re-host stray external/
+  inline art to Blob in one click.
 
 ## Brand assets
 
 Cosmic identity (hero, logo, badge sprites, ambient, OG image) was generated with
-Higgsfield and is served via rewrites in `next.config.ts`. To self-host, download those
-URLs into `public/assets/` with the same filenames — local files take precedence.
+Higgsfield. Uploaded/admin-set art is stored on Vercel Blob; a boot migration re-hosts any
+stray external CDN or inline images to Blob automatically. To self-host the static defaults,
+place files in `public/assets/` with the same filenames — local files take precedence.
