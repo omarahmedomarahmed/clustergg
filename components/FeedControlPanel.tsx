@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
@@ -34,17 +34,8 @@ const STAT_CATALOG: { key: string; label: string; icon: string; href: (slug: str
 ];
 const DEFAULT_STATS = ["cp", "quests", "followers", "games"];
 
-function timeLeft(iso: string): string {
-  const ms = new Date(iso).getTime() - Date.now();
-  if (ms <= 0) return "ended";
-  const d = Math.floor(ms / 86400000), h = Math.floor((ms % 86400000) / 3600000);
-  if (d > 0) return `${d}d ${h}h`;
-  const m = Math.floor((ms % 3600000) / 60000);
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
-}
-
 export default function FeedControlPanel({
-  me, accounts, statValues, activeChallenges, games, prefs, theme,
+  me, accounts, statValues, games, prefs, theme,
 }: {
   me: PanelMe; accounts: PanelAccount[]; statValues: Record<string, number>;
   activeChallenges: PanelChallenge[]; games: PanelGame[]; prefs: PanelPrefs;
@@ -55,21 +46,16 @@ export default function FeedControlPanel({
   const coverUrl = theme?.coverUrl ?? me.bannerUrl;
   const [editing, setEditing] = useState(false);
   const [stats, setStats] = useState<string[]>(prefs.stats.length ? prefs.stats : DEFAULT_STATS);
-  const [followedCh, setFollowedCh] = useState<string[]>(prefs.challenges ?? []);
-  const [followedLb, setFollowedLb] = useState<string[]>(prefs.leaderboards ?? []);
+  const [openAcct, setOpenAcct] = useState<string | null>(null);
+  const [connectOpen, setConnectOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-
-  const chById = useMemo(() => new Map(activeChallenges.map((c) => [c.id, c])), [activeChallenges]);
-  const gameByName = useMemo(() => new Map(games.map((g) => [g.name, g])), [games]);
-  const shownChallenges = followedCh.map((id) => chById.get(id)).filter(Boolean) as PanelChallenge[];
-  const shownLeaderboards = followedLb.map((n) => gameByName.get(n)).filter(Boolean) as PanelGame[];
 
   const toggle = (arr: string[], set: (v: string[]) => void, key: string) =>
     set(arr.includes(key) ? arr.filter((k) => k !== key) : [...arr, key]);
 
   const save = () => {
     startTransition(async () => {
-      await saveFeedPrefs(JSON.stringify({ stats, challenges: followedCh, leaderboards: followedLb }));
+      await saveFeedPrefs(JSON.stringify({ stats }));
       setEditing(false);
     });
   };
@@ -100,7 +86,7 @@ export default function FeedControlPanel({
             {me.title && <p className="text-xs font-semibold truncate" style={{ color: accent }}>{me.title}</p>}
           </div>
           <div className="hidden sm:flex flex-wrap gap-2 pb-1">
-            <Link href="/profile" className="glow-btn pressable rounded-full px-4 py-2 text-xs font-semibold text-white inline-flex items-center gap-1.5"><Icon name="link" size={13} /> Connect</Link>
+            <button onClick={() => setConnectOpen((v) => !v)} className="glow-btn pressable rounded-full px-4 py-2 text-xs font-semibold text-white inline-flex items-center gap-1.5"><Icon name="link" size={13} /> Connect</button>
             <Link href={`/u/${me.slug}`} className="ghost-btn pressable rounded-full px-4 py-2 text-xs inline-flex items-center gap-1.5"><Icon name="eye" size={13} /> Profile</Link>
           </div>
         </div>
@@ -134,115 +120,67 @@ export default function FeedControlPanel({
           </div>
         </div>
 
-        {/* Connected accounts — cards with the game's cover art */}
-        {accounts.length > 0 && (
-          <div className="mt-5">
-            <div className="text-[11px] uppercase tracking-widest text-muted mb-2">Connected accounts</div>
-            <div className="flex gap-2.5 overflow-x-auto pb-1 -mx-1 px-1">
-              {accounts.map((a) => (
-                <Link key={a.id} href="/profile" className="group relative shrink-0 w-44 overflow-hidden rounded-xl border border-white/10 hover:border-cyan-400/40 transition-colors">
+        {/* Connected accounts — expand in place (no navigation) */}
+        <div className="mt-5">
+          <div className="text-[11px] uppercase tracking-widest text-muted mb-2">Connected accounts</div>
+          <div className="flex flex-wrap gap-2.5">
+            {accounts.map((a) => {
+              const open = openAcct === a.id;
+              return (
+                <div key={a.id} className={`relative overflow-hidden rounded-xl border transition-colors ${open ? "w-full border-cyan-400/40" : "w-44 border-white/10 hover:border-cyan-400/40"}`}>
                   {a.coverUrl ? (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={a.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40 group-hover:opacity-55 transition-opacity" />
+                    <img src={a.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
                   ) : (
-                    <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(120deg, #8b5cf633, #22d3ee22)" }} />
+                    <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${accent2}33, ${accent}22)` }} />
                   )}
-                  <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-[#0a0a1c] via-[#0a0a1c]/70 to-transparent" />
-                  <div className="relative flex items-center gap-2 p-2.5">
+                  <span aria-hidden className="absolute inset-0 bg-gradient-to-t from-[#0a0a1c] via-[#0a0a1c]/75 to-[#0a0a1c]/30" />
+                  <button onClick={() => setOpenAcct(open ? null : a.id)} className="relative w-full flex items-center gap-2 p-2.5 text-left">
                     <GameLogo logoUrl={a.logoUrl} name={a.gameName ?? a.providerName} size={30} rounded="rounded-lg" className="ring-1 ring-white/20" />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1">
                       <div className="text-xs font-bold truncate">{a.inGameName}</div>
                       <div className="text-[10px] text-muted truncate">{a.gameName ?? a.providerName}{a.region ? ` · ${a.region}` : ""}</div>
                     </div>
-                  </div>
-                </Link>
-              ))}
-              <Link href="/profile" className="shrink-0 w-28 flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/15 text-muted hover:border-cyan-400/40 hover:text-cyan-300 transition-colors">
-                <Icon name="plus" size={16} /> <span className="text-[10px]">Add game</span>
-              </Link>
-            </div>
-          </div>
-        )}
-
-        {/* Followed challenges + leaderboards */}
-        <div className="mt-5 grid md:grid-cols-2 gap-4">
-          {/* Challenges */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] uppercase tracking-widest text-muted inline-flex items-center gap-1.5"><Icon name="zap" size={12} className="text-amber-300" /> Followed challenges</span>
-            </div>
-            {editing ? (
-              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                {activeChallenges.length === 0 && <p className="text-[11px] text-muted">No live challenges to follow yet.</p>}
-                {activeChallenges.map((c) => (
-                  <button key={c.id} onClick={() => toggle(followedCh, setFollowedCh, c.id)}
-                    className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors ${followedCh.includes(c.id) ? "border-amber-400/50 bg-amber-500/10" : "border-white/10 hover:border-white/25"}`}>
-                    <Icon name={followedCh.includes(c.id) ? "check" : "plus"} size={12} className={followedCh.includes(c.id) ? "text-amber-300" : "text-muted"} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-xs font-semibold truncate">{c.title}</span>
-                      <span className="block text-[10px] text-muted truncate">{c.game} · ends {timeLeft(c.endAt)}</span>
-                    </span>
+                    <Icon name={open ? "chevronDown" : "chevronRight"} size={13} className="text-muted shrink-0" />
                   </button>
-                ))}
-              </div>
-            ) : shownChallenges.length === 0 ? (
-              <p className="text-[11px] text-muted">Tap <b>Customize panel</b> to follow live challenges.</p>
-            ) : (
-              <div className="space-y-2">
-                {shownChallenges.map((c) => (
-                  <Link key={c.id} href={c.planetSlug ? `/planets/${c.planetSlug}/challenges/${c.id}` : "/planets"}
-                    className="group relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/10 p-2.5 hover:border-amber-400/40 transition-colors">
-                    {c.coverUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img src={c.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />}
-                    <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-[#0a0a1c] via-[#0a0a1c]/75 to-[#0a0a1c]/40" />
-                    <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 ring-1 ring-amber-400/30"><Icon name="zap" size={14} className="text-amber-300" /></span>
-                    <span className="relative min-w-0 flex-1">
-                      <span className="block text-xs font-bold truncate">{c.title}</span>
-                      <span className="block text-[10px] text-muted">{c.game} · ends {timeLeft(c.endAt)}{c.joined && c.myRank ? ` · you're #${c.myRank}` : ""}</span>
-                    </span>
-                    {c.joined && <span className="relative shrink-0 text-[9px] font-bold uppercase text-emerald-300">In</span>}
-                  </Link>
-                ))}
-              </div>
-            )}
+                  {open && (
+                    <div className="relative border-t border-white/10 p-3 text-xs text-muted space-y-1">
+                      <div>Game: <b className="text-ink">{a.gameName ?? a.providerName}</b></div>
+                      <div>In-game name: <b className="text-ink">{a.inGameName}</b></div>
+                      {a.region && <div>Region: <b className="text-ink">{a.region}</b></div>}
+                      <div className="pt-1.5 flex gap-2">
+                        <Link href="/profile" className="inline-flex items-center gap-1 text-cyan-300 hover:underline"><Icon name="settings" size={11} /> Manage</Link>
+                        {a.gameName && <Link href="/planets" className="inline-flex items-center gap-1 text-cyan-300 hover:underline"><Icon name="planet" size={11} /> Planet</Link>}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            {/* Inline connect — opens the picker in place, no navigation to a new page first */}
+            <button onClick={() => setConnectOpen((v) => !v)}
+              className="w-28 flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/15 text-muted hover:border-cyan-400/40 hover:text-cyan-300 transition-colors py-3">
+              <Icon name={connectOpen ? "chevronDown" : "plus"} size={16} /> <span className="text-[10px]">Connect game</span>
+            </button>
           </div>
 
-          {/* Leaderboards */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] uppercase tracking-widest text-muted inline-flex items-center gap-1.5"><Icon name="chart" size={12} className="text-cyan-300" /> Followed leaderboards</span>
-            </div>
-            {editing ? (
-              <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-                {games.length === 0 && <p className="text-[11px] text-muted">No game leaderboards yet.</p>}
+          {connectOpen && (
+            <div className="mt-2.5 rounded-xl border border-cyan-400/25 bg-black/25 p-3">
+              <div className="text-[11px] text-muted mb-2">Pick a game to connect — you&apos;ll link your account on the next step.</div>
+              <div className="flex flex-wrap gap-2">
                 {games.map((g) => (
-                  <button key={g.name} onClick={() => toggle(followedLb, setFollowedLb, g.name)}
-                    className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors ${followedLb.includes(g.name) ? "border-cyan-400/50 bg-cyan-500/10" : "border-white/10 hover:border-white/25"}`}>
-                    <Icon name={followedLb.includes(g.name) ? "check" : "plus"} size={12} className={followedLb.includes(g.name) ? "text-cyan-300" : "text-muted"} />
-                    <GameLogo logoUrl={g.logoUrl} name={g.name} size={22} rounded="rounded-md" className="ring-1 ring-white/15" />
-                    <span className="text-xs font-semibold truncate flex-1">{g.name}</span>
-                  </button>
-                ))}
-              </div>
-            ) : shownLeaderboards.length === 0 ? (
-              <p className="text-[11px] text-muted">Tap <b>Customize panel</b> to follow game leaderboards.</p>
-            ) : (
-              <div className="space-y-2">
-                {shownLeaderboards.map((g) => (
-                  <Link key={g.name} href={g.slug ? `/planets/${g.slug}` : `/leaderboards?game=${encodeURIComponent(g.name)}`}
-                    className="group relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/10 p-2.5 hover:border-cyan-400/40 transition-colors">
-                    {g.coverUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img src={g.coverUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-30" />}
-                    <span aria-hidden className="absolute inset-0 bg-gradient-to-r from-[#0a0a1c] via-[#0a0a1c]/75 to-[#0a0a1c]/40" />
-                    <GameLogo logoUrl={g.logoUrl} name={g.name} size={30} rounded="rounded-lg" className="relative ring-1 ring-white/20" />
-                    <span className="relative min-w-0 flex-1">
-                      <span className="block text-xs font-bold truncate">{g.name}</span>
-                      <span className="block text-[10px] text-muted">View leaderboard →</span>
-                    </span>
-                    <Icon name="chart" size={14} className="relative text-cyan-300 shrink-0" />
+                  <Link key={g.name} href={g.slug ? `/planets/${g.slug}` : "/profile"} title={`Connect ${g.name}`}
+                    className="group relative flex items-center gap-1.5 rounded-lg border border-white/10 px-2.5 py-1.5 hover:border-cyan-400/40">
+                    <GameLogo logoUrl={g.logoUrl} name={g.name} size={20} rounded="rounded-md" className="ring-1 ring-white/15" />
+                    <span className="text-[11px] font-semibold">{g.name}</span>
                   </Link>
                 ))}
+                <Link href="/profile" className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-200">
+                  <Icon name="arrowRight" size={12} /> All providers
+                </Link>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {editing && (
