@@ -363,6 +363,29 @@ export async function getTotalCp(db: DB, userId: string | null): Promise<number>
   return Number(row?.c ?? 0);
 }
 
+// ===== CP ledger (history log) =====
+export type CpLedgerEntry = {
+  id: string; questId: string; questKey: string; questName: string; color: string; logoUrl: string | null;
+  actionKey: string; label: string; qp: number; at: string;
+};
+// Every CP award for a gamer (when + why), newest first. Optionally scoped to
+// one quest. Backed by questEvents; the "why" comes from the action label.
+export async function getCpLedger(db: DB, userId: string | null, opts?: { questId?: string; limit?: number }): Promise<CpLedgerEntry[]> {
+  if (!userId) return [];
+  const wheres = [eq(schema.questEvents.userId, userId)];
+  if (opts?.questId) wheres.push(eq(schema.questEvents.questId, opts.questId));
+  const rows = await db.select({
+    id: schema.questEvents.id, questId: schema.questEvents.questId, actionKey: schema.questEvents.actionKey,
+    qp: schema.questEvents.qpAwarded, at: schema.questEvents.createdAt,
+    key: schema.quests.key, name: schema.quests.name, color: schema.quests.color, logoUrl: schema.quests.logoUrl,
+  }).from(schema.questEvents).innerJoin(schema.quests, eq(schema.questEvents.questId, schema.quests.id))
+    .where(and(...wheres)).orderBy(desc(schema.questEvents.createdAt)).limit(opts?.limit ?? 120);
+  return rows.map((r) => ({
+    id: r.id, questId: r.questId, questKey: r.key, questName: r.name, color: r.color, logoUrl: r.logoUrl,
+    actionKey: r.actionKey, label: ACTION_LABEL[r.actionKey] ?? r.actionKey, qp: r.qp, at: r.at.toISOString(),
+  }));
+}
+
 // Top questers per quest (CP leaderboard), keyed by quest id.
 export async function getQuestTops(db: DB, questIds: string[], perQuest = 8): Promise<Map<string, QuestGamer[]>> {
   const out = new Map<string, QuestGamer[]>();
