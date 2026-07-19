@@ -5,6 +5,7 @@ import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignR
 import BrandCreativeUploader from "@/components/BrandCreativeUploader";
 import BrandMessageForm from "@/components/BrandMessageForm";
 import BrandAnalyticsPanel from "@/components/BrandAnalyticsPanel";
+import BrandAppearanceEditor from "@/components/BrandAppearanceEditor";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import Icon from "@/components/Icon";
 
@@ -128,10 +129,16 @@ export default async function BrandPortalPage({
   );
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
+      {brand.portalBgUrl && (
+        <div className="fixed inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.92)), url(${brand.portalBgUrl})` }} />
+      )}
       <PortalHeader name={brand.name} logo={brand.logoUrl} cover={cover} subtitle={`${data.totals.total} campaign${data.totals.total === 1 ? "" : "s"} · ${data.totals.active} live`} />
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-8">
         {brand.about && <div className="glass p-5 text-sm text-muted">{brand.about}</div>}
+
+        {/* Brand can restyle its own portal */}
+        <BrandAppearanceEditor brandId={brand.id} keyStr={key} initial={{ logoUrl: brand.logoUrl ?? "", coverUrl: brand.coverUrl ?? "", portalBgUrl: brand.portalBgUrl ?? "" }} />
 
         {data.totals.total === 0 ? (
           <div className="glass p-6">

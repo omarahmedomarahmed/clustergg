@@ -40,6 +40,7 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
           </select>
           <div><div className="text-xs text-muted mb-1">Brand logo</div><ImageUpload name="logoUrl" defaultValue={brand.logoUrl ?? ""} aspect="1/1" rounded="rounded-xl" maxDim={400} scope="creative" hint="Square brand logo." /></div>
           <div><div className="text-xs text-muted mb-1">Portal cover</div><ImageUpload name="coverUrl" defaultValue={brand.coverUrl ?? ""} aspect="16/9" maxDim={1400} scope="creative" hint="Wide cover shown on the brand portal." /></div>
+          <div className="sm:col-span-2"><div className="text-xs text-muted mb-1">Portal background art (full-page)</div><ImageUpload name="portalBgUrl" defaultValue={brand.portalBgUrl ?? ""} aspect="16/9" maxDim={1920} scope="creative" hint="Cosmic art behind the whole brand portal (kept dark for readability)." /></div>
           <input name="contactEmail" type="email" defaultValue={brand.contactEmail ?? ""} placeholder="Contact email" className="input-cosmic" />
           <select name="status" defaultValue={brand.status} className="input-cosmic">
             <option value="active">Active</option>

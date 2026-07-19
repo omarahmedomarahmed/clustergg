@@ -65,7 +65,7 @@ export default function NavMenus({
       <div className="relative">
         <button type="button" aria-label="Messages" className={iconBtn} onClick={() => toggle("dm")}>
           <Icon name="message" size={19} />
-          {conversations.some((c) => c.unread) && <span className="absolute -right-1.5 -top-1 h-2 w-2 rounded-full bg-cyan-400" />}
+          {conversations.some((c) => c.unread) && <span className="absolute -right-1.5 -top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-[#04051a] animate-pulse" />}
         </button>
         {open === "dm" && (
           <div className={panel}>
@@ -87,7 +87,7 @@ export default function NavMenus({
                     </span>
                     <span className={`block text-xs truncate ${c.unread ? "text-ink" : "text-muted"}`}>{c.snippet}</span>
                   </span>
-                  {c.unread && <span className="h-2 w-2 shrink-0 rounded-full bg-cyan-400" />}
+                  {c.unread && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-rose-500" />}
                 </Link>
               ))}
             </div>

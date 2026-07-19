@@ -40,6 +40,24 @@ export async function saveFeedPrefs(prefsJson: string) {
   revalidatePath("/feed");
 }
 
+// Mark all quests as "seen" at their current CP — clears the nav red dots. Called
+// when the gamer opens the quest menu.
+export async function markQuestsSeen() {
+  const me = await requireUser();
+  const db = await getDb();
+  const [[cur], quests] = await Promise.all([
+    db.select({ feedPrefs: schema.users.feedPrefs }).from(schema.users).where(eq(schema.users.id, me.id)).limit(1),
+    db.select({ key: schema.quests.key, id: schema.quests.id }).from(schema.quests),
+  ]);
+  const prog = await db.select({ questId: schema.userQuestProgress.questId, qp: schema.userQuestProgress.qp })
+    .from(schema.userQuestProgress).where(eq(schema.userQuestProgress.userId, me.id));
+  const qpById = new Map(prog.map((p) => [p.questId, p.qp]));
+  const questSeen: Record<string, number> = {};
+  for (const q of quests) questSeen[q.key] = qpById.get(q.id) ?? 0;
+  const prefs: Record<string, unknown> = { ...((cur?.feedPrefs ?? {}) as Record<string, unknown>), questSeen };
+  await db.update(schema.users).set({ feedPrefs: prefs as typeof schema.users.$inferInsert.feedPrefs }).where(eq(schema.users.id, me.id));
+}
+
 // ---------- Follows ----------
 export async function toggleFollow(targetUserId: string, path: string) {
   const me = await requireUser();

@@ -2,6 +2,7 @@ import { getContent } from "@/lib/cms";
 import LoadingPhrases from "@/components/LoadingPhrases";
 import BrandHeader from "@/components/BrandHeader";
 import AdSlot from "@/components/AdSlot";
+import AppStoreBadges from "@/components/AppStoreBadges";
 
 // Global navigation fallback — shown while a new (dynamic) route segment loads.
 // Fully admin-editable (Brand kit): orb color/size/logo, the gamified astronaut,
@@ -59,12 +60,11 @@ export default async function Loading() {
         </div>
       </div>
 
-      {/* Wordmark pinned to the bottom */}
-      {showWordmark && (
-        <div className="absolute bottom-6 left-0 right-0 flex justify-center opacity-90">
-          <BrandHeader placement="footer" />
-        </div>
-      )}
+      {/* Wordmark + app badges pinned to the bottom */}
+      <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-3">
+        <AppStoreBadges size="sm" />
+        {showWordmark && <div className="opacity-90"><BrandHeader placement="footer" /></div>}
+      </div>
     </div>
   );
 }

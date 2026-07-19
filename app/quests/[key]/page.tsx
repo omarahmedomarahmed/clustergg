@@ -36,22 +36,70 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
     <div>
       <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} rocketUrl={rocketUrl} />
 
-      {/* Per-quest CP leaderboard */}
+      {/* Glorified milestone leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">
-        <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: quest.color }}>
-          <Icon name="chart" size={18} /> {quest.name} leaderboard
-        </h2>
-        <div className="glass divide-y divide-white/5">
-          {leaderboard.length === 0 && <div className="p-5 text-sm text-muted">No questers yet — be the first to earn Cluster Points here.</div>}
-          {leaderboard.map((g, i) => (
-            <Link key={g.slug} href={`/u/${g.slug}`} className="flex items-center gap-3 p-3 hover:bg-white/5">
-              <span className="w-6 text-center font-bold text-sm" style={{ color: i < 3 ? quest.color : "#8b8ba7" }}>{i + 1}</span>
-              <Avatar name={g.name} src={g.avatarUrl} size={30} />
-              <span className="flex-1 truncate font-semibold text-sm">{g.name}</span>
-              <span className="text-sm shrink-0" style={{ color: quest.accent2 }}>{(g.qp ?? 0).toLocaleString()} CP</span>
-            </Link>
-          ))}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: quest.color }}>
+            <Icon name="trophy" size={18} /> {quest.name} milestone leaderboard
+          </h2>
+          <span className="text-xs text-muted">{leaderboard.length} quester{leaderboard.length === 1 ? "" : "s"}</span>
         </div>
+
+        {leaderboard.length === 0 ? (
+          <div className="glass p-6 text-center text-sm text-muted">No questers yet — be the first to earn Cluster Points here.</div>
+        ) : (() => {
+          const tierFor = (qp: number) => [...quest.tiers].filter((t) => qp >= t.thresholdQp).sort((a, b) => b.thresholdQp - a.thresholdQp)[0] ?? null;
+          const medal = ["#fbbf24", "#cbd5e1", "#b45309"];
+          const podium = leaderboard.slice(0, 3);
+          const order = podium.length === 3 ? [1, 0, 2] : podium.map((_, i) => i);
+          return (
+            <>
+              {/* Podium — who's reached the furthest milestones */}
+              <div className={`grid gap-3 mb-4 ${podium.length >= 3 ? "grid-cols-3" : podium.length === 2 ? "grid-cols-2" : "grid-cols-1"}`}>
+                {order.map((pos) => {
+                  const g = podium[pos]; if (!g) return null;
+                  const t = tierFor(g.qp ?? 0);
+                  const raised = pos === 0;
+                  return (
+                    <Link key={g.slug} href={`/u/${g.slug}`}
+                      className={`glass relative flex flex-col items-center text-center p-4 hover:ring-1 hover:ring-cyan-400/40 transition ${raised ? "sm:-mt-3" : "sm:mt-2"}`}
+                      style={{ borderTop: `3px solid ${medal[pos]}` }}>
+                      <span className="absolute top-2 left-2 text-xs font-black" style={{ color: medal[pos] }}>#{pos + 1}</span>
+                      <div className="relative">
+                        <Avatar name={g.name} src={g.avatarUrl} size={raised ? 64 : 52} />
+                        {t?.iconUrl && /* eslint-disable-next-line @next/next/no-img-element */ <img src={t.iconUrl} alt="" className="absolute -bottom-1 -right-1 h-7 w-7 object-contain drop-shadow" />}
+                      </div>
+                      <div className="mt-2 font-bold text-sm truncate max-w-full">{g.name}</div>
+                      {t && <div className="text-[11px] font-semibold" style={{ color: t.color || quest.color }}>{t.name}</div>}
+                      <div className="mt-0.5 inline-flex items-center gap-1 text-sm font-bold" style={{ color: quest.accent2 }}>{(g.qp ?? 0).toLocaleString()} CP</div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* The rest */}
+              {leaderboard.length > 3 && (
+                <div className="glass divide-y divide-white/5">
+                  {leaderboard.slice(3).map((g, i) => {
+                    const t = tierFor(g.qp ?? 0);
+                    const mine = user?.slug === g.slug;
+                    return (
+                      <Link key={g.slug} href={`/u/${g.slug}`} className={`flex items-center gap-3 p-3 ${mine ? "bg-cyan-500/[0.08]" : "hover:bg-white/5"}`}>
+                        <span className="w-6 text-center font-bold text-sm text-muted">{i + 4}</span>
+                        <Avatar name={g.name} src={g.avatarUrl} size={34} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold text-sm">{g.name}{mine && <span className="text-cyan-300"> · you</span>}</span>
+                          {t && <span className="block text-[11px]" style={{ color: t.color || quest.color }}>Reached {t.name}</span>}
+                        </span>
+                        <span className="text-sm shrink-0 font-bold" style={{ color: quest.accent2 }}>{(g.qp ?? 0).toLocaleString()} CP</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
 
         {/* This quest's CP history */}
         {questLedger.length > 0 && (

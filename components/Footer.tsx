@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getContent } from "@/lib/cms";
 import BrandHeader from "@/components/BrandHeader";
+import AppStoreBadges from "@/components/AppStoreBadges";
 
 export default async function Footer() {
   const c = await getContent(["footer.tagline", "brand.footer.bg"]);
@@ -12,6 +13,7 @@ export default async function Footer() {
         <div>
           <div className="mb-3"><BrandHeader placement="footer" /></div>
           <p className="text-muted leading-relaxed">{c["footer.tagline"]}</p>
+          <div className="mt-4"><AppStoreBadges className="items-start" /></div>
         </div>
         <div>
           <div className="font-semibold mb-3 text-ink">Platform</div>

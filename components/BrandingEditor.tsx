@@ -34,6 +34,7 @@ export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
   defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultOrbColor, defaultQuestRocket,
   defaultLoadingInterval = 3, defaultLoadingAstronaut = "", defaultLoadingBg = "", defaultLoadingWordmark = true, defaultLoadingOrbSize = 80,
+  defaultOrbSize = 56,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -56,11 +57,13 @@ export default function BrandingEditor({
   defaultLoadingBg?: string;
   defaultLoadingWordmark?: boolean;
   defaultLoadingOrbSize?: number;
+  defaultOrbSize?: number;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [cpIcon, setCpIcon] = useState(defaultCpIcon);
   const [orbIcon, setOrbIcon] = useState(defaultOrbIcon);
   const [orbColor, setOrbColor] = useState(defaultOrbColor || "#8b5cf6");
+  const [orbSize, setOrbSize] = useState(defaultOrbSize);
   const [questRocket, setQuestRocket] = useState(defaultQuestRocket);
   const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
   const [navBg, setNavBg] = useState(defaultNavBg);
@@ -123,6 +126,10 @@ export default function BrandingEditor({
             <input type="color" name="orbColor" value={orbColor} onChange={(e) => setOrbColor(e.target.value)} className="h-9 w-12 cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
           </label>
         </div>
+        <label className="mt-3 block text-xs text-muted">Orb size <span className="text-cyan-300">{orbSize}px</span>
+          <input type="range" min={44} max={120} step={2} value={orbSize} onChange={(e) => setOrbSize(Number(e.target.value))} className="w-full accent-violet-500" />
+        </label>
+        <input type="hidden" name="orbSize" value={orbSize} />
       </div>
 
       {/* Quest-map "you are here" marker */}

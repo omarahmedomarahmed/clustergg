@@ -306,6 +306,8 @@ export const brands = pgTable("brands", {
   accessKey: text("access_key"),        // key that unlocks the brand portal
   logoUrl: text("logo_url"),
   coverUrl: text("cover_url"),          // brand portal cover art
+  portalBgUrl: text("portal_bg_url"),   // full-page background art behind the portal
+  chartPrefs: jsonb("chart_prefs").$type<unknown>(), // brand/admin chart layout config
   about: text("about"),                 // shown on the portal (creative brief etc.)
   industry: text("industry").notNull().default("other"),
   contactEmail: text("contact_email"),

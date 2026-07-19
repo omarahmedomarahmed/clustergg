@@ -67,6 +67,7 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.loading.orbSize", String(Math.max(72, Math.min(200, Number.isFinite(orbSize) && orbSize > 0 ? orbSize : 80))));
   if (formData.has("orbIcon")) await setContent("brand.orb.icon", String(formData.get("orbIcon") ?? "").trim());
   if (formData.has("orbColor")) await setContent("brand.orb.color", String(formData.get("orbColor") ?? "#8b5cf6").trim() || "#8b5cf6");
+  if (formData.has("orbSize")) { const os = Number(formData.get("orbSize")); await setContent("brand.orb.size", String(Math.max(44, Math.min(120, Number.isFinite(os) && os > 0 ? os : 56)))); }
   if (formData.has("questRocket")) await setContent("brand.quest.rocket", String(formData.get("questRocket") ?? "").trim());
   await setContent("brand.nav.bg", String(formData.get("navBg") ?? "").trim());
   await setContent("brand.footer.bg", String(formData.get("footerBg") ?? "").trim());
@@ -446,6 +447,7 @@ export async function saveBrand(formData: FormData) {
     about: String(formData.get("about") ?? "").trim() || null,
     logoUrl: String(formData.get("logoUrl") ?? "").trim() || null,
     coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
+    portalBgUrl: String(formData.get("portalBgUrl") ?? "").trim() || null,
     industry: String(formData.get("industry") ?? "other"),
     contactEmail: String(formData.get("contactEmail") ?? "").trim() || null,
     status: String(formData.get("status") ?? "active"),
