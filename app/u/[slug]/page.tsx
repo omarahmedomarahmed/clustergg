@@ -150,6 +150,7 @@ export default async function ProfilePage({ params }: Props) {
     const st = standingsByAccount.get(a.id) ?? [];
     return {
       id: a.id,
+      provider: a.provider,
       tag: a.inGameName,
       providerName: p?.name ?? a.provider,
       gameName: p?.game ?? "",

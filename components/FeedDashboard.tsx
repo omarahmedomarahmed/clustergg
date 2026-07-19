@@ -6,19 +6,24 @@ import Icon from "@/components/Icon";
 import CpIcon from "@/components/CpIcon";
 import GameLogo from "@/components/GameLogo";
 import { saveFeedPrefs } from "@/app/actions/social";
+import LolCard from "@/components/LolCard";
 
 export type DashQuest = { key: string; name: string; color: string; logoUrl: string | null; qp: number; totalCp: number; pct: number; tierName: string };
 export type DashLeaderboard = { game: string; metricKey: string; title: string; slug: string | null; logoUrl: string | null; coverUrl: string | null };
 export type DashStat = { accountId: string; game: string; logoUrl: string | null; metricKey: string; metricLabel: string; value: number; inGameName: string };
-export type Widget = { id: string; type: "quest" | "cp" | "stat" | "leaderboard"; w: number; config: Record<string, string> };
+export type DashLolAccount = { accountId: string; tag: string; region: string | null };
+export type Widget = { id: string; type: "quest" | "cp" | "stat" | "leaderboard" | "lolaccount"; w: number; config: Record<string, string> };
 
-type Sources = { quests: DashQuest[]; leaderboards: DashLeaderboard[]; stats: DashStat[]; cpTotal: number; cpByQuest: Record<string, number> };
+type Sources = { quests: DashQuest[]; leaderboards: DashLeaderboard[]; stats: DashStat[]; cpTotal: number; cpByQuest: Record<string, number>; lolAccounts: DashLolAccount[] };
+
+const LOL_COLORS = { accent: "#22d3ee", accent2: "#a78bfa", text: "#e8eaf6", muted: "#9aa0c3", panel: "#0b0d26" };
 
 const TYPES: { type: Widget["type"]; label: string; icon: string }[] = [
   { type: "quest", label: "Quest tracker", icon: "trophy" },
   { type: "cp", label: "CP total / quest", icon: "spark" },
   { type: "stat", label: "Game stat", icon: "gamepad" },
   { type: "leaderboard", label: "Leaderboard", icon: "chart" },
+  { type: "lolaccount", label: "League account", icon: "gamepad" },
 ];
 
 const rid = () => Math.random().toString(36).slice(2, 10);
@@ -33,6 +38,7 @@ export default function FeedDashboard({ sources, initial }: { sources: Sources; 
     if (type === "quest") return { questKey: sources.quests[0]?.key ?? "" };
     if (type === "cp") return { scope: "total" };
     if (type === "stat") return sources.stats[0] ? { accountId: sources.stats[0].accountId, metricKey: sources.stats[0].metricKey } : {};
+    if (type === "lolaccount") return { accountId: sources.lolAccounts[0]?.accountId ?? "" };
     return sources.leaderboards[0] ? { game: sources.leaderboards[0].game, metricKey: sources.leaderboards[0].metricKey } : {};
   };
   const addWidget = (type: Widget["type"]) => setWidgets((w) => [...w, { id: rid(), type, w: 1, config: defaultConfig(type) }]);
@@ -70,7 +76,7 @@ export default function FeedDashboard({ sources, initial }: { sources: Sources; 
         <div className="glass p-3 mb-3">
           <div className="text-[11px] uppercase tracking-widest text-muted mb-2">Drag or tap to add a widget</div>
           <div className="flex flex-wrap gap-2">
-            {TYPES.map((t) => (
+            {TYPES.filter((t) => t.type !== "lolaccount" || sources.lolAccounts.length > 0).map((t) => (
               <button key={t.type} draggable onDragStart={(e) => e.dataTransfer.setData("wtype", t.type)}
                 onClick={() => addWidget(t.type)}
                 className="inline-flex items-center gap-1.5 rounded-full border border-white/12 px-3 py-1.5 text-xs font-semibold hover:border-cyan-400/50 cursor-grab active:cursor-grabbing">
@@ -182,6 +188,21 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
         ),
       };
     }
+    if (widget.type === "lolaccount") {
+      const la = sources.lolAccounts.find((x) => x.accountId === c.accountId) ?? sources.lolAccounts[0];
+      if (!la) return { compact: <Empty label="No League account linked" />, expanded: null, fullHref: "/profile" };
+      const numbers = sources.stats.filter((s) => s.accountId === la.accountId).map((s) => ({ label: s.metricLabel, value: s.value.toLocaleString() }));
+      return {
+        fullHref: "/profile",
+        compact: (
+          <div className="flex items-center gap-3">
+            <span className="grid place-items-center h-9 w-9 rounded-lg bg-[#c89b3c]/20 text-[#c89b3c] font-bold">⚡</span>
+            <div className="min-w-0"><div className="text-sm font-bold truncate">{la.tag}</div><div className="text-[10px] text-muted">League of Legends · tap for full snapshot</div></div>
+          </div>
+        ),
+        expanded: <LolCard accountId={la.accountId} colors={LOL_COLORS} statNumbers={numbers} />,
+      };
+    }
     // leaderboard
     const lb = sources.leaderboards.find((x) => x.game === c.game && x.metricKey === c.metricKey) ?? sources.leaderboards.find((x) => x.game === c.game) ?? sources.leaderboards[0];
     if (!lb) return { compact: <Empty label="No leaderboards" />, expanded: null, fullHref: "/leaderboards" };
@@ -241,6 +262,11 @@ function WidgetConfig({ widget, sources, onCfg }: { widget: Widget; sources: Sou
   if (widget.type === "stat") return (
     <select value={`${c.accountId}::${c.metricKey}`} onChange={(e) => { const [accountId, metricKey] = e.target.value.split("::"); onCfg({ accountId, metricKey }); }} className={sel}>
       {sources.stats.map((s) => <option key={`${s.accountId}::${s.metricKey}`} value={`${s.accountId}::${s.metricKey}`}>{s.game} · {s.metricLabel}</option>)}
+    </select>
+  );
+  if (widget.type === "lolaccount") return (
+    <select value={c.accountId ?? ""} onChange={(e) => onCfg({ accountId: e.target.value })} className={sel}>
+      {sources.lolAccounts.map((l) => <option key={l.accountId} value={l.accountId}>{l.tag}</option>)}
     </select>
   );
   return (

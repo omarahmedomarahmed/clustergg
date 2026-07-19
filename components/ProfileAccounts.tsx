@@ -1,14 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
 import BrandGlyph from "@/components/BrandGlyph";
 import LinkAccountForm, { type ProviderInfo } from "@/components/LinkAccountForm";
+import LolCard, { type LolSnapshot } from "@/components/LolCard";
 
 export type AccountCard = {
   id: string;
+  provider: string;
   tag: string;
   providerName: string;
   gameName: string;
@@ -26,7 +28,9 @@ export type ThemeColors = {
 
 // Connected-game accounts on a gamer's profile: a big row of game logos, then
 // collapsed cards (logo + tag) that expand to full stats over the game's cover
-// art. On your own profile, "Connect a game" opens the picker inline.
+// art. League accounts get a rich, interactive snapshot (live game, recent
+// matches, top champions) and use the gamer's real LoL profile icon as the card
+// image. On your own profile, "Connect a game" opens the picker inline.
 export default function ProfileAccounts({
   accounts, colors, isOwner, providers, gameLogos,
 }: {
@@ -94,64 +98,90 @@ export default function ProfileAccounts({
 
           {/* Cards */}
           <div className="space-y-3">
-            {accounts.map((a) => {
-              const active = open === a.id;
-              return (
-                <div key={a.id} className="rounded-2xl overflow-hidden relative" style={{ border: `1px solid ${mix(20)}` }}>
-                  {/* Connected-account cards always use the game's own cover art. */}
-                  {a.coverUrl ? (
-                    <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(3,4,15,${active ? "0.82" : "0.86"}), rgba(3,4,15,${active ? "0.9" : "0.92"})), url(${a.coverUrl})` }} />
-                  ) : (
-                    <div className="absolute inset-0" style={{ background: mix(6) }} />
-                  )}
-                  <button onClick={() => setOpen(active ? null : a.id)} className="relative w-full flex items-center gap-3 p-3.5 text-left">
-                    {a.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={a.avatar} alt="" className="h-11 w-11 rounded-xl object-cover border" style={{ borderColor: mix(40) }} />
-                    ) : (
-                      <GameLogo logoUrl={a.logoUrl} name={a.gameName || a.providerName} size={44} rounded="rounded-xl" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold truncate flex items-center gap-1.5" style={{ color: c.text }}>
-                        {a.tag} {a.verified && <span className="text-[11px]" style={{ color: c.accent2 }}>✓</span>}
-                      </div>
-                      <div className="text-xs" style={{ color: c.muted }}>{a.providerName}</div>
-                    </div>
-                    <Icon name={active ? "chevronDown" : "chevronRight"} size={16} style={{ color: c.muted }} />
-                  </button>
-
-                  {active && (
-                    <div className="relative px-3.5 pb-3.5">
-                      {a.stats.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                          {a.stats.map((s, i) => (
-                            <div key={i} className="rounded-lg px-2.5 py-1.5" style={{ background: "rgba(255,255,255,0.06)" }}>
-                              <div className="text-[10px] uppercase tracking-wider truncate" style={{ color: c.muted }}>{s.label}</div>
-                              <div className="font-bold" style={{ color: c.accent2 }}>{s.value}</div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-xs" style={{ color: c.muted }}>Stats sync shortly after connecting.</div>
-                      )}
-                      {a.standings.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {a.standings.map((x) => (
-                            <Link key={x.metricKey} href={`/leaderboards/${encodeURIComponent(x.game)}?stat=${x.metricKey}`}
-                              className="text-[11px] rounded-full px-2.5 py-1" style={{ border: `1px solid ${mix(35)}`, color: c.accent }}>
-                              #{x.rank} of {x.total} · {x.label}
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {accounts.map((a) => (
+              <AccountRow key={a.id} account={a} colors={c} active={open === a.id} onToggle={() => setOpen(open === a.id ? null : a.id)} />
+            ))}
           </div>
         </>
       )}
     </section>
+  );
+}
+
+function AccountRow({ account: a, colors: c, active, onToggle }: { account: AccountCard; colors: ThemeColors; active: boolean; onToggle: () => void }) {
+  const mix = (pct: number) => `color-mix(in srgb, ${c.accent} ${pct}%, transparent)`;
+  const isLol = a.provider === "riot-lol";
+  const [snap, setSnap] = useState<LolSnapshot | null>(null);
+
+  // For League accounts, pull the snapshot once so the collapsed header can show
+  // the real profile icon + a "live now" pulse, and the expanded card can reuse it.
+  useEffect(() => {
+    if (!isLol) return;
+    let alive = true;
+    fetch(`/api/lol/snapshot?account=${encodeURIComponent(a.id)}`, { cache: "no-store" })
+      .then((r) => r.json()).then((s: LolSnapshot) => { if (alive) setSnap(s); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isLol, a.id]);
+
+  const headerImg = (isLol && snap?.profileIconUrl) || a.avatar;
+  const liveNow = isLol && snap?.live?.inGame;
+
+  return (
+    <div className="rounded-2xl overflow-hidden relative" style={{ border: `1px solid ${liveNow ? "rgba(244,63,94,0.5)" : mix(20)}` }}>
+      {a.coverUrl ? (
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(3,4,15,${active ? "0.82" : "0.86"}), rgba(3,4,15,${active ? "0.9" : "0.92"})), url(${a.coverUrl})` }} />
+      ) : (
+        <div className="absolute inset-0" style={{ background: mix(6) }} />
+      )}
+      <button onClick={onToggle} className="relative w-full flex items-center gap-3 p-3.5 text-left">
+        {headerImg ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={headerImg} alt="" className="h-11 w-11 rounded-xl object-cover border" style={{ borderColor: mix(40) }} />
+        ) : (
+          <GameLogo logoUrl={a.logoUrl} name={a.gameName || a.providerName} size={44} rounded="rounded-xl" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="font-bold truncate flex items-center gap-1.5" style={{ color: c.text }}>
+            {a.tag} {a.verified && <span className="text-[11px]" style={{ color: c.accent2 }}>✓</span>}
+            {liveNow && <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 border border-rose-400/50 px-1.5 py-0.5 text-[9px] font-bold text-rose-200"><span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" /> LIVE</span>}
+          </div>
+          <div className="text-xs flex items-center gap-2" style={{ color: c.muted }}>
+            {a.providerName}
+            {isLol && snap?.summonerLevel != null && <span>· Lv {snap.summonerLevel}</span>}
+          </div>
+        </div>
+        <Icon name={active ? "chevronDown" : "chevronRight"} size={16} style={{ color: c.muted }} />
+      </button>
+
+      {active && (
+        <div className="relative px-3.5 pb-3.5">
+          {isLol ? (
+            <LolCard accountId={a.id} colors={{ accent: c.accent, accent2: c.accent2, text: c.text, muted: c.muted, panel: c.panel }} statNumbers={a.stats} snapshot={snap} />
+          ) : a.stats.length > 0 ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {a.stats.map((s, i) => (
+                <div key={i} className="rounded-lg px-2.5 py-1.5" style={{ background: "rgba(255,255,255,0.06)" }}>
+                  <div className="text-[10px] uppercase tracking-wider truncate" style={{ color: c.muted }}>{s.label}</div>
+                  <div className="font-bold" style={{ color: c.accent2 }}>{s.value}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-xs" style={{ color: c.muted }}>Stats sync shortly after connecting.</div>
+          )}
+          {a.standings.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {a.standings.map((x) => (
+                <Link key={x.metricKey} href={`/leaderboards/${encodeURIComponent(x.game)}?stat=${x.metricKey}`}
+                  className="text-[11px] rounded-full px-2.5 py-1" style={{ border: `1px solid ${mix(35)}`, color: c.accent }}>
+                  #{x.rank} of {x.total} · {x.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

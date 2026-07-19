@@ -131,6 +131,7 @@ export default async function FeedPage() {
     const g = gameName ? gameByName.get(gameName) : undefined;
     return { accountId: s.linkedAccountId, game: gameName ?? s.game, logoUrl: slimImg(g?.logoUrl ?? null, 300000), metricKey: s.metricKey, metricLabel: s.metricKey.replace(/_/g, " "), value: s.metricValue, inGameName: a?.inGameName ?? "" };
   });
+  const lolAccounts = accounts.filter((a) => a.provider === "riot-lol").map((a) => ({ accountId: a.id, tag: a.inGameName, region: a.region ?? null }));
   const dashboardWidgets = (Array.isArray(prefs.dashboard) ? prefs.dashboard : []) as Widget[];
   const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
 
@@ -152,7 +153,7 @@ export default async function FeedPage() {
 
       {/* Drag-and-drop tracker dashboard */}
       <FeedDashboard
-        sources={{ quests: dashQuests, leaderboards: dashLeaderboards, stats: dashStats, cpTotal: totalCp, cpByQuest }}
+        sources={{ quests: dashQuests, leaderboards: dashLeaderboards, stats: dashStats, cpTotal: totalCp, cpByQuest, lolAccounts }}
         initial={dashboardWidgets}
       />
 
