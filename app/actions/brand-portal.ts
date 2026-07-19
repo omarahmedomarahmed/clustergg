@@ -64,6 +64,16 @@ export async function portalSaveAppearance(brandId: string, key: string, formDat
   return { ok: true };
 }
 
+// Brand saves its customized chart dashboard layout (chart_prefs jsonb).
+export async function portalSaveCharts(brandId: string, key: string, json: string) {
+  const { db, brand } = await requireBrand(brandId, key);
+  let parsed: unknown;
+  try { parsed = JSON.parse(json); } catch { return { error: "Could not save charts." }; }
+  await db.update(schema.brands).set({ chartPrefs: parsed as typeof schema.brands.$inferInsert.chartPrefs }).where(eq(schema.brands.id, brandId));
+  revalidatePath(`/brands/${brand.slug}`);
+  return { ok: true };
+}
+
 // Brand posts a message into the shared inbox.
 export async function portalSendMessage(brandId: string, key: string, formData: FormData) {
   const { db, brand } = await requireBrand(brandId, key);

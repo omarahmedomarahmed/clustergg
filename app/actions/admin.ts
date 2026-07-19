@@ -468,6 +468,21 @@ export async function saveBrand(formData: FormData) {
   revalidatePath("/admin/ads");
 }
 
+// Admin saves the chart dashboard layout for a brand's portal (same chart_prefs
+// the brand edits themselves — admin can seed or override it).
+export async function adminSaveBrandCharts(brandId: string, json: string) {
+  const admin = await requireArea("ads");
+  const db = await getDb();
+  let parsed: unknown;
+  try { parsed = JSON.parse(json); } catch { return { error: "Could not save charts." }; }
+  await db.update(schema.brands).set({ chartPrefs: parsed as typeof schema.brands.$inferInsert.chartPrefs }).where(eq(schema.brands.id, brandId));
+  await audit(admin.id, "brand.charts", "brand", brandId);
+  const [b] = await db.select({ slug: schema.brands.slug }).from(schema.brands).where(eq(schema.brands.id, brandId)).limit(1);
+  if (b) revalidatePath(`/brands/${b.slug}`);
+  revalidatePath(`/admin/brands/${brandId}`);
+  return { ok: true };
+}
+
 // Rotate a brand's portal access key (invalidates the old shared link).
 export async function regenerateBrandKey(brandId: string) {
   const admin = await requireArea("ads");

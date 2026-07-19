@@ -6,6 +6,7 @@ import BrandMessageForm from "@/components/BrandMessageForm";
 import BrandAnalyticsPanel from "@/components/BrandAnalyticsPanel";
 import BrandAppearanceEditor from "@/components/BrandAppearanceEditor";
 import BrandCreativesTab from "@/components/BrandCreativesTab";
+import BrandChartBuilder from "@/components/BrandChartBuilder";
 import Tabs from "@/components/Tabs";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import Icon from "@/components/Icon";
@@ -160,6 +161,10 @@ export default async function BrandPortalPage({
             {/* Interactive chart (all campaigns) + placement table — refreshes in place */}
             <BrandAnalyticsPanel brandId={brand.id} keyStr={key} initial={brandAnalytics}
               title="Impressions & clicks — all campaigns" filename={`${brand.slug}-analytics`} />
+
+            {/* Customizable chart dashboard — brands build/resize/save their own charts */}
+            <BrandChartBuilder mode="brand" brandId={brand.id} keyStr={key} initial={brand.chartPrefs}
+              data={{ impressions: brandAnalytics.impressions, clicks: brandAnalytics.clicks, ctr: brandAnalytics.ctr, active: data.totals.active, byDay: brandAnalytics.byDay, byPlacement: brandAnalytics.byPlacement }} />
 
             {/* Marketing intelligence */}
             <section>
