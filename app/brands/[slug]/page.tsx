@@ -2,10 +2,11 @@ import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness, getBrandInbox } from "@/lib/brands";
-import BrandCreativeUploader from "@/components/BrandCreativeUploader";
 import BrandMessageForm from "@/components/BrandMessageForm";
 import BrandAnalyticsPanel from "@/components/BrandAnalyticsPanel";
 import BrandAppearanceEditor from "@/components/BrandAppearanceEditor";
+import BrandCreativesTab from "@/components/BrandCreativesTab";
+import Tabs from "@/components/Tabs";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import Icon from "@/components/Icon";
 
@@ -94,25 +95,26 @@ export default async function BrandPortalPage({
             <Stat label="Placements ready" value={`${readiness.filled}/${readiness.total}`} accent={readiness.ready ? "#34d399" : "#fbbf24"} />
           </div>
 
-          {/* Interactive chart + placement table (refreshes in place) at the top */}
-          <BrandAnalyticsPanel brandId={brand.id} keyStr={key} campaignId={campaign.id} initial={analytics}
-            title="Performance over time" filename={`campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}`} />
-
-          {/* Creative slots */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="grid" size={18} className="text-violet-300" /> Creatives by placement</h2>
-              <span className={`text-xs font-semibold ${readiness.ready ? "text-emerald-300" : "text-amber-300"}`}>{readiness.filled}/{readiness.total} ready{readiness.ready ? " — campaign can go live" : ""}</span>
-            </div>
-            <p className="text-xs text-muted mb-4">Your campaign shows in every placement. Each shows for ~5 seconds every minute alongside other brands. Upload one creative per placement below.</p>
-            <div className="grid md:grid-cols-2 gap-3">
-              {readiness.slots.map((s) => (
-                <BrandCreativeUploader key={s.placementId} brandId={brand.id} keyStr={key}
-                  slot={{ placementId: s.placementId, key: s.key, pageScope: s.pageScope, width: s.width, height: s.height, creativeType: s.creativeType, fileUrl: s.fileUrl, clickUrl: s.clickUrl }} />
-              ))}
-            </div>
-          </section>
-
+          {/* Analytics + Creatives split into tabs */}
+          <Tabs tabs={[
+            {
+              key: "analytics", label: "Analytics", icon: "spark",
+              node: (
+                <BrandAnalyticsPanel brandId={brand.id} keyStr={key} campaignId={campaign.id} initial={analytics}
+                  title="Performance over time" filename={`campaign-${campaign.name.replace(/\s+/g, "-").toLowerCase()}`} />
+              ),
+            },
+            {
+              key: "creatives", label: `Creatives (${readiness.filled}/${readiness.total})`, icon: "grid",
+              node: (
+                <div>
+                  <p className="text-xs text-muted mb-4">Your campaign shows in every placement — ~5 seconds every minute alongside other brands. Each row below is one placement; click it to view or upload a creative.</p>
+                  <BrandCreativesTab brandId={brand.id} keyStr={key}
+                    slots={readiness.slots.map((s) => ({ placementId: s.placementId, key: s.key, pageScope: s.pageScope, width: s.width, height: s.height, creativeType: s.creativeType, fileUrl: s.fileUrl, clickUrl: s.clickUrl }))} />
+                </div>
+              ),
+            },
+          ]} />
         </div>
       </div>
     );
