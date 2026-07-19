@@ -2,8 +2,9 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { saveCampaign, saveBrand, adminSendBrandMessage } from "@/app/actions/admin";
-import { getBrandInbox } from "@/lib/brands";
+import { getBrandInbox, getBrandAnalytics } from "@/lib/brands";
 import AdminBrandKey from "@/components/AdminBrandKey";
+import BrandChartBuilder from "@/components/BrandChartBuilder";
 import ImageUpload from "@/components/ImageUpload";
 import { timeAgo } from "@/lib/utils";
 
@@ -15,10 +16,12 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
   const [brand] = await db.select().from(schema.brands).where(eq(schema.brands.id, id)).limit(1);
   if (!brand) notFound();
 
-  const [campaigns, inbox] = await Promise.all([
+  const [campaigns, inbox, analytics] = await Promise.all([
     db.select().from(schema.adCampaigns).where(eq(schema.adCampaigns.brandId, id)).orderBy(desc(schema.adCampaigns.createdAt)),
     getBrandInbox(db, id),
+    getBrandAnalytics(db, id, { days: 90 }),
   ]);
+  const activeCampaigns = campaigns.filter((c) => c.status === "active").length;
   const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
   return (
@@ -49,6 +52,17 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
           <textarea name="about" defaultValue={brand.about ?? ""} placeholder="About / creative brief shown on the portal" rows={2} className="input-cosmic sm:col-span-2" />
           <div><button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Save branding</button></div>
         </form>
+      </div>
+
+      {/* Admin control over the brand's portal charts */}
+      <div className="glass p-6">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-bold">Portal charts</h2>
+          <a href={`/brands/${brand.slug}?key=${encodeURIComponent(brand.accessKey ?? "")}`} target="_blank" className="text-xs text-cyan-300 hover:underline">Open live portal →</a>
+        </div>
+        <p className="text-xs text-muted mb-4">Seed or override the chart dashboard the brand sees on their portal. They can keep, edit, resize, add or reset these charts themselves.</p>
+        <BrandChartBuilder mode="admin" brandId={brand.id} initial={brand.chartPrefs}
+          data={{ impressions: analytics.impressions, clicks: analytics.clicks, ctr: analytics.ctr, active: activeCampaigns, byDay: analytics.byDay, byPlacement: analytics.byPlacement }} />
       </div>
 
       <div className="glass p-6">

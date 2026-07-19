@@ -10,7 +10,7 @@ import { resolveGame } from "@/lib/game-logos";
 import { syncUserAccountsIfStale } from "@/lib/sync";
 import { getContent } from "@/lib/cms";
 import { slimImg } from "@/lib/img";
-import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip } from "@/lib/theme";
+import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip, sectionArtStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
@@ -362,7 +362,16 @@ export default async function ProfilePage({ params }: Props) {
         </div>
 
         <div className="mt-8 space-y-10 pb-16">
-          {theme.order.map((key) => sectionNode(key))}
+          {theme.order.map((key) => {
+            const node = sectionNode(key);
+            if (!node) return null;
+            const art = theme.sectionArt?.[key];
+            // A gamer can set a background image per section; it renders as an
+            // art-backed panel (with a readability overlay) behind the content.
+            return art
+              ? <div key={key} className="rounded-2xl p-4 sm:p-6" style={{ ...sectionArtStyle(theme, key), border: `1px solid color-mix(in srgb, ${theme.accent} 22%, transparent)` }}>{node}</div>
+              : node;
+          })}
         </div>
       </div>
 
