@@ -7,7 +7,7 @@ import ImageUpload from "@/components/ImageUpload";
 import { saveProfileTheme } from "@/app/actions/connections";
 import {
   ProfileTheme, resolveTheme, themeToVars, bgStyle, coverStyle, cursorValue,
-  TEMPLATES, FONTS, CURSOR_KEYS, SECTIONS, BG_PRESETS, AVATAR_SHAPES, avatarClip,
+  TEMPLATES, FONTS, CURSOR_KEYS, SECTIONS, BG_PRESETS, AVATAR_SHAPES, avatarClip, sectionArtStyle,
 } from "@/lib/theme";
 
 export type PreviewData = {
@@ -67,6 +67,7 @@ export default function ProfileBuilder({
   const [avatarUrl, setAvatarUrl] = useState(initialAvatar);
   const [bannerUrl, setBannerUrl] = useState(initialBanner);
   const [tab, setTab] = useState<"identity" | "theme" | "style">("identity");
+  const [artOpen, setArtOpen] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -77,6 +78,10 @@ export default function ProfileBuilder({
     if (tmpl) { setTheme((t) => ({ ...resolveTheme({ ...t, ...tmpl.theme, template: key }) })); setSaved(false); }
   };
   const toggleSection = (key: string) => { setTheme((t) => ({ ...t, sections: { ...t.sections, [key]: !t.sections[key] } })); setSaved(false); };
+  const setSectionArt = (key: string, url: string) => {
+    setTheme((t) => { const art = { ...t.sectionArt }; if (url) art[key] = url; else delete art[key]; return { ...t, sectionArt: art }; });
+    setSaved(false);
+  };
   const moveSection = (key: string, dir: -1 | 1) => {
     setTheme((t) => {
       const arr = [...t.order];
@@ -272,18 +277,31 @@ export default function ProfileBuilder({
             <Slider label="Corner radius" value={theme.radius} min={0} max={28} onChange={(v) => set("radius", v)} suffix="px" />
 
             <div className="border-t border-violet-400/15 pt-4">
-              <label className="text-xs text-muted block mb-2">Sections — show, hide &amp; reorder</label>
+              <label className="text-xs text-muted block mb-2">Sections — show, hide, reorder &amp; set card art</label>
               <div className="space-y-1.5">
                 {theme.order.map((key, i) => {
                   const sec = SECTIONS.find((s) => s.key === key);
                   if (!sec) return null;
                   const on = theme.sections[key];
+                  const hasArt = !!theme.sectionArt[key];
+                  const open = artOpen === key;
                   return (
-                    <div key={key} className="flex items-center gap-2 rounded-lg border border-violet-400/15 px-2.5 py-1.5">
-                      <button onClick={() => toggleSection(key)} className={`text-xs ${on ? "text-emerald-300" : "text-muted"}`}><Icon name={on ? "eye" : "x"} size={14} /></button>
-                      <span className={`text-xs flex-1 ${on ? "" : "text-muted line-through"}`}>{sec.label}</span>
-                      <button onClick={() => moveSection(key, -1)} disabled={i === 0} className="text-muted hover:text-ink disabled:opacity-30"><Icon name="arrowUp" size={13} /></button>
-                      <button onClick={() => moveSection(key, 1)} disabled={i === theme.order.length - 1} className="text-muted hover:text-ink disabled:opacity-30"><Icon name="arrowDown" size={13} /></button>
+                    <div key={key} className="rounded-lg border border-violet-400/15">
+                      <div className="flex items-center gap-2 px-2.5 py-1.5">
+                        <button onClick={() => toggleSection(key)} className={`text-xs ${on ? "text-emerald-300" : "text-muted"}`}><Icon name={on ? "eye" : "x"} size={14} /></button>
+                        <span className={`text-xs flex-1 ${on ? "" : "text-muted line-through"}`}>{sec.label}</span>
+                        <button onClick={() => setArtOpen(open ? null : key)} title="Card background art"
+                          className={`text-xs ${hasArt ? "text-cyan-300" : "text-muted hover:text-ink"}`}><Icon name="spark" size={13} /></button>
+                        <button onClick={() => moveSection(key, -1)} disabled={i === 0} className="text-muted hover:text-ink disabled:opacity-30"><Icon name="arrowUp" size={13} /></button>
+                        <button onClick={() => moveSection(key, 1)} disabled={i === theme.order.length - 1} className="text-muted hover:text-ink disabled:opacity-30"><Icon name="arrowDown" size={13} /></button>
+                      </div>
+                      {open && (
+                        <div className="px-2.5 pb-2.5 pt-1 border-t border-violet-400/10">
+                          <div className="text-[10px] text-muted mb-1.5">Background art for the “{sec.label}” card</div>
+                          <ImageUpload value={theme.sectionArt[key] ?? ""} onChange={(v) => setSectionArt(key, v)} aspect="16/9" maxDim={1200} quality={0.74} scope="profile" />
+                          {hasArt && <button onClick={() => setSectionArt(key, "")} className="mt-1.5 text-[11px] text-rose-300 hover:underline">Remove art</button>}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -339,9 +357,10 @@ export default function ProfileBuilder({
               <div className="mt-5 space-y-3">
                 {theme.order.filter((k) => theme.sections[k]).map((key) => {
                   const sec = SECTIONS.find((s) => s.key === key)!;
+                  const art = theme.sectionArt[key];
                   return (
-                    <div key={key} className={`p-card p-card-${theme.cardStyle}`}>
-                      <div className="text-sm font-semibold flex items-center gap-2 mb-2" style={{ color: theme.text }}>
+                    <div key={key} className={`p-card p-card-${theme.cardStyle}`} style={art ? sectionArtStyle(theme, key) : undefined}>
+                      <div className="text-sm font-semibold flex items-center gap-2 mb-2" style={{ color: art ? "#fff" : theme.text }}>
                         <span className="h-2 w-2 rounded-full" style={{ background: theme.accent }} /> {sec.label}
                       </div>
                       {renderSection(key)}

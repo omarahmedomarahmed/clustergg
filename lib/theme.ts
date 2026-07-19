@@ -30,6 +30,7 @@ export type ProfileTheme = {
   avatarSize: number;        // avatar diameter px
   sections: Record<string, boolean>;  // visibility
   order: string[];           // section order
+  sectionArt: Record<string, string>; // per-section card background image URL
 };
 
 export type AvatarShape = "circle" | "rounded" | "square" | "heart" | "star" | "lightning" | "hexagon";
@@ -162,6 +163,7 @@ export const DEFAULT_THEME: ProfileTheme = {
   avatarSize: 128,
   sections: Object.fromEntries(SECTIONS.map((s) => [s.key, true])),
   order: SECTIONS.map((s) => s.key),
+  sectionArt: {},
 };
 
 export function resolveTheme(raw: unknown): ProfileTheme {
@@ -176,6 +178,19 @@ export function resolveTheme(raw: unknown): ProfileTheme {
     ...merged,
     sections: { ...DEFAULT_THEME.sections, ...(t.sections ?? {}) },
     order,
+    sectionArt: (t.sectionArt && typeof t.sectionArt === "object" ? t.sectionArt : {}) as Record<string, string>,
+  };
+}
+
+// Per-section card background art (+ dark overlay so text stays readable). Empty
+// when the gamer hasn't set art for that section. Shared by builder + public page.
+export function sectionArtStyle(t: ProfileTheme, key: string): CSSProperties {
+  const url = t.sectionArt?.[key];
+  if (!url) return {};
+  return {
+    backgroundImage: `linear-gradient(rgba(4,5,26,0.60), rgba(4,5,26,0.78)), url("${url}")`,
+    backgroundSize: "cover",
+    backgroundPosition: "center",
   };
 }
 
