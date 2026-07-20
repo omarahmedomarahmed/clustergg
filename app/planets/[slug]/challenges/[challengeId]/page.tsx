@@ -41,7 +41,11 @@ export default async function ChallengePage({
   if (!challenge) notFound();
 
   const viewer = await getCurrentUser();
-  const { tr } = await getT(viewer?.locale);
+  const { tr, te } = await getT(viewer?.locale);
+  // Admin translations for this challenge's text (falls back to the DB value).
+  challenge.title = te("challenge", challenge.id, "title", challenge.title);
+  challenge.description = te("challenge", challenge.id, "description", challenge.description);
+  challenge.prizeDescription = te("challenge", challenge.id, "prizeDescription", challenge.prizeDescription);
   const provider = getProvider(challenge.provider);
   const path = `/planets/${slug}/challenges/${challengeId}`;
   const cms = await getContent(["banner.arena"]);

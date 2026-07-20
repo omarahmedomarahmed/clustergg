@@ -24,6 +24,7 @@ import DiscordTag from "@/components/DiscordTag";
 import QuestCard from "@/components/QuestCard";
 import CpIcon from "@/components/CpIcon";
 import { getUserQuests } from "@/lib/quests";
+import { localizeQuest } from "@/lib/i18n/entities";
 import { startConversation } from "@/app/actions/social";
 import { fmtNum, timeAgo } from "@/lib/utils";
 
@@ -50,7 +51,7 @@ export default async function ProfilePage({ params }: Props) {
   if (!user || user.status === "banned") notFound();
 
   const viewer = await getCurrentUser();
-  const { tr } = await getT(viewer?.locale);
+  const { tr, te } = await getT(viewer?.locale);
   const isOwner = viewer?.id === user.id;
   const adminView = isAdmin(viewer) && !isOwner;
 
@@ -100,7 +101,7 @@ export default async function ProfilePage({ params }: Props) {
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(12),
   ]);
 
-  const profileQuests = await getUserQuests(db, user.id);
+  const profileQuests = (await getUserQuests(db, user.id)).map((q) => localizeQuest(q, te));
   const games = await db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games);
   const gameCover = new Map(games.map((g) => [g.name, g.coverUrl]));
   const accountAvatar = (a: typeof accounts[number]): string | null => {

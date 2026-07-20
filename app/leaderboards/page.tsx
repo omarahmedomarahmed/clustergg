@@ -13,8 +13,10 @@ export const metadata = { title: "Leaderboards" };
 export default async function LeaderboardsPage({ searchParams }: { searchParams: Promise<{ game?: string; metric?: string }> }) {
   const { game, metric } = await searchParams;
   const db = await getDb();
-  const boards = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.isActive, true));
-  const { tr } = await getT();
+  const boardsRaw = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.isActive, true));
+  const { tr, te } = await getT();
+  // Admin-translated board titles (falls back to the DB title per locale).
+  const boards = boardsRaw.map((b) => ({ ...b, title: te("leaderboard", b.id, "title", b.title) }));
 
   if (boards.length === 0) {
     return (

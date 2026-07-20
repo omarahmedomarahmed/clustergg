@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getT } from "@/lib/i18n/t-server";
+import { localizeQuest } from "@/lib/i18n/entities";
 import { getUserQuests, getQuestTops, getCpLedger } from "@/lib/quests";
 import QuestCard from "@/components/QuestCard";
 import CpLedger from "@/components/CpLedger";
@@ -15,13 +16,14 @@ export const metadata = { title: "Quests" };
 export default async function QuestsPage() {
   const user = await getCurrentUser();
   const db = await getDb();
-  const quests = await getUserQuests(db, user?.id ?? null);
+  const questsRaw = await getUserQuests(db, user?.id ?? null);
   const [tops, ledger] = await Promise.all([
-    getQuestTops(db, quests.map((q) => q.id), 8),
+    getQuestTops(db, questsRaw.map((q) => q.id), 8),
     getCpLedger(db, user?.id ?? null, { limit: 200 }),
   ]);
-  const totalCp = quests.reduce((s, q) => s + q.totalCp, 0);
-  const { tr } = await getT(user?.locale);
+  const totalCp = questsRaw.reduce((s, q) => s + q.totalCp, 0);
+  const { tr, te } = await getT(user?.locale);
+  const quests = questsRaw.map((q) => localizeQuest(q, te));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">

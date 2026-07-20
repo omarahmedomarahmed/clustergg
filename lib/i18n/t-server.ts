@@ -1,6 +1,7 @@
 import { getContent } from "@/lib/cms";
 import { getLocale } from "./server";
 import { t as tKey, tr as trText, type StringKey } from "./strings";
+import { trEntity } from "./entities";
 import type { Locale } from "./locale";
 
 // Admin overrides for UI strings live in two CMS keys — ui.overrides.en and
@@ -32,6 +33,7 @@ export async function getUiOverrides(locale: Locale): Promise<Record<string, str
 export async function getT(fallbackUserLocale?: string | null): Promise<{
   locale: Locale; overrides: Record<string, string>;
   t: (k: StringKey) => string; tr: (text: string) => string;
+  te: (kind: string, id: string, field: string, fallback: string | null | undefined) => string;
 }> {
   const locale = await getLocale(fallbackUserLocale);
   const overrides = await getUiOverrides(locale);
@@ -39,5 +41,7 @@ export async function getT(fallbackUserLocale?: string | null): Promise<{
     locale, overrides,
     t: (k) => tKey(locale, k, overrides),
     tr: (text) => trText(locale, text, overrides),
+    // te(kind, id, field, dbValue): admin translation of a dynamic DB entity.
+    te: (kind, id, field, fallback) => trEntity(overrides, kind, id, field, fallback),
   };
 }

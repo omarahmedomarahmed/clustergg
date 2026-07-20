@@ -22,6 +22,7 @@ import { slimImg } from "@/lib/img";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { getQuestHeroData } from "@/lib/quest-hero";
 import { getPlanetExplore } from "@/lib/planet-explore";
+import { getT } from "@/lib/i18n/t-server";
 import OAuthButtons from "@/components/OAuthButtons";
 
 export const dynamic = "force-dynamic";
@@ -114,9 +115,13 @@ export default async function PlanetPage({
   const hasSkin = layout === "cover" ? false : (layout === "globe" ? !!game?.planetImageUrl : !!game?.planetImageUrl);
   const pAccent = game?.accent || "#8b5cf6";
   const pAccent2 = game?.accent2 || "#22d3ee";
-  const skinnedPlanets = hasSkin ? await buildSkinnedPlanets(db) : [];
+  const { te } = await getT(viewer?.locale);
+  // Localize the current planet's name in the skinned-planets list (the hero
+  // heading + toggle read from it).
+  const skinnedPlanetsRaw = hasSkin ? await buildSkinnedPlanets(db) : [];
+  const skinnedPlanets = skinnedPlanetsRaw.map((p) => p.slug === space.slug ? { ...p, name: te("planet", space.id, "name", p.name) } : p);
   const questHero = hasSkin && skinnedPlanets.length > 0 ? await getQuestHeroData(db, viewer?.id ?? null) : null;
-  const planetExplore = hasSkin && skinnedPlanets.length > 0 ? await getPlanetExplore(db, space.slug) : null;
+  const planetExplore = hasSkin && skinnedPlanets.length > 0 ? await getPlanetExplore(db, space.slug, te) : null;
 
   return (
     <div>
@@ -124,7 +129,7 @@ export default async function PlanetPage({
         <>
           <HeroStage planets={skinnedPlanets} initialSlug={space.slug} quest={questHero} swap={false} explore={planetExplore} />
           <div className="mx-auto max-w-6xl px-4 -mt-2 mb-4 flex flex-wrap items-center gap-3">
-            <p className="text-muted text-sm mr-auto">{space.description}</p>
+            <p className="text-muted text-sm mr-auto">{te("planet", space.id, "description", space.description)}</p>
             {gameProviders.map((p) => (
               <span key={p.id} className={`text-xs rounded-full px-2.5 py-1 border ${isProviderLive(p) ? "border-emerald-400/40 text-emerald-300" : "border-amber-400/30 text-amber-300/80"}`}>
                 {p.name} {isProviderLive(p) ? "· live" : "· key ready"}
