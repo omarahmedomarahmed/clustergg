@@ -4,6 +4,7 @@ import { desc, eq, inArray, ne, and } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import Avatar from "@/components/Avatar";
+import { getT } from "@/lib/i18n/t-server";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -39,13 +40,14 @@ export default async function MessagesPage() {
     ]);
     return { c, other: others[0]?.u, lastMsg };
   }));
+  const { tr } = await getT();
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
-      <h1 className="text-2xl font-bold mb-6">Messages</h1>
+      <h1 className="text-2xl font-bold mb-6">{tr("Messages")}</h1>
       {items.length === 0 ? (
         <div className="glass p-10 text-center text-muted">
-          No transmissions yet. Visit a <Link href="/search" className="text-cyan-300 underline">gamer&apos;s profile</Link> and hit Message.
+          {tr("No transmissions yet. Visit a")} <Link href="/search" className="text-cyan-300 underline">{tr("gamer's profile")}</Link> {tr("and hit Message.")}
         </div>
       ) : (
         <div className="space-y-2">
@@ -54,7 +56,7 @@ export default async function MessagesPage() {
               <Avatar name={other.displayName} src={other.avatarUrl} size={44} />
               <div className="min-w-0 flex-1">
                 <div className="font-semibold">{other.displayName}</div>
-                <div className="text-sm text-muted truncate">{lastMsg?.body ?? "New conversation"}</div>
+                <div className="text-sm text-muted truncate">{lastMsg?.body ?? tr("New conversation")}</div>
               </div>
               <div className="text-xs text-muted shrink-0">{lastMsg && timeAgo(lastMsg.createdAt)}</div>
             </Link>

@@ -187,12 +187,12 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.trophies || trophyWins.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="trophy" size={19} style={{ color: theme.accent }} /> {poss} trophy case</h2>
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="trophy" size={19} style={{ color: theme.accent }} /> {poss} {tr("trophy case")}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {trophyWins.map(({ p, c }) => { const art = c.trophyId ? trophyArt.get(c.trophyId) : undefined; return (
                 <div key={p.id} className={`${cardCls} text-center`}>
                   {art ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={art} alt="" className="mx-auto h-28 object-contain float-y" /> : <Icon name="trophy" size={56} className="mx-auto my-6" style={{ color: theme.accent }} />}
-                  <div className="mt-2 text-xs font-bold" style={{ color: theme.accent2 }}>{p.finalPlacement === 1 ? "CHAMPION" : `#${p.finalPlacement} PLACE`}</div>
+                  <div className="mt-2 text-xs font-bold" style={{ color: theme.accent2 }}>{p.finalPlacement === 1 ? tr("CHAMPION") : `#${p.finalPlacement} ${tr("PLACE")}`}</div>
                   <div className="text-sm font-semibold mt-0.5 line-clamp-1" style={{ color: theme.text }}>{c.title}</div>
                 </div>); })}
             </div>
@@ -203,7 +203,7 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.challenges || activeChallenges.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="zap" size={19} style={{ color: theme.accent }} /> {poss} challenges</h2>
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="zap" size={19} style={{ color: theme.accent }} /> {poss} {tr("challenges")}</h2>
             <div className="grid sm:grid-cols-2 gap-3">
               {activeChallenges.map(({ p, c }) => {
                 const cover = slimImg(c.coverUrl) ?? slimImg(gameCover.get(c.game) ?? null);
@@ -219,13 +219,13 @@ export default async function ProfilePage({ params }: Props) {
                       )}
                       <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,5,26,0.92), rgba(4,5,26,0.25))" }} />
                       <div className="absolute top-2 left-2.5 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 px-2 py-0.5 text-[9px] uppercase tracking-widest text-emerald-200">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> {tr("Live")}
                       </div>
                       <div className="absolute bottom-2 left-3 right-3">
                         <div className="font-bold text-sm truncate drop-shadow" style={{ color: "#fff" }}>{c.title}</div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-white/70">{c.game} · ends {timeAgo(c.endAt).replace(" ago", "")}</span>
-                          <span className="font-bold" style={{ color: theme.accent2 }}>{p.currentPoints} pts</span>
+                          <span className="text-white/70">{c.game} · {tr("ends")} {timeAgo(c.endAt).replace(" ago", "")}</span>
+                          <span className="font-bold" style={{ color: theme.accent2 }}>{p.currentPoints} {tr("pts")}</span>
                         </div>
                       </div>
                     </div>
@@ -239,7 +239,7 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.activity || recentPosts.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="message" size={19} style={{ color: theme.accent }} /> {poss} recent posts</h2>
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="message" size={19} style={{ color: theme.accent }} /> {poss} {tr("recent posts")}</h2>
             <div className="space-y-2">
               {recentPosts.map(({ post, space }) => (
                 <Link key={post.id} href={`/planets/${space.slug}`} className={`${cardCls} block`}>
@@ -254,7 +254,7 @@ export default async function ProfilePage({ params }: Props) {
         if (!S.spaces || spaceRows.length === 0) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="planet" size={19} style={{ color: theme.accent }} /> {poss} planets</h2>
+            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="planet" size={19} style={{ color: theme.accent }} /> {poss} {tr("planets")}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {spaceRows.map(({ s }) => {
                 const cover = slimImg(s.game ? gameCover.get(s.game) ?? null : null);
@@ -279,12 +279,12 @@ export default async function ProfilePage({ params }: Props) {
           <section key={key}>
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <Icon name="trophy" size={16} style={{ color: theme.accent }} />
-              <h2 className="text-lg font-bold" style={{ color: theme.text }}>{poss} quests progress</h2>
+              <h2 className="text-lg font-bold" style={{ color: theme.text }}>{poss} {tr("quests progress")}</h2>
               {/* Gamer's TOTAL Cluster Points across all quests */}
               <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-bold" style={{ background: `color-mix(in srgb, ${theme.accent2} 18%, transparent)`, color: theme.accent2 }}>
-                <CpIcon size={18} /> {profileQuests.reduce((s, q) => s + q.totalCp, 0).toLocaleString()} total CP
+                <CpIcon size={18} /> {profileQuests.reduce((s, q) => s + q.totalCp, 0).toLocaleString()} {tr("total CP")}
               </span>
-              <Link href="/quests" className="text-xs p-muted hover:underline ml-auto">Leaderboard →</Link>
+              <Link href="/quests" className="text-xs p-muted hover:underline ml-auto">{tr("Leaderboard →")}</Link>
             </div>
             {/* Completed-quest badges (icon ×N) */}
             {profileQuests.some((q) => q.completions > 0) && (
@@ -315,7 +315,7 @@ export default async function ProfilePage({ params }: Props) {
 
       {adminView && (
         <div className="bg-amber-500/15 border-b border-amber-400/40 text-amber-200 text-sm text-center py-2 px-4">
-          <Icon name="shield" size={14} className="inline mr-1.5" /> Admin view — <Link href={`/admin/users/${user.id}`} className="underline">manage this user in Mission Control</Link>
+          <Icon name="shield" size={14} className="inline mr-1.5" /> {tr("Admin view —")} <Link href={`/admin/users/${user.id}`} className="underline">{tr("manage this user in Mission Control")}</Link>
         </div>
       )}
 
@@ -346,24 +346,24 @@ export default async function ProfilePage({ params }: Props) {
           </div>
           <div className="flex gap-3 pb-1 w-full sm:w-auto justify-center">
             {isOwner ? (
-              <Link href="/profile" className={`p-btn p-btn-${theme.buttonStyle}`}><Icon name="edit" size={14} /> Customize</Link>
+              <Link href="/profile" className={`p-btn p-btn-${theme.buttonStyle}`}><Icon name="edit" size={14} /> {tr("Customize")}</Link>
             ) : viewer ? (
               <>
                 <FollowButton targetUserId={user.id} isFollowing={isFollowingRow.length > 0} path={`/u/${user.slug}`} />
-                <form action={startConversation.bind(null, user.id)}><button className={`p-btn p-btn-${theme.buttonStyle === "neon" ? "glass" : "outline"}`}><Icon name="message" size={14} /> Message</button></form>
+                <form action={startConversation.bind(null, user.id)}><button className={`p-btn p-btn-${theme.buttonStyle === "neon" ? "glass" : "outline"}`}><Icon name="message" size={14} /> {tr("Message")}</button></form>
               </>
             ) : (
-              <Link href="/signup" className={`p-btn p-btn-${theme.buttonStyle}`}>Join to follow</Link>
+              <Link href="/signup" className={`p-btn p-btn-${theme.buttonStyle}`}>{tr("Join to follow")}</Link>
             )}
           </div>
         </div>
 
         {user.bio && <p className="mt-4 max-w-2xl" style={{ color: theme.muted }}>{user.bio}</p>}
         <div className="flex flex-wrap gap-6 mt-4 text-sm">
-          <Link href={`/u/${user.slug}/followers`} style={{ color: theme.text }}><b>{Number(followerRow?.c ?? 0)}</b> <span className="p-muted">followers</span></Link>
-          <Link href={`/u/${user.slug}/following`} style={{ color: theme.text }}><b>{Number(followingRow?.c ?? 0)}</b> <span className="p-muted">following</span></Link>
+          <Link href={`/u/${user.slug}/followers`} style={{ color: theme.text }}><b>{Number(followerRow?.c ?? 0)}</b> <span className="p-muted">{tr("followers")}</span></Link>
+          <Link href={`/u/${user.slug}/following`} style={{ color: theme.text }}><b>{Number(followingRow?.c ?? 0)}</b> <span className="p-muted">{tr("following")}</span></Link>
           <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">{tr("views")}</span></span>
-          {bestStanding && S.standings && <span style={{ color: theme.accent }}><Icon name="chart" size={14} className="inline mr-1" /> Top {Math.max(1, Math.round((bestStanding.rank / bestStanding.total) * 100))}% · {bestStanding.title}</span>}
+          {bestStanding && S.standings && <span style={{ color: theme.accent }}><Icon name="chart" size={14} className="inline mr-1" /> {tr("Top")} {Math.max(1, Math.round((bestStanding.rank / bestStanding.total) * 100))}% · {bestStanding.title}</span>}
         </div>
 
         <div className="mt-8 space-y-10 pb-16">

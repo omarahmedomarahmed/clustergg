@@ -8,6 +8,7 @@ import QuestMapHero from "@/components/QuestMapHero";
 import CpLedger from "@/components/CpLedger";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
+import { getT } from "@/lib/i18n/t-server";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   ]);
   const rocketUrl = brand["brand.quest.rocket"] || undefined;
   const tabs = allQuests.map((q) => ({ key: q.key, name: q.name, color: q.color, logoUrl: q.logoUrl, icon: q.icon, mapArtUrl: q.mapArtUrl }));
+  const { tr } = await getT();
 
   return (
     <div>
@@ -40,13 +42,13 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
       <div className="mx-auto max-w-3xl px-4 pb-16">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: quest.color }}>
-            <Icon name="trophy" size={18} /> {quest.name} milestone leaderboard
+            <Icon name="trophy" size={18} /> {quest.name} {tr("milestone leaderboard")}
           </h2>
-          <span className="text-xs text-muted">{leaderboard.length} quester{leaderboard.length === 1 ? "" : "s"}</span>
+          <span className="text-xs text-muted">{leaderboard.length} {tr(leaderboard.length === 1 ? "quester" : "questers")}</span>
         </div>
 
         {leaderboard.length === 0 ? (
-          <div className="glass p-6 text-center text-sm text-muted">No questers yet — be the first to earn Cluster Points here.</div>
+          <div className="glass p-6 text-center text-sm text-muted">{tr("No questers yet — be the first to earn Cluster Points here.")}</div>
         ) : (() => {
           const tierFor = (qp: number) => [...quest.tiers].filter((t) => qp >= t.thresholdQp).sort((a, b) => b.thresholdQp - a.thresholdQp)[0] ?? null;
           const medal = ["#fbbf24", "#cbd5e1", "#b45309"];
@@ -88,8 +90,8 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
                         <span className="w-6 text-center font-bold text-sm text-muted">{i + 4}</span>
                         <Avatar name={g.name} src={g.avatarUrl} size={34} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate font-semibold text-sm">{g.name}{mine && <span className="text-cyan-300"> · you</span>}</span>
-                          {t && <span className="block text-[11px]" style={{ color: t.color || quest.color }}>Reached {t.name}</span>}
+                          <span className="block truncate font-semibold text-sm">{g.name}{mine && <span className="text-cyan-300"> · {tr("you")}</span>}</span>
+                          {t && <span className="block text-[11px]" style={{ color: t.color || quest.color }}>{tr("Reached")} {t.name}</span>}
                         </span>
                         <span className="text-sm shrink-0 font-bold" style={{ color: quest.accent2 }}>{(g.qp ?? 0).toLocaleString()} CP</span>
                       </Link>
@@ -104,7 +106,7 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
         {/* This quest's CP history */}
         {questLedger.length > 0 && (
           <div className="mt-6">
-            <CpLedger entries={questLedger} title={`${quest.name} CP history`} />
+            <CpLedger entries={questLedger} title={`${quest.name} ${tr("CP history")}`} />
           </div>
         )}
       </div>

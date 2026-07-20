@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
 import CpIcon from "@/components/CpIcon";
+import { useTr } from "@/components/LocaleProvider";
 import { saveFeedPrefs } from "@/app/actions/social";
 
 export type PanelAccount = {
@@ -41,6 +42,7 @@ export default function FeedControlPanel({
   activeChallenges: PanelChallenge[]; games: PanelGame[]; prefs: PanelPrefs;
   theme?: { accent?: string; accent2?: string; coverUrl?: string | null };
 }) {
+  const tr = useTr();
   const accent = theme?.accent || "#22d3ee";
   const accent2 = theme?.accent2 || "#8b5cf6";
   const coverUrl = theme?.coverUrl ?? me.bannerUrl;
@@ -73,7 +75,7 @@ export default function FeedControlPanel({
         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1c] via-[#0a0a1c]/40 to-transparent" />
         <button onClick={() => setEditing((v) => !v)}
           className="absolute top-3 right-3 inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-black/50 backdrop-blur px-3 py-1.5 text-xs font-semibold text-white hover:border-cyan-400/50 transition-colors">
-          <Icon name={editing ? "x" : "edit"} size={13} /> {editing ? "Done" : "Customize panel"}
+          <Icon name={editing ? "x" : "edit"} size={13} /> {editing ? tr("Done") : tr("Customize panel")}
         </button>
       </div>
 
@@ -86,8 +88,8 @@ export default function FeedControlPanel({
             {me.title && <p className="text-xs font-semibold truncate" style={{ color: accent }}>{me.title}</p>}
           </div>
           <div className="hidden sm:flex flex-wrap gap-2 pb-1">
-            <button onClick={() => setConnectOpen((v) => !v)} className="glow-btn pressable rounded-full px-4 py-2 text-xs font-semibold text-white inline-flex items-center gap-1.5"><Icon name="link" size={13} /> Connect</button>
-            <Link href={`/u/${me.slug}`} className="ghost-btn pressable rounded-full px-4 py-2 text-xs inline-flex items-center gap-1.5"><Icon name="eye" size={13} /> Profile</Link>
+            <button onClick={() => setConnectOpen((v) => !v)} className="glow-btn pressable rounded-full px-4 py-2 text-xs font-semibold text-white inline-flex items-center gap-1.5"><Icon name="link" size={13} /> {tr("Connect")}</button>
+            <Link href={`/u/${me.slug}`} className="ghost-btn pressable rounded-full px-4 py-2 text-xs inline-flex items-center gap-1.5"><Icon name="eye" size={13} /> {tr("Profile")}</Link>
           </div>
         </div>
 
@@ -98,7 +100,7 @@ export default function FeedControlPanel({
               {STAT_CATALOG.map((s) => (
                 <button key={s.key} onClick={() => toggle(stats, setStats, s.key)}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${stats.includes(s.key) ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-200" : "border-white/12 text-muted hover:border-white/30"}`}>
-                  {stats.includes(s.key) ? <Icon name="check" size={11} /> : <Icon name="plus" size={11} />} {s.label}
+                  {stats.includes(s.key) ? <Icon name="check" size={11} /> : <Icon name="plus" size={11} />} {tr(s.label)}
                 </button>
               ))}
             </div>
@@ -113,7 +115,7 @@ export default function FeedControlPanel({
                     {key === "cp" ? <CpIcon size={16} /> : <Icon name={s.icon} size={15} style={{ color: accent }} />}
                   </div>
                   <div className="text-lg font-bold">{(statValues[key] ?? 0).toLocaleString()}</div>
-                  <div className="text-[10px] uppercase tracking-widest text-muted truncate">{s.label}</div>
+                  <div className="text-[10px] uppercase tracking-widest text-muted truncate">{tr(s.label)}</div>
                 </Link>
               );
             })}
@@ -122,7 +124,7 @@ export default function FeedControlPanel({
 
         {/* Connected accounts — expand in place (no navigation) */}
         <div className="mt-5">
-          <div className="text-[11px] uppercase tracking-widest text-muted mb-2">Connected accounts</div>
+          <div className="text-[11px] uppercase tracking-widest text-muted mb-2">{tr("Connected accounts")}</div>
           <div className="flex flex-wrap gap-2.5">
             {accounts.map((a) => {
               const open = openAcct === a.id;
@@ -145,12 +147,12 @@ export default function FeedControlPanel({
                   </button>
                   {open && (
                     <div className="relative border-t border-white/10 p-3 text-xs text-muted space-y-1">
-                      <div>Game: <b className="text-ink">{a.gameName ?? a.providerName}</b></div>
-                      <div>In-game name: <b className="text-ink">{a.inGameName}</b></div>
-                      {a.region && <div>Region: <b className="text-ink">{a.region}</b></div>}
+                      <div>{tr("Game")}: <b className="text-ink">{a.gameName ?? a.providerName}</b></div>
+                      <div>{tr("In-game name")}: <b className="text-ink">{a.inGameName}</b></div>
+                      {a.region && <div>{tr("Region")}: <b className="text-ink">{a.region}</b></div>}
                       <div className="pt-1.5 flex gap-2">
-                        <Link href="/profile" className="inline-flex items-center gap-1 text-cyan-300 hover:underline"><Icon name="settings" size={11} /> Manage</Link>
-                        {a.gameName && <Link href="/planets" className="inline-flex items-center gap-1 text-cyan-300 hover:underline"><Icon name="planet" size={11} /> Planet</Link>}
+                        <Link href="/profile" className="inline-flex items-center gap-1 text-cyan-300 hover:underline"><Icon name="settings" size={11} /> {tr("Manage")}</Link>
+                        {a.gameName && <Link href="/planets" className="inline-flex items-center gap-1 text-cyan-300 hover:underline"><Icon name="planet" size={11} /> {tr("Planet")}</Link>}
                       </div>
                     </div>
                   )}
@@ -160,13 +162,13 @@ export default function FeedControlPanel({
             {/* Inline connect — opens the picker in place, no navigation to a new page first */}
             <button onClick={() => setConnectOpen((v) => !v)}
               className="w-28 flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-white/15 text-muted hover:border-cyan-400/40 hover:text-cyan-300 transition-colors py-3">
-              <Icon name={connectOpen ? "chevronDown" : "plus"} size={16} /> <span className="text-[10px]">Connect game</span>
+              <Icon name={connectOpen ? "chevronDown" : "plus"} size={16} /> <span className="text-[10px]">{tr("Connect game")}</span>
             </button>
           </div>
 
           {connectOpen && (
             <div className="mt-2.5 rounded-xl border border-cyan-400/25 bg-black/25 p-3">
-              <div className="text-[11px] text-muted mb-2">Pick a game to connect — you&apos;ll link your account on the next step.</div>
+              <div className="text-[11px] text-muted mb-2">{tr("Pick a game to connect — you'll link your account on the next step.")}</div>
               <div className="flex flex-wrap gap-2">
                 {games.map((g) => (
                   <Link key={g.name} href={g.slug ? `/planets/${g.slug}` : "/profile"} title={`Connect ${g.name}`}
@@ -176,7 +178,7 @@ export default function FeedControlPanel({
                   </Link>
                 ))}
                 <Link href="/profile" className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400/30 bg-cyan-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-cyan-200">
-                  <Icon name="arrowRight" size={12} /> All providers
+                  <Icon name="arrowRight" size={12} /> {tr("All providers")}
                 </Link>
               </div>
             </div>
@@ -187,7 +189,7 @@ export default function FeedControlPanel({
           <div className="mt-4 flex justify-end">
             <button onClick={save} disabled={pending}
               className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white inline-flex items-center gap-2 disabled:opacity-60">
-              <Icon name="check" size={14} /> {pending ? "Saving…" : "Save panel"}
+              <Icon name="check" size={14} /> {pending ? tr("Saving…") : tr("Save panel")}
             </button>
           </div>
         )}
