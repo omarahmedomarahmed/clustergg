@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Icon from "@/components/Icon";
 import { saveUiString } from "@/app/actions/language";
 
-export type UiItem = { key: string; en: string; ar: string };
+export type UiItem = { key: string; en: string; ar: string; label?: string };
 export type UiGroup = { page: string; items: UiItem[] };
 
 // Admin editor for every interface string, grouped by page. Each string is
@@ -38,7 +38,8 @@ export default function UiStringsEditor({ groups }: { groups: UiGroup[] }) {
       </div>
       <div className="space-y-2">
         {groups.map((g) => {
-          const items = g.items.filter((it) => !q || it.en.toLowerCase().includes(q.toLowerCase()) || it.key.toLowerCase().includes(q.toLowerCase()) || (vals[it.key]?.ar ?? "").includes(q));
+          const ql = q.toLowerCase();
+          const items = g.items.filter((it) => !q || it.en.toLowerCase().includes(ql) || it.key.toLowerCase().includes(ql) || (it.label ?? "").toLowerCase().includes(ql) || (vals[it.key]?.ar ?? "").includes(q));
           if (items.length === 0) return null;
           const isOpen = open === g.page || !!q;
           return (
@@ -51,7 +52,9 @@ export default function UiStringsEditor({ groups }: { groups: UiGroup[] }) {
                 <div className="px-3 pb-3 space-y-2">
                   {items.map((it) => (
                     <div key={it.key} className="rounded-lg border border-white/10 bg-black/20 p-2.5">
-                      <div className="text-[10px] font-mono text-muted mb-1.5 truncate">{it.key}</div>
+                      {it.label
+                        ? <div className="text-xs font-semibold text-cyan-100 mb-1.5 truncate">{it.label}</div>
+                        : <div className="text-[10px] font-mono text-muted mb-1.5 truncate">{it.key}</div>}
                       <div className="grid sm:grid-cols-2 gap-2">
                         <label className="block"><span className="text-[10px] uppercase tracking-widest text-muted">English</span>
                           <input value={vals[it.key]?.en ?? ""} onChange={(e) => set(it.key, "en", e.target.value)} className="input-cosmic !py-1.5 w-full text-sm mt-0.5" /></label>

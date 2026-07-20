@@ -60,6 +60,7 @@ export default function PlanetExplorer({
   const [sel, setSel] = useState<Sel>(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(false);
+  const [mtab, setMtab] = useState(0); // active segment on the mobile layout
   const frame = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (slug: string) => {
@@ -165,8 +166,23 @@ export default function PlanetExplorer({
         );
     }
   };
-  const leftNodes = layout.left.map(renderModule).filter(Boolean);
-  const rightNodes = layout.right.map(renderModule).filter(Boolean);
+  // Render each module once; reuse the node in the desktop rail AND the mobile
+  // segmented tabs, so the same data drives both layouts.
+  const leftMods = layout.left.map((m) => ({ m, node: renderModule(m) })).filter((x) => x.node) as { m: HeroModule; node: React.ReactNode }[];
+  const rightMods = layout.right.map((m) => ({ m, node: renderModule(m) })).filter((x) => x.node) as { m: HeroModule; node: React.ReactNode }[];
+  const leftNodes = leftMods.map((x) => x.node);
+  const rightNodes = rightMods.map((x) => x.node);
+  const mobileMods = [...leftMods, ...rightMods];
+  const modMeta = (kind: string): { label: string; icon: string } => {
+    switch (kind) {
+      case "champions": return { label: tr("Champions"), icon: "swords" };
+      case "entities": return { label: tr("Game world"), icon: "swords" };
+      case "challenges": return { label: tr("Challenges"), icon: "zap" };
+      case "regions": return { label: tr("Players"), icon: "users" };
+      default: return { label: tr("Leaderboards"), icon: "chart" };
+    }
+  };
+  const mActive = Math.min(mtab, Math.max(0, mobileMods.length - 1));
 
   return (
     <section className="relative overflow-hidden">
@@ -234,9 +250,9 @@ export default function PlanetExplorer({
                 ))}
               </div>
 
-              {/* ===== Middle stage — anything clicked opens here ===== */}
+              {/* ===== Middle stage — anything clicked opens here (desktop) ===== */}
               {sel && (
-                <div className="absolute inset-0 z-30 flex items-center justify-center" onClick={() => setSel(null)}>
+                <div className="absolute inset-0 z-30 hidden md:flex items-center justify-center" onClick={() => setSel(null)}>
                   <div className="w-[min(100%,480px)] max-h-full overflow-y-auto rounded-2xl border border-white/15 backdrop-blur-xl shadow-2xl"
                     style={{ background: middleBg ? `linear-gradient(rgba(4,5,26,0.9), rgba(4,5,26,0.95)), url(${middleBg}) center/cover` : "rgba(4,5,26,0.94)" }}
                     onClick={(e) => e.stopPropagation()}>
@@ -282,18 +298,65 @@ export default function PlanetExplorer({
           );
         }
         return (
-          <div className="grid gap-4 lg:grid-cols-[300px_1fr_300px] items-start">
-            <aside className={`order-2 lg:order-1 ${leftNodes.length ? "" : "hidden lg:block"}`}>
-              {leftNodes.length > 0 && panel(leftNodes)}
-            </aside>
-            <div className="order-1 lg:order-2">{globeBlock}</div>
-            <aside className={`order-3 ${rightNodes.length ? "" : "hidden lg:block"}`}>
-              {rightNodes.length > 0 && panel(rightNodes)}
-            </aside>
-          </div>
+          <>
+            {/* ===== Desktop / tablet: full 3-zone management layout ===== */}
+            <div className="hidden md:grid gap-4 lg:grid-cols-[300px_1fr_300px] items-start">
+              <aside className={`order-2 lg:order-1 ${leftNodes.length ? "" : "hidden lg:block"}`}>
+                {leftNodes.length > 0 && panel(leftNodes)}
+              </aside>
+              <div className="order-1 lg:order-2">{globeBlock}</div>
+              <aside className={`order-3 ${rightNodes.length ? "" : "hidden lg:block"}`}>
+                {rightNodes.length > 0 && panel(rightNodes)}
+              </aside>
+            </div>
+
+            {/* ===== Mobile: native-game layout — globe + segmented tabs ===== */}
+            <div className="md:hidden">
+              <div className="mx-auto max-w-[360px]">{globeBlock}</div>
+              {mobileMods.length > 0 && (
+                <div className="mt-5">
+                  <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1 [scrollbar-width:none]">
+                    {mobileMods.map((x, i) => {
+                      const meta = modMeta(x.m.kind);
+                      const on = i === mActive;
+                      return (
+                        <button key={x.m.id} onClick={() => setMtab(i)}
+                          className={`shrink-0 inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 text-xs font-bold border transition ${on ? "border-cyan-400/60 bg-cyan-500/12 text-cyan-100" : "border-white/12 text-muted"}`}>
+                          <Icon name={meta.icon} size={14} /> {meta.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-2 rounded-3xl border border-white/10 bg-[#070826]/55 backdrop-blur-md p-3.5">
+                    {mobileMods[mActive]?.node}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
         );
         })()}
       </div>
+
+      {/* ===== Mobile detail sheet — anything tapped slides up from the bottom ===== */}
+      {sel && (
+        <div className="md:hidden fixed inset-0 z-50 flex items-end" onClick={() => setSel(null)}>
+          <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
+          <div className="relative w-full max-h-[86vh] overflow-y-auto rounded-t-3xl border-t border-white/15 shadow-2xl p-3 pb-10 rise-in"
+            style={{ background: middleBg ? `linear-gradient(rgba(4,5,26,0.94), rgba(4,5,26,0.97)), url(${middleBg}) center/cover` : "#05061c" }}
+            onClick={(e) => e.stopPropagation()}>
+            <div className="mx-auto mb-2.5 h-1.5 w-11 rounded-full bg-white/25" />
+            <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-white/10">
+              <span className="text-[11px] uppercase tracking-widest text-cyan-200">{tr("Details")}</span>
+              <div className="flex items-center gap-1.5">
+                <button onClick={refresh} title={tr("Refresh")} className="text-muted p-1.5"><Icon name="satellite" size={16} className={loading ? "animate-spin" : ""} /></button>
+                <button onClick={() => setSel(null)} title={tr("Close")} className="text-muted p-1.5"><Icon name="x" size={20} /></button>
+              </div>
+            </div>
+            <Stage sel={sel} data={data} game={game} onGamer={openGamer} onOpenEntity={(e) => setSel({ kind: "entity", entityKind: e.kind, id: e.id, name: e.name, image: e.image })} onBack={() => setSel(null)} />
+          </div>
+        </div>
+      )}
     </section>
   );
 }

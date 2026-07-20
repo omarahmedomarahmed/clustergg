@@ -15,6 +15,7 @@ import { getQuestHeroData } from "@/lib/quest-hero";
 import { getUserQuests, getQuestTops } from "@/lib/quests";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { getT } from "@/lib/i18n/t-server";
+import { localizeQuest } from "@/lib/i18n/entities";
 import { slimImg } from "@/lib/img";
 import { timeAgo } from "@/lib/utils";
 
@@ -103,7 +104,8 @@ export default async function LandingPage() {
   const counts = statCounts[0] ?? { users: 0, accounts: 0, challenges: 0, games: 0 };
   const ticker = tickerRows.length > 0 ? [...tickerRows, ...tickerRows] : [];
   const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
-  const { tr } = await getT();
+  const { tr, te } = await getT();
+  const homeQuestsL = homeQuests.map((q) => localizeQuest(q, te));
   const statCards = [
     { n: counts.users, label: tr("Gamers"), icon: "users" },
     { n: counts.accounts, label: tr("Linked accounts"), icon: "link" },
@@ -317,7 +319,7 @@ export default async function LandingPage() {
       </section>
 
       {/* ===== QUESTS — same card layout as /quests ===== */}
-      {homeQuests.length > 0 && (
+      {homeQuestsL.length > 0 && (
         <section className="mx-auto max-w-6xl px-4 pb-20">
           <div className="text-center">
             <h2 className="text-3xl md:text-4xl font-bold">
@@ -328,7 +330,7 @@ export default async function LandingPage() {
             </p>
           </div>
           <div className="mt-10 grid md:grid-cols-2 gap-5">
-            {homeQuests.map((q) => <QuestCard key={q.id} quest={q} top={questTops.get(q.id) ?? []} />)}
+            {homeQuestsL.map((q) => <QuestCard key={q.id} quest={q} top={questTops.get(q.id) ?? []} />)}
           </div>
           <div className="mt-8 text-center">
             <Link href="/quests" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm inline-flex items-center gap-2">

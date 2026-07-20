@@ -13,8 +13,10 @@ export const metadata = { title: "Leaderboards" };
 export default async function LeaderboardsPage({ searchParams }: { searchParams: Promise<{ game?: string; metric?: string }> }) {
   const { game, metric } = await searchParams;
   const db = await getDb();
-  const boards = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.isActive, true));
-  const { tr } = await getT();
+  const boardsRaw = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.isActive, true));
+  const { tr, te } = await getT();
+  // Admin-translated board titles (falls back to the DB title per locale).
+  const boards = boardsRaw.map((b) => ({ ...b, title: te("leaderboard", b.id, "title", b.title) }));
 
   if (boards.length === 0) {
     return (
@@ -42,7 +44,7 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
     const on = selectedMetric === mKey;
     return (
       <Link key={mKey} href={`/leaderboards?game=${encodeURIComponent(selectedName)}${mKey === "all" ? "" : `&metric=${encodeURIComponent(mKey)}`}`} scroll={false}
-        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${on ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-200" : "border-white/12 text-muted hover:text-ink"}`}>
+        className={`shrink-0 whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition ${on ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-200" : "border-white/12 text-muted hover:text-ink"}`}>
         {label}
       </Link>
     );
@@ -55,13 +57,14 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
         <p className="text-muted mt-2">{tr("Real, API-verified rankings across every game. Pick a planet.")}</p>
       </div>
 
-      {/* Game toggle — logos */}
-      <div className="flex flex-wrap justify-center gap-2 mb-8">
+      {/* Game toggle — a horizontal-scroll strip on mobile (native rank-screen
+          switcher), wrapping + centred from md up. */}
+      <div className="flex gap-2 overflow-x-auto pb-2 mb-6 md:mb-8 md:flex-wrap md:justify-center md:overflow-visible [scrollbar-width:none]">
         {games.map((g) => {
           const active = g.name === selectedName;
           return (
             <Link key={g.name} href={`/leaderboards?game=${encodeURIComponent(g.name)}`} scroll={false}
-              className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 transition-all ${active ? "border-cyan-400/60 bg-cyan-400/10 scale-105" : "border-violet-400/20 opacity-70 hover:opacity-100"}`}>
+              className={`shrink-0 inline-flex items-center gap-2 rounded-2xl border px-3 py-1.5 transition-all ${active ? "border-cyan-400/60 bg-cyan-400/10 scale-105" : "border-violet-400/20 opacity-70 hover:opacity-100"}`}>
               {g.logoUrl ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={g.name} size={26} rounded="rounded-lg" /> : <Icon name="gamepad" size={16} className="text-violet-300" />}
               <span className="text-sm font-semibold">{g.name}</span>
             </Link>
@@ -85,9 +88,9 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
             {selected.slug && <Link href={`/planets/${selected.slug}`} className="ml-auto text-xs text-cyan-300 hover:underline">{tr("Visit planet →")}</Link>}
           </div>
 
-          {/* Metric filter — every metric we track for this game */}
+          {/* Metric filter — horizontal-scroll chips on mobile, wrapping on md+ */}
           {gameBoards.length > 1 && (
-            <div className="flex flex-wrap gap-1.5 mb-5">
+            <div className="flex gap-1.5 mb-5 overflow-x-auto pb-1.5 md:flex-wrap md:overflow-visible [scrollbar-width:none]">
               {metricChip("all", `All metrics (${gameBoards.length})`)}
               {gameBoards.map((b) => metricChip(b.metricKey, b.title.split("·")[1]?.trim() ?? b.title))}
             </div>

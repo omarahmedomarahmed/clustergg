@@ -20,6 +20,7 @@ const NAV: { section: string; area?: string; items: { href: string; label: strin
     items: [
       { href: "/admin/content", label: "Site content" },
       { href: "/admin/language", label: "Language & flags (Arabic)" },
+      { href: "/admin/translations", label: "Content translations (Ar/En)" },
       { href: "/admin/backgrounds", label: "Page backgrounds" },
       { href: "/admin/cards", label: "Card backgrounds" },
       { href: "/admin/brand-kit", label: "Logos & brand kit" },

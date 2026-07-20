@@ -49,7 +49,7 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { slug: "speedrunning", name: "Speedrunning", description: "Personal bests, podiums and world records from Speedrun.com." },
     { slug: "roblox", name: "Roblox", description: "The creator universe — followers, friends and legacy." },
     { slug: "apex-legends", name: "Apex Legends", description: "Ranked RP and lifetime kills from the Outlands." },
-    { slug: "pubg", name: "PUBG: Battlegrounds", description: "Chicken dinners, survival stats and the Outlands of Erangel." },
+    { slug: "pubg", name: "PUBG", description: "Chicken dinners, survival stats and the Outlands of Erangel." },
     { slug: "osu", name: "osu!", description: "Performance points and global rank precision clicking." },
     { slug: "mobile-legends", name: "Mobile Legends", description: "MLBB wins, win rate and MVPs — verified with an in-game code." },
   ];
@@ -104,7 +104,7 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { slug: "chess", name: "Chess", game: "Chess", description: "Chess.com & Lichess grinders. Real rating leaderboards." },
     { slug: "dota-2", name: "Dota 2", game: "Dota 2", description: "MMR climbers and Immortal dreamers." },
     { slug: "apex-legends", name: "Apex Legends", game: "Apex Legends", description: "Ranked RP and lifetime kills from the Outlands." },
-    { slug: "pubg", name: "PUBG: Battlegrounds", game: "PUBG: Battlegrounds", description: "Chicken dinners, survival stats and the Outlands of Erangel." },
+    { slug: "pubg", name: "PUBG", game: "PUBG", description: "Chicken dinners, survival stats and the Outlands of Erangel." },
     { slug: "mobile-legends", name: "Mobile Legends", game: "Mobile Legends", description: "MLBB grinders — rank up, rack up MVPs, top the win-rate board." },
     { slug: "general-gaming", name: "General Gaming", game: null, description: "Everything gaming across the galaxy." },
     { slug: "hardware-setups", name: "Hardware & Setups", game: null, description: "Battlestations, peripherals, and RGB supremacy." },
@@ -445,7 +445,6 @@ const APEX_GLOBE = `${HF_CDN}/hf_20260720_030624_a1f6d900-3452-4987-b428-ffd6954
 const PLANET_SKINS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_114614_b3a4ad5b-e49a-4fab-99fb-056fd13ab71f.png`,
   "VALORANT": `${HF_CDN}/hf_20260713_214139_cba722cd-6ede-4996-b8a7-ae0315304705.png`,
-  "PUBG: Battlegrounds": PUBG_GLOBE,
   "PUBG": PUBG_GLOBE,
   "Dota 2": `${HF_CDN}/hf_20260717_223926_6bf3756b-3ee1-4629-98ae-e458dcddd180.png`,
   "Fortnite": FORTNITE_GLOBE,
@@ -456,14 +455,13 @@ const PLANET_SKINS: Record<string, string> = {
 // Force PUBG + Fortnite onto the background-free globes on existing DBs (the user
 // asked for both specifically), replacing whatever skin they currently hold.
 const FORCE_GLOBES: Record<string, string> = {
-  "PUBG": PUBG_GLOBE, "PUBG: Battlegrounds": PUBG_GLOBE, "Fortnite": FORTNITE_GLOBE,
+  "PUBG": PUBG_GLOBE, "Fortnite": FORTNITE_GLOBE,
 };
 // Superseded chess globe (first, static render) — replaced by the animated one.
 const SUPERSEDED_CHESS = `${HF_CDN}/hf_20260718_004005_7cbd4afc-202f-4acb-b558-519546ffd94c.png`;
 const PLANET_BGS: Record<string, string> = {
   "League of Legends": `${HF_CDN}/hf_20260714_120620_3c2d92d2-00a7-4f38-ba68-7712e85b962d.png`,
   "VALORANT": `${HF_CDN}/hf_20260714_120636_4b63d00d-68e5-4379-b419-a0bc8b423124.png`,
-  "PUBG: Battlegrounds": `${HF_CDN}/hf_20260717_224254_9bf2847f-9b30-40e6-89b1-7c0816a28962.png`,
   "PUBG": `${HF_CDN}/hf_20260717_224254_9bf2847f-9b30-40e6-89b1-7c0816a28962.png`,
   "Dota 2": `${HF_CDN}/hf_20260717_224257_d5b1ca32-3a9c-4434-a7e8-8aa256473b7a.png`,
   "Fortnite": `${HF_CDN}/hf_20260717_224259_eef07acf-cc6f-44ed-b0f0-715f2c6eb1d3.png`,
@@ -478,12 +476,10 @@ const APEX_COVER = `${HF_CDN}/hf_20260720_030417_c62e0e73-7c73-4e30-91b9-da355b1
 const PUBG_COVER = `${HF_CDN}/hf_20260720_030759_1a51629d-2149-4075-bba6-7079e5267163.png`;
 const GAME_LOGOS: Record<string, string> = {
   "Apex Legends": APEX_GLOBE,
-  "PUBG: Battlegrounds": PUBG_GLOBE,
   "PUBG": PUBG_GLOBE,
 };
 const GAME_COVERS: Record<string, string> = {
   "Apex Legends": APEX_COVER,
-  "PUBG: Battlegrounds": PUBG_COVER,
   "PUBG": PUBG_COVER,
 };
 // ===== Image re-hosting: move inline base64 + external CDN art into our Blob =====
@@ -599,6 +595,31 @@ export async function ensureBrandKeys(db: DB) {
   }
 }
 
+// One-time rename: the game formerly seeded as "PUBG: Battlegrounds" is now just
+// "PUBG" everywhere (provider registry, art maps, entity catalog). Older DBs
+// still hold the long name on the games/spaces rows and every table that stores
+// a game name, which broke art lookups (planet globe, connect logo/cover) that
+// key off the canonical name. Rename them all in place. Idempotent — the WHERE
+// clause matches nothing once done.
+export async function renameLegacyGameNames(db: DB) {
+  const renames: { table: string; col: string }[] = [
+    { table: "games", col: "name" },
+    { table: "spaces", col: "name" },
+    { table: "spaces", col: "game" },
+    { table: "challenges", col: "game" },
+    { table: "leaderboards", col: "game" },
+    { table: "stat_current", col: "game" },
+    { table: "stat_snapshots", col: "game" },
+    { table: "game_entity_overrides", col: "game" },
+    { table: "trophies", col: "game" },
+  ];
+  for (const r of renames) {
+    try {
+      await db.execute(dsql`UPDATE ${dsql.identifier(r.table)} SET ${dsql.identifier(r.col)} = 'PUBG' WHERE ${dsql.identifier(r.col)} = 'PUBG: Battlegrounds'`);
+    } catch { /* table/col may not exist on older schemas — non-fatal */ }
+  }
+}
+
 export async function ensurePlanetSkins(db: DB) {
   // Replace superseded renders in place.
   for (const [oldUrl, name] of Object.entries(SUPERSEDED_SKINS)) {
@@ -694,7 +715,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-20.1-apex-planet";
+const MAINT_VERSION = "2026-07-20.2-pubg-rename";
 
 export async function runBootMaintenance(db: DB) {
   try {
@@ -710,7 +731,7 @@ export async function runBootMaintenance(db: DB) {
   // show up. Idempotent: onConflictDoNothing keyed on the unique slug.
   const ensurePlanets = [
     { slug: "apex-legends", name: "Apex Legends", game: "Apex Legends", description: "Ranked RP and lifetime kills from the Outlands." },
-    { slug: "pubg", name: "PUBG: Battlegrounds", game: "PUBG: Battlegrounds", description: "Chicken dinners, survival stats and the Outlands of Erangel." },
+    { slug: "pubg", name: "PUBG", game: "PUBG", description: "Chicken dinners, survival stats and the Outlands of Erangel." },
   ];
   for (const p of ensurePlanets) {
     try {
@@ -725,6 +746,9 @@ export async function runBootMaintenance(db: DB) {
       }
     } catch { /* non-fatal */ }
   }
+  // Canonicalize the PUBG game name on older DBs BEFORE skinning, so the art maps
+  // (keyed on "PUBG") match the rows.
+  await renameLegacyGameNames(db);
   await ensurePlanetSkins(db);
   // Ad inventory slots that pages reference (idempotent — insert if missing).
   const extraPlacements = [

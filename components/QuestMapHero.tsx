@@ -166,7 +166,7 @@ export default function QuestMapHero({
         {/* The map — fit (zoomed out) by default; zoom ONLY via the on-map
             controls (no scroll-zoom, no drag). Sits BEHIND the surrounding text
             (z-0) and gently bobs up/down like a planet. */}
-        <div className="relative z-0 mx-auto w-full max-w-4xl aspect-[16/9] float-y">
+        <div className="relative z-0 mx-auto w-full max-w-4xl aspect-[4/5] sm:aspect-[16/9] float-y">
           <ZoomPan className="h-full w-full" max={4} initial={1} wheel={false} pan={false}>
           {/* map art */}
           <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />

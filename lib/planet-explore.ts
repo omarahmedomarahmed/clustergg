@@ -28,7 +28,12 @@ export type PlanetExplore = {
 
 const splashUrl = (ddId: string) => `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${ddId}_0.jpg`;
 
-export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExplore | null> {
+// `te` (optional) applies admin EN/AR translations to board + challenge titles
+// and the planet name based on the viewer's locale; defaults to the DB value.
+export async function getPlanetExplore(
+  db: DB, slug: string,
+  te: (kind: string, id: string, field: string, fallback: string | null | undefined) => string = (_k, _i, _f, v) => v ?? "",
+): Promise<PlanetExplore | null> {
   const [space] = await db.select().from(schema.spaces).where(eq(schema.spaces.slug, slug)).limit(1);
   if (!space) return null;
   const game = space.game ?? null;
@@ -70,7 +75,7 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
       const a = accById.get(r.accountId);
       return { rank: i + 1, slug: a?.slug ?? "", name: a?.name ?? "Gamer", avatar: a ? gameAvatar(a) : null, country: a?.country ?? null, accountId: r.accountId, provider: a?.provider ?? null, value: r.value, rankLabel: r.rankLabel };
     }).filter((e) => e.slug);
-    return { metricKey: b.metricKey, title: b.title, unit: b.unit ?? null, sortDir: b.sortDir, entries };
+    return { metricKey: b.metricKey, title: te("leaderboard", b.id, "title", b.title), unit: b.unit ?? null, sortDir: b.sortDir, entries };
   }).filter((b) => b.entries.length > 0);
 
   // ---- Champion mastery boards (auto-derived from connected accounts) ----
@@ -105,10 +110,10 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
     if (arr.length < 5) { const a = acctBySlug.get(p.slug); arr.push({ slug: p.slug, name: p.name, avatar: a ? gameAvatar(a) : p.avatarUrl, country: p.country ?? null, points: p.points }); topByCh.set(p.challengeId, arr); }
   }
   const challenges: ExploreChallenge[] = challengeRows.map((c) => ({
-    id: c.id, title: c.title, coverUrl: c.coverUrl,
+    id: c.id, title: te("challenge", c.id, "title", c.title), coverUrl: c.coverUrl,
     startAt: c.startAt.toISOString(), endAt: c.endAt.toISOString(), status: c.status,
-    description: c.description ?? "", format: c.format,
-    conditions: c.rules?.conditions ?? [], prize: c.prizeDescription ?? null,
+    description: te("challenge", c.id, "description", c.description ?? ""), format: c.format,
+    conditions: c.rules?.conditions ?? [], prize: te("challenge", c.id, "prizeDescription", c.prizeDescription) || null,
     top: topByCh.get(c.id) ?? [],
   }));
 
@@ -126,7 +131,7 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
   const regions = [...regionMap.values()];
 
   return {
-    slug: space.slug, name: space.name, game, hasChampions: championBoards.length > 0,
+    slug: space.slug, name: te("planet", space.id, "name", space.name), game, hasChampions: championBoards.length > 0,
     heroLayout: gameRow?.heroLayout ?? null, bgUrl: gameRow?.planetBgUrl ?? gameRow?.coverUrl ?? null,
     boards, championBoards, challenges, regions,
   };
