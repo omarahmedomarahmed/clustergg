@@ -510,13 +510,13 @@ function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: strin
   );
 }
 
-// The lore card shown in the middle when an entity is clicked: the splash /
-// portrait painted as the card BACKGROUND, a skins strip at the TOP (click a
-// skin to set it as the cover + open the full image), plus lore + abilities.
+// The lore card shown in the middle when an entity is clicked: a big splash/
+// portrait COVER that stays pinned at the top while you scroll, with the same
+// art faintly filling the card background. Clicking a skin swaps the cover +
+// background in place (no image popup).
 function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; kind: string; id: string; name: string; image: string }) {
   const [d, setD] = useState<EntityDetail | null>(null);
   const [cover, setCover] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<string | null>(null);
   useEffect(() => {
     if (!game) return; let alive = true; setCover(null);
     fetch(`/api/planet/entity?game=${encodeURIComponent(game)}&kind=${kind}&id=${encodeURIComponent(id)}`, { cache: "force-cache" })
@@ -524,26 +524,36 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
     return () => { alive = false; };
   }, [game, kind, id]);
   const splash = cover || d?.splash || image;
+  const contain = kind === "weapon";
   return (
     <div className="relative -m-3 rounded-2xl overflow-hidden">
-      <div className="absolute inset-0 bg-cover bg-center transition-[background-image]" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.7), rgba(4,5,26,0.9)), url(${splash})` }} />
-      <div className="relative p-3">
-        <div className="flex items-center gap-2.5 mb-2">
+      {/* Faint splash filling the whole card background */}
+      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.94)), url(${splash})` }} />
+      {/* Persistent COVER pinned to the top while the body scrolls */}
+      <div className="sticky top-0 z-10">
+        <div className="relative h-36 sm:h-44 bg-[#04051a]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image} alt="" className={`h-12 w-12 rounded-lg border border-white/20 ${kind === "weapon" ? "object-contain bg-black/40" : "object-cover"}`} />
-          <div><div className="font-bold text-lg">{name}</div>{d?.role && <div className="text-[11px] text-cyan-200">{d.role}</div>}</div>
+          <img src={splash} alt={name} className={`absolute inset-0 h-full w-full ${contain ? "object-contain p-3 bg-black/30" : "object-cover"}`} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, #04051a, rgba(4,5,26,0.15) 55%, transparent)" }} />
+          <div className="absolute bottom-2 left-3 right-3">
+            <div className="text-xl font-bold drop-shadow">{name}</div>
+            {d?.role && <div className="text-[11px] text-cyan-200">{d.role}</div>}
+          </div>
         </div>
+      </div>
+      <div className="relative p-3">
         {!d ? <div className="text-xs text-muted animate-pulse">Loading lore…</div> : (
           <>
-            {/* Skins at the TOP — click to set as cover + open the full image */}
+            {/* Skin selector — tap a skin to repaint the cover + background */}
             {d.skins.length > 0 && (
               <div className="mb-3">
-                <div className="text-[10px] uppercase tracking-widest text-white/60 mb-1.5">{d.skins.length} skin{d.skins.length === 1 ? "" : "s"} · tap to preview</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/60 mb-1.5">{d.skins.length} skin{d.skins.length === 1 ? "" : "s"} · tap to set the cover</div>
                 <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  <button onClick={() => setCover(null)} className={`shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${!cover ? "border-cyan-400 text-cyan-200" : "border-white/12 text-muted hover:text-ink"}`}>Default</button>
                   {d.skins.map((s, i) => (
-                    <button key={i} onClick={() => { setCover(s.image); setLightbox(s.image); }} title={s.name} className={`shrink-0 w-32 text-left rounded-lg overflow-hidden border transition ${cover === s.image ? "border-cyan-400" : "border-white/10 hover:border-cyan-400/50"}`}>
+                    <button key={i} onClick={() => setCover(s.image)} title={s.name} className={`shrink-0 w-24 text-left rounded-lg overflow-hidden border transition ${cover === s.image ? "border-cyan-400" : "border-white/10 hover:border-cyan-400/50"}`}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={s.image} alt={s.name} loading="lazy" className={`h-16 w-32 ${kind === "weapon" ? "object-contain bg-black/40 p-1" : "object-cover"}`} onError={(ev) => { ((ev.currentTarget.closest("button")) as HTMLElement).style.display = "none"; }} />
+                      <img src={s.image} alt={s.name} loading="lazy" className={`h-12 w-24 ${contain ? "object-contain bg-black/40 p-1" : "object-cover"}`} onError={(ev) => { ((ev.currentTarget.closest("button")) as HTMLElement).style.display = "none"; }} />
                       <div className="text-[9px] text-white/70 truncate px-1 py-0.5">{s.name}</div>
                     </button>
                   ))}
@@ -557,18 +567,6 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
           </>
         )}
       </div>
-      {lightbox && <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />}
-    </div>
-  );
-}
-
-// Full-screen image viewer for a skin/splash. Click anywhere to close.
-function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85" onClick={(e) => { e.stopPropagation(); onClose(); }}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="" className="max-h-[90vh] max-w-[92vw] rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
-      <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-4 right-4 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"><Icon name="x" size={18} /></button>
     </div>
   );
 }

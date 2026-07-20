@@ -34,7 +34,7 @@ export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
   defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultOrbColor, defaultQuestRocket,
   defaultLoadingInterval = 3, defaultLoadingAstronaut = "", defaultLoadingBg = "", defaultLoadingWordmark = true, defaultLoadingOrbSize = 80,
-  defaultOrbSize = 56,
+  defaultOrbSize = 56, defaultHidePlanets = false,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -58,6 +58,7 @@ export default function BrandingEditor({
   defaultLoadingWordmark?: boolean;
   defaultLoadingOrbSize?: number;
   defaultOrbSize?: number;
+  defaultHidePlanets?: boolean;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [cpIcon, setCpIcon] = useState(defaultCpIcon);
@@ -66,6 +67,7 @@ export default function BrandingEditor({
   const [orbSize, setOrbSize] = useState(defaultOrbSize);
   const [questRocket, setQuestRocket] = useState(defaultQuestRocket);
   const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
+  const [hidePlanets, setHidePlanets] = useState(!!defaultHidePlanets);
   const [navBg, setNavBg] = useState(defaultNavBg);
   const [footerBg, setFooterBg] = useState(defaultFooterBg);
   const [favicon, setFavicon] = useState(defaultFavicon);
@@ -149,6 +151,10 @@ export default function BrandingEditor({
         <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
           <ImageUpload name="planetsIcon" value={planetsIcon} onChange={setPlanetsIcon}
             aspect="1/1" rounded="rounded-xl" maxDim={128} scope="content" hint="Square icon, shown at 40×40 in the nav." />
+          <label className="mt-3 flex items-center gap-2 text-sm text-muted cursor-pointer">
+            <input type="checkbox" name="hidePlanets" checked={hidePlanets} onChange={(e) => setHidePlanets(e.target.checked)} className="accent-cyan-400" />
+            Hide the &ldquo;All planets&rdquo; badge from the nav bar
+          </label>
         </div>
       </div>
 

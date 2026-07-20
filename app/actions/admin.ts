@@ -53,6 +53,7 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.wordmark.zoom", String(Math.max(0.5, Math.min(3, Number.isFinite(wmZoom) ? wmZoom : 1))));
   await setContent("brand.nav.mode", mode(formData.get("navMode")));
   await setContent("brand.nav.planetsIcon", String(formData.get("planetsIcon") ?? "").trim());
+  await setContent("brand.nav.hidePlanets", formData.get("hidePlanets") === "on" ? "1" : "");
   await setContent("brand.footer.mode", mode(formData.get("footerMode")));
   await setContent("brand.loading.color", String(formData.get("loadingColor") ?? "#8b5cf6").trim() || "#8b5cf6");
   await setContent("brand.loading.logo", String(formData.get("loadingLogo") ?? "").trim());
