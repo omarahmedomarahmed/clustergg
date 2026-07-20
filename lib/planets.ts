@@ -56,6 +56,7 @@ export function computeRealRegions(rows: RegionRow[], pins: PinMap, fallbackCode
 export const PLANET_PALETTE: Record<string, { accent: string; accent2: string }> = {
   "League of Legends": { accent: "#c89b3c", accent2: "#3b82f6" },
   "VALORANT": { accent: "#fd4556", accent2: "#22d3ee" },
+  "Apex Legends": { accent: "#da292a", accent2: "#f97316" },
 };
 
 // Interactive-hero data for every game that has a planet skin: region gamer

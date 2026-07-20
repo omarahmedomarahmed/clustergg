@@ -7,6 +7,7 @@ import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
 import TopBannerAd from "@/components/TopBannerAd";
 import LolCard from "@/components/LolCard";
+import EntityImg from "@/components/EntityImg";
 import { ChallengeLog } from "@/components/ChallengeLog";
 import { slimImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
@@ -462,7 +463,7 @@ function RailGroup({ icon, title, accent, children }: { icon: string; title: str
   );
 }
 
-const entityLabel = (k: string) => k === "weapon" ? "Weapons" : k === "agent" ? "Agents" : k === "hero" ? "Heroes" : k === "champion" ? "Champions" : k === "outfit" ? "Outfits" : "Game world";
+const entityLabel = (k: string) => k === "weapon" ? "Weapons" : k === "agent" ? "Agents" : k === "hero" ? "Heroes" : k === "champion" ? "Champions" : k === "outfit" ? "Outfits" : k === "legend" ? "Legends" : k === "map" ? "Maps" : "Game world";
 const entityImgCls = (k: string) => k === "weapon" ? "object-contain p-1 bg-black/30" : "object-cover";
 
 // The game-world rail: entities (champions/agents/weapons/heroes) as big art
@@ -496,9 +497,8 @@ function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: strin
           )}
           <div className="grid grid-cols-3 gap-1.5 max-h-[210px] overflow-y-auto pr-0.5 overscroll-contain">
             {shown.map((e) => (
-              <button key={`${e.kind}-${e.id}`} onClick={() => onOpen(e)} title={e.name} className="relative rounded-lg overflow-hidden border border-white/10 hover:border-cyan-400/50 transition aspect-square">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={e.image} alt={e.name} loading="lazy" className={`h-full w-full ${entityImgCls(e.kind)}`} />
+              <button key={`${e.kind}-${e.id}`} onClick={() => onOpen(e)} title={e.name} style={{ containerType: "size" }} className="relative rounded-lg overflow-hidden border border-white/10 hover:border-cyan-400/50 transition aspect-square">
+                <EntityImg src={e.image} name={e.name} kind={e.kind} className={`h-full w-full ${entityImgCls(e.kind)}`} />
                 <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#04051a] to-transparent text-[9px] font-bold px-1 pb-0.5 pt-2 truncate">{e.name}</span>
               </button>
             ))}
@@ -531,9 +531,8 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
       <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.94)), url(${splash})` }} />
       {/* Persistent COVER pinned to the top while the body scrolls */}
       <div className="sticky top-0 z-10">
-        <div className="relative h-36 sm:h-44 bg-[#04051a]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={splash} alt={name} className={`absolute inset-0 h-full w-full ${contain ? "object-contain p-3 bg-black/30" : "object-cover"}`} />
+        <div className="relative h-36 sm:h-44 bg-[#04051a]" style={{ containerType: "size" }}>
+          <EntityImg src={splash} name={name} kind={kind} className={`absolute inset-0 h-full w-full ${contain ? "object-contain p-3 bg-black/30" : "object-cover"}`} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to top, #04051a, rgba(4,5,26,0.15) 55%, transparent)" }} />
           <div className="absolute bottom-2 left-3 right-3">
             <div className="text-xl font-bold drop-shadow">{name}</div>
@@ -590,9 +589,8 @@ function MiddleDirectory({ game, entityKind, onOpen }: { game: string | null; en
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full rounded-lg border border-white/12 bg-black/30 px-2.5 py-1.5 text-xs outline-none focus:border-cyan-400/50 mb-2" />
       <div className="grid grid-cols-4 gap-1.5 max-h-[320px] overflow-y-auto overscroll-contain">
         {shown.map((e) => (
-          <button key={`${e.kind}-${e.id}`} onClick={() => onOpen(e)} title={e.name} className="relative rounded-lg overflow-hidden border border-white/10 hover:border-cyan-400/50 aspect-square">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={e.image} alt={e.name} loading="lazy" className={`h-full w-full ${entityImgCls(e.kind)}`} />
+          <button key={`${e.kind}-${e.id}`} onClick={() => onOpen(e)} title={e.name} style={{ containerType: "size" }} className="relative rounded-lg overflow-hidden border border-white/10 hover:border-cyan-400/50 aspect-square">
+            <EntityImg src={e.image} name={e.name} kind={e.kind} className={`h-full w-full ${entityImgCls(e.kind)}`} />
             <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#04051a] to-transparent text-[9px] font-bold px-1 pb-0.5 pt-2 truncate">{e.name}</span>
           </button>
         ))}

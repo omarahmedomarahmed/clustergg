@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
+import EntityImg from "@/components/EntityImg";
 import type { EntityLite, EntityDetail } from "@/lib/game-entities";
 
-const KIND_LABEL: Record<string, string> = { champion: "Champions", hero: "Heroes", agent: "Agents", weapon: "Weapons", outfit: "Outfits" };
+const KIND_LABEL: Record<string, string> = { champion: "Champions", hero: "Heroes", agent: "Agents", weapon: "Weapons", outfit: "Outfits", legend: "Legends", map: "Maps" };
 
 // The game-world directory on a planet page: every champion / agent+weapon /
 // hero of the game as a searchable art grid; click one for its splash, lore and
@@ -45,9 +46,8 @@ export default function GameDirectory({ game }: { game: string }) {
       <div className="max-h-[58vh] overflow-y-auto overscroll-contain pr-1 rounded-xl">
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
           {shown.map((e) => (
-            <button key={`${e.kind}-${e.id}`} onClick={() => setOpen(e)} className="group relative rounded-xl overflow-hidden border border-white/10 hover:border-cyan-400/50 transition text-left aspect-square">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={e.image} alt={e.name} loading="lazy" className={`h-full w-full transition-transform group-hover:scale-105 ${e.kind === "weapon" ? "object-contain p-2 bg-black/30" : "object-cover"}`} />
+            <button key={`${e.kind}-${e.id}`} onClick={() => setOpen(e)} style={{ containerType: "size" }} className="group relative rounded-xl overflow-hidden border border-white/10 hover:border-cyan-400/50 transition text-left aspect-square">
+              <EntityImg src={e.image} name={e.name} kind={e.kind} className={`h-full w-full transition-transform group-hover:scale-105 ${e.kind === "weapon" ? "object-contain p-2 bg-black/30" : "object-cover"}`} />
               <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#04051a] to-transparent p-1.5">
                 <div className="text-[11px] font-bold truncate">{e.name}</div>
                 {e.role && <div className="text-[9px] text-muted truncate">{e.role}</div>}
@@ -79,9 +79,8 @@ function EntityModal({ game, lite, onClose }: { game: string; lite: EntityLite; 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm" onClick={onClose}>
       <div className="relative w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-white/15 bg-[#04051a]" onClick={(e) => e.stopPropagation()}>
         {/* Persistent cover pinned to the top while the body scrolls */}
-        <div className="sticky top-0 z-10 h-44 sm:h-56 bg-[#04051a]">
-          {headerImg && /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={headerImg} alt="" className={`absolute inset-0 h-full w-full ${lite.kind === "weapon" ? "object-contain p-6" : "object-cover"}`} />}
+        <div className="sticky top-0 z-10 h-44 sm:h-56 bg-[#04051a]" style={{ containerType: "size" }}>
+          <EntityImg src={headerImg} name={lite.name} kind={lite.kind} className={`absolute inset-0 h-full w-full ${lite.kind === "weapon" ? "object-contain p-6" : "object-cover"}`} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to top, #04051a, rgba(4,5,26,0.2) 60%, transparent)" }} />
           <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"><Icon name="x" size={16} /></button>
           <div className="absolute bottom-3 left-4 right-4">

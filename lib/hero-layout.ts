@@ -7,7 +7,7 @@ export type HeroModule =
   | { id: string; kind: "leaderboards"; limit?: number }
   | { id: string; kind: "board"; metricKey: string }
   | { id: string; kind: "champions"; limit?: number }
-  | { id: string; kind: "entities"; entityKind?: "all" | "champion" | "hero" | "agent" | "weapon" | "outfit"; limit?: number }
+  | { id: string; kind: "entities"; entityKind?: "all" | "champion" | "hero" | "agent" | "weapon" | "outfit" | "legend" | "map"; limit?: number }
   | { id: string; kind: "challenges" }
   | { id: string; kind: "regions" };
 
@@ -27,11 +27,13 @@ export const HERO_MODULE_META: { kind: HeroModuleKind; label: string; icon: stri
 const rid = () => "m-" + Math.random().toString(36).slice(2, 9);
 
 // The game-world entity kinds a game exposes (client-safe mapping).
-export function entityKindsForGame(game: string | null | undefined): ("champion" | "hero" | "agent" | "weapon" | "outfit")[] {
+export function entityKindsForGame(game: string | null | undefined): ("champion" | "hero" | "agent" | "weapon" | "outfit" | "legend" | "map")[] {
   if (game === "League of Legends") return ["champion"];
   if (game === "VALORANT") return ["agent", "weapon"];
   if (game === "Dota 2") return ["hero"];
   if (game === "Fortnite") return ["outfit"];
+  if (game === "Apex Legends") return ["legend"];
+  if (game === "PUBG: Battlegrounds" || game === "PUBG") return ["weapon", "map"];
   return [];
 }
 export function newModule(kind: HeroModuleKind): HeroModule {
