@@ -204,8 +204,11 @@ async function createDb(): Promise<DB> {
   // Apply the same idempotent column back-fills so demo mode matches the schema
   // without hand-editing the static DDL for every new column.
   await runColumnMigrations(db);
-  const { seed } = await import("./seed");
+  const { seed, runBootMaintenance, ensureBrandKeys } = await import("./seed");
   await seed(db, { demo: true });
+  // Demo mode must run the same boot maintenance as production (planet skins,
+  // logos/covers, house ads) so globes + connect art show here too.
+  try { await runBootMaintenance(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
   return db;
 }
 
