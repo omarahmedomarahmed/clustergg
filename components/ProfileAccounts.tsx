@@ -7,6 +7,7 @@ import GameLogo from "@/components/GameLogo";
 import BrandGlyph from "@/components/BrandGlyph";
 import LinkAccountForm, { type ProviderInfo } from "@/components/LinkAccountForm";
 import LolCard, { type LolSnapshot } from "@/components/LolCard";
+import { useTr } from "@/components/LocaleProvider";
 
 export type AccountCard = {
   id: string;
@@ -42,6 +43,7 @@ export default function ProfileAccounts({
 }) {
   const [open, setOpen] = useState<string | null>(accounts.length === 1 ? accounts[0].id : null);
   const [connect, setConnect] = useState(false);
+  const tr = useTr();
   const c = colors;
   const mix = (pct: number) => `color-mix(in srgb, ${c.accent} ${pct}%, transparent)`;
 
@@ -49,12 +51,12 @@ export default function ProfileAccounts({
     <section>
       <div className="flex items-center justify-between mb-3 gap-3">
         <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: c.text }}>
-          <Icon name="gamepad" size={19} style={{ color: c.accent }} /> Connected games
+          <Icon name="gamepad" size={19} style={{ color: c.accent }} /> {tr("Connected games")}
         </h2>
         {isOwner && (
           <button onClick={() => setConnect((v) => !v)} className="text-xs rounded-full px-3 py-1.5 inline-flex items-center gap-1.5"
             style={{ border: `1px solid ${mix(40)}`, color: c.accent }}>
-            <Icon name={connect ? "x" : "link"} size={12} /> {connect ? "Close" : "Connect a game"}
+            <Icon name={connect ? "x" : "link"} size={12} /> {connect ? tr("Close") : tr("Connect a game")}
           </button>
         )}
       </div>
@@ -63,20 +65,20 @@ export default function ProfileAccounts({
       {isOwner && connect && (
         <div className="mb-5 rounded-2xl p-4" style={{ background: mix(8), border: `1px solid ${mix(25)}` }}>
           {/* Discord = your universal identity — always first. */}
-          <div className="text-sm font-semibold mb-2" style={{ color: c.text }}>Your identity</div>
+          <div className="text-sm font-semibold mb-2" style={{ color: c.text }}>{tr("Your identity")}</div>
           <a href="/api/auth/discord?intent=link&next=/profile"
             className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white mb-4"
             style={{ background: "#5865f2", boxShadow: "0 6px 18px -8px #5865f2" }}>
-            <BrandGlyph provider="discord" size={16} /> Connect Discord
+            <BrandGlyph provider="discord" size={16} /> {tr("Connect Discord")}
           </a>
-          <div className="text-sm font-semibold mb-3" style={{ color: c.text }}>Pick a game to connect</div>
+          <div className="text-sm font-semibold mb-3" style={{ color: c.text }}>{tr("Pick a game to connect")}</div>
           <LinkAccountForm providers={providers} gameLogos={gameLogos} />
         </div>
       )}
 
       {accounts.length === 0 ? (
         <div className="rounded-2xl p-6 text-center text-sm" style={{ background: mix(6), color: c.muted }}>
-          {isOwner ? "No games connected yet — connect your first above." : "No games connected yet."}
+          {isOwner ? tr("No games connected yet — connect your first above.") : tr("No games connected yet.")}
         </div>
       ) : (
         <>
@@ -109,6 +111,7 @@ export default function ProfileAccounts({
 }
 
 function AccountRow({ account: a, colors: c, active, onToggle }: { account: AccountCard; colors: ThemeColors; active: boolean; onToggle: () => void }) {
+  const tr = useTr();
   const mix = (pct: number) => `color-mix(in srgb, ${c.accent} ${pct}%, transparent)`;
   const isLol = a.provider === "riot-lol";
   const [snap, setSnap] = useState<LolSnapshot | null>(null);
@@ -168,14 +171,14 @@ function AccountRow({ account: a, colors: c, active, onToggle }: { account: Acco
               ))}
             </div>
           ) : (
-            <div className="text-xs" style={{ color: c.muted }}>Stats sync shortly after connecting.</div>
+            <div className="text-xs" style={{ color: c.muted }}>{tr("Stats sync shortly after connecting.")}</div>
           )}
           {a.standings.length > 0 && (
             <div className="mt-3 flex flex-wrap gap-1.5">
               {a.standings.map((x) => (
                 <Link key={x.metricKey} href={`/leaderboards/${encodeURIComponent(x.game)}?stat=${x.metricKey}`}
                   className="text-[11px] rounded-full px-2.5 py-1" style={{ border: `1px solid ${mix(35)}`, color: c.accent }}>
-                  #{x.rank} of {x.total} · {x.label}
+                  #{x.rank} {tr("of")} {x.total} · {x.label}
                 </Link>
               ))}
             </div>

@@ -419,6 +419,28 @@ export const AR_TEXT: Record<string, string> = {
   "Active challenges": "التحديات النشطة",
   "Recent posts": "أحدث المنشورات",
   "My planets": "كواكبي",
+  // Post reactions + comments
+  "Like": "إعجاب",
+  "Dislike": "عدم إعجاب",
+  "Meh": "عادي",
+  "Log in to react": "سجّل الدخول للتفاعل",
+  "View": "عرض",
+  "comment": "تعليق",
+  "comments": "تعليقات",
+  "Add a comment": "أضف تعليقًا",
+  "Reply": "رد",
+  "Write a reply…": "اكتب ردًا…",
+  "Add a comment…": "أضف تعليقًا…",
+  "Post": "نشر",
+  "to join the conversation.": "للانضمام إلى المحادثة.",
+  // Profile connected accounts
+  "Connected games": "الألعاب المرتبطة",
+  "Your identity": "هويتك",
+  "Connect Discord": "ربط ديسكورد",
+  "Pick a game to connect": "اختر لعبة للربط",
+  "No games connected yet — connect your first above.": "لا توجد ألعاب مرتبطة بعد — اربط أول لعبة أعلاه.",
+  "No games connected yet.": "لا توجد ألعاب مرتبطة بعد.",
+  "Stats sync shortly after connecting.": "تتزامن الإحصاءات بعد الربط بقليل.",
   // Common
   "See all": "عرض الكل",
   "Save": "حفظ",
@@ -447,6 +469,8 @@ export const PAGE_STRINGS: { page: string; strings: string[] }[] = [
   { page: "Feed panel", strings: ["Done", "Customize panel", "Connect", "Profile", "Cluster Points", "Quest badges", "Followers", "Following", "Profile views", "Games linked", "Challenges joined", "Posts", "Connected accounts", "Game", "In-game name", "Region", "Manage", "Planet", "Connect game", "Pick a game to connect — you'll link your account on the next step.", "All providers", "Saving…", "Save panel"] },
   { page: "Feed dashboard", strings: ["Build your dashboard", "drop quest trackers, CP history, game stats and leaderboards onto a canvas.", "Build", "My dashboard", "Save", "Done", "Customize", "Drag or tap to add a widget", "Quest tracker", "CP total / quest", "Game stat", "Leaderboard", "League account", "Drop widgets here.", "Open full page", "No quests", "No connected stats", "No League account linked", "No leaderboards", "Total CP", "CP", "Couldn't load the leaderboard.", "Loading standings…", "No ranked players yet.", "You", "of"] },
   { page: "Profile builder", strings: ["Identity", "Theme", "Style", "Your real content shows here.", "No accounts linked yet — connect a game.", "Link a game to appear on leaderboards.", "Win a challenge to earn a trophy.", "No badges yet.", "Not competing in any challenges right now.", "No posts yet.", "Join a planet to show it here.", "Flex title (under your name)", "e.g. Blitz Grandmaster", "Bio", "Avatar / profile image", "Avatar shape", "Avatar size", "Cover / banner image", "Cover height", "Cover darken", "Page background image", "None", "Background blur", "Background darken", "Templates", "Recolor everything", "Page background", "Card background", "Accent", "Accent 2 (gradients)", "Text", "Muted text", "Card style", "Button style", "Font", "Corner radius", "Sections — show, hide, reorder & set card art", "Card background art", "Background art for the", "card", "Remove art", "Custom cursor", "(everyone sees it on your profile)", "Cursor color", "or paste a custom 32×32 PNG URL", "Live preview —", "Saving…", "Saved ✓", "Save changes", "Couldn't save — an image may be too large. Try a smaller one.", "Connected accounts", "Quests & Cluster Points", "Leaderboard standings", "Trophy case", "Badges", "Active challenges", "Recent posts", "My planets"] },
+  { page: "Posts & comments", strings: ["Like", "Dislike", "Meh", "Log in to react", "View", "comment", "comments", "Add a comment", "Reply", "Write a reply…", "Send", "Add a comment…", "Post", "Log in", "to join the conversation."] },
+  { page: "Connected games", strings: ["Connected games", "Close", "Connect a game", "Your identity", "Connect Discord", "Pick a game to connect", "No games connected yet — connect your first above.", "No games connected yet.", "Stats sync shortly after connecting."] },
 ];
 
 // t(): dotted-key lookup for chrome.

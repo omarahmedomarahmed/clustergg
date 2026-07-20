@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { addComment } from "@/app/actions/social";
 import Avatar from "@/components/Avatar";
+import { useTr } from "@/components/LocaleProvider";
 import { timeAgo } from "@/lib/utils";
 
 type CommentRow = {
@@ -17,6 +18,7 @@ export default function CommentThread({
   const [open, setOpen] = useState(false);
   const [replyTo, setReplyTo] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const tr = useTr();
 
   const roots = comments.filter((c) => !c.comment.parentCommentId);
   const childrenOf = (id: string) => comments.filter((c) => c.comment.parentCommentId === id);
@@ -34,7 +36,7 @@ export default function CommentThread({
     <div className="mt-3 border-t border-violet-400/10 pt-3">
       {!open ? (
         <button onClick={() => setOpen(true)} className="text-xs text-muted hover:text-cyan-300">
-          {comments.length > 0 ? `View ${comments.length} comment${comments.length === 1 ? "" : "s"}` : "Add a comment"} →
+          {comments.length > 0 ? `${tr("View")} ${comments.length} ${tr(comments.length === 1 ? "comment" : "comments")}` : tr("Add a comment")} →
         </button>
       ) : (
         <div className="space-y-3">
@@ -50,7 +52,7 @@ export default function CommentThread({
                   <p className="text-sm mt-0.5">{comment.body}</p>
                   {viewerId && (
                     <button onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)} className="text-[11px] text-muted hover:text-cyan-300 mt-0.5">
-                      Reply
+                      {tr("Reply")}
                     </button>
                   )}
                   {childrenOf(comment.id).map(({ comment: child, author: childAuthor }) => (
@@ -67,8 +69,8 @@ export default function CommentThread({
                   ))}
                   {replyTo === comment.id && (
                     <form action={submit(comment.id)} className="mt-2 flex gap-2">
-                      <input name="body" required placeholder="Write a reply…" className="input-cosmic !py-1.5 text-sm" autoFocus />
-                      <button disabled={pending} className="ghost-btn rounded-full px-4 text-xs">Send</button>
+                      <input name="body" required placeholder={tr("Write a reply…")} className="input-cosmic !py-1.5 text-sm" autoFocus />
+                      <button disabled={pending} className="ghost-btn rounded-full px-4 text-xs">{tr("Send")}</button>
                     </form>
                   )}
                 </div>
@@ -77,11 +79,11 @@ export default function CommentThread({
           ))}
           {viewerId ? (
             <form action={submit(null)} className="flex gap-2 pt-1">
-              <input name="body" required placeholder="Add a comment…" className="input-cosmic !py-1.5 text-sm" />
-              <button disabled={pending} className="ghost-btn rounded-full px-4 text-xs">Post</button>
+              <input name="body" required placeholder={tr("Add a comment…")} className="input-cosmic !py-1.5 text-sm" />
+              <button disabled={pending} className="ghost-btn rounded-full px-4 text-xs">{tr("Post")}</button>
             </form>
           ) : (
-            <p className="text-xs text-muted"><Link href="/login" className="text-cyan-300 underline">Log in</Link> to join the conversation.</p>
+            <p className="text-xs text-muted"><Link href="/login" className="text-cyan-300 underline">{tr("Log in")}</Link> {tr("to join the conversation.")}</p>
           )}
         </div>
       )}

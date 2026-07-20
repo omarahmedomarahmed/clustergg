@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { reactToPost } from "@/app/actions/social";
 import Icon from "@/components/Icon";
+import { useTr } from "@/components/LocaleProvider";
 
 const REACTIONS = [
   { type: "like" as const, icon: "arrowUp", label: "Like" },
@@ -20,13 +21,14 @@ export default function ReactionBar({
   loggedIn: boolean;
 }) {
   const [pending, startTransition] = useTransition();
+  const tr = useTr();
   return (
     <div className="flex items-center gap-2">
       {REACTIONS.map((r) => (
         <button
           key={r.type}
           disabled={pending || !loggedIn}
-          title={loggedIn ? r.label : "Log in to react"}
+          title={loggedIn ? tr(r.label) : tr("Log in to react")}
           onClick={() => startTransition(() => reactToPost(postId, r.type, path))}
           className={`pressable flex items-center gap-1.5 rounded-full px-3 py-1 text-xs border transition-colors ${
             mine === r.type
