@@ -4,18 +4,19 @@ import { createContext, useContext } from "react";
 import { t as translate, type StringKey } from "@/lib/i18n/strings";
 import type { Locale } from "@/lib/i18n/locale";
 
-const Ctx = createContext<Locale>("en");
+type Ctx = { locale: Locale; overrides: Record<string, string> };
+const LocaleCtx = createContext<Ctx>({ locale: "en", overrides: {} });
 
-// Seeds the active locale from the server so client chrome can translate with
-// useT() without prop-drilling.
-export function LocaleProvider({ locale, children }: { locale: Locale; children: React.ReactNode }) {
-  return <Ctx.Provider value={locale}>{children}</Ctx.Provider>;
+// Seeds the active locale + admin string overrides from the server so client
+// chrome can translate with useT() without prop-drilling.
+export function LocaleProvider({ locale, overrides = {}, children }: { locale: Locale; overrides?: Record<string, string>; children: React.ReactNode }) {
+  return <LocaleCtx.Provider value={{ locale, overrides }}>{children}</LocaleCtx.Provider>;
 }
 
 export function useLocale(): Locale {
-  return useContext(Ctx);
+  return useContext(LocaleCtx).locale;
 }
 export function useT(): (key: StringKey) => string {
-  const locale = useContext(Ctx);
-  return (key: StringKey) => translate(locale, key);
+  const { locale, overrides } = useContext(LocaleCtx);
+  return (key: StringKey) => translate(locale, key, overrides);
 }

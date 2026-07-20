@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Cairo } from "next/font/google";
 import "./globals.css";
 import { getLocale } from "@/lib/i18n/server";
+import { getUiOverrides } from "@/lib/i18n/t-server";
 import { dirOf } from "@/lib/i18n/locale";
 import Starfield from "@/components/Starfield";
 import Nav from "@/components/Nav";
@@ -70,11 +71,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const me = await getCurrentUser().catch(() => null);
   const locale = await getLocale(me?.locale);
   const dir = dirOf(locale);
+  const uiOverrides = await getUiOverrides(locale);
 
   return (
     <html lang={locale} dir={dir} className={`${grotesk.variable} ${cairo.variable}`}>
       <body className={`nebula-bg min-h-screen antialiased ${locale === "ar" ? "font-arabic" : ""}`} style={cpIcon ? ({ ["--cp-icon" as string]: `url(${cpIcon})` }) : undefined}>
-        <LocaleProvider locale={locale}>
+        <LocaleProvider locale={locale} overrides={uiOverrides}>
         <RouteProgress />
         <PageBackground map={bgMap} />
         <Starfield />

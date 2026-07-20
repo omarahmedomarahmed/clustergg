@@ -1,5 +1,7 @@
 import { getContent, getRawContent } from "@/lib/cms";
 import { getCountries } from "@/lib/countries-server";
+import { STRINGS, STRING_KEYS } from "@/lib/i18n/strings";
+import { saveUiString } from "@/app/actions/language";
 import CountriesEditor from "@/components/CountriesEditor";
 import ArabicContentEditor, { type ArabicItem } from "@/components/ArabicContentEditor";
 import Icon from "@/components/Icon";
@@ -33,12 +35,23 @@ const TRANSLATABLE: { key: string; label: string; multiline?: boolean }[] = [
 
 export default async function LanguageAdminPage() {
   const keys = TRANSLATABLE.map((t) => t.key);
-  const [countries, en, ar] = await Promise.all([
+  const [countries, en, ar, uiRaw] = await Promise.all([
     getCountries(),
     getContent(keys, "en"),
     getRawContent(keys, "ar"),
+    getRawContent(["ui.overrides"], "ar"),
   ]);
   const items: ArabicItem[] = TRANSLATABLE.map((t) => ({ key: t.key, label: t.label, en: en[t.key] ?? "", ar: ar[t.key] ?? "", multiline: t.multiline }));
+
+  // Interface (UI dictionary) strings — every built-in string, overridable.
+  let uiMap: Record<string, string> = {};
+  try { if (uiRaw["ui.overrides"]) uiMap = JSON.parse(uiRaw["ui.overrides"]); } catch { /* none */ }
+  const uiItems: ArabicItem[] = STRING_KEYS.map((k) => ({
+    key: k, label: k,
+    en: `EN: ${STRINGS.en[k]}   ·   AR: ${STRINGS.ar[k]}`,
+    ar: uiMap[k] ?? "",
+    multiline: STRINGS.en[k].length > 40,
+  }));
 
   return (
     <div className="space-y-6">
@@ -50,6 +63,12 @@ export default async function LanguageAdminPage() {
         </p>
       </div>
       <ArabicContentEditor items={items} />
+      <ArabicContentEditor
+        items={uiItems}
+        save={saveUiString}
+        title="Interface strings (Arabic)"
+        subtitle="Override the built-in Arabic for nav, buttons and page headers. Blank keeps the built-in translation."
+      />
       <CountriesEditor initial={countries} />
     </div>
   );

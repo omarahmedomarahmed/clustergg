@@ -1,12 +1,14 @@
 import type { Locale } from "./locale";
 
-// UI string dictionary for hard-coded chrome (nav, footer, buttons, common
-// labels). Arabic overlays English; a missing Arabic key falls back to English
-// so nothing is ever blank. This is the seed set — extend it wave by wave; the
-// admin can also override any string via the Language page (future work).
+// UI string dictionary for hard-coded chrome (nav, footer, page headers, common
+// buttons/empty-states). Arabic overlays English; a missing Arabic key falls
+// back to English so nothing is ever blank. Admins can override ANY string via
+// the Language page — those overrides (passed in as `overrides`) win over the
+// built-in Arabic here. Extend this map wave by wave to cover more pages.
 
 export const STRINGS = {
   en: {
+    // Nav / chrome
     "nav.home": "Home",
     "nav.planets": "Planets",
     "nav.allPlanets": "All planets",
@@ -21,12 +23,62 @@ export const STRINGS = {
     "nav.customize": "Customize profile",
     "nav.signOut": "Sign out",
     "nav.join": "Join the Cluster",
+    // Common actions / labels
     "common.notifications": "Notifications",
     "common.markAllRead": "Mark all read",
     "common.seeAll": "See all",
     "common.search": "Search",
     "common.save": "Save",
+    "common.saving": "Saving…",
+    "common.saved": "Saved",
+    "common.cancel": "Cancel",
+    "common.close": "Close",
+    "common.edit": "Edit",
+    "common.delete": "Delete",
     "common.loading": "Loading…",
+    "common.viewProfile": "View live profile",
+    "common.findGamers": "Find gamers",
+    "common.connectGame": "Connect a game",
+    "common.explorePlanets": "Explore planets",
+    "common.live": "Live",
+    "common.ended": "Ended",
+    "common.endsIn": "Ends in",
+    "common.prize": "Prize",
+    "common.howToWin": "How to win",
+    "common.topStandings": "Top standings",
+    "common.caughtUp": "You're all caught up.",
+    // Footer
+    "footer.product": "Product",
+    "footer.company": "Company",
+    "footer.legal": "Legal",
+    "footer.about": "About",
+    "footer.contact": "Contact",
+    "footer.privacy": "Privacy",
+    "footer.terms": "Terms",
+    "footer.cookies": "Cookies",
+    "footer.rights": "All rights reserved.",
+    // Feed / sections
+    "feed.explore": "Explore planets & quests",
+    "feed.liveChallenges": "Live challenges",
+    "feed.yourFeed": "Your feed",
+    "feed.myPlanets": "My planets",
+    "feed.tapGame": "Tap a game to explore its planet",
+    // Planets / leaderboards / quests
+    "planets.title": "The Game Galaxy",
+    "planets.explore": "Explore the planet",
+    "leaderboards.title": "Leaderboards",
+    "quests.title": "Quests",
+    "quests.allQuests": "All quests",
+    "challenges.title": "Live Challenges",
+    "challenges.join": "Join challenge",
+    "challenges.fullPage": "Full challenge page",
+    // Profile
+    "profile.yourProfile": "Your profile",
+    "profile.customizeTab": "Customize",
+    "profile.accountsTab": "Game accounts",
+    "profile.flagLanguage": "Flag & language",
+    "profile.countryFlag": "Country flag",
+    "profile.language": "Language",
   },
   ar: {
     "nav.home": "الرئيسية",
@@ -48,12 +100,61 @@ export const STRINGS = {
     "common.seeAll": "عرض الكل",
     "common.search": "بحث",
     "common.save": "حفظ",
+    "common.saving": "جارٍ الحفظ…",
+    "common.saved": "تم الحفظ",
+    "common.cancel": "إلغاء",
+    "common.close": "إغلاق",
+    "common.edit": "تعديل",
+    "common.delete": "حذف",
     "common.loading": "جارٍ التحميل…",
+    "common.viewProfile": "عرض الملف المباشر",
+    "common.findGamers": "ابحث عن لاعبين",
+    "common.connectGame": "اربط لعبة",
+    "common.explorePlanets": "استكشف الكواكب",
+    "common.live": "مباشر",
+    "common.ended": "انتهى",
+    "common.endsIn": "ينتهي خلال",
+    "common.prize": "الجائزة",
+    "common.howToWin": "كيف تفوز",
+    "common.topStandings": "أفضل الترتيب",
+    "common.caughtUp": "لا يوجد جديد.",
+    "footer.product": "المنتج",
+    "footer.company": "الشركة",
+    "footer.legal": "قانوني",
+    "footer.about": "من نحن",
+    "footer.contact": "تواصل معنا",
+    "footer.privacy": "الخصوصية",
+    "footer.terms": "الشروط",
+    "footer.cookies": "ملفات الارتباط",
+    "footer.rights": "جميع الحقوق محفوظة.",
+    "feed.explore": "استكشف الكواكب والمهام",
+    "feed.liveChallenges": "التحديات المباشرة",
+    "feed.yourFeed": "خلاصتك",
+    "feed.myPlanets": "كواكبي",
+    "feed.tapGame": "اضغط على لعبة لاستكشاف كوكبها",
+    "planets.title": "مجرّة الألعاب",
+    "planets.explore": "استكشف الكوكب",
+    "leaderboards.title": "لوحات الصدارة",
+    "quests.title": "المهام",
+    "quests.allQuests": "كل المهام",
+    "challenges.title": "التحديات المباشرة",
+    "challenges.join": "انضم إلى التحدي",
+    "challenges.fullPage": "صفحة التحدي كاملة",
+    "profile.yourProfile": "ملفك الشخصي",
+    "profile.customizeTab": "تخصيص",
+    "profile.accountsTab": "حسابات الألعاب",
+    "profile.flagLanguage": "العلم واللغة",
+    "profile.countryFlag": "علم الدولة",
+    "profile.language": "اللغة",
   },
 } as const;
 
 export type StringKey = keyof typeof STRINGS["en"];
+export const STRING_KEYS = Object.keys(STRINGS.en) as StringKey[];
 
-export function t(locale: Locale, key: StringKey): string {
+// Admin overrides (locale-scoped map) win over the built-in Arabic dictionary.
+export function t(locale: Locale, key: StringKey, overrides?: Record<string, string> | null): string {
+  const ov = overrides?.[key];
+  if (ov) return ov;
   return (STRINGS[locale] as Record<string, string>)[key] || STRINGS.en[key] || key;
 }

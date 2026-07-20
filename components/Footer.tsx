@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { getContent } from "@/lib/cms";
+import { getT } from "@/lib/i18n/t-server";
 import BrandHeader from "@/components/BrandHeader";
 import AppStoreBadges from "@/components/AppStoreBadges";
 
 export default async function Footer() {
   const c = await getContent(["footer.tagline", "brand.footer.bg"]);
   const footerBg = c["brand.footer.bg"];
+  const { t } = await getT();
   return (
     <footer className="relative z-10 mt-20 border-t border-violet-500/15 bg-cover bg-center"
       style={footerBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.86), rgba(4,5,26,0.92)), url(${footerBg})` } : undefined}>
@@ -16,20 +18,20 @@ export default async function Footer() {
           <div className="mt-4"><AppStoreBadges className="items-start" /></div>
         </div>
         <div>
-          <div className="font-semibold mb-3 text-ink">Platform</div>
+          <div className="font-semibold mb-3 text-ink">{t("footer.product")}</div>
           <ul className="space-y-2 text-muted">
-            <li><Link href="/planets" className="hover:text-ink">Planets</Link></li>
-            <li><Link href="/leaderboards" className="hover:text-ink">Leaderboards</Link></li>
-            <li><Link href="/search" className="hover:text-ink">Find gamers</Link></li>
-            <li><Link href="/signup" className="hover:text-ink">Create your profile</Link></li>
+            <li><Link href="/planets" className="hover:text-ink">{t("nav.planets")}</Link></li>
+            <li><Link href="/leaderboards" className="hover:text-ink">{t("nav.leaderboards")}</Link></li>
+            <li><Link href="/search" className="hover:text-ink">{t("common.findGamers")}</Link></li>
+            <li><Link href="/signup" className="hover:text-ink">{t("nav.join")}</Link></li>
           </ul>
         </div>
         <div>
-          <div className="font-semibold mb-3 text-ink">Legal</div>
+          <div className="font-semibold mb-3 text-ink">{t("footer.legal")}</div>
           <ul className="space-y-2 text-muted">
-            <li><Link href="/legal/privacy" className="hover:text-ink">Privacy Policy</Link></li>
-            <li><Link href="/legal/terms" className="hover:text-ink">Terms of Service</Link></li>
-            <li><Link href="/legal/cookies" className="hover:text-ink">Cookie Policy</Link></li>
+            <li><Link href="/legal/privacy" className="hover:text-ink">{t("footer.privacy")}</Link></li>
+            <li><Link href="/legal/terms" className="hover:text-ink">{t("footer.terms")}</Link></li>
+            <li><Link href="/legal/cookies" className="hover:text-ink">{t("footer.cookies")}</Link></li>
           </ul>
         </div>
       </div>

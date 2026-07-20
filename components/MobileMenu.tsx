@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
+import { useT } from "@/components/LocaleProvider";
 import { logout } from "@/app/actions/auth";
 
 export default function MobileMenu({
@@ -12,6 +13,7 @@ export default function MobileMenu({
 }: { links: { href: string; label: string; icon: string; logoUrl?: string | null }[]; loggedIn: boolean; profileSlug?: string | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const t = useT();
 
   useEffect(() => { setOpen(false); }, [pathname]);
   useEffect(() => {
@@ -67,21 +69,21 @@ export default function MobileMenu({
                 <>
                   {profileSlug && (
                     <Link href={`/u/${profileSlug}`} className="flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-muted hover:text-ink">
-                      <Icon name="user" size={18} /> My profile
+                      <Icon name="user" size={18} /> {t("nav.myProfile")}
                     </Link>
                   )}
                   <Link href="/profile" className="flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-muted hover:text-ink">
-                    <Icon name="edit" size={18} /> Customize profile
+                    <Icon name="edit" size={18} /> {t("nav.customize")}
                   </Link>
                   <form action={logout}>
                     <button type="submit" className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-rose-300 hover:text-rose-200 text-left">
-                      <Icon name="logout" size={18} /> Sign out
+                      <Icon name="logout" size={18} /> {t("nav.signOut")}
                     </button>
                   </form>
                 </>
               ) : (
                 <Link href="/signup" className="glow-btn block rounded-full px-6 py-3 text-center font-semibold text-white">
-                  Join the Cluster
+                  {t("nav.join")}
                 </Link>
               )}
             </div>
