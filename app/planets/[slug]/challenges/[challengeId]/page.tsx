@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getT } from "@/lib/i18n/t-server";
 import { getProvider } from "@/lib/providers/registry";
 import { getContent } from "@/lib/cms";
 import Icon from "@/components/Icon";
@@ -40,6 +41,7 @@ export default async function ChallengePage({
   if (!challenge) notFound();
 
   const viewer = await getCurrentUser();
+  const { tr } = await getT(viewer?.locale);
   const provider = getProvider(challenge.provider);
   const path = `/planets/${slug}/challenges/${challengeId}`;
   const cms = await getContent(["banner.arena"]);
@@ -197,7 +199,7 @@ export default async function ChallengePage({
 
           <section>
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-              <Icon name="chart" size={18} className="text-cyan-300" /> Live standings & scoring log
+              <Icon name="chart" size={18} className="text-cyan-300" /> {tr("Live standings & scoring log")}
             </h2>
             <LiveChallengeBoard challengeId={challenge.id} />
           </section>
@@ -207,7 +209,7 @@ export default async function ChallengePage({
           {trophy[0] && (
             <div className="glass p-6 text-center glow-sweep">
               <div className="text-[10px] uppercase tracking-widest text-amber-300 mb-3 inline-flex items-center gap-1.5">
-                <Icon name="trophy" size={12} /> Prize pool
+                <Icon name="trophy" size={12} /> {tr("Prize pool")}
               </div>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={trophy[0].imageUrl} alt={trophy[0].name} className="mx-auto h-44 object-contain float-y" />
@@ -215,11 +217,11 @@ export default async function ChallengePage({
               {challenge.prizeDescription && (
                 <p className="text-xs text-muted mt-1.5">{challenge.prizeDescription}</p>
               )}
-              <p className="text-[10px] text-muted/70 mt-3">Winners display this trophy on their profile forever.</p>
+              <p className="text-[10px] text-muted/70 mt-3">{tr("Winners display this trophy on their profile forever.")}</p>
             </div>
           )}
           <div className="glass p-5 text-sm text-muted space-y-2">
-            <div className="font-bold text-ink flex items-center gap-2"><Icon name="satellite" size={15} /> How scoring works</div>
+            <div className="font-bold text-ink flex items-center gap-2"><Icon name="satellite" size={15} /> {tr("How scoring works")}</div>
             <p>Your stats are snapshotted when you join. Only <b className="text-ink">new</b> activity counts.</p>
             <p>Every sync pulls fresh data from the {provider?.name} API and the board updates in real time.</p>
             {(challenge.rules?.conditions?.length ?? 0) > 0 && (

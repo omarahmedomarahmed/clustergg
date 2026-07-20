@@ -89,7 +89,10 @@ export const AR_TEXT: Record<string, string> = {
   "Your complete CP history": "سجل نقاطك الكامل",
   // Challenges
   "Live Challenges": "التحديات المباشرة",
-  "Join challenge": "انضم إلى التحدي",
+  "Live standings & scoring log": "الترتيب المباشر وسجل النقاط",
+  "Prize pool": "مجموع الجوائز",
+  "Winners display this trophy on their profile forever.": "يعرض الفائزون هذه الكأس على ملفهم للأبد.",
+  "How scoring works": "كيف تُحتسب النقاط",
   "How to win": "كيف تفوز",
   "Prize": "الجائزة",
   "Top standings": "أفضل الترتيب",
@@ -111,6 +114,7 @@ export const AR_TEXT: Record<string, string> = {
   "Your game accounts": "حسابات ألعابك",
   "Followers": "المتابعون",
   "Following": "يتابع",
+  "Follow": "متابعة",
   "views": "مشاهدات",
   // Common
   "See all": "عرض الكل",
@@ -123,10 +127,10 @@ export const AR_TEXT: Record<string, string> = {
 export const PAGE_STRINGS: { page: string; strings: string[] }[] = [
   { page: "Planets", strings: ["Explore", "Planets", "Request a new planet", "Each game has its own planet — leaderboards, challenges, players and a community feed, all in one world."] },
   { page: "Quests", strings: ["Quests", "Play the Cluster.", "Earn your legend.", "Each quest is a guided path across the galaxy. Tap a quest to open its map, track your Cluster Points, and see who's leading the way.", "Sign in with Discord to start earning quest badges.", "Your total Cluster Points", "Quests are being forged — check back shortly.", "Your complete CP history"] },
-  { page: "Challenges", strings: ["Live Challenges", "Join challenge", "How to win", "Prize", "Top standings", "No competitors yet — be the first to join.", "Full challenge page", "Ended", "Live now"] },
+  { page: "Challenges", strings: ["Live standings & scoring log", "Prize pool", "Winners display this trophy on their profile forever.", "How scoring works", "How to win", "Prize", "Top standings", "No competitors yet — be the first to join.", "Full challenge page", "Ended", "Live now"] },
   { page: "Notifications", strings: ["Notifications", "Mark all read", "All quiet on the cosmic front."] },
   { page: "Profile", strings: ["Your", "profile", "Make this page yours, then connect your games.", "Everything saves to your public link.", "View live profile", "Your game accounts"] },
-  { page: "Public profile", strings: ["Followers", "Following", "views"] },
+  { page: "Public profile", strings: ["Follow", "Following", "views"] },
 ];
 
 // t(): dotted-key lookup for chrome.
