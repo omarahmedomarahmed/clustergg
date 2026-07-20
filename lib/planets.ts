@@ -74,8 +74,8 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
     .from(schema.spaces).where(and(eq(schema.spaces.isActive, true), inArray(schema.spaces.game, names)));
   const slugByGame = new Map(spaceRows.filter((s) => s.game).map((s) => [s.game as string, s.slug]));
 
-  // Match providers to catalog games by normalized name, so "PUBG" (catalog)
-  // still picks up the "PUBG: Battlegrounds" provider (and vice versa).
+  // Match providers to catalog games by normalized name, tolerant of small
+  // naming differences between the provider registry and the games catalog.
   const providerToGame = new Map<string, string>();
   for (const g of skinned) for (const p of PROVIDERS.filter((pr) => sameGame(pr.game, g.name))) providerToGame.set(p.id, g.name);
   const providerIds = [...providerToGame.keys()];

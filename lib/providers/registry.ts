@@ -148,7 +148,7 @@ export const PROVIDERS: ProviderDef[] = [
     ],
   },
   {
-    id: "pubg", name: "PUBG", game: "PUBG: Battlegrounds", glyph: "🍳", color: "#f2a900",
+    id: "pubg", name: "PUBG", game: "PUBG", glyph: "🍳", color: "#f2a900",
     authType: "apikey", envVars: ["PUBG_API_KEY"], identifierLabel: "PUBG player name (case-sensitive)",
     phase: 2, docsUrl: "https://developer.pubg.com",
     capabilities: [

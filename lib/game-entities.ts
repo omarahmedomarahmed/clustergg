@@ -19,7 +19,7 @@ const TTL = 12 * 3600_000;
 
 // Which games have a catalogue (used to decide whether to show the section).
 export function gameHasDirectory(game: string | null | undefined): boolean {
-  return !!game && ["League of Legends", "VALORANT", "Dota 2", "Fortnite", "Apex Legends", "PUBG: Battlegrounds", "PUBG"].includes(game);
+  return !!game && ["League of Legends", "VALORANT", "Dota 2", "Fortnite", "Apex Legends", "PUBG"].includes(game);
 }
 
 // ---------- League of Legends (Data Dragon) ----------
@@ -229,7 +229,7 @@ export async function getEntityList(game: string): Promise<EntityLite[]> {
     if (game === "Apex Legends") {
       return [...APEX_LEGENDS].sort((a, b) => a.name.localeCompare(b.name)).map((s) => toLite(s, "legend"));
     }
-    if (game === "PUBG: Battlegrounds" || game === "PUBG") {
+    if (game === "PUBG") {
       return [
         ...PUBG_MAPS.map((s) => toLite(s, "map")),
         ...[...PUBG_WEAPONS].sort((a, b) => a.name.localeCompare(b.name)).map((s) => toLite(s, "weapon")),
@@ -309,7 +309,7 @@ export async function getEntityDetail(game: string, kind: string, id: string): P
       const s = APEX_LEGENDS.find((x) => x.id === id); if (!s) return null;
       return toDetail(s, "legend");
     }
-    if (game === "PUBG: Battlegrounds" || game === "PUBG") {
+    if (game === "PUBG") {
       const s = (kind === "map" ? PUBG_MAPS : PUBG_WEAPONS).find((x) => x.id === id)
         ?? PUBG_MAPS.find((x) => x.id === id) ?? PUBG_WEAPONS.find((x) => x.id === id);
       if (!s) return null;

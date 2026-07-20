@@ -33,7 +33,7 @@ export function entityKindsForGame(game: string | null | undefined): ("champion"
   if (game === "Dota 2") return ["hero"];
   if (game === "Fortnite") return ["outfit"];
   if (game === "Apex Legends") return ["legend"];
-  if (game === "PUBG: Battlegrounds" || game === "PUBG") return ["weapon", "map"];
+  if (game === "PUBG") return ["weapon", "map"];
   return [];
 }
 export function newModule(kind: HeroModuleKind): HeroModule {
