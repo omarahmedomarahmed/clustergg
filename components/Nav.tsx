@@ -80,9 +80,10 @@ export default async function Nav() {
   // Quest cards fill the nav between the game logos and the right-hand controls.
   const navQuests = await getNavQuests(db, user?.id ?? null, 4);
   const totalCp = user ? await getTotalCp(db, user.id) : 0;
-  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg"]);
+  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets"]);
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
+  const hidePlanets = brand["brand.nav.hidePlanets"] === "1";
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and
   // "all planets" live in the mobile drawer for reachability.
@@ -111,12 +112,14 @@ export default async function Nav() {
                 className="relative ring-1 ring-violet-400/25 group-hover:ring-cyan-400/60 shadow-lg" />
             </Link>
           ))}
-          <Link href="/planets" title="All planets"
-            className="shrink-0 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 text-muted hover:text-cyan-300 hover:border-cyan-400/50 transition-colors">
-            {planetsIcon
-              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={planetsIcon} alt="All planets" className="h-full w-full object-cover" />
-              : <Icon name="planet" size={18} />}
-          </Link>
+          {!hidePlanets && (
+            <Link href="/planets" title="All planets"
+              className="shrink-0 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 text-muted hover:text-cyan-300 hover:border-cyan-400/50 transition-colors">
+              {planetsIcon
+                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={planetsIcon} alt="All planets" className="h-full w-full object-cover" />
+                : <Icon name="planet" size={18} />}
+            </Link>
+          )}
         </nav>
 
         {/* One quest card (with a dropdown to switch) fills the nav space (lg+) */}

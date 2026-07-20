@@ -39,6 +39,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.wordmark.zoom": "1",               // wide wordmark scale multiplier
   "brand.nav.mode": "both",                 // mark | wordmark | both
   "brand.nav.planetsIcon": "",              // custom image for the nav "all planets" button
+  "brand.nav.hidePlanets": "",              // "1" hides the "All planets" badge from the nav
   "brand.footer.mode": "both",
   // Loading screen (rotating circle) — editable color + optional inner logo +
   // a rotating list of phrases (one per line) that cycles every second.

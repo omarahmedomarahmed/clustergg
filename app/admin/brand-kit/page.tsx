@@ -13,7 +13,7 @@ const asMode = (v: string | undefined): Mode => (v === "mark" || v === "wordmark
 export default async function BrandKitPage() {
   const c = await getContent([
     "brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y",
-    "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.footer.mode",
+    "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.nav.hidePlanets", "brand.footer.mode",
     "brand.loading.color", "brand.loading.logo", "brand.loading.phrases",
     "brand.loading.interval", "brand.loading.astronaut", "brand.loading.bg", "brand.loading.wordmark", "brand.loading.orbSize",
     "brand.nav.bg", "brand.footer.bg", "brand.favicon", "brand.favicon.zoom", "brand.cpIcon", "brand.orb.icon", "brand.orb.color", "brand.orb.size", "brand.quest.rocket",
@@ -51,6 +51,7 @@ export default async function BrandKitPage() {
           defaultLoadingLogo={c["brand.loading.logo"] || ""}
           defaultLoadingPhrases={c["brand.loading.phrases"] ?? "Traversing the cluster…"}
           defaultPlanetsIcon={c["brand.nav.planetsIcon"] || ""}
+          defaultHidePlanets={c["brand.nav.hidePlanets"] === "1"}
           defaultNavBg={c["brand.nav.bg"] || ""}
           defaultFooterBg={c["brand.footer.bg"] || ""}
           defaultFavicon={c["brand.favicon"] || ""}
