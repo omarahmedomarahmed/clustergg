@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Icon from "@/components/Icon";
+import { useT } from "@/components/LocaleProvider";
 
 // Native-app-style bottom tab bar, mobile only. Five tabs with the Planets globe
 // raised + glorified in the centre. Same tabs for guests and members (the Home
@@ -12,11 +13,12 @@ export default function BottomNav({ loggedIn, globeUrl }: { loggedIn: boolean; g
   // Hide inside the admin console (it has its own nav) and full-screen editors.
   if (pathname.startsWith("/admin") || pathname.startsWith("/onboarding")) return null;
 
+  const t = useT();
   const tabs = [
-    { href: loggedIn ? "/feed" : "/", label: "Home", icon: "home", match: (p: string) => p === "/" || p === "/feed" },
-    { href: "/quests", label: "Quests", icon: "trophy", match: (p: string) => p.startsWith("/quests") },
-    { href: "/leaderboards", label: "Ranks", icon: "chart", match: (p: string) => p.startsWith("/leaderboards") },
-    { href: loggedIn ? "/profile" : "/login", label: "You", icon: "user", match: (p: string) => p.startsWith("/profile") || p.startsWith("/u/") || p.startsWith("/login") },
+    { href: loggedIn ? "/feed" : "/", label: t("nav.home"), icon: "home", match: (p: string) => p === "/" || p === "/feed" },
+    { href: "/quests", label: t("nav.quests"), icon: "trophy", match: (p: string) => p.startsWith("/quests") },
+    { href: "/leaderboards", label: t("nav.ranks"), icon: "chart", match: (p: string) => p.startsWith("/leaderboards") },
+    { href: loggedIn ? "/profile" : "/login", label: t("nav.you"), icon: "user", match: (p: string) => p.startsWith("/profile") || p.startsWith("/u/") || p.startsWith("/login") },
   ];
   const planetsActive = pathname.startsWith("/planets") || pathname.startsWith("/games");
 
@@ -35,7 +37,7 @@ export default function BottomNav({ loggedIn, globeUrl }: { loggedIn: boolean; g
                 ? <img src={globeUrl} alt="" className="h-full w-full object-cover" />
                 : <Icon name="planet" size={30} className="text-white" />}
             </span>
-            <span className={`text-[10px] font-bold mt-0.5 ${planetsActive ? "text-cyan-300" : "text-muted"}`}>Planets</span>
+            <span className={`text-[10px] font-bold mt-0.5 ${planetsActive ? "text-cyan-300" : "text-muted"}`}>{t("nav.planets")}</span>
           </Link>
           {/* right two */}
           {tabs.slice(2).map((t) => <Tab key={t.href} t={t} active={t.match(pathname)} />)}

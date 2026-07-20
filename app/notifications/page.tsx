@@ -5,6 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { markAllNotificationsRead } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
+import { getT } from "@/lib/i18n/t-server";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { timeAgo } from "@/lib/utils";
 import Icon from "@/components/Icon";
@@ -25,19 +26,20 @@ export default async function NotificationsPage() {
     .orderBy(desc(schema.notifications.createdAt))
     .limit(50);
   const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
+  const { tr } = await getT(user.locale);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Notifications</h1>
+        <h1 className="text-2xl font-bold">{tr("Notifications")}</h1>
         {items.some((n) => !n.readAt) && (
           <form action={markAllNotificationsRead}>
-            <button className="ghost-btn rounded-full px-4 py-1.5 text-xs">Mark all read</button>
+            <button className="ghost-btn rounded-full px-4 py-1.5 text-xs">{tr("Mark all read")}</button>
           </form>
         )}
       </div>
       {items.length === 0 ? (
-        <div className="glass p-10 text-center text-muted">All quiet on the cosmic front.</div>
+        <div className="glass p-10 text-center text-muted">{tr("All quiet on the cosmic front.")}</div>
       ) : (
         <div className="space-y-2">
           {items.map((n) => (

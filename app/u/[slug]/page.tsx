@@ -12,6 +12,8 @@ import { getContent } from "@/lib/cms";
 import { slimImg } from "@/lib/img";
 import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip, sectionArtStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
+import Flag from "@/components/Flag";
+import { getT } from "@/lib/i18n/t-server";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import FollowButton from "@/components/FollowButton";
@@ -48,6 +50,7 @@ export default async function ProfilePage({ params }: Props) {
   if (!user || user.status === "banned") notFound();
 
   const viewer = await getCurrentUser();
+  const { tr } = await getT(viewer?.locale);
   const isOwner = viewer?.id === user.id;
   const adminView = isAdmin(viewer) && !isOwner;
 
@@ -332,6 +335,7 @@ export default async function ProfilePage({ params }: Props) {
           <div className="min-w-0 w-full sm:flex-1 sm:w-auto pb-1">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center justify-center sm:justify-start gap-2 flex-wrap break-words" style={{ color: theme.text }}>
               {user.displayName}
+              {user.country && <Flag code={user.country} className="text-2xl sm:text-3xl" title={user.country} />}
               {user.isVerified && <Icon name="check" size={20} strokeWidth={3} style={{ color: theme.accent2 }} />}
             </h1>
             {user.title && <div className="text-base sm:text-lg font-semibold p-grad">{user.title}</div>}
@@ -358,7 +362,7 @@ export default async function ProfilePage({ params }: Props) {
         <div className="flex flex-wrap gap-6 mt-4 text-sm">
           <Link href={`/u/${user.slug}/followers`} style={{ color: theme.text }}><b>{Number(followerRow?.c ?? 0)}</b> <span className="p-muted">followers</span></Link>
           <Link href={`/u/${user.slug}/following`} style={{ color: theme.text }}><b>{Number(followingRow?.c ?? 0)}</b> <span className="p-muted">following</span></Link>
-          <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">views</span></span>
+          <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">{tr("views")}</span></span>
           {bestStanding && S.standings && <span style={{ color: theme.accent }}><Icon name="chart" size={14} className="inline mr-1" /> Top {Math.max(1, Math.round((bestStanding.rank / bestStanding.total) * 100))}% · {bestStanding.title}</span>}
         </div>
 

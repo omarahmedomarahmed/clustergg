@@ -266,3 +266,6 @@ a, button, [role="button"], select, summary { cursor: pointer; }
 /* Hide scrollbar for the game-logo nav row while keeping it scrollable. */
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Arabic / RTL mode: swap in the Arabic-capable webfont site-wide. */
+.font-arabic { font-family: var(--font-cairo), var(--font-grotesk), system-ui, sans-serif; }

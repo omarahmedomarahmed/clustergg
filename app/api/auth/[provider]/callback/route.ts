@@ -4,7 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { createSession, getSession } from "@/lib/auth";
 import { uid, slugify } from "@/lib/utils";
-import { oauthConfig, exchangeCode, verifySteamOpenId, appBaseUrl } from "@/lib/oauth";
+import { oauthConfig, exchangeCode, verifySteamOpenId, appBaseUrl, originFromHeaders } from "@/lib/oauth";
 import type { OAuthProfile } from "@/lib/oauth";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,9 @@ const GAME_LINK: Record<string, string> = { steam: "steam" };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
-  const base = appBaseUrl(req.nextUrl.origin);
+  // Same host the authorize step used, so redirect_uri matches + cookie is present.
+  const origin = originFromHeaders(req.headers, req.nextUrl.origin);
+  const base = appBaseUrl(origin);
   const fail = (msg: string) => NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(msg)}`, base));
 
   const cfg = oauthConfig(provider);
@@ -39,7 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     } else {
       const code = sp.get("code");
       if (!code) return fail(sp.get("error") || "no_code");
-      const token = await exchangeCode(provider, code, req.nextUrl.origin);
+      const token = await exchangeCode(provider, code, origin);
       profile = await cfg.userInfo(token);
     }
   } catch (e) {

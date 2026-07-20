@@ -9,6 +9,9 @@ import { resolveGameLogo, resolveGameCover } from "@/lib/game-logos";
 import { getContent } from "@/lib/cms";
 import ProfileBuilder from "@/components/ProfileBuilder";
 import ProfileHub from "@/components/ProfileHub";
+import ProfileLocaleFlag from "@/components/ProfileLocaleFlag";
+import { getCountries } from "@/lib/countries-server";
+import { getT } from "@/lib/i18n/t-server";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
@@ -70,22 +73,27 @@ export default async function OwnProfilePage() {
     standingsCount: accounts.length,
   };
 
+  const countries = await getCountries();
   const customize = (
-    <ProfileBuilder
-      slug={user.slug}
-      displayName={user.displayName}
-      initialTheme={user.theme}
-      initialTitle={user.title ?? ""}
-      initialBio={user.bio ?? ""}
-      initialAvatar={user.avatarUrl ?? ""}
-      initialBanner={user.bannerUrl ?? ""}
-      previewData={previewData}
-    />
+    <div className="space-y-6">
+      <ProfileLocaleFlag countries={countries} country={user.country ?? ""} locale={(user as { locale?: string }).locale ?? "en"} />
+      <ProfileBuilder
+        slug={user.slug}
+        displayName={user.displayName}
+        initialTheme={user.theme}
+        initialTitle={user.title ?? ""}
+        initialBio={user.bio ?? ""}
+        initialAvatar={user.avatarUrl ?? ""}
+        initialBanner={user.bannerUrl ?? ""}
+        previewData={previewData}
+      />
+    </div>
   );
 
+  const { tr } = await getT(user.locale);
   const accountsTab = (
     <section className="glass p-5 md:p-6">
-      <h2 className="font-bold flex items-center gap-2 mb-1"><Icon name="link" size={18} className="text-cyan-300" /> Your game accounts</h2>
+      <h2 className="font-bold flex items-center gap-2 mb-1"><Icon name="link" size={18} className="text-cyan-300" /> {tr("Your game accounts")}</h2>
       <p className="text-sm text-muted mb-5">Connect a game to pull your live stats onto your profile and leaderboards. Your progress stays even if a token expires.</p>
 
       {accounts.length > 0 && (
@@ -145,11 +153,11 @@ export default async function OwnProfilePage() {
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold">Your <span className="grad-text">profile</span></h1>
-          <p className="text-sm text-muted mt-1">Make this page yours, then connect your games. Everything saves to clustergg.com/u/{user.slug}.</p>
+          <h1 className="text-2xl font-bold">{tr("Your")} <span className="grad-text">{tr("profile")}</span></h1>
+          <p className="text-sm text-muted mt-1">{tr("Make this page yours, then connect your games.")} {tr("Everything saves to your public link.")}</p>
         </div>
         <Link href={`/u/${user.slug}`} className="ghost-btn pressable rounded-full px-4 py-1.5 text-sm inline-flex items-center gap-2">
-          <Icon name="eye" size={14} /> View live profile
+          <Icon name="eye" size={14} /> {tr("View live profile")}
         </Link>
       </div>
 

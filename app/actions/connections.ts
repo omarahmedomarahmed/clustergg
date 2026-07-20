@@ -159,6 +159,9 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
   const bio = String(formData.get("bio") ?? "").trim().slice(0, 400);
   const country = String(formData.get("country") ?? "").trim().toUpperCase().slice(0, 2);
   const rawSlug = String(formData.get("slug") ?? "").trim();
+  const { normalizeLocale, LOCALE_COOKIE } = await import("@/lib/i18n/locale");
+  const hasLocale = formData.has("locale");
+  const locale = normalizeLocale(String(formData.get("locale") ?? "en"));
   if (displayName.length < 2) return { error: "Display name must be 2+ characters." };
 
   const db = await getDb();
@@ -170,10 +173,15 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
     if (taken && taken.id !== me.id) return { error: "That profile URL is taken." };
   }
   await db.update(schema.users)
-    .set({ displayName, bio: bio || null, country: country || null, slug })
+    .set({ displayName, bio: bio || null, country: country || null, slug, ...(hasLocale ? { locale } : {}) })
     .where(eq(schema.users.id, me.id));
+  if (hasLocale) {
+    const { cookies } = await import("next/headers");
+    (await cookies()).set(LOCALE_COOKIE, locale, { path: "/", maxAge: 60 * 60 * 24 * 365, sameSite: "lax" });
+  }
   revalidatePath(`/u/${slug}`);
   revalidatePath("/profile");
+  revalidatePath("/", "layout");
   return { ok: true };
 }
 

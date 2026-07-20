@@ -10,8 +10,10 @@ import BrandGlyph from "@/components/BrandGlyph";
 import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
+import LocaleToggle from "@/components/LocaleToggle";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { getContent } from "@/lib/cms";
+import { getT } from "@/lib/i18n/t-server";
 import { slimImg } from "@/lib/img";
 
 export default async function Nav() {
@@ -84,14 +86,15 @@ export default async function Nav() {
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
   const hidePlanets = brand["brand.nav.hidePlanets"] === "1";
+  const { locale, t } = await getT(user?.locale ?? null);
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and
   // "all planets" live in the mobile drawer for reachability.
   const mobileLinks = [
-    ...(user ? [{ href: "/feed", label: "Home", icon: "home" }] : []),
-    { href: "/planets", label: "All planets", icon: "planet" },
-    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad" })),
-    ...(user ? [{ href: "/messages", label: "Messages", icon: "message" }] : []),
+    ...(user ? [{ href: "/feed", label: t("nav.home"), icon: "home" }] : []),
+    ...(hidePlanets ? [] : [{ href: "/planets", label: t("nav.allPlanets"), icon: "planet" }]),
+    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad", logoUrl: slimImg(g.logoUrl, 300000) })),
+    ...(user ? [{ href: "/messages", label: t("nav.messages"), icon: "message" }] : []),
   ];
 
   return (
@@ -133,6 +136,7 @@ export default async function Nav() {
         <div className="md:hidden flex-1" />
 
         <div className="flex items-center gap-3 shrink-0">
+          <LocaleToggle current={locale} compact />
           {user ? (
             <>
               <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />
@@ -148,11 +152,11 @@ export default async function Nav() {
               <Link href="/search" aria-label="Search" className="hidden sm:flex text-muted hover:text-ink transition-colors">
                 <Icon name="search" size={19} />
               </Link>
-              <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">Log in</Link>
+              <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>
               <a href="/api/auth/discord?next=/onboarding" title="Sign in with Discord"
                 className="pressable inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white"
                 style={{ background: "#5865f2", boxShadow: "0 6px 18px -8px #5865f2" }}>
-                <BrandGlyph provider="discord" size={16} /> <span className="hidden sm:inline">Sign in with</span> Discord
+                <BrandGlyph provider="discord" size={16} /> <span className="hidden sm:inline">{t("nav.signIn")}</span> Discord
               </a>
             </>
           )}

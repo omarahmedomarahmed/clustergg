@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
+import { useT } from "@/components/LocaleProvider";
+import { markAllNotificationsRead } from "@/app/actions/social";
 
 export type NavNotif = { id: string; type: string; title: string; body: string | null; href: string | null; read: boolean; at: string };
 export type NavConvo = { id: string; name: string; avatarUrl: string | null; snippet: string; at: string; unread: boolean };
@@ -38,6 +40,9 @@ export default function NavMenus({
 
   const toggle = (k: "search" | "dm" | "bell") => setOpen((v) => (v === k ? null : k));
   const iconBtn = "relative flex items-center justify-center text-muted hover:text-ink transition-colors";
+  const [markPending, startMark] = useTransition();
+  const t = useT();
+  const markAllRead = () => startMark(async () => { await markAllNotificationsRead(); router.refresh(); });
   const panel = "absolute right-0 top-full z-50 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-xl border border-white/10 bg-[#0a0a1c]/95 backdrop-blur-xl shadow-2xl overflow-hidden";
 
   return (
@@ -106,12 +111,20 @@ export default function NavMenus({
         {open === "bell" && (
           <div className={panel}>
             <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/8">
-              <span className="text-sm font-bold">Notifications</span>
-              <Link href="/notifications" onClick={() => setOpen(null)} className="text-[11px] text-cyan-300 hover:underline">See all</Link>
+              <span className="text-sm font-bold">{t("common.notifications")}</span>
+              <div className="flex items-center gap-3">
+                {unread > 0 && (
+                  <button type="button" onClick={markAllRead} disabled={markPending}
+                    className="text-[11px] text-cyan-300 hover:underline disabled:opacity-50 inline-flex items-center gap-1">
+                    <Icon name="check" size={11} /> {markPending ? "…" : t("common.markAllRead")}
+                  </button>
+                )}
+                <Link href="/notifications" onClick={() => setOpen(null)} className="text-[11px] text-cyan-300 hover:underline">{t("common.seeAll")}</Link>
+              </div>
             </div>
             <div className="max-h-96 overflow-y-auto">
               {notifications.length === 0 ? (
-                <div className="p-5 text-center text-xs text-muted">You&apos;re all caught up.</div>
+                <div className="p-5 text-center text-xs text-muted">{t("common.caughtUp")}</div>
               ) : notifications.map((n) => {
                 const inner = (
                   <span className="flex gap-3">

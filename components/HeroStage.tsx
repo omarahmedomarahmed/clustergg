@@ -16,7 +16,7 @@ import type { PlanetExplore } from "@/lib/planet-explore";
 // server-rendered explorer data for the initial planet (planet page); when null
 // the explorer lazy-loads it from the API (home/feed).
 export default function HeroStage({
-  planets, initialSlug, heading, quest, swap = true, explore = null,
+  planets, initialSlug, heading, quest, swap = true, explore = null, compact = false,
 }: {
   planets: PlanetData[];
   initialSlug: string;
@@ -24,6 +24,7 @@ export default function HeroStage({
   quest: QuestHeroData | null;
   swap?: boolean;
   explore?: PlanetExplore | null;
+  compact?: boolean;
 }) {
   const [mode, setMode] = useState<"planet" | "quest">("planet");
 
@@ -34,6 +35,6 @@ export default function HeroStage({
     : null;
 
   return mode === "planet" || !quest
-    ? <PlanetExplorer planets={planets} initialSlug={initialSlug} initial={explore} swap={swap} heading={heading} toggle={toggle} />
+    ? <PlanetExplorer planets={planets} initialSlug={initialSlug} initial={explore} swap={swap} heading={heading} toggle={toggle} compact={compact} />
     : <QuestMapHero quest={quest.quest} tierHolders={quest.tierHolders} tabs={quest.tabs} toggle={toggle} variants={quest.variants} totalCp={quest.totalCp} />;
 }

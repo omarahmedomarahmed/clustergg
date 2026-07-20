@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { getT } from "@/lib/i18n/t-server";
 import { getUserQuests, getQuestTops, getCpLedger } from "@/lib/quests";
 import QuestCard from "@/components/QuestCard";
 import CpLedger from "@/components/CpLedger";
@@ -20,20 +21,21 @@ export default async function QuestsPage() {
     getCpLedger(db, user?.id ?? null, { limit: 200 }),
   ]);
   const totalCp = quests.reduce((s, q) => s + q.totalCp, 0);
+  const { tr } = await getT(user?.locale);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-cyan-300 mb-2">
-          <Icon name="trophy" size={14} /> Quests
+          <Icon name="trophy" size={14} /> {tr("Quests")}
         </div>
-        <h1 className="text-3xl md:text-4xl font-bold">Play the Cluster. <span className="grad-text">Earn your legend.</span></h1>
-        <p className="text-muted mt-2 max-w-2xl mx-auto">Each quest is a guided path across the galaxy. Tap a quest to open its map, track your Cluster Points, and see who&apos;s leading the way.</p>
+        <h1 className="text-3xl md:text-4xl font-bold">{tr("Play the Cluster.")} <span className="grad-text">{tr("Earn your legend.")}</span></h1>
+        <p className="text-muted mt-2 max-w-2xl mx-auto">{tr("Each quest is a guided path across the galaxy. Tap a quest to open its map, track your Cluster Points, and see who's leading the way.")}</p>
       </div>
 
       {!user && (
         <div className="glass p-5 mb-8 max-w-md mx-auto text-center">
-          <p className="text-sm text-muted mb-3">Sign in with Discord to start earning quest badges.</p>
+          <p className="text-sm text-muted mb-3">{tr("Sign in with Discord to start earning quest badges.")}</p>
           <div className="mx-auto max-w-xs"><OAuthButtons next="/quests" /></div>
         </div>
       )}
@@ -43,7 +45,7 @@ export default async function QuestsPage() {
         <div className="glass p-5 md:p-6 mb-8">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-[11px] uppercase tracking-widest text-muted">Your total Cluster Points</div>
+              <div className="text-[11px] uppercase tracking-widest text-muted">{tr("Your total Cluster Points")}</div>
               <div className="flex items-center gap-2.5 mt-1">
                 <CpIcon size={34} />
                 <span className="text-4xl font-bold grad-text">{totalCp.toLocaleString()}</span>
@@ -69,13 +71,13 @@ export default async function QuestsPage() {
           {quests.map((q) => <QuestCard key={q.id} quest={q} top={tops.get(q.id) ?? []} />)}
         </div>
       ) : (
-        <div className="glass p-10 text-center text-muted">Quests are being forged — check back shortly.</div>
+        <div className="glass p-10 text-center text-muted">{tr("Quests are being forged — check back shortly.")}</div>
       )}
 
       {/* Full CP history log across every quest, with filters */}
       {user && ledger.length > 0 && (
         <div className="mt-8">
-          <CpLedger entries={ledger} quests={quests.map((q) => ({ key: q.key, name: q.name, color: q.color }))} title="Your complete CP history" />
+          <CpLedger entries={ledger} quests={quests.map((q) => ({ key: q.key, name: q.name, color: q.color }))} title={tr("Your complete CP history")} />
         </div>
       )}
 

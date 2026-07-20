@@ -4,13 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
+import GameLogo from "@/components/GameLogo";
+import { useT } from "@/components/LocaleProvider";
 import { logout } from "@/app/actions/auth";
 
 export default function MobileMenu({
   links, loggedIn, profileSlug,
-}: { links: { href: string; label: string; icon: string }[]; loggedIn: boolean; profileSlug?: string | null }) {
+}: { links: { href: string; label: string; icon: string; logoUrl?: string | null }[]; loggedIn: boolean; profileSlug?: string | null }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const t = useT();
 
   useEffect(() => { setOpen(false); }, [pathname]);
   useEffect(() => {
@@ -31,7 +34,7 @@ export default function MobileMenu({
       {open && (
         <div className="fixed inset-0 z-[60]">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-0 h-full w-72 bg-[#070826] border-l border-violet-500/25 p-5 flex flex-col animate-[rise-in_.25s_ease] shadow-2xl">
+          <div className="absolute right-0 top-0 h-full w-72 bg-[#070826]/95 backdrop-blur-2xl border-l border-violet-500/25 p-5 flex flex-col animate-[rise-in_.25s_ease] shadow-2xl overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <span className="text-sm font-bold tracking-widest grad-text">CLUSTER</span>
               <button
@@ -49,12 +52,14 @@ export default function MobileMenu({
                   <Link
                     key={l.href}
                     href={l.href}
-                    className={`flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] transition-colors ${
+                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] transition-colors ${
                       active ? "bg-violet-500/15 text-ink border border-violet-400/30" : "text-muted hover:text-ink hover:bg-violet-500/8"
                     }`}
                   >
-                    <Icon name={l.icon} size={18} className={active ? "text-cyan-300" : ""} />
-                    {l.label}
+                    {l.logoUrl
+                      ? <GameLogo logoUrl={l.logoUrl} name={l.label} size={26} rounded="rounded-lg" className="ring-1 ring-violet-400/25 shrink-0" />
+                      : <Icon name={l.icon} size={18} className={active ? "text-cyan-300" : ""} />}
+                    <span className="truncate">{l.label}</span>
                   </Link>
                 );
               })}
@@ -64,21 +69,21 @@ export default function MobileMenu({
                 <>
                   {profileSlug && (
                     <Link href={`/u/${profileSlug}`} className="flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-muted hover:text-ink">
-                      <Icon name="user" size={18} /> My profile
+                      <Icon name="user" size={18} /> {t("nav.myProfile")}
                     </Link>
                   )}
                   <Link href="/profile" className="flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-muted hover:text-ink">
-                    <Icon name="edit" size={18} /> Customize profile
+                    <Icon name="edit" size={18} /> {t("nav.customize")}
                   </Link>
                   <form action={logout}>
                     <button type="submit" className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-rose-300 hover:text-rose-200 text-left">
-                      <Icon name="logout" size={18} /> Sign out
+                      <Icon name="logout" size={18} /> {t("nav.signOut")}
                     </button>
                   </form>
                 </>
               ) : (
                 <Link href="/signup" className="glow-btn block rounded-full px-6 py-3 text-center font-semibold text-white">
-                  Join the Cluster
+                  {t("nav.join")}
                 </Link>
               )}
             </div>

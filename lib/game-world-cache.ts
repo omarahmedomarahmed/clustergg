@@ -13,6 +13,7 @@ import {
 } from "@/lib/game-entities";
 import { getContent, setContent } from "@/lib/cms";
 import { putJsonToBlob, uploadUrlToBlob, blobConfigured } from "@/lib/blob";
+import { loadOverrideMap, mergeList, mergeDetail } from "@/lib/game-overrides";
 import { slugify } from "@/lib/utils";
 
 export type GameWorldSnapshot = {
@@ -51,16 +52,19 @@ async function loadSnapshot(game: string): Promise<GameWorldSnapshot | null> {
 // in-process cached inside game-entities).
 export async function getCachedEntityList(game: string): Promise<EntityLite[]> {
   const snap = await loadSnapshot(game);
-  if (snap?.list?.length) return snap.list;
-  return getEntityList(game);
+  const base = snap?.list?.length ? snap.list : await getEntityList(game);
+  const ov = await loadOverrideMap(game);
+  return ov.size ? mergeList(base, ov) : base;
 }
 
-// Read one entity's detail: snapshot first, else live.
+// Read one entity's detail: admin override → snapshot → live.
 export async function getCachedEntityDetail(game: string, kind: string, id: string): Promise<EntityDetail | null> {
+  const ov = await loadOverrideMap(game);
+  const o = ov.get(`${kind}:${id}`);
+  if (o?.custom) return mergeDetail(null, o, kind, id);
   const snap = await loadSnapshot(game);
-  const hit = snap?.details?.[detailKey(kind, id)];
-  if (hit) return hit;
-  return getEntityDetail(game, kind, id);
+  const base = snap?.details?.[detailKey(kind, id)] ?? await getEntityDetail(game, kind, id);
+  return mergeDetail(base, o, kind, id);
 }
 
 export type SyncResult = { ok: boolean; game: string; count: number; artHosted: number; reason?: string };

@@ -17,6 +17,7 @@ import { getTotalCp, getUserQuests } from "@/lib/quests";
 import { getProvider } from "@/lib/providers/registry";
 import { resolveTheme, themeToVars, bgLayerStyle } from "@/lib/theme";
 import { getContent } from "@/lib/cms";
+import { getT } from "@/lib/i18n/t-server";
 import { cardBgCmsKeys, buildCardBgMap, cardBgStyle } from "@/lib/card-bg";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
@@ -27,6 +28,7 @@ export const metadata = { title: "Home" };
 export default async function FeedPage() {
   const user = await getCurrentUserFull();
   if (!user) redirect("/login");
+  const { t } = await getT(user.locale);
   const db = await getDb();
   // The feed adopts the gamer's own profile theme so it feels like their page.
   const theme = resolveTheme(user.theme);
@@ -165,9 +167,9 @@ export default async function FeedPage() {
           {/* Explore planets / quests — interactive globe ⇄ quest map */}
           {skinnedPlanets.length > 0 && (
             <section>
-              <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="planet" size={18} className="text-cyan-300" /> Explore planets &amp; quests</h2>
+              <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="planet" size={18} className="text-cyan-300" /> {t("feed.explore")}</h2>
               <div className="rounded-2xl overflow-hidden border border-violet-400/15">
-                <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="Tap a game to explore its planet" quest={questHero} />
+                <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="Tap a game to explore its planet" quest={questHero} compact />
               </div>
             </section>
           )}
@@ -176,7 +178,7 @@ export default async function FeedPage() {
           {liveChallenges.length > 0 && (
             <section>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold flex items-center gap-2"><Icon name="zap" size={18} className="text-amber-300" /> Live challenges</h2>
+                <h2 className="text-lg font-bold flex items-center gap-2"><Icon name="zap" size={18} className="text-amber-300" /> {t("feed.liveChallenges")}</h2>
                 <Link href="/planets" className="text-xs text-cyan-300 hover:underline">See all</Link>
               </div>
               <div className="grid sm:grid-cols-2 gap-4">
@@ -214,14 +216,14 @@ export default async function FeedPage() {
 
           {/* Feed */}
           <section>
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="home" size={18} className="text-violet-300" /> Your feed</h2>
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="home" size={18} className="text-violet-300" /> {t("feed.yourFeed")}</h2>
             {posts.length === 0 ? (
               <div className="glass p-8 text-center">
                 <Icon name="rocket" size={34} className="text-cyan-300 mx-auto mb-3" />
                 <h3 className="font-bold text-lg">Let&apos;s light up your galaxy</h3>
                 <p className="text-muted text-sm mt-1 max-w-md mx-auto">Your feed fills up as you join planets and follow gamers. Start with a few:</p>
                 <div className="flex flex-wrap justify-center gap-2 mt-4">
-                  <Link href="/planets" className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">Explore planets</Link>
+                  <Link href="/planets" className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">{t("common.explorePlanets")}</Link>
                   <Link href="/search" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">Find gamers</Link>
                   <Link href="/profile" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">Connect a game</Link>
                 </div>
@@ -243,7 +245,7 @@ export default async function FeedPage() {
         <aside className="space-y-6">
           {/* My planets */}
           <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_myplanets") }}>
-            <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="planet" size={15} className="text-cyan-300" /> My planets</h3>
+            <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="planet" size={15} className="text-cyan-300" /> {t("feed.myPlanets")}</h3>
             {mySpaceRows.length === 0 ? (
               <p className="text-xs text-muted">You haven&apos;t joined any planets yet.</p>
             ) : (

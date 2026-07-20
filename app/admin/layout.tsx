@@ -19,9 +19,11 @@ const NAV: { section: string; area?: string; items: { href: string; label: strin
     section: "Design & content",
     items: [
       { href: "/admin/content", label: "Site content" },
+      { href: "/admin/language", label: "Language & flags (Arabic)" },
       { href: "/admin/backgrounds", label: "Page backgrounds" },
       { href: "/admin/cards", label: "Card backgrounds" },
       { href: "/admin/brand-kit", label: "Logos & brand kit" },
+      { href: "/admin/creative-studio", label: "Creative studio" },
       { href: "/admin/partners", label: "Partners" },
     ],
   },
@@ -29,6 +31,7 @@ const NAV: { section: string; area?: string; items: { href: string; label: strin
     section: "Games & planets",
     items: [
       { href: "/admin/games", label: "Games catalog" },
+      { href: "/admin/game-worlds", label: "Game worlds (heroes/lore)" },
       { href: "/admin/connect", label: "Connect providers" },
       { href: "/admin/spaces", label: "Planets" },
       { href: "/admin/spaces/requests", label: "Planet requests" },

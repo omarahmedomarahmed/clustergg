@@ -2,12 +2,14 @@
 
 import { useTransition } from "react";
 import { toggleFollow } from "@/app/actions/social";
+import { useTr } from "@/components/LocaleProvider";
 import Icon from "@/components/Icon";
 
 export default function FollowButton({
   targetUserId, isFollowing, path,
 }: { targetUserId: string; isFollowing: boolean; path: string }) {
   const [pending, startTransition] = useTransition();
+  const tr = useTr();
   return (
     <button
       disabled={pending}
@@ -16,7 +18,7 @@ export default function FollowButton({
         isFollowing ? "ghost-btn" : "glow-btn text-white"
       }`}
     >
-      {isFollowing ? <><Icon name="check" size={14} /> Following</> : "Follow"}
+      {isFollowing ? <><Icon name="check" size={14} /> {tr("Following")}</> : tr("Follow")}
     </button>
   );
 }
