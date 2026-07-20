@@ -25,6 +25,21 @@ export async function rehostAllImagesNow(): Promise<ActionState> {
   return { ok: true, message: "Re-hosted all external + inline images to Blob." };
 }
 
+// Snapshot a game's world catalogue (champions / agents / weapons / legends /
+// maps + lore) to Blob so planet pages stop re-calling Data Dragon / valorant-
+// api / OpenDota / fortnite-api. `art` also re-hosts the images to our storage.
+export async function adminSyncGameWorld(game: string, art: boolean): Promise<ActionState> {
+  const admin = await requireArea("storage");
+  const { gameHasDirectory } = await import("@/lib/game-entities");
+  if (!gameHasDirectory(game)) return { error: "That game has no game-world catalogue." };
+  const { syncGameWorld } = await import("@/lib/game-world-cache");
+  const res = await syncGameWorld(game, { art });
+  await audit(admin.id, "gameworld.sync", "game", game, { art, count: res.count, artHosted: res.artHosted });
+  revalidatePath("/admin/storage");
+  if (!res.ok) return { error: `Sync failed: ${res.reason ?? "unknown"}` };
+  return { ok: true, message: `Cached ${res.count} entries${art ? ` · re-hosted ${res.artHosted} images` : ""}.` };
+}
+
 // Platform logo (nav + footer) — image + framing, saved to the CMS. Applies
 // site-wide immediately via a layout revalidation.
 export async function saveBrandLogo(_prev: ActionState, formData: FormData): Promise<ActionState> {
