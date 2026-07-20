@@ -12,6 +12,7 @@ import EntityImg from "@/components/EntityImg";
 import CoverImage from "@/components/CoverImage";
 import Countdown from "@/components/Countdown";
 import { ChallengeLog } from "@/components/ChallengeLog";
+import { useTr } from "@/components/LocaleProvider";
 import { slimImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
 import type { RegionStat } from "@/lib/regions";
@@ -50,6 +51,7 @@ export default function PlanetExplorer({
   toggle?: React.ReactNode;
   compact?: boolean;   // feed teaser: single-column so a narrow container looks right
 }) {
+  const tr = useTr();
   const start = Math.max(0, planets.findIndex((x) => x.slug === initialSlug));
   const [idx, setIdx] = useState(start);
   const p = planets[idx] ?? planets[0];
@@ -109,7 +111,7 @@ export default function PlanetExplorer({
       case "leaderboards": {
         const list = m.limit ? boards.slice(0, m.limit) : boards;
         if (list.length === 0) return null;
-        return <RailGroup key={m.id} icon="chart" title="Leaderboards">{list.map((b) => <BoardMini key={b.metricKey} board={b} onTitle={() => setSel({ kind: "board", metricKey: b.metricKey })} onGamer={openGamer} />)}</RailGroup>;
+        return <RailGroup key={m.id} icon="chart" title={tr("Leaderboards")}>{list.map((b) => <BoardMini key={b.metricKey} board={b} onTitle={() => setSel({ kind: "board", metricKey: b.metricKey })} onGamer={openGamer} />)}</RailGroup>;
       }
       case "board": {
         const b = boards.find((x) => x.metricKey === m.metricKey);
@@ -119,7 +121,7 @@ export default function PlanetExplorer({
       case "champions": {
         const list = m.limit ? champBoards.slice(0, m.limit) : champBoards;
         if (list.length === 0) return null;
-        return <RailGroup key={m.id} icon="swords" title="Champion mastery"><ChampList boards={list} onOpen={(id) => setSel({ kind: "champ", championId: id })} /></RailGroup>;
+        return <RailGroup key={m.id} icon="swords" title={tr("Champion mastery")}><ChampList boards={list} onOpen={(id) => setSel({ kind: "champ", championId: id })} /></RailGroup>;
       }
       case "entities":
         if (!game) return null;
@@ -129,7 +131,7 @@ export default function PlanetExplorer({
       case "challenges":
         if (challenges.length === 0) return null;
         return (
-          <RailGroup key={m.id} icon="zap" title="Challenges" accent="text-amber-200">
+          <RailGroup key={m.id} icon="zap" title={tr("Challenges")} accent="text-amber-200">
             <div className="space-y-2">
               {challenges.map((c) => (
                 <button key={c.id} onClick={() => setSel({ kind: "challenge", id: c.id })} className="w-full text-left rounded-xl overflow-hidden relative border border-white/10 hover:border-cyan-400/40 transition">
@@ -137,7 +139,7 @@ export default function PlanetExplorer({
                     {c.coverUrl ? <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${slimImg(c.coverUrl, 300000)})` }} /> : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${p.accent}55, ${p.accent2}33)` }} />}
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,5,26,0.92), rgba(4,5,26,0.2))" }} />
                     <div className="absolute bottom-1.5 left-2.5 right-2.5">
-                      <div className="text-[9px] uppercase tracking-widest text-emerald-300 flex items-center gap-1">{c.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />} {c.status === "active" ? "Live" : "Ended"}</div>
+                      <div className="text-[9px] uppercase tracking-widest text-emerald-300 flex items-center gap-1">{c.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />} {c.status === "active" ? tr("Live") : tr("Ended")}</div>
                       <div className="text-sm font-bold truncate">{c.title}</div>
                     </div>
                   </div>
@@ -149,7 +151,7 @@ export default function PlanetExplorer({
       case "regions":
         if (regions.length === 0) return null;
         return (
-          <RailGroup key={m.id} icon="users" title="Players by region">
+          <RailGroup key={m.id} icon="users" title={tr("Players by region")}>
             <div className="space-y-1">
               {regions.map((r) => (
                 <button key={r.key} onClick={() => setSel({ kind: "region", region: r })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
@@ -198,7 +200,7 @@ export default function PlanetExplorer({
 
       <div className="mx-auto max-w-7xl px-4 pt-4 pb-10">
         <div className="text-center mb-3">
-          <div className="text-[11px] uppercase tracking-widest text-cyan-300 inline-flex items-center gap-1.5"><Icon name="planet" size={13} /> {heading ?? "Explore the planet"}</div>
+          <div className="text-[11px] uppercase tracking-widest text-cyan-300 inline-flex items-center gap-1.5"><Icon name="planet" size={13} /> {heading ?? tr("Explore the planet")}</div>
           <h1 className="text-3xl md:text-5xl font-bold">{p.name}</h1>
         </div>
 
@@ -239,10 +241,10 @@ export default function PlanetExplorer({
                     style={{ background: middleBg ? `linear-gradient(rgba(4,5,26,0.9), rgba(4,5,26,0.95)), url(${middleBg}) center/cover` : "rgba(4,5,26,0.94)" }}
                     onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
-                      <span className="text-[11px] uppercase tracking-widest text-cyan-200">Details</span>
+                      <span className="text-[11px] uppercase tracking-widest text-cyan-200">{tr("Details")}</span>
                       <div className="flex items-center gap-1">
-                        <button onClick={refresh} title="Refresh" className="text-muted hover:text-cyan-300 p-1"><Icon name="satellite" size={13} className={loading ? "animate-spin" : ""} /></button>
-                        <button onClick={() => setSel(null)} title="Close" className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
+                        <button onClick={refresh} title={tr("Refresh")} className="text-muted hover:text-cyan-300 p-1"><Icon name="satellite" size={13} className={loading ? "animate-spin" : ""} /></button>
+                        <button onClick={() => setSel(null)} title={tr("Close")} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
                       </div>
                     </div>
                     <div className="p-3">
@@ -256,7 +258,7 @@ export default function PlanetExplorer({
             {swap && (
               <div className="text-center mt-4">
                 <Link href={`/planets/${p.slug}`} className="inline-flex items-center gap-2 glow-btn pressable rounded-full px-6 py-2.5 text-sm font-semibold text-white whitespace-nowrap">
-                  Enter the {p.name} planet <Icon name="arrowRight" size={15} />
+                  {tr("Enter the")} {p.name} {tr("planet")} <Icon name="arrowRight" size={15} />
                 </Link>
               </div>
             )}
@@ -301,6 +303,7 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
   sel: Sel; data: PlanetExplore | null; game: string | null;
   onGamer: (g: GamerSel) => void; onOpenEntity: (e: EntityLite) => void; onBack: () => void;
 }) {
+  const tr = useTr();
   if (!sel || !data) return null;
 
   if (sel.kind === "entity") return <EntityLoreCard game={game} kind={sel.entityKind} id={sel.id} name={sel.name} image={sel.image} />;
@@ -316,13 +319,13 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
             <div className="font-bold truncate">{g.name}</div>
             {g.sub && <div className="text-xs text-muted truncate">{g.sub}</div>}
           </div>
-          <Link href={`/u/${g.slug}`} className="ml-auto text-[11px] text-cyan-300 hover:underline shrink-0 inline-flex items-center gap-1">Profile <Icon name="arrowRight" size={11} /></Link>
+          <Link href={`/u/${g.slug}`} className="ml-auto text-[11px] text-cyan-300 hover:underline shrink-0 inline-flex items-center gap-1">{tr("Profile")} <Icon name="arrowRight" size={11} /></Link>
         </div>
         {g.challengeId
           ? <ChallengeLog challengeId={g.challengeId} slug={g.slug} title={g.challengeTitle} />
           : g.provider === "riot-lol" && g.accountId
             ? <LolCard accountId={g.accountId} colors={COL} statNumbers={[]} />
-            : <div className="text-xs text-muted">Open the full profile for this gamer&apos;s complete stats.</div>}
+            : <div className="text-xs text-muted">{tr("Open the full profile for this gamer's complete stats.")}</div>}
       </div>
     );
   }
@@ -348,7 +351,7 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
           <div className="flex items-center gap-2.5 mb-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={c.iconUrl} alt="" className="h-12 w-12 rounded-lg border border-white/20" />
-            <div><div className="font-bold">{c.name}</div><div className="text-[11px] text-muted">Mastery leaderboard · {c.entries.length} gamer{c.entries.length === 1 ? "" : "s"}</div></div>
+            <div><div className="font-bold">{c.name}</div><div className="text-[11px] text-muted">{tr("Mastery leaderboard")} · {c.entries.length} {tr(c.entries.length === 1 ? "gamer" : "gamers")}</div></div>
           </div>
           <div className="space-y-1">
             {c.entries.map((e) => (
@@ -376,7 +379,7 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
           <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,5,26,0.96), rgba(4,5,26,0.15) 62%, transparent)" }} />
           <div className="absolute bottom-2 left-3 right-3">
             <div className="text-[10px] uppercase tracking-widest flex items-center gap-1.5" style={{ color: active ? "#6ee7b7" : "#9aa0c3" }}>
-              {active && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />} {active ? "Live now" : "Ended"}
+              {active && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />} {active ? tr("Live now") : tr("Ended")}
             </div>
             <div className="text-lg font-bold drop-shadow leading-tight">{c.title}</div>
           </div>
@@ -384,36 +387,36 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
         <div className="p-3 space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg border border-white/10 bg-black/25 p-2">
-              <div className="text-[9px] uppercase tracking-widest text-muted flex items-center gap-1"><Icon name="clock" size={10} /> {active ? "Ends in" : "Status"}</div>
-              <div className="text-sm font-bold text-amber-200">{active ? <Countdown endsAt={c.endAt} /> : "Ended"}</div>
+              <div className="text-[9px] uppercase tracking-widest text-muted flex items-center gap-1"><Icon name="clock" size={10} /> {active ? tr("Ends in") : tr("Status")}</div>
+              <div className="text-sm font-bold text-amber-200">{active ? <Countdown endsAt={c.endAt} /> : tr("Ended")}</div>
             </div>
             <div className="rounded-lg border border-white/10 bg-black/25 p-2">
-              <div className="text-[9px] uppercase tracking-widest text-muted flex items-center gap-1"><Icon name="clock" size={10} /> Window</div>
+              <div className="text-[9px] uppercase tracking-widest text-muted flex items-center gap-1"><Icon name="clock" size={10} /> {tr("Window")}</div>
               <div className="text-[11px] leading-tight">{fmtDateTime(c.startAt)}<br /><span className="text-muted">→ {fmtDateTime(c.endAt)}</span></div>
             </div>
           </div>
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-cyan-200 mb-1 flex items-center gap-1"><Icon name="target" size={11} /> How to win</div>
+            <div className="text-[10px] uppercase tracking-widest text-cyan-200 mb-1 flex items-center gap-1"><Icon name="target" size={11} /> {tr("How to win")}</div>
             {c.description && <p className="text-[12px] text-white/85 leading-relaxed mb-1.5 whitespace-pre-line">{c.description}</p>}
             <div className="text-[11px] text-white/70">{winCondition(c.format, c.conditions)}</div>
           </div>
-          {c.prize && <div className="rounded-lg border border-amber-400/25 bg-amber-500/[0.06] p-2 text-[11px]"><span className="text-amber-200 font-semibold inline-flex items-center gap-1"><Icon name="trophy" size={11} /> Prize:</span> {c.prize}</div>}
+          {c.prize && <div className="rounded-lg border border-amber-400/25 bg-amber-500/[0.06] p-2 text-[11px]"><span className="text-amber-200 font-semibold inline-flex items-center gap-1"><Icon name="trophy" size={11} /> {tr("Prize")}:</span> {c.prize}</div>}
           <div>
-            <div className="text-[10px] uppercase tracking-widest text-cyan-200 mb-1">Top standings</div>
-            {c.top.length === 0 ? <div className="text-xs text-muted">No competitors yet — be the first to join.</div> : (
+            <div className="text-[10px] uppercase tracking-widest text-cyan-200 mb-1">{tr("Top standings")}</div>
+            {c.top.length === 0 ? <div className="text-xs text-muted">{tr("No competitors yet — be the first to join.")}</div> : (
               <div className="space-y-1">
                 {c.top.map((e, i) => (
                   <button key={e.slug} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: null, provider: null, sub: `${e.points} pts`, challengeId: c.id, challengeTitle: c.title })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
                     <span className="w-5 text-center text-xs font-bold text-muted">{i + 1}</span>
                     <Avatar name={e.name} src={e.avatar} size={26} />
                     <span className="flex-1 truncate text-sm">{e.name} <Flag code={e.country} className="text-xs" /></span>
-                    <span className="text-xs font-bold text-cyan-200">{e.points} pts</span>
+                    <span className="text-xs font-bold text-cyan-200">{e.points} {tr("pts")}</span>
                   </button>
                 ))}
               </div>
             )}
           </div>
-          <Link href={`/planets/${data.slug}/challenges/${c.id}`} className="inline-flex items-center gap-1 text-[11px] text-cyan-300 hover:underline">Full challenge page <Icon name="arrowRight" size={11} /></Link>
+          <Link href={`/planets/${data.slug}/challenges/${c.id}`} className="inline-flex items-center gap-1 text-[11px] text-cyan-300 hover:underline">{tr("Full challenge page")} <Icon name="arrowRight" size={11} /></Link>
         </div>
       </div>
     );
@@ -424,8 +427,8 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
   return (
     <div>
       <div className="text-sm font-bold mb-1 flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: r.color }} /> {r.label}</div>
-      <div className="text-[11px] text-muted mb-2">{r.count} gamer{r.count === 1 ? "" : "s"} in this region</div>
-      {r.gamers.length === 0 ? <div className="text-xs text-muted">No profiles to show here yet.</div> : (
+      <div className="text-[11px] text-muted mb-2">{r.count} {tr(r.count === 1 ? "gamer" : "gamers")} {tr("in this region")}</div>
+      {r.gamers.length === 0 ? <div className="text-xs text-muted">{tr("No profiles to show here yet.")}</div> : (
         <div className="space-y-1">
           {r.gamers.map((g) => (
             <button key={g.slug} onClick={() => onGamer({ slug: g.slug, name: g.name, avatar: g.avatar ?? null, accountId: g.accountId ?? null, provider: g.provider ?? null, sub: g.ign })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
@@ -441,7 +444,8 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
 }
 
 function EntryList({ entries, unit, onGamer }: { entries: ExploreEntry[]; unit: string | null; onGamer: (g: GamerSel) => void }) {
-  if (entries.length === 0) return <div className="text-xs text-muted">No ranked gamers yet.</div>;
+  const tr = useTr();
+  if (entries.length === 0) return <div className="text-xs text-muted">{tr("No ranked gamers yet.")}</div>;
   return (
     <div className="space-y-1">
       {entries.map((e) => (
@@ -478,6 +482,7 @@ function BoardMini({ board, onTitle, onGamer }: { board: ExploreBoard; onTitle: 
 }
 
 function ChampList({ boards, onOpen }: { boards: ChampBoard[]; onOpen: (id: number) => void }) {
+  const tr = useTr();
   return (
     <div className="grid grid-cols-2 gap-2">
       {boards.map((c) => (
@@ -487,7 +492,7 @@ function ChampList({ boards, onOpen }: { boards: ChampBoard[]; onOpen: (id: numb
           <div className="absolute bottom-1 left-2 right-2 flex items-center gap-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={c.iconUrl} alt="" className="h-6 w-6 rounded" />
-            <div className="min-w-0"><div className="text-[11px] font-bold truncate">{c.name}</div><div className="text-[9px] text-muted">{c.entries.length} gamer{c.entries.length === 1 ? "" : "s"}</div></div>
+            <div className="min-w-0"><div className="text-[11px] font-bold truncate">{c.name}</div><div className="text-[9px] text-muted">{c.entries.length} {tr(c.entries.length === 1 ? "gamer" : "gamers")}</div></div>
           </div>
         </button>
       ))}
@@ -515,6 +520,7 @@ const entityImgCls = (k: string) => k === "weapon" ? "object-contain p-1 bg-blac
 // tiles — limited (default 10), searchable, filterable by role/lane, scrollable.
 // Click a tile → lore card in the middle; "See all" → full directory in middle.
 function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: string; entityKind: string; limit: number; onOpen: (e: EntityLite) => void; onExpand: (k: string) => void }) {
+  const tr = useTr();
   const [list, setList] = useState<EntityLite[] | null>(null);
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
@@ -530,13 +536,13 @@ function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: strin
   const filtered = (list ?? []).filter((e) => (role === "all" || e.role === role) && (!q || e.name.toLowerCase().includes(q.toLowerCase())));
   const shown = filtered.slice(0, limit);
   return (
-    <RailGroup icon="swords" title={entityLabel(entityKind)} accent="text-violet-200">
-      {!list ? <div className="text-xs text-muted animate-pulse">Loading…</div> : (
+    <RailGroup icon="swords" title={tr(entityLabel(entityKind))} accent="text-violet-200">
+      {!list ? <div className="text-xs text-muted animate-pulse">{tr("Loading…")}</div> : (
         <>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${list.length}…`} className="w-full rounded-lg border border-white/12 bg-black/30 px-2.5 py-1.5 text-xs outline-none focus:border-cyan-400/50 mb-2" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`${tr("Search")} ${list.length}…`} className="w-full rounded-lg border border-white/12 bg-black/30 px-2.5 py-1.5 text-xs outline-none focus:border-cyan-400/50 mb-2" />
           {roles.length > 1 && (
             <div className="flex flex-wrap gap-1 mb-2">
-              <MiniChip on={role === "all"} onClick={() => setRole("all")}>All</MiniChip>
+              <MiniChip on={role === "all"} onClick={() => setRole("all")}>{tr("All")}</MiniChip>
               {roles.map((r) => <MiniChip key={r} on={role === r} onClick={() => setRole(r)}>{r}</MiniChip>)}
             </div>
           )}
@@ -548,7 +554,7 @@ function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: strin
               </button>
             ))}
           </div>
-          <button onClick={() => onExpand(entityKind)} className="mt-1.5 w-full text-left text-[11px] text-cyan-300 hover:underline">See all {filtered.length} →</button>
+          <button onClick={() => onExpand(entityKind)} className="mt-1.5 w-full text-left text-[11px] text-cyan-300 hover:underline">{tr("See all")} {filtered.length} →</button>
         </>
       )}
     </RailGroup>
@@ -560,6 +566,7 @@ function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: strin
 // art faintly filling the card background. Clicking a skin swaps the cover +
 // background in place (no image popup).
 function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; kind: string; id: string; name: string; image: string }) {
+  const tr = useTr();
   const [d, setD] = useState<EntityDetail | null>(null);
   const [cover, setCover] = useState<string | null>(null);
   useEffect(() => {
@@ -588,14 +595,14 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
         </div>
       </div>
       <div className="relative p-3">
-        {!d ? <div className="text-xs text-muted animate-pulse">Loading lore…</div> : (
+        {!d ? <div className="text-xs text-muted animate-pulse">{tr("Loading lore…")}</div> : (
           <>
             {/* Skin selector — tap a skin to repaint the cover + background */}
             {d.skins.length > 0 && (
               <div className="mb-3">
-                <div className="text-[10px] uppercase tracking-widest text-white/60 mb-1.5">{d.skins.length} skin{d.skins.length === 1 ? "" : "s"} · tap to set the cover</div>
+                <div className="text-[10px] uppercase tracking-widest text-white/60 mb-1.5">{d.skins.length} {tr(d.skins.length === 1 ? "skin · tap to set the cover" : "skins · tap to set the cover")}</div>
                 <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                  <button onClick={() => setCover(null)} className={`shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${!cover ? "border-cyan-400 text-cyan-200" : "border-white/12 text-muted hover:text-ink"}`}>Default</button>
+                  <button onClick={() => setCover(null)} className={`shrink-0 rounded-lg border px-2.5 py-1 text-[11px] font-semibold ${!cover ? "border-cyan-400 text-cyan-200" : "border-white/12 text-muted hover:text-ink"}`}>{tr("Default")}</button>
                   {d.skins.map((s, i) => (
                     <button key={i} onClick={() => setCover(s.image)} title={s.name} className={`shrink-0 w-24 text-left rounded-lg overflow-hidden border transition ${cover === s.image ? "border-cyan-400" : "border-white/10 hover:border-cyan-400/50"}`}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -609,7 +616,7 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
             {d.meta.filter((m) => m.value).length > 0 && <div className="flex flex-wrap gap-1.5 mb-2">{d.meta.filter((m) => m.value).map((m) => <span key={m.label} className="rounded-full border border-white/12 bg-black/30 px-2 py-0.5 text-[10px]"><span className="text-muted">{m.label}:</span> <b>{m.value}</b></span>)}</div>}
             {d.lore && <p className="text-[13px] text-white/85 leading-relaxed mb-2 whitespace-pre-line">{d.lore}</p>}
             {d.abilities.length > 0 && <div className="space-y-1.5">{d.abilities.map((ab, i) => (<div key={i} className="flex gap-2">{ab.icon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={ab.icon} alt="" className="h-7 w-7 rounded shrink-0 bg-black/40" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} />}<div className="min-w-0"><div className="text-xs font-semibold">{ab.name}</div>{ab.desc && <div className="text-[11px] text-white/60 line-clamp-2">{ab.desc}</div>}</div></div>))}</div>}
-            {!d.lore && d.abilities.length === 0 && d.skins.length === 0 && <p className="text-xs text-white/60">No lore available yet.</p>}
+            {!d.lore && d.abilities.length === 0 && d.skins.length === 0 && <p className="text-xs text-white/60">{tr("No lore available yet.")}</p>}
           </>
         )}
       </div>
@@ -619,6 +626,7 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
 
 // The full game-world directory expanded into the middle stage.
 function MiddleDirectory({ game, entityKind, onOpen }: { game: string | null; entityKind: string; onOpen: (e: EntityLite) => void }) {
+  const tr = useTr();
   const [list, setList] = useState<EntityLite[] | null>(null);
   const [q, setQ] = useState("");
   useEffect(() => {
@@ -628,12 +636,12 @@ function MiddleDirectory({ game, entityKind, onOpen }: { game: string | null; en
       .catch(() => alive && setList([]));
     return () => { alive = false; };
   }, [game, entityKind]);
-  if (!list) return <div className="text-xs text-muted animate-pulse">Loading…</div>;
+  if (!list) return <div className="text-xs text-muted animate-pulse">{tr("Loading…")}</div>;
   const shown = list.filter((e) => !q || e.name.toLowerCase().includes(q.toLowerCase()));
   return (
     <div>
-      <div className="text-sm font-bold mb-2">{entityLabel(entityKind)} · {list.length}</div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" className="w-full rounded-lg border border-white/12 bg-black/30 px-2.5 py-1.5 text-xs outline-none focus:border-cyan-400/50 mb-2" />
+      <div className="text-sm font-bold mb-2">{tr(entityLabel(entityKind))} · {list.length}</div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr("Search…")} className="w-full rounded-lg border border-white/12 bg-black/30 px-2.5 py-1.5 text-xs outline-none focus:border-cyan-400/50 mb-2" />
       <div className="grid grid-cols-4 gap-1.5 max-h-[320px] overflow-y-auto overscroll-contain">
         {shown.map((e) => (
           <button key={`${e.kind}-${e.id}`} onClick={() => onOpen(e)} title={e.name} style={{ containerType: "size" }} className="relative rounded-lg overflow-hidden border border-white/10 hover:border-cyan-400/50 aspect-square">
@@ -646,7 +654,8 @@ function MiddleDirectory({ game, entityKind, onOpen }: { game: string | null; en
   );
 }
 function Empty({ onBack }: { onBack: () => void }) {
-  return <div className="text-xs text-muted">Not available. <button onClick={onBack} className="text-cyan-300 underline">Close</button></div>;
+  const tr = useTr();
+  return <div className="text-xs text-muted">{tr("Not available.")} <button onClick={onBack} className="text-cyan-300 underline">{tr("Close")}</button></div>;
 }
 function shortTitle(t: string) { return t.split("·")[1]?.trim() ?? t; }
 
