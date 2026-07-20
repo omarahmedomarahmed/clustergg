@@ -69,6 +69,7 @@ export default function ProfileBuilder({
   const [bannerUrl, setBannerUrl] = useState(initialBanner);
   const [tab, setTab] = useState<"identity" | "theme" | "style">("identity");
   const [artOpen, setArtOpen] = useState<string | null>(null);
+  const [sheet, setSheet] = useState(false); // mobile: is the editor bottom-sheet expanded
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -158,14 +159,29 @@ export default function ProfileBuilder({
   const pill = (active: boolean) => `stat-tab ${active ? "stat-tab-active" : ""}`;
 
   return (
-    <div className="grid lg:grid-cols-[minmax(340px,380px)_1fr] gap-6 items-start">
-      {/* ===== Editor (left) ===== */}
-      <div className="glass p-4 md:p-5 lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] overflow-y-auto">
+    <div className="flex flex-col-reverse lg:grid lg:grid-cols-[minmax(340px,380px)_1fr] lg:gap-6 lg:items-start">
+      {/* ===== Editor — a slide-up bottom sheet on mobile, a sticky rail on desktop ===== */}
+      <div className={`glass overflow-y-auto lg:sticky lg:top-16 lg:inset-x-auto lg:bottom-auto lg:z-auto lg:max-h-[calc(100vh-5rem)] lg:rounded-2xl lg:p-5 lg:pb-5 fixed inset-x-0 bottom-16 z-40 rounded-t-3xl border-t border-white/15 shadow-[0_-12px_40px_-12px_rgba(0,0,0,0.7)] transition-[max-height] duration-300 lg:shadow-none lg:border-t-0 lg:rounded-b-2xl ${sheet ? "max-h-[74vh] p-4 pb-6" : "max-h-[124px] p-4"}`}>
+        {/* Mobile sheet handle + Save + expand toggle */}
+        <div className="lg:hidden flex items-center gap-2 mb-3">
+          <button onClick={() => setSheet((v) => !v)} className="flex-1 flex flex-col items-center py-0.5" aria-label={sheet ? "Collapse editor" : "Expand editor"}>
+            <span className="h-1.5 w-11 rounded-full bg-white/30 mb-1.5" />
+            <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-cyan-200">
+              <Icon name={sheet ? "chevronDown" : "edit"} size={13} /> {sheet ? tr("Done") : tr("Customize")}
+            </span>
+          </button>
+          <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-5 py-2 text-xs font-bold text-white disabled:opacity-60 shrink-0">
+            {pending ? tr("Saving…") : saved ? tr("Saved ✓") : tr("Save")}
+          </button>
+        </div>
+
+        {/* Controls — hidden on mobile until the sheet is expanded */}
+        <div className={`${sheet ? "" : "hidden"} lg:block`}>
         <div className="flex items-center justify-between mb-4">
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
             {tabs.map((t) => (
               <button key={t.k} onClick={() => setTab(t.k)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition-colors ${tab === t.k ? "border-cyan-400/70 bg-cyan-400/10 text-cyan-200" : "border-violet-400/25 text-muted hover:text-ink"}`}>
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition-colors ${tab === t.k ? "border-cyan-400/70 bg-cyan-400/10 text-cyan-200" : "border-violet-400/25 text-muted hover:text-ink"}`}>
                 <Icon name={t.icon} size={14} /> {tr(t.label)}
               </button>
             ))}
@@ -324,11 +340,12 @@ export default function ProfileBuilder({
             </div>
           </div>
         )}
+        </div>{/* /controls */}
       </div>
 
-      {/* ===== Live preview (right) ===== */}
-      <div className="lg:sticky lg:top-16">
-        <div className="flex items-center justify-between mb-2">
+      {/* ===== Live preview (right / top-on-mobile) — extra bottom room for the sheet ===== */}
+      <div className="lg:sticky lg:top-16 pb-52 lg:pb-0">
+        <div className="hidden lg:flex items-center justify-between mb-2">
           <div className="text-xs text-muted flex items-center gap-2"><Icon name="eye" size={13} /> {tr("Live preview —")} clustergg.com/u/{slug}</div>
           <div className="flex items-center gap-3">
             {saveError && <span className="text-xs text-rose-300">{saveError}</span>}
@@ -336,6 +353,11 @@ export default function ProfileBuilder({
               {pending ? tr("Saving…") : saved ? tr("Saved ✓") : tr("Save changes")}
             </button>
           </div>
+        </div>
+        {/* Mobile preview caption + any save error */}
+        <div className="lg:hidden flex items-center justify-between mb-2 text-xs text-muted">
+          <span className="flex items-center gap-1.5"><Icon name="eye" size={13} /> {tr("Live preview —")} @{slug}</span>
+          {saveError && <span className="text-rose-300">{saveError}</span>}
         </div>
         <div className="rounded-2xl overflow-hidden border border-violet-400/20">
           <div className="profile-root" style={{ ...vars, cursor: previewCursor !== "auto" ? previewCursor : undefined, ...bgStyle(theme) }}>
