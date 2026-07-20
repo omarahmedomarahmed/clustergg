@@ -116,6 +116,22 @@ export const AR_TEXT: Record<string, string> = {
   "Following": "يتابع",
   "Follow": "متابعة",
   "views": "مشاهدات",
+  // Leaderboards
+  "Leaderboards": "لوحات الصدارة",
+  "No leaderboards configured yet.": "لا توجد لوحات صدارة بعد.",
+  "Galaxy": "المجرّة",
+  "Real, API-verified rankings across every game. Pick a planet.": "تصنيفات حقيقية موثّقة عبر واجهات الألعاب لكل لعبة. اختر كوكبًا.",
+  "leaderboards": "لوحات الصدارة",
+  "Visit planet →": "زيارة الكوكب →",
+  // Search
+  "Scan the": "امسح",
+  "galaxy": "المجرّة",
+  "Search gamers, spaces, posts…": "ابحث عن لاعبين وكواكب ومنشورات…",
+  "Gamers": "اللاعبون",
+  "Posts": "المنشورات",
+  "No gamers found.": "لم يُعثر على لاعبين.",
+  "No planets found.": "لم يُعثر على كواكب.",
+  "No posts found.": "لم يُعثر على منشورات.",
   // Common
   "See all": "عرض الكل",
   "Save": "حفظ",
@@ -131,6 +147,8 @@ export const PAGE_STRINGS: { page: string; strings: string[] }[] = [
   { page: "Notifications", strings: ["Notifications", "Mark all read", "All quiet on the cosmic front."] },
   { page: "Profile", strings: ["Your", "profile", "Make this page yours, then connect your games.", "Everything saves to your public link.", "View live profile", "Your game accounts"] },
   { page: "Public profile", strings: ["Follow", "Following", "views"] },
+  { page: "Leaderboards", strings: ["Leaderboards", "No leaderboards configured yet.", "Galaxy", "Real, API-verified rankings across every game. Pick a planet.", "leaderboards", "Visit planet →"] },
+  { page: "Search", strings: ["Scan the", "galaxy", "Search gamers, spaces, posts…", "Gamers", "Planets", "Posts", "No gamers found.", "No planets found.", "No posts found."] },
 ];
 
 // t(): dotted-key lookup for chrome.

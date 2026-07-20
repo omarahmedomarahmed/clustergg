@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import LeaderboardWidget from "@/components/LeaderboardWidget";
+import { getT } from "@/lib/i18n/t-server";
 import { slimImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
@@ -13,12 +14,13 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
   const { game, metric } = await searchParams;
   const db = await getDb();
   const boards = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.isActive, true));
+  const { tr } = await getT();
 
   if (boards.length === 0) {
     return (
       <div className="mx-auto max-w-4xl px-4 py-16 text-center">
-        <h1 className="text-3xl font-bold mb-3">Leaderboards</h1>
-        <p className="text-muted">No leaderboards configured yet.</p>
+        <h1 className="text-3xl font-bold mb-3">{tr("Leaderboards")}</h1>
+        <p className="text-muted">{tr("No leaderboards configured yet.")}</p>
       </div>
     );
   }
@@ -49,8 +51,8 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="text-center mb-6">
-        <h1 className="text-3xl md:text-4xl font-bold">Galaxy <span className="grad-text">Leaderboards</span></h1>
-        <p className="text-muted mt-2">Real, API-verified rankings across every game. Pick a planet.</p>
+        <h1 className="text-3xl md:text-4xl font-bold">{tr("Galaxy")} <span className="grad-text">{tr("Leaderboards")}</span></h1>
+        <p className="text-muted mt-2">{tr("Real, API-verified rankings across every game. Pick a planet.")}</p>
       </div>
 
       {/* Game toggle — logos */}
@@ -79,8 +81,8 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
         <div className="relative">
           <div className="flex items-center gap-3 mb-4">
             {selected.logoUrl && <GameLogo logoUrl={slimImg(selected.logoUrl)} name={selected.name} size={40} rounded="rounded-xl" />}
-            <h2 className="text-xl font-bold">{selected.name} leaderboards</h2>
-            {selected.slug && <Link href={`/planets/${selected.slug}`} className="ml-auto text-xs text-cyan-300 hover:underline">Visit planet →</Link>}
+            <h2 className="text-xl font-bold">{selected.name} {tr("leaderboards")}</h2>
+            {selected.slug && <Link href={`/planets/${selected.slug}`} className="ml-auto text-xs text-cyan-300 hover:underline">{tr("Visit planet →")}</Link>}
           </div>
 
           {/* Metric filter — every metric we track for this game */}

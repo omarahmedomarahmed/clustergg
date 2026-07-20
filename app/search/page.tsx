@@ -2,6 +2,7 @@ import Link from "next/link";
 import { desc, ilike, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import Avatar from "@/components/Avatar";
+import { getT } from "@/lib/i18n/t-server";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -31,14 +32,15 @@ export default async function SearchPage({
           .limit(10),
       ])
     : [[], [], []];
+  const { tr } = await getT();
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="text-2xl font-bold mb-6">Scan the <span className="grad-text">galaxy</span></h1>
+      <h1 className="text-2xl font-bold mb-6">{tr("Scan the")} <span className="grad-text">{tr("galaxy")}</span></h1>
       <form className="mb-10">
         <input
           name="q" defaultValue={query} autoFocus
-          placeholder="Search gamers, spaces, posts…"
+          placeholder={tr("Search gamers, spaces, posts…")}
           className="input-cosmic text-lg !py-3.5"
         />
       </form>
@@ -46,8 +48,8 @@ export default async function SearchPage({
       {query && (
         <div className="space-y-10">
           <section>
-            <h2 className="text-sm uppercase tracking-widest text-muted mb-3">Gamers</h2>
-            {gamers.length === 0 ? <p className="text-muted text-sm">No gamers found.</p> : (
+            <h2 className="text-sm uppercase tracking-widest text-muted mb-3">{tr("Gamers")}</h2>
+            {gamers.length === 0 ? <p className="text-muted text-sm">{tr("No gamers found.")}</p> : (
               <div className="grid sm:grid-cols-2 gap-3">
                 {gamers.map((g) => (
                   <Link key={g.id} href={`/u/${g.slug}`} className="glass glass-hover flex items-center gap-3 p-3">
@@ -62,8 +64,8 @@ export default async function SearchPage({
             )}
           </section>
           <section>
-            <h2 className="text-sm uppercase tracking-widest text-muted mb-3">Spaces</h2>
-            {spaces.length === 0 ? <p className="text-muted text-sm">No spaces found.</p> : (
+            <h2 className="text-sm uppercase tracking-widest text-muted mb-3">{tr("Planets")}</h2>
+            {spaces.length === 0 ? <p className="text-muted text-sm">{tr("No planets found.")}</p> : (
               <div className="grid sm:grid-cols-2 gap-3">
                 {spaces.map((s) => (
                   <Link key={s.id} href={`/planets/${s.slug}`} className="glass glass-hover flex items-center gap-3 p-3">
@@ -78,8 +80,8 @@ export default async function SearchPage({
             )}
           </section>
           <section>
-            <h2 className="text-sm uppercase tracking-widest text-muted mb-3">Posts</h2>
-            {posts.length === 0 ? <p className="text-muted text-sm">No posts found.</p> : (
+            <h2 className="text-sm uppercase tracking-widest text-muted mb-3">{tr("Posts")}</h2>
+            {posts.length === 0 ? <p className="text-muted text-sm">{tr("No posts found.")}</p> : (
               <div className="space-y-3">
                 {posts.map(({ post, author, space }) => (
                   <Link key={post.id} href={`/planets/${space.slug}`} className="glass glass-hover block p-4">
