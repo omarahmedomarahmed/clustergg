@@ -119,18 +119,18 @@ export default async function ChallengePage({
           <Link href={`/planets/${slug}`} className="text-sm text-muted hover:text-cyan-300 inline-flex items-center gap-1.5 mb-3">
             <Icon name="arrowLeft" size={14} /> {tr("Back to planet")}
           </Link>
-          <div className="flex flex-wrap items-center gap-3 mb-3">
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] uppercase tracking-widest border ${
+          <div className="flex items-center gap-2 sm:gap-3 mb-3 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible [scrollbar-width:none]">
+            <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] uppercase tracking-widest border ${
               challenge.status === "active" ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10" : "border-violet-400/40 text-muted bg-black/40"}`}>
               {challenge.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
               {challenge.status === "active" ? tr("Live event") : challenge.status}
             </span>
-            <span className="text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1 capitalize">{challenge.cadence} {tr("challenge")}</span>
-            <span className="text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1">
+            <span className="shrink-0 whitespace-nowrap text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1 capitalize">{challenge.cadence} {tr("challenge")}</span>
+            <span className="shrink-0 whitespace-nowrap text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1">
               {challenge.format === "top1" ? tr("Winner takes all") : challenge.format === "top3" ? tr("Top 3 podium") : tr("Threshold race")}
             </span>
             {challenge.status === "active" && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-200 border border-amber-400/50 bg-amber-500/10 rounded-full px-3 py-1">
+              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-200 border border-amber-400/50 bg-amber-500/10 rounded-full px-3 py-1">
                 <Icon name="clock" size={12} /> <Countdown endsAt={challenge.endAt.toISOString()} prefix={`${tr("ends in")} `} />
               </span>
             )}
@@ -165,7 +165,7 @@ export default async function ChallengePage({
 
             <div className="mt-6">
               {!viewer ? (
-                <Link href="/signup" className="glow-btn pressable rounded-full px-8 py-3 font-semibold text-white inline-flex items-center gap-2">
+                <Link href="/signup" className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white flex sm:inline-flex w-full sm:w-auto items-center justify-center gap-2">
                   <Icon name="rocket" size={16} /> {tr("Sign up to compete")}
                 </Link>
               ) : joined ? (
@@ -193,7 +193,7 @@ export default async function ChallengePage({
                       <Icon name="check" size={14} /> {gate.questName} {tr("badges")} {gate.have}/{gate.need} — {tr("you qualify")}
                     </div>
                   )}
-                  <button className="glow-btn pressable rounded-full px-8 py-3 font-semibold text-white inline-flex items-center gap-2">
+                  <button className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white flex sm:inline-flex w-full sm:w-auto items-center justify-center gap-2">
                     <Icon name="rocket" size={16} /> {tr("Join with")} {myAccounts[0].inGameName}
                   </button>
                 </form>
