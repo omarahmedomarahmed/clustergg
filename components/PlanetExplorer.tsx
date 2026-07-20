@@ -8,6 +8,8 @@ import GameLogo from "@/components/GameLogo";
 import TopBannerAd from "@/components/TopBannerAd";
 import LolCard from "@/components/LolCard";
 import EntityImg from "@/components/EntityImg";
+import CoverImage from "@/components/CoverImage";
+import Countdown from "@/components/Countdown";
 import { ChallengeLog } from "@/components/ChallengeLog";
 import { slimImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
@@ -37,7 +39,7 @@ type Sel =
 // hero (switch planets, lazy-loading each). Modules with no data are hidden, so
 // the same layout fits every game.
 export default function PlanetExplorer({
-  planets, initialSlug, initial, swap = false, heading, toggle,
+  planets, initialSlug, initial, swap = false, heading, toggle, compact = false,
 }: {
   planets: PlanetData[];
   initialSlug: string;
@@ -45,6 +47,7 @@ export default function PlanetExplorer({
   swap?: boolean;
   heading?: string;
   toggle?: React.ReactNode;
+  compact?: boolean;   // feed teaser: single-column so a narrow container looks right
 }) {
   const start = Math.max(0, planets.findIndex((x) => x.slug === initialSlug));
   const [idx, setIdx] = useState(start);
@@ -198,22 +201,15 @@ export default function PlanetExplorer({
           <h1 className="text-3xl md:text-5xl font-bold">{p.name}</h1>
         </div>
 
-        {/* 3-zone layout: leaderboards | globe+stage | challenges/players */}
-        <div className="grid gap-4 lg:grid-cols-[300px_1fr_300px] items-start">
-          {/* ---- LEFT sidebar (admin-configured modules) ---- */}
-          <aside className={`order-2 lg:order-1 ${leftNodes.length ? "" : "hidden lg:block"}`}>
-            {leftNodes.length > 0 && (
-              <div className="rounded-2xl border border-white/10 bg-[#070826]/35 backdrop-blur-md p-3 lg:sticky lg:top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain space-y-4">
-                {leftNodes}
-              </div>
-            )}
-          </aside>
-
-          {/* ---- CENTER: globe + stage ---- */}
-          <div className="order-1 lg:order-2 relative">
+        {/* On the feed teaser (compact) the sidebars stack under a centered globe
+            so a narrow column never squeezes the globe into a dot. On the planet
+            page it's the full 3-zone management layout. */}
+        {(() => {
+        const globeBlock = (
+          <div className="relative">
             <div
               ref={frame}
-              className="relative mx-auto aspect-square w-full max-w-[520px] select-none"
+              className={`relative mx-auto aspect-square w-full select-none ${compact ? "max-w-[360px]" : "max-w-[520px]"}`}
               onMouseMove={onMove}
               onMouseLeave={() => { setTilt({ x: 0, y: 0 }); setZoom(false); }}
               onMouseEnter={() => setZoom(true)}
@@ -258,22 +254,42 @@ export default function PlanetExplorer({
 
             {swap && (
               <div className="text-center mt-4">
-                <Link href={`/planets/${p.slug}`} className="inline-flex items-center gap-2 glow-btn pressable rounded-full px-6 py-2.5 text-sm font-semibold text-white">
+                <Link href={`/planets/${p.slug}`} className="inline-flex items-center gap-2 glow-btn pressable rounded-full px-6 py-2.5 text-sm font-semibold text-white whitespace-nowrap">
                   Enter the {p.name} planet <Icon name="arrowRight" size={15} />
                 </Link>
               </div>
             )}
           </div>
+        );
+        const panel = (nodes: React.ReactNode[]) => (
+          <div className="rounded-2xl border border-white/10 bg-[#070826]/35 backdrop-blur-md p-3 space-y-4">{nodes}</div>
+        );
 
-          {/* ---- RIGHT sidebar (admin-configured modules) ---- */}
-          <aside className={`order-3 ${rightNodes.length ? "" : "hidden lg:block"}`}>
-            {rightNodes.length > 0 && (
-              <div className="rounded-2xl border border-white/10 bg-[#070826]/35 backdrop-blur-md p-3 lg:sticky lg:top-20 max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain space-y-4">
-                {rightNodes}
-              </div>
-            )}
-          </aside>
-        </div>
+        if (compact) {
+          return (
+            <div>
+              <div className="mx-auto max-w-[440px]">{globeBlock}</div>
+              {(leftNodes.length > 0 || rightNodes.length > 0) && (
+                <div className="grid sm:grid-cols-2 gap-4 mt-6">
+                  {leftNodes.length > 0 && panel(leftNodes)}
+                  {rightNodes.length > 0 && panel(rightNodes)}
+                </div>
+              )}
+            </div>
+          );
+        }
+        return (
+          <div className="grid gap-4 lg:grid-cols-[300px_1fr_300px] items-start">
+            <aside className={`order-2 lg:order-1 ${leftNodes.length ? "" : "hidden lg:block"}`}>
+              {leftNodes.length > 0 && panel(leftNodes)}
+            </aside>
+            <div className="order-1 lg:order-2">{globeBlock}</div>
+            <aside className={`order-3 ${rightNodes.length ? "" : "hidden lg:block"}`}>
+              {rightNodes.length > 0 && panel(rightNodes)}
+            </aside>
+          </div>
+        );
+        })()}
       </div>
     </section>
   );
@@ -352,24 +368,52 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
   if (sel.kind === "challenge") {
     const c = data.challenges.find((x) => x.id === sel.id);
     if (!c) return <Empty onBack={onBack} />;
+    const active = c.status === "active";
     return (
-      <div>
-        {c.coverUrl && <div className="h-24 -m-3 mb-2 bg-cover bg-center rounded-t-2xl" style={{ backgroundImage: `linear-gradient(to top, rgba(4,5,26,0.9), rgba(4,5,26,0.2)), url(${slimImg(c.coverUrl, 400000)})` }} />}
-        <div className="text-sm font-bold mb-1 flex items-center gap-1.5"><Icon name="zap" size={14} className="text-amber-300" /> {c.title}</div>
-        <div className="text-[11px] text-muted mb-2">{c.status === "active" ? "Live now" : "Ended"} · top standings</div>
-        {c.top.length === 0 ? <div className="text-xs text-muted">No competitors yet.</div> : (
-          <div className="space-y-1">
-            {c.top.map((e, i) => (
-              <button key={e.slug} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: null, provider: null, sub: `${e.points} pts`, challengeId: c.id, challengeTitle: c.title })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
-                <span className="w-5 text-center text-xs font-bold text-muted">{i + 1}</span>
-                <Avatar name={e.name} src={e.avatar} size={26} />
-                <span className="flex-1 truncate text-sm">{e.name}</span>
-                <span className="text-xs font-bold text-cyan-200">{e.points} pts</span>
-              </button>
-            ))}
+      <div className="-m-3">
+        <CoverImage src={c.coverUrl} name={c.title} kind="challenge" heightClass="h-40" rounded="rounded-t-2xl" padded={false}>
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,5,26,0.96), rgba(4,5,26,0.15) 62%, transparent)" }} />
+          <div className="absolute bottom-2 left-3 right-3">
+            <div className="text-[10px] uppercase tracking-widest flex items-center gap-1.5" style={{ color: active ? "#6ee7b7" : "#9aa0c3" }}>
+              {active && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />} {active ? "Live now" : "Ended"}
+            </div>
+            <div className="text-lg font-bold drop-shadow leading-tight">{c.title}</div>
           </div>
-        )}
-        <Link href={`/planets/${data.slug}/challenges/${c.id}`} className="mt-2 inline-flex items-center gap-1 text-[11px] text-cyan-300 hover:underline">Full challenge <Icon name="arrowRight" size={11} /></Link>
+        </CoverImage>
+        <div className="p-3 space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-lg border border-white/10 bg-black/25 p-2">
+              <div className="text-[9px] uppercase tracking-widest text-muted flex items-center gap-1"><Icon name="clock" size={10} /> {active ? "Ends in" : "Status"}</div>
+              <div className="text-sm font-bold text-amber-200">{active ? <Countdown endsAt={c.endAt} /> : "Ended"}</div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/25 p-2">
+              <div className="text-[9px] uppercase tracking-widest text-muted flex items-center gap-1"><Icon name="clock" size={10} /> Window</div>
+              <div className="text-[11px] leading-tight">{fmtDateTime(c.startAt)}<br /><span className="text-muted">→ {fmtDateTime(c.endAt)}</span></div>
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-cyan-200 mb-1 flex items-center gap-1"><Icon name="target" size={11} /> How to win</div>
+            {c.description && <p className="text-[12px] text-white/85 leading-relaxed mb-1.5 whitespace-pre-line">{c.description}</p>}
+            <div className="text-[11px] text-white/70">{winCondition(c.format, c.conditions)}</div>
+          </div>
+          {c.prize && <div className="rounded-lg border border-amber-400/25 bg-amber-500/[0.06] p-2 text-[11px]"><span className="text-amber-200 font-semibold inline-flex items-center gap-1"><Icon name="trophy" size={11} /> Prize:</span> {c.prize}</div>}
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-cyan-200 mb-1">Top standings</div>
+            {c.top.length === 0 ? <div className="text-xs text-muted">No competitors yet — be the first to join.</div> : (
+              <div className="space-y-1">
+                {c.top.map((e, i) => (
+                  <button key={e.slug} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: null, provider: null, sub: `${e.points} pts`, challengeId: c.id, challengeTitle: c.title })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
+                    <span className="w-5 text-center text-xs font-bold text-muted">{i + 1}</span>
+                    <Avatar name={e.name} src={e.avatar} size={26} />
+                    <span className="flex-1 truncate text-sm">{e.name}</span>
+                    <span className="text-xs font-bold text-cyan-200">{e.points} pts</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <Link href={`/planets/${data.slug}/challenges/${c.id}`} className="inline-flex items-center gap-1 text-[11px] text-cyan-300 hover:underline">Full challenge page <Icon name="arrowRight" size={11} /></Link>
+        </div>
       </div>
     );
   }
@@ -529,10 +573,12 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
     <div className="relative -m-3 rounded-2xl overflow-hidden">
       {/* Faint splash filling the whole card background */}
       <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.94)), url(${splash})` }} />
-      {/* Persistent COVER pinned to the top while the body scrolls */}
+      {/* Persistent COVER pinned to the top while the body scrolls — shows the
+          FULL art (contain) over a blurred fill so nothing is ever cropped. */}
       <div className="sticky top-0 z-10">
-        <div className="relative h-36 sm:h-44 bg-[#04051a]" style={{ containerType: "size" }}>
-          <EntityImg src={splash} name={name} kind={kind} className={`absolute inset-0 h-full w-full ${contain ? "object-contain p-3 bg-black/30" : "object-cover"}`} />
+        <div className="relative h-40 sm:h-52 bg-[#04051a]" style={{ containerType: "size" }}>
+          {splash && <div className="absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-45" style={{ backgroundImage: `url(${splash})` }} />}
+          <EntityImg src={splash} name={name} kind={kind} className={`absolute inset-0 h-full w-full object-contain ${contain ? "p-3" : "p-1"}`} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to top, #04051a, rgba(4,5,26,0.15) 55%, transparent)" }} />
           <div className="absolute bottom-2 left-3 right-3">
             <div className="text-xl font-bold drop-shadow">{name}</div>
@@ -602,3 +648,14 @@ function Empty({ onBack }: { onBack: () => void }) {
   return <div className="text-xs text-muted">Not available. <button onClick={onBack} className="text-cyan-300 underline">Close</button></div>;
 }
 function shortTitle(t: string) { return t.split("·")[1]?.trim() ?? t; }
+
+function fmtDateTime(iso: string): string {
+  try { return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch { return ""; }
+}
+const OP_LABEL: Record<string, string> = { ">=": "reach", ">": "exceed", "<=": "stay under", "<": "drop below", "==": "hit", "=": "hit" };
+function winCondition(format: string, conditions: { metric: string; op: string; value: number }[]): string {
+  const base = format === "top1" ? "Finish #1 on the challenge leaderboard." : format === "threshold_race" ? "Be first to reach the target." : "Finish in the top 3 of the challenge leaderboard.";
+  if (!conditions || conditions.length === 0) return base;
+  const parts = conditions.map((c) => `${OP_LABEL[c.op] ?? c.op} ${Number(c.value).toLocaleString()} ${c.metric.replace(/_/g, " ")}`);
+  return `${base} Scoring: ${parts.join(", ")}.`;
+}

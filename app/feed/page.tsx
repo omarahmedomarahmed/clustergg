@@ -167,7 +167,7 @@ export default async function FeedPage() {
             <section>
               <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="planet" size={18} className="text-cyan-300" /> Explore planets &amp; quests</h2>
               <div className="rounded-2xl overflow-hidden border border-violet-400/15">
-                <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="Tap a game to explore its planet" quest={questHero} />
+                <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="Tap a game to explore its planet" quest={questHero} compact />
               </div>
             </section>
           )}

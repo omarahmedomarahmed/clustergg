@@ -14,7 +14,11 @@ import { toRegion, REGIONS } from "@/lib/regions";
 export type ExploreEntry = { rank: number; slug: string; name: string; avatar: string | null; accountId: string | null; provider: string | null; value: number; rankLabel: string | null };
 export type ExploreBoard = { metricKey: string; title: string; unit: string | null; sortDir: string; entries: ExploreEntry[] };
 export type ChampBoard = { championId: number; ddId: string; name: string; iconUrl: string; splashUrl: string; entries: { rank: number; slug: string; name: string; avatar: string | null; accountId: string; points: number; level: number }[] };
-export type ExploreChallenge = { id: string; title: string; coverUrl: string | null; endAt: string; status: string; top: { slug: string; name: string; avatar: string | null; points: number }[] };
+export type ExploreChallenge = {
+  id: string; title: string; coverUrl: string | null; startAt: string; endAt: string; status: string;
+  description: string; format: string; conditions: { metric: string; op: string; value: number }[];
+  prize: string | null; top: { slug: string; name: string; avatar: string | null; points: number }[];
+};
 export type ExploreRegion = { key: string; label: string; short: string; color: string; count: number; gamers: { slug: string; name: string; avatar: string | null; ign: string }[] };
 export type PlanetExplore = {
   slug: string; name: string; game: string | null; hasChampions: boolean;
@@ -100,7 +104,11 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
     if (arr.length < 5) { const a = acctBySlug.get(p.slug); arr.push({ slug: p.slug, name: p.name, avatar: a ? gameAvatar(a) : p.avatarUrl, points: p.points }); topByCh.set(p.challengeId, arr); }
   }
   const challenges: ExploreChallenge[] = challengeRows.map((c) => ({
-    id: c.id, title: c.title, coverUrl: c.coverUrl, endAt: c.endAt.toISOString(), status: c.status, top: topByCh.get(c.id) ?? [],
+    id: c.id, title: c.title, coverUrl: c.coverUrl,
+    startAt: c.startAt.toISOString(), endAt: c.endAt.toISOString(), status: c.status,
+    description: c.description ?? "", format: c.format,
+    conditions: c.rules?.conditions ?? [], prize: c.prizeDescription ?? null,
+    top: topByCh.get(c.id) ?? [],
   }));
 
   // ---- Players by region (game-specific avatars) ----

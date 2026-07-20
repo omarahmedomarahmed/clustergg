@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { uid } from "@/lib/utils";
@@ -234,8 +234,9 @@ export async function markAllNotificationsRead() {
   const me = await requireUser();
   const db = await getDb();
   await db.update(schema.notifications).set({ readAt: new Date() })
-    .where(eq(schema.notifications.userId, me.id));
+    .where(and(eq(schema.notifications.userId, me.id), isNull(schema.notifications.readAt)));
   revalidatePath("/notifications");
+  revalidatePath("/", "layout"); // refresh the nav bell badge everywhere
 }
 
 // ---------- Challenges ----------

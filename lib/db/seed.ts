@@ -471,6 +471,21 @@ const PLANET_BGS: Record<string, string> = {
   "Chess": `${HF_CDN}/hf_20260718_004014_550032cb-9efb-4a43-8ae8-a1ea21a123b4.png`,
   "Apex Legends": `${HF_CDN}/hf_20260720_030417_c62e0e73-7c73-4e30-91b9-da355b1b87fa.png`,
 };
+// Connect-picker / onboarding logo + cover for the newly-added games (Apex,
+// PUBG). Only fills where null, so admin uploads are never clobbered. Reuses the
+// planet globe as the game icon and generated game art as the cover.
+const APEX_COVER = `${HF_CDN}/hf_20260720_030417_c62e0e73-7c73-4e30-91b9-da355b1b87fa.png`;
+const PUBG_COVER = `${HF_CDN}/hf_20260720_030759_1a51629d-2149-4075-bba6-7079e5267163.png`;
+const GAME_LOGOS: Record<string, string> = {
+  "Apex Legends": APEX_GLOBE,
+  "PUBG: Battlegrounds": PUBG_GLOBE,
+  "PUBG": PUBG_GLOBE,
+};
+const GAME_COVERS: Record<string, string> = {
+  "Apex Legends": APEX_COVER,
+  "PUBG: Battlegrounds": PUBG_COVER,
+  "PUBG": PUBG_COVER,
+};
 // ===== Image re-hosting: move inline base64 + external CDN art into our Blob =====
 // The real Neon data-transfer fix: any base64 `data:image` stored INSIDE a row
 // (notably the profile-builder `theme` JSONB, which can be megabytes) is
@@ -605,6 +620,15 @@ export async function ensurePlanetSkins(db: DB) {
   for (const [name, url] of Object.entries(PLANET_BGS)) {
     await db.update(schema.games).set({ planetBgUrl: url })
       .where(and(eq(schema.games.name, name), isNull(schema.games.planetBgUrl)));
+  }
+  // Connect-picker / onboarding logo + cover for games that have none yet.
+  for (const [name, url] of Object.entries(GAME_LOGOS)) {
+    await db.update(schema.games).set({ logoUrl: url })
+      .where(and(eq(schema.games.name, name), isNull(schema.games.logoUrl)));
+  }
+  for (const [name, url] of Object.entries(GAME_COVERS)) {
+    await db.update(schema.games).set({ coverUrl: url })
+      .where(and(eq(schema.games.name, name), isNull(schema.games.coverUrl)));
   }
 }
 
