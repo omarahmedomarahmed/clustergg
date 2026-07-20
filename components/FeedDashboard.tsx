@@ -7,6 +7,7 @@ import CpIcon from "@/components/CpIcon";
 import GameLogo from "@/components/GameLogo";
 import { saveFeedPrefs } from "@/app/actions/social";
 import LolCard from "@/components/LolCard";
+import { useTr } from "@/components/LocaleProvider";
 
 export type DashQuest = { key: string; name: string; color: string; logoUrl: string | null; qp: number; totalCp: number; pct: number; tierName: string };
 export type DashLeaderboard = { game: string; metricKey: string; title: string; slug: string | null; logoUrl: string | null; coverUrl: string | null };
@@ -29,6 +30,7 @@ const TYPES: { type: Widget["type"]; label: string; icon: string }[] = [
 const rid = () => Math.random().toString(36).slice(2, 10);
 
 export default function FeedDashboard({ sources, initial }: { sources: Sources; initial: Widget[] }) {
+  const tr = useTr();
   const [editing, setEditing] = useState(false);
   const [widgets, setWidgets] = useState<Widget[]>(initial);
   const [drag, setDrag] = useState<number | null>(null);
@@ -55,8 +57,8 @@ export default function FeedDashboard({ sources, initial }: { sources: Sources; 
   if (widgets.length === 0 && !editing) {
     return (
       <div className="glass p-5 mb-6 flex items-center justify-between gap-3">
-        <div className="text-sm text-muted"><b className="text-ink">Build your dashboard</b> — drop quest trackers, CP history, game stats and leaderboards onto a canvas.</div>
-        <button onClick={() => setEditing(true)} className="glow-btn pressable rounded-full px-4 py-2 text-xs font-semibold text-white inline-flex items-center gap-1.5 shrink-0"><Icon name="plus" size={13} /> Build</button>
+        <div className="text-sm text-muted"><b className="text-ink">{tr("Build your dashboard")}</b> — {tr("drop quest trackers, CP history, game stats and leaderboards onto a canvas.")}</div>
+        <button onClick={() => setEditing(true)} className="glow-btn pressable rounded-full px-4 py-2 text-xs font-semibold text-white inline-flex items-center gap-1.5 shrink-0"><Icon name="plus" size={13} /> {tr("Build")}</button>
       </div>
     );
   }
@@ -64,23 +66,23 @@ export default function FeedDashboard({ sources, initial }: { sources: Sources; 
   return (
     <div className="mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold flex items-center gap-2"><Icon name="grid" size={18} className="text-cyan-300" /> My dashboard</h2>
+        <h2 className="text-lg font-bold flex items-center gap-2"><Icon name="grid" size={18} className="text-cyan-300" /> {tr("My dashboard")}</h2>
         <div className="flex gap-2">
-          {editing && <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-4 py-1.5 text-xs font-semibold text-white inline-flex items-center gap-1.5"><Icon name="check" size={13} /> {pending ? "Saving…" : "Save"}</button>}
-          <button onClick={() => setEditing((v) => !v)} className="ghost-btn pressable rounded-full px-4 py-1.5 text-xs inline-flex items-center gap-1.5"><Icon name={editing ? "x" : "edit"} size={13} /> {editing ? "Done" : "Customize"}</button>
+          {editing && <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-4 py-1.5 text-xs font-semibold text-white inline-flex items-center gap-1.5"><Icon name="check" size={13} /> {pending ? tr("Saving…") : tr("Save")}</button>}
+          <button onClick={() => setEditing((v) => !v)} className="ghost-btn pressable rounded-full px-4 py-1.5 text-xs inline-flex items-center gap-1.5"><Icon name={editing ? "x" : "edit"} size={13} /> {editing ? tr("Done") : tr("Customize")}</button>
         </div>
       </div>
 
       {/* Palette */}
       {editing && (
         <div className="glass p-3 mb-3">
-          <div className="text-[11px] uppercase tracking-widest text-muted mb-2">Drag or tap to add a widget</div>
+          <div className="text-[11px] uppercase tracking-widest text-muted mb-2">{tr("Drag or tap to add a widget")}</div>
           <div className="flex flex-wrap gap-2">
             {TYPES.filter((t) => t.type !== "lolaccount" || sources.lolAccounts.length > 0).map((t) => (
               <button key={t.type} draggable onDragStart={(e) => e.dataTransfer.setData("wtype", t.type)}
                 onClick={() => addWidget(t.type)}
                 className="inline-flex items-center gap-1.5 rounded-full border border-white/12 px-3 py-1.5 text-xs font-semibold hover:border-cyan-400/50 cursor-grab active:cursor-grabbing">
-                <Icon name={t.icon} size={13} className="text-cyan-300" /> {t.label}
+                <Icon name={t.icon} size={13} className="text-cyan-300" /> {tr(t.label)}
               </button>
             ))}
           </div>
@@ -103,7 +105,7 @@ export default function FeedDashboard({ sources, initial }: { sources: Sources; 
             <WidgetCard widget={wg} sources={sources} editing={editing} onWidth={(n) => update(wg.id, { w: n })} onCfg={(p) => setCfg(wg.id, p)} onRemove={() => remove(wg.id)} />
           </div>
         ))}
-        {editing && widgets.length === 0 && <div className="col-span-full text-center text-sm text-muted py-6">Drop widgets here.</div>}
+        {editing && widgets.length === 0 && <div className="col-span-full text-center text-sm text-muted py-6">{tr("Drop widgets here.")}</div>}
       </div>
     </div>
   );
@@ -113,13 +115,14 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
   widget: Widget; sources: Sources; editing: boolean;
   onWidth: (n: number) => void; onCfg: (p: Record<string, string>) => void; onRemove: () => void;
 }) {
+  const tr = useTr();
   const c = widget.config;
   const [exp, setExp] = useState(false);
 
   const { compact, expanded, fullHref } = useMemo(() => {
     if (widget.type === "quest") {
       const q = sources.quests.find((x) => x.key === c.questKey) ?? sources.quests[0];
-      if (!q) return { compact: <Empty label="No quests" />, expanded: null, fullHref: "/quests" };
+      if (!q) return { compact: <Empty label={tr("No quests")} />, expanded: null, fullHref: "/quests" };
       return {
         fullHref: `/quests/${q.key}`,
         compact: (
@@ -167,7 +170,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
     }
     if (widget.type === "stat") {
       const s = sources.stats.find((x) => x.accountId === c.accountId && x.metricKey === c.metricKey) ?? sources.stats[0];
-      if (!s) return { compact: <Empty label="No connected stats" />, expanded: null, fullHref: "/profile" };
+      if (!s) return { compact: <Empty label={tr("No connected stats")} />, expanded: null, fullHref: "/profile" };
       return {
         fullHref: "/profile",
         compact: (
@@ -190,7 +193,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
     }
     if (widget.type === "lolaccount") {
       const la = sources.lolAccounts.find((x) => x.accountId === c.accountId) ?? sources.lolAccounts[0];
-      if (!la) return { compact: <Empty label="No League account linked" />, expanded: null, fullHref: "/profile" };
+      if (!la) return { compact: <Empty label={tr("No League account linked")} />, expanded: null, fullHref: "/profile" };
       const numbers = sources.stats.filter((s) => s.accountId === la.accountId).map((s) => ({ label: s.metricLabel, value: s.value.toLocaleString() }));
       return {
         fullHref: "/profile",
@@ -205,7 +208,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
     }
     // leaderboard
     const lb = sources.leaderboards.find((x) => x.game === c.game && x.metricKey === c.metricKey) ?? sources.leaderboards.find((x) => x.game === c.game) ?? sources.leaderboards[0];
-    if (!lb) return { compact: <Empty label="No leaderboards" />, expanded: null, fullHref: "/leaderboards" };
+    if (!lb) return { compact: <Empty label={tr("No leaderboards")} />, expanded: null, fullHref: "/leaderboards" };
     return {
       fullHref: lb.slug ? `/planets/${lb.slug}?stat=${encodeURIComponent(lb.metricKey)}` : `/leaderboards?game=${encodeURIComponent(lb.game)}`,
       compact: (
@@ -216,7 +219,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
       ),
       expanded: <LeaderboardLive game={lb.game} metric={lb.metricKey} />,
     };
-  }, [widget, sources, c]);
+  }, [widget, sources, c, tr]);
 
   return (
     <div className="glass p-3.5 h-full relative">
@@ -237,7 +240,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
       {exp && !editing && expanded && (
         <div className="mt-3 border-t border-white/10 pt-3">
           {expanded}
-          <Link href={fullHref} className="mt-2 inline-flex items-center gap-1 text-[11px] text-cyan-300 hover:underline"><Icon name="arrowRight" size={11} /> Open full page</Link>
+          <Link href={fullHref} className="mt-2 inline-flex items-center gap-1 text-[11px] text-cyan-300 hover:underline"><Icon name="arrowRight" size={11} /> {tr("Open full page")}</Link>
         </div>
       )}
       {editing && <WidgetConfig widget={widget} sources={sources} onCfg={onCfg} />}
@@ -246,6 +249,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
 }
 
 function WidgetConfig({ widget, sources, onCfg }: { widget: Widget; sources: Sources; onCfg: (p: Record<string, string>) => void }) {
+  const tr = useTr();
   const c = widget.config;
   const sel = "mt-2 w-full rounded-lg border border-white/12 bg-black/30 px-2 py-1 text-[11px] outline-none focus:border-cyan-400/50";
   if (widget.type === "quest") return (
@@ -255,8 +259,8 @@ function WidgetConfig({ widget, sources, onCfg }: { widget: Widget; sources: Sou
   );
   if (widget.type === "cp") return (
     <select value={c.scope ?? "total"} onChange={(e) => onCfg({ scope: e.target.value })} className={sel}>
-      <option value="total">Total CP</option>
-      {sources.quests.map((q) => <option key={q.key} value={q.key}>{q.name} CP</option>)}
+      <option value="total">{tr("Total CP")}</option>
+      {sources.quests.map((q) => <option key={q.key} value={q.key}>{q.name} {tr("CP")}</option>)}
     </select>
   );
   if (widget.type === "stat") return (
@@ -286,6 +290,7 @@ type LbData = { unit: string | null; total: number; entries: LbEntry[]; me: { ra
 // Live leaderboard inside a dashboard widget: real top entries for the selected
 // game + metric, plus the gamer's own standing pinned below.
 function LeaderboardLive({ game, metric }: { game: string; metric: string }) {
+  const tr = useTr();
   const [data, setData] = useState<LbData | null>(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
@@ -297,13 +302,13 @@ function LeaderboardLive({ game, metric }: { game: string; metric: string }) {
     return () => { alive = false; };
   }, [game, metric]);
 
-  if (err) return <div className="text-xs text-muted py-2">Couldn&apos;t load the leaderboard.</div>;
-  if (!data) return <div className="text-xs text-muted py-2">Loading standings…</div>;
+  if (err) return <div className="text-xs text-muted py-2">{tr("Couldn't load the leaderboard.")}</div>;
+  if (!data) return <div className="text-xs text-muted py-2">{tr("Loading standings…")}</div>;
   const fmt = (v: number, rl: string | null) => rl ?? (v.toLocaleString() + (data.unit ? ` ${data.unit}` : ""));
 
   return (
     <div className="space-y-1.5">
-      {data.entries.length === 0 && <div className="text-xs text-muted">No ranked players yet.</div>}
+      {data.entries.length === 0 && <div className="text-xs text-muted">{tr("No ranked players yet.")}</div>}
       {data.entries.map((e) => (
         <Link key={e.slug} href={`/u/${e.slug}`} className="flex items-center gap-2 text-xs hover:text-cyan-300">
           <span className="w-4 text-center font-bold text-muted">{e.rank}</span>
@@ -315,7 +320,7 @@ function LeaderboardLive({ game, metric }: { game: string; metric: string }) {
       {data.me && (
         <div className="mt-2 flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/[0.08] px-2 py-1.5 text-xs">
           <span className="w-4 text-center font-bold text-cyan-300">{data.me.rank}</span>
-          <span className="min-w-0 flex-1 truncate font-semibold">You{data.me.rank <= data.total ? ` · of ${data.total}` : ""}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold">{tr("You")}{data.me.rank <= data.total ? ` · ${tr("of")} ${data.total}` : ""}</span>
           <span className="font-bold text-cyan-200 shrink-0">{fmt(data.me.value, data.me.rankLabel)}</span>
         </div>
       )}
