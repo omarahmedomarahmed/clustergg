@@ -8,6 +8,7 @@ import ImageUpload from "@/components/ImageUpload";
 import Icon from "@/components/Icon";
 import SubmitButton from "@/components/SubmitButton";
 import QuestMapPinEditor from "@/components/QuestMapPinEditor";
+import QuestPathEditor from "@/components/QuestPathEditor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Edit quest" };
@@ -78,6 +79,20 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
             mapArtUrl={quest.mapArtUrl ?? quest.cardBgUrl ?? ""}
             accent={quest.color}
             tiers={tiers.map((t) => ({ id: t.id, name: t.name, thresholdQp: t.thresholdQp, color: t.color ?? quest.color, iconUrl: t.iconUrl ?? null, x: t.mapX, y: t.mapY }))}
+          />
+        </div>
+      )}
+
+      {/* Draw the curved trail the astronaut rides */}
+      {tiers.length > 1 && (
+        <div className="glass p-6">
+          <h2 className="font-bold mb-1 flex items-center gap-2"><Icon name="rocket" size={16} className="text-cyan-300" /> Astronaut trail (curved path)</h2>
+          <QuestPathEditor
+            questId={quest.id}
+            mapArtUrl={quest.mapArtUrl ?? quest.cardBgUrl ?? ""}
+            accent={quest.accent2 || quest.color}
+            milestones={tiers.map((t) => ({ id: t.id, name: t.name, color: t.color ?? quest.color, x: t.mapX, y: t.mapY }))}
+            initial={Array.isArray(quest.pathPoints) ? quest.pathPoints : []}
           />
         </div>
       )}

@@ -9,8 +9,8 @@ import { slimImg } from "@/lib/img";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Leaderboards" };
 
-export default async function LeaderboardsPage({ searchParams }: { searchParams: Promise<{ game?: string }> }) {
-  const { game } = await searchParams;
+export default async function LeaderboardsPage({ searchParams }: { searchParams: Promise<{ game?: string; metric?: string }> }) {
+  const { game, metric } = await searchParams;
   const db = await getDb();
   const boards = await db.select().from(schema.leaderboards).where(eq(schema.leaderboards.isActive, true));
 
@@ -33,6 +33,18 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
   const selected = games.find((g) => g.name === selectedName)!;
   const gameBoards = boards.filter((b) => b.game === selectedName);
   const cover = slimImg(selected.coverUrl ?? null);
+  // Metric filter: narrow this game's boards to one metric (or "all").
+  const selectedMetric = metric && gameBoards.some((b) => b.metricKey === metric) ? metric : "all";
+  const shownBoards = selectedMetric === "all" ? gameBoards : gameBoards.filter((b) => b.metricKey === selectedMetric);
+  const metricChip = (mKey: string, label: string) => {
+    const on = selectedMetric === mKey;
+    return (
+      <Link key={mKey} href={`/leaderboards?game=${encodeURIComponent(selectedName)}${mKey === "all" ? "" : `&metric=${encodeURIComponent(mKey)}`}`} scroll={false}
+        className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${on ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-200" : "border-white/12 text-muted hover:text-ink"}`}>
+        {label}
+      </Link>
+    );
+  };
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -65,21 +77,36 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
         <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.86), rgba(4,5,26,0.94))" }} />
 
         <div className="relative">
-          <div className="flex items-center gap-3 mb-5">
+          <div className="flex items-center gap-3 mb-4">
             {selected.logoUrl && <GameLogo logoUrl={slimImg(selected.logoUrl)} name={selected.name} size={40} rounded="rounded-xl" />}
             <h2 className="text-xl font-bold">{selected.name} leaderboards</h2>
             {selected.slug && <Link href={`/planets/${selected.slug}`} className="ml-auto text-xs text-cyan-300 hover:underline">Visit planet →</Link>}
           </div>
 
-          {/* All this game's boards, side by side */}
-          <div className="grid lg:grid-cols-2 gap-5">
-            {gameBoards.map((b) => (
-              <div key={b.id} className="rounded-2xl border border-white/10 bg-[#04051a]/60 p-4">
-                <div className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="chart" size={15} className="text-cyan-300" /> {b.title}</div>
-                <LeaderboardWidget boards={[b]} basePath="/leaderboards" limit={10} compact />
-              </div>
-            ))}
-          </div>
+          {/* Metric filter — every metric we track for this game */}
+          {gameBoards.length > 1 && (
+            <div className="flex flex-wrap gap-1.5 mb-5">
+              {metricChip("all", `All metrics (${gameBoards.length})`)}
+              {gameBoards.map((b) => metricChip(b.metricKey, b.title.split("·")[1]?.trim() ?? b.title))}
+            </div>
+          )}
+
+          {/* Boards — full podium when a single metric is filtered, else the grid */}
+          {selectedMetric !== "all" && shownBoards[0] ? (
+            <div className="rounded-2xl border border-white/10 bg-[#04051a]/60 p-4 max-w-2xl mx-auto">
+              <div className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="chart" size={15} className="text-cyan-300" /> {shownBoards[0].title}</div>
+              <LeaderboardWidget boards={[shownBoards[0]]} basePath={`/leaderboards?game=${encodeURIComponent(selectedName)}`} limit={25} />
+            </div>
+          ) : (
+            <div className="grid lg:grid-cols-2 gap-5">
+              {shownBoards.map((b) => (
+                <div key={b.id} className="rounded-2xl border border-white/10 bg-[#04051a]/60 p-4">
+                  <div className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="chart" size={15} className="text-cyan-300" /> {b.title}</div>
+                  <LeaderboardWidget boards={[b]} basePath="/leaderboards" limit={10} compact />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

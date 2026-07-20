@@ -105,6 +105,7 @@ export const PROVIDERS: ProviderDef[] = [
     capabilities: [
       { key: "solo_lp", label: "Solo/Duo LP", higherIsBetter: true },
       { key: "solo_tier", label: "Solo/Duo tier", higherIsBetter: true, rankLabels: ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND","MASTER","GRANDMASTER","CHALLENGER"] },
+      { key: "flex_tier", label: "Flex 5v5 tier", higherIsBetter: true, rankLabels: ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND","MASTER","GRANDMASTER","CHALLENGER"] },
       { key: "wins", label: "Ranked wins", higherIsBetter: true },
       { key: "losses", label: "Ranked losses" },
       { key: "win_rate", label: "Win rate %", unit: "%", higherIsBetter: true },

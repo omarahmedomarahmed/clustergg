@@ -267,20 +267,37 @@ const riotLol = {
     try {
       const platform = a.region ?? "euw1";
       const headers = { "X-Riot-Token": key };
-      const summoner = await j<any>(
-        `https://${platform}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${a.providerAccountId}`, { headers });
-      const entries = await j<any[]>(
-        `https://${platform}.api.riotgames.com/lol/league/v4/entries/by-puuid/${a.providerAccountId}`, { headers });
+      // Summoner + ranked entries + top champion mastery in parallel (mastery
+      // isolated so a mastery hiccup never fails the rank sync).
+      const [summoner, entries, masteryRaw] = await Promise.all([
+        j<any>(`https://${platform}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${a.providerAccountId}`, { headers }),
+        j<any[]>(`https://${platform}.api.riotgames.com/lol/league/v4/entries/by-puuid/${a.providerAccountId}`, { headers }),
+        j<any[]>(`https://${platform}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${a.providerAccountId}/top?count=8`, { headers }).catch(() => []),
+      ]);
       const solo = entries.find((e) => e.queueType === "RANKED_SOLO_5x5");
+      const flex = entries.find((e) => e.queueType === "RANKED_FLEX_SR");
       const TIERS = ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND","MASTER","GRANDMASTER","CHALLENGER"];
+      const tierVal = (e: any) => e?.tier ? TIERS.indexOf(e.tier) * 400 + (num(e.leaguePoints) ?? 0) : undefined;
       const wins = num(solo?.wins), losses = num(solo?.losses);
+      // Persist game-specific avatar (profile icon) + champion mastery so the
+      // planet page / leaderboards read them without any live Riot call.
+      let providerDataPatch: Record<string, unknown> | undefined;
+      try {
+        const { lolPersistBits } = await import("@/lib/providers/riot-lol-rich");
+        const bits = await lolPersistBits(summoner?.profileIconId != null ? Number(summoner.profileIconId) : null, masteryRaw ?? []);
+        providerDataPatch = { gameAvatar: bits.gameAvatar, profileIconId: bits.profileIconId, lolChampions: bits.champions };
+      } catch { /* non-fatal — stats still sync */ }
       return {
         ok: true,
+        providerDataPatch,
         metrics: metricsOf({
           summoner_level: num(summoner?.summonerLevel),
           solo_lp: num(solo?.leaguePoints),
           solo_tier: solo?.tier
-            ? { value: TIERS.indexOf(solo.tier) * 400 + (num(solo.leaguePoints) ?? 0), rankLabel: `${solo.tier} ${solo.rank ?? ""}`.trim() }
+            ? { value: tierVal(solo)!, rankLabel: `${solo.tier} ${solo.rank ?? ""}`.trim() }
+            : undefined,
+          flex_tier: flex?.tier
+            ? { value: tierVal(flex)!, rankLabel: `${flex.tier} ${flex.rank ?? ""}`.trim() }
             : undefined,
           wins, losses,
           win_rate: wins != null && losses != null && wins + losses > 0

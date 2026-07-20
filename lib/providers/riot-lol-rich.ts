@@ -247,3 +247,18 @@ export async function getLolMatchDetail(matchId: string, puuid: string, platform
 function emptySnap(error: string): LolSnapshot {
   return { ok: false, error, profileIconUrl: null, summonerLevel: null, live: null, champions: [], matches: [] };
 }
+
+// ---------- Persisted bits (written to linked_game_accounts.providerData) ----------
+// The sync engine calls this so the planet page + leaderboards can read a
+// gamer's game-specific avatar (profile icon) and their champion mastery cheaply
+// server-side, without any live Riot call per row.
+export type PersistChamp = { championId: number; ddId: string; name: string; iconUrl: string; level: number; points: number };
+export async function lolPersistBits(profileIconId: number | null, masteryRaw: any[]): Promise<{ gameAvatar: string | null; profileIconId: number | null; champions: PersistChamp[] }> {
+  let dd: { version: string; byId: Map<number, Champ> };
+  try { dd = await dataDragon(); } catch { dd = { version: "14.1.1", byId: new Map() }; }
+  const champions: PersistChamp[] = (masteryRaw ?? []).map((m) => {
+    const id = Number(m.championId); const idStr = dd.byId.get(id)?.id ?? "";
+    return { championId: id, ddId: idStr, name: dd.byId.get(id)?.name ?? `Champion ${id}`, iconUrl: champIconUrl(dd.version, idStr), level: Number(m.championLevel ?? 0), points: Number(m.championPoints ?? 0) };
+  });
+  return { gameAvatar: profileIconId != null ? profileIconUrl(dd.version, profileIconId) : null, profileIconId, champions };
+}

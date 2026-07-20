@@ -12,6 +12,7 @@ import LeaderboardWidget from "@/components/LeaderboardWidget";
 import PostCard from "@/components/PostCard";
 import JoinSpaceButton from "@/components/JoinSpaceButton";
 import HeroStage from "@/components/HeroStage";
+import GameDirectory from "@/components/GameDirectory";
 import Countdown from "@/components/Countdown";
 import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
@@ -19,6 +20,7 @@ import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { getQuestHeroData } from "@/lib/quest-hero";
+import { getPlanetExplore } from "@/lib/planet-explore";
 import OAuthButtons from "@/components/OAuthButtons";
 
 export const dynamic = "force-dynamic";
@@ -113,12 +115,13 @@ export default async function PlanetPage({
   const pAccent2 = game?.accent2 || "#22d3ee";
   const skinnedPlanets = hasSkin ? await buildSkinnedPlanets(db) : [];
   const questHero = hasSkin && skinnedPlanets.length > 0 ? await getQuestHeroData(db, viewer?.id ?? null) : null;
+  const planetExplore = hasSkin && skinnedPlanets.length > 0 ? await getPlanetExplore(db, space.slug) : null;
 
   return (
     <div>
       {hasSkin && skinnedPlanets.length > 0 ? (
         <>
-          <HeroStage planets={skinnedPlanets} initialSlug={space.slug} quest={questHero} swap={false} />
+          <HeroStage planets={skinnedPlanets} initialSlug={space.slug} quest={questHero} swap={false} explore={planetExplore} />
           <div className="mx-auto max-w-6xl px-4 -mt-2 mb-4 flex flex-wrap items-center gap-3">
             <p className="text-muted text-sm mr-auto">{space.description}</p>
             {gameProviders.map((p) => (
@@ -236,6 +239,10 @@ export default async function PlanetPage({
                 </div>
               </section>
             )}
+
+            {/* Game-world directory — champions / agents+weapons / heroes with lore.
+                Self-loads and renders nothing for games without a catalogue. */}
+            {game && <GameDirectory game={game.name} />}
 
             {/* Leaderboard #2 — challenges, each with its own live board */}
             <section>
