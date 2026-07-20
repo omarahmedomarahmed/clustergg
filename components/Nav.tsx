@@ -11,6 +11,7 @@ import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
 import LocaleToggle from "@/components/LocaleToggle";
+import MobileHud from "@/components/MobileHud";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
@@ -163,6 +164,18 @@ export default async function Nav() {
           <MobileMenu links={mobileLinks} loggedIn={!!user} profileSlug={user?.slug ?? null} />
         </div>
       </div>
+
+      {/* Native-mobile-game HUD strip (level bar + red-dot alerts), members only */}
+      {user && (
+        <MobileHud
+          displayName={user.displayName}
+          avatarUrl={user.avatarUrl}
+          slug={user.slug}
+          cp={totalCp}
+          unread={unread}
+          unreadDm={navConvos.some((c) => c.unread)}
+        />
+      )}
     </header>
   );
 }
