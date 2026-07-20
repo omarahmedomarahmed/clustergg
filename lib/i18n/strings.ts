@@ -190,6 +190,24 @@ export const AR_TEXT: Record<string, string> = {
   "profile settings": "إعدادات الملف",
   "Follow some gamers": "تابع بعض اللاعبين",
   "Enter the Cluster": "ادخل كلاستر",
+  // Home (landing) — note: "Gamers" and "All planets" already defined above
+  "The Cluster galaxy — pick a game": "مجرّة كلاستر — اختر لعبة",
+  "Linked accounts": "الحسابات المرتبطة",
+  "Games": "الألعاب",
+  "Challenges": "التحديات",
+  "Enter your feed": "ادخل إلى خلاصتك",
+  "pts": "نقطة",
+  "in": "في",
+  "All challenges": "كل التحديات",
+  "Live": "مباشر",
+  "ends": "ينتهي",
+  "Throne unclaimed — join first": "العرش شاغر — كن أول من ينضم",
+  "Compete": "نافس",
+  "The": " ",
+  "Game Galaxy": "مجرّة الألعاب",
+  "Chart your": "خطّط",
+  "Everything you do earns Cluster Points across galaxy-spanning quests. Climb each map from Bronze to Platinum.": "كل ما تفعله يكسبك نقاط كلاستر عبر مهام تمتد في المجرّة. تسلّق كل خريطة من البرونز إلى البلاتين.",
+  "Explore all quests": "استكشف كل المهام",
   // Common
   "See all": "عرض الكل",
   "Save": "حفظ",
@@ -211,6 +229,7 @@ export const PAGE_STRINGS: { page: string; strings: string[] }[] = [
   { page: "Settings", strings: ["Account", "Email", "Member since", "Role", "Danger zone", "Deleting your account removes your profile, linked accounts, posts and messages. This cannot be undone.", "Delete my account", "Game accounts", "Notifications", "Privacy", "Email digests", "Challenge results, badge awards and moderation notices.", "In-app notifications for follows, badges and challenges are always on — they're how the galaxy talks to you.", "Profile visibility", "Who can see", "Public — anyone with the link", "Followers only", "Private — only me", "Who can message me", "Everyone", "Only people I follow", "Nobody", "Save"] },
   { page: "Login & signup", strings: ["Welcome back,", "star traveler", "Sign in with Discord — your universal gamer identity.", "Sign-in failed", "Try again or use email.", "or email", "New here?", "Join the Cluster", "Claim your", "cosmic profile", "Sign up with Discord and your avatar + handle come with you. One profile for every game.", "Sign-up failed", "Already aboard?", "Log in"] },
   { page: "Onboarding", strings: ["Welcome to the Cluster,", "Your identity is set — now light up your constellation.", "Link Discord to make it your universal identity:", "Link your game accounts", "linked", "Green providers verify instantly against real APIs — try Chess.com, Lichess, Dota 2, Speedrun.com or Roblox.", "Your public profile", "Your shareable link is ready:", "customize it in", "profile settings", "Follow some gamers", "Enter the Cluster"] },
+  { page: "Home", strings: ["The Cluster galaxy — pick a game", "Gamers", "Linked accounts", "Games", "Challenges", "Enter your feed", "pts", "in", "All challenges", "Live", "ends", "Throne unclaimed — join first", "Compete", "Game Galaxy", "All planets", "Chart your", "Everything you do earns Cluster Points across galaxy-spanning quests. Climb each map from Bronze to Platinum.", "Explore all quests"] },
 ];
 
 // t(): dotted-key lookup for chrome.

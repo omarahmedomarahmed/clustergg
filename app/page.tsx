@@ -14,6 +14,7 @@ import { buildSkinnedPlanets } from "@/lib/planets";
 import { getQuestHeroData } from "@/lib/quest-hero";
 import { getUserQuests, getQuestTops } from "@/lib/quests";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
+import { getT } from "@/lib/i18n/t-server";
 import { slimImg } from "@/lib/img";
 import { timeAgo } from "@/lib/utils";
 
@@ -102,12 +103,19 @@ export default async function LandingPage() {
   const counts = statCounts[0] ?? { users: 0, accounts: 0, challenges: 0, games: 0 };
   const ticker = tickerRows.length > 0 ? [...tickerRows, ...tickerRows] : [];
   const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
+  const { tr } = await getT();
+  const statCards = [
+    { n: counts.users, label: tr("Gamers"), icon: "users" },
+    { n: counts.accounts, label: tr("Linked accounts"), icon: "link" },
+    { n: counts.games, label: tr("Games"), icon: "gamepad" },
+    { n: counts.challenges, label: tr("Challenges"), icon: "zap" },
+  ];
 
   return (
     <div className="overflow-x-clip">
       {/* ===== INTERACTIVE HERO — planet globe ⇄ quest map toggle ===== */}
       {skinnedPlanets.length > 0 && (
-        <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="The Cluster galaxy — pick a game" quest={questHero} />
+        <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading={tr("The Cluster galaxy — pick a game")} quest={questHero} />
       )}
 
       {/* ===== HERO ===== */}
@@ -123,12 +131,7 @@ export default async function LandingPage() {
             </div>
           )}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">
-            {[
-              { n: counts.users, label: "Gamers", icon: "users" },
-              { n: counts.accounts, label: "Linked accounts", icon: "link" },
-              { n: counts.games, label: "Games", icon: "gamepad" },
-              { n: counts.challenges, label: "Challenges", icon: "zap" },
-            ].map((s) => (
+            {statCards.map((s) => (
               <div key={s.label} className="glass card-lift px-4 py-4 text-center">
                 <Icon name={s.icon} size={16} className="text-violet-300 mb-1.5" />
                 <div className="text-3xl font-bold grad-text">{Number(s.n).toLocaleString()}</div>
@@ -154,7 +157,7 @@ export default async function LandingPage() {
             <div className="rise-in rise-in-3 mt-10 flex flex-col items-center gap-4">
               {viewer ? (
                 <Link href="/feed" className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white text-lg">
-                  Enter your feed <Icon name="arrowRight" size={16} className="ml-1" />
+                  {tr("Enter your feed")} <Icon name="arrowRight" size={16} className="ml-1" />
                 </Link>
               ) : (
                 <>
@@ -167,12 +170,7 @@ export default async function LandingPage() {
               )}
             </div>
             <div className="rise-in rise-in-4 mt-16 grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">
-              {[
-                { n: counts.users, label: "Gamers", icon: "users" },
-                { n: counts.accounts, label: "Linked accounts", icon: "link" },
-                { n: counts.games, label: "Games", icon: "gamepad" },
-                { n: counts.challenges, label: "Challenges", icon: "zap" },
-              ].map((s) => (
+              {statCards.map((s) => (
                 <div key={s.label} className="glass card-lift px-4 py-4">
                   <Icon name={s.icon} size={16} className="text-violet-300 mb-1.5" />
                   <div className="text-3xl font-bold grad-text">{Number(s.n).toLocaleString()}</div>
@@ -192,8 +190,8 @@ export default async function LandingPage() {
               <Link key={i} href={`/u/${t.user.slug}`} className="flex items-center gap-2 text-sm whitespace-nowrap text-muted hover:text-ink">
                 <Avatar name={t.user.displayName} src={t.user.avatarUrl} size={22} />
                 <span className="text-ink font-semibold">{t.user.displayName}</span>
-                <span className="text-cyan-300 font-bold">{t.points} pts</span>
-                <span>in {t.challenge.title}</span>
+                <span className="text-cyan-300 font-bold">{t.points} {tr("pts")}</span>
+                <span>{tr("in")} {t.challenge.title}</span>
               </Link>
             ))}
           </div>
@@ -214,7 +212,7 @@ export default async function LandingPage() {
                 </h2>
                 <p className="text-muted mt-2 max-w-xl">{c["section.challenges.subtitle"]}</p>
               </div>
-              <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">All challenges</Link>
+              <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">{tr("All challenges")}</Link>
             </div>
 
             <div className="grid md:grid-cols-3 gap-5">
@@ -234,12 +232,12 @@ export default async function LandingPage() {
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/40 to-transparent" />
                       <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-emerald-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live · {challenge.cadence}
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> {tr("Live")} · {challenge.cadence}
                       </div>
                       <div className="absolute bottom-3 left-4 right-4">
                         <div className="font-bold text-lg leading-tight drop-shadow">{challenge.title}</div>
                         <div className="text-xs text-muted mt-0.5 inline-flex items-center gap-1.5">
-                          <Icon name="clock" size={11} /> ends {timeAgo(challenge.endAt).replace(" ago", "")} · {challenge.game}
+                          <Icon name="clock" size={11} /> {tr("ends")} {timeAgo(challenge.endAt).replace(" ago", "")} · {challenge.game}
                         </div>
                       </div>
                     </div>
@@ -248,14 +246,14 @@ export default async function LandingPage() {
                       {/* Hover reveal: live top 3 */}
                       <div className="event-reveal mt-3 space-y-1.5">
                         {top3.length === 0 && (
-                          <div className="text-xs text-cyan-300 inline-flex items-center gap-1.5"><Icon name="crown" size={12} /> Throne unclaimed — join first</div>
+                          <div className="text-xs text-cyan-300 inline-flex items-center gap-1.5"><Icon name="crown" size={12} /> {tr("Throne unclaimed — join first")}</div>
                         )}
                         {top3.map((t, i) => (
                           <div key={t.slug} className="flex items-center gap-2 text-sm">
                             <span className={`rank-chip rank-chip-${i + 1} !h-6 !min-w-6 text-xs`}>{i + 1}</span>
                             <Avatar name={t.name} src={t.avatarUrl} size={20} />
                             <span className="truncate text-xs">{t.name}</span>
-                            <span className="ml-auto text-cyan-200 font-bold text-xs">{t.points} pts</span>
+                            <span className="ml-auto text-cyan-200 font-bold text-xs">{t.points} {tr("pts")}</span>
                           </div>
                         ))}
                       </div>
@@ -265,7 +263,7 @@ export default async function LandingPage() {
                             <Icon name="trophy" size={12} /> {challenge.prizeDescription.split("+")[0]}
                           </span>
                         )}
-                        <span className="inline-flex items-center gap-1 text-xs text-cyan-300 shrink-0">Compete <Icon name="chevronRight" size={12} /></span>
+                        <span className="inline-flex items-center gap-1 text-xs text-cyan-300 shrink-0">{tr("Compete")} <Icon name="chevronRight" size={12} /></span>
                       </div>
                     </div>
                   </Link>
@@ -286,11 +284,11 @@ export default async function LandingPage() {
         <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
           <div>
             <h2 className="text-3xl md:text-4xl font-bold">
-              The <span className="grad-text">Game Galaxy</span>
+              {tr("The")} <span className="grad-text">{tr("Game Galaxy")}</span>
             </h2>
             <p className="text-muted mt-2 max-w-xl">{c["section.games.subtitle"]}</p>
           </div>
-          <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">All planets</Link>
+          <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">{tr("All planets")}</Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
           {games.map((g, i) => {
@@ -323,10 +321,10 @@ export default async function LandingPage() {
         <section className="mx-auto max-w-6xl px-4 pb-20">
           <div className="text-center">
             <h2 className="text-3xl md:text-4xl font-bold">
-              Chart your <span className="grad-text">Quests</span>
+              {tr("Chart your")} <span className="grad-text">{tr("Quests")}</span>
             </h2>
             <p className="text-muted mt-3 max-w-lg mx-auto">
-              Everything you do earns Cluster Points across galaxy-spanning quests. Climb each map from Bronze to Platinum.
+              {tr("Everything you do earns Cluster Points across galaxy-spanning quests. Climb each map from Bronze to Platinum.")}
             </p>
           </div>
           <div className="mt-10 grid md:grid-cols-2 gap-5">
@@ -334,7 +332,7 @@ export default async function LandingPage() {
           </div>
           <div className="mt-8 text-center">
             <Link href="/quests" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm inline-flex items-center gap-2">
-              Explore all quests <Icon name="arrowRight" size={15} />
+              {tr("Explore all quests")} <Icon name="arrowRight" size={15} />
             </Link>
           </div>
         </section>
