@@ -138,3 +138,24 @@ export async function deleteTier(questId: string, tierId: string) {
   await audit(admin.id, "quest.tier_delete", questId);
   revalidatePath(`/admin/quests/${questId}`);
 }
+
+// Save the curved trail the astronaut rides across the quest map. Accepts a JSON
+// array of { x, y } waypoints (0-100). Empty clears it (falls back to a straight
+// line through the milestone pins).
+export async function saveQuestPath(questId: string, _prev: TierPinState, formData: FormData): Promise<TierPinState> {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const clamp = (v: number) => Math.max(0, Math.min(100, Number.isFinite(v) ? Math.round(v * 10) / 10 : 50));
+  let pts: { x: number; y: number }[] = [];
+  try {
+    const parsed = JSON.parse(String(formData.get("points") ?? "[]"));
+    if (Array.isArray(parsed)) pts = parsed.filter((p) => p && typeof p.x === "number" && typeof p.y === "number").map((p) => ({ x: clamp(p.x), y: clamp(p.y) }));
+  } catch { pts = []; }
+  await db.update(schema.quests)
+    .set({ pathPoints: pts.length >= 2 ? pts : null })
+    .where(eq(schema.quests.id, questId));
+  await audit(admin.id, "quest.path", questId);
+  revalidatePath(`/admin/quests/${questId}`);
+  revalidatePath("/quests");
+  return { ok: true, message: pts.length >= 2 ? `Trail saved (${pts.length} points).` : "Trail cleared." };
+}

@@ -8,6 +8,7 @@ import TopBannerAd from "@/components/TopBannerAd";
 import ZoomPan from "@/components/ZoomPan";
 import CpIcon from "@/components/CpIcon";
 import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
+import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
@@ -37,24 +38,39 @@ export default function QuestMapHero({
   const holders = active ? active.tierHolders : tierHolders;
   const tiers = q.tiers;
 
-  // "You are here" marker: interpolate along the path between the last earned
-  // pin and the next one, by CP progress into the current segment.
   const cur = q.currentTierIndex; // -1 before first tier
   const from = cur >= 0 ? tiers[cur] : null;
   const to = q.nextTier;
-  let youX: number, youY: number;
+
+  // The trail: an admin-drawn curved path when set, else the straight line
+  // through the milestone pins. We draw a smooth curve through it AND place the
+  // astronaut EXACTLY on that same curve, so the marker rides the line.
+  const trail: Pt[] = q.pathPoints && q.pathPoints.length >= 2
+    ? q.pathPoints
+    : tiers.map((t) => ({ x: t.mapX, y: t.mapY }));
+  const curveD = smoothPathD(trail);
+  const samples = sampleCurve(trail);
+  const totalLen = samples.length ? samples[samples.length - 1].len : 0;
+  // Anchor each milestone onto the curve (arc-length of its nearest curve point),
+  // then walk between the current and next milestone by CP fraction — so the
+  // astronaut is between the right pins and never leaves the line.
+  const lenAt = (p: Pt) => nearestLength(samples, p);
+  let markerLen: number;
   if (from && to) {
     const span = to.thresholdQp - from.thresholdQp || 1;
     const f = Math.max(0, Math.min(1, (q.qp - from.thresholdQp) / span));
-    youX = from.mapX + (to.mapX - from.mapX) * f;
-    youY = from.mapY + (to.mapY - from.mapY) * f;
+    const a = lenAt({ x: from.mapX, y: from.mapY }), b = lenAt({ x: to.mapX, y: to.mapY });
+    markerLen = a + (b - a) * f;
   } else if (!from && to) {
     const f = Math.max(0, Math.min(1, q.qp / (to.thresholdQp || 1)));
-    youX = 8 + (to.mapX - 8) * f; youY = to.mapY;
+    markerLen = lenAt({ x: to.mapX, y: to.mapY }) * f;
   } else {
-    const last = tiers[tiers.length - 1];
-    youX = last?.mapX ?? 92; youY = last?.mapY ?? 50;
+    markerLen = totalLen;
   }
+  const you = pointAtLength(samples, markerLen);
+  // Facing: sample a little ahead on the curve to know travel direction.
+  const ahead = pointAtLength(samples, Math.min(totalLen, markerLen + 1));
+  const youX = you.x, youY = you.y;
 
   return (
     <section className="relative overflow-hidden">
@@ -157,13 +173,12 @@ export default function QuestMapHero({
           {/* readability veil */}
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.15), rgba(4,5,26,0.45))" }} />
 
-          {/* Path line connecting the milestones */}
-          <svg className="absolute inset-0 h-full w-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <polyline
-              points={tiers.map((t) => `${t.mapX},${t.mapY}`).join(" ")}
-              fill="none" stroke={`${q.color}`} strokeOpacity="0.5" strokeWidth="0.8"
-              strokeDasharray="2 1.6" strokeLinecap="round" />
-          </svg>
+          {/* Curved trail the astronaut rides (admin-editable path, else the pins) */}
+          {curveD && (
+            <svg className="absolute inset-0 h-full w-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <path d={curveD} fill="none" stroke={q.color} strokeOpacity="0.5" strokeWidth="0.8" strokeDasharray="2 1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
 
           {/* Milestone pins */}
           {tiers.map((t, i) => {
@@ -191,8 +206,8 @@ export default function QuestMapHero({
               static image via brand.quest.rocket. Fixed (no float). */}
           <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10" style={{ left: `${youX}%`, top: `${youY}%` }}>
             {(() => {
-              // Direction toward the next milestone: right if it's further along, else left.
-              const facing: "front" | "left" | "right" = to ? (to.mapX >= youX ? "right" : "left") : "front";
+              // Direction along the curve: face where the trail is heading next.
+              const facing: "front" | "left" | "right" = to ? (ahead.x >= youX ? "right" : "left") : "front";
               const markerUrl = rocketUrl || QUEST_ASTRONAUT[facing];
               return markerUrl ? (
                 <span className="relative block h-14 w-14 md:h-16 md:w-16">
