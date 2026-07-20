@@ -1,15 +1,15 @@
 import { getContent, getRawContent } from "@/lib/cms";
 import { getCountries } from "@/lib/countries-server";
-import { STRINGS, STRING_KEYS } from "@/lib/i18n/strings";
-import { saveUiString } from "@/app/actions/language";
+import { STRINGS, STRING_KEYS, PAGE_STRINGS, AR_TEXT } from "@/lib/i18n/strings";
 import CountriesEditor from "@/components/CountriesEditor";
 import ArabicContentEditor, { type ArabicItem } from "@/components/ArabicContentEditor";
+import UiStringsEditor, { type UiGroup } from "@/components/UiStringsEditor";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Language & flags" };
 
-// The site-copy keys worth translating (text, not URLs/colours), with labels.
+// Marketing / CMS copy keys (translatable text, not URLs/colours).
 const TRANSLATABLE: { key: string; label: string; multiline?: boolean }[] = [
   { key: "hero.badge", label: "Hero · badge" },
   { key: "hero.title.line1", label: "Hero · title line 1" },
@@ -39,36 +39,37 @@ export default async function LanguageAdminPage() {
     getCountries(),
     getContent(keys, "en"),
     getRawContent(keys, "ar"),
-    getRawContent(["ui.overrides"], "ar"),
+    getRawContent(["ui.overrides.en", "ui.overrides.ar"], "en"),
   ]);
   const items: ArabicItem[] = TRANSLATABLE.map((t) => ({ key: t.key, label: t.label, en: en[t.key] ?? "", ar: ar[t.key] ?? "", multiline: t.multiline }));
 
-  // Interface (UI dictionary) strings — every built-in string, overridable.
-  let uiMap: Record<string, string> = {};
-  try { if (uiRaw["ui.overrides"]) uiMap = JSON.parse(uiRaw["ui.overrides"]); } catch { /* none */ }
-  const uiItems: ArabicItem[] = STRING_KEYS.map((k) => ({
-    key: k, label: k,
-    en: `EN: ${STRINGS.en[k]}   ·   AR: ${STRINGS.ar[k]}`,
-    ar: uiMap[k] ?? "",
-    multiline: STRINGS.en[k].length > 40,
-  }));
+  // Current per-locale UI overrides.
+  const parse = (s?: string) => { try { const j = JSON.parse(s || "{}"); return j && typeof j === "object" ? j as Record<string, string> : {}; } catch { return {}; } };
+  const enOv = parse(uiRaw["ui.overrides.en"]);
+  const arOv = parse(uiRaw["ui.overrides.ar"]);
+
+  const uiGroups: UiGroup[] = [
+    {
+      page: "Chrome (nav, footer, buttons)",
+      items: STRING_KEYS.map((k) => ({ key: k, en: enOv[k] ?? STRINGS.en[k], ar: arOv[k] ?? STRINGS.ar[k] })),
+    },
+    ...PAGE_STRINGS.map((g) => ({
+      page: g.page,
+      items: g.strings.map((s) => ({ key: s, en: enOv[s] ?? s, ar: arOv[s] ?? AR_TEXT[s] ?? "" })),
+    })),
+  ];
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold flex items-center gap-2"><Icon name="globe" size={20} className="text-cyan-300" /> Language &amp; flags</h1>
         <p className="text-sm text-muted mt-1">
-          Translate the site into Arabic (gamers switch with the 🇪🇬/🇺🇸 toggle in the nav) and manage the country flags they can pick.
-          The full localization roadmap lives in <span className="font-mono text-[12px]">docs/arabic-localization-plan.md</span>.
+          Edit every word on every page in English and Arabic, translate the marketing copy, and manage the country flags.
+          Gamers switch language with the 🇪🇬/🇺🇸 toggle in the nav. Roadmap: <span className="font-mono text-[12px]">docs/arabic-localization-plan.md</span>.
         </p>
       </div>
-      <ArabicContentEditor items={items} />
-      <ArabicContentEditor
-        items={uiItems}
-        save={saveUiString}
-        title="Interface strings (Arabic)"
-        subtitle="Override the built-in Arabic for nav, buttons and page headers. Blank keeps the built-in translation."
-      />
+      <UiStringsEditor groups={uiGroups} />
+      <ArabicContentEditor items={items} title="Marketing copy (Arabic)" subtitle="Translate the homepage / section copy. English is edited on the Site content page." />
       <CountriesEditor initial={countries} />
     </div>
   );

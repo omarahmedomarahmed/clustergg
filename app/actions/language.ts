@@ -15,18 +15,20 @@ export async function saveArabicContent(key: string, value: string) {
   return { ok: true };
 }
 
-// Override one built-in UI dictionary string in Arabic (stored in the single
-// ui.overrides@ar JSON map). Empty value clears the override (falls back to the
-// built-in Arabic).
-export async function saveUiString(key: string, value: string) {
+// Override a UI string in a given locale (stored in ui.overrides.<locale> JSON).
+// Works for both English and Arabic, so admins can edit every word in either
+// language. Empty value clears the override (falls back to the built-in).
+export async function saveUiString(key: string, locale: string, value: string) {
   await requireStaff();
   if (!key) return { error: "Missing key." };
+  const loc = locale === "ar" ? "ar" : "en";
+  const storeKey = `ui.overrides.${loc}`;
   const { getRawContent, setContent } = await import("@/lib/cms");
-  const raw = (await getRawContent(["ui.overrides"], "ar"))["ui.overrides"];
+  const raw = (await getRawContent([storeKey], "en"))[storeKey];
   let map: Record<string, string> = {};
   try { if (raw) { const j = JSON.parse(raw); if (j && typeof j === "object") map = j; } } catch { /* reset */ }
   if (value.trim()) map[key] = value.trim(); else delete map[key];
-  await setContent("ui.overrides", JSON.stringify(map), "ar");
+  await setContent(storeKey, JSON.stringify(map), "en");
   const { invalidateUiOverrides } = await import("@/lib/i18n/t-server");
   invalidateUiOverrides();
   revalidatePath("/", "layout");
