@@ -70,17 +70,23 @@ export const STRING_KEYS = Object.keys(STRINGS.en) as StringKey[];
 // Built-in Arabic for tr() strings, keyed by the exact English text.
 export const AR_TEXT: Record<string, string> = {
   // Planets
-  "The Game Galaxy": "مجرّة الألعاب",
-  "Every world we track — pick yours and claim your standing.": "كل عالم نتتبعه — اختر عالمك وثبّت مكانتك.",
+  "Explore": "استكشف",
+  "Planets": "الكواكب",
+  "Request a new planet": "اطلب كوكبًا جديدًا",
+  "Each game has its own planet — leaderboards, challenges, players and a community feed, all in one world.": "لكل لعبة كوكبها الخاص — لوحات الصدارة والتحديات واللاعبون وخلاصة المجتمع، في عالم واحد.",
   "All planets": "كل الكواكب",
   "Explore the planet": "استكشف الكوكب",
   "Full →": "المزيد →",
   // Quests
   "Quests": "المهام",
   "All quests": "كل المهام",
-  "Chart your quests": "خطط مهامك",
-  "Your Cluster Points": "نقاط كلاستر الخاصة بك",
-  "Total CP": "إجمالي النقاط",
+  "Play the Cluster.": "العب في كلاستر.",
+  "Earn your legend.": "اصنع أسطورتك.",
+  "Each quest is a guided path across the galaxy. Tap a quest to open its map, track your Cluster Points, and see who's leading the way.": "كل مهمة هي مسار موجّه عبر المجرّة. اضغط على مهمة لفتح خريطتها وتتبّع نقاط كلاستر ومعرفة من يتصدّر.",
+  "Sign in with Discord to start earning quest badges.": "سجّل الدخول عبر ديسكورد لبدء كسب أوسمة المهام.",
+  "Your total Cluster Points": "إجمالي نقاط كلاستر لديك",
+  "Quests are being forged — check back shortly.": "يجري إعداد المهام — تحقق قريبًا.",
+  "Your complete CP history": "سجل نقاطك الكامل",
   // Challenges
   "Live Challenges": "التحديات المباشرة",
   "Join challenge": "انضم إلى التحدي",
@@ -95,13 +101,13 @@ export const AR_TEXT: Record<string, string> = {
   "Notifications": "الإشعارات",
   "Mark all read": "تحديد الكل كمقروء",
   "You're all caught up.": "لا يوجد جديد.",
-  "No notifications yet.": "لا توجد إشعارات بعد.",
+  "All quiet on the cosmic front.": "كل شيء هادئ في الكون.",
   // Profile
-  "Your profile": "ملفك الشخصي",
+  "Your": "ملفك",
+  "profile": "الشخصي",
   "Make this page yours, then connect your games.": "خصّص هذه الصفحة ثم اربط ألعابك.",
+  "Everything saves to your public link.": "كل شيء يُحفظ في رابطك العام.",
   "View live profile": "عرض الملف المباشر",
-  "Customize": "تخصيص",
-  "Game accounts": "حسابات الألعاب",
   "Your game accounts": "حسابات ألعابك",
   "Followers": "المتابعون",
   "Following": "يتابع",
@@ -115,11 +121,11 @@ export const AR_TEXT: Record<string, string> = {
 
 // Registry of editable page strings, grouped by page, for the admin editor.
 export const PAGE_STRINGS: { page: string; strings: string[] }[] = [
-  { page: "Planets", strings: ["The Game Galaxy", "Every world we track — pick yours and claim your standing.", "All planets", "Explore the planet", "Full →"] },
-  { page: "Quests", strings: ["Quests", "All quests", "Chart your quests", "Your Cluster Points", "Total CP"] },
+  { page: "Planets", strings: ["Explore", "Planets", "Request a new planet", "Each game has its own planet — leaderboards, challenges, players and a community feed, all in one world."] },
+  { page: "Quests", strings: ["Quests", "Play the Cluster.", "Earn your legend.", "Each quest is a guided path across the galaxy. Tap a quest to open its map, track your Cluster Points, and see who's leading the way.", "Sign in with Discord to start earning quest badges.", "Your total Cluster Points", "Quests are being forged — check back shortly.", "Your complete CP history"] },
   { page: "Challenges", strings: ["Live Challenges", "Join challenge", "How to win", "Prize", "Top standings", "No competitors yet — be the first to join.", "Full challenge page", "Ended", "Live now"] },
-  { page: "Notifications", strings: ["Notifications", "Mark all read", "You're all caught up.", "No notifications yet."] },
-  { page: "Profile", strings: ["Your profile", "Make this page yours, then connect your games.", "View live profile", "Customize", "Game accounts", "Your game accounts"] },
+  { page: "Notifications", strings: ["Notifications", "Mark all read", "All quiet on the cosmic front."] },
+  { page: "Profile", strings: ["Your", "profile", "Make this page yours, then connect your games.", "Everything saves to your public link.", "View live profile", "Your game accounts"] },
   { page: "Public profile", strings: ["Followers", "Following", "views"] },
 ];
 

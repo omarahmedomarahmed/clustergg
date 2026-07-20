@@ -2,6 +2,7 @@ import Link from "next/link";
 import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getT } from "@/lib/i18n/t-server";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
@@ -21,19 +22,20 @@ export default async function PlanetsDirectory() {
     ? await db.select().from(schema.games).where(inArray(schema.games.name, gameNames))
     : [];
   const gameByName = new Map(gameRows.map((g) => [g.name, g]));
+  const { tr } = await getT(user?.locale);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12">
       <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
-        <h1 className="text-3xl font-bold">Explore <span className="grad-text">Planets</span></h1>
+        <h1 className="text-3xl font-bold">{tr("Explore")} <span className="grad-text">{tr("Planets")}</span></h1>
         {user && (
           <Link href="/spaces/request-new" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">
-            Request a new planet
+            {tr("Request a new planet")}
           </Link>
         )}
       </div>
       <p className="text-muted max-w-xl mb-10">
-        Each game has its own planet — leaderboards, challenges, players and a community feed, all in one world.
+        {tr("Each game has its own planet — leaderboards, challenges, players and a community feed, all in one world.")}
       </p>
 
       <AdSlot placement="games_top_banner" className="mb-10" />

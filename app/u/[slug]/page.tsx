@@ -13,6 +13,7 @@ import { slimImg } from "@/lib/img";
 import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip, sectionArtStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import Flag from "@/components/Flag";
+import { getT } from "@/lib/i18n/t-server";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import FollowButton from "@/components/FollowButton";
@@ -49,6 +50,7 @@ export default async function ProfilePage({ params }: Props) {
   if (!user || user.status === "banned") notFound();
 
   const viewer = await getCurrentUser();
+  const { tr } = await getT(viewer?.locale);
   const isOwner = viewer?.id === user.id;
   const adminView = isAdmin(viewer) && !isOwner;
 
@@ -360,7 +362,7 @@ export default async function ProfilePage({ params }: Props) {
         <div className="flex flex-wrap gap-6 mt-4 text-sm">
           <Link href={`/u/${user.slug}/followers`} style={{ color: theme.text }}><b>{Number(followerRow?.c ?? 0)}</b> <span className="p-muted">followers</span></Link>
           <Link href={`/u/${user.slug}/following`} style={{ color: theme.text }}><b>{Number(followingRow?.c ?? 0)}</b> <span className="p-muted">following</span></Link>
-          <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">views</span></span>
+          <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">{tr("views")}</span></span>
           {bestStanding && S.standings && <span style={{ color: theme.accent }}><Icon name="chart" size={14} className="inline mr-1" /> Top {Math.max(1, Math.round((bestStanding.rank / bestStanding.total) * 100))}% · {bestStanding.title}</span>}
         </div>
 
