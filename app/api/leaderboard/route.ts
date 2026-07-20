@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { gameAvatarOf } from "@/lib/game-identity";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export async function GET(req: NextRequest) {
     name: schema.users.displayName,
     slug: schema.users.slug,
     avatarUrl: schema.users.avatarUrl,
+    providerData: schema.linkedGameAccounts.providerData,
     inGameName: schema.linkedGameAccounts.inGameName,
   })
     .from(schema.statCurrent)
@@ -39,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     game, metric, unit, total: rows.length,
-    entries: rows.slice(0, 10).map((r, i) => ({ rank: i + 1, name: r.name, slug: r.slug, avatarUrl: r.avatarUrl, inGameName: r.inGameName, value: r.value, rankLabel: r.rankLabel })),
+    entries: rows.slice(0, 10).map((r, i) => ({ rank: i + 1, name: r.name, slug: r.slug, avatarUrl: gameAvatarOf(r.providerData) ?? r.avatarUrl, inGameName: r.inGameName, value: r.value, rankLabel: r.rankLabel })),
     me: myIdx >= 0 ? { rank: myIdx + 1, value: rows[myIdx].value, rankLabel: rows[myIdx].rankLabel, name: rows[myIdx].name } : null,
   });
 }

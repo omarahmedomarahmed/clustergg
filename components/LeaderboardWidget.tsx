@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import { fmtNum } from "@/lib/utils";
+import { gameAvatarOf } from "@/lib/game-identity";
 
 type Board = typeof schema.leaderboards.$inferSelect;
 
@@ -64,7 +65,7 @@ export default async function LeaderboardWidget({
                     className={`podium-step podium-${place} flex flex-col items-center px-2 text-center ${heights[place]}`}
                   >
                     {place === 1 && <Icon name="crown" size={20} className="text-amber-300 mb-1" />}
-                    <Avatar name={e.user.displayName} src={e.user.avatarUrl} size={place === 1 ? 56 : 44} />
+                    <Avatar name={e.user.displayName} src={gameAvatarOf(e.account.providerData) ?? e.user.avatarUrl} size={place === 1 ? 56 : 44} />
                     <div className="mt-2 font-semibold text-sm truncate max-w-full">{e.user.displayName}</div>
                     <div className="text-[11px] text-muted truncate max-w-full">{e.account.inGameName}</div>
                     <div className={`mt-1.5 font-bold ${place === 1 ? "text-amber-300 text-lg" : "text-cyan-200"}`}>
@@ -86,8 +87,8 @@ export default async function LeaderboardWidget({
                     const rank = compact ? i + 1 : i + 4;
                     return (
                       <tr key={`${e.user.id}-${rank}`}>
-                        {/* Gamer image on the far LEFT */}
-                        <td className="w-12"><Link href={`/u/${e.user.slug}`}><Avatar name={e.user.displayName} src={e.user.avatarUrl} size={34} /></Link></td>
+                        {/* Gamer image on the far LEFT — game-specific avatar when we have it */}
+                        <td className="w-12"><Link href={`/u/${e.user.slug}`}><Avatar name={e.user.displayName} src={gameAvatarOf(e.account.providerData) ?? e.user.avatarUrl} size={34} /></Link></td>
                         {/* Gamer tag in the MIDDLE */}
                         <td>
                           <Link href={`/u/${e.user.slug}`} className="min-w-0 hover:text-cyan-300">
@@ -120,7 +121,7 @@ async function db_entries(board: Board, limit: number) {
     value: schema.statCurrent.metricValue,
     rankLabel: schema.statCurrent.rankLabel,
     user: schema.publicUserColumns,
-    account: { inGameName: schema.linkedGameAccounts.inGameName },
+    account: { inGameName: schema.linkedGameAccounts.inGameName, providerData: schema.linkedGameAccounts.providerData },
   })
     .from(schema.statCurrent)
     .innerJoin(schema.linkedGameAccounts, eq(schema.statCurrent.linkedAccountId, schema.linkedGameAccounts.id))
