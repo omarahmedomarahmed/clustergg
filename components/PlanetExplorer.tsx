@@ -9,16 +9,17 @@ import TopBannerAd from "@/components/TopBannerAd";
 import LolCard from "@/components/LolCard";
 import { slimImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
-import type { PlanetExplore, ExploreBoard, ChampBoard, ExploreChallenge, ExploreRegion, ExploreEntry } from "@/lib/planet-explore";
+import type { RegionStat } from "@/lib/regions";
+import type { PlanetExplore, ExploreBoard, ChampBoard, ExploreEntry } from "@/lib/planet-explore";
 
 const COL = { accent: "#22d3ee", accent2: "#a78bfa", text: "#e8eaf6", muted: "#9aa0c3", panel: "#0b0d26" };
 
-type GamerSel = { slug: string; name: string; avatar: string | null; accountId: string | null; provider: string | null; sub?: string };
+type GamerSel = { slug: string; name: string; avatar: string | null; accountId: string | null; provider: string | null; sub?: string; challengeId?: string; challengeTitle?: string };
 type Sel =
   | { kind: "board"; metricKey: string }
   | { kind: "champ"; championId: number }
   | { kind: "challenge"; id: string }
-  | { kind: "region"; key: string }
+  | { kind: "region"; region: RegionStat }
   | { kind: "gamer"; g: GamerSel }
   | null;
 
@@ -82,7 +83,9 @@ export default function PlanetExplorer({
   const boards = data?.boards ?? [];
   const champBoards = data?.championBoards ?? [];
   const challenges = data?.challenges ?? [];
-  const regions = (data?.regions ?? []).filter((r) => r.count > 0);
+  // Region players come from the globe's real server-code regions (p.regions) —
+  // the same data that positions the pins — so counts + players always match.
+  const regions = (p?.regions ?? []).filter((r) => r.count > 0);
   const hasLeft = boards.length > 0 || champBoards.length > 0;
   const hasRight = challenges.length > 0 || regions.length > 0;
 
@@ -167,7 +170,7 @@ export default function PlanetExplorer({
                 <div className="absolute inset-0 rounded-full pointer-events-none" style={{ boxShadow: "inset 0 0 70px 8px rgba(0,0,0,0.55)" }} />
                 {/* region hotspots → open region in the middle */}
                 {p.regions.map((r) => (
-                  <button key={r.key} onClick={() => setSel({ kind: "region", key: r.key })} title={`${r.label} · ${r.count}`}
+                  <button key={r.key} onClick={() => setSel({ kind: "region", region: r })} title={`${r.label} · ${r.count}`}
                     className="absolute -translate-x-1/2 -translate-y-1/2 group z-10" style={{ left: `${r.x}%`, top: `${r.y}%` }}>
                     <span className="block rounded-full transition-transform group-hover:scale-125" style={{ width: 13, height: 13, background: r.color, boxShadow: `0 0 12px 2px ${r.color}` }} />
                     {r.count > 0 && <span className="absolute inset-0 rounded-full animate-ping" style={{ background: `${r.color}66` }} />}
@@ -233,7 +236,7 @@ export default function PlanetExplorer({
                     <div className="text-xs font-bold uppercase tracking-widest text-cyan-200 mb-2 flex items-center gap-1.5"><Icon name="users" size={13} /> Players by region</div>
                     <div className="space-y-1">
                       {regions.map((r) => (
-                        <button key={r.key} onClick={() => setSel({ kind: "region", key: r.key })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
+                        <button key={r.key} onClick={() => setSel({ kind: "region", region: r })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
                           <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: r.color }} />
                           <span className="text-sm flex-1 truncate">{r.label}</span>
                           <span className="text-xs font-bold text-cyan-200">{r.count}</span>
@@ -267,9 +270,11 @@ function Stage({ sel, data, onGamer, onBack }: { sel: Sel; data: PlanetExplore |
           </div>
           <Link href={`/u/${g.slug}`} className="ml-auto text-[11px] text-cyan-300 hover:underline shrink-0 inline-flex items-center gap-1">Profile <Icon name="arrowRight" size={11} /></Link>
         </div>
-        {g.provider === "riot-lol" && g.accountId
-          ? <LolCard accountId={g.accountId} colors={COL} statNumbers={[]} />
-          : <div className="text-xs text-muted">Open the full profile for this gamer&apos;s complete stats.</div>}
+        {g.challengeId
+          ? <ChallengeLog challengeId={g.challengeId} slug={g.slug} title={g.challengeTitle} />
+          : g.provider === "riot-lol" && g.accountId
+            ? <LolCard accountId={g.accountId} colors={COL} statNumbers={[]} />
+            : <div className="text-xs text-muted">Open the full profile for this gamer&apos;s complete stats.</div>}
       </div>
     );
   }
@@ -324,7 +329,7 @@ function Stage({ sel, data, onGamer, onBack }: { sel: Sel; data: PlanetExplore |
         {c.top.length === 0 ? <div className="text-xs text-muted">No competitors yet.</div> : (
           <div className="space-y-1">
             {c.top.map((e, i) => (
-              <button key={e.slug} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: null, provider: null, sub: `${e.points} pts` })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
+              <button key={e.slug} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: null, provider: null, sub: `${e.points} pts`, challengeId: c.id, challengeTitle: c.title })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
                 <span className="w-5 text-center text-xs font-bold text-muted">{i + 1}</span>
                 <Avatar name={e.name} src={e.avatar} size={26} />
                 <span className="flex-1 truncate text-sm">{e.name}</span>
@@ -338,9 +343,8 @@ function Stage({ sel, data, onGamer, onBack }: { sel: Sel; data: PlanetExplore |
     );
   }
 
-  // region
-  const r = data.regions.find((x) => x.key === sel.key);
-  if (!r) return <Empty onBack={onBack} />;
+  // region — from the globe's real server-code data (sel.region)
+  const r = sel.region;
   return (
     <div>
       <div className="text-sm font-bold mb-1 flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full" style={{ background: r.color }} /> {r.label}</div>
@@ -348,9 +352,9 @@ function Stage({ sel, data, onGamer, onBack }: { sel: Sel; data: PlanetExplore |
       {r.gamers.length === 0 ? <div className="text-xs text-muted">No profiles to show here yet.</div> : (
         <div className="space-y-1">
           {r.gamers.map((g) => (
-            <button key={g.slug} onClick={() => onGamer({ slug: g.slug, name: g.name, avatar: g.avatar, accountId: null, provider: null, sub: g.ign })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
-              <Avatar name={g.name} src={g.avatar} size={26} />
-              <span className="flex-1 min-w-0"><span className="block truncate text-sm">{g.name}</span><span className="block truncate text-[10px] text-muted">{g.ign}</span></span>
+            <button key={g.slug} onClick={() => onGamer({ slug: g.slug, name: g.name, avatar: g.avatar ?? null, accountId: null, provider: null, sub: g.ign })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
+              <Avatar name={g.name} src={g.avatar ?? null} size={26} />
+              <span className="flex-1 min-w-0"><span className="block truncate text-sm">{g.name}</span>{g.ign && <span className="block truncate text-[10px] text-muted">{g.ign}</span>}</span>
             </button>
           ))}
         </div>
@@ -410,6 +414,45 @@ function ChampList({ boards, onOpen }: { boards: ChampBoard[]; onOpen: (id: numb
           </div>
         </button>
       ))}
+    </div>
+  );
+}
+
+// The point-history log that shows exactly how a gamer earned their challenge
+// points (from challengeEvents). Opened when a gamer is clicked on a challenge
+// board — also reusable from the planet leaderboard + /leaderboards pages.
+export function ChallengeLog({ challengeId, slug, title }: { challengeId: string; slug: string; title?: string }) {
+  const [rows, setRows] = useState<{ eventType: string; points: number; at: string }[] | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/challenge/points?challenge=${encodeURIComponent(challengeId)}&slug=${encodeURIComponent(slug)}`, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!alive) return; if (j) { setRows(j.events ?? []); setTotal(j.total ?? 0); } else setErr(true); })
+      .catch(() => alive && setErr(true));
+    return () => { alive = false; };
+  }, [challengeId, slug]);
+
+  if (err) return <div className="text-xs text-muted">Couldn&apos;t load the points log.</div>;
+  if (!rows) return <div className="text-xs text-muted animate-pulse">Loading points log…</div>;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-[11px] uppercase tracking-widest text-muted">{title ? `${title} — ` : ""}points log</div>
+        {total != null && <div className="text-sm font-bold text-cyan-200">{total.toLocaleString()} pts</div>}
+      </div>
+      {rows.length === 0 ? <div className="text-xs text-muted">No scoring events yet.</div> : (
+        <div className="space-y-1 max-h-56 overflow-y-auto">
+          {rows.map((e, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-lg bg-white/[0.04] px-2.5 py-1.5 text-xs">
+              <span className="flex-1 min-w-0 truncate">{e.eventType.replace(/_/g, " ")}</span>
+              <span className="text-[10px] text-muted shrink-0">{new Date(e.at).toLocaleDateString()}</span>
+              <span className={`font-bold shrink-0 ${e.points >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{e.points >= 0 ? "+" : ""}{e.points}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

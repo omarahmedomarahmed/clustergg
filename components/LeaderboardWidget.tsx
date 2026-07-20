@@ -85,23 +85,26 @@ export default async function LeaderboardWidget({
                 <tbody>
                   {(compact ? entries : rest).map((e, i) => {
                     const rank = compact ? i + 1 : i + 4;
+                    // Tighter cells + smaller rank chip in compact cards so the
+                    // full placement number always fits at the right edge.
+                    const pad = compact ? "!px-2 !py-1.5" : "";
                     return (
                       <tr key={`${e.user.id}-${rank}`}>
                         {/* Gamer image on the far LEFT — game-specific avatar when we have it */}
-                        <td className="w-12"><Link href={`/u/${e.user.slug}`}><Avatar name={e.user.displayName} src={gameAvatarOf(e.account.providerData) ?? e.user.avatarUrl} size={34} /></Link></td>
+                        <td className={`w-10 ${pad} !pr-1`}><Link href={`/u/${e.user.slug}`}><Avatar name={e.user.displayName} src={gameAvatarOf(e.account.providerData) ?? e.user.avatarUrl} size={compact ? 30 : 34} /></Link></td>
                         {/* Gamer tag in the MIDDLE */}
-                        <td>
+                        <td className={pad}>
                           <Link href={`/u/${e.user.slug}`} className="min-w-0 hover:text-cyan-300">
                             <div className="font-semibold text-sm truncate">{e.user.displayName}</div>
                             <div className="text-xs text-muted truncate">{e.account.inGameName}</div>
                           </Link>
                         </td>
-                        <td className="text-right font-bold text-cyan-200 text-sm whitespace-nowrap">
+                        <td className={`text-right font-bold text-cyan-200 whitespace-nowrap ${compact ? "text-xs" : "text-sm"} ${pad} !px-1`}>
                           {e.rankLabel ?? fmtNum(e.value)}
                           {board.unit && !e.rankLabel && <span className="text-[10px] font-normal text-muted"> {board.unit}</span>}
                         </td>
                         {/* Rank on the far RIGHT */}
-                        <td className="w-12 text-right"><span className={`rank-chip ${rank <= 3 ? `rank-chip-${rank}` : ""}`}>{rank}</span></td>
+                        <td className={`text-right ${pad} !pl-1`}><span className={`rank-chip ${compact ? "!h-6 !min-w-6 text-[11px]" : ""} ${rank <= 3 ? `rank-chip-${rank}` : ""}`}>{rank}</span></td>
                       </tr>
                     );
                   })}
