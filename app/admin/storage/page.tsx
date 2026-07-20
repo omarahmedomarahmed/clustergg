@@ -8,6 +8,9 @@ import GameWorldSyncPanel from "@/components/GameWorldSyncPanel";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
+// Give the game-world "Sync + art" action room to re-host images (best-effort;
+// the sync itself also self-limits to a time budget under this).
+export const maxDuration = 60;
 export const metadata = { title: "Admin · Image storage" };
 
 const CAT_META: Record<ImageCategory, { label: string; cls: string; note: string }> = {
