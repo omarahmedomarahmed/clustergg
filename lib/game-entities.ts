@@ -3,7 +3,7 @@
 // directory renders identically; games we have no catalogue for return [] and
 // the UI hides the section. All sources are free/public and cached in-process.
 
-export type EntityKind = "champion" | "hero" | "agent" | "weapon";
+export type EntityKind = "champion" | "hero" | "agent" | "weapon" | "outfit";
 export type EntityLite = { id: string; kind: EntityKind; name: string; image: string; role: string | null; tags: string[] };
 export type EntityAbility = { name: string; icon: string | null; desc: string };
 export type EntitySkin = { name: string; image: string };
@@ -19,7 +19,7 @@ const TTL = 12 * 3600_000;
 
 // Which games have a catalogue (used to decide whether to show the section).
 export function gameHasDirectory(game: string | null | undefined): boolean {
-  return !!game && ["League of Legends", "VALORANT", "Dota 2"].includes(game);
+  return !!game && ["League of Legends", "VALORANT", "Dota 2", "Fortnite"].includes(game);
 }
 
 // ---------- League of Legends (Data Dragon) ----------
@@ -54,6 +54,16 @@ async function valWeapons() {
   return v;
 }
 
+// ---------- Fortnite (fortnite-api.com — free cosmetics catalogue) ----------
+let fnCache: Cache<any[]> = null;
+async function fnOutfits() {
+  if (fnCache && fnCache.exp > Date.now()) return fnCache.v;
+  const r = await pj<any>("https://fortnite-api.com/v2/cosmetics/br", 10000);
+  const v = (r.data ?? []).filter((c: any) => c?.type?.value === "outfit" && (c.images?.icon || c.images?.smallIcon));
+  fnCache = { v, exp: Date.now() + TTL };
+  return v;
+}
+
 // ---------- Dota 2 (OpenDota) ----------
 let dotaCache: Cache<any[]> = null;
 async function dotaHeroes() {
@@ -83,6 +93,11 @@ export async function getEntityList(game: string): Promise<EntityLite[]> {
       const heroes = await dotaHeroes();
       return heroes.map((h: any): EntityLite => ({ id: String(h.id), kind: "hero", name: h.localized_name, image: dotaImg(h.name), role: h.primary_attr === "str" ? "Strength" : h.primary_attr === "agi" ? "Agility" : h.primary_attr === "int" ? "Intelligence" : "Universal", tags: h.roles ?? [] }))
         .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    if (game === "Fortnite") {
+      const outfits = await fnOutfits();
+      return outfits.map((c: any): EntityLite => ({ id: c.id, kind: "outfit", name: c.name, image: c.images.icon || c.images.smallIcon, role: c.rarity?.displayValue ?? null, tags: c.rarity?.displayValue ? [c.rarity.displayValue] : [] }))
+        .sort((a: EntityLite, b: EntityLite) => a.name.localeCompare(b.name));
     }
   } catch { /* fall through */ }
   return [];
@@ -136,6 +151,22 @@ export async function getEntityDetail(game: string, kind: string, id: string): P
         id: String(h.id), kind: "hero", name: h.localized_name, image: dotaImg(h.name), splash: dotaVert(h.name),
         role: attr, tags: h.roles ?? [], lore: null, abilities: [], skins: [],
         meta: [{ label: "Primary attribute", value: attr }, { label: "Attack", value: h.attack_type ?? "" }, { label: "Roles", value: (h.roles ?? []).join(", ") }],
+      };
+    }
+    if (game === "Fortnite") {
+      const c = (await fnOutfits()).find((x: any) => x.id === id); if (!c) return null;
+      // Each style variant becomes a selectable "skin".
+      const variantSkins: EntitySkin[] = (c.variants ?? []).flatMap((v: any) => (v.options ?? []).map((o: any) => ({ name: o.name || v.type || "Style", image: o.image })).filter((s: EntitySkin) => s.image)).slice(0, 40);
+      return {
+        id: c.id, kind: "outfit", name: c.name, image: c.images.icon || c.images.smallIcon, splash: c.images.featured || c.images.icon,
+        role: c.rarity?.displayValue ?? null, tags: c.rarity?.displayValue ? [c.rarity.displayValue] : [],
+        lore: [c.description, c.introduction?.text].filter(Boolean).join("\n\n") || null, abilities: [], skins: variantSkins,
+        meta: [
+          { label: "Rarity", value: c.rarity?.displayValue ?? "" },
+          { label: "Set", value: c.set?.value ?? "" },
+          { label: "Introduced", value: c.introduction?.text ?? "" },
+          { label: "Released", value: c.added ? new Date(c.added).toLocaleDateString() : "" },
+        ],
       };
     }
   } catch { /* fall through */ }

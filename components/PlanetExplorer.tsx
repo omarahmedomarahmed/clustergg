@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
@@ -91,7 +91,10 @@ export default function PlanetExplorer({
   // Region players come from the globe's real server-code regions (p.regions) —
   // the same data that positions the pins — so counts + players always match.
   const regions = (p?.regions ?? []).filter((r) => r.count > 0);
-  const layout = normalizeHeroLayout(data?.heroLayout);
+  // Memoize so module ids stay STABLE across the frequent re-renders the globe's
+  // mousemove causes — otherwise the sidebar modules remount every frame and the
+  // entity rail flickers as it re-fetches.
+  const layout = useMemo(() => normalizeHeroLayout(data?.heroLayout), [data?.heroLayout]);
   const middleBg = data?.bgUrl || p?.bgUrl || p?.coverUrl || null;
 
   // Render one admin-configured sidebar module. Modules with no data return null
@@ -379,9 +382,10 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
       {r.gamers.length === 0 ? <div className="text-xs text-muted">No profiles to show here yet.</div> : (
         <div className="space-y-1">
           {r.gamers.map((g) => (
-            <button key={g.slug} onClick={() => onGamer({ slug: g.slug, name: g.name, avatar: g.avatar ?? null, accountId: null, provider: null, sub: g.ign })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
+            <button key={g.slug} onClick={() => onGamer({ slug: g.slug, name: g.name, avatar: g.avatar ?? null, accountId: g.accountId ?? null, provider: g.provider ?? null, sub: g.ign })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
               <Avatar name={g.name} src={g.avatar ?? null} size={26} />
-              <span className="flex-1 min-w-0"><span className="block truncate text-sm">{g.name}</span>{g.ign && <span className="block truncate text-[10px] text-muted">{g.ign}</span>}</span>
+              <span className="flex-1 min-w-0"><span className="block truncate text-sm">{g.name}</span>{g.ign && <span className="block truncate text-[10px] text-cyan-200/80">{g.ign}</span>}</span>
+              <Icon name="chevronRight" size={13} className="text-muted shrink-0" />
             </button>
           ))}
         </div>
@@ -458,7 +462,7 @@ function RailGroup({ icon, title, accent, children }: { icon: string; title: str
   );
 }
 
-const entityLabel = (k: string) => k === "weapon" ? "Weapons" : k === "agent" ? "Agents" : k === "hero" ? "Heroes" : k === "champion" ? "Champions" : "Game world";
+const entityLabel = (k: string) => k === "weapon" ? "Weapons" : k === "agent" ? "Agents" : k === "hero" ? "Heroes" : k === "champion" ? "Champions" : k === "outfit" ? "Outfits" : "Game world";
 const entityImgCls = (k: string) => k === "weapon" ? "object-contain p-1 bg-black/30" : "object-cover";
 
 // The game-world rail: entities (champions/agents/weapons/heroes) as big art
@@ -507,19 +511,22 @@ function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: strin
 }
 
 // The lore card shown in the middle when an entity is clicked: the splash /
-// portrait painted as the card BACKGROUND, plus lore + abilities.
+// portrait painted as the card BACKGROUND, a skins strip at the TOP (click a
+// skin to set it as the cover + open the full image), plus lore + abilities.
 function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; kind: string; id: string; name: string; image: string }) {
   const [d, setD] = useState<EntityDetail | null>(null);
+  const [cover, setCover] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null);
   useEffect(() => {
-    if (!game) return; let alive = true;
+    if (!game) return; let alive = true; setCover(null);
     fetch(`/api/planet/entity?game=${encodeURIComponent(game)}&kind=${kind}&id=${encodeURIComponent(id)}`, { cache: "force-cache" })
       .then((r) => (r.ok ? r.json() : null)).then((j) => { if (alive) setD(j); }).catch(() => {});
     return () => { alive = false; };
   }, [game, kind, id]);
-  const splash = d?.splash || image;
+  const splash = cover || d?.splash || image;
   return (
     <div className="relative -m-3 rounded-2xl overflow-hidden">
-      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.7), rgba(4,5,26,0.9)), url(${splash})` }} />
+      <div className="absolute inset-0 bg-cover bg-center transition-[background-image]" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.7), rgba(4,5,26,0.9)), url(${splash})` }} />
       <div className="relative p-3">
         <div className="flex items-center gap-2.5 mb-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -528,27 +535,40 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
         </div>
         {!d ? <div className="text-xs text-muted animate-pulse">Loading lore…</div> : (
           <>
-            {d.meta.filter((m) => m.value).length > 0 && <div className="flex flex-wrap gap-1.5 mb-2">{d.meta.filter((m) => m.value).map((m) => <span key={m.label} className="rounded-full border border-white/12 bg-black/30 px-2 py-0.5 text-[10px]"><span className="text-muted">{m.label}:</span> <b>{m.value}</b></span>)}</div>}
-            {d.lore && <p className="text-[13px] text-white/85 leading-relaxed mb-2 whitespace-pre-line">{d.lore}</p>}
-            {d.abilities.length > 0 && <div className="space-y-1.5">{d.abilities.map((ab, i) => (<div key={i} className="flex gap-2">{ab.icon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={ab.icon} alt="" className="h-7 w-7 rounded shrink-0 bg-black/40" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} />}<div className="min-w-0"><div className="text-xs font-semibold">{ab.name}</div>{ab.desc && <div className="text-[11px] text-white/60 line-clamp-2">{ab.desc}</div>}</div></div>))}</div>}
+            {/* Skins at the TOP — click to set as cover + open the full image */}
             {d.skins.length > 0 && (
-              <div className="mt-3">
-                <div className="text-[10px] uppercase tracking-widest text-white/60 mb-1.5">{d.skins.length} skin{d.skins.length === 1 ? "" : "s"}</div>
+              <div className="mb-3">
+                <div className="text-[10px] uppercase tracking-widest text-white/60 mb-1.5">{d.skins.length} skin{d.skins.length === 1 ? "" : "s"} · tap to preview</div>
                 <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                   {d.skins.map((s, i) => (
-                    <div key={i} className="shrink-0 w-32">
+                    <button key={i} onClick={() => { setCover(s.image); setLightbox(s.image); }} title={s.name} className={`shrink-0 w-32 text-left rounded-lg overflow-hidden border transition ${cover === s.image ? "border-cyan-400" : "border-white/10 hover:border-cyan-400/50"}`}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={s.image} alt={s.name} loading="lazy" className={`h-16 w-32 rounded-lg border border-white/10 ${kind === "weapon" ? "object-contain bg-black/40 p-1" : "object-cover"}`} onError={(ev) => { (ev.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
-                      <div className="text-[9px] text-white/70 truncate mt-0.5">{s.name}</div>
-                    </div>
+                      <img src={s.image} alt={s.name} loading="lazy" className={`h-16 w-32 ${kind === "weapon" ? "object-contain bg-black/40 p-1" : "object-cover"}`} onError={(ev) => { ((ev.currentTarget.closest("button")) as HTMLElement).style.display = "none"; }} />
+                      <div className="text-[9px] text-white/70 truncate px-1 py-0.5">{s.name}</div>
+                    </button>
                   ))}
                 </div>
               </div>
             )}
+            {d.meta.filter((m) => m.value).length > 0 && <div className="flex flex-wrap gap-1.5 mb-2">{d.meta.filter((m) => m.value).map((m) => <span key={m.label} className="rounded-full border border-white/12 bg-black/30 px-2 py-0.5 text-[10px]"><span className="text-muted">{m.label}:</span> <b>{m.value}</b></span>)}</div>}
+            {d.lore && <p className="text-[13px] text-white/85 leading-relaxed mb-2 whitespace-pre-line">{d.lore}</p>}
+            {d.abilities.length > 0 && <div className="space-y-1.5">{d.abilities.map((ab, i) => (<div key={i} className="flex gap-2">{ab.icon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={ab.icon} alt="" className="h-7 w-7 rounded shrink-0 bg-black/40" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} />}<div className="min-w-0"><div className="text-xs font-semibold">{ab.name}</div>{ab.desc && <div className="text-[11px] text-white/60 line-clamp-2">{ab.desc}</div>}</div></div>))}</div>}
             {!d.lore && d.abilities.length === 0 && d.skins.length === 0 && <p className="text-xs text-white/60">No lore available yet.</p>}
           </>
         )}
       </div>
+      {lightbox && <ImageLightbox src={lightbox} onClose={() => setLightbox(null)} />}
+    </div>
+  );
+}
+
+// Full-screen image viewer for a skin/splash. Click anywhere to close.
+function ImageLightbox({ src, onClose }: { src: string; onClose: () => void }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/85" onClick={(e) => { e.stopPropagation(); onClose(); }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={src} alt="" className="max-h-[90vh] max-w-[92vw] rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+      <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-4 right-4 rounded-full bg-black/60 p-2 text-white hover:bg-black/80"><Icon name="x" size={18} /></button>
     </div>
   );
 }

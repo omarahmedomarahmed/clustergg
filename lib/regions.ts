@@ -45,7 +45,7 @@ export function toRegion(providerRegion?: string | null, country?: string | null
   return null;
 }
 
-export type RegionGamer = { name: string; slug: string; avatar?: string | null; ign?: string };
+export type RegionGamer = { name: string; slug: string; avatar?: string | null; ign?: string; accountId?: string; provider?: string };
 export type RegionStat = { key: string; label: string; short: string; color: string; x: number; y: number; count: number; gamers: RegionGamer[] };
 
 export function emptyRegionStats(): RegionStat[] {

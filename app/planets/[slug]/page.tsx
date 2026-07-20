@@ -252,10 +252,6 @@ export default async function PlanetPage({
               </section>
             )}
 
-            {/* Game-world directory — champions / agents+weapons / heroes with lore.
-                Self-loads and renders nothing for games without a catalogue. */}
-            {game && <GameDirectory game={game.name} />}
-
             {/* Leaderboard #2 — challenges, each with its own live board */}
             <section>
               <h2 className="text-xl font-bold mb-1 flex items-center gap-2"><Icon name="zap" size={20} className="text-amber-300" /> Challenges</h2>
@@ -308,6 +304,10 @@ export default async function PlanetPage({
                 </div>
               )}
             </section>
+
+            {/* Game-world directory — champions / agents+weapons / heroes with lore.
+                Self-loads, capped + scrollable, renders nothing for games without a catalogue. */}
+            {game && <GameDirectory game={game.name} />}
 
             {/* Community feed */}
             <section>
