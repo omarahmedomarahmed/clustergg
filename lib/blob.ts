@@ -79,6 +79,19 @@ export async function putBuffer(buffer: Buffer, contentType: string, ext: string
   }
 }
 
+// Store an arbitrary JSON object in Vercel Blob and return its public URL (or
+// null on failure). Used for game-world catalogue snapshots so we serve the data
+// from our own storage instead of re-calling Data Dragon / valorant-api.
+export async function putJsonToBlob(obj: unknown, scope: string): Promise<string | null> {
+  if (!blobConfigured()) return null;
+  try {
+    const buffer = Buffer.from(JSON.stringify(obj), "utf8");
+    return await putBuffer(buffer, "application/json", "json", scope);
+  } catch {
+    return null;
+  }
+}
+
 const OUR_BLOB_HOST = /\.public\.blob\.vercel-storage\.com/i;
 
 // Re-host an EXTERNAL image URL (e.g. a Higgsfield cloudfront link) into our own

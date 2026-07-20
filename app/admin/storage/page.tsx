@@ -1,8 +1,16 @@
+import { eq } from "drizzle-orm";
 import { collectImageRefs, measureSizes, classifyUrl, type ImageCategory } from "@/lib/storage-audit";
+import { getDb, schema } from "@/lib/db";
+import { gameHasDirectory } from "@/lib/game-entities";
+import { getSnapshotMeta } from "@/lib/game-world-cache";
 import RehostImagesButton from "@/components/RehostImagesButton";
+import GameWorldSyncPanel from "@/components/GameWorldSyncPanel";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
+// Give the game-world "Sync + art" action room to re-host images (best-effort;
+// the sync itself also self-limits to a time budget under this).
+export const maxDuration = 60;
 export const metadata = { title: "Admin · Image storage" };
 
 const CAT_META: Record<ImageCategory, { label: string; cls: string; note: string }> = {
@@ -19,6 +27,15 @@ const kb = (n: number) => n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(2)} MB
 export default async function AdminStoragePage() {
   const refs = await collectImageRefs();
   const sizes = await measureSizes(refs);
+
+  // Game-world snapshot status: every active catalogue game + when it was cached.
+  const db = await getDb();
+  const activeGames = await db.select({ name: schema.games.name }).from(schema.games).where(eq(schema.games.isActive, true));
+  const dirGames = [...new Set(activeGames.map((g) => g.name))].filter(gameHasDirectory);
+  const gwRows = await Promise.all(dirGames.map(async (game) => {
+    const meta = await getSnapshotMeta(game);
+    return { game, syncedAt: meta?.syncedAt ?? null, art: meta?.art ?? false, count: meta?.count ?? 0 };
+  }));
 
   const rows = refs.map((r) => ({ ...r, cat: classifyUrl(r.url), size: sizes.get(r.url) ?? null }))
     .sort((a, b) => (b.size ?? -1) - (a.size ?? -1));
@@ -56,6 +73,9 @@ export default async function AdminStoragePage() {
         </div>
         <RehostImagesButton />
       </div>
+
+      {/* Game-world catalogue snapshots */}
+      <GameWorldSyncPanel rows={gwRows} />
 
       {/* Huge images to compress */}
       {huge.length > 0 && (
