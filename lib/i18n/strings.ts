@@ -162,6 +162,34 @@ export const AR_TEXT: Record<string, string> = {
   "Everyone": "الجميع",
   "Only people I follow": "الأشخاص الذين أتابعهم فقط",
   "Nobody": "لا أحد",
+  // Auth (login / signup)
+  "Welcome back,": "مرحبًا بعودتك،",
+  "star traveler": "يا مسافر النجوم",
+  "Sign in with Discord — your universal gamer identity.": "سجّل الدخول عبر ديسكورد — هويتك الموحّدة كلاعب.",
+  "Sign-in failed": "فشل تسجيل الدخول",
+  "Try again or use email.": "حاول مجددًا أو استخدم البريد الإلكتروني.",
+  "or email": "أو البريد الإلكتروني",
+  "New here?": "جديد هنا؟",
+  "Claim your": "احصل على",
+  "cosmic profile": "ملفك الكوني",
+  "Sign up with Discord and your avatar + handle come with you. One profile for every game.": "سجّل عبر ديسكورد ويأتي معك صورتك واسمك. ملف واحد لكل لعبة.",
+  "Sign-up failed": "فشل التسجيل",
+  "Already aboard?": "على متن السفينة بالفعل؟",
+  "Log in": "تسجيل الدخول",
+  "Join the Cluster": "انضم إلى كلاستر",
+  // Onboarding
+  "Welcome to the Cluster,": "مرحبًا بك في كلاستر،",
+  "Your identity is set — now light up your constellation.": "تم ضبط هويتك — الآن أضِئ كوكبتك.",
+  "Link Discord to make it your universal identity:": "اربط ديسكورد ليصبح هويتك الموحّدة:",
+  "Link your game accounts": "اربط حسابات ألعابك",
+  "linked": "مرتبط",
+  "Green providers verify instantly against real APIs — try Chess.com, Lichess, Dota 2, Speedrun.com or Roblox.": "المزوّدون الخضر يتم التحقق منهم فورًا عبر واجهات حقيقية — جرّب Chess.com أو Lichess أو Dota 2 أو Speedrun.com أو Roblox.",
+  "Your public profile": "ملفك العام",
+  "Your shareable link is ready:": "رابطك القابل للمشاركة جاهز:",
+  "customize it in": "خصّصه من",
+  "profile settings": "إعدادات الملف",
+  "Follow some gamers": "تابع بعض اللاعبين",
+  "Enter the Cluster": "ادخل كلاستر",
   // Common
   "See all": "عرض الكل",
   "Save": "حفظ",
@@ -181,6 +209,8 @@ export const PAGE_STRINGS: { page: string; strings: string[] }[] = [
   { page: "Search", strings: ["Scan the", "galaxy", "Search gamers, spaces, posts…", "Gamers", "Planets", "Posts", "No gamers found.", "No planets found.", "No posts found."] },
   { page: "Messages", strings: ["Messages", "No transmissions yet. Visit a", "gamer's profile", "and hit Message.", "New conversation", "Transmit a message…", "Send"] },
   { page: "Settings", strings: ["Account", "Email", "Member since", "Role", "Danger zone", "Deleting your account removes your profile, linked accounts, posts and messages. This cannot be undone.", "Delete my account", "Game accounts", "Notifications", "Privacy", "Email digests", "Challenge results, badge awards and moderation notices.", "In-app notifications for follows, badges and challenges are always on — they're how the galaxy talks to you.", "Profile visibility", "Who can see", "Public — anyone with the link", "Followers only", "Private — only me", "Who can message me", "Everyone", "Only people I follow", "Nobody", "Save"] },
+  { page: "Login & signup", strings: ["Welcome back,", "star traveler", "Sign in with Discord — your universal gamer identity.", "Sign-in failed", "Try again or use email.", "or email", "New here?", "Join the Cluster", "Claim your", "cosmic profile", "Sign up with Discord and your avatar + handle come with you. One profile for every game.", "Sign-up failed", "Already aboard?", "Log in"] },
+  { page: "Onboarding", strings: ["Welcome to the Cluster,", "Your identity is set — now light up your constellation.", "Link Discord to make it your universal identity:", "Link your game accounts", "linked", "Green providers verify instantly against real APIs — try Chess.com, Lichess, Dota 2, Speedrun.com or Roblox.", "Your public profile", "Your shareable link is ready:", "customize it in", "profile settings", "Follow some gamers", "Enter the Cluster"] },
 ];
 
 // t(): dotted-key lookup for chrome.
