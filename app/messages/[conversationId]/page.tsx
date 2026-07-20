@@ -7,6 +7,7 @@ import Avatar from "@/components/Avatar";
 import AdSlot from "@/components/AdSlot";
 import MessageThread from "@/components/MessageThread";
 import ConversationsSidebar from "@/components/ConversationsSidebar";
+import { getT } from "@/lib/i18n/t-server";
 import { sendMessage } from "@/app/actions/social";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +38,7 @@ export default async function ConversationPage({
     eq(schema.conversationParticipants.conversationId, conversationId),
     eq(schema.conversationParticipants.userId, user.id),
   ));
+  const { tr } = await getT();
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-6 grid lg:grid-cols-[300px_1fr] gap-4" style={{ minHeight: "calc(100vh - 4rem)" }}>
@@ -59,8 +61,8 @@ export default async function ConversationPage({
         <div className="mt-4">
           <AdSlot placement="messages_footer" className="mb-3" />
           <form action={sendMessage.bind(null, conversationId)} className="flex gap-2">
-            <input name="body" required maxLength={4000} placeholder="Transmit a message…" className="input-cosmic" autoComplete="off" />
-            <button className="glow-btn rounded-full px-6 text-sm font-semibold text-white shrink-0">Send</button>
+            <input name="body" required maxLength={4000} placeholder={tr("Transmit a message…")} className="input-cosmic" autoComplete="off" />
+            <button className="glow-btn rounded-full px-6 text-sm font-semibold text-white shrink-0">{tr("Send")}</button>
           </form>
         </div>
       </div>

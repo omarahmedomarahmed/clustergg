@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getT } from "@/lib/i18n/t-server";
 
 const TABS = [
   { key: "account", href: "/settings/account", label: "Account" },
@@ -7,7 +8,8 @@ const TABS = [
   { key: "privacy", href: "/settings/privacy", label: "Privacy" },
 ];
 
-export default function SettingsNav({ active }: { active: string }) {
+export default async function SettingsNav({ active }: { active: string }) {
+  const { tr } = await getT();
   return (
     <div className="mb-8 flex flex-wrap gap-2">
       {TABS.map((t) => (
@@ -20,7 +22,7 @@ export default function SettingsNav({ active }: { active: string }) {
               : "border-violet-400/20 text-muted hover:border-violet-400/50"
           }`}
         >
-          {t.label}
+          {tr(t.label)}
         </Link>
       ))}
     </div>
