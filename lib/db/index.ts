@@ -132,6 +132,26 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "accent" text`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "accent2" text`,
   `ALTER TABLE "games" ADD COLUMN IF NOT EXISTS "planet_layout" text NOT NULL DEFAULT 'auto'`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "locale" text NOT NULL DEFAULT 'en'`,
+  `CREATE TABLE IF NOT EXISTS "game_entity_overrides" (
+    "id" text PRIMARY KEY,
+    "game" text NOT NULL,
+    "kind" text NOT NULL,
+    "entity_id" text NOT NULL,
+    "custom" boolean NOT NULL DEFAULT false,
+    "hidden" boolean NOT NULL DEFAULT false,
+    "sort_order" integer NOT NULL DEFAULT 0,
+    "name" text,
+    "role" text,
+    "image" text,
+    "splash" text,
+    "lore" text,
+    "meta" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "abilities" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "skins" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "updated_at" timestamp with time zone NOT NULL DEFAULT now()
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "geo_game_kind_entity_idx" ON "game_entity_overrides" ("game","kind","entity_id")`,
 ];
 
 async function runColumnMigrations(db: DB) {

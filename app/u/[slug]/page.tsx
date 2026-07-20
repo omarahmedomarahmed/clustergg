@@ -12,6 +12,7 @@ import { getContent } from "@/lib/cms";
 import { slimImg } from "@/lib/img";
 import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip, sectionArtStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
+import Flag from "@/components/Flag";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import FollowButton from "@/components/FollowButton";
@@ -332,6 +333,7 @@ export default async function ProfilePage({ params }: Props) {
           <div className="min-w-0 w-full sm:flex-1 sm:w-auto pb-1">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center justify-center sm:justify-start gap-2 flex-wrap break-words" style={{ color: theme.text }}>
               {user.displayName}
+              {user.country && <Flag code={user.country} className="text-2xl sm:text-3xl" title={user.country} />}
               {user.isVerified && <Icon name="check" size={20} strokeWidth={3} style={{ color: theme.accent2 }} />}
             </h1>
             {user.title && <div className="text-base sm:text-lg font-semibold p-grad">{user.title}</div>}

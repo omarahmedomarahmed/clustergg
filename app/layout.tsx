@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { Space_Grotesk } from "next/font/google";
+import { Space_Grotesk, Cairo } from "next/font/google";
 import "./globals.css";
+import { getLocale } from "@/lib/i18n/server";
+import { dirOf } from "@/lib/i18n/locale";
 import Starfield from "@/components/Starfield";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
@@ -14,6 +16,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { PAGE_BG_KEYS, pageBgCmsKeys } from "@/lib/page-bg";
 
 const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk" });
+// Arabic-capable webfont, applied when the site is in RTL/Arabic mode.
+const cairo = Cairo({ subsets: ["arabic", "latin"], variable: "--font-cairo" });
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://clustergg.com";
 
@@ -63,10 +67,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cpIcon = bgContent["brand.cpIcon"];
   const planetsGlobe = bgContent["brand.nav.planetsIcon"] || "";
   const me = await getCurrentUser().catch(() => null);
+  const locale = await getLocale(me?.locale);
+  const dir = dirOf(locale);
 
   return (
-    <html lang="en" className={grotesk.variable}>
-      <body className="nebula-bg min-h-screen antialiased" style={cpIcon ? ({ ["--cp-icon" as string]: `url(${cpIcon})` }) : undefined}>
+    <html lang={locale} dir={dir} className={`${grotesk.variable} ${cairo.variable}`}>
+      <body className={`nebula-bg min-h-screen antialiased ${locale === "ar" ? "font-arabic" : ""}`} style={cpIcon ? ({ ["--cp-icon" as string]: `url(${cpIcon})` }) : undefined}>
         <RouteProgress />
         <PageBackground map={bgMap} />
         <Starfield />

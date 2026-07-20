@@ -20,7 +20,8 @@ export const users = pgTable("users", {
   avatarUrl: text("avatar_url"),
   bannerUrl: text("banner_url"),
   bio: text("bio"),
-  country: text("country"),
+  country: text("country"),           // ISO-3166 alpha-2 (e.g. "EG") → flag shown next to the name everywhere
+  locale: text("locale").notNull().default("en"), // "en" | "ar" — the gamer's chosen site language
   title: text("title"), // flex title shown under the name (e.g. "Blitz Grandmaster")
   role: text("role").notNull().default("user"), // user | admin | superadmin | brand
   status: text("status").notNull().default("active"), // active | suspended | banned
@@ -430,6 +431,30 @@ export const games = pgTable("games", {
   showInNav: boolean("show_in_nav").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
 });
+
+// ===== Admin overrides for a game's world catalogue =====
+// The champions/agents/weapons/legends/maps normally come from Data Dragon /
+// valorant-api / static catalogues. This table lets an admin edit any of them
+// (name, role, lore, image, splash, skins, abilities), hide them, reorder, or
+// add brand-new custom entities (e.g. PUBG heroes). Merged on top of the base.
+export const gameEntityOverrides = pgTable("game_entity_overrides", {
+  id: id(),
+  game: text("game").notNull(),
+  kind: text("kind").notNull(),          // champion | agent | weapon | hero | outfit | legend | map
+  entityId: text("entity_id").notNull(), // base id, or a generated id for custom entries
+  custom: boolean("custom").notNull().default(false),
+  hidden: boolean("hidden").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  name: text("name"),
+  role: text("role"),
+  image: text("image"),
+  splash: text("splash"),
+  lore: text("lore"),
+  meta: jsonb("meta").$type<{ label: string; value: string }[]>().notNull().default([]),
+  abilities: jsonb("abilities").$type<{ name: string; icon: string | null; desc: string }[]>().notNull().default([]),
+  skins: jsonb("skins").$type<{ name: string; image: string }[]>().notNull().default([]),
+  updatedAt: now("updated_at"),
+}, (t) => [uniqueIndex("geo_game_kind_entity_idx").on(t.game, t.kind, t.entityId)]);
 
 // ===== Partners ("Trusted by" slider, admin-managed) =====
 export const partners = pgTable("partners", {

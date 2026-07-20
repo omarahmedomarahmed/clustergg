@@ -77,6 +77,9 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.favicon.zoom": "1",
   // Connect/onboarding: comma-separated provider ids the admin has hidden.
   "connect.hidden": "",
+  // Admin-editable roster of countries gamers can pick a flag from (JSON array of
+  // {code,name}); empty = the built-in default roster (lib/flags.ts).
+  "profile.countries": "",
   // RBAC: comma-separated admin areas delegated to the staff role (see lib/permissions).
   "staff.access": "",
   // The Cluster Points currency icon art (editable; defaults to the generated one).

@@ -11,15 +11,15 @@ import { toRegion, REGIONS } from "@/lib/regions";
 // every gamer carrying their game-specific avatar. Structured so ANY game can
 // fill it; modules with no data are simply returned empty and hidden by the UI.
 
-export type ExploreEntry = { rank: number; slug: string; name: string; avatar: string | null; accountId: string | null; provider: string | null; value: number; rankLabel: string | null };
+export type ExploreEntry = { rank: number; slug: string; name: string; avatar: string | null; country: string | null; accountId: string | null; provider: string | null; value: number; rankLabel: string | null };
 export type ExploreBoard = { metricKey: string; title: string; unit: string | null; sortDir: string; entries: ExploreEntry[] };
-export type ChampBoard = { championId: number; ddId: string; name: string; iconUrl: string; splashUrl: string; entries: { rank: number; slug: string; name: string; avatar: string | null; accountId: string; points: number; level: number }[] };
+export type ChampBoard = { championId: number; ddId: string; name: string; iconUrl: string; splashUrl: string; entries: { rank: number; slug: string; name: string; avatar: string | null; country: string | null; accountId: string; points: number; level: number }[] };
 export type ExploreChallenge = {
   id: string; title: string; coverUrl: string | null; startAt: string; endAt: string; status: string;
   description: string; format: string; conditions: { metric: string; op: string; value: number }[];
-  prize: string | null; top: { slug: string; name: string; avatar: string | null; points: number }[];
+  prize: string | null; top: { slug: string; name: string; avatar: string | null; country: string | null; points: number }[];
 };
-export type ExploreRegion = { key: string; label: string; short: string; color: string; count: number; gamers: { slug: string; name: string; avatar: string | null; ign: string }[] };
+export type ExploreRegion = { key: string; label: string; short: string; color: string; count: number; gamers: { slug: string; name: string; avatar: string | null; ign: string; country: string | null }[] };
 export type PlanetExplore = {
   slug: string; name: string; game: string | null; hasChampions: boolean;
   heroLayout: unknown; bgUrl: string | null;
@@ -42,6 +42,7 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
         region: schema.linkedGameAccounts.region, providerData: schema.linkedGameAccounts.providerData,
         ign: schema.linkedGameAccounts.inGameName,
         slug: schema.users.slug, name: schema.users.displayName, avatarUrl: schema.users.avatarUrl,
+        country: schema.users.country,
       })
         .from(schema.linkedGameAccounts)
         .innerJoin(schema.users, eq(schema.linkedGameAccounts.userId, schema.users.id))
@@ -67,17 +68,17 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
     rows.sort((x, y) => b.sortDir === "asc" ? x.value - y.value : y.value - x.value);
     const entries: ExploreEntry[] = rows.slice(0, 15).map((r, i) => {
       const a = accById.get(r.accountId);
-      return { rank: i + 1, slug: a?.slug ?? "", name: a?.name ?? "Gamer", avatar: a ? gameAvatar(a) : null, accountId: r.accountId, provider: a?.provider ?? null, value: r.value, rankLabel: r.rankLabel };
+      return { rank: i + 1, slug: a?.slug ?? "", name: a?.name ?? "Gamer", avatar: a ? gameAvatar(a) : null, country: a?.country ?? null, accountId: r.accountId, provider: a?.provider ?? null, value: r.value, rankLabel: r.rankLabel };
     }).filter((e) => e.slug);
     return { metricKey: b.metricKey, title: b.title, unit: b.unit ?? null, sortDir: b.sortDir, entries };
   }).filter((b) => b.entries.length > 0);
 
   // ---- Champion mastery boards (auto-derived from connected accounts) ----
-  const champMap = new Map<number, { ddId: string; name: string; iconUrl: string; rows: { slug: string; name: string; avatar: string | null; accountId: string; points: number; level: number }[] }>();
+  const champMap = new Map<number, { ddId: string; name: string; iconUrl: string; rows: { slug: string; name: string; avatar: string | null; country: string | null; accountId: string; points: number; level: number }[] }>();
   for (const a of accounts) {
     for (const ch of championsOf(a.providerData)) {
       if (!champMap.has(ch.championId)) champMap.set(ch.championId, { ddId: ch.ddId, name: ch.name, iconUrl: ch.iconUrl, rows: [] });
-      champMap.get(ch.championId)!.rows.push({ slug: a.slug, name: a.name, avatar: gameAvatar(a), accountId: a.id, points: ch.points, level: ch.level });
+      champMap.get(ch.championId)!.rows.push({ slug: a.slug, name: a.name, avatar: gameAvatar(a), country: a.country ?? null, accountId: a.id, points: ch.points, level: ch.level });
     }
   }
   const championBoards: ChampBoard[] = [...champMap.entries()].map(([championId, v]) => ({
@@ -91,7 +92,7 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
     .orderBy(desc(schema.challenges.startAt)).limit(6);
   const chIds = challengeRows.map((c) => c.id);
   const parts = chIds.length
-    ? await db.select({ challengeId: schema.challengeParticipants.challengeId, points: schema.challengeParticipants.currentPoints, name: schema.users.displayName, slug: schema.users.slug, avatarUrl: schema.users.avatarUrl })
+    ? await db.select({ challengeId: schema.challengeParticipants.challengeId, points: schema.challengeParticipants.currentPoints, name: schema.users.displayName, slug: schema.users.slug, avatarUrl: schema.users.avatarUrl, country: schema.users.country })
         .from(schema.challengeParticipants)
         .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
         .where(and(inArray(schema.challengeParticipants.challengeId, chIds), eq(schema.challengeParticipants.status, "active")))
@@ -101,7 +102,7 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
   const acctBySlug = new Map(accounts.map((a) => [a.slug, a]));
   for (const p of parts) {
     const arr = topByCh.get(p.challengeId) ?? [];
-    if (arr.length < 5) { const a = acctBySlug.get(p.slug); arr.push({ slug: p.slug, name: p.name, avatar: a ? gameAvatar(a) : p.avatarUrl, points: p.points }); topByCh.set(p.challengeId, arr); }
+    if (arr.length < 5) { const a = acctBySlug.get(p.slug); arr.push({ slug: p.slug, name: p.name, avatar: a ? gameAvatar(a) : p.avatarUrl, country: p.country ?? null, points: p.points }); topByCh.set(p.challengeId, arr); }
   }
   const challenges: ExploreChallenge[] = challengeRows.map((c) => ({
     id: c.id, title: c.title, coverUrl: c.coverUrl,
@@ -120,7 +121,7 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
     if (!rk) continue;
     const reg = regionMap.get(rk)!;
     reg.count++;
-    if (!seen.has(a.slug) && reg.gamers.length < 8) { seen.add(a.slug); reg.gamers.push({ slug: a.slug, name: a.name, avatar: gameAvatar(a), ign: a.ign }); }
+    if (!seen.has(a.slug) && reg.gamers.length < 8) { seen.add(a.slug); reg.gamers.push({ slug: a.slug, name: a.name, avatar: gameAvatar(a), ign: a.ign, country: a.country ?? null }); }
   }
   const regions = [...regionMap.values()];
 

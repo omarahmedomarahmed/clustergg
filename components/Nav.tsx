@@ -10,8 +10,10 @@ import BrandGlyph from "@/components/BrandGlyph";
 import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
+import LocaleToggle from "@/components/LocaleToggle";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { getContent } from "@/lib/cms";
+import { getLocale } from "@/lib/i18n/server";
 import { slimImg } from "@/lib/img";
 
 export default async function Nav() {
@@ -84,6 +86,7 @@ export default async function Nav() {
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
   const hidePlanets = brand["brand.nav.hidePlanets"] === "1";
+  const locale = await getLocale(null);
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and
   // "all planets" live in the mobile drawer for reachability.
@@ -133,6 +136,7 @@ export default async function Nav() {
         <div className="md:hidden flex-1" />
 
         <div className="flex items-center gap-3 shrink-0">
+          <LocaleToggle current={locale} compact />
           {user ? (
             <>
               <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />

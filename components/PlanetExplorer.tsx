@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
+import Flag from "@/components/Flag";
 import GameLogo from "@/components/GameLogo";
 import TopBannerAd from "@/components/TopBannerAd";
 import LolCard from "@/components/LolCard";
@@ -355,7 +356,7 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
                 className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
                 <span className="w-5 text-center text-xs font-bold text-muted">{e.rank}</span>
                 <Avatar name={e.name} src={e.avatar} size={26} />
-                <span className="flex-1 truncate text-sm">{e.name}</span>
+                <span className="flex-1 truncate text-sm">{e.name} <Flag code={e.country} className="text-xs" /></span>
                 <span className="text-xs font-bold text-cyan-200">{e.points.toLocaleString()}</span>
               </button>
             ))}
@@ -405,7 +406,7 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
                   <button key={e.slug} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: null, provider: null, sub: `${e.points} pts`, challengeId: c.id, challengeTitle: c.title })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
                     <span className="w-5 text-center text-xs font-bold text-muted">{i + 1}</span>
                     <Avatar name={e.name} src={e.avatar} size={26} />
-                    <span className="flex-1 truncate text-sm">{e.name}</span>
+                    <span className="flex-1 truncate text-sm">{e.name} <Flag code={e.country} className="text-xs" /></span>
                     <span className="text-xs font-bold text-cyan-200">{e.points} pts</span>
                   </button>
                 ))}
@@ -429,7 +430,7 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
           {r.gamers.map((g) => (
             <button key={g.slug} onClick={() => onGamer({ slug: g.slug, name: g.name, avatar: g.avatar ?? null, accountId: g.accountId ?? null, provider: g.provider ?? null, sub: g.ign })} className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
               <Avatar name={g.name} src={g.avatar ?? null} size={26} />
-              <span className="flex-1 min-w-0"><span className="block truncate text-sm">{g.name}</span>{g.ign && <span className="block truncate text-[10px] text-cyan-200/80">{g.ign}</span>}</span>
+              <span className="flex-1 min-w-0"><span className="block truncate text-sm">{g.name} <Flag code={g.country} className="text-xs" /></span>{g.ign && <span className="block truncate text-[10px] text-cyan-200/80">{g.ign}</span>}</span>
               <Icon name="chevronRight" size={13} className="text-muted shrink-0" />
             </button>
           ))}
@@ -448,7 +449,7 @@ function EntryList({ entries, unit, onGamer }: { entries: ExploreEntry[]; unit: 
           className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
           <span className="w-5 text-center text-xs font-bold text-muted">{e.rank}</span>
           <Avatar name={e.name} src={e.avatar} size={26} />
-          <span className="flex-1 truncate text-sm">{e.name}</span>
+          <span className="flex-1 truncate text-sm">{e.name} <Flag code={e.country} className="text-xs" /></span>
           <span className="text-xs font-bold text-cyan-200">{e.rankLabel ?? e.value.toLocaleString()}{unit && !e.rankLabel ? ` ${unit}` : ""}</span>
         </button>
       ))}
@@ -468,7 +469,7 @@ function BoardMini({ board, onTitle, onGamer }: { board: ExploreBoard; onTitle: 
           className="w-full flex items-center gap-2 rounded-md px-1 py-1 hover:bg-white/5 text-left">
           <span className="w-4 text-center text-[10px] font-bold text-muted">{e.rank}</span>
           <Avatar name={e.name} src={e.avatar} size={22} />
-          <span className="flex-1 truncate text-[12px]">{e.name}</span>
+          <span className="flex-1 truncate text-[12px]">{e.name} <Flag code={e.country} className="text-[11px]" /></span>
           <span className="text-[11px] font-bold text-cyan-200">{e.rankLabel ?? e.value.toLocaleString()}</span>
         </button>
       ))}

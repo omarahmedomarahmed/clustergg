@@ -9,6 +9,8 @@ import { resolveGameLogo, resolveGameCover } from "@/lib/game-logos";
 import { getContent } from "@/lib/cms";
 import ProfileBuilder from "@/components/ProfileBuilder";
 import ProfileHub from "@/components/ProfileHub";
+import ProfileLocaleFlag from "@/components/ProfileLocaleFlag";
+import { getCountries } from "@/lib/countries-server";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
@@ -70,17 +72,21 @@ export default async function OwnProfilePage() {
     standingsCount: accounts.length,
   };
 
+  const countries = await getCountries();
   const customize = (
-    <ProfileBuilder
-      slug={user.slug}
-      displayName={user.displayName}
-      initialTheme={user.theme}
-      initialTitle={user.title ?? ""}
-      initialBio={user.bio ?? ""}
-      initialAvatar={user.avatarUrl ?? ""}
-      initialBanner={user.bannerUrl ?? ""}
-      previewData={previewData}
-    />
+    <div className="space-y-6">
+      <ProfileLocaleFlag countries={countries} country={user.country ?? ""} locale={(user as { locale?: string }).locale ?? "en"} />
+      <ProfileBuilder
+        slug={user.slug}
+        displayName={user.displayName}
+        initialTheme={user.theme}
+        initialTitle={user.title ?? ""}
+        initialBio={user.bio ?? ""}
+        initialAvatar={user.avatarUrl ?? ""}
+        initialBanner={user.bannerUrl ?? ""}
+        previewData={previewData}
+      />
+    </div>
   );
 
   const accountsTab = (
