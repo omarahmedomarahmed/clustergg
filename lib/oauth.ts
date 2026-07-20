@@ -31,11 +31,29 @@ type OpenIdConfig = {
 
 export type OAuthConfig = OAuth2Config | OpenIdConfig;
 
-// The canonical app origin used to build redirect URIs. Pin this in prod so it
-// matches what you registered with Discord/Steam even behind preview domains.
+// The app origin used to build redirect URIs. We PREFER the real request origin
+// so the whole OAuth round-trip stays on the exact host the user started on —
+// the `oauth_flow` state cookie is host-scoped, so a cross-domain hop (e.g.
+// clustergg.com → clustergg.vercel.app because an env var pinned the other
+// domain) drops the cookie and the callback fails with `state_mismatch`.
+// The pinned env (OAUTH_BASE_URL / NEXT_PUBLIC_APP_URL) is only a fallback for
+// local dev or when the request origin can't be determined.
 export function appBaseUrl(reqOrigin: string): string {
-  const env = process.env.OAUTH_BASE_URL || process.env.NEXT_PUBLIC_APP_URL;
-  return (env || reqOrigin).replace(/\/+$/, "");
+  const clean = (reqOrigin || "").replace(/\/+$/, "");
+  const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(:|\/|$)/i.test(clean);
+  if (clean && !isLocal) return clean;
+  const env = (process.env.OAUTH_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "").replace(/\/+$/, "");
+  return env || clean;
+}
+
+// Resolve the true public origin of an incoming request from the proxy headers
+// Vercel sets (x-forwarded-host / -proto), falling back to the parsed URL. Used
+// so redirect URIs + the state cookie live on the SAME host the user is on.
+export function originFromHeaders(headers: Headers, fallbackOrigin: string): string {
+  const host = (headers.get("x-forwarded-host") || headers.get("host") || "").split(",")[0].trim();
+  if (!host) return (fallbackOrigin || "").replace(/\/+$/, "");
+  const proto = (headers.get("x-forwarded-proto") || "https").split(",")[0].trim();
+  return `${proto}://${host}`;
 }
 
 export function redirectUri(providerId: string, reqOrigin: string): string {

@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { buildAuthorizeUrl, isOAuthAvailable, appBaseUrl } from "@/lib/oauth";
+import { buildAuthorizeUrl, isOAuthAvailable, appBaseUrl, originFromHeaders } from "@/lib/oauth";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/auth/:provider?next=/feed&intent=link — start a sign-in / link flow.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
-  const base = appBaseUrl(req.nextUrl.origin);
+  // Keep the whole flow on the host the user is actually on (see appBaseUrl).
+  const origin = originFromHeaders(req.headers, req.nextUrl.origin);
+  const base = appBaseUrl(origin);
 
   if (!isOAuthAvailable(provider)) {
     return NextResponse.redirect(new URL(`/login?error=${provider}_unavailable`, base));
@@ -23,5 +25,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     path: "/", maxAge: 600,
   });
 
-  return NextResponse.redirect(buildAuthorizeUrl(provider, req.nextUrl.origin, state));
+  return NextResponse.redirect(buildAuthorizeUrl(provider, origin, state));
 }
