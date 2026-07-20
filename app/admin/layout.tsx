@@ -30,6 +30,7 @@ const NAV: { section: string; area?: string; items: { href: string; label: strin
     section: "Games & planets",
     items: [
       { href: "/admin/games", label: "Games catalog" },
+      { href: "/admin/game-worlds", label: "Game worlds (heroes/lore)" },
       { href: "/admin/connect", label: "Connect providers" },
       { href: "/admin/spaces", label: "Planets" },
       { href: "/admin/spaces/requests", label: "Planet requests" },
