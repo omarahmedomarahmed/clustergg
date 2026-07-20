@@ -8,7 +8,7 @@ import { slimImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
 
 export type PinMap = Record<string, { x: number; y: number; color: string; label: string }>;
-type RegionRow = { region: string | null; name: string; slug: string; avatar?: string | null; ign?: string | null; providerData?: Record<string, unknown> | null };
+type RegionRow = { region: string | null; name: string; slug: string; avatar?: string | null; ign?: string | null; providerData?: Record<string, unknown> | null; accountId?: string; provider?: string };
 
 // Build globe regions from the REAL server/region codes providers return
 // (account.region), so pins map to actual game servers (EUW1, NA1, KR, …) — not
@@ -25,7 +25,7 @@ export function computeRealRegions(rows: RegionRow[], pins: PinMap, fallbackCode
     if (!e) { e = { count: 0, gamers: [] }; byCode.set(code, e); }
     e.count++;
     if (e.gamers.length < 8 && !e.gamers.some((x) => x.slug === a.slug)) {
-      e.gamers.push({ name: a.name, slug: a.slug, avatar: gameAvatarOf(a.providerData) ?? a.avatar ?? null, ign: a.ign ?? undefined });
+      e.gamers.push({ name: a.name, slug: a.slug, avatar: gameAvatarOf(a.providerData) ?? a.avatar ?? null, ign: a.ign ?? undefined, accountId: a.accountId, provider: a.provider });
     }
   }
   // Include any admin-placed pins even if they currently have no gamers.
@@ -81,6 +81,7 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
 
   const accountRows = providerIds.length
     ? await db.selectDistinct({
+        accountId: schema.linkedGameAccounts.id,
         provider: schema.linkedGameAccounts.provider,
         region: schema.linkedGameAccounts.region,
         ign: schema.linkedGameAccounts.inGameName,

@@ -7,7 +7,7 @@ export type HeroModule =
   | { id: string; kind: "leaderboards"; limit?: number }
   | { id: string; kind: "board"; metricKey: string }
   | { id: string; kind: "champions"; limit?: number }
-  | { id: string; kind: "entities"; entityKind?: "all" | "champion" | "hero" | "agent" | "weapon"; limit?: number }
+  | { id: string; kind: "entities"; entityKind?: "all" | "champion" | "hero" | "agent" | "weapon" | "outfit"; limit?: number }
   | { id: string; kind: "challenges" }
   | { id: string; kind: "regions" };
 
@@ -27,10 +27,11 @@ export const HERO_MODULE_META: { kind: HeroModuleKind; label: string; icon: stri
 const rid = () => "m-" + Math.random().toString(36).slice(2, 9);
 
 // The game-world entity kinds a game exposes (client-safe mapping).
-export function entityKindsForGame(game: string | null | undefined): ("champion" | "hero" | "agent" | "weapon")[] {
+export function entityKindsForGame(game: string | null | undefined): ("champion" | "hero" | "agent" | "weapon" | "outfit")[] {
   if (game === "League of Legends") return ["champion"];
   if (game === "VALORANT") return ["agent", "weapon"];
   if (game === "Dota 2") return ["hero"];
+  if (game === "Fortnite") return ["outfit"];
   return [];
 }
 export function newModule(kind: HeroModuleKind): HeroModule {
@@ -41,10 +42,12 @@ export function newModule(kind: HeroModuleKind): HeroModule {
   return { id: rid(), kind } as HeroModule;
 }
 
+// Stable ids — the default layout is recomputed on every render for games with
+// no saved layout, so random ids would remount (and flicker) the sidebar.
 export function defaultHeroLayout(): HeroLayout {
   return {
-    left: [{ id: rid(), kind: "leaderboards" }, { id: rid(), kind: "entities", entityKind: "all", limit: 10 }],
-    right: [{ id: rid(), kind: "challenges" }, { id: rid(), kind: "regions" }],
+    left: [{ id: "d-lb", kind: "leaderboards" }, { id: "d-ent", kind: "entities", entityKind: "all", limit: 12 }],
+    right: [{ id: "d-ch", kind: "challenges" }, { id: "d-rg", kind: "regions" }],
   };
 }
 

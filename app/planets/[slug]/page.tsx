@@ -13,6 +13,7 @@ import PostCard from "@/components/PostCard";
 import JoinSpaceButton from "@/components/JoinSpaceButton";
 import HeroStage from "@/components/HeroStage";
 import GameDirectory from "@/components/GameDirectory";
+import ChallengePointsButton from "@/components/ChallengeLog";
 import Countdown from "@/components/Countdown";
 import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
@@ -223,26 +224,33 @@ export default async function PlanetPage({
                   <h2 className="text-xl font-bold flex items-center gap-2"><Icon name="chart" size={20} className="text-cyan-300" /> {game.name} leaderboards</h2>
                   <Link href={`/leaderboards?game=${encodeURIComponent(game.name)}`} className="text-xs text-cyan-300 hover:underline shrink-0">All leaderboards →</Link>
                 </div>
-                <p className="text-xs text-muted mb-4">Live standings from API-verified accounts — each board side by side.</p>
+                <p className="text-xs text-muted mb-4">Live standings from API-verified accounts — every metric we track, each board over the game&apos;s art.</p>
                 {/* Glorified cards, one board each, over the game's cover art */}
                 <div className="grid md:grid-cols-2 gap-5">
-                  {boards.map((b) => (
-                    <div key={b.id} className="relative overflow-hidden rounded-2xl border border-white/10 p-4">
-                      {slimImg(game.coverUrl) && <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${slimImg(game.coverUrl)})` }} />}
-                      <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.7), rgba(4,5,26,0.9))" }} />
-                      <div className="relative">
-                        <div className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="chart" size={15} className="text-cyan-300" /> {b.title}</div>
-                        <LeaderboardWidget boards={[b]} basePath={path} limit={10} compact />
+                  {boards.map((b) => {
+                    const metricName = b.title.split("·")[1]?.trim() ?? b.title;
+                    return (
+                      <div key={b.id} className="group relative overflow-hidden rounded-2xl border border-white/10 hover:border-cyan-400/30 transition-colors" style={{ boxShadow: `0 0 0 1px ${pAccent}18` }}>
+                        {slimImg(game.coverUrl) && <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-35 transition-opacity" style={{ backgroundImage: `url(${slimImg(game.coverUrl)})` }} />}
+                        <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(180deg, rgba(4,5,26,0.66), rgba(4,5,26,0.92)), radial-gradient(120% 80% at 100% 0%, ${pAccent2}1f, transparent 60%)` }} />
+                        <div aria-hidden className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, ${pAccent}, ${pAccent2})` }} />
+                        <div className="relative p-4">
+                          <div className="flex items-center gap-2.5 mb-3">
+                            {game.logoUrl ? <GameLogo logoUrl={slimImg(game.logoUrl, 200000)} name={game.name} size={28} rounded="rounded-lg" className="ring-1 ring-white/15" /> : <Icon name="chart" size={18} className="text-cyan-300" />}
+                            <div className="min-w-0">
+                              <div className="font-bold text-sm truncate">{metricName}</div>
+                              <div className="text-[10px] uppercase tracking-widest text-muted">{game.name}</div>
+                            </div>
+                            <Link href={`/leaderboards?game=${encodeURIComponent(game.name)}&metric=${encodeURIComponent(b.metricKey)}`} className="ml-auto text-[11px] text-cyan-300 hover:underline inline-flex items-center gap-0.5 shrink-0">Full <Icon name="arrowRight" size={11} /></Link>
+                          </div>
+                          <LeaderboardWidget boards={[b]} basePath={path} limit={10} compact />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </section>
             )}
-
-            {/* Game-world directory — champions / agents+weapons / heroes with lore.
-                Self-loads and renders nothing for games without a catalogue. */}
-            {game && <GameDirectory game={game.name} />}
 
             {/* Leaderboard #2 — challenges, each with its own live board */}
             <section>
@@ -278,12 +286,13 @@ export default async function PlanetPage({
                           ) : (
                             <div className="space-y-1.5">
                               {top.map((t, i) => (
-                                <Link key={t.slug} href={`/u/${t.slug}`} className="flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-violet-500/10">
+                                <ChallengePointsButton key={t.slug} challengeId={ch.id} slug={t.slug} name={t.name} title={ch.title}
+                                  className="w-full flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-violet-500/10 text-left">
                                   <span className={`rank-chip rank-chip-${i + 1} !h-6 !min-w-6 text-xs`}>{i + 1}</span>
                                   <Avatar name={t.name} src={t.avatarUrl} size={24} />
                                   <span className="text-sm truncate flex-1">{t.name}</span>
                                   <span className="text-cyan-200 font-bold text-sm">{t.points} pts</span>
-                                </Link>
+                                </ChallengePointsButton>
                               ))}
                               <Link href={`${path}/challenges/${ch.id}`} className="block text-center text-xs text-cyan-300 hover:underline pt-1">Full standings →</Link>
                             </div>
@@ -295,6 +304,10 @@ export default async function PlanetPage({
                 </div>
               )}
             </section>
+
+            {/* Game-world directory — champions / agents+weapons / heroes with lore.
+                Self-loads, capped + scrollable, renders nothing for games without a catalogue. */}
+            {game && <GameDirectory game={game.name} />}
 
             {/* Community feed */}
             <section>
