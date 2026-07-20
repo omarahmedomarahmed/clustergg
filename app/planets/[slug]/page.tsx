@@ -12,6 +12,7 @@ import LeaderboardWidget from "@/components/LeaderboardWidget";
 import PostCard from "@/components/PostCard";
 import JoinSpaceButton from "@/components/JoinSpaceButton";
 import HeroStage from "@/components/HeroStage";
+import GameDirectory from "@/components/GameDirectory";
 import Countdown from "@/components/Countdown";
 import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
@@ -238,6 +239,10 @@ export default async function PlanetPage({
                 </div>
               </section>
             )}
+
+            {/* Game-world directory — champions / agents+weapons / heroes with lore.
+                Self-loads and renders nothing for games without a catalogue. */}
+            {game && <GameDirectory game={game.name} />}
 
             {/* Leaderboard #2 — challenges, each with its own live board */}
             <section>
