@@ -113,21 +113,21 @@ export default async function ChallengePage({
 
         <div className={`mx-auto max-w-5xl px-4 ${embed ? "pt-8" : "-mt-32 relative"}`}>
           <Link href={`/planets/${slug}`} className="text-sm text-muted hover:text-cyan-300 inline-flex items-center gap-1.5 mb-3">
-            <Icon name="arrowLeft" size={14} /> Back to planet
+            <Icon name="arrowLeft" size={14} /> {tr("Back to planet")}
           </Link>
           <div className="flex flex-wrap items-center gap-3 mb-3">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] uppercase tracking-widest border ${
               challenge.status === "active" ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10" : "border-violet-400/40 text-muted bg-black/40"}`}>
               {challenge.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-              {challenge.status === "active" ? "Live event" : challenge.status}
+              {challenge.status === "active" ? tr("Live event") : challenge.status}
             </span>
-            <span className="text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1 capitalize">{challenge.cadence} challenge</span>
+            <span className="text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1 capitalize">{challenge.cadence} {tr("challenge")}</span>
             <span className="text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1">
-              {challenge.format === "top1" ? "Winner takes all" : challenge.format === "top3" ? "Top 3 podium" : "Threshold race"}
+              {challenge.format === "top1" ? tr("Winner takes all") : challenge.format === "top3" ? tr("Top 3 podium") : tr("Threshold race")}
             </span>
             {challenge.status === "active" && (
               <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-200 border border-amber-400/50 bg-amber-500/10 rounded-full px-3 py-1">
-                <Icon name="clock" size={12} /> <Countdown endsAt={challenge.endAt.toISOString()} prefix="ends in " />
+                <Icon name="clock" size={12} /> <Countdown endsAt={challenge.endAt.toISOString()} prefix={`${tr("ends in")} `} />
               </span>
             )}
           </div>
@@ -141,15 +141,15 @@ export default async function ChallengePage({
             <p className="text-muted leading-relaxed">{challenge.description}</p>
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               {[
-                { label: "Game", value: challenge.game, icon: "gamepad" },
-                { label: "Starts", value: fmtDate(challenge.startAt), icon: "clock" },
-                { label: "Ends", value: (
+                { label: tr("Game"), value: challenge.game, icon: "gamepad" },
+                { label: tr("Starts"), value: fmtDate(challenge.startAt), icon: "clock" },
+                { label: tr("Ends"), value: (
                   <span className="flex flex-col">
                     <span>{fmtDate(challenge.endAt)}</span>
-                    {challenge.status === "active" && <span className="text-[10px] font-bold text-amber-300"><Countdown endsAt={challenge.endAt.toISOString()} prefix="in " /></span>}
+                    {challenge.status === "active" && <span className="text-[10px] font-bold text-amber-300"><Countdown endsAt={challenge.endAt.toISOString()} prefix={`${tr("in")} `} /></span>}
                   </span>
                 ), icon: "flame" },
-                { label: "Scoring", value: Object.entries(challenge.pointsEngine ?? {}).map(([k, v]) => `+${v}/${k}`).join(" ") || "—", icon: "chart" },
+                { label: tr("Scoring"), value: Object.entries(challenge.pointsEngine ?? {}).map(([k, v]) => `+${v}/${k}`).join(" ") || "—", icon: "chart" },
               ].map((cell) => (
                 <div key={cell.label} className="rounded-lg border border-violet-400/15 p-3">
                   <Icon name={cell.icon} size={14} className="text-violet-300 mb-1" />
@@ -162,35 +162,35 @@ export default async function ChallengePage({
             <div className="mt-6">
               {!viewer ? (
                 <Link href="/signup" className="glow-btn pressable rounded-full px-8 py-3 font-semibold text-white inline-flex items-center gap-2">
-                  <Icon name="rocket" size={16} /> Sign up to compete
+                  <Icon name="rocket" size={16} /> {tr("Sign up to compete")}
                 </Link>
               ) : joined ? (
                 <div className="text-emerald-300 font-semibold inline-flex items-center gap-2">
-                  <Icon name="check" size={18} /> You&apos;re in — go play {challenge.game}. Points sync automatically.
+                  <Icon name="check" size={18} /> {tr("You're in — go play")} {challenge.game}. {tr("Points sync automatically.")}
                 </div>
               ) : myAccounts.length === 0 ? (
                 <div className="text-sm text-muted inline-flex items-center gap-2">
                   <Icon name="link" size={15} />
-                  You need a linked <b>{provider?.name}</b> account —{" "}
-                  <Link href="/profile" className="text-cyan-300 underline">link it on your profile</Link>.
+                  {tr("You need a linked")} <b>{provider?.name}</b> {tr("account —")}{" "}
+                  <Link href="/profile" className="text-cyan-300 underline">{tr("link it on your profile")}</Link>.
                 </div>
               ) : gate && !gate.ok ? (
                 <div className="rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4 text-sm">
                   <div className="flex items-center gap-2 font-semibold text-amber-200">
                     {gate.logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={gate.logoUrl} alt="" className="h-6 w-6 object-contain" /> : <Icon name="lock" size={15} />}
-                    Locked — earn {gate.need} <b>{gate.questName}</b> badge{gate.need > 1 ? "s" : ""} to enter
+                    {tr("Locked — earn")} {gate.need} <b>{gate.questName}</b> {gate.need > 1 ? tr("badges to enter") : tr("badge to enter")}
                   </div>
-                  <p className="text-xs text-muted mt-1">You have {gate.have}/{gate.need}. Complete the <Link href="/quests" className="text-cyan-300 underline">{gate.questName} quest</Link> {gate.need - gate.have} more time{gate.need - gate.have > 1 ? "s" : ""} to unlock this challenge.</p>
+                  <p className="text-xs text-muted mt-1">{tr("You have")} {gate.have}/{gate.need}. {tr("Complete the")} <Link href="/quests" className="text-cyan-300 underline">{gate.questName} {tr("quest")}</Link> {gate.need - gate.have} {gate.need - gate.have > 1 ? tr("more times") : tr("more time")} {tr("to unlock this challenge.")}</p>
                 </div>
               ) : (
                 <form action={joinChallenge.bind(null, challenge.id, myAccounts[0].id, path)}>
                   {gate && (
                     <div className="mb-2 inline-flex items-center gap-1.5 text-xs text-emerald-300 font-semibold">
-                      <Icon name="check" size={14} /> {gate.questName} badges {gate.have}/{gate.need} — you qualify
+                      <Icon name="check" size={14} /> {gate.questName} {tr("badges")} {gate.have}/{gate.need} — {tr("you qualify")}
                     </div>
                   )}
                   <button className="glow-btn pressable rounded-full px-8 py-3 font-semibold text-white inline-flex items-center gap-2">
-                    <Icon name="rocket" size={16} /> Join with {myAccounts[0].inGameName}
+                    <Icon name="rocket" size={16} /> {tr("Join with")} {myAccounts[0].inGameName}
                   </button>
                 </form>
               )}
@@ -222,10 +222,10 @@ export default async function ChallengePage({
           )}
           <div className="glass p-5 text-sm text-muted space-y-2">
             <div className="font-bold text-ink flex items-center gap-2"><Icon name="satellite" size={15} /> {tr("How scoring works")}</div>
-            <p>Your stats are snapshotted when you join. Only <b className="text-ink">new</b> activity counts.</p>
-            <p>Every sync pulls fresh data from the {provider?.name} API and the board updates in real time.</p>
+            <p>{tr("Your stats are snapshotted when you join. Only")} <b className="text-ink">{tr("new")}</b> {tr("activity counts.")}</p>
+            <p>{tr("Every sync pulls fresh data from the")} {provider?.name} {tr("API and the board updates in real time.")}</p>
             {(challenge.rules?.conditions?.length ?? 0) > 0 && (
-              <p>Qualification: {challenge.rules.conditions.map((cd) => `${cd.metric} ${cd.op} ${cd.value}`).join(" AND ")}</p>
+              <p>{tr("Qualification:")} {challenge.rules.conditions.map((cd) => `${cd.metric} ${cd.op} ${cd.value}`).join(" AND ")}</p>
             )}
           </div>
           <AdSlot placement="challenge_sidebar" />
