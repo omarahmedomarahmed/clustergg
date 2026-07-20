@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import ImageUpload from "@/components/ImageUpload";
+import { useTr } from "@/components/LocaleProvider";
 import { saveProfileTheme } from "@/app/actions/connections";
 import {
   ProfileTheme, resolveTheme, themeToVars, bgStyle, coverStyle, cursorValue,
@@ -71,6 +72,7 @@ export default function ProfileBuilder({
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const tr = useTr();
 
   const set = <K extends keyof ProfileTheme>(k: K, v: ProfileTheme[K]) => { setTheme((t) => ({ ...t, [k]: v })); setSaved(false); };
   const applyTemplate = (key: string) => {
@@ -100,7 +102,7 @@ export default function ProfileBuilder({
       await saveProfileTheme(theme as unknown as Record<string, unknown>, { title, bio, avatarUrl, bannerUrl });
       setSaved(true);
     } catch {
-      setSaveError("Couldn't save — an image may be too large. Try a smaller one.");
+      setSaveError(tr("Couldn't save — an image may be too large. Try a smaller one."));
     }
   });
 
@@ -127,7 +129,7 @@ export default function ProfileBuilder({
     <span key={i} className="text-xs rounded-full px-2.5 py-1" style={{ background: `color-mix(in srgb, ${theme.accent} 16%, transparent)`, color: theme.text, border: `1px solid color-mix(in srgb, ${theme.accent} 35%, transparent)` }}>{label}</span>
   );
   const renderSection = (key: string): React.ReactNode => {
-    if (!pd) return empty("Your real content shows here.");
+    if (!pd) return empty(tr("Your real content shows here."));
     switch (key) {
       case "accounts":
         return pd.accounts.length
@@ -136,19 +138,19 @@ export default function ProfileBuilder({
                 <div className="font-semibold truncate">{a.name}</div>
                 <div style={{ color: theme.muted }}>{a.provider}</div>
               </div>))}</div>
-          : empty("No accounts linked yet — connect a game.");
+          : empty(tr("No accounts linked yet — connect a game."));
       case "standings":
-        return pd.standingsCount ? empty(`Ranked across ${pd.standingsCount} game account${pd.standingsCount > 1 ? "s" : ""}.`) : empty("Link a game to appear on leaderboards.");
+        return pd.standingsCount ? empty(`${tr("Ranked across")} ${pd.standingsCount} ${tr(pd.standingsCount > 1 ? "game accounts." : "game account.")}`) : empty(tr("Link a game to appear on leaderboards."));
       case "trophies":
-        return pd.trophies.length ? <div className="flex flex-wrap gap-1.5">{pd.trophies.map((t, i) => chip(t.title, i))}</div> : empty("Win a challenge to earn a trophy.");
+        return pd.trophies.length ? <div className="flex flex-wrap gap-1.5">{pd.trophies.map((t, i) => chip(t.title, i))}</div> : empty(tr("Win a challenge to earn a trophy."));
       case "badges":
-        return pd.badges.length ? <div className="flex flex-wrap gap-1.5">{pd.badges.map((b, i) => chip(b.name, i))}</div> : empty("No badges yet.");
+        return pd.badges.length ? <div className="flex flex-wrap gap-1.5">{pd.badges.map((b, i) => chip(b.name, i))}</div> : empty(tr("No badges yet."));
       case "challenges":
-        return pd.challenges.length ? <div className="flex flex-wrap gap-1.5">{pd.challenges.map((c, i) => chip(c.title, i))}</div> : empty("Not competing in any challenges right now.");
+        return pd.challenges.length ? <div className="flex flex-wrap gap-1.5">{pd.challenges.map((c, i) => chip(c.title, i))}</div> : empty(tr("Not competing in any challenges right now."));
       case "activity":
-        return pd.postsCount ? empty(`${pd.postsCount} post${pd.postsCount > 1 ? "s" : ""} across your planets.`) : empty("No posts yet.");
+        return pd.postsCount ? empty(`${pd.postsCount} ${tr(pd.postsCount > 1 ? "posts across your planets." : "post across your planets.")}`) : empty(tr("No posts yet."));
       case "spaces":
-        return pd.spaces.length ? <div className="flex flex-wrap gap-1.5">{pd.spaces.map((s, i) => chip(s.name, i))}</div> : empty("Join a planet to show it here.");
+        return pd.spaces.length ? <div className="flex flex-wrap gap-1.5">{pd.spaces.map((s, i) => chip(s.name, i))}</div> : empty(tr("Join a planet to show it here."));
       default: return null;
     }
   };
@@ -164,7 +166,7 @@ export default function ProfileBuilder({
             {tabs.map((t) => (
               <button key={t.k} onClick={() => setTab(t.k)}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition-colors ${tab === t.k ? "border-cyan-400/70 bg-cyan-400/10 text-cyan-200" : "border-violet-400/25 text-muted hover:text-ink"}`}>
-                <Icon name={t.icon} size={14} /> {t.label}
+                <Icon name={t.icon} size={14} /> {tr(t.label)}
               </button>
             ))}
           </div>
@@ -174,35 +176,35 @@ export default function ProfileBuilder({
         {tab === "identity" && (
           <div className="space-y-4">
             <div>
-              <label className="text-xs text-muted">Flex title (under your name)</label>
-              <input value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} maxLength={60} placeholder="e.g. Blitz Grandmaster" className="input-cosmic mt-1" />
+              <label className="text-xs text-muted">{tr("Flex title (under your name)")}</label>
+              <input value={title} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} maxLength={60} placeholder={tr("e.g. Blitz Grandmaster")} className="input-cosmic mt-1" />
             </div>
             <div>
-              <label className="text-xs text-muted">Bio</label>
+              <label className="text-xs text-muted">{tr("Bio")}</label>
               <textarea value={bio} onChange={(e) => { setBio(e.target.value); setSaved(false); }} rows={3} maxLength={400} className="input-cosmic mt-1" />
             </div>
 
-            <ImageUpload label="Avatar / profile image" value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={480} quality={0.82} scope="profile" />
+            <ImageUpload label={tr("Avatar / profile image")} value={avatarUrl} onChange={(v) => { setAvatarUrl(v); setSaved(false); }} aspect="1/1" rounded="rounded-full" maxDim={480} quality={0.82} scope="profile" />
             <div>
-              <label className="text-xs text-muted block mb-1.5">Avatar shape</label>
+              <label className="text-xs text-muted block mb-1.5">{tr("Avatar shape")}</label>
               <div className="flex flex-wrap gap-1.5">
                 {AVATAR_SHAPES.map((s) => <button key={s} onClick={() => set("avatarShape", s)} className={`${pill(theme.avatarShape === s)} capitalize`}>{s}</button>)}
               </div>
             </div>
-            <Slider label="Avatar size" value={theme.avatarSize} min={80} max={200} onChange={(v) => set("avatarSize", v)} suffix="px" />
+            <Slider label={tr("Avatar size")} value={theme.avatarSize} min={80} max={200} onChange={(v) => set("avatarSize", v)} suffix="px" />
 
             <div className="border-t border-violet-400/15 pt-4">
-              <ImageUpload label="Cover / banner image" value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1280} quality={0.78} scope="profile" />
+              <ImageUpload label={tr("Cover / banner image")} value={bannerUrl} onChange={(v) => { setBannerUrl(v); setSaved(false); }} aspect="16/9" maxDim={1280} quality={0.78} scope="profile" />
               <div className="mt-2 space-y-2">
-                <Slider label="Cover height" value={theme.coverHeight} min={120} max={360} onChange={(v) => set("coverHeight", v)} suffix="px" />
-                <Slider label="Cover darken" value={theme.coverOverlay} min={0} max={90} onChange={(v) => set("coverOverlay", v)} suffix="%" />
+                <Slider label={tr("Cover height")} value={theme.coverHeight} min={120} max={360} onChange={(v) => set("coverHeight", v)} suffix="px" />
+                <Slider label={tr("Cover darken")} value={theme.coverOverlay} min={0} max={90} onChange={(v) => set("coverOverlay", v)} suffix="%" />
               </div>
             </div>
 
             <div className="border-t border-violet-400/15 pt-4">
-              <label className="text-xs text-muted block mb-1.5">Page background image</label>
+              <label className="text-xs text-muted block mb-1.5">{tr("Page background image")}</label>
               <div className="grid grid-cols-5 gap-1.5 mb-2">
-                <button onClick={() => set("bgImage", null)} className={`h-9 rounded-lg border text-[9px] ${!theme.bgImage ? "border-cyan-400/70" : "border-violet-400/20"}`} style={{ background: theme.bg }}>None</button>
+                <button onClick={() => set("bgImage", null)} className={`h-9 rounded-lg border text-[9px] ${!theme.bgImage ? "border-cyan-400/70" : "border-violet-400/20"}`} style={{ background: theme.bg }}>{tr("None")}</button>
                 {BG_PRESETS.map((b) => (
                   <button key={b.url} onClick={() => set("bgImage", b.url)} title={b.name}
                     className={`h-9 rounded-lg border bg-cover bg-center ${theme.bgImage === b.url ? "border-cyan-400/70" : "border-violet-400/20"}`}
@@ -211,8 +213,8 @@ export default function ProfileBuilder({
               </div>
               <ImageUpload value={theme.bgImage ?? ""} onChange={(v) => set("bgImage", v || null)} aspect="16/9" maxDim={1280} quality={0.72} scope="profile" />
               <div className="mt-2 space-y-2">
-                <Slider label="Background blur" value={theme.bgBlur} min={0} max={20} onChange={(v) => set("bgBlur", v)} suffix="px" />
-                <Slider label="Background darken" value={theme.bgOverlay} min={0} max={90} onChange={(v) => set("bgOverlay", v)} suffix="%" />
+                <Slider label={tr("Background blur")} value={theme.bgBlur} min={0} max={20} onChange={(v) => set("bgBlur", v)} suffix="px" />
+                <Slider label={tr("Background darken")} value={theme.bgOverlay} min={0} max={90} onChange={(v) => set("bgOverlay", v)} suffix="%" />
               </div>
             </div>
           </div>
@@ -222,7 +224,7 @@ export default function ProfileBuilder({
         {tab === "theme" && (
           <div className="space-y-4">
             <div>
-              <label className="text-xs text-muted block mb-2">Templates</label>
+              <label className="text-xs text-muted block mb-2">{tr("Templates")}</label>
               <div className="grid grid-cols-2 gap-2">
                 {TEMPLATES.map((t) => {
                   const rt = resolveTheme({ ...t.theme, template: t.key });
@@ -242,13 +244,13 @@ export default function ProfileBuilder({
               </div>
             </div>
             <div className="border-t border-violet-400/15 pt-4 space-y-3">
-              <div className="text-xs uppercase tracking-widest text-muted">Recolor everything</div>
-              <Swatch label="Page background" value={theme.bg} onChange={(v) => set("bg", v)} />
-              <Swatch label="Card background" value={theme.panel} onChange={(v) => set("panel", v)} />
-              <Swatch label="Accent" value={theme.accent} onChange={(v) => set("accent", v)} />
-              <Swatch label="Accent 2 (gradients)" value={theme.accent2} onChange={(v) => set("accent2", v)} />
-              <Swatch label="Text" value={theme.text} onChange={(v) => set("text", v)} />
-              <Swatch label="Muted text" value={theme.muted} onChange={(v) => set("muted", v)} />
+              <div className="text-xs uppercase tracking-widest text-muted">{tr("Recolor everything")}</div>
+              <Swatch label={tr("Page background")} value={theme.bg} onChange={(v) => set("bg", v)} />
+              <Swatch label={tr("Card background")} value={theme.panel} onChange={(v) => set("panel", v)} />
+              <Swatch label={tr("Accent")} value={theme.accent} onChange={(v) => set("accent", v)} />
+              <Swatch label={tr("Accent 2 (gradients)")} value={theme.accent2} onChange={(v) => set("accent2", v)} />
+              <Swatch label={tr("Text")} value={theme.text} onChange={(v) => set("text", v)} />
+              <Swatch label={tr("Muted text")} value={theme.muted} onChange={(v) => set("muted", v)} />
             </div>
           </div>
         )}
@@ -257,27 +259,27 @@ export default function ProfileBuilder({
         {tab === "style" && (
           <div className="space-y-4">
             <div>
-              <label className="text-xs text-muted block mb-1.5">Card style</label>
+              <label className="text-xs text-muted block mb-1.5">{tr("Card style")}</label>
               <div className="flex flex-wrap gap-1.5">
                 {CARD_STYLES.map((s) => <button key={s} onClick={() => set("cardStyle", s)} className={`${pill(theme.cardStyle === s)} capitalize`}>{s}</button>)}
               </div>
             </div>
             <div>
-              <label className="text-xs text-muted block mb-1.5">Button style</label>
+              <label className="text-xs text-muted block mb-1.5">{tr("Button style")}</label>
               <div className="flex flex-wrap gap-1.5">
                 {BUTTON_STYLES.map((s) => <button key={s} onClick={() => set("buttonStyle", s)} className={`${pill(theme.buttonStyle === s)} capitalize`}>{s}</button>)}
               </div>
             </div>
             <div>
-              <label className="text-xs text-muted block mb-1.5">Font</label>
+              <label className="text-xs text-muted block mb-1.5">{tr("Font")}</label>
               <div className="flex flex-wrap gap-1.5">
                 {Object.keys(FONTS).map((f) => <button key={f} onClick={() => set("font", f)} className={`${pill(theme.font === f)} capitalize`}>{f}</button>)}
               </div>
             </div>
-            <Slider label="Corner radius" value={theme.radius} min={0} max={28} onChange={(v) => set("radius", v)} suffix="px" />
+            <Slider label={tr("Corner radius")} value={theme.radius} min={0} max={28} onChange={(v) => set("radius", v)} suffix="px" />
 
             <div className="border-t border-violet-400/15 pt-4">
-              <label className="text-xs text-muted block mb-2">Sections — show, hide, reorder &amp; set card art</label>
+              <label className="text-xs text-muted block mb-2">{tr("Sections — show, hide, reorder & set card art")}</label>
               <div className="space-y-1.5">
                 {theme.order.map((key, i) => {
                   const sec = SECTIONS.find((s) => s.key === key);
@@ -289,17 +291,17 @@ export default function ProfileBuilder({
                     <div key={key} className="rounded-lg border border-violet-400/15">
                       <div className="flex items-center gap-2 px-2.5 py-1.5">
                         <button onClick={() => toggleSection(key)} className={`text-xs ${on ? "text-emerald-300" : "text-muted"}`}><Icon name={on ? "eye" : "x"} size={14} /></button>
-                        <span className={`text-xs flex-1 ${on ? "" : "text-muted line-through"}`}>{sec.label}</span>
-                        <button onClick={() => setArtOpen(open ? null : key)} title="Card background art"
+                        <span className={`text-xs flex-1 ${on ? "" : "text-muted line-through"}`}>{tr(sec.label)}</span>
+                        <button onClick={() => setArtOpen(open ? null : key)} title={tr("Card background art")}
                           className={`text-xs ${hasArt ? "text-cyan-300" : "text-muted hover:text-ink"}`}><Icon name="spark" size={13} /></button>
                         <button onClick={() => moveSection(key, -1)} disabled={i === 0} className="text-muted hover:text-ink disabled:opacity-30"><Icon name="arrowUp" size={13} /></button>
                         <button onClick={() => moveSection(key, 1)} disabled={i === theme.order.length - 1} className="text-muted hover:text-ink disabled:opacity-30"><Icon name="arrowDown" size={13} /></button>
                       </div>
                       {open && (
                         <div className="px-2.5 pb-2.5 pt-1 border-t border-violet-400/10">
-                          <div className="text-[10px] text-muted mb-1.5">Background art for the “{sec.label}” card</div>
+                          <div className="text-[10px] text-muted mb-1.5">{tr("Background art for the")} “{tr(sec.label)}” {tr("card")}</div>
                           <ImageUpload value={theme.sectionArt[key] ?? ""} onChange={(v) => setSectionArt(key, v)} aspect="16/9" maxDim={1200} quality={0.74} scope="profile" />
-                          {hasArt && <button onClick={() => setSectionArt(key, "")} className="mt-1.5 text-[11px] text-rose-300 hover:underline">Remove art</button>}
+                          {hasArt && <button onClick={() => setSectionArt(key, "")} className="mt-1.5 text-[11px] text-rose-300 hover:underline">{tr("Remove art")}</button>}
                         </div>
                       )}
                     </div>
@@ -309,7 +311,7 @@ export default function ProfileBuilder({
             </div>
 
             <div className="border-t border-violet-400/15 pt-4">
-              <label className="text-xs text-muted block mb-2">Custom cursor <span className="text-muted/70">(everyone sees it on your profile)</span></label>
+              <label className="text-xs text-muted block mb-2">{tr("Custom cursor")} <span className="text-muted/70">{tr("(everyone sees it on your profile)")}</span></label>
               <div className="grid grid-cols-4 gap-1.5 mb-2">
                 {CURSOR_KEYS.map((c) => (
                   <button key={c} onClick={() => set("cursor", c)}
@@ -317,8 +319,8 @@ export default function ProfileBuilder({
                     style={{ cursor: cursorValue(c, theme.cursorColor) }}>{c}</button>
                 ))}
               </div>
-              <Swatch label="Cursor color" value={theme.cursorColor} onChange={(v) => set("cursorColor", v)} />
-              <input value={theme.cursor.startsWith("http") ? theme.cursor : ""} onChange={(e) => set("cursor", e.target.value || "default")} placeholder="or paste a custom 32×32 PNG URL" className="input-cosmic mt-2 text-xs" />
+              <Swatch label={tr("Cursor color")} value={theme.cursorColor} onChange={(v) => set("cursorColor", v)} />
+              <input value={theme.cursor.startsWith("http") ? theme.cursor : ""} onChange={(e) => set("cursor", e.target.value || "default")} placeholder={tr("or paste a custom 32×32 PNG URL")} className="input-cosmic mt-2 text-xs" />
             </div>
           </div>
         )}
@@ -327,11 +329,11 @@ export default function ProfileBuilder({
       {/* ===== Live preview (right) ===== */}
       <div className="lg:sticky lg:top-16">
         <div className="flex items-center justify-between mb-2">
-          <div className="text-xs text-muted flex items-center gap-2"><Icon name="eye" size={13} /> Live preview — clustergg.com/u/{slug}</div>
+          <div className="text-xs text-muted flex items-center gap-2"><Icon name="eye" size={13} /> {tr("Live preview —")} clustergg.com/u/{slug}</div>
           <div className="flex items-center gap-3">
             {saveError && <span className="text-xs text-rose-300">{saveError}</span>}
             <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">
-              {pending ? "Saving…" : saved ? "Saved ✓" : "Save changes"}
+              {pending ? tr("Saving…") : saved ? tr("Saved ✓") : tr("Save changes")}
             </button>
           </div>
         </div>
