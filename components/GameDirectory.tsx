@@ -106,7 +106,21 @@ function EntityModal({ game, lite, onClose }: { game: string; lite: EntityLite; 
                   </div>
                 </div>
               )}
-              {!d.lore && d.abilities.length === 0 && <p className="text-sm text-muted">No lore available for this one yet.</p>}
+              {d.skins.length > 0 && (
+                <div className="mt-4">
+                  <div className="text-xs font-bold uppercase tracking-widest text-cyan-200 mb-2">{d.skins.length} skin{d.skins.length === 1 ? "" : "s"}</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {d.skins.map((s, i) => (
+                      <div key={i} className="rounded-lg overflow-hidden border border-white/10">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={s.image} alt={s.name} loading="lazy" className={`h-20 w-full ${lite.kind === "weapon" ? "object-contain bg-black/40 p-1.5" : "object-cover"}`} onError={(ev) => { (ev.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+                        <div className="text-[10px] text-muted truncate px-1.5 py-1">{s.name}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {!d.lore && d.abilities.length === 0 && d.skins.length === 0 && <p className="text-sm text-muted">No lore available for this one yet.</p>}
             </>
           )}
         </div>

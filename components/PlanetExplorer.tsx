@@ -569,7 +569,21 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
             {d.meta.filter((m) => m.value).length > 0 && <div className="flex flex-wrap gap-1.5 mb-2">{d.meta.filter((m) => m.value).map((m) => <span key={m.label} className="rounded-full border border-white/12 bg-black/30 px-2 py-0.5 text-[10px]"><span className="text-muted">{m.label}:</span> <b>{m.value}</b></span>)}</div>}
             {d.lore && <p className="text-[13px] text-white/85 leading-relaxed mb-2 whitespace-pre-line">{d.lore}</p>}
             {d.abilities.length > 0 && <div className="space-y-1.5">{d.abilities.map((ab, i) => (<div key={i} className="flex gap-2">{ab.icon && /* eslint-disable-next-line @next/next/no-img-element */ <img src={ab.icon} alt="" className="h-7 w-7 rounded shrink-0 bg-black/40" onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = "none"; }} />}<div className="min-w-0"><div className="text-xs font-semibold">{ab.name}</div>{ab.desc && <div className="text-[11px] text-white/60 line-clamp-2">{ab.desc}</div>}</div></div>))}</div>}
-            {!d.lore && d.abilities.length === 0 && <p className="text-xs text-white/60">No lore available yet.</p>}
+            {d.skins.length > 0 && (
+              <div className="mt-3">
+                <div className="text-[10px] uppercase tracking-widest text-white/60 mb-1.5">{d.skins.length} skin{d.skins.length === 1 ? "" : "s"}</div>
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+                  {d.skins.map((s, i) => (
+                    <div key={i} className="shrink-0 w-32">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={s.image} alt={s.name} loading="lazy" className={`h-16 w-32 rounded-lg border border-white/10 ${kind === "weapon" ? "object-contain bg-black/40 p-1" : "object-cover"}`} onError={(ev) => { (ev.currentTarget.parentElement as HTMLElement).style.display = "none"; }} />
+                      <div className="text-[9px] text-white/70 truncate mt-0.5">{s.name}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!d.lore && d.abilities.length === 0 && d.skins.length === 0 && <p className="text-xs text-white/60">No lore available yet.</p>}
           </>
         )}
       </div>
