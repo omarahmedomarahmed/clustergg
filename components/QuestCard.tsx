@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
+import { useTr } from "@/components/LocaleProvider";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // One Quest as a gamified, themed card. The whole card navigates to the quest's
 // map page; tapping a milestone opens a helper card with that milestone's story.
 export default function QuestCard({ quest, top = [], href }: { quest: QuestView; top?: QuestGamer[]; href?: string }) {
   const router = useRouter();
+  const tr = useTr();
   const [tab, setTab] = useState<"progress" | "leaders">("progress");
   const [sel, setSel] = useState<number | null>(null);
   const q = quest;
@@ -58,7 +60,7 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
         </div>
         <div className="text-right shrink-0">
           <div className="font-bold" style={{ color: q.accent2 }}>{q.qp.toLocaleString()}</div>
-          <div className="text-[10px] text-muted">CP · {earnedCount}/{q.tiers.length}</div>
+          <div className="text-[10px] text-muted">{tr("CP")} · {earnedCount}/{q.tiers.length}</div>
         </div>
       </div>
 
@@ -86,13 +88,13 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
             <div className="font-bold text-sm flex items-center gap-2" style={{ color: q.tiers[sel].color || q.color }}>
               {q.tiers[sel].name}
               <span className="text-[9px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5" style={{ background: q.tiers[sel].earned ? "#10b98122" : "#ffffff10", color: q.tiers[sel].earned ? "#34d399" : "#94a3b8" }}>
-                {q.tiers[sel].earned ? "✓ Unlocked" : "How to reach"}
+                {q.tiers[sel].earned ? tr("✓ Unlocked") : tr("How to reach")}
               </span>
             </div>
             <button onClick={(e) => { stop(e); setSel(null); }} className="text-muted hover:text-ink"><Icon name="x" size={13} /></button>
           </div>
-          <p className="text-[11px] text-muted mt-1 leading-relaxed">{q.tiers[sel].description || `Reach ${q.tiers[sel].thresholdQp.toLocaleString()} Cluster Points to unlock ${q.tiers[sel].name}.`}</p>
-          <div className="mt-1.5 text-[11px]"><b style={{ color: q.accent2 }}>{q.tiers[sel].thresholdQp.toLocaleString()} CP</b> · {q.tiers[sel].holders.toLocaleString()} reached this step</div>
+          <p className="text-[11px] text-muted mt-1 leading-relaxed">{q.tiers[sel].description || `${tr("Reach")} ${q.tiers[sel].thresholdQp.toLocaleString()} ${tr("Cluster Points to unlock")} ${q.tiers[sel].name}.`}</p>
+          <div className="mt-1.5 text-[11px]"><b style={{ color: q.accent2 }}>{q.tiers[sel].thresholdQp.toLocaleString()} {tr("CP")}</b> · {q.tiers[sel].holders.toLocaleString()} {tr("reached this step")}</div>
         </div>
       )}
 
@@ -110,27 +112,27 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
             <button key={t} onClick={(e) => { stop(e); setTab(t); }}
               className={`text-[11px] font-semibold rounded-full px-2.5 py-1 transition-colors ${tab === t ? "text-white" : "text-muted hover:text-ink"}`}
               style={tab === t ? { background: `${q.color}33` } : undefined}>
-              {t === "progress" ? "My progress" : "Leaderboard"}
+              {t === "progress" ? tr("My progress") : tr("Leaderboard")}
             </button>
           ))}
         </div>
         {tab === "progress" ? (
           <div className="text-[11px] text-muted">
-            {done ? <span style={{ color: q.color }}>★ Max tier reached — legend status.</span>
-              : <>{into.toLocaleString()} / {span.toLocaleString()} CP to <b style={{ color: q.color }}>{q.nextTier!.name}</b></>}
+            {done ? <span style={{ color: q.color }}>{tr("★ Max tier reached — legend status.")}</span>
+              : <>{into.toLocaleString()} / {span.toLocaleString()} {tr("CP to")} <b style={{ color: q.color }}>{q.nextTier!.name}</b></>}
           </div>
         ) : (
           <div className="space-y-1">
-            {top.length === 0 && <div className="text-[11px] text-muted">No questers yet.</div>}
+            {top.length === 0 && <div className="text-[11px] text-muted">{tr("No questers yet.")}</div>}
             {top.slice(0, 4).map((g, i) => (
               <Link key={g.slug} href={`/u/${g.slug}`} onClick={stop} className="flex items-center gap-2 text-xs hover:text-cyan-300">
                 <span className="w-4 text-center font-bold" style={{ color: q.color }}>{i + 1}</span>
                 <Avatar name={g.name} src={g.avatarUrl} size={18} />
                 <span className="flex-1 truncate">{g.name}</span>
-                <span className="text-muted shrink-0">{(g.qp ?? 0).toLocaleString()} CP</span>
+                <span className="text-muted shrink-0">{(g.qp ?? 0).toLocaleString()} {tr("CP")}</span>
               </Link>
             ))}
-            <Link href={link} onClick={stop} className="block text-[11px] hover:underline pt-1" style={{ color: q.color }}>Full leaderboard →</Link>
+            <Link href={link} onClick={stop} className="block text-[11px] hover:underline pt-1" style={{ color: q.color }}>{tr("Full leaderboard →")}</Link>
           </div>
         )}
       </div>
