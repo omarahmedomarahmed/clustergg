@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
@@ -19,6 +19,7 @@ type Ev = { id: string; who: string; slug: string; type: string; points: number;
 // Polls standings + the scoring ledger — the board and history move in real time.
 export default function LiveChallengeBoard({ challengeId }: { challengeId: string }) {
   const [data, setData] = useState<{ entries: Entry[]; events: Ev[] } | null>(null);
+  const [openSlug, setOpenSlug] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -48,19 +49,45 @@ export default function LiveChallengeBoard({ challengeId }: { challengeId: strin
           </div>
           <table className="w-full table-cosmic">
             <tbody>
-              {data.entries.map((e, i) => (
-                <tr key={e.slug} className={e.status === "disqualified" ? "opacity-40 line-through" : ""}>
-                  <td className="w-14"><span className={`rank-chip ${i < 3 ? `rank-chip-${i + 1}` : ""}`}>{i + 1}</span></td>
-                  <td>
-                    <a href={`/u/${e.slug}`} className="flex items-center gap-2.5 hover:text-cyan-300">
-                      <Avatar name={e.displayName} src={e.avatarUrl} size={28} />
-                      <span className="font-semibold">{e.displayName}</span>
-                      <span className="text-xs text-muted hidden sm:inline">({e.inGameName})</span>
-                    </a>
-                  </td>
-                  <td className="text-right font-bold text-cyan-200">{e.points} pts</td>
-                </tr>
-              ))}
+              {data.entries.map((e, i) => {
+                const mine = openSlug === e.slug;
+                const log = data.events.filter((ev) => ev.slug === e.slug);
+                return (
+                  <Fragment key={e.slug}>
+                    <tr className={`${e.status === "disqualified" ? "opacity-40 line-through" : ""} cursor-pointer hover:bg-violet-500/8`} onClick={() => setOpenSlug(mine ? null : e.slug)}>
+                      <td className="w-14"><span className={`rank-chip ${i < 3 ? `rank-chip-${i + 1}` : ""}`}>{i + 1}</span></td>
+                      <td>
+                        <span className="flex items-center gap-2.5">
+                          <Avatar name={e.displayName} src={e.avatarUrl} size={28} />
+                          <span className="font-semibold">{e.displayName}</span>
+                          <span className="text-xs text-muted hidden sm:inline">({e.inGameName})</span>
+                          <Icon name={mine ? "chevronDown" : "chevronRight"} size={13} className="text-muted" />
+                        </span>
+                      </td>
+                      <td className="text-right font-bold text-cyan-200">{e.points} pts</td>
+                    </tr>
+                    {mine && (
+                      <tr>
+                        <td colSpan={3} className="!py-2 bg-black/20">
+                          <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5 px-1">{e.displayName}&apos;s points log · <a href={`/u/${e.slug}`} className="text-cyan-300 hover:underline">profile →</a></div>
+                          {log.length === 0 ? <div className="text-xs text-muted px-1">No scored events yet.</div> : (
+                            <div className="space-y-1">
+                              {log.map((ev) => (
+                                <div key={ev.id} className="flex items-center gap-2 text-xs px-1">
+                                  <Icon name={ev.points >= 0 ? "arrowUp" : "arrowDown"} size={11} className={ev.points >= 0 ? "text-emerald-300" : "text-rose-300"} />
+                                  <span className="text-muted flex-1 truncate">{ev.type.replace(/_/g, " ")}</span>
+                                  <span className="text-muted/70">{timeAgo(ev.at)}</span>
+                                  <span className={`font-bold w-12 text-right ${ev.points >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{ev.points >= 0 ? "+" : ""}{ev.points}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
