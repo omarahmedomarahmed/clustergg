@@ -18,6 +18,7 @@ export type ExploreChallenge = { id: string; title: string; coverUrl: string | n
 export type ExploreRegion = { key: string; label: string; short: string; color: string; count: number; gamers: { slug: string; name: string; avatar: string | null; ign: string }[] };
 export type PlanetExplore = {
   slug: string; name: string; game: string | null; hasChampions: boolean;
+  heroLayout: unknown; bgUrl: string | null;
   boards: ExploreBoard[]; championBoards: ChampBoard[]; challenges: ExploreChallenge[]; regions: ExploreRegion[];
 };
 
@@ -27,6 +28,7 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
   const [space] = await db.select().from(schema.spaces).where(eq(schema.spaces.slug, slug)).limit(1);
   if (!space) return null;
   const game = space.game ?? null;
+  const [gameRow] = game ? await db.select({ heroLayout: schema.games.heroLayout, planetBgUrl: schema.games.planetBgUrl, coverUrl: schema.games.coverUrl }).from(schema.games).where(eq(schema.games.name, game)).limit(1) : [];
   const providerIds = game ? PROVIDERS.filter((p) => p.game === game).map((p) => p.id) : [];
 
   // All connected accounts for this game (base for avatars, regions, champions).
@@ -114,5 +116,9 @@ export async function getPlanetExplore(db: DB, slug: string): Promise<PlanetExpl
   }
   const regions = [...regionMap.values()];
 
-  return { slug: space.slug, name: space.name, game, hasChampions: championBoards.length > 0, boards, championBoards, challenges, regions };
+  return {
+    slug: space.slug, name: space.name, game, hasChampions: championBoards.length > 0,
+    heroLayout: gameRow?.heroLayout ?? null, bgUrl: gameRow?.planetBgUrl ?? gameRow?.coverUrl ?? null,
+    boards, championBoards, challenges, regions,
+  };
 }

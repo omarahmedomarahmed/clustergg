@@ -1,20 +1,21 @@
 import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PROVIDERS } from "@/lib/providers/registry";
-import { prettyRegion, REGION_PALETTE, type RegionStat } from "@/lib/regions";
+import { prettyRegion, REGION_PALETTE, type RegionStat, type RegionGamer } from "@/lib/regions";
 import { regionsForGame, sameGame, defaultRegionCode } from "@/lib/game-regions";
+import { gameAvatarOf } from "@/lib/game-identity";
 import { slimImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
 
 export type PinMap = Record<string, { x: number; y: number; color: string; label: string }>;
-type RegionRow = { region: string | null; name: string; slug: string };
+type RegionRow = { region: string | null; name: string; slug: string; avatar?: string | null; ign?: string | null; providerData?: Record<string, unknown> | null };
 
 // Build globe regions from the REAL server/region codes providers return
 // (account.region), so pins map to actual game servers (EUW1, NA1, KR, …) — not
 // generic macro-regions. Positions come from the admin's saved pins; unplaced
 // servers are auto-spread around the globe so they're immediately draggable.
 export function computeRealRegions(rows: RegionRow[], pins: PinMap, fallbackCode?: string): RegionStat[] {
-  const byCode = new Map<string, { count: number; gamers: { name: string; slug: string }[] }>();
+  const byCode = new Map<string, { count: number; gamers: RegionGamer[] }>();
   for (const a of rows) {
     // Accounts whose provider didn't return a region still get placed — on the
     // game's default region — so their gamer never silently disappears.
@@ -23,7 +24,9 @@ export function computeRealRegions(rows: RegionRow[], pins: PinMap, fallbackCode
     let e = byCode.get(code);
     if (!e) { e = { count: 0, gamers: [] }; byCode.set(code, e); }
     e.count++;
-    if (e.gamers.length < 5 && !e.gamers.some((x) => x.slug === a.slug)) e.gamers.push({ name: a.name, slug: a.slug });
+    if (e.gamers.length < 8 && !e.gamers.some((x) => x.slug === a.slug)) {
+      e.gamers.push({ name: a.name, slug: a.slug, avatar: gameAvatarOf(a.providerData) ?? a.avatar ?? null, ign: a.ign ?? undefined });
+    }
   }
   // Include any admin-placed pins even if they currently have no gamers.
   for (const code of Object.keys(pins)) if (!byCode.has(code)) byCode.set(code, { count: 0, gamers: [] });
@@ -80,9 +83,12 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
     ? await db.selectDistinct({
         provider: schema.linkedGameAccounts.provider,
         region: schema.linkedGameAccounts.region,
+        ign: schema.linkedGameAccounts.inGameName,
+        providerData: schema.linkedGameAccounts.providerData,
         country: schema.users.country,
         name: schema.users.displayName,
         slug: schema.users.slug,
+        avatar: schema.users.avatarUrl,
       }).from(schema.linkedGameAccounts)
         .innerJoin(schema.users, eq(schema.linkedGameAccounts.userId, schema.users.id))
         .where(and(inArray(schema.linkedGameAccounts.provider, providerIds), eq(schema.users.status, "active")))
@@ -101,7 +107,7 @@ export async function buildSkinnedPlanets(db: Awaited<ReturnType<typeof getDb>>)
       if (regions.length === 0) {
         regions = regionsForGame(g.name).map((r) => {
           const pin = pins[r.code];
-          return { key: r.code, label: pin?.label || r.label, short: r.short, color: pin?.color || r.color, x: pin?.x ?? r.x, y: pin?.y ?? r.y, count: 0, gamers: [] as { name: string; slug: string }[] };
+          return { key: r.code, label: pin?.label || r.label, short: r.short, color: pin?.color || r.color, x: pin?.x ?? r.x, y: pin?.y ?? r.y, count: 0, gamers: [] as RegionGamer[] };
         });
       }
       const total = regions.reduce((sum, r) => sum + r.count, 0);

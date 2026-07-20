@@ -6,7 +6,8 @@
 export type EntityKind = "champion" | "hero" | "agent" | "weapon";
 export type EntityLite = { id: string; kind: EntityKind; name: string; image: string; role: string | null; tags: string[] };
 export type EntityAbility = { name: string; icon: string | null; desc: string };
-export type EntityDetail = EntityLite & { splash: string | null; lore: string | null; abilities: EntityAbility[]; meta: { label: string; value: string }[] };
+export type EntitySkin = { name: string; image: string };
+export type EntityDetail = EntityLite & { splash: string | null; lore: string | null; abilities: EntityAbility[]; skins: EntitySkin[]; meta: { label: string; value: string }[] };
 
 type Cache<T> = { v: T; exp: number } | null;
 async function pj<T = any>(url: string, ms = 8000): Promise<T> {
@@ -99,6 +100,7 @@ export async function getEntityDetail(game: string, kind: string, id: string): P
           ...(c.passive ? [{ name: c.passive.name, icon: `https://ddragon.leagueoflegends.com/cdn/${version}/img/passive/${c.passive.image?.full}`, desc: strip(c.passive.description) }] : []),
           ...((c.spells ?? []).map((s: any) => ({ name: s.name, icon: `https://ddragon.leagueoflegends.com/cdn/${version}/img/spell/${s.image?.full}`, desc: strip(s.description) }))),
         ],
+        skins: (c.skins ?? []).filter((s: any) => s.num !== 0 || (c.skins ?? []).length === 1).map((s: any) => ({ name: s.name === "default" ? c.name : s.name, image: `https://ddragon.leagueoflegends.com/cdn/img/champion/splash/${c.id}_${s.num}.jpg` })),
         meta: [{ label: "Title", value: c.title ?? "" }, { label: "Difficulty", value: `${c.info?.difficulty ?? "?"}/10` }, { label: "Roles", value: (c.tags ?? []).join(", ") }],
       };
     }
@@ -108,6 +110,7 @@ export async function getEntityDetail(game: string, kind: string, id: string): P
         id: a.uuid, kind: "agent", name: a.displayName, image: a.displayIcon, splash: a.fullPortrait || a.background || null,
         role: a.role?.displayName ?? null, tags: a.role?.displayName ? [a.role.displayName] : [], lore: a.description || null,
         abilities: (a.abilities ?? []).filter((ab: any) => ab.displayName).map((ab: any) => ({ name: `${ab.slot ? ab.slot + ": " : ""}${ab.displayName}`, icon: ab.displayIcon ?? null, desc: strip(ab.description) })),
+        skins: [],
         meta: [{ label: "Role", value: a.role?.displayName ?? "" }],
       };
     }
@@ -117,6 +120,7 @@ export async function getEntityDetail(game: string, kind: string, id: string): P
       return {
         id: w.uuid, kind: "weapon", name: w.displayName, image: w.displayIcon, splash: w.displayIcon,
         role: w.shopData?.categoryText ?? null, tags: [], lore: null, abilities: [],
+        skins: (w.skins ?? []).map((s: any) => ({ name: s.displayName, image: s.displayIcon || s.chromas?.[0]?.fullRender || s.chromas?.[0]?.displayIcon || s.levels?.[0]?.displayIcon })).filter((s: any) => s.image).slice(0, 40),
         meta: [
           { label: "Cost", value: w.shopData?.cost != null ? `${w.shopData.cost} creds` : "—" },
           { label: "Fire rate", value: stats?.fireRate != null ? `${stats.fireRate}/s` : "—" },
@@ -130,7 +134,7 @@ export async function getEntityDetail(game: string, kind: string, id: string): P
       const attr = h.primary_attr === "str" ? "Strength" : h.primary_attr === "agi" ? "Agility" : h.primary_attr === "int" ? "Intelligence" : "Universal";
       return {
         id: String(h.id), kind: "hero", name: h.localized_name, image: dotaImg(h.name), splash: dotaVert(h.name),
-        role: attr, tags: h.roles ?? [], lore: null, abilities: [],
+        role: attr, tags: h.roles ?? [], lore: null, abilities: [], skins: [],
         meta: [{ label: "Primary attribute", value: attr }, { label: "Attack", value: h.attack_type ?? "" }, { label: "Roles", value: (h.roles ?? []).join(", ") }],
       };
     }

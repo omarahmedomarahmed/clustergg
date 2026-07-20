@@ -425,6 +425,7 @@ export const games = pgTable("games", {
   accent: text("accent"),                              // primary accent color (hero glow/gradient)
   accent2: text("accent2"),                            // secondary accent
   planetLayout: text("planet_layout").notNull().default("auto"), // auto | globe | cover
+  heroLayout: jsonb("hero_layout").$type<unknown>(),   // admin-configured left/right hero sidebar modules
   sortOrder: integer("sort_order").notNull().default(0),
   showInNav: boolean("show_in_nav").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),

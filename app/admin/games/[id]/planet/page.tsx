@@ -6,6 +6,8 @@ import { buildSkinnedPlanets } from "@/lib/planets";
 import { regionsForGame } from "@/lib/game-regions";
 import PlanetPinEditor, { type EditablePin } from "@/components/PlanetPinEditor";
 import PlanetArtForm from "@/components/PlanetArtForm";
+import HeroLayoutEditor from "@/components/HeroLayoutEditor";
+import { and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Planet pins" };
@@ -17,6 +19,9 @@ export default async function AdminPlanetPinsPage({ params }: { params: Promise<
   if (!game) notFound();
 
   const pinOverrides = (game.planetPins ?? {}) as Record<string, { x: number; y: number; color: string; label: string }>;
+  // Leaderboards for this game — the metric options the hero-layout editor offers.
+  const gameBoards = await db.select({ metricKey: schema.leaderboards.metricKey, title: schema.leaderboards.title })
+    .from(schema.leaderboards).where(and(eq(schema.leaderboards.game, game.name), eq(schema.leaderboards.isActive, true)));
 
   // Prefer live region counts (from the same builder the hero uses); fall back
   // to defaults + saved overrides with zero counts when the game has no planet.
@@ -48,6 +53,12 @@ export default async function AdminPlanetPinsPage({ params }: { params: Promise<
       <div className="glass p-6">
         <h2 className="font-bold mb-3">Globe art</h2>
         <PlanetArtForm gameId={game.id} planetImageUrl={game.planetImageUrl} planetBgUrl={game.planetBgUrl} />
+      </div>
+
+      {/* Hero sidebars — what shows to the left and right of the globe. */}
+      <div className="glass p-6">
+        <h2 className="font-bold mb-1 flex items-center gap-2"><span>Hero sidebars</span></h2>
+        <HeroLayoutEditor gameId={game.id} game={game.name} initial={game.heroLayout} boards={gameBoards} />
       </div>
 
       {game.planetImageUrl ? (
