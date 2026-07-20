@@ -282,6 +282,7 @@ export const AR_TEXT: Record<string, string> = {
   "Explore all quests": "استكشف كل المهام",
   // Planet explorer (interactive globe) — reuses Challenges/Leaderboards/Live/etc above
   "Champion mastery": "إتقان الأبطال",
+  "Players": "اللاعبون",
   "Players by region": "اللاعبون حسب المنطقة",
   "Details": "التفاصيل",
   "Refresh": "تحديث",
