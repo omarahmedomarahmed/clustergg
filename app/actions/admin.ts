@@ -833,6 +833,22 @@ export async function savePlanetPins(gameId: string, _prev: ActionState, formDat
   return { ok: true, message: "Planet pins saved." };
 }
 
+// Save the planet hero sidebar layout (left/right modules + order) for a game.
+export async function saveHeroLayout(gameId: string, _prev: ActionState, formData: FormData): Promise<ActionState> {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const { normalizeHeroLayout } = await import("@/lib/hero-layout");
+  let parsed: unknown = null;
+  try { parsed = JSON.parse(String(formData.get("layout") ?? "null")); } catch { parsed = null; }
+  const layout = parsed ? normalizeHeroLayout(parsed) : null;
+  await db.update(schema.games).set({ heroLayout: layout as typeof schema.games.$inferInsert.heroLayout }).where(eq(schema.games.id, gameId));
+  await audit(admin.id, "game.hero_layout", "game", gameId);
+  revalidatePath("/admin/games");
+  revalidatePath("/planets");
+  revalidatePath("/");
+  return { ok: true, message: "Hero sidebar layout saved." };
+}
+
 // ---------- Partners ("Trusted by") ----------
 export async function savePartner(formData: FormData) {
   const admin = await requireStaff();
