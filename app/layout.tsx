@@ -7,6 +7,7 @@ import Starfield from "@/components/Starfield";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import { LocaleProvider } from "@/components/LocaleProvider";
 import CookieConsent from "@/components/CookieConsent";
 import QuestOrbMount from "@/components/QuestOrbMount";
 import RouteProgress from "@/components/RouteProgress";
@@ -73,6 +74,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html lang={locale} dir={dir} className={`${grotesk.variable} ${cairo.variable}`}>
       <body className={`nebula-bg min-h-screen antialiased ${locale === "ar" ? "font-arabic" : ""}`} style={cpIcon ? ({ ["--cp-icon" as string]: `url(${cpIcon})` }) : undefined}>
+        <LocaleProvider locale={locale}>
         <RouteProgress />
         <PageBackground map={bgMap} />
         <Starfield />
@@ -87,6 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <BottomNav loggedIn={!!me} globeUrl={planetsGlobe} />
         <QuestOrbMount />
         <CookieConsent />
+        </LocaleProvider>
       </body>
     </html>
   );
