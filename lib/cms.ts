@@ -86,23 +86,52 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.cpIcon": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260717_223629_251d5972-a1bc-4e38-8724-1ea35bf10f18.png",
 };
 
-export async function getContent(keys: string[]): Promise<Record<string, string>> {
+// Content is locale-aware: Arabic values live under a "<key>@ar" namespaced key
+// and OVERLAY the English value when the active locale is Arabic (empty ar value
+// falls back to English → the site is never blank while translation is ongoing).
+// The locale is auto-resolved from the request cookie so callers don't change;
+// pass `localeOverride` to force one (e.g. the admin translation editor).
+export async function getContent(keys: string[], localeOverride?: "en" | "ar"): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const k of keys) out[k] = CONTENT_DEFAULTS[k] ?? "";
+  let locale: "en" | "ar" = localeOverride ?? "en";
+  if (!localeOverride) {
+    try { const { getLocale } = await import("@/lib/i18n/server"); locale = await getLocale(); } catch { /* default en */ }
+  }
+  const fetchKeys = locale === "ar" ? [...keys, ...keys.map((k) => `${k}@ar`)] : keys;
   try {
     const db = await getDb();
     const rows = await db.select().from(schema.platformSettings)
-      .where(inArray(schema.platformSettings.key, keys));
-    for (const row of rows) {
-      if (typeof row.value === "string" && row.value) out[row.key] = row.value;
+      .where(inArray(schema.platformSettings.key, fetchKeys));
+    const map = new Map(rows.map((r) => [r.key, typeof r.value === "string" ? r.value : ""]));
+    for (const k of keys) {
+      const base = map.get(k);
+      if (typeof base === "string" && base) out[k] = base;
+      if (locale === "ar") { const ar = map.get(`${k}@ar`); if (ar) out[k] = ar; }
     }
   } catch { /* defaults already applied */ }
   return out;
 }
 
-export async function setContent(key: string, value: string) {
+// Read the raw stored value for a key in a specific locale (no fallback) — used
+// by the admin translation editor so it shows exactly what's saved.
+export async function getRawContent(keys: string[], locale: "en" | "ar"): Promise<Record<string, string>> {
+  const out: Record<string, string> = {};
+  const storeKeys = locale === "ar" ? keys.map((k) => `${k}@ar`) : keys;
+  try {
+    const db = await getDb();
+    const rows = await db.select().from(schema.platformSettings)
+      .where(inArray(schema.platformSettings.key, storeKeys));
+    const map = new Map(rows.map((r) => [r.key, typeof r.value === "string" ? r.value : ""]));
+    for (const k of keys) out[k] = map.get(locale === "ar" ? `${k}@ar` : k) ?? "";
+  } catch { /* empty */ }
+  return out;
+}
+
+export async function setContent(key: string, value: string, locale: "en" | "ar" = "en") {
+  const storeKey = locale === "ar" ? `${key}@ar` : key;
   const db = await getDb();
   await db.insert(schema.platformSettings)
-    .values({ key, value, updatedAt: new Date() })
+    .values({ key: storeKey, value, updatedAt: new Date() })
     .onConflictDoUpdate({ target: schema.platformSettings.key, set: { value, updatedAt: new Date() } });
 }
