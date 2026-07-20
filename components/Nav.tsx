@@ -89,8 +89,8 @@ export default async function Nav() {
   // "all planets" live in the mobile drawer for reachability.
   const mobileLinks = [
     ...(user ? [{ href: "/feed", label: "Home", icon: "home" }] : []),
-    { href: "/planets", label: "All planets", icon: "planet" },
-    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad" })),
+    ...(hidePlanets ? [] : [{ href: "/planets", label: "All planets", icon: "planet" }]),
+    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad", logoUrl: slimImg(g.logoUrl, 300000) })),
     ...(user ? [{ href: "/messages", label: "Messages", icon: "message" }] : []),
   ];
 
