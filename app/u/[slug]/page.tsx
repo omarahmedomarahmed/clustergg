@@ -25,6 +25,7 @@ import QuestCard from "@/components/QuestCard";
 import CpIcon from "@/components/CpIcon";
 import { getUserQuests } from "@/lib/quests";
 import { localizeQuest } from "@/lib/i18n/entities";
+import { levelFromCp } from "@/lib/level";
 import { startConversation } from "@/app/actions/social";
 import { fmtNum, timeAgo } from "@/lib/utils";
 
@@ -102,6 +103,9 @@ export default async function ProfilePage({ params }: Props) {
   ]);
 
   const profileQuests = (await getUserQuests(db, user.id)).map((q) => localizeQuest(q, te));
+  // Player level (from total Cluster Points) — makes the profile read as a game card.
+  const profileCp = profileQuests.reduce((s, q) => s + q.totalCp, 0);
+  const plvl = levelFromCp(profileCp);
   const games = await db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games);
   const gameCover = new Map(games.map((g) => [g.name, g.coverUrl]));
   const accountAvatar = (a: typeof accounts[number]): string | null => {
@@ -330,8 +334,16 @@ export default async function ProfilePage({ params }: Props) {
 
       <div className="mx-auto max-w-5xl px-4 relative" style={{ marginTop: -Math.round(theme.avatarSize * 0.42) }}>
         <div className="flex flex-col items-center text-center sm:flex-row sm:flex-wrap sm:items-end sm:text-left gap-4 sm:gap-5">
-          <div className="overflow-hidden border-2 shrink-0" style={{ borderColor: theme.accent, width: `min(${theme.avatarSize}px, 38vw)`, height: `min(${theme.avatarSize}px, 38vw)`, borderRadius: avatarClip(theme.avatarShape) ? 0 : (theme.avatarShape === "circle" ? "9999px" : theme.avatarShape === "rounded" ? "22%" : "10%"), clipPath: avatarClip(theme.avatarShape), WebkitClipPath: avatarClip(theme.avatarShape) }}>
-            <Avatar name={user.displayName} src={user.avatarUrl} size={theme.avatarSize} className="!rounded-none !h-full !w-full" />
+          <div className="relative shrink-0">
+            <div className="overflow-hidden border-2" style={{ borderColor: theme.accent, width: `min(${theme.avatarSize}px, 38vw)`, height: `min(${theme.avatarSize}px, 38vw)`, borderRadius: avatarClip(theme.avatarShape) ? 0 : (theme.avatarShape === "circle" ? "9999px" : theme.avatarShape === "rounded" ? "22%" : "10%"), clipPath: avatarClip(theme.avatarShape), WebkitClipPath: avatarClip(theme.avatarShape) }}>
+              <Avatar name={user.displayName} src={user.avatarUrl} size={theme.avatarSize} className="!rounded-none !h-full !w-full" />
+            </div>
+            {/* Player-level badge — game-card identity */}
+            <span className="absolute -bottom-1.5 -right-1.5 flex h-8 min-w-8 items-center justify-center rounded-full border-4 px-1.5 text-sm font-black text-white shadow-lg"
+              style={{ background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, borderColor: theme.bg }}
+              title={`Level ${plvl.level}`}>
+              {plvl.level}
+            </span>
           </div>
           <div className="min-w-0 w-full sm:flex-1 sm:w-auto pb-1">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center justify-center sm:justify-start gap-2 flex-wrap break-words" style={{ color: theme.text }}>
@@ -343,6 +355,16 @@ export default async function ProfilePage({ params }: Props) {
             {user.discordUsername && <div className="mt-1.5 flex justify-center sm:justify-start"><DiscordTag username={user.discordUsername} size="md" /></div>}
             <div className="flex items-center justify-center sm:justify-start gap-2 text-xs sm:text-sm p-muted mt-1.5">
               <span className="truncate">clustergg.com/u/{user.slug}</span><CopyLinkButton path={`/u/${user.slug}`} />
+            </div>
+            {/* XP bar — level progress toward the next level */}
+            <div className="mt-2.5 max-w-xs mx-auto sm:mx-0">
+              <div className="flex items-center justify-between text-[10px] font-bold mb-1">
+                <span style={{ color: theme.accent2 }}>{tr("Level")} {plvl.level}</span>
+                <span className="p-muted">{plvl.into.toLocaleString()} / {plvl.span.toLocaleString()} CP</span>
+              </div>
+              <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.10)" }}>
+                <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(5, plvl.pct)}%`, background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
+              </div>
             </div>
           </div>
           <div className="flex gap-3 pb-1 w-full sm:w-auto justify-center">

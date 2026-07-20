@@ -186,6 +186,7 @@ export const AR_TEXT: Record<string, string> = {
   "Message": "مراسلة",
   "Join to follow": "انضم للمتابعة",
   "Top": "أفضل",
+  "Level": "المستوى",
   "CHAMPION": "البطل",
   "PLACE": "المركز",
   // Leaderboards
@@ -459,7 +460,7 @@ export const PAGE_STRINGS: { page: string; strings: string[] }[] = [
   { page: "Challenges", strings: ["Live standings & scoring log", "Prize pool", "Winners display this trophy on their profile forever.", "How scoring works", "How to win", "Prize", "Top standings", "No competitors yet — be the first to join.", "Full challenge page", "Ended", "Live now", "Back to planet", "Live event", "challenge", "Winner takes all", "Top 3 podium", "Threshold race", "ends in", "Game", "Starts", "Ends", "Scoring", "Sign up to compete", "You're in — go play", "Points sync automatically.", "You need a linked", "account —", "link it on your profile", "Locked — earn", "badge to enter", "badges to enter", "You have", "Complete the", "quest", "more time", "more times", "to unlock this challenge.", "badges", "you qualify", "Join with", "Your stats are snapshotted when you join. Only", "new", "activity counts.", "Every sync pulls fresh data from the", "API and the board updates in real time.", "Qualification:"] },
   { page: "Notifications", strings: ["Notifications", "Mark all read", "All quiet on the cosmic front."] },
   { page: "Profile", strings: ["Your", "profile", "Make this page yours, then connect your games.", "Everything saves to your public link.", "View live profile", "Your game accounts"] },
-  { page: "Public profile", strings: ["Follow", "Following", "views", "followers", "following", "trophy case", "challenges", "recent posts", "planets", "quests progress", "total CP", "Leaderboard →", "Admin view —", "manage this user in Mission Control", "Customize", "Message", "Join to follow", "Top", "CHAMPION", "PLACE", "Live", "ends", "pts"] },
+  { page: "Public profile", strings: ["Follow", "Following", "views", "followers", "following", "trophy case", "challenges", "recent posts", "planets", "quests progress", "total CP", "Leaderboard →", "Admin view —", "manage this user in Mission Control", "Customize", "Message", "Join to follow", "Top", "Level", "CHAMPION", "PLACE", "Live", "ends", "pts"] },
   { page: "Leaderboards", strings: ["Leaderboards", "No leaderboards configured yet.", "Galaxy", "Real, API-verified rankings across every game. Pick a planet.", "leaderboards", "Visit planet →"] },
   { page: "Search", strings: ["Scan the", "galaxy", "Search gamers, spaces, posts…", "Gamers", "Planets", "Posts", "No gamers found.", "No planets found.", "No posts found."] },
   { page: "Messages", strings: ["Messages", "No transmissions yet. Visit a", "gamer's profile", "and hit Message.", "New conversation", "Transmit a message…", "Send"] },
