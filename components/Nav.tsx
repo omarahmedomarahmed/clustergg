@@ -13,6 +13,7 @@ import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
 import LocaleToggle from "@/components/LocaleToggle";
 import MobileHud from "@/components/MobileHud";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
+import { parseDrawerLinks } from "@/lib/mobile-nav";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
 import { slimImg } from "@/lib/img";
@@ -83,7 +84,7 @@ export default async function Nav() {
   // Quest cards fill the nav between the game logos and the right-hand controls.
   const navQuests = await getNavQuests(db, user?.id ?? null, 4);
   const totalCp = user ? await getTotalCp(db, user.id) : 0;
-  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode"]);
+  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode", "mobile.drawer.extra"]);
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
   const hidePlanets = brand["brand.nav.hidePlanets"] === "1";
@@ -97,11 +98,14 @@ export default async function Nav() {
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and
   // "all planets" live in the mobile drawer for reachability.
+  const drawerExtra = parseDrawerLinks(brand["mobile.drawer.extra"]);
   const mobileLinks = [
     ...(user ? [{ href: "/feed", label: t("nav.home"), icon: "home" }] : []),
     ...(hidePlanets ? [] : [{ href: "/planets", label: t("nav.allPlanets"), icon: "planet" }]),
-    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad", logoUrl: slimImg(g.logoUrl, 300000) })),
+    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad", logoUrl: slimImg(g.logoUrl, 300000) as string | null })),
     ...(user ? [{ href: "/messages", label: t("nav.messages"), icon: "message" }] : []),
+    // Admin-defined extra drawer links (Admin → Mobile chrome).
+    ...drawerExtra,
   ];
 
   return (
