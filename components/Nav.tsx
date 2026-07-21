@@ -83,10 +83,16 @@ export default async function Nav() {
   // Quest cards fill the nav between the game logos and the right-hand controls.
   const navQuests = await getNavQuests(db, user?.id ?? null, 4);
   const totalCp = user ? await getTotalCp(db, user.id) : 0;
-  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets"]);
+  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode"]);
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
   const hidePlanets = brand["brand.nav.hidePlanets"] === "1";
+  // The uploaded brand lockup for the mobile drawer (falls back to the mark, then
+  // the built-in wordmark text) — mirrors BrandHeader so the drawer never shows
+  // the placeholder "CLUSTER" text when a wordmark/logo is uploaded.
+  const brandMode = brand["brand.nav.mode"] || "both";
+  const drawerWordmark = brandMode !== "mark" ? (brand["brand.wordmark"] || null) : null;
+  const drawerMark = brand["brand.logo"] || "/assets/logo.png";
   const { locale, t } = await getT(user?.locale ?? null);
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and
@@ -161,7 +167,7 @@ export default async function Nav() {
               </a>
             </>
           )}
-          <MobileMenu links={mobileLinks} loggedIn={!!user} profileSlug={user?.slug ?? null} />
+          <MobileMenu links={mobileLinks} loggedIn={!!user} profileSlug={user?.slug ?? null} wordmarkUrl={drawerWordmark} markUrl={drawerMark} />
         </div>
       </div>
 
