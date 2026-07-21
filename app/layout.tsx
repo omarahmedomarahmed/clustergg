@@ -18,6 +18,7 @@ import { parseBottomTabs } from "@/lib/mobile-nav";
 import { getCurrentUser } from "@/lib/auth";
 import { PAGE_BG_KEYS, pageBgCmsKeys } from "@/lib/page-bg";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const grotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-grotesk" });
 // Arabic-capable webfont, applied when the site is in RTL/Arabic mode.
@@ -96,6 +97,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <CookieConsent />
         </LocaleProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
