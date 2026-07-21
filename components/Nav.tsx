@@ -13,6 +13,7 @@ import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
 import LocaleToggle from "@/components/LocaleToggle";
 import MobileHud from "@/components/MobileHud";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
+import { parseDrawerLinks } from "@/lib/mobile-nav";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
 import { slimImg } from "@/lib/img";
@@ -83,19 +84,28 @@ export default async function Nav() {
   // Quest cards fill the nav between the game logos and the right-hand controls.
   const navQuests = await getNavQuests(db, user?.id ?? null, 4);
   const totalCp = user ? await getTotalCp(db, user.id) : 0;
-  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets"]);
+  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode", "mobile.drawer.extra"]);
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
   const hidePlanets = brand["brand.nav.hidePlanets"] === "1";
+  // The uploaded brand lockup for the mobile drawer (falls back to the mark, then
+  // the built-in wordmark text) — mirrors BrandHeader so the drawer never shows
+  // the placeholder "CLUSTER" text when a wordmark/logo is uploaded.
+  const brandMode = brand["brand.nav.mode"] || "both";
+  const drawerWordmark = brandMode !== "mark" ? (brand["brand.wordmark"] || null) : null;
+  const drawerMark = brand["brand.logo"] || "/assets/logo.png";
   const { locale, t } = await getT(user?.locale ?? null);
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and
   // "all planets" live in the mobile drawer for reachability.
+  const drawerExtra = parseDrawerLinks(brand["mobile.drawer.extra"]);
   const mobileLinks = [
     ...(user ? [{ href: "/feed", label: t("nav.home"), icon: "home" }] : []),
     ...(hidePlanets ? [] : [{ href: "/planets", label: t("nav.allPlanets"), icon: "planet" }]),
-    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad", logoUrl: slimImg(g.logoUrl, 300000) })),
+    ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad", logoUrl: slimImg(g.logoUrl, 300000) as string | null })),
     ...(user ? [{ href: "/messages", label: t("nav.messages"), icon: "message" }] : []),
+    // Admin-defined extra drawer links (Admin → Mobile chrome).
+    ...drawerExtra,
   ];
 
   return (
@@ -161,7 +171,7 @@ export default async function Nav() {
               </a>
             </>
           )}
-          <MobileMenu links={mobileLinks} loggedIn={!!user} profileSlug={user?.slug ?? null} />
+          <MobileMenu links={mobileLinks} loggedIn={!!user} profileSlug={user?.slug ?? null} wordmarkUrl={drawerWordmark} markUrl={drawerMark} />
         </div>
       </div>
 

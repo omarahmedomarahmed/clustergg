@@ -14,6 +14,7 @@ import QuestOrbMount from "@/components/QuestOrbMount";
 import RouteProgress from "@/components/RouteProgress";
 import PageBackground from "@/components/PageBackground";
 import { getContent } from "@/lib/cms";
+import { parseBottomTabs } from "@/lib/mobile-nav";
 import { getCurrentUser } from "@/lib/auth";
 import { PAGE_BG_KEYS, pageBgCmsKeys } from "@/lib/page-bg";
 
@@ -63,11 +64,12 @@ export const viewport: Viewport = { themeColor: "#04051a" };
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Per-page custom backgrounds (Admin → Page backgrounds). Fetched once here
   // and handed to a client picker so navigation never re-fetches.
-  const bgContent = await getContent([...pageBgCmsKeys, "brand.cpIcon", "brand.nav.planetsIcon"]).catch(() => ({} as Record<string, string>));
+  const bgContent = await getContent([...pageBgCmsKeys, "brand.cpIcon", "brand.nav.planetsIcon", "mobile.bottomnav"]).catch(() => ({} as Record<string, string>));
   const bgMap: Record<string, string> = {};
   for (const k of PAGE_BG_KEYS) bgMap[k] = bgContent[`page.bg.${k}`] || "";
   const cpIcon = bgContent["brand.cpIcon"];
   const planetsGlobe = bgContent["brand.nav.planetsIcon"] || "";
+  const bottomTabs = parseBottomTabs(bgContent["mobile.bottomnav"]);
   const me = await getCurrentUser().catch(() => null);
   const locale = await getLocale(me?.locale);
   const dir = dirOf(locale);
@@ -88,7 +90,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main className="flex-1 pb-20 md:pb-0">{children}</main>
           <Footer />
         </div>
-        <BottomNav loggedIn={!!me} globeUrl={planetsGlobe} />
+        <BottomNav loggedIn={!!me} globeUrl={planetsGlobe} tabs={bottomTabs ?? undefined} />
         <QuestOrbMount />
         <CookieConsent />
         </LocaleProvider>

@@ -24,6 +24,7 @@ const NAV: { section: string; area?: string; items: { href: string; label: strin
       { href: "/admin/backgrounds", label: "Page backgrounds" },
       { href: "/admin/cards", label: "Card backgrounds" },
       { href: "/admin/brand-kit", label: "Logos & brand kit" },
+      { href: "/admin/mobile", label: "Mobile chrome (nav/drawer)" },
       { href: "/admin/creative-studio", label: "Creative studio" },
       { href: "/admin/partners", label: "Partners" },
     ],

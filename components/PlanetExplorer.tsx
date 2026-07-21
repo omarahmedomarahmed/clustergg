@@ -61,7 +61,17 @@ export default function PlanetExplorer({
   const [tilt, setTilt] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(false);
   const [mtab, setMtab] = useState(0); // active segment on the mobile layout
+  const [sheetFull, setSheetFull] = useState(false); // mobile detail sheet: expanded to (near) full screen
+  const sheetTouchY = useRef(0);
   const frame = useRef<HTMLDivElement>(null);
+
+  // Swipe the mobile detail sheet up to enlarge, down to shrink/close.
+  const onSheetTouchStart = (e: React.TouchEvent) => { sheetTouchY.current = e.touches[0].clientY; };
+  const onSheetTouchEnd = (e: React.TouchEvent) => {
+    const dy = e.changedTouches[0].clientY - sheetTouchY.current;
+    if (dy < -40) setSheetFull(true);
+    else if (dy > 50) { if (sheetFull) setSheetFull(false); else setSel(null); }
+  };
 
   const load = useCallback(async (slug: string) => {
     setLoading(true);
@@ -338,22 +348,31 @@ export default function PlanetExplorer({
         })()}
       </div>
 
-      {/* ===== Mobile detail sheet — anything tapped slides up from the bottom ===== */}
+      {/* ===== Mobile detail sheet — slides up from the bottom, fills most of the
+          screen, sits ABOVE the bottom nav, and can be swiped/tapped to full ===== */}
       {sel && (
-        <div className="md:hidden fixed inset-0 z-50 flex items-end" onClick={() => setSel(null)}>
+        <div className="md:hidden fixed inset-0 z-[70] flex items-end" onClick={() => setSel(null)}>
           <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
-          <div className="relative w-full max-h-[86vh] overflow-y-auto rounded-t-3xl border-t border-white/15 shadow-2xl p-3 pb-10 rise-in"
-            style={{ background: middleBg ? `linear-gradient(rgba(4,5,26,0.94), rgba(4,5,26,0.97)), url(${middleBg}) center/cover` : "#05061c" }}
+          <div className="relative w-full rounded-t-3xl border-t border-white/15 shadow-2xl flex flex-col rise-in transition-[height] duration-300"
+            style={{ height: sheetFull ? "96dvh" : "82dvh", background: middleBg ? `linear-gradient(rgba(4,5,26,0.94), rgba(4,5,26,0.97)), url(${middleBg}) center/cover` : "#05061c" }}
             onClick={(e) => e.stopPropagation()}>
-            <div className="mx-auto mb-2.5 h-1.5 w-11 rounded-full bg-white/25" />
-            <div className="flex items-center justify-between px-1 pb-2 mb-1 border-b border-white/10">
+            {/* Grab handle — tap or swipe up to enlarge, swipe down to shrink/close */}
+            <div className="shrink-0 pt-2.5 pb-1.5 cursor-grab select-none" onClick={() => setSheetFull((v) => !v)}
+              onTouchStart={onSheetTouchStart} onTouchEnd={onSheetTouchEnd}>
+              <div className="mx-auto h-1.5 w-11 rounded-full bg-white/30" />
+            </div>
+            <div className="shrink-0 flex items-center justify-between px-3 pb-2 border-b border-white/10">
               <span className="text-[11px] uppercase tracking-widest text-cyan-200">{tr("Details")}</span>
               <div className="flex items-center gap-1.5">
+                <button onClick={() => setSheetFull((v) => !v)} title="Expand" className="text-muted p-1.5"><Icon name={sheetFull ? "arrowDown" : "arrowUp"} size={17} /></button>
                 <button onClick={refresh} title={tr("Refresh")} className="text-muted p-1.5"><Icon name="satellite" size={16} className={loading ? "animate-spin" : ""} /></button>
                 <button onClick={() => setSel(null)} title={tr("Close")} className="text-muted p-1.5"><Icon name="x" size={20} /></button>
               </div>
             </div>
-            <Stage sel={sel} data={data} game={game} onGamer={openGamer} onOpenEntity={(e) => setSel({ kind: "entity", entityKind: e.kind, id: e.id, name: e.name, image: e.image })} onBack={() => setSel(null)} />
+            {/* Scroll area — extra bottom room so nothing hides under the bottom nav */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-3" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 6rem)" }}>
+              <Stage sel={sel} data={data} game={game} onGamer={openGamer} onOpenEntity={(e) => setSel({ kind: "entity", entityKind: e.kind, id: e.id, name: e.name, image: e.image })} onBack={() => setSel(null)} />
+            </div>
           </div>
         </div>
       )}
