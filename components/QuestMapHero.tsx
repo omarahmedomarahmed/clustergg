@@ -4,11 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
+import { useTr } from "@/components/LocaleProvider";
 import TopBannerAd from "@/components/TopBannerAd";
 import ZoomPan from "@/components/ZoomPan";
 import CpIcon from "@/components/CpIcon";
 import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
+import QuestGame, { type QuestRule, type QuestLogEntry } from "@/components/QuestGame";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
@@ -16,7 +18,7 @@ import type { QuestView, QuestGamer } from "@/lib/quests";
 // path as you progress (bronze → platinum), a per-quest space backdrop, and a
 // glorified toggle to switch to another quest's map.
 export default function QuestMapHero({
-  quest, tierHolders, tabs, toggle, backHref, variants, totalCp, rocketUrl,
+  quest, tierHolders, tabs, toggle, backHref, variants, totalCp, rocketUrl, game,
 }: {
   quest: QuestView;
   tierHolders: Record<string, QuestGamer[]>;
@@ -25,6 +27,9 @@ export default function QuestMapHero({
   backHref?: string;
   totalCp?: number;
   rocketUrl?: string;
+  // When provided, the map becomes PLAYABLE: clicking the art or any milestone
+  // opens the full-screen quest game popup (web + mobile).
+  game?: { rules: QuestRule[]; log: QuestLogEntry[]; totalCp: number };
   // When provided, the quest tabs switch the map IN-FRAME (feed/home) instead
   // of navigating to the quest page.
   variants?: { key: string; quest: QuestView; tierHolders: Record<string, QuestGamer[]> }[];
@@ -32,6 +37,10 @@ export default function QuestMapHero({
   const [sel, setSel] = useState<number | null>(null);
   const [howto, setHowto] = useState(false);
   const [activeKey, setActiveKey] = useState(quest.key);
+  const [play, setPlay] = useState(false);
+  const [playTier, setPlayTier] = useState<number | null>(null);
+  const openGame = (tier: number | null) => { setPlayTier(tier); setSel(null); setPlay(true); };
+  const tr = useTr();
   const inFrame = !!variants && variants.length > 0;
   const active = inFrame ? (variants!.find((v) => v.key === activeKey) ?? variants![0]) : null;
   const q = active ? active.quest : quest;
@@ -172,6 +181,8 @@ export default function QuestMapHero({
           <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
           {/* readability veil */}
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.15), rgba(4,5,26,0.45))" }} />
+          {/* Playable: tapping the map art itself launches the quest game */}
+          {game && <button aria-label={tr("Play quest")} onClick={() => openGame(null)} className="absolute inset-0 cursor-pointer" />}
 
           {/* Curved trail the astronaut rides (admin-editable path, else the pins) */}
           {curveD && (
@@ -184,7 +195,7 @@ export default function QuestMapHero({
           {tiers.map((t, i) => {
             const active = sel === i;
             return (
-              <button key={t.id} onClick={() => setSel(active ? null : i)}
+              <button key={t.id} onClick={() => (game ? openGame(i) : setSel(active ? null : i))}
                 title={`${t.name} · ${t.thresholdQp} CP`}
                 className="absolute -translate-x-1/2 -translate-y-1/2 group"
                 style={{ left: `${t.mapX}%`, top: `${t.mapY}%` }}>
@@ -226,6 +237,14 @@ export default function QuestMapHero({
             </span>
           </div>
           </ZoomPan>
+
+          {/* PLAY — launches the full-screen quest game (web + mobile popup) */}
+          {game && (
+            <button type="button" onClick={() => openGame(null)}
+              className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 glow-btn pressable inline-flex items-center gap-2 rounded-full px-7 py-2.5 text-sm font-bold text-white shadow-xl">
+              <Icon name="play" size={14} /> {tr("Play quest")}
+            </button>
+          )}
 
           {/* How-to-play button — opens an overlay with the quest description */}
           <button type="button" onClick={() => setHowto((v) => !v)}
@@ -284,6 +303,12 @@ export default function QuestMapHero({
           ))}
         </div>
       </div>
+
+      {/* The full-screen playable quest game (popup overlay, web + mobile) */}
+      {game && play && (
+        <QuestGame quest={q} holders={holders} rules={game.rules} log={game.log} totalCp={game.totalCp}
+          rocketUrl={rocketUrl} initialTier={playTier} onClose={() => setPlay(false)} />
+      )}
     </section>
   );
 }

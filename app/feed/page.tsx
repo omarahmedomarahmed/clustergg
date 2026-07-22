@@ -141,7 +141,7 @@ export default async function FeedPage() {
     <div className="profile-root relative" style={{ ...(themeToVars(theme) as React.CSSProperties), background: theme.bgImage ? "transparent" : undefined }}>
       {/* The gamer's own profile background — feed feels like their page */}
       {theme.bgImage && <div aria-hidden className="fixed inset-0 -z-10" style={bgLayerStyle(theme)} />}
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 pt-8">
       {/* ===== Gamer control panel (themed with the gamer's profile) ===== */}
       <FeedControlPanel
         me={{ displayName: user.displayName, slug: user.slug, avatarUrl: user.avatarUrl, bannerUrl: user.bannerUrl ?? null, title: user.title ?? null }}
@@ -161,18 +161,68 @@ export default async function FeedPage() {
 
       <AdSlot placement="feed_top_banner" className="mb-8" />
 
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-        {/* ===== Main column ===== */}
-        <div className="min-w-0 space-y-8">
-          {/* Explore planets / quests — interactive globe ⇄ quest map */}
-          {skinnedPlanets.length > 0 && (
-            <section>
-              <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="planet" size={18} className="text-cyan-300" /> {t("feed.explore")}</h2>
-              <div className="rounded-2xl overflow-hidden border border-violet-400/15">
-                <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="Tap a game to explore its planet" quest={questHero} compact />
-              </div>
-            </section>
+      {/* ===== My planets + Explore planets — ON TOP of the hero, side by side ===== */}
+      <div className="grid sm:grid-cols-2 gap-4 mb-8">
+        {/* My planets */}
+        <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_myplanets") }}>
+          <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="planet" size={15} className="text-cyan-300" /> {t("feed.myPlanets")}</h3>
+          {mySpaceRows.length === 0 ? (
+            <p className="text-xs text-muted">You haven&apos;t joined any planets yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {mySpaceRows.map(({ s }) => {
+                const g = s.game ? gameByName.get(s.game) : undefined;
+                const cover = slimImg(g?.coverUrl ?? null);
+                return (
+                  <Link key={s.id} href={`/planets/${s.slug}`} className="relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/10 p-2 group">
+                    {cover && <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-35 group-hover:opacity-50 transition-opacity" style={{ backgroundImage: `url(${cover})` }} />}
+                    <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.85), rgba(4,5,26,0.55))" }} />
+                    {g ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={28} rounded="rounded-lg" className="relative ring-1 ring-white/15" /> : <span className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
+                    <span className="relative text-sm font-semibold truncate">{s.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
           )}
+        </div>
+
+        {/* Explore planets */}
+        <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_explore") }}>
+          <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="rocket" size={15} className="text-violet-300" /> Explore planets</h3>
+          <div className="space-y-2">
+            {suggested.map((s) => {
+              const g = s.game ? gameByName.get(s.game) : undefined;
+              const cover = slimImg(g?.coverUrl ?? null);
+              return (
+                <Link key={s.id} href={`/planets/${s.slug}`} className="relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/10 p-2 group">
+                  {cover && <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-35 group-hover:opacity-50 transition-opacity" style={{ backgroundImage: `url(${cover})` }} />}
+                  <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.85), rgba(4,5,26,0.55))" }} />
+                  {g ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={28} rounded="rounded-lg" className="relative ring-1 ring-white/15" /> : <span className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
+                  <span className="relative text-sm font-semibold truncate flex-1">{s.name}</span>
+                  <Icon name="chevronRight" size={14} className="relative text-muted" />
+                </Link>
+              );
+            })}
+          </div>
+          <Link href="/planets" className="mt-3 block text-center text-xs text-cyan-300 hover:underline">See all planets</Link>
+        </div>
+      </div>
+      </div>
+
+      {/* ===== Planets/quests hero — FULL WIDTH of the screen, undivided ===== */}
+      {skinnedPlanets.length > 0 && (
+        <section className="w-full mb-8">
+          <div className="mx-auto max-w-6xl px-4">
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="planet" size={18} className="text-cyan-300" /> {t("feed.explore")}</h2>
+          </div>
+          <div className="w-full border-y border-violet-400/15 overflow-hidden">
+            <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="Tap a game to explore its planet" quest={questHero} compact />
+          </div>
+        </section>
+      )}
+
+      <div className="mx-auto max-w-6xl px-4 pb-8">
+        <div className="space-y-8">
 
           {/* Live challenges */}
           {liveChallenges.length > 0 && (
@@ -239,57 +289,8 @@ export default async function FeedPage() {
               </div>
             )}
           </section>
-        </div>
-
-        {/* ===== Rail ===== */}
-        <aside className="space-y-6">
-          {/* My planets */}
-          <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_myplanets") }}>
-            <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="planet" size={15} className="text-cyan-300" /> {t("feed.myPlanets")}</h3>
-            {mySpaceRows.length === 0 ? (
-              <p className="text-xs text-muted">You haven&apos;t joined any planets yet.</p>
-            ) : (
-              <div className="space-y-2">
-                {mySpaceRows.map(({ s }) => {
-                  const g = s.game ? gameByName.get(s.game) : undefined;
-                  const cover = slimImg(g?.coverUrl ?? null);
-                  return (
-                    <Link key={s.id} href={`/planets/${s.slug}`} className="relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/10 p-2 group">
-                      {cover && <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-35 group-hover:opacity-50 transition-opacity" style={{ backgroundImage: `url(${cover})` }} />}
-                      <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.85), rgba(4,5,26,0.55))" }} />
-                      {g ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={28} rounded="rounded-lg" className="relative ring-1 ring-white/15" /> : <span className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
-                      <span className="relative text-sm font-semibold truncate">{s.name}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Explore planets */}
-          <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_explore") }}>
-            <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="rocket" size={15} className="text-violet-300" /> Explore planets</h3>
-            <div className="space-y-2">
-              {suggested.map((s) => {
-                const g = s.game ? gameByName.get(s.game) : undefined;
-                const cover = slimImg(g?.coverUrl ?? null);
-                return (
-                  <Link key={s.id} href={`/planets/${s.slug}`} className="relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/10 p-2 group">
-                    {cover && <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-35 group-hover:opacity-50 transition-opacity" style={{ backgroundImage: `url(${cover})` }} />}
-                    <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.85), rgba(4,5,26,0.55))" }} />
-                    {g ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={28} rounded="rounded-lg" className="relative ring-1 ring-white/15" /> : <span className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
-                    <span className="relative text-sm font-semibold truncate flex-1">{s.name}</span>
-                    <Icon name="chevronRight" size={14} className="relative text-muted" />
-                  </Link>
-                );
-              })}
-            </div>
-            <Link href="/planets" className="mt-3 block text-center text-xs text-cyan-300 hover:underline">See all planets</Link>
-          </div>
-
           <AdSlot placement="feed_sidebar" />
-        </aside>
-      </div>
+        </div>
       </div>
     </div>
   );
