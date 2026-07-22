@@ -44,6 +44,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     thresholdTarget: challenge.thresholdTarget, startAt: challenge.startAt.toISOString(), endAt: challenge.endAt.toISOString(),
     coverUrl: challenge.coverUrl, coverAdjust: (challenge.coverAdjust ?? { zoom: 1, x: 50, y: 50 }) as { zoom: number; x: number; y: number },
     trophyId: challenge.trophyId, status: challenge.status, prizeDescription: challenge.prizeDescription,
+    prizes: challenge.prizes ?? null,
     gateQuestId: challenge.gateQuestId, gateMinBadges: challenge.gateMinBadges ?? 0,
   };
 

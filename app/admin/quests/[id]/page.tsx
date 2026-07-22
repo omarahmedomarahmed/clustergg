@@ -9,6 +9,7 @@ import Icon from "@/components/Icon";
 import SubmitButton from "@/components/SubmitButton";
 import QuestMapPinEditor from "@/components/QuestMapPinEditor";
 import QuestPathEditor from "@/components/QuestPathEditor";
+import QuestGameScreensEditor from "@/components/QuestGameScreensEditor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Edit quest" };
@@ -47,6 +48,14 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
           <ImageUpload name="logoUrl" defaultValue={quest.logoUrl ?? ""} label="Quest emblem" aspect="1/1" rounded="rounded-xl" maxDim={512} scope="quest" hint="Square logo shown on cards + orb." />
           <ImageUpload name="cardBgUrl" defaultValue={quest.cardBgUrl ?? ""} label="Card / hero space background" aspect="16/9" maxDim={1400} scope="quest" hint="Themed space art behind the card + quest map hero." />
           <ImageUpload name="mapArtUrl" defaultValue={quest.mapArtUrl ?? ""} label="Quest map art (treasure map)" aspect="16/9" maxDim={1800} scope="quest" hint="The map shown as the standalone quest-page hero; place tier pins on it below." />
+          <label className="block text-xs text-muted">
+            Animated map (looping mp4) — plays instead of the still art everywhere the map shows
+            <input name="mapVideoUrl" defaultValue={quest.mapVideoUrl ?? ""} placeholder="https://…/map-loop.mp4 (blank = still art)" className="input-cosmic mt-1 w-full !py-1.5 text-sm" />
+          </label>
+          <label className="block text-xs text-muted">
+            3D terrain mesh (GLB) — enables the in-game 3D view of this map
+            <input name="mapGlbUrl" defaultValue={quest.mapGlbUrl ?? ""} placeholder="https://…/terrain.glb (blank = no 3D view)" className="input-cosmic mt-1 w-full !py-1.5 text-sm" />
+          </label>
           <ImageUpload name="coverUrl" defaultValue={quest.coverUrl ?? ""} label="Cover banner (optional)" aspect="16/9" maxDim={1600} scope="quest" hint="Wide banner." />
         </div>
 
@@ -93,9 +102,20 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
             accent={quest.accent2 || quest.color}
             milestones={tiers.map((t) => ({ id: t.id, name: t.name, color: t.color ?? quest.color, x: t.mapX, y: t.mapY }))}
             initial={Array.isArray(quest.pathPoints) ? quest.pathPoints : []}
+            initialMobile={Array.isArray(quest.pathPointsMobile) ? quest.pathPointsMobile : []}
           />
         </div>
       )}
+
+      {/* The playable game's screens: panel art/titles/buttons + starter missions */}
+      <div className="glass p-6">
+        <h2 className="font-bold mb-1 flex items-center gap-2"><Icon name="gamepad" size={16} className="text-cyan-300" /> Game screens (playable quest)</h2>
+        <QuestGameScreensEditor
+          questId={quest.id}
+          initialUi={(quest.gameUi ?? null) as import("@/lib/quest-game").QuestGameUi | null}
+          initialMissions={(quest.missionsConfig ?? null) as import("@/lib/quest-game").MissionConfig[] | null}
+        />
+      </div>
 
       {/* Tiers (badges) */}
       <div className="glass p-6">

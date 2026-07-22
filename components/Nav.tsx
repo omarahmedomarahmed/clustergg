@@ -93,7 +93,9 @@ export default async function Nav() {
   // the placeholder "CLUSTER" text when a wordmark/logo is uploaded.
   const brandMode = brand["brand.nav.mode"] || "both";
   const drawerWordmark = brandMode !== "mark" ? (brand["brand.wordmark"] || null) : null;
-  const drawerMark = brand["brand.logo"] || "/assets/logo.png";
+  // Only pass a real uploaded mark — the built-in placeholder path doesn't exist
+  // as a file, so leaving it null lets the drawer show the gradient CLUSTER text.
+  const drawerMark = brand["brand.logo"] && brand["brand.logo"] !== "/assets/logo.png" ? brand["brand.logo"] : null;
   const { locale, t } = await getT(user?.locale ?? null);
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and

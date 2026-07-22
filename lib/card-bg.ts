@@ -9,6 +9,10 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "notification", label: "Notification cards", note: "Rows on the notifications page." },
   { key: "feed_myplanets", label: "Feed · My planets card", note: "Right-rail 'My planets' card on the feed." },
   { key: "feed_explore", label: "Feed · Explore planets card", note: "Right-rail 'Explore planets' card on the feed." },
+  { key: "quest_rules", label: "Quest game · Rules screen", note: "Background art of the in-game 'Rules' panel (how CP is earned)." },
+  { key: "quest_log", label: "Quest game · My log screen", note: "Background art of the in-game CP history panel." },
+  { key: "quest_guide", label: "Quest game · Guide screen", note: "Background art of the in-game how-to-play panel." },
+  { key: "quest_missions", label: "Quest game · Missions screen", note: "Background art of the in-game starter-missions panel." },
 ];
 
 export const CARD_BG_KEYS = CARD_BG_TYPES.map((t) => t.key);

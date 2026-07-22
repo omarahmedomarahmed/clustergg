@@ -60,6 +60,8 @@ export async function saveQuest(questId: string, formData: FormData) {
     cardBgUrl: String(formData.get("cardBgUrl") ?? "").trim() || null,
     coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
     mapArtUrl: String(formData.get("mapArtUrl") ?? "").trim() || null,
+    mapVideoUrl: String(formData.get("mapVideoUrl") ?? "").trim() || null,
+    mapGlbUrl: String(formData.get("mapGlbUrl") ?? "").trim() || null,
     actionWeights: weights,
     dailyCaps: caps,
     sortOrder: Number(formData.get("sortOrder")) || 0,
@@ -141,7 +143,8 @@ export async function deleteTier(questId: string, tierId: string) {
 
 // Save the curved trail the astronaut rides across the quest map. Accepts a JSON
 // array of { x, y } waypoints (0-100). Empty clears it (falls back to a straight
-// line through the milestone pins).
+// line through the milestone pins). `variant` picks which trail: "desktop"
+// (16:9 map) or "mobile" (4:5 phone map — the curve bends differently there).
 export async function saveQuestPath(questId: string, _prev: TierPinState, formData: FormData): Promise<TierPinState> {
   const admin = await requireStaff();
   const db = await getDb();
@@ -151,11 +154,65 @@ export async function saveQuestPath(questId: string, _prev: TierPinState, formDa
     const parsed = JSON.parse(String(formData.get("points") ?? "[]"));
     if (Array.isArray(parsed)) pts = parsed.filter((p) => p && typeof p.x === "number" && typeof p.y === "number").map((p) => ({ x: clamp(p.x), y: clamp(p.y) }));
   } catch { pts = []; }
+  const mobile = String(formData.get("variant") ?? "desktop") === "mobile";
   await db.update(schema.quests)
-    .set({ pathPoints: pts.length >= 2 ? pts : null })
+    .set(mobile ? { pathPointsMobile: pts.length >= 2 ? pts : null } : { pathPoints: pts.length >= 2 ? pts : null })
     .where(eq(schema.quests.id, questId));
   await audit(admin.id, "quest.path", questId);
   revalidatePath(`/admin/quests/${questId}`);
   revalidatePath("/quests");
-  return { ok: true, message: pts.length >= 2 ? `Trail saved (${pts.length} points).` : "Trail cleared." };
+  const which = mobile ? "Mobile trail" : "Desktop trail";
+  return { ok: true, message: pts.length >= 2 ? `${which} saved (${pts.length} points).` : `${which} cleared.` };
+}
+
+// ===== Quest game screens (missions + panel overrides) =====
+// Admin-edited starter-mission roster for a quest: kind decides how completion
+// is measured (connect / planet / challenge / ads with a threshold), labels and
+// links are free-form. Empty list restores the built-in defaults.
+export async function saveQuestMissions(
+  questId: string,
+  missions: { kind: string; label: string; href: string; icon: string; threshold?: number; enabled?: boolean }[],
+) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const kinds = new Set(["connect", "planet", "challenge", "ads"]);
+  const clean = (Array.isArray(missions) ? missions : [])
+    .filter((m) => m && kinds.has(String(m.kind)) && String(m.label || "").trim() && String(m.href || "").trim())
+    .slice(0, 8)
+    .map((m) => ({
+      kind: String(m.kind), label: String(m.label).slice(0, 140), href: String(m.href).slice(0, 200),
+      icon: String(m.icon || "spark").slice(0, 30),
+      ...(m.kind === "ads" ? { threshold: Math.max(1, Math.min(1000, Math.round(Number(m.threshold) || 5))) } : {}),
+      enabled: m.enabled !== false,
+    }));
+  await db.update(schema.quests).set({ missionsConfig: clean.length ? clean : null }).where(eq(schema.quests.id, questId));
+  await audit(admin.id, "quest.missions", questId);
+  revalidatePath(`/admin/quests/${questId}`); revalidatePath("/quests"); revalidatePath("/feed"); revalidatePath("/");
+  return { ok: true };
+}
+
+// Per-panel overrides for the in-game screens: title text (translatable via the
+// Language editor), background image with dark-overlay strength, button color.
+export async function saveQuestGameUi(
+  questId: string,
+  ui: Record<string, { title?: string; bg?: string; dim?: number; btn?: string }>,
+) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const keys = ["rules", "log", "guide", "missions", "milestone"] as const;
+  const clean: Record<string, { title?: string; bg?: string; dim?: number; btn?: string }> = {};
+  for (const k of keys) {
+    const c = ui?.[k];
+    if (!c) continue;
+    const e: { title?: string; bg?: string; dim?: number; btn?: string } = {};
+    if (c.title?.trim()) e.title = String(c.title).slice(0, 140);
+    if (c.bg?.trim()) e.bg = String(c.bg).slice(0, 2000);
+    if (Number.isFinite(Number(c.dim))) e.dim = Math.max(0, Math.min(100, Math.round(Number(c.dim))));
+    if (c.btn?.trim()) e.btn = String(c.btn).slice(0, 60);
+    if (Object.keys(e).length) clean[k] = e;
+  }
+  await db.update(schema.quests).set({ gameUi: Object.keys(clean).length ? clean : null }).where(eq(schema.quests.id, questId));
+  await audit(admin.id, "quest.game_ui", questId);
+  revalidatePath(`/admin/quests/${questId}`); revalidatePath("/quests"); revalidatePath("/feed"); revalidatePath("/");
+  return { ok: true };
 }

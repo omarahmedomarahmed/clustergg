@@ -2,6 +2,7 @@ import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
+import type { MissionConfig, QuestGameUi, QuestRule, StarterMissions } from "@/lib/quest-game";
 
 // ===== Action catalog =====
 // The set of trackable actions the engine knows how to emit. A quest "listens"
@@ -323,9 +324,17 @@ export type QuestTierView = { id: string; name: string; description: string; thr
 export type QuestView = {
   id: string; key: string; name: string; tagline: string; lore: string; color: string; accent2: string; icon: string;
   logoUrl: string | null; cardBgUrl: string | null; coverUrl: string | null; mapArtUrl: string | null;
+  mapVideoUrl: string | null;
+  mapGlbUrl: string | null;
   pathPoints: { x: number; y: number }[] | null;
+  pathPointsMobile: { x: number; y: number }[] | null;
   qp: number; tiers: QuestTierView[]; currentTierIndex: number; nextTier: QuestTierView | null;
   completions: number; totalCp: number;
+  // The quest's scoring rules (action → CP + daily cap), ready for the game UI.
+  rules: QuestRule[];
+  // Admin-edited starter missions + per-panel game-screen overrides.
+  missions: MissionConfig[] | null;
+  gameUi: QuestGameUi | null;
 };
 
 async function tierHolderCountMap(db: DB, tierIds: string[]): Promise<Map<string, number>> {
@@ -349,6 +358,12 @@ export async function getUserQuests(db: DB, userId: string | null): Promise<Ques
   return quests.map((q) => {
     const p = progByQuest.get(q.id);
     const qp = p?.qp ?? 0;
+    const weights = (q.actionWeights ?? {}) as Record<string, number>;
+    const caps = (q.dailyCaps ?? {}) as Record<string, number>;
+    const rules: QuestRule[] = Object.entries(weights)
+      .filter(([, v]) => Number(v) > 0)
+      .map(([k, v]) => ({ key: k, label: ACTION_LABEL[k] ?? k, points: Number(v), cap: Number(caps[k]) > 0 ? Number(caps[k]) : undefined }))
+      .sort((a, b) => b.points - a.points);
     // "Earned" reflects the CURRENT cycle (re-enroll resets the map); lifetime
     // achievements are the quest badges (completions) shown on the profile.
     const qTiers = tiers.filter((t) => t.questId === q.id).sort((a, b) => a.tierIndex - b.tierIndex)
@@ -359,9 +374,15 @@ export async function getUserQuests(db: DB, userId: string | null): Promise<Ques
     return {
       id: q.id, key: q.key, name: q.name, tagline: q.tagline, lore: q.lore, color: q.color, accent2: q.accent2, icon: q.icon,
       logoUrl: q.logoUrl, cardBgUrl: q.cardBgUrl, coverUrl: q.coverUrl, mapArtUrl: q.mapArtUrl,
+      mapVideoUrl: q.mapVideoUrl,
+      mapGlbUrl: q.mapGlbUrl,
       pathPoints: Array.isArray(q.pathPoints) && q.pathPoints.length >= 2 ? q.pathPoints : null,
+      pathPointsMobile: Array.isArray(q.pathPointsMobile) && q.pathPointsMobile.length >= 2 ? q.pathPointsMobile : null,
       qp, tiers: qTiers, currentTierIndex, nextTier,
       completions, totalCp: (p?.lifetimeQp ?? 0) + qp,
+      rules,
+      missions: Array.isArray(q.missionsConfig) && q.missionsConfig.length ? (q.missionsConfig as MissionConfig[]) : null,
+      gameUi: (q.gameUi ?? null) as QuestGameUi | null,
     };
   });
 }
@@ -402,6 +423,42 @@ export async function getCpLedger(db: DB, userId: string | null, opts?: { questI
     id: r.id, questId: r.questId, questKey: r.key, questName: r.name, color: r.color, logoUrl: r.logoUrl,
     actionKey: r.actionKey, label: ACTION_LABEL[r.actionKey] ?? r.actionKey, qp: r.qp, at: r.at.toISOString(),
   }));
+}
+
+// ===== Guided starter missions =====
+// When the gamer FIRST did each of the onboarding actions (connect an account,
+// join a planet, join a challenge, see an ad). Null = not yet — the game shows
+// a red dot and walks them there. Sources are the real tables (so it's accurate
+// even if the action pre-dates the CP ledger), ads come from the quest events.
+export async function getStarterMissions(db: DB, userId: string | null): Promise<StarterMissions> {
+  const none: StarterMissions = { connectAt: null, planetAt: null, challengeAt: null, adCount: 0, adDates: [] };
+  if (!userId) return none;
+  const iso = (d: unknown): string | null => {
+    if (!d) return null;
+    const dd = new Date(d as string | Date);
+    return isNaN(+dd) ? null : dd.toISOString();
+  };
+  try {
+    const adWhere = and(eq(schema.questEvents.userId, userId), inArray(schema.questEvents.actionKey, ["ad_impression", "ad_click"]));
+    const [[acct], [planet], [chall], adRows, [adCountRow]] = await Promise.all([
+      db.select({ at: sql<Date | null>`MIN(${schema.linkedGameAccounts.createdAt})` })
+        .from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, userId)),
+      db.select({ at: sql<Date | null>`MIN(${schema.spaceMembers.joinedAt})` })
+        .from(schema.spaceMembers).where(eq(schema.spaceMembers.userId, userId)),
+      db.select({ at: sql<Date | null>`MIN(${schema.challengeParticipants.joinedAt})` })
+        .from(schema.challengeParticipants).where(eq(schema.challengeParticipants.userId, userId)),
+      // The earliest ad events (oldest first) so any admin-set threshold N can
+      // resolve "the moment the Nth ad was seen" exactly.
+      db.select({ at: schema.questEvents.createdAt }).from(schema.questEvents)
+        .where(adWhere).orderBy(schema.questEvents.createdAt).limit(30),
+      db.select({ c: sql<number>`count(*)` }).from(schema.questEvents).where(adWhere),
+    ]);
+    return {
+      connectAt: iso(acct?.at), planetAt: iso(planet?.at), challengeAt: iso(chall?.at),
+      adCount: Number(adCountRow?.c ?? 0),
+      adDates: adRows.map((r) => iso(r.at)).filter((d): d is string => !!d),
+    };
+  } catch { return none; }
 }
 
 // Top questers per quest (CP leaderboard), keyed by quest id.

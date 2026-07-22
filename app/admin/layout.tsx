@@ -46,6 +46,7 @@ const NAV: { section: string; area?: string; items: { href: string; label: strin
       { href: "/admin/quests", label: "Quests" },
       { href: "/admin/leaderboards", label: "Leaderboards" },
       { href: "/admin/trophies", label: "Trophies" },
+      { href: "/admin/redeems", label: "Trophy redemptions" },
     ],
   },
   {

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
-import { getQuestByKey, getTotalCp, getCpLedger } from "@/lib/quests";
+import { getQuestByKey, getTotalCp, getCpLedger, getStarterMissions } from "@/lib/quests";
+import { getQuestPanelArt } from "@/lib/quest-hero";
 import { getContent } from "@/lib/cms";
 import QuestMapHero from "@/components/QuestMapHero";
 import CpLedger from "@/components/CpLedger";
@@ -26,10 +27,12 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   if (!detail) notFound();
 
   const { quest: questRaw, allQuests, tierHolders, leaderboard } = detail;
-  const [totalCp, questLedger, brand] = await Promise.all([
+  const [totalCp, questLedger, brand, missions, panelArt] = await Promise.all([
     getTotalCp(db, user?.id ?? null),
-    getCpLedger(db, user?.id ?? null, { questId: questRaw.id, limit: 120 }),
+    getCpLedger(db, user?.id ?? null, { questId: questRaw.id, limit: 200 }),
     getContent(["brand.quest.rocket"]),
+    getStarterMissions(db, user?.id ?? null),
+    getQuestPanelArt(),
   ]);
   const rocketUrl = brand["brand.quest.rocket"] || undefined;
   const { tr, te } = await getT();
@@ -39,7 +42,8 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
 
   return (
     <div>
-      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} rocketUrl={rocketUrl} />
+      <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} rocketUrl={rocketUrl}
+        game={{ rules: quest.rules, log: questLedger, totalCp, art: panelArt, missions }} />
 
       {/* Glorified milestone leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">

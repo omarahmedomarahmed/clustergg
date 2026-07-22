@@ -13,10 +13,17 @@ type Milestone = { id: string; name: string; color: string; x: number; y: number
 // "delete" mode to remove it. The live preview is the exact curve the hero
 // renders, so the astronaut rides precisely on this line.
 export default function QuestPathEditor({
-  questId, mapArtUrl, accent, milestones, initial,
-}: { questId: string; mapArtUrl: string; accent: string; milestones: Milestone[]; initial: Pt[] }) {
+  questId, mapArtUrl, accent, milestones, initial, initialMobile = [],
+}: { questId: string; mapArtUrl: string; accent: string; milestones: Milestone[]; initial: Pt[]; initialMobile?: Pt[] }) {
   const seed = initial.length >= 2 ? initial : milestones.map((m) => ({ x: m.x, y: m.y }));
-  const [pts, setPts] = useState<Pt[]>(seed);
+  // The mobile map (4:5 phone crop) gets its OWN trail — the same percentages
+  // land differently on a 4:5 canvas, so admins trace each aspect separately.
+  const seedMobile = initialMobile.length >= 2 ? initialMobile : seed;
+  const [variant, setVariant] = useState<"desktop" | "mobile">("desktop");
+  const [ptsByVariant, setPtsByVariant] = useState<Record<"desktop" | "mobile", Pt[]>>({ desktop: seed, mobile: seedMobile });
+  const pts = ptsByVariant[variant];
+  const setPts = (up: Pt[] | ((prev: Pt[]) => Pt[])) =>
+    setPtsByVariant((m) => ({ ...m, [variant]: typeof up === "function" ? up(m[variant]) : up }));
   const [mode, setMode] = useState<"move" | "add" | "insert" | "delete">("move");
   const frame = useRef<HTMLDivElement>(null);
   const dragging = useRef<number | null>(null);
@@ -68,7 +75,20 @@ export default function QuestPathEditor({
 
   return (
     <form action={formAction} className="space-y-3">
-      <p className="text-xs text-muted">Trace the trail drawn on your map art. Click to drop points, drag to bend the curve. The astronaut rides exactly on this line between milestones.</p>
+      <p className="text-xs text-muted">Trace the trail drawn on your map art. Click to drop points, drag to bend the curve. The astronaut rides exactly on this line between milestones. The <b>Mobile</b> tab edits a separate trail for the 4:5 phone map — trace it there too so the line matches the art on phones.</p>
+      {/* Desktop / Mobile trail switch — each aspect keeps its own curve */}
+      <div className="flex gap-1.5">
+        {(["desktop", "mobile"] as const).map((v) => (
+          <button key={v} type="button" onClick={() => setVariant(v)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${variant === v ? "border-amber-400/60 bg-amber-500/10 text-amber-200" : "border-white/12 text-muted hover:text-ink"}`}>
+            <Icon name={v === "desktop" ? "monitor" : "user"} size={12} /> {v === "desktop" ? "Desktop trail (16:9)" : "Mobile trail (4:5)"}
+          </button>
+        ))}
+        {variant === "mobile" && (
+          <button type="button" onClick={() => setPts(ptsByVariant.desktop.map((p) => ({ ...p })))}
+            className="rounded-full border border-white/12 px-3 py-1 text-xs text-muted hover:text-ink">Copy from desktop</button>
+        )}
+      </div>
       <div className="flex flex-wrap gap-1.5">
         {modeBtn("move", "Move", "target")}
         {modeBtn("add", "Add point", "plus")}
@@ -80,8 +100,8 @@ export default function QuestPathEditor({
 
       <div ref={frame} onPointerMove={onMove} onPointerUp={() => (dragging.current = null)} onPointerLeave={() => (dragging.current = null)}
         onClick={onCanvasClick}
-        className={`relative w-full rounded-2xl overflow-hidden select-none touch-none border border-violet-400/15 ${mode === "add" || mode === "insert" ? "cursor-crosshair" : "cursor-default"}`}
-        style={{ aspectRatio: "16 / 9", background: "#0a0a1c" }}>
+        className={`relative rounded-2xl overflow-hidden select-none touch-none border border-violet-400/15 ${mode === "add" || mode === "insert" ? "cursor-crosshair" : "cursor-default"} ${variant === "mobile" ? "mx-auto max-w-sm w-full" : "w-full"}`}
+        style={{ aspectRatio: variant === "mobile" ? "4 / 5" : "16 / 9", background: "#0a0a1c" }}>
         {mapArtUrl
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={mapArtUrl} alt="quest map" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
@@ -108,9 +128,10 @@ export default function QuestPathEditor({
       </div>
 
       <input type="hidden" name="points" value={JSON.stringify(pts)} />
+      <input type="hidden" name="variant" value={variant} />
       <div className="flex items-center gap-3">
         <button disabled={pending} className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white inline-flex items-center gap-1.5 disabled:opacity-50">
-          <Icon name="rocket" size={14} /> {pending ? "Saving…" : "Save trail"}
+          <Icon name="rocket" size={14} /> {pending ? "Saving…" : variant === "mobile" ? "Save mobile trail" : "Save desktop trail"}
         </button>
         <span className="text-xs text-muted">{pts.length} point{pts.length === 1 ? "" : "s"}</span>
         {state?.ok && <span className="text-xs text-emerald-300">✓ {state.message}</span>}

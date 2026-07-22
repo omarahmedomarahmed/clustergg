@@ -24,7 +24,8 @@ export default async function AdminTrophiesPage() {
           <select name="tier" className="input-cosmic">
             {["gold", "silver", "bronze", "legendary"].map((t) => <option key={t}>{t}</option>)}
           </select>
-          <input name="game" placeholder="Game (optional — blank = universal)" className="input-cosmic sm:col-span-2" />
+          <input name="game" placeholder="Game (optional — blank = universal)" className="input-cosmic" />
+          <input name="value" type="number" min={0} step="0.01" placeholder="Value in USD (e.g. 25)" className="input-cosmic" />
           <div className="sm:col-span-2">
             <ImageUpload name="imageUrl" label="Trophy image" aspect="1/1" maxDim={700} scope="trophy" hint="Transparent PNG of the trophy/cup." />
           </div>
@@ -39,6 +40,17 @@ export default async function AdminTrophiesPage() {
             <img src={t.imageUrl} alt={t.name} className="mx-auto h-32 object-contain" />
             <div className="font-semibold text-sm mt-2">{t.name}</div>
             <div className="text-xs text-muted capitalize">{t.tier}{t.game ? ` · ${t.game}` : " · universal"}</div>
+            {/* Inline $-value edit — the amount gamers can redeem this trophy for */}
+            <form action={saveTrophy} className="mt-2 flex items-center justify-center gap-1.5">
+              <input type="hidden" name="trophyId" value={t.id} />
+              <input type="hidden" name="name" value={t.name} />
+              <input type="hidden" name="imageUrl" value={t.imageUrl} />
+              <input type="hidden" name="tier" value={t.tier} />
+              <input type="hidden" name="game" value={t.game ?? ""} />
+              <span className="text-emerald-300 font-bold text-sm">$</span>
+              <input name="value" type="number" min={0} step="0.01" defaultValue={t.value ?? 0} className="input-cosmic !py-1 !px-2 text-xs w-20" />
+              <button className="ghost-btn rounded-full px-2.5 py-1 text-[11px]">Set</button>
+            </form>
             <form action={deleteTrophy.bind(null, t.id)} className="mt-2">
               <button className="text-xs text-rose-300 hover:underline">Delete</button>
             </form>

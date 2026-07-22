@@ -26,6 +26,7 @@ export type ChallengeEdit = {
   thresholdTarget: number | null; startAt: string; endAt: string;
   coverUrl: string | null; coverAdjust: { zoom: number; x: number; y: number };
   trophyId: string | null; status: string; prizeDescription: string | null;
+  prizes?: { first?: string[]; second?: string[]; third?: string[] } | null;
   gateQuestId: string | null; gateMinBadges: number;
 };
 
@@ -264,10 +265,20 @@ export default function ChallengeBuilder({
           <div className="sm:col-span-2">
             <CoverFramer name="coverUrl" maxDim={1400} defaultUrl={challenge?.coverUrl ?? ""} defaultAdjust={challenge?.coverAdjust} label="Cover image (card + hero)" hint="Drag to reposition, slider to zoom." />
           </div>
-          <select name="trophyId" defaultValue={challenge?.trophyId ?? ""} className="input-cosmic">
-            <option value="">No trophy</option>
-            {trophies.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.tier})</option>)}
-          </select>
+          {/* Podium prizes — one or MORE trophies per place (Ctrl/Cmd-click to
+              multi-select). 2nd/3rd only apply to podium formats. */}
+          <div className="sm:col-span-2 grid sm:grid-cols-3 gap-3">
+            {([["prize:first", "1st place trophies", challenge?.prizes?.first ?? (challenge?.trophyId ? [challenge.trophyId] : [])],
+               ["prize:second", "2nd place trophies (podium)", challenge?.prizes?.second ?? []],
+               ["prize:third", "3rd place trophies (podium)", challenge?.prizes?.third ?? []]] as [string, string, string[]][]).map(([name, label, dflt]) => (
+              <label key={name} className="block text-xs text-muted">
+                {label}
+                <select name={name} multiple defaultValue={dflt} size={4} className="input-cosmic mt-1 w-full !py-1 text-xs">
+                  {trophies.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.tier})</option>)}
+                </select>
+              </label>
+            ))}
+          </div>
           <input name="prizeDescription" placeholder="Prize description" defaultValue={challenge?.prizeDescription ?? undefined} className="input-cosmic" />
           <select name="status" defaultValue={challenge?.status ?? "active"} className="input-cosmic sm:col-span-2">
             <option value="active">Active (publish now)</option>

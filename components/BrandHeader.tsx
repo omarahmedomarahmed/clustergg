@@ -8,6 +8,9 @@ export default async function BrandHeader({ placement = "nav" }: { placement?: "
   const c = await getContent(["brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y", "brand.wordmark", "brand.wordmark.zoom", modeKey]);
   const mode = c[modeKey] || "both";
   const markUrl = c["brand.logo"] || "/assets/logo.png";
+  // No custom logo uploaded yet → the built-in placeholder path doesn't exist as
+  // a file, so render a gradient "C" glyph instead of a broken image.
+  const hasCustomMark = !!markUrl && markUrl !== "/assets/logo.png";
   const zoom = Number(c["brand.logo.zoom"]) || 1;
   const x = Number(c["brand.logo.x"] ?? 50);
   const y = Number(c["brand.logo.y"] ?? 50);
@@ -30,9 +33,14 @@ export default async function BrandHeader({ placement = "nav" }: { placement?: "
   return (
     <span className="flex items-center gap-2.5">
       {showMark && (
-        <span className={`relative inline-block shrink-0 overflow-hidden rounded-xl ring-1 ring-violet-400/30 ${placement === "nav" ? "pulse-glow" : ""}`} style={{ width: markSize, height: markSize }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={markUrl} alt="Cluster" className="h-full w-full object-cover" style={{ objectPosition: `${x}% ${y}%`, transform: `scale(${zoom})` }} />
+        <span className={`relative inline-flex items-center justify-center shrink-0 overflow-hidden rounded-xl ring-1 ring-violet-400/30 ${placement === "nav" ? "pulse-glow" : ""}`} style={{ width: markSize, height: markSize }}>
+          {hasCustomMark ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={markUrl} alt="Cluster" className="h-full w-full object-cover" style={{ objectPosition: `${x}% ${y}%`, transform: `scale(${zoom})` }} />
+          ) : (
+            <span aria-label="Cluster" className="flex h-full w-full items-center justify-center font-black text-white"
+              style={{ fontSize: markSize * 0.58, background: "radial-gradient(circle at 30% 25%, #8b5cf6, #22d3ee 95%)" }}>C</span>
+          )}
         </span>
       )}
       {word}

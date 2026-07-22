@@ -425,7 +425,15 @@ export async function saveChallenge(formData: FormData) {
     heroUrl: String(formData.get("heroUrl") ?? "").trim() || null,
     coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
     coverAdjust: adjust,
-    trophyId: String(formData.get("trophyId") ?? "").trim() || null,
+    // Multi-trophy podium prizes: one or more trophies per place. The legacy
+    // single trophyId mirrors the first 1st-place trophy for old consumers.
+    ...(() => {
+      const pick = (k: string) => formData.getAll(k).map(String).map((s) => s.trim()).filter(Boolean);
+      const prizes = { first: pick("prize:first"), second: pick("prize:second"), third: pick("prize:third") };
+      const any = prizes.first.length || prizes.second.length || prizes.third.length;
+      const legacy = String(formData.get("trophyId") ?? "").trim() || null;
+      return { prizes: any ? prizes : null, trophyId: prizes.first[0] ?? legacy };
+    })(),
     status: String(formData.get("status") ?? "draft"),
     prizeDescription: String(formData.get("prizeDescription") ?? "").trim() || null,
   };
@@ -433,6 +441,10 @@ export async function saveChallenge(formData: FormData) {
 
   if (challengeId) {
     await db.update(schema.challenges).set(values).where(eq(schema.challenges.id, challengeId));
+    // Completed challenge → hand the podium trophies to the placed gamers.
+    if (values.status === "completed") {
+      try { const { awardChallengeTrophies } = await import("@/lib/trophies"); await awardChallengeTrophies(db, challengeId); } catch { /* non-fatal */ }
+    }
     await audit(admin.id, "challenge.update", "challenge", challengeId);
     revalidatePath(`/admin/challenges/${challengeId}`);
   } else {
@@ -908,6 +920,8 @@ export async function saveTrophy(formData: FormData) {
     imageUrl: String(formData.get("imageUrl") ?? "").trim(),
     tier: String(formData.get("tier") ?? "gold"),
     game: String(formData.get("game") ?? "").trim() || null,
+    // Admin-assigned $ value — shown on challenge prizes and redeemable.
+    value: Math.max(0, Number(formData.get("value")) || 0),
   };
   if (!values.name || !values.imageUrl) return;
   if (trophyId) {

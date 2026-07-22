@@ -29,6 +29,8 @@ export const users = pgTable("users", {
   primarySignupProvider: text("primary_signup_provider"),
   discordUsername: text("discord_username"), // Discord handle — the gamer's universal identity, shown everywhere
   profileViews: integer("profile_views").notNull().default(0), // public view counter (brag number)
+  payoutMethod: jsonb("payout_method").$type<{ currency: string; method: string; details: Record<string, string> }>(), // saved trophy-redeem payout method
+  payoutChanges: integer("payout_changes").notNull().default(0), // method edits used (locks at 3)
   profileVisibility: text("profile_visibility").notNull().default("public"), // public | followers | private
   allowMessagesFrom: text("allow_messages_from").notNull().default("everyone"), // everyone | following | nobody
   emailNotifications: boolean("email_notifications").notNull().default(true),
@@ -272,6 +274,7 @@ export const challenges = pgTable("challenges", {
   coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
     .notNull().default({ zoom: 1, x: 50, y: 50 }),
   trophyId: text("trophy_id"),
+  prizes: jsonb("prizes").$type<{ first?: string[]; second?: string[]; third?: string[] }>(), // multi-trophy podium prizes per place
   prizeDescription: text("prize_description"),
   createdBy: text("created_by"),
   createdAt: now("created_at"),
@@ -473,6 +476,37 @@ export const trophies = pgTable("trophies", {
   imageUrl: text("image_url").notNull(),
   tier: text("tier").notNull().default("gold"), // gold | silver | bronze | legendary
   game: text("game"),
+  value: doublePrecision("value").notNull().default(0), // admin-assigned $ value (shown on prizes, redeemable)
+});
+
+// A trophy AWARDED to a gamer (challenge podium win). Lives on their profile
+// until redeemed; "pending" = locked inside an open redeem request.
+export const userTrophies = pgTable("user_trophies", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  trophyId: text("trophy_id").notNull().references(() => trophies.id, { onDelete: "cascade" }),
+  challengeId: text("challenge_id"),
+  placement: integer("placement").notNull().default(1), // 1 | 2 | 3
+  status: text("status").notNull().default("held"),     // held | pending | redeemed
+  awardedAt: timestamp("awarded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// A gamer's request to cash out one or more trophy awards. pending → approved
+// (admin) → paid (admin uploads payment proof; awards become redeemed).
+export const trophyRedeems = pgTable("trophy_redeems", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  awardIds: jsonb("award_ids").$type<string[]>().notNull().default([]),
+  amount: doublePrecision("amount").notNull().default(0),
+  currency: text("currency").notNull().default("USD"),  // USD | EGP
+  method: text("method").notNull().default("ach"),      // ach | wallet | instapay
+  details: jsonb("details").$type<Record<string, string>>().notNull().default({}),
+  status: text("status").notNull().default("pending"),  // pending | approved | paid | rejected | cancelled
+  gamerConfirmedAt: timestamp("gamer_confirmed_at", { withTimezone: true }),
+  proofUrl: text("proof_url"),                          // admin-uploaded payment confirmation
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
 });
 
 // ===== Admin =====
@@ -510,7 +544,12 @@ export const quests = pgTable("quests", {
   cardBgUrl: text("card_bg_url"),              // gamified floating-card background
   coverUrl: text("cover_url"),
   mapArtUrl: text("map_art_url"),              // treasure-map art for the quest hero
+  mapVideoUrl: text("map_video_url"),          // looping animated map (mp4) — plays instead of the still art
+  mapGlbUrl: text("map_glb_url"),              // 3D terrain mesh (GLB) — powers the in-game 3D view
   pathPoints: jsonb("path_points").$type<{ x: number; y: number }[]>(), // curved trail waypoints the astronaut rides
+  pathPointsMobile: jsonb("path_points_mobile").$type<{ x: number; y: number }[]>(), // separate trail for the 4:5 mobile map (curves differ per aspect)
+  missionsConfig: jsonb("missions_config").$type<{ kind: string; label: string; href: string; icon: string; threshold?: number; enabled?: boolean }[]>(), // admin-edited starter missions
+  gameUi: jsonb("game_ui").$type<Record<string, { title?: string; bg?: string; dim?: number; btn?: string }>>(), // per-panel game-screen overrides (title/bg/overlay/button)
   actionWeights: jsonb("action_weights").$type<Record<string, number>>().notNull().default({}),
   dailyCaps: jsonb("daily_caps").$type<Record<string, number>>().notNull().default({}),
   sortOrder: integer("sort_order").notNull().default(0),
