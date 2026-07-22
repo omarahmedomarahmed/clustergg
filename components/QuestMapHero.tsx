@@ -265,7 +265,7 @@ export default function QuestMapHero({
               missions are still open. */}
           {gameData && (
             <button type="button" onClick={() => openGame(null)}
-              className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pressable inline-flex items-center gap-2 rounded-full px-7 py-2.5 text-sm font-bold text-white shadow-xl transition-transform hover:scale-105"
+              className="absolute bottom-16 sm:bottom-3 left-1/2 -translate-x-1/2 z-30 pressable inline-flex items-center gap-2 rounded-full px-7 py-2.5 text-sm font-bold text-white shadow-xl transition-transform hover:scale-105"
               style={{ background: `linear-gradient(90deg, ${q.color}, ${q.accent2})`, boxShadow: `0 10px 28px -10px ${q.color}` }}>
               <Icon name="play" size={14} /> {tr("Play quest")}
               {openMissions(q.missions, gameData.missions) > 0 && (

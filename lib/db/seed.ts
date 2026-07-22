@@ -715,7 +715,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-22.3-trophy-economy";
+const MAINT_VERSION = "2026-07-22.4-ascension-loop-v3";
 
 // Looping animated quest maps (Higgsfield kling image→video from the original
 // map art). Applied once per quest when no video is set; admins can replace or
@@ -723,14 +723,15 @@ const MAINT_VERSION = "2026-07-22.3-trophy-economy";
 const QUEST_MAP_VIDEOS: Record<string, string> = {
   conquest: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015922_4aea0000-d74e-4fb6-bae9-e456aa097c7f.mp4",
   orbit: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015928_fb0e499a-7988-4ac6-9a31-d1581010ea2c.mp4",
-  // Regenerated with clearly-visible motion (the first pass barely moved).
-  ascension: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_021830_b29a5e1b-a43f-40cc-86e7-c6411310fd99.mp4",
+  // v3 — dramatic motion: rockets launch/land, nebula streams, peaks pulse.
+  ascension: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_024136_043113a0-083b-43fd-a497-3021001d7ff9.mp4",
   signal: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015940_f5a41d5c-72d3-4d5c-8707-bb6fd55a94b8.mp4",
 };
 // Superseded generated loops — auto-replaced by the new version above (admin
 // uploads that aren't in this list are never touched).
 const OLD_MAP_VIDEOS: string[] = [
   "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015935_37dfb652-b7a4-4787-89b6-7c7f907fe1d9.mp4",
+  "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_021830_b29a5e1b-a43f-40cc-86e7-c6411310fd99.mp4",
 ];
 
 // 3D terrain meshes (Higgsfield image→3D GLB from the transparent map art) —
