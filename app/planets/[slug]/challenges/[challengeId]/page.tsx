@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
+import GameLogo from "@/components/GameLogo";
+import { slimImg } from "@/lib/img";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n/t-server";
@@ -50,7 +52,12 @@ export default async function ChallengePage({
   const path = `/planets/${slug}/challenges/${challengeId}`;
   const cms = await getContent(["banner.arena"]);
 
-  const [myParticipation, myAccounts, trophy] = await Promise.all([
+  // Podium prizes: one or more trophies per place (falls back to the legacy
+  // single trophy as the 1st-place prize).
+  const prizeCfg = challenge.prizes ?? (challenge.trophyId ? { first: [challenge.trophyId] } : null);
+  const prizeIds = [...new Set([...(prizeCfg?.first ?? []), ...(prizeCfg?.second ?? []), ...(prizeCfg?.third ?? [])])];
+
+  const [myParticipation, myAccounts, prizeTrophies, [game]] = await Promise.all([
     viewer
       ? db.select().from(schema.challengeParticipants).where(and(
           eq(schema.challengeParticipants.challengeId, challenge.id),
@@ -61,10 +68,14 @@ export default async function ChallengePage({
           eq(schema.linkedGameAccounts.userId, viewer.id),
           eq(schema.linkedGameAccounts.provider, challenge.provider)))
       : Promise.resolve([]),
-    challenge.trophyId
-      ? db.select().from(schema.trophies).where(eq(schema.trophies.id, challenge.trophyId)).limit(1)
+    prizeIds.length
+      ? db.select().from(schema.trophies).where(inArray(schema.trophies.id, prizeIds))
       : Promise.resolve([]),
+    // The challenge's game — its logo, cover and planet art theme this page.
+    db.select({ logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl, planetBgUrl: schema.games.planetBgUrl })
+      .from(schema.games).where(eq(schema.games.name, challenge.game)).limit(1),
   ]);
+  const trophyById = new Map(prizeTrophies.map((t) => [t.id, t]));
 
   const joined = myParticipation.length > 0;
 
@@ -82,10 +93,18 @@ export default async function ChallengePage({
 
   const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const embed = challenge.heroType === "stream" && challenge.heroUrl ? streamEmbed(challenge.heroUrl) : null;
-  const coverUrl = challenge.coverUrl ?? cms["banner.arena"];
+  // Game-first theming: the game's cover backs the hero when the challenge has
+  // none, and the game's planet/cover art backs the WHOLE page (dimmed).
+  const coverUrl = challenge.coverUrl ?? slimImg(game?.coverUrl ?? null, 800000) ?? cms["banner.arena"];
+  const pageBg = slimImg(game?.planetBgUrl ?? game?.coverUrl ?? null, 800000);
 
   return (
     <div>
+      {/* Game-themed page backdrop — the whole page lives in this game's world */}
+      {pageBg && (
+        <div aria-hidden className="fixed inset-0 -z-10 bg-cover bg-center"
+          style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.86), rgba(4,5,26,0.95)), url(${pageBg})` }} />
+      )}
       {/* ===== Glorified hero ===== */}
       <section className="relative">
         {challenge.heroType === "video" && challenge.heroUrl ? (
@@ -135,13 +154,22 @@ export default async function ChallengePage({
               </span>
             )}
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold drop-shadow-lg">{challenge.title}</h1>
+          <div className="flex items-center gap-3">
+            {game?.logoUrl && (
+              <GameLogo logoUrl={slimImg(game.logoUrl, 300000)} name={challenge.game} size={52} rounded="rounded-2xl"
+                className="ring-2 ring-white/20 shadow-2xl shrink-0" />
+            )}
+            <h1 className="text-3xl md:text-5xl font-bold drop-shadow-lg">{challenge.title}</h1>
+          </div>
         </div>
       </section>
 
       <div className="mx-auto max-w-5xl px-4 mt-8 grid gap-8 lg:grid-cols-[1fr_300px]">
         <div className="min-w-0 space-y-8">
           <div className="glass p-6 md:p-8">
+            <h2 className="font-bold mb-2 flex items-center gap-2">
+              <Icon name="shield" size={16} className="text-amber-300" /> {tr("Rules — how to win")}
+            </h2>
             <p className="text-muted leading-relaxed">{challenge.description}</p>
             <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
               {[
@@ -210,18 +238,41 @@ export default async function ChallengePage({
         </div>
 
         <aside className="space-y-6">
-          {trophy[0] && (
-            <div className="glass p-6 text-center glow-sweep">
-              <div className="text-[10px] uppercase tracking-widest text-amber-300 mb-3 inline-flex items-center gap-1.5">
+          {prizeCfg && prizeTrophies.length > 0 && (
+            <div className="glass p-6 glow-sweep">
+              <div className="text-[10px] uppercase tracking-widest text-amber-300 mb-4 inline-flex items-center gap-1.5">
                 <Icon name="trophy" size={12} /> {tr("Prize pool")}
               </div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={trophy[0].imageUrl} alt={trophy[0].name} className="mx-auto h-44 object-contain float-y" />
-              <div className="font-bold mt-3">{trophy[0].name}</div>
+              <div className="space-y-6">
+                {([["first", tr("1st place"), "#fbbf24"], ["second", tr("2nd place"), "#cbd5e1"], ["third", tr("3rd place"), "#b45309"]] as const).map(([key, label, color]) => {
+                  const list = (prizeCfg[key] ?? []).map((id) => trophyById.get(id)).filter((t): t is NonNullable<typeof t> => !!t);
+                  if (!list.length) return null;
+                  return (
+                    <div key={key} className="text-center">
+                      <div className="text-[11px] font-black uppercase tracking-widest mb-2" style={{ color }}>{label}</div>
+                      <div className={`grid gap-3 ${list.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
+                        {list.map((t) => (
+                          <div key={t.id} className="relative">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={t.imageUrl} alt={t.name} className={`mx-auto object-contain float-y ${list.length > 1 ? "h-28" : "h-40"}`} />
+                            {/* The trophy's $ value — right on the art */}
+                            {Number(t.value) > 0 && (
+                              <span className="absolute top-0 right-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[11px] font-black text-white shadow-lg">
+                                ${Number(t.value).toLocaleString()}
+                              </span>
+                            )}
+                            <div className="text-xs font-bold mt-1">{t.name}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
               {challenge.prizeDescription && (
-                <p className="text-xs text-muted mt-1.5">{challenge.prizeDescription}</p>
+                <p className="text-xs text-muted mt-4 text-center">{challenge.prizeDescription}</p>
               )}
-              <p className="text-[10px] text-muted/70 mt-3">{tr("Winners display this trophy on their profile forever.")}</p>
+              <p className="text-[10px] text-muted/70 mt-3 text-center">{tr("Winners display these trophies on their profile forever.")}</p>
             </div>
           )}
           <div className="glass p-5 text-sm text-muted space-y-2">

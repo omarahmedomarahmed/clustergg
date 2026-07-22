@@ -272,6 +272,7 @@ export const challenges = pgTable("challenges", {
   coverAdjust: jsonb("cover_adjust").$type<{ zoom: number; x: number; y: number }>()
     .notNull().default({ zoom: 1, x: 50, y: 50 }),
   trophyId: text("trophy_id"),
+  prizes: jsonb("prizes").$type<{ first?: string[]; second?: string[]; third?: string[] }>(), // multi-trophy podium prizes per place
   prizeDescription: text("prize_description"),
   createdBy: text("created_by"),
   createdAt: now("created_at"),
@@ -473,6 +474,7 @@ export const trophies = pgTable("trophies", {
   imageUrl: text("image_url").notNull(),
   tier: text("tier").notNull().default("gold"), // gold | silver | bronze | legendary
   game: text("game"),
+  value: doublePrecision("value").notNull().default(0), // admin-assigned $ value (shown on prizes, redeemable)
 });
 
 // ===== Admin =====
