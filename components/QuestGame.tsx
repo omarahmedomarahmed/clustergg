@@ -11,6 +11,7 @@ import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import CpIcon from "@/components/CpIcon";
 import ZoomPan from "@/components/ZoomPan";
+import LoopVideo from "@/components/LoopVideo";
 import { useTr } from "@/components/LocaleProvider";
 import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
@@ -269,7 +270,7 @@ export default function QuestGame({
         : <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(1000px 560px at 25% 8%, ${quest.color}29, transparent 60%), radial-gradient(800px 480px at 90% 100%, ${quest.accent2}1f, transparent 60%)` }} />}
 
       {/* ===== HUD top bar ===== */}
-      <div className="relative z-30 flex items-center gap-2.5 px-3 pt-3 sm:px-4" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+      <div className="relative z-[45] flex items-center gap-2.5 px-3 pt-3 sm:px-4" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
         <span className="flex h-10 w-10 items-center justify-center rounded-xl border shrink-0" style={{ borderColor: `${quest.color}66`, background: `${quest.color}1f` }}>
           {quest.logoUrl
             ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={quest.logoUrl} alt="" className="h-8 w-8 object-contain" />
@@ -317,17 +318,17 @@ export default function QuestGame({
             )}
             {view3d && quest.mapGlbUrl ? (
               <>
-                <GlbTerrain url={quest.mapGlbUrl} accent={quest.accent2} />
+                <GlbTerrain url={quest.mapGlbUrl} textureUrl={quest.mapArtUrl} accent={quest.accent2} />
                 <span className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 rounded-full bg-black/60 px-3 py-1 text-[10px] text-muted pointer-events-none whitespace-nowrap">
                   {tr("Drag to orbit · pinch or scroll to zoom · switch to Map for milestones")}
                 </span>
               </>
             ) : (
             <ZoomPan className="h-full w-full" min={1} max={4} initial={1} wheel pan>
-              {/* World art — the looping animated map (mp4) when set */}
+              {/* World art — the looping animated map (mp4) when set, played as
+                  a boomerang (forward then reverse) so it never jump-cuts */}
               {quest.mapVideoUrl ? (
-                <video src={quest.mapVideoUrl} autoPlay muted loop playsInline
-                  poster={quest.mapArtUrl ?? undefined}
+                <LoopVideo src={quest.mapVideoUrl} poster={quest.mapArtUrl ?? undefined}
                   className="absolute inset-0 h-full w-full object-cover" />
               ) : (
                 <div className="absolute inset-0" style={{ background: quest.mapArtUrl ? `url(${quest.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${quest.color}22, ${quest.accent2}18), #0a0a1c` }} />
@@ -405,6 +406,14 @@ export default function QuestGame({
           </div>
         )}
       </div>
+
+      {/* Click-anywhere-to-close backdrop: any open panel or milestone card is
+          dismissed by tapping outside it (the sheets + top/bottom bars sit above
+          this layer, so their own controls keep working). */}
+      {(panel !== null || sel !== null) && (
+        <button aria-label={tr("Close")} onClick={() => { setPanel(null); setSel(null); }}
+          className="fixed inset-0 z-[38] cursor-default" />
+      )}
 
       {/* ===== Milestone card (opens when the astronaut arrives) ===== */}
       {sel !== null && tiers[sel] && (
@@ -579,8 +588,11 @@ export default function QuestGame({
         </div>
       )}
 
-      {/* ===== Bottom action bar — game cards with red attention dots ===== */}
-      <div className="relative z-30 flex items-stretch gap-2 px-3 pt-2 sm:justify-center"
+      {/* ===== Bottom action bar — game cards with red attention dots =====
+          Stays above the close-backdrop on desktop (where panels float in the
+          corner) so tab-switching still works; on mobile the bottom sheet
+          covers it so it keeps the lower z. */}
+      <div className="relative z-30 sm:z-[45] flex items-stretch gap-2 px-3 pt-2 sm:justify-center"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         {tabBtn("missions", "rocket", tr("Missions"), missionsOpen > 0 ? missionsOpen : false)}
         {tabBtn("rules", "zap", tr("Rules"), rulesUnread)}

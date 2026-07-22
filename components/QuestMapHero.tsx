@@ -8,6 +8,7 @@ import { useTr } from "@/components/LocaleProvider";
 import TopBannerAd from "@/components/TopBannerAd";
 import ZoomPan from "@/components/ZoomPan";
 import CpIcon from "@/components/CpIcon";
+import LoopVideo from "@/components/LoopVideo";
 import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
 import QuestGame from "@/components/QuestGame";
@@ -193,10 +194,10 @@ export default function QuestMapHero({
             (z-0) and gently bobs up/down like a planet. */}
         <div className="relative z-0 mx-auto w-full max-w-4xl aspect-[4/5] sm:aspect-[16/9] float-y">
           <ZoomPan className="h-full w-full" max={4} initial={1} wheel={false} pan={false}>
-          {/* map art — the looping animated map (mp4) when set, else the still */}
+          {/* map art — the boomerang-looping animated map (mp4) when set, else
+              the still (forward-then-reverse so it never jump-cuts) */}
           {q.mapVideoUrl ? (
-            <video src={q.mapVideoUrl} autoPlay muted loop playsInline
-              poster={q.mapArtUrl ?? undefined}
+            <LoopVideo src={q.mapVideoUrl} poster={q.mapArtUrl ?? undefined}
               className="absolute inset-0 h-full w-full object-cover" />
           ) : (
             <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
