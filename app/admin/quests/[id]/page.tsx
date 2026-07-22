@@ -10,6 +10,7 @@ import SubmitButton from "@/components/SubmitButton";
 import QuestMapPinEditor from "@/components/QuestMapPinEditor";
 import QuestPathEditor from "@/components/QuestPathEditor";
 import QuestGameScreensEditor from "@/components/QuestGameScreensEditor";
+import QuestMap3dEditor from "@/components/QuestMap3dEditor";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Edit quest" };
@@ -103,6 +104,21 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
             milestones={tiers.map((t) => ({ id: t.id, name: t.name, color: t.color ?? quest.color, x: t.mapX, y: t.mapY }))}
             initial={Array.isArray(quest.pathPoints) ? quest.pathPoints : []}
             initialMobile={Array.isArray(quest.pathPointsMobile) ? quest.pathPointsMobile : []}
+          />
+        </div>
+      )}
+
+      {/* 3D terrain texture mapping — live editor so the flat art lines up on the mesh */}
+      {quest.mapGlbUrl && (
+        <div className="glass p-6">
+          <h2 className="font-bold mb-1 flex items-center gap-2"><Icon name="planet" size={16} className="text-cyan-300" /> 3D terrain mapping</h2>
+          <p className="text-xs text-muted mb-3">Line the flat map art up onto the 3D rock — it renders unlit (never dark). Drag the sliders and the preview updates live.</p>
+          <QuestMap3dEditor
+            questId={quest.id}
+            glbUrl={quest.mapGlbUrl}
+            artUrl={quest.mapArtUrl ?? quest.cardBgUrl ?? null}
+            accent={quest.accent2 || quest.color}
+            initial={(quest.mapGlbCfg ?? null) as import("@/lib/quest-game").MapGlbCfg | null}
           />
         </div>
       )}

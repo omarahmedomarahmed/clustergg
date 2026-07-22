@@ -105,6 +105,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "quests" ADD COLUMN IF NOT EXISTS "path_points_mobile" jsonb`,
   `ALTER TABLE "quests" ADD COLUMN IF NOT EXISTS "map_video_url" text`,
   `ALTER TABLE "quests" ADD COLUMN IF NOT EXISTS "map_glb_url" text`,
+  `ALTER TABLE "quests" ADD COLUMN IF NOT EXISTS "map_glb_cfg" jsonb`,
   `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "value" double precision NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "payout_method" jsonb`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "payout_changes" integer NOT NULL DEFAULT 0`,

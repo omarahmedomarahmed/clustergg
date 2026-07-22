@@ -216,3 +216,28 @@ export async function saveQuestGameUi(
   revalidatePath(`/admin/quests/${questId}`); revalidatePath("/quests"); revalidatePath("/feed"); revalidatePath("/");
   return { ok: true };
 }
+
+// Persist the 3D terrain texture-mapping tuning for a quest (Admin → Quests →
+// quest → 3D terrain). Empty/defaults clear it.
+export async function saveQuestMapGlbCfg(questId: string, cfg: Record<string, unknown>) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const num = (v: unknown, min: number, max: number, d: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : d;
+  };
+  const clean = {
+    projection: cfg.projection === "uv" ? "uv" : "planar",
+    offsetX: num(cfg.offsetX, -1, 1, 0), offsetY: num(cfg.offsetY, -1, 1, 0),
+    scaleX: num(cfg.scaleX, 0.1, 8, 1), scaleY: num(cfg.scaleY, 0.1, 8, 1),
+    rotation: num(cfg.rotation, -360, 360, 0),
+    flipX: !!cfg.flipX, flipY: !!cfg.flipY,
+    yaw: num(cfg.yaw, -360, 360, 0),
+    brightness: num(cfg.brightness, 0.3, 3, 1),
+    autoRotate: cfg.autoRotate !== false,
+  };
+  await db.update(schema.quests).set({ mapGlbCfg: clean }).where(eq(schema.quests.id, questId));
+  await audit(admin.id, "quest.map_glb_cfg", questId);
+  revalidatePath(`/admin/quests/${questId}`); revalidatePath("/quests"); revalidatePath("/feed"); revalidatePath("/");
+  return { ok: true };
+}

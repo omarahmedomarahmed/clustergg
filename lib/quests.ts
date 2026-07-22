@@ -326,6 +326,7 @@ export type QuestView = {
   logoUrl: string | null; cardBgUrl: string | null; coverUrl: string | null; mapArtUrl: string | null;
   mapVideoUrl: string | null;
   mapGlbUrl: string | null;
+  mapGlbCfg: import("@/lib/quest-game").MapGlbCfg | null;
   pathPoints: { x: number; y: number }[] | null;
   pathPointsMobile: { x: number; y: number }[] | null;
   qp: number; tiers: QuestTierView[]; currentTierIndex: number; nextTier: QuestTierView | null;
@@ -376,6 +377,7 @@ export async function getUserQuests(db: DB, userId: string | null): Promise<Ques
       logoUrl: q.logoUrl, cardBgUrl: q.cardBgUrl, coverUrl: q.coverUrl, mapArtUrl: q.mapArtUrl,
       mapVideoUrl: q.mapVideoUrl,
       mapGlbUrl: q.mapGlbUrl,
+      mapGlbCfg: (q.mapGlbCfg ?? null) as import("@/lib/quest-game").MapGlbCfg | null,
       pathPoints: Array.isArray(q.pathPoints) && q.pathPoints.length >= 2 ? q.pathPoints : null,
       pathPointsMobile: Array.isArray(q.pathPointsMobile) && q.pathPointsMobile.length >= 2 ? q.pathPointsMobile : null,
       qp, tiers: qTiers, currentTierIndex, nextTier,

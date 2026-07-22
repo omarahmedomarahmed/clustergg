@@ -318,7 +318,7 @@ export default function QuestGame({
             )}
             {view3d && quest.mapGlbUrl ? (
               <>
-                <GlbTerrain url={quest.mapGlbUrl} textureUrl={quest.mapArtUrl} accent={quest.accent2} />
+                <GlbTerrain url={quest.mapGlbUrl} textureUrl={quest.mapArtUrl} accent={quest.accent2} cfg={quest.mapGlbCfg} />
                 <span className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 rounded-full bg-black/60 px-3 py-1 text-[10px] text-muted pointer-events-none whitespace-nowrap">
                   {tr("Drag to orbit · pinch or scroll to zoom · switch to Map for milestones")}
                 </span>
