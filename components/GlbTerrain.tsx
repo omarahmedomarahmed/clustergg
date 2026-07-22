@@ -1,14 +1,26 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { DEFAULT_MAP_GLB_CFG, type MapGlbCfg } from "@/lib/quest-game";
 
 // Three.js 3D terrain viewer for a quest map's GLB mesh (Higgsfield image→3D).
-// Auto-rotates, drag to orbit, pinch/wheel to zoom — three.js is loaded lazily
-// so it never enters the main bundle. If the mesh ships without a baked texture
-// (image_to_3d sometimes returns geometry-only, which renders plain white), we
-// drape the quest's own map art onto it so the terrain always looks textured.
-export default function GlbTerrain({ url, textureUrl, accent = "#8b5cf6" }: { url: string; textureUrl?: string | null; accent?: string }) {
+// The flat quest map art is projected onto the mesh UNLIT (never dark) so the
+// terrain always shows the exact art colours. By default the art is draped
+// top-down by world XZ ("planar") so features land in their correct place on
+// the 3D rock; admins can nudge offset / scale / rotation / flip / yaw /
+// brightness to line it up perfectly (all live). three.js is loaded lazily so
+// it never enters the main bundle.
+export default function GlbTerrain({
+  url, textureUrl, accent = "#8b5cf6", cfg,
+}: { url: string; textureUrl?: string | null; accent?: string; cfg?: MapGlbCfg | null }) {
   const ref = useRef<HTMLDivElement | null>(null);
+  // Live-tunable values read every frame so the admin editor updates instantly
+  // without rebuilding the three.js scene.
+  const cfgRef = useRef<Required<MapGlbCfg>>({ ...DEFAULT_MAP_GLB_CFG, ...(cfg ?? {}) });
+  useEffect(() => { cfgRef.current = { ...DEFAULT_MAP_GLB_CFG, ...(cfg ?? {}) }; }, [cfg]);
+
+  // Structural settings that require a rebuild (projection + which mesh UVs).
+  const projection = cfg?.projection ?? DEFAULT_MAP_GLB_CFG.projection;
 
   useEffect(() => {
     const el = ref.current;
@@ -25,63 +37,81 @@ export default function GlbTerrain({ url, textureUrl, accent = "#8b5cf6" }: { ur
 
       const scene = new THREE.Scene();
       const cam = new THREE.PerspectiveCamera(45, Math.max(1, el.clientWidth) / Math.max(1, el.clientHeight), 0.01, 100);
-      cam.position.set(0, 1.1, 2.4);
+      cam.position.set(0, 1.2, 2.5);
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(el.clientWidth, el.clientHeight);
       renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
-      // Correct color pipeline so baked textures show their real colours instead
-      // of washing out to white.
       renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1.0;
       el.appendChild(renderer.domElement);
-
-      // Gentle, balanced lighting — the previous rig was ~4× too bright and blew
-      // the terrain out to a flat white.
-      scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-      const hemi = new THREE.HemisphereLight(0xbcd4ff, 0x1a1030, 0.5); scene.add(hemi);
-      const key = new THREE.DirectionalLight(0xffffff, 1.15); key.position.set(2, 3, 2); scene.add(key);
-      const rim = new THREE.DirectionalLight(new THREE.Color(accent), 0.6); rim.position.set(-2, 1.5, -2); scene.add(rim);
 
       const controls = new OrbitControls(cam, renderer.domElement);
       controls.enableDamping = true;
-      controls.autoRotate = true;
       controls.autoRotateSpeed = 1.1;
       controls.minDistance = 1.2;
       controls.maxDistance = 5;
 
-      // Preload the fallback texture (the quest map art) once.
-      let fallbackTex: import("three").Texture | null = null;
+      // The map art, loaded once, applied UNLIT so nothing is ever in shadow.
+      let tex: import("three").Texture | null = null;
       if (textureUrl) {
         try {
-          fallbackTex = await new THREE.TextureLoader().loadAsync(textureUrl);
-          fallbackTex.colorSpace = THREE.SRGBColorSpace;
-          fallbackTex.flipY = false; // glTF UV convention
-        } catch { fallbackTex = null; }
+          tex = await new THREE.TextureLoader().loadAsync(textureUrl);
+          tex.colorSpace = THREE.SRGBColorSpace;
+          tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+          tex.center.set(0.5, 0.5);
+        } catch { tex = null; }
       }
       if (stop) return;
+
+      const materials: import("three").MeshBasicMaterial[] = [];
 
       new GLTFLoader().load(url, (g) => {
         if (stop) return;
         const obj = g.scene;
+
+        // Normalise to a unit-ish size centred at origin FIRST so planar UVs use
+        // the local geometry box.
+        const box0 = new THREE.Box3().setFromObject(obj);
+        const size0 = box0.getSize(new THREE.Vector3());
+        const minXZ = new THREE.Vector3(box0.min.x, 0, box0.min.z);
+        const spanX = size0.x || 1, spanZ = size0.z || 1;
+
         obj.traverse((child) => {
           const mesh = child as import("three").Mesh;
           if (!mesh.isMesh) return;
-          const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-          for (const m of mats) {
-            const mat = m as import("three").MeshStandardMaterial;
-            // Untextured/near-white material → drape the map art on it.
-            const hasMap = !!mat.map;
-            if (!hasMap && fallbackTex) { mat.map = fallbackTex; mat.color?.set(0xffffff); mat.needsUpdate = true; }
-            if ("metalness" in mat) mat.metalness = Math.min(mat.metalness ?? 0, 0.2);
-            if ("roughness" in mat) mat.roughness = Math.max(mat.roughness ?? 1, 0.75);
+
+          // Planar top-down UVs: project each vertex onto the XZ plane so the
+          // flat art lays over the terrain in the right position.
+          if (projection === "planar" && mesh.geometry) {
+            const pos = mesh.geometry.getAttribute("position");
+            if (pos) {
+              const uv = new Float32Array(pos.count * 2);
+              const v = new THREE.Vector3();
+              const worldMatrix = mesh.matrixWorld;
+              mesh.updateWorldMatrix(true, false);
+              for (let i = 0; i < pos.count; i++) {
+                v.fromBufferAttribute(pos, i).applyMatrix4(worldMatrix);
+                uv[i * 2] = (v.x - minXZ.x) / spanX;
+                uv[i * 2 + 1] = (v.z - minXZ.z) / spanZ;
+              }
+              mesh.geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+            }
           }
+
+          // Unlit material showing the texture at full brightness.
+          const existing = mesh.material as import("three").MeshStandardMaterial;
+          const map = tex ?? existing?.map ?? null;
+          const mat = new THREE.MeshBasicMaterial({ map: map ?? undefined, color: 0xffffff, side: THREE.DoubleSide });
+          if (!map) mat.color.set(new THREE.Color(accent).multiplyScalar(0.7));
+          mesh.material = mat;
+          materials.push(mat);
         });
+
         const box = new THREE.Box3().setFromObject(obj);
         const size = box.getSize(new THREE.Vector3()).length() || 1;
         const center = box.getCenter(new THREE.Vector3());
         obj.position.sub(center);
-        obj.scale.setScalar(2.2 / size);
+        obj.scale.setScalar(2.3 / size);
+        obj.name = "terrain";
         scene.add(obj);
       });
 
@@ -94,8 +124,24 @@ export default function GlbTerrain({ url, textureUrl, accent = "#8b5cf6" }: { ur
       const ro = new ResizeObserver(onResize);
       ro.observe(el);
 
+      let lastYaw = 0;
       const loop = () => {
         if (stop) { ro.disconnect(); return; }
+        const c = cfgRef.current;
+        // Live texture transform.
+        if (tex) {
+          tex.offset.set(c.offsetX, c.offsetY);
+          tex.repeat.set((c.flipX ? -1 : 1) * c.scaleX, (c.flipY ? -1 : 1) * c.scaleY);
+          tex.rotation = (c.rotation * Math.PI) / 180;
+          tex.needsUpdate = true;
+        }
+        for (const m of materials) { const b = c.brightness; m.color.setRGB(b, b, b); }
+        // Model yaw + optional auto-rotate.
+        const terrain = scene.getObjectByName("terrain");
+        if (terrain) {
+          if (c.autoRotate) terrain.rotation.y += 0.006;
+          else { terrain.rotation.y += ((c.yaw * Math.PI) / 180) - lastYaw; lastYaw = (c.yaw * Math.PI) / 180; }
+        }
         controls.update();
         renderer!.render(scene, cam);
         frame = requestAnimationFrame(loop);
@@ -109,7 +155,7 @@ export default function GlbTerrain({ url, textureUrl, accent = "#8b5cf6" }: { ur
       renderer?.dispose();
       if (el) el.innerHTML = "";
     };
-  }, [url, textureUrl, accent]);
+  }, [url, textureUrl, accent, projection]);
 
   return <div ref={ref} className="absolute inset-0" style={{ touchAction: "none" }} />;
 }

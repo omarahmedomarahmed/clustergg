@@ -57,6 +57,27 @@ export function openMissions(cfg: MissionConfig[] | null | undefined, s: Starter
 export type PanelCfg = { title?: string; bg?: string; dim?: number; btn?: string };
 export type QuestGameUi = { rules?: PanelCfg; log?: PanelCfg; guide?: PanelCfg; missions?: PanelCfg; milestone?: PanelCfg };
 
+// Admin-tunable 3D terrain texture mapping — projects the flat quest map art
+// onto the 3D mesh so features land in the right place, unlit (never dark).
+// `projection: "planar"` drapes the art top-down by world XZ (correct
+// placement); "uv" uses the mesh's own baked UVs. offset/scale/rotation/flip
+// nudge the art to line up perfectly; yaw spins the model; brightness tints it.
+export type MapGlbCfg = {
+  projection?: "planar" | "uv";
+  offsetX?: number; offsetY?: number;   // 0..1
+  scaleX?: number; scaleY?: number;     // repeat (1 = fill once)
+  rotation?: number;                    // degrees (texture)
+  flipX?: boolean; flipY?: boolean;
+  yaw?: number;                         // degrees (model spin)
+  brightness?: number;                  // 0.4..2 (1 = as-is)
+  autoRotate?: boolean;
+};
+
+export const DEFAULT_MAP_GLB_CFG: Required<MapGlbCfg> = {
+  projection: "planar", offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1,
+  rotation: 0, flipX: false, flipY: false, yaw: 0, brightness: 1, autoRotate: true,
+};
+
 // Admin-set CSS `background` values for the in-game panels (from the universal
 // card-background editor: quest_rules / quest_log / quest_guide / quest_missions).
 export type QuestPanelArt = { rules?: string; log?: string; guide?: string; missions?: string };
