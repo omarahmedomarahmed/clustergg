@@ -10,7 +10,7 @@ import ZoomPan from "@/components/ZoomPan";
 import { useTr } from "@/components/LocaleProvider";
 import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
-import type { QuestGamePayload } from "@/lib/quest-game";
+import { DEFAULT_MISSIONS, missionDone, type QuestGamePayload, type QuestGameUi } from "@/lib/quest-game";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // The playable space-game experience for a quest: a full-screen overlay where
@@ -190,17 +190,36 @@ export default function QuestGame({
     return [...m.values()].sort((a, b) => b.total - a.total);
   }, [log]);
 
-  // Guided starter missions — red dots drive the gamer to their firsts.
+  // Guided starter missions — admin-configurable per quest (labels, links,
+  // thresholds), completion resolved from the gamer's REAL history. Red dots
+  // drive them to their firsts; the ads mission is threshold-based (e.g. 5 ads).
   const missionList = useMemo(() => {
     if (!missions) return [];
-    return [
-      { key: "connect", icon: "link", label: tr("Connect your first game account"), href: "/profile", at: missions.connectAt },
-      { key: "planet", icon: "planet", label: tr("Join your first planet"), href: "/planets", at: missions.planetAt },
-      { key: "challenge", icon: "zap", label: tr("Join your first challenge"), href: "/planets", at: missions.challengeAt },
-      { key: "ad", icon: "eye", label: tr("Spot your first sponsor signal (ad)"), href: "/feed", at: missions.adAt },
-    ];
-  }, [missions, tr]);
+    const cfg = (quest.missions && quest.missions.length ? quest.missions : DEFAULT_MISSIONS).filter((m) => m.enabled !== false);
+    return cfg.map((m) => ({
+      ...m,
+      at: missionDone(m, missions),
+      progress: m.kind === "ads" ? `${Math.min(missions.adCount, m.threshold ?? 5)}/${m.threshold ?? 5}` : null,
+    }));
+  }, [missions, quest]);
   const missionsOpen = missionList.filter((m) => !m.at).length;
+
+  // Per-quest admin overrides for the game screens (title / bg + dark overlay /
+  // button color) — Admin → Quests → quest → Game screens.
+  const gu: QuestGameUi = quest.gameUi ?? {};
+  const guBg = (k: keyof QuestGameUi): string | null => {
+    const c = gu[k];
+    if (!c?.bg) return null;
+    const dim = (Math.max(0, Math.min(100, c.dim ?? 62)) / 100).toFixed(2);
+    return `linear-gradient(rgba(4,5,26,0.28), rgba(4,5,26,${dim})), url(${c.bg}) center/cover`;
+  };
+  const guTitle = (k: keyof QuestGameUi, dflt: string): string => (gu[k]?.title ? tr(gu[k]!.title!) : dflt);
+  const btnStyle = (k: keyof QuestGameUi) => {
+    const b = gu[k]?.btn;
+    return b
+      ? { background: b, boxShadow: `0 8px 22px -10px ${b}` }
+      : { background: `linear-gradient(90deg, ${quest.color}, ${quest.accent2})`, boxShadow: `0 8px 22px -10px ${quest.color}` };
+  };
   const rulesUnread = quest.qp === 0; // fresh questers should read the rules first
   const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
@@ -208,19 +227,25 @@ export default function QuestGame({
 
   const sheet = "absolute inset-x-0 bottom-0 z-40 max-h-[72dvh] overflow-y-auto overscroll-contain rounded-t-3xl sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[420px] sm:max-h-[70dvh] sm:rounded-2xl border border-white/15 backdrop-blur-xl shadow-2xl";
   const defaultSheetBg = `linear-gradient(rgba(4,5,26,0.92), rgba(4,5,26,0.96))${quest.cardBgUrl ? `, url(${quest.cardBgUrl}) center/cover` : ""}`;
-  const panelBg = (k: "rules" | "log" | "guide" | "missions") => ({ background: art?.[k] || defaultSheetBg });
+  const panelBg = (k: keyof QuestGameUi) => ({
+    background: guBg(k) || (k !== "milestone" ? art?.[k as "rules" | "log" | "guide" | "missions"] : undefined) || defaultSheetBg,
+  });
   const redDot = (n?: number) => (
-    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-[#04051a]">
+    <span className="absolute -top-1.5 -right-1.5 z-10 flex h-4.5 min-w-4.5 h-[18px] min-w-[18px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-[#04051a] shadow-[0_0_10px_rgba(244,63,94,0.9)]">
       {n && n > 1 ? n : ""}
     </span>
   );
-  // Game-card action buttons (bottom bar) — art background + red attention dots.
+  // Game-card action buttons (bottom bar) — art background + red attention
+  // dots. The art is clipped by an INNER span so the dot rides the top layer,
+  // never hidden by the card's rounded clipping.
   const tabBtn = (p: Exclude<Panel, null>, icon: string, label: string, dot?: number | boolean) => (
     <button key={p} onClick={() => { setSel(null); setPanel(panel === p ? null : p); }}
-      className={`relative flex flex-1 sm:flex-none sm:w-32 flex-col items-center justify-end gap-1 overflow-hidden rounded-2xl border px-2 pt-6 pb-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide transition-all active:scale-95 ${panel === p ? "text-white scale-[1.03]" : "text-white/85"}`}
+      className={`relative flex flex-1 sm:flex-none sm:w-32 flex-col items-center justify-end gap-1 rounded-2xl border px-2 pt-6 pb-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide transition-all active:scale-95 ${panel === p ? "text-white scale-[1.03]" : "text-white/85"}`}
       style={{ borderColor: panel === p ? `${quest.color}dd` : "rgba(255,255,255,0.14)", boxShadow: panel === p ? `0 0 22px -6px ${quest.color}` : "none" }}>
-      <span aria-hidden className="absolute inset-0" style={{ background: art?.[p] || `linear-gradient(180deg, ${quest.color}30, rgba(4,5,26,0.9))` }} />
-      <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.1), rgba(4,5,26,0.65))" }} />
+      <span aria-hidden className="absolute inset-0 overflow-hidden rounded-2xl">
+        <span className="absolute inset-0" style={{ background: guBg(p) || art?.[p] || `linear-gradient(180deg, ${quest.color}30, rgba(4,5,26,0.9))` }} />
+        <span className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.1), rgba(4,5,26,0.65))" }} />
+      </span>
       <Icon name={icon} size={17} className="relative" style={{ color: panel === p ? quest.accent2 : "#e6e6f7" }} />
       <span className="relative leading-none">{label}</span>
       {dot ? redDot(typeof dot === "number" ? dot : undefined) : null}
@@ -279,8 +304,14 @@ export default function QuestGame({
         {sw > 0 && (
           <div className="relative" style={{ width: sw, height: sh }}>
             <ZoomPan className="h-full w-full" min={1} max={4} initial={1} wheel pan>
-              {/* World art */}
-              <div className="absolute inset-0" style={{ background: quest.mapArtUrl ? `url(${quest.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${quest.color}22, ${quest.accent2}18), #0a0a1c` }} />
+              {/* World art — the looping animated map (mp4) when set */}
+              {quest.mapVideoUrl ? (
+                <video src={quest.mapVideoUrl} autoPlay muted loop playsInline
+                  poster={quest.mapArtUrl ?? undefined}
+                  className="absolute inset-0 h-full w-full object-cover" />
+              ) : (
+                <div className="absolute inset-0" style={{ background: quest.mapArtUrl ? `url(${quest.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${quest.color}22, ${quest.accent2}18), #0a0a1c` }} />
+              )}
               <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.12), rgba(4,5,26,0.4))" }} />
 
               {/* Trail */}
@@ -356,7 +387,7 @@ export default function QuestGame({
 
       {/* ===== Milestone card (opens when the astronaut arrives) ===== */}
       {sel !== null && tiers[sel] && (
-        <div className={sheet} style={{ background: defaultSheetBg }}>
+        <div className={sheet} style={panelBg("milestone")}>
           <div className="p-4" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
               <div className="font-bold flex items-center gap-2" style={{ color: tiers[sel].color || quest.color }}>
@@ -385,7 +416,7 @@ export default function QuestGame({
             {!tiers[sel].earned && (
               <button onClick={() => { setSel(null); setPanel("rules"); }}
                 className="mt-3 w-full pressable rounded-full px-4 py-2 text-sm font-bold text-white"
-                style={{ background: `linear-gradient(90deg, ${quest.color}, ${quest.accent2})`, boxShadow: `0 8px 22px -10px ${quest.color}` }}>
+                style={btnStyle("milestone")}>
                 {tr("How do I earn CP?")}
               </button>
             )}
@@ -398,7 +429,7 @@ export default function QuestGame({
         <div className={sheet} style={panelBg("rules")}>
           <div className="p-4 space-y-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold flex items-center gap-2"><Icon name="zap" size={16} style={{ color: quest.color }} /> {tr("Game rules — how you earn CP")}</h3>
+              <h3 className="font-bold flex items-center gap-2"><Icon name="zap" size={16} style={{ color: quest.color }} /> {guTitle("rules", tr("Game rules — how you earn CP"))}</h3>
               <button onClick={() => setPanel(null)} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
             </div>
             <p className="text-xs text-muted leading-relaxed">{quest.lore || quest.tagline}</p>
@@ -432,7 +463,7 @@ export default function QuestGame({
         <div className={sheet} style={panelBg("log")}>
           <div className="p-4 space-y-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold flex items-center gap-2"><Icon name="clock" size={16} style={{ color: quest.color }} /> {tr("My quest history")}</h3>
+              <h3 className="font-bold flex items-center gap-2"><Icon name="clock" size={16} style={{ color: quest.color }} /> {guTitle("log", tr("My quest history"))}</h3>
               <button onClick={() => setPanel(null)} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
             </div>
             <div className="flex items-center gap-4 text-xs">
@@ -471,25 +502,29 @@ export default function QuestGame({
         <div className={sheet} style={panelBg("missions")}>
           <div className="p-4 space-y-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold flex items-center gap-2"><Icon name="rocket" size={16} style={{ color: quest.color }} /> {tr("Starter missions")}</h3>
+              <h3 className="font-bold flex items-center gap-2"><Icon name="rocket" size={16} style={{ color: quest.color }} /> {guTitle("missions", tr("Starter missions"))}</h3>
               <button onClick={() => setPanel(null)} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
             </div>
             <p className="text-xs text-muted leading-relaxed">{tr("Your first moves in the Cluster — each one earns CP and lights up your trail. Finish all four to launch for real.")}</p>
             <div className="space-y-1.5">
-              {missionList.map((m) => (
-                <Link key={m.key} href={m.href} onClick={close}
+              {missionList.map((m, i) => (
+                <Link key={i} href={m.href} onClick={close}
                   className="relative flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition-colors"
                   style={{ borderColor: m.at ? "#10b98155" : "rgba(255,255,255,0.14)", background: m.at ? "#10b9811a" : "rgba(0,0,0,0.4)" }}>
                   <span className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0" style={{ background: m.at ? "#10b98126" : `${quest.color}22` }}>
                     <Icon name={m.icon} size={16} style={{ color: m.at ? "#34d399" : quest.color }} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold truncate">{m.label}</span>
-                    <span className="block text-[10px] text-muted">{m.at ? `✓ ${tr("Done")} · ${fmt(m.at)}` : tr("Tap to go do it now")}</span>
+                    <span className="block text-sm font-semibold truncate">{tr(m.label)}</span>
+                    <span className="block text-[10px] text-muted">
+                      {m.at ? `✓ ${tr("Done")} · ${fmt(m.at)}` : m.progress ? `${m.progress} · ${tr("keep going")}` : tr("Tap to go do it now")}
+                    </span>
                   </span>
                   {m.at
                     ? <span className="text-emerald-300 font-black">✓</span>
-                    : <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 animate-ping opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" /></span>}
+                    : m.progress
+                      ? <span className="text-[10px] font-black text-rose-300">{m.progress}</span>
+                      : <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 animate-ping opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" /></span>}
                 </Link>
               ))}
               {missionList.length === 0 && <div className="text-xs text-muted">{tr("Sign in to start your missions.")}</div>}
@@ -502,7 +537,7 @@ export default function QuestGame({
         <div className={sheet} style={panelBg("guide")}>
           <div className="p-4 space-y-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold flex items-center gap-2"><Icon name="spark" size={16} style={{ color: quest.color }} /> {tr("How to play")}</h3>
+              <h3 className="font-bold flex items-center gap-2"><Icon name="spark" size={16} style={{ color: quest.color }} /> {guTitle("guide", tr("How to play"))}</h3>
               <button onClick={() => setPanel(null)} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
             </div>
             {[

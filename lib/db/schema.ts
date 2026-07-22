@@ -510,8 +510,11 @@ export const quests = pgTable("quests", {
   cardBgUrl: text("card_bg_url"),              // gamified floating-card background
   coverUrl: text("cover_url"),
   mapArtUrl: text("map_art_url"),              // treasure-map art for the quest hero
+  mapVideoUrl: text("map_video_url"),          // looping animated map (mp4) — plays instead of the still art
   pathPoints: jsonb("path_points").$type<{ x: number; y: number }[]>(), // curved trail waypoints the astronaut rides
   pathPointsMobile: jsonb("path_points_mobile").$type<{ x: number; y: number }[]>(), // separate trail for the 4:5 mobile map (curves differ per aspect)
+  missionsConfig: jsonb("missions_config").$type<{ kind: string; label: string; href: string; icon: string; threshold?: number; enabled?: boolean }[]>(), // admin-edited starter missions
+  gameUi: jsonb("game_ui").$type<Record<string, { title?: string; bg?: string; dim?: number; btn?: string }>>(), // per-panel game-screen overrides (title/bg/overlay/button)
   actionWeights: jsonb("action_weights").$type<Record<string, number>>().notNull().default({}),
   dailyCaps: jsonb("daily_caps").$type<Record<string, number>>().notNull().default({}),
   sortOrder: integer("sort_order").notNull().default(0),

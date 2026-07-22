@@ -11,7 +11,7 @@ import CpIcon from "@/components/CpIcon";
 import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
 import QuestGame from "@/components/QuestGame";
-import type { QuestGamePayload } from "@/lib/quest-game";
+import { openMissions, type QuestGamePayload } from "@/lib/quest-game";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
@@ -193,8 +193,14 @@ export default function QuestMapHero({
             (z-0) and gently bobs up/down like a planet. */}
         <div className="relative z-0 mx-auto w-full max-w-4xl aspect-[4/5] sm:aspect-[16/9] float-y">
           <ZoomPan className="h-full w-full" max={4} initial={1} wheel={false} pan={false}>
-          {/* map art */}
-          <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
+          {/* map art — the looping animated map (mp4) when set, else the still */}
+          {q.mapVideoUrl ? (
+            <video src={q.mapVideoUrl} autoPlay muted loop playsInline
+              poster={q.mapArtUrl ?? undefined}
+              className="absolute inset-0 h-full w-full object-cover" />
+          ) : (
+            <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
+          )}
           {/* readability veil */}
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.15), rgba(4,5,26,0.45))" }} />
           {/* Playable: tapping the map art itself launches the quest game */}
@@ -262,7 +268,7 @@ export default function QuestMapHero({
               className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 pressable inline-flex items-center gap-2 rounded-full px-7 py-2.5 text-sm font-bold text-white shadow-xl transition-transform hover:scale-105"
               style={{ background: `linear-gradient(90deg, ${q.color}, ${q.accent2})`, boxShadow: `0 10px 28px -10px ${q.color}` }}>
               <Icon name="play" size={14} /> {tr("Play quest")}
-              {gameData.missions && Object.values(gameData.missions).some((v) => !v) && (
+              {openMissions(q.missions, gameData.missions) > 0 && (
                 <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
                   <span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 animate-ping opacity-75" />
                   <span className="relative inline-flex h-3.5 w-3.5 rounded-full bg-rose-500 ring-2 ring-[#04051a]" />

@@ -715,7 +715,23 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-20.2-pubg-rename";
+const MAINT_VERSION = "2026-07-22.1-quest-videos";
+
+// Looping animated quest maps (Higgsfield kling image→video from the original
+// map art). Applied once per quest when no video is set; admins can replace or
+// clear them in Admin → Quests.
+const QUEST_MAP_VIDEOS: Record<string, string> = {
+  conquest: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015922_4aea0000-d74e-4fb6-bae9-e456aa097c7f.mp4",
+  orbit: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015928_fb0e499a-7988-4ac6-9a31-d1581010ea2c.mp4",
+  ascension: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015935_37dfb652-b7a4-4787-89b6-7c7f907fe1d9.mp4",
+  signal: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015940_f5a41d5c-72d3-4d5c-8707-bb6fd55a94b8.mp4",
+};
+
+// Extra Higgsfield trophies (style-matched to the original set).
+const EXTRA_TROPHIES: { name: string; imageUrl: string; tier: string }[] = [
+  { name: "Platinum Galaxy Ring Cup", imageUrl: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_020023_311be94b-577b-4962-89f9-97c6ec3e53b8.png", tier: "legendary" },
+  { name: "Emerald Comet Chalice", imageUrl: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_020028_73daef83-147f-4088-a80f-be54819cd112.png", tier: "gold" },
+];
 
 export async function runBootMaintenance(db: DB) {
   try {
@@ -770,6 +786,21 @@ export async function runBootMaintenance(db: DB) {
   // ensureProvisioned — not gated here — so it self-heals if Blob became
   // available after this version flag was already set.)
   try { const { seedQuests, ensureQuestArt } = await import("@/lib/quests"); await seedQuests(db); await ensureQuestArt(db); } catch { /* non-fatal */ }
+
+  // Animated quest maps: fill in the generated loop for quests that have none.
+  for (const [key, url] of Object.entries(QUEST_MAP_VIDEOS)) {
+    try {
+      const [q] = await db.select({ id: schema.quests.id, v: schema.quests.mapVideoUrl }).from(schema.quests).where(eq(schema.quests.key, key)).limit(1);
+      if (q && !q.v) await db.update(schema.quests).set({ mapVideoUrl: url }).where(eq(schema.quests.id, q.id));
+    } catch { /* non-fatal */ }
+  }
+  // New trophies (insert-if-missing by name; admin can edit/delete them after).
+  for (const t of EXTRA_TROPHIES) {
+    try {
+      const [ex] = await db.select({ id: schema.trophies.id }).from(schema.trophies).where(eq(schema.trophies.name, t.name)).limit(1);
+      if (!ex) await db.insert(schema.trophies).values({ id: uid(), ...t });
+    } catch { /* non-fatal */ }
+  }
 
   await db.insert(schema.platformSettings)
     .values({ key: "boot_maintenance", value: { version: MAINT_VERSION } })
