@@ -5,6 +5,7 @@ import { gameHasDirectory } from "@/lib/game-entities";
 import { getSnapshotMeta } from "@/lib/game-world-cache";
 import RehostImagesButton from "@/components/RehostImagesButton";
 import GameWorldSyncPanel from "@/components/GameWorldSyncPanel";
+import StorageCompressor from "@/components/StorageCompressor";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +44,6 @@ export default async function AdminStoragePage() {
   const byCat = new Map<ImageCategory, number>();
   for (const r of rows) byCat.set(r.cat, (byCat.get(r.cat) ?? 0) + 1);
   const totalBytes = [...new Set(rows.map((r) => r.url))].reduce((s, u) => s + (sizes.get(u) ?? 0), 0);
-  const huge = rows.filter((r) => (r.size ?? 0) >= HUGE);
   const higgs = byCat.get("higgsfield") ?? 0;
   const inline = byCat.get("inline-dataurl") ?? 0;
   const needsRehost = higgs + inline;
@@ -77,22 +77,8 @@ export default async function AdminStoragePage() {
       {/* Game-world catalogue snapshots */}
       <GameWorldSyncPanel rows={gwRows} />
 
-      {/* Huge images to compress */}
-      {huge.length > 0 && (
-        <div className="glass p-5">
-          <h2 className="font-bold flex items-center gap-2 mb-1"><Icon name="flame" size={16} className="text-rose-300" /> Heaviest images (≥ 0.5 MB — compress these)</h2>
-          <p className="text-xs text-muted mb-3">These are the ones worth compressing (they&apos;re re-downloaded by every visitor). Re-upload a smaller version from the relevant admin editor.</p>
-          <div className="flex flex-wrap gap-2">
-            {huge.map((r, i) => (
-              <a key={i} href={r.url} target="_blank" rel="noopener" className="inline-flex items-center gap-2 rounded-full border border-rose-400/25 bg-rose-500/[0.06] px-3 py-1.5 text-xs hover:border-rose-400/50">
-                <span className="font-bold text-rose-200">{kb(r.size!)}</span>
-                <span className="text-muted">{r.table}·{r.field}</span>
-                <span className="truncate max-w-[160px]">{r.label}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Bulk compress + replace + delete (fixes Vercel Blob data transfer) */}
+      <StorageCompressor rows={rows.map((r) => ({ url: r.url, label: r.label, table: r.table, field: r.field, size: r.size, cat: r.cat }))} />
 
       {/* Full table */}
       <div className="glass overflow-x-auto">
