@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import type { PgTable } from "drizzle-orm/pg-core";
 
 export type ImageRef = { table: string; field: string; refId: string; label: string; url: string };
 export type ImageCategory = "vercel-blob" | "higgsfield" | "inline-dataurl" | "external" | "empty";
@@ -53,7 +55,99 @@ export async function collectImageRefs(): Promise<ImageRef[]> {
   for (const t of trophies) push("trophies", "image", t.id, t.name, t.imageUrl);
   for (const u of users) { push("users", "avatar", u.id, u.name, u.avatarUrl); push("users", "banner", u.id, u.name, u.bannerUrl); }
 
+  // Quest map video + 3D mesh (big files that also count toward transfer).
+  const questAv = await db.select({ id: schema.quests.id, name: schema.quests.name, mapVideoUrl: schema.quests.mapVideoUrl, mapGlbUrl: schema.quests.mapGlbUrl }).from(schema.quests);
+  for (const q of questAv) { push("quests", "map-video", q.id, q.name, q.mapVideoUrl); push("quests", "map-glb", q.id, q.name, q.mapGlbUrl); }
+
+  // CMS content (platform_settings): brand art, page backgrounds, loading
+  // screen, quest-panel art, etc. — often the biggest single images.
+  try {
+    const settings = await db.select().from(schema.platformSettings);
+    for (const s of settings) {
+      const v = typeof s.value === "string" ? s.value : "";
+      if (v && classifyUrl(v) !== "empty" && classifyUrl(v) !== "external") push("platform_settings", "content", s.key, s.key, v);
+      else if (v && /^https?:\/\//i.test(v) && /\.(png|jpe?g|webp|gif|svg|mp4)(\?|$)/i.test(v)) push("platform_settings", "content", s.key, s.key, v);
+    }
+  } catch { /* settings table missing */ }
+
   return refs;
+}
+
+// ===== Mutation: replace / delete an image URL everywhere it's referenced =====
+
+// Every scalar image column, so a URL swap or wipe hits all of them.
+type ColTuple = [PgTable, string, unknown];
+function imageColumns(): ColTuple[] {
+  const s = schema;
+  return [
+    [s.games, "logoUrl", s.games.logoUrl], [s.games, "coverUrl", s.games.coverUrl],
+    [s.games, "planetImageUrl", s.games.planetImageUrl], [s.games, "planetBgUrl", s.games.planetBgUrl],
+    [s.quests, "logoUrl", s.quests.logoUrl], [s.quests, "cardBgUrl", s.quests.cardBgUrl],
+    [s.quests, "coverUrl", s.quests.coverUrl], [s.quests, "mapArtUrl", s.quests.mapArtUrl],
+    [s.quests, "mapVideoUrl", s.quests.mapVideoUrl], [s.quests, "mapGlbUrl", s.quests.mapGlbUrl],
+    [s.questTiers, "iconUrl", s.questTiers.iconUrl],
+    [s.adCreatives, "fileUrl", s.adCreatives.fileUrl],
+    [s.brands, "logoUrl", s.brands.logoUrl], [s.brands, "coverUrl", s.brands.coverUrl],
+    [s.challenges, "coverUrl", s.challenges.coverUrl], [s.challenges, "heroUrl", s.challenges.heroUrl],
+    [s.partners, "logoUrl", s.partners.logoUrl],
+    [s.trophies, "imageUrl", s.trophies.imageUrl],
+    [s.users, "avatarUrl", s.users.avatarUrl], [s.users, "bannerUrl", s.users.bannerUrl],
+  ];
+}
+
+// Point every reference of `oldUrl` at `newUrl` (scalar columns + CMS content).
+export async function replaceUrlEverywhere(oldUrl: string, newUrl: string): Promise<number> {
+  const db = await getDb();
+  let n = 0;
+  for (const [tbl, field, col] of imageColumns()) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await db.update(tbl as any).set({ [field]: newUrl }).where(eq(col as any, oldUrl));
+    n += (r as { rowCount?: number }).rowCount ?? 0;
+  }
+  // CMS content is jsonb-stored strings; match in JS to avoid jsonb casting.
+  try {
+    const rows = await db.select().from(schema.platformSettings);
+    for (const s of rows) {
+      if (typeof s.value === "string" && s.value === oldUrl) {
+        await db.update(schema.platformSettings).set({ value: newUrl, updatedAt: new Date() }).where(eq(schema.platformSettings.key, s.key));
+        n++;
+      }
+    }
+  } catch { /* ignore */ }
+  return n;
+}
+
+// Null out every reference of `url` (scalar columns + CMS content).
+export async function deleteUrlEverywhere(url: string): Promise<number> {
+  const db = await getDb();
+  let n = 0;
+  for (const [tbl, field, col] of imageColumns()) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = await db.update(tbl as any).set({ [field]: null }).where(eq(col as any, url));
+    n += (r as { rowCount?: number }).rowCount ?? 0;
+  }
+  try {
+    const rows = await db.select().from(schema.platformSettings);
+    for (const s of rows) {
+      if (typeof s.value === "string" && s.value === url) {
+        await db.update(schema.platformSettings).set({ value: "", updatedAt: new Date() }).where(eq(schema.platformSettings.key, s.key));
+        n++;
+      }
+    }
+  } catch { /* ignore */ }
+  return n;
+}
+
+// Delete the underlying Vercel Blob object (only ours — never a CDN we don't own).
+export async function delBlobObject(url: string): Promise<boolean> {
+  if (classifyUrl(url) !== "vercel-blob") return false;
+  try {
+    const { del } = await import("@vercel/blob");
+    const { resolveBlobToken } = await import("@/lib/blob");
+    const token = resolveBlobToken();
+    await del(url, token ? { token } : undefined);
+    return true;
+  } catch { return false; }
 }
 
 // HEAD each remote image to read Content-Length. Inline data URLs are sized from
