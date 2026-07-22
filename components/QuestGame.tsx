@@ -2,7 +2,11 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import Link from "next/link";
+
+// Three.js only loads when the gamer opens the 3D view.
+const GlbTerrain = dynamic(() => import("@/components/GlbTerrain"), { ssr: false });
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import CpIcon from "@/components/CpIcon";
@@ -41,6 +45,7 @@ export default function QuestGame({
   const [facing, setFacing] = useState<"front" | "left" | "right">("front");
   const [arrived, setArrived] = useState<number | null>(null); // celebration ring
   const [fs, setFs] = useState(false);
+  const [view3d, setView3d] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const rootRef = useRef<HTMLDivElement | null>(null);
   const areaRef = useRef<HTMLDivElement | null>(null);
@@ -303,6 +308,21 @@ export default function QuestGame({
       <div ref={areaRef} className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-1 py-1">
         {sw > 0 && (
           <div className="relative" style={{ width: sw, height: sh }}>
+            {/* 2D map ⇄ 3D terrain toggle (when this quest has a GLB mesh) */}
+            {quest.mapGlbUrl && (
+              <button onClick={() => setView3d((v) => !v)}
+                className="absolute top-3 right-3 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 backdrop-blur px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-white hover:border-cyan-400/50">
+                <Icon name="planet" size={12} style={{ color: quest.accent2 }} /> {view3d ? tr("Map") : tr("3D")}
+              </button>
+            )}
+            {view3d && quest.mapGlbUrl ? (
+              <>
+                <GlbTerrain url={quest.mapGlbUrl} accent={quest.accent2} />
+                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 rounded-full bg-black/60 px-3 py-1 text-[10px] text-muted pointer-events-none whitespace-nowrap">
+                  {tr("Drag to orbit · pinch or scroll to zoom · switch to Map for milestones")}
+                </span>
+              </>
+            ) : (
             <ZoomPan className="h-full w-full" min={1} max={4} initial={1} wheel pan>
               {/* World art — the looping animated map (mp4) when set */}
               {quest.mapVideoUrl ? (
@@ -373,9 +393,10 @@ export default function QuestGame({
                 </span>
               </div>
             </ZoomPan>
+            )}
 
             {/* Walk home — jump the astronaut back to your true CP position */}
-            {awayFromHome && (
+            {!view3d && awayFromHome && (
               <button onClick={() => { setSel(null); walkTo(youLen); }}
                 className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 backdrop-blur px-3.5 py-1.5 text-[11px] font-bold text-white">
                 <Icon name="target" size={13} style={{ color: quest.accent2 }} /> {tr("Back to my position")}

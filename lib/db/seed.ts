@@ -715,7 +715,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-22.1-quest-videos";
+const MAINT_VERSION = "2026-07-22.2-ascension-3d";
 
 // Looping animated quest maps (Higgsfield kling image→video from the original
 // map art). Applied once per quest when no video is set; admins can replace or
@@ -723,14 +723,31 @@ const MAINT_VERSION = "2026-07-22.1-quest-videos";
 const QUEST_MAP_VIDEOS: Record<string, string> = {
   conquest: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015922_4aea0000-d74e-4fb6-bae9-e456aa097c7f.mp4",
   orbit: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015928_fb0e499a-7988-4ac6-9a31-d1581010ea2c.mp4",
-  ascension: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015935_37dfb652-b7a4-4787-89b6-7c7f907fe1d9.mp4",
+  // Regenerated with clearly-visible motion (the first pass barely moved).
+  ascension: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_021830_b29a5e1b-a43f-40cc-86e7-c6411310fd99.mp4",
   signal: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015940_f5a41d5c-72d3-4d5c-8707-bb6fd55a94b8.mp4",
+};
+// Superseded generated loops — auto-replaced by the new version above (admin
+// uploads that aren't in this list are never touched).
+const OLD_MAP_VIDEOS: string[] = [
+  "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_015935_37dfb652-b7a4-4787-89b6-7c7f907fe1d9.mp4",
+];
+
+// 3D terrain meshes (Higgsfield image→3D GLB from the transparent map art) —
+// power the in-game "3D" view. Filled once when unset; admin-replaceable.
+const QUEST_MAP_GLBS: Record<string, string> = {
+  conquest: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/511ad436-7663-4201-b0ee-1e2bac4d1b8d.glb",
+  orbit: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/c08d5f64-e419-4176-8cb6-4a371ec1de9b.glb",
+  ascension: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/45afea60-f6c1-408b-a745-263705de23a2.glb",
+  signal: "https://d3u0tzju9qaucj.cloudfront.net/7d051b5a-7bfe-49fe-a484-24e7b3a9458a/dfb92d96-cd1a-4650-b1c4-a9733abec294.glb",
 };
 
 // Extra Higgsfield trophies (style-matched to the original set).
 const EXTRA_TROPHIES: { name: string; imageUrl: string; tier: string }[] = [
   { name: "Platinum Galaxy Ring Cup", imageUrl: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_020023_311be94b-577b-4962-89f9-97c6ec3e53b8.png", tier: "legendary" },
   { name: "Emerald Comet Chalice", imageUrl: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_020028_73daef83-147f-4088-a80f-be54819cd112.png", tier: "gold" },
+  { name: "Violet Nebula Crown", imageUrl: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_021802_1e8bd62d-f012-40a7-bc89-1a4803bab376.png", tier: "legendary" },
+  { name: "Crimson Star Shard Obelisk", imageUrl: "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_021817_c5fc1387-5a85-44c5-8dc3-a3b93bf550b2.png", tier: "silver" },
 ];
 
 export async function runBootMaintenance(db: DB) {
@@ -787,11 +804,14 @@ export async function runBootMaintenance(db: DB) {
   // available after this version flag was already set.)
   try { const { seedQuests, ensureQuestArt } = await import("@/lib/quests"); await seedQuests(db); await ensureQuestArt(db); } catch { /* non-fatal */ }
 
-  // Animated quest maps: fill in the generated loop for quests that have none.
+  // Animated quest maps: fill in the generated loop for quests that have none
+  // (or still carry a superseded generated loop). 3D terrain meshes likewise.
   for (const [key, url] of Object.entries(QUEST_MAP_VIDEOS)) {
     try {
-      const [q] = await db.select({ id: schema.quests.id, v: schema.quests.mapVideoUrl }).from(schema.quests).where(eq(schema.quests.key, key)).limit(1);
-      if (q && !q.v) await db.update(schema.quests).set({ mapVideoUrl: url }).where(eq(schema.quests.id, q.id));
+      const [q] = await db.select({ id: schema.quests.id, v: schema.quests.mapVideoUrl, g: schema.quests.mapGlbUrl }).from(schema.quests).where(eq(schema.quests.key, key)).limit(1);
+      if (!q) continue;
+      if (!q.v || OLD_MAP_VIDEOS.includes(q.v)) await db.update(schema.quests).set({ mapVideoUrl: url }).where(eq(schema.quests.id, q.id));
+      if (!q.g && QUEST_MAP_GLBS[key]) await db.update(schema.quests).set({ mapGlbUrl: QUEST_MAP_GLBS[key] }).where(eq(schema.quests.id, q.id));
     } catch { /* non-fatal */ }
   }
   // New trophies (insert-if-missing by name; admin can edit/delete them after).

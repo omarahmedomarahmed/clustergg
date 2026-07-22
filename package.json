@@ -13,13 +13,15 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.3.4",
     "@neondatabase/serverless": "^1.0.0",
+    "@types/three": "^0.185.1",
     "@vercel/blob": "^2.6.1",
     "bcryptjs": "^3.0.3",
     "drizzle-orm": "^0.44.2",
     "jose": "^6.0.11",
     "next": "^15.3.4",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.10",

@@ -513,6 +513,7 @@ export const quests = pgTable("quests", {
   coverUrl: text("cover_url"),
   mapArtUrl: text("map_art_url"),              // treasure-map art for the quest hero
   mapVideoUrl: text("map_video_url"),          // looping animated map (mp4) — plays instead of the still art
+  mapGlbUrl: text("map_glb_url"),              // 3D terrain mesh (GLB) — powers the in-game 3D view
   pathPoints: jsonb("path_points").$type<{ x: number; y: number }[]>(), // curved trail waypoints the astronaut rides
   pathPointsMobile: jsonb("path_points_mobile").$type<{ x: number; y: number }[]>(), // separate trail for the 4:5 mobile map (curves differ per aspect)
   missionsConfig: jsonb("missions_config").$type<{ kind: string; label: string; href: string; icon: string; threshold?: number; enabled?: boolean }[]>(), // admin-edited starter missions

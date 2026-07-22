@@ -61,6 +61,7 @@ export async function saveQuest(questId: string, formData: FormData) {
     coverUrl: String(formData.get("coverUrl") ?? "").trim() || null,
     mapArtUrl: String(formData.get("mapArtUrl") ?? "").trim() || null,
     mapVideoUrl: String(formData.get("mapVideoUrl") ?? "").trim() || null,
+    mapGlbUrl: String(formData.get("mapGlbUrl") ?? "").trim() || null,
     actionWeights: weights,
     dailyCaps: caps,
     sortOrder: Number(formData.get("sortOrder")) || 0,
