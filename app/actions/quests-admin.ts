@@ -141,7 +141,8 @@ export async function deleteTier(questId: string, tierId: string) {
 
 // Save the curved trail the astronaut rides across the quest map. Accepts a JSON
 // array of { x, y } waypoints (0-100). Empty clears it (falls back to a straight
-// line through the milestone pins).
+// line through the milestone pins). `variant` picks which trail: "desktop"
+// (16:9 map) or "mobile" (4:5 phone map — the curve bends differently there).
 export async function saveQuestPath(questId: string, _prev: TierPinState, formData: FormData): Promise<TierPinState> {
   const admin = await requireStaff();
   const db = await getDb();
@@ -151,11 +152,13 @@ export async function saveQuestPath(questId: string, _prev: TierPinState, formDa
     const parsed = JSON.parse(String(formData.get("points") ?? "[]"));
     if (Array.isArray(parsed)) pts = parsed.filter((p) => p && typeof p.x === "number" && typeof p.y === "number").map((p) => ({ x: clamp(p.x), y: clamp(p.y) }));
   } catch { pts = []; }
+  const mobile = String(formData.get("variant") ?? "desktop") === "mobile";
   await db.update(schema.quests)
-    .set({ pathPoints: pts.length >= 2 ? pts : null })
+    .set(mobile ? { pathPointsMobile: pts.length >= 2 ? pts : null } : { pathPoints: pts.length >= 2 ? pts : null })
     .where(eq(schema.quests.id, questId));
   await audit(admin.id, "quest.path", questId);
   revalidatePath(`/admin/quests/${questId}`);
   revalidatePath("/quests");
-  return { ok: true, message: pts.length >= 2 ? `Trail saved (${pts.length} points).` : "Trail cleared." };
+  const which = mobile ? "Mobile trail" : "Desktop trail";
+  return { ok: true, message: pts.length >= 2 ? `${which} saved (${pts.length} points).` : `${which} cleared.` };
 }

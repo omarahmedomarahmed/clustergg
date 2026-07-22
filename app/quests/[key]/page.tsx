@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth";
-import { getDb, schema } from "@/lib/db";
-import { getQuestByKey, getTotalCp, getCpLedger, ACTION_LABEL } from "@/lib/quests";
+import { getDb } from "@/lib/db";
+import { getQuestByKey, getTotalCp, getCpLedger, getStarterMissions } from "@/lib/quests";
+import { getQuestPanelArt } from "@/lib/quest-hero";
 import { getContent } from "@/lib/cms";
 import QuestMapHero from "@/components/QuestMapHero";
 import CpLedger from "@/components/CpLedger";
@@ -27,22 +27,14 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   if (!detail) notFound();
 
   const { quest: questRaw, allQuests, tierHolders, leaderboard } = detail;
-  const [totalCp, questLedger, brand, [ruleRow]] = await Promise.all([
+  const [totalCp, questLedger, brand, missions, panelArt] = await Promise.all([
     getTotalCp(db, user?.id ?? null),
     getCpLedger(db, user?.id ?? null, { questId: questRaw.id, limit: 200 }),
     getContent(["brand.quest.rocket"]),
-    db.select({ w: schema.quests.actionWeights, c: schema.quests.dailyCaps })
-      .from(schema.quests).where(eq(schema.quests.id, questRaw.id)).limit(1),
+    getStarterMissions(db, user?.id ?? null),
+    getQuestPanelArt(),
   ]);
   const rocketUrl = brand["brand.quest.rocket"] || undefined;
-  // The playable game's "rules screen": every action this quest listens to, how
-  // many CP it grants, and its daily cap — full scoring visibility for gamers.
-  const weights = (ruleRow?.w ?? {}) as Record<string, number>;
-  const caps = (ruleRow?.c ?? {}) as Record<string, number>;
-  const gameRules = Object.entries(weights)
-    .filter(([, v]) => Number(v) > 0)
-    .map(([k, v]) => ({ key: k, label: ACTION_LABEL[k] ?? k, points: Number(v), cap: Number(caps[k]) > 0 ? Number(caps[k]) : undefined }))
-    .sort((a, b) => b.points - a.points);
   const { tr, te } = await getT();
   const quest = localizeQuest(questRaw, te);
   // Tabs use each quest's id to localize its name for the switcher.
@@ -51,7 +43,7 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   return (
     <div>
       <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} rocketUrl={rocketUrl}
-        game={{ rules: gameRules, log: questLedger, totalCp }} />
+        game={{ rules: quest.rules, log: questLedger, totalCp, art: panelArt, missions }} />
 
       {/* Glorified milestone leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">

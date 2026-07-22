@@ -511,6 +511,7 @@ export const quests = pgTable("quests", {
   coverUrl: text("cover_url"),
   mapArtUrl: text("map_art_url"),              // treasure-map art for the quest hero
   pathPoints: jsonb("path_points").$type<{ x: number; y: number }[]>(), // curved trail waypoints the astronaut rides
+  pathPointsMobile: jsonb("path_points_mobile").$type<{ x: number; y: number }[]>(), // separate trail for the 4:5 mobile map (curves differ per aspect)
   actionWeights: jsonb("action_weights").$type<Record<string, number>>().notNull().default({}),
   dailyCaps: jsonb("daily_caps").$type<Record<string, number>>().notNull().default({}),
   sortOrder: integer("sort_order").notNull().default(0),

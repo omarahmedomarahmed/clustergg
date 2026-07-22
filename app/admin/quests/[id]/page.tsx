@@ -93,6 +93,7 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
             accent={quest.accent2 || quest.color}
             milestones={tiers.map((t) => ({ id: t.id, name: t.name, color: t.color ?? quest.color, x: t.mapX, y: t.mapY }))}
             initial={Array.isArray(quest.pathPoints) ? quest.pathPoints : []}
+            initialMobile={Array.isArray(quest.pathPointsMobile) ? quest.pathPointsMobile : []}
           />
         </div>
       )}

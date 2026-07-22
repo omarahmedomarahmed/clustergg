@@ -84,6 +84,12 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "staff.access": "",
   // The Cluster Points currency icon art (editable; defaults to the generated one).
   "brand.cpIcon": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260717_223629_251d5972-a1bc-4e38-8724-1ea35bf10f18.png",
+  // Quest-game panel art (Rules / Log / Guide / Missions screens) — generated
+  // cosmic defaults, replaceable in Admin → Card backgrounds.
+  "card.bg.quest_rules": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_010231_915c66fd-4f71-4af9-9e89-b9e6abd8a395.png",
+  "card.bg.quest_log": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_010235_4e49d817-1dba-419a-81a4-482f6b2192a8.png",
+  "card.bg.quest_guide": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_010239_1deaec61-61f9-4f0e-86ce-f42342cd3b0c.png",
+  "card.bg.quest_missions": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_010244_4c9666d0-355d-4ad3-a8be-0c378eae0c9a.png",
 };
 
 // Content is locale-aware: Arabic values live under a "<key>@ar" namespaced key

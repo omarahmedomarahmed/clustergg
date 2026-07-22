@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import Link from "next/link";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import CpIcon from "@/components/CpIcon";
@@ -9,28 +10,25 @@ import ZoomPan from "@/components/ZoomPan";
 import { useTr } from "@/components/LocaleProvider";
 import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
+import type { QuestGamePayload } from "@/lib/quest-game";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 
 // The playable space-game experience for a quest: a full-screen overlay where
-// the map art is the game world, the astronaut is your clickable character that
-// WALKS the trail when you tap a milestone, and the quest rules (which action
-// grants how many CP, with daily caps) + your per-action CP history are the
-// in-game "rules" and "log" screens. Optimized for phones (100dvh overlay,
-// bottom-sheet panels, pinch-free zoom buttons + drag pan) and desktop.
+// the map art is the game world, the astronaut is your character that WALKS the
+// trail when you tap a milestone, and the quest's real scoring config + the
+// gamer's real CP history power the in-game Rules / Log / Missions / Guide
+// screens. Uses the mobile-specific trail (pathPointsMobile) when the stage is
+// portrait, so the line matches the art on phones. Panel art is admin-editable
+// (Admin → Card backgrounds → Quest game screens).
 
-export type QuestRule = { key: string; label: string; points: number; cap?: number };
-export type QuestLogEntry = { id: string; actionKey: string; label: string; qp: number; at: string };
-
-type Panel = "rules" | "log" | "guide" | null;
+type Panel = "rules" | "log" | "guide" | "missions" | null;
 
 export default function QuestGame({
-  quest, holders, rules, log, totalCp, rocketUrl, initialTier, onClose,
+  quest, holders, game, rocketUrl, initialTier, onClose,
 }: {
   quest: QuestView;
   holders: Record<string, QuestGamer[]>;
-  rules: QuestRule[];
-  log: QuestLogEntry[];
-  totalCp: number;
+  game: QuestGamePayload;
   rocketUrl?: string;
   initialTier?: number | null;
   onClose: () => void;
@@ -41,6 +39,7 @@ export default function QuestGame({
   const [sel, setSel] = useState<number | null>(null);
   const [walking, setWalking] = useState(false);
   const [facing, setFacing] = useState<"front" | "left" | "right">("front");
+  const [arrived, setArrived] = useState<number | null>(null); // celebration ring
   const [fs, setFs] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -49,12 +48,30 @@ export default function QuestGame({
   useEffect(() => setMounted(true), []);
 
   const tiers = quest.tiers;
+  const { rules, log, totalCp, art, missions } = game;
 
-  // ===== World geometry — the same curve the hero uses, so positions match =====
+  // ===== Stage sizing — the world keeps the hero's aspect (pins line up with
+  // the art) and is fitted as large as possible into the free screen area. =====
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    const measure = () => setArea({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [mounted]);
+  const portrait = area.h >= area.w;
+  const ratio = portrait ? 4 / 5 : 16 / 9;
+  let sw = area.w, sh = sw / ratio;
+  if (sh > area.h && area.h > 0) { sh = area.h; sw = sh * ratio; }
+
+  // ===== World geometry — same curve as the hero; portrait screens use the
+  // admin's MOBILE trail (the curve differs between 4:5 and 16:9 art). =====
   const { curveD, samples, totalLen, tierLens, youLen } = useMemo(() => {
-    const trail: Pt[] = quest.pathPoints && quest.pathPoints.length >= 2
-      ? quest.pathPoints
-      : tiers.map((t) => ({ x: t.mapX, y: t.mapY }));
+    const mobile = quest.pathPointsMobile && quest.pathPointsMobile.length >= 2 ? quest.pathPointsMobile : null;
+    const desktop = quest.pathPoints && quest.pathPoints.length >= 2 ? quest.pathPoints : null;
+    const trail: Pt[] = (portrait ? mobile ?? desktop : desktop) ?? tiers.map((t) => ({ x: t.mapX, y: t.mapY }));
     const s = sampleCurve(trail);
     const tl = s.length ? s[s.length - 1].len : 0;
     const lens = tiers.map((t) => nearestLength(s, { x: t.mapX, y: t.mapY }));
@@ -74,13 +91,15 @@ export default function QuestGame({
       you = tl;
     }
     return { curveD: smoothPathD(trail), samples: s, totalLen: tl, tierLens: lens, youLen: you };
-  }, [quest, tiers]);
+  }, [quest, tiers, portrait]);
 
   // ===== The character walks the trail (RAF along the sampled curve) =====
   const [markerLen, setMarkerLen] = useState(youLen);
   const markerRef = useRef(youLen);
   const anim = useRef<number | null>(null);
   const setLen = (v: number) => { markerRef.current = v; setMarkerLen(v); };
+  // Re-anchor when the trail itself changes (portrait flip / quest switch).
+  useEffect(() => { setLen(youLen); }, [youLen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const walkTo = (target: number, after?: () => void) => {
     if (anim.current) cancelAnimationFrame(anim.current);
@@ -105,10 +124,19 @@ export default function QuestGame({
   };
   useEffect(() => () => { if (anim.current) cancelAnimationFrame(anim.current); }, []);
 
+  const goTo = (i: number) => {
+    setPanel(null); setSel(null);
+    walkTo(tierLens[i], () => {
+      setSel(i);
+      setArrived(i);
+      setTimeout(() => setArrived((a) => (a === i ? null : a)), 1500);
+    });
+  };
+
   // Deep-link: opened from a milestone pin → the astronaut travels there.
   useEffect(() => {
     if (initialTier != null && tiers[initialTier]) {
-      const id = setTimeout(() => walkTo(tierLens[initialTier], () => setSel(initialTier)), 350);
+      const id = setTimeout(() => goTo(initialTier), 350);
       return () => clearTimeout(id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,21 +168,6 @@ export default function QuestGame({
     onClose();
   };
 
-  // ===== Stage sizing — the world keeps the hero's aspect (pins line up with
-  // the art) and is fitted as large as possible into the free screen area. =====
-  useEffect(() => {
-    const el = areaRef.current;
-    if (!el) return;
-    const measure = () => setArea({ w: el.clientWidth, h: el.clientHeight });
-    measure();
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [mounted]);
-  const ratio = area.w > area.h ? 16 / 9 : 4 / 5;
-  let sw = area.w, sh = sw / ratio;
-  if (sh > area.h && area.h > 0) { sh = area.h; sw = sh * ratio; }
-
   const you = pointAtLength(samples, markerLen);
   const home = pointAtLength(samples, youLen);
   const awayFromHome = Math.abs(markerLen - youLen) > 1;
@@ -169,7 +182,7 @@ export default function QuestGame({
 
   // CP history grouped by action type — full visibility of what earned what.
   const groups = useMemo(() => {
-    const m = new Map<string, { key: string; label: string; total: number; entries: QuestLogEntry[] }>();
+    const m = new Map<string, { key: string; label: string; total: number; entries: typeof log }>();
     for (const e of log) {
       const g = m.get(e.actionKey) ?? { key: e.actionKey, label: e.label, total: 0, entries: [] };
       g.total += e.qp; g.entries.push(e); m.set(e.actionKey, g);
@@ -177,20 +190,49 @@ export default function QuestGame({
     return [...m.values()].sort((a, b) => b.total - a.total);
   }, [log]);
 
+  // Guided starter missions — red dots drive the gamer to their firsts.
+  const missionList = useMemo(() => {
+    if (!missions) return [];
+    return [
+      { key: "connect", icon: "link", label: tr("Connect your first game account"), href: "/profile", at: missions.connectAt },
+      { key: "planet", icon: "planet", label: tr("Join your first planet"), href: "/planets", at: missions.planetAt },
+      { key: "challenge", icon: "zap", label: tr("Join your first challenge"), href: "/planets", at: missions.challengeAt },
+      { key: "ad", icon: "eye", label: tr("Spot your first sponsor signal (ad)"), href: "/feed", at: missions.adAt },
+    ];
+  }, [missions, tr]);
+  const missionsOpen = missionList.filter((m) => !m.at).length;
+  const rulesUnread = quest.qp === 0; // fresh questers should read the rules first
+  const fmt = (iso: string) => new Date(iso).toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
   if (!mounted) return null;
 
-  const sheet = "absolute inset-x-0 bottom-0 z-40 max-h-[72dvh] overflow-y-auto overscroll-contain rounded-t-3xl sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[400px] sm:max-h-[70dvh] sm:rounded-2xl border border-white/15 backdrop-blur-xl";
-  const sheetBg = { background: `linear-gradient(rgba(4,5,26,0.92), rgba(4,5,26,0.96))${quest.cardBgUrl ? `, url(${quest.cardBgUrl}) center/cover` : ""}` };
-  const tabBtn = (p: Panel, icon: string, label: string) => (
-    <button onClick={() => { setSel(null); setPanel(panel === p ? null : p); }}
-      className={`flex flex-1 sm:flex-none flex-col sm:flex-row items-center gap-0.5 sm:gap-2 rounded-2xl px-3 py-2 text-[11px] sm:text-xs font-bold uppercase tracking-wide transition-colors border ${panel === p ? "text-white" : "text-muted hover:text-white"}`}
-      style={{ borderColor: panel === p ? `${quest.color}cc` : "rgba(255,255,255,0.12)", background: panel === p ? `${quest.color}26` : "rgba(0,0,0,0.45)" }}>
-      <Icon name={icon} size={16} style={{ color: panel === p ? quest.color : undefined }} /> {label}
+  const sheet = "absolute inset-x-0 bottom-0 z-40 max-h-[72dvh] overflow-y-auto overscroll-contain rounded-t-3xl sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[420px] sm:max-h-[70dvh] sm:rounded-2xl border border-white/15 backdrop-blur-xl shadow-2xl";
+  const defaultSheetBg = `linear-gradient(rgba(4,5,26,0.92), rgba(4,5,26,0.96))${quest.cardBgUrl ? `, url(${quest.cardBgUrl}) center/cover` : ""}`;
+  const panelBg = (k: "rules" | "log" | "guide" | "missions") => ({ background: art?.[k] || defaultSheetBg });
+  const redDot = (n?: number) => (
+    <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white ring-2 ring-[#04051a]">
+      {n && n > 1 ? n : ""}
+    </span>
+  );
+  // Game-card action buttons (bottom bar) — art background + red attention dots.
+  const tabBtn = (p: Exclude<Panel, null>, icon: string, label: string, dot?: number | boolean) => (
+    <button key={p} onClick={() => { setSel(null); setPanel(panel === p ? null : p); }}
+      className={`relative flex flex-1 sm:flex-none sm:w-32 flex-col items-center justify-end gap-1 overflow-hidden rounded-2xl border px-2 pt-6 pb-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide transition-all active:scale-95 ${panel === p ? "text-white scale-[1.03]" : "text-white/85"}`}
+      style={{ borderColor: panel === p ? `${quest.color}dd` : "rgba(255,255,255,0.14)", boxShadow: panel === p ? `0 0 22px -6px ${quest.color}` : "none" }}>
+      <span aria-hidden className="absolute inset-0" style={{ background: art?.[p] || `linear-gradient(180deg, ${quest.color}30, rgba(4,5,26,0.9))` }} />
+      <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.1), rgba(4,5,26,0.65))" }} />
+      <Icon name={icon} size={17} className="relative" style={{ color: panel === p ? quest.accent2 : "#e6e6f7" }} />
+      <span className="relative leading-none">{label}</span>
+      {dot ? redDot(typeof dot === "number" ? dot : undefined) : null}
     </button>
   );
 
   const overlay = (
     <div ref={rootRef} className="fixed inset-0 z-[120] flex flex-col select-none" style={{ background: "#04051a" }} dir="ltr">
+      <style>{`
+        @keyframes qg-hop { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-9%) } }
+        @keyframes qg-burst { 0% { transform: scale(0.4); opacity: 0.9 } 100% { transform: scale(2.1); opacity: 0 } }
+      `}</style>
       {/* Space backdrop */}
       {quest.cardBgUrl
         ? <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.55), rgba(4,5,26,0.8)), url(${quest.cardBgUrl})` }} />
@@ -205,7 +247,7 @@ export default function QuestGame({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-sm truncate">{quest.name}</span>
+            <span className="font-bold text-sm truncate bg-clip-text text-transparent" style={{ backgroundImage: `linear-gradient(90deg, ${quest.color}, ${quest.accent2})` }}>{quest.name}</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-black/50 border border-white/10 px-2 py-0.5 text-[11px] font-bold shrink-0" style={{ color: quest.accent2 }}>
               <CpIcon size={13} /> {quest.qp.toLocaleString()}
             </span>
@@ -259,9 +301,13 @@ export default function QuestGame({
 
               {/* Milestone stops — tap to send your astronaut there */}
               {tiers.map((t, i) => (
-                <button key={t.id} onClick={() => { setPanel(null); setSel(null); walkTo(tierLens[i], () => setSel(i)); }}
+                <button key={t.id} onClick={() => goTo(i)}
                   className="absolute -translate-x-1/2 -translate-y-1/2 group"
                   style={{ left: `${t.mapX}%`, top: `${t.mapY}%` }}>
+                  {arrived === i && (
+                    <span aria-hidden className="absolute inset-0 -m-2 rounded-full border-2 pointer-events-none"
+                      style={{ borderColor: t.color || quest.color, animation: "qg-burst 1.4s ease-out forwards" }} />
+                  )}
                   <span className="flex items-center justify-center rounded-full transition-transform group-hover:scale-110 group-active:scale-95"
                     style={{ width: sel === i ? 52 : 44, height: sel === i ? 52 : 44, background: t.earned ? `${(t.color || quest.color)}33` : "rgba(0,0,0,0.55)", border: `2px solid ${t.earned ? (t.color || quest.color) : "rgba(255,255,255,0.25)"}`, boxShadow: t.earned ? `0 0 20px -2px ${t.color || quest.color}` : "none" }}>
                     {t.iconUrl
@@ -280,11 +326,12 @@ export default function QuestGame({
                 </span>
               )}
 
-              {/* Your astronaut — walks the trail */}
+              {/* Your astronaut — walks the trail (hops while travelling) */}
               <div className="absolute -translate-x-1/2 -translate-y-1/2 z-10 pointer-events-none" style={{ left: `${you.x}%`, top: `${you.y}%` }}>
                 {marker ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={marker} alt="" className={`h-12 w-12 sm:h-16 sm:w-16 object-contain drop-shadow-[0_0_12px_rgba(34,211,238,0.7)] ${walking ? "" : "float-y"}`} />
+                  <img src={marker} alt="" className={`h-12 w-12 sm:h-16 sm:w-16 object-contain drop-shadow-[0_0_12px_rgba(34,211,238,0.7)] ${walking ? "" : "float-y"}`}
+                    style={walking ? { animation: "qg-hop 0.45s ease-in-out infinite" } : undefined} />
                 ) : (
                   <span className="flex h-7 w-7 items-center justify-center rounded-full text-white" style={{ background: quest.accent2, boxShadow: `0 0 16px 3px ${quest.accent2}` }}>
                     <Icon name="rocket" size={14} />
@@ -309,7 +356,7 @@ export default function QuestGame({
 
       {/* ===== Milestone card (opens when the astronaut arrives) ===== */}
       {sel !== null && tiers[sel] && (
-        <div className={sheet} style={sheetBg}>
+        <div className={sheet} style={{ background: defaultSheetBg }}>
           <div className="p-4" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
               <div className="font-bold flex items-center gap-2" style={{ color: tiers[sel].color || quest.color }}>
@@ -337,7 +384,8 @@ export default function QuestGame({
             )}
             {!tiers[sel].earned && (
               <button onClick={() => { setSel(null); setPanel("rules"); }}
-                className="mt-3 w-full glow-btn pressable rounded-full px-4 py-2 text-sm font-bold text-white">
+                className="mt-3 w-full pressable rounded-full px-4 py-2 text-sm font-bold text-white"
+                style={{ background: `linear-gradient(90deg, ${quest.color}, ${quest.accent2})`, boxShadow: `0 8px 22px -10px ${quest.color}` }}>
                 {tr("How do I earn CP?")}
               </button>
             )}
@@ -345,9 +393,9 @@ export default function QuestGame({
         </div>
       )}
 
-      {/* ===== Rules / Log / Guide panels ===== */}
+      {/* ===== Rules / Log / Missions / Guide panels (admin-editable art) ===== */}
       {panel === "rules" && (
-        <div className={sheet} style={sheetBg}>
+        <div className={sheet} style={panelBg("rules")}>
           <div className="p-4 space-y-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
               <h3 className="font-bold flex items-center gap-2"><Icon name="zap" size={16} style={{ color: quest.color }} /> {tr("Game rules — how you earn CP")}</h3>
@@ -356,7 +404,7 @@ export default function QuestGame({
             <p className="text-xs text-muted leading-relaxed">{quest.lore || quest.tagline}</p>
             <div className="space-y-1.5">
               {rules.map((r) => (
-                <div key={r.key} className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-black/30 px-3 py-2">
+                <div key={r.key} className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-black/40 px-3 py-2">
                   <Icon name="zap" size={14} className="shrink-0" style={{ color: quest.accent2 }} />
                   <span className="text-sm flex-1 min-w-0 truncate">{tr(r.label)}</span>
                   {r.cap ? <span className="text-[10px] text-muted whitespace-nowrap">{tr("max")} {r.cap}/{tr("day")}</span> : null}
@@ -381,10 +429,10 @@ export default function QuestGame({
       )}
 
       {panel === "log" && (
-        <div className={sheet} style={sheetBg}>
+        <div className={sheet} style={panelBg("log")}>
           <div className="p-4 space-y-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
-              <h3 className="font-bold flex items-center gap-2"><Icon name="clock" size={16} style={{ color: quest.color }} /> {tr("My CP log")}</h3>
+              <h3 className="font-bold flex items-center gap-2"><Icon name="clock" size={16} style={{ color: quest.color }} /> {tr("My quest history")}</h3>
               <button onClick={() => setPanel(null)} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
             </div>
             <div className="flex items-center gap-4 text-xs">
@@ -392,9 +440,9 @@ export default function QuestGame({
               <span className="text-muted">{quest.totalCp.toLocaleString()} {tr("lifetime in this quest")}</span>
             </div>
             {groups.length === 0 ? (
-              <div className="text-xs text-muted">{tr("No CP earned here yet — check the game rules and make your first move.")}</div>
+              <div className="text-xs text-muted">{tr("No CP earned here yet — open the Rules screen and make your first move.")}</div>
             ) : groups.map((g) => (
-              <div key={g.key} className="rounded-xl border border-white/10 bg-black/30 overflow-hidden">
+              <div key={g.key} className="rounded-xl border border-white/10 bg-black/40 overflow-hidden">
                 <button onClick={() => setOpenGroups((o) => ({ ...o, [g.key]: !o[g.key] }))}
                   className="w-full flex items-center gap-2.5 px-3 py-2 text-left">
                   <Icon name="zap" size={13} className="shrink-0" style={{ color: quest.accent2 }} />
@@ -407,7 +455,7 @@ export default function QuestGame({
                   <div className="border-t border-white/10 divide-y divide-white/5">
                     {g.entries.map((e) => (
                       <div key={e.id} className="flex items-center justify-between px-3 py-1.5 text-[11px]">
-                        <span className="text-muted">{new Date(e.at).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                        <span className="text-muted">{fmt(e.at)}</span>
                         <span className="font-bold" style={{ color: quest.accent2 }}>+{e.qp} CP</span>
                       </div>
                     ))}
@@ -419,8 +467,39 @@ export default function QuestGame({
         </div>
       )}
 
+      {panel === "missions" && (
+        <div className={sheet} style={panelBg("missions")}>
+          <div className="p-4 space-y-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold flex items-center gap-2"><Icon name="rocket" size={16} style={{ color: quest.color }} /> {tr("Starter missions")}</h3>
+              <button onClick={() => setPanel(null)} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
+            </div>
+            <p className="text-xs text-muted leading-relaxed">{tr("Your first moves in the Cluster — each one earns CP and lights up your trail. Finish all four to launch for real.")}</p>
+            <div className="space-y-1.5">
+              {missionList.map((m) => (
+                <Link key={m.key} href={m.href} onClick={close}
+                  className="relative flex items-center gap-2.5 rounded-xl border px-3 py-2.5 transition-colors"
+                  style={{ borderColor: m.at ? "#10b98155" : "rgba(255,255,255,0.14)", background: m.at ? "#10b9811a" : "rgba(0,0,0,0.4)" }}>
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg shrink-0" style={{ background: m.at ? "#10b98126" : `${quest.color}22` }}>
+                    <Icon name={m.icon} size={16} style={{ color: m.at ? "#34d399" : quest.color }} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold truncate">{m.label}</span>
+                    <span className="block text-[10px] text-muted">{m.at ? `✓ ${tr("Done")} · ${fmt(m.at)}` : tr("Tap to go do it now")}</span>
+                  </span>
+                  {m.at
+                    ? <span className="text-emerald-300 font-black">✓</span>
+                    : <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 animate-ping opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" /></span>}
+                </Link>
+              ))}
+              {missionList.length === 0 && <div className="text-xs text-muted">{tr("Sign in to start your missions.")}</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {panel === "guide" && (
-        <div className={sheet} style={sheetBg}>
+        <div className={sheet} style={panelBg("guide")}>
           <div className="p-4 space-y-3" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <div className="flex items-center justify-between">
               <h3 className="font-bold flex items-center gap-2"><Icon name="spark" size={16} style={{ color: quest.color }} /> {tr("How to play")}</h3>
@@ -444,10 +523,11 @@ export default function QuestGame({
         </div>
       )}
 
-      {/* ===== Bottom action bar ===== */}
-      <div className="relative z-30 flex items-center gap-2 px-3 pt-2 sm:justify-center"
+      {/* ===== Bottom action bar — game cards with red attention dots ===== */}
+      <div className="relative z-30 flex items-stretch gap-2 px-3 pt-2 sm:justify-center"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
-        {tabBtn("rules", "zap", tr("Rules"))}
+        {tabBtn("missions", "rocket", tr("Missions"), missionsOpen > 0 ? missionsOpen : false)}
+        {tabBtn("rules", "zap", tr("Rules"), rulesUnread)}
         {tabBtn("log", "clock", tr("My log"))}
         {tabBtn("guide", "spark", tr("Guide"))}
       </div>
