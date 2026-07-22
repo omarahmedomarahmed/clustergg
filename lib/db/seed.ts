@@ -715,7 +715,7 @@ export async function migrateGameImagesToBlob(db: DB) {
 // single tiny platform_settings read. This keeps steady-state cold boots from
 // re-scanning tables (the original cause of the Neon data-transfer blowout).
 // Bump MAINT_VERSION whenever the seeded ads/skins change so it re-runs once.
-const MAINT_VERSION = "2026-07-22.2-ascension-3d";
+const MAINT_VERSION = "2026-07-22.3-trophy-economy";
 
 // Looping animated quest maps (Higgsfield kling image→video from the original
 // map art). Applied once per quest when no video is set; admins can replace or
@@ -821,6 +821,13 @@ export async function runBootMaintenance(db: DB) {
       if (!ex) await db.insert(schema.trophies).values({ id: uid(), ...t });
     } catch { /* non-fatal */ }
   }
+  // Backfill trophy AWARDS for challenges completed before the trophy economy
+  // existed (idempotent — the unique award index dedupes).
+  try {
+    const { awardChallengeTrophies } = await import("@/lib/trophies");
+    const done = await db.select({ id: schema.challenges.id }).from(schema.challenges).where(eq(schema.challenges.status, "completed")).limit(200);
+    for (const c of done) await awardChallengeTrophies(db, c.id);
+  } catch { /* non-fatal */ }
 
   await db.insert(schema.platformSettings)
     .values({ key: "boot_maintenance", value: { version: MAINT_VERSION } })

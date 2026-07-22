@@ -24,6 +24,8 @@ import DiscordTag from "@/components/DiscordTag";
 import QuestCard from "@/components/QuestCard";
 import CpIcon from "@/components/CpIcon";
 import { getUserQuests } from "@/lib/quests";
+import { getTrophyCase, getMyRedeems } from "@/lib/trophies";
+import TrophyCase from "@/components/TrophyCase";
 import { localizeQuest } from "@/lib/i18n/entities";
 import { levelFromCp } from "@/lib/level";
 import { startConversation } from "@/app/actions/social";
@@ -134,10 +136,11 @@ export default async function ProfilePage({ params }: Props) {
     if (!bestStanding || rank / tot < bestStanding.rank / bestStanding.total) bestStanding = entry;
   }
 
-  const trophyWins = participations.filter(({ p, c }) => c.status === "completed" && p.finalPlacement && p.finalPlacement <= 3);
-  const trophyArt = new Map<string, string>();
-  const trophyIds = trophyWins.map(({ c }) => c.trophyId).filter((x): x is string => !!x);
-  if (trophyIds.length) { const rows = await db.select().from(schema.trophies).where(inArray(schema.trophies.id, trophyIds)); for (const t of rows) trophyArt.set(t.id, t.imageUrl); }
+  // The REAL trophy shelf: awarded trophies (redeemed ones move to history and
+  // leave the public profile). Owners also get the redeem flow.
+  const trophyShelfAll = await getTrophyCase(db, user.id);
+  const trophyShelf = trophyShelfAll.filter((a) => a.status !== "redeemed");
+  const myRedeems = isOwner ? await getMyRedeems(db, user.id) : [];
   const activeChallenges = participations.filter(({ c }) => c.status === "active");
   // Resolve each challenge's planet slug so its card links to the challenge page.
   const challengeSpaceIds = [...new Set(participations.map(({ c }) => c.spaceId))];
@@ -189,17 +192,29 @@ export default async function ProfilePage({ params }: Props) {
           </div>
         );
       case "trophies":
-        if (!S.trophies || trophyWins.length === 0) return null;
+        if (!S.trophies || (trophyShelf.length === 0 && !isOwner)) return null;
+        if (!S.trophies || (trophyShelf.length === 0 && trophyShelfAll.length === 0 && myRedeems.length === 0)) return null;
         return (
           <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="trophy" size={19} style={{ color: theme.accent }} /> {poss} {tr("trophy case")}</h2>
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+              <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: theme.text }}><Icon name="trophy" size={19} style={{ color: theme.accent }} /> {poss} {tr("trophy case")}</h2>
+              {isOwner && (
+                <TrophyCase variant="button" awards={trophyShelfAll} redeems={myRedeems}
+                  savedMethod={user.payoutMethod ?? null} changesUsed={user.payoutChanges ?? 0} />
+              )}
+            </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {trophyWins.map(({ p, c }) => { const art = c.trophyId ? trophyArt.get(c.trophyId) : undefined; return (
-                <div key={p.id} className={`${cardCls} text-center`}>
-                  {art ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={art} alt="" className="mx-auto h-28 object-contain float-y" /> : <Icon name="trophy" size={56} className="mx-auto my-6" style={{ color: theme.accent }} />}
-                  <div className="mt-2 text-xs font-bold" style={{ color: theme.accent2 }}>{p.finalPlacement === 1 ? tr("CHAMPION") : `#${p.finalPlacement} ${tr("PLACE")}`}</div>
-                  <div className="text-sm font-semibold mt-0.5 line-clamp-1" style={{ color: theme.text }}>{c.title}</div>
-                </div>); })}
+              {trophyShelf.map((a) => (
+                <div key={a.id} className={`${cardCls} text-center`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={a.imageUrl} alt={a.name} className="mx-auto h-32 object-contain float-y" />
+                  <div className="mt-2 text-xs font-bold" style={{ color: theme.accent2 }}>{a.placement === 1 ? tr("CHAMPION") : `#${a.placement} ${tr("PLACE")}`}</div>
+                  <div className="mt-0.5 flex items-center justify-center gap-1.5">
+                    {a.gameLogoUrl && <GameLogo logoUrl={slimImg(a.gameLogoUrl, 300000)} name={a.game ?? ""} size={16} rounded="rounded" />}
+                    <span className="text-sm font-semibold line-clamp-1" style={{ color: theme.text }}>{a.challengeTitle ?? a.name}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           </section>
         );

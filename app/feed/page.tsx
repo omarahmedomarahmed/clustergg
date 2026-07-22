@@ -14,6 +14,8 @@ import FeedDashboard, { type Widget } from "@/components/FeedDashboard";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { getQuestHeroData } from "@/lib/quest-hero";
 import { getTotalCp, getUserQuests } from "@/lib/quests";
+import { getTrophyCase, getMyRedeems } from "@/lib/trophies";
+import TrophyCase from "@/components/TrophyCase";
 import { getProvider } from "@/lib/providers/registry";
 import { resolveTheme, themeToVars, bgLayerStyle } from "@/lib/theme";
 import { getContent } from "@/lib/cms";
@@ -79,6 +81,7 @@ export default async function FeedPage() {
 
   const skinnedPlanets = await buildSkinnedPlanets(db);
   const questHero = await getQuestHeroData(db, user.id);
+  const [myTrophies, myTrophyRedeems] = await Promise.all([getTrophyCase(db, user.id), getMyRedeems(db, user.id)]);
 
   // ===== Control-panel data =====
   const prefs = (user.feedPrefs ?? {}) as { stats?: string[]; challenges?: string[]; leaderboards?: string[]; dashboard?: unknown[] };
@@ -160,6 +163,12 @@ export default async function FeedPage() {
       />
 
       <AdSlot placement="feed_top_banner" className="mb-8" />
+
+      {/* ===== Trophy case — balance, redeem flow + request tracking ===== */}
+      <div className="mb-6">
+        <TrophyCase variant="card" awards={myTrophies} redeems={myTrophyRedeems}
+          savedMethod={user.payoutMethod ?? null} changesUsed={user.payoutChanges ?? 0} />
+      </div>
 
       {/* ===== My planets + Explore planets — ON TOP of the hero, side by side ===== */}
       <div className="grid sm:grid-cols-2 gap-4 mb-8">

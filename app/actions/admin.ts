@@ -441,6 +441,10 @@ export async function saveChallenge(formData: FormData) {
 
   if (challengeId) {
     await db.update(schema.challenges).set(values).where(eq(schema.challenges.id, challengeId));
+    // Completed challenge → hand the podium trophies to the placed gamers.
+    if (values.status === "completed") {
+      try { const { awardChallengeTrophies } = await import("@/lib/trophies"); await awardChallengeTrophies(db, challengeId); } catch { /* non-fatal */ }
+    }
     await audit(admin.id, "challenge.update", "challenge", challengeId);
     revalidatePath(`/admin/challenges/${challengeId}`);
   } else {

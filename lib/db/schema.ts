@@ -29,6 +29,8 @@ export const users = pgTable("users", {
   primarySignupProvider: text("primary_signup_provider"),
   discordUsername: text("discord_username"), // Discord handle — the gamer's universal identity, shown everywhere
   profileViews: integer("profile_views").notNull().default(0), // public view counter (brag number)
+  payoutMethod: jsonb("payout_method").$type<{ currency: string; method: string; details: Record<string, string> }>(), // saved trophy-redeem payout method
+  payoutChanges: integer("payout_changes").notNull().default(0), // method edits used (locks at 3)
   profileVisibility: text("profile_visibility").notNull().default("public"), // public | followers | private
   allowMessagesFrom: text("allow_messages_from").notNull().default("everyone"), // everyone | following | nobody
   emailNotifications: boolean("email_notifications").notNull().default(true),
@@ -475,6 +477,36 @@ export const trophies = pgTable("trophies", {
   tier: text("tier").notNull().default("gold"), // gold | silver | bronze | legendary
   game: text("game"),
   value: doublePrecision("value").notNull().default(0), // admin-assigned $ value (shown on prizes, redeemable)
+});
+
+// A trophy AWARDED to a gamer (challenge podium win). Lives on their profile
+// until redeemed; "pending" = locked inside an open redeem request.
+export const userTrophies = pgTable("user_trophies", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  trophyId: text("trophy_id").notNull().references(() => trophies.id, { onDelete: "cascade" }),
+  challengeId: text("challenge_id"),
+  placement: integer("placement").notNull().default(1), // 1 | 2 | 3
+  status: text("status").notNull().default("held"),     // held | pending | redeemed
+  awardedAt: timestamp("awarded_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// A gamer's request to cash out one or more trophy awards. pending → approved
+// (admin) → paid (admin uploads payment proof; awards become redeemed).
+export const trophyRedeems = pgTable("trophy_redeems", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  awardIds: jsonb("award_ids").$type<string[]>().notNull().default([]),
+  amount: doublePrecision("amount").notNull().default(0),
+  currency: text("currency").notNull().default("USD"),  // USD | EGP
+  method: text("method").notNull().default("ach"),      // ach | wallet | instapay
+  details: jsonb("details").$type<Record<string, string>>().notNull().default({}),
+  status: text("status").notNull().default("pending"),  // pending | approved | paid | rejected | cancelled
+  gamerConfirmedAt: timestamp("gamer_confirmed_at", { withTimezone: true }),
+  proofUrl: text("proof_url"),                          // admin-uploaded payment confirmation
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  decidedAt: timestamp("decided_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
 });
 
 // ===== Admin =====
