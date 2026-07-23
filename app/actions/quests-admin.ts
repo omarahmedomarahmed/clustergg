@@ -226,15 +226,21 @@ export async function saveQuestMapGlbCfg(questId: string, cfg: Record<string, un
     const n = Number(v);
     return Number.isFinite(n) ? Math.max(min, Math.min(max, n)) : d;
   };
+  const axis = cfg.planarAxis === "x" || cfg.planarAxis === "z" ? cfg.planarAxis : "y";
   const clean = {
     projection: cfg.projection === "uv" ? "uv" : "planar",
+    planarAxis: axis,
     offsetX: num(cfg.offsetX, -1, 1, 0), offsetY: num(cfg.offsetY, -1, 1, 0),
     scaleX: num(cfg.scaleX, 0.1, 8, 1), scaleY: num(cfg.scaleY, 0.1, 8, 1),
     rotation: num(cfg.rotation, -360, 360, 0),
     flipX: !!cfg.flipX, flipY: !!cfg.flipY,
     yaw: num(cfg.yaw, -360, 360, 0),
+    pitch: num(cfg.pitch, -90, 90, 0),
     brightness: num(cfg.brightness, 0.3, 3, 1),
+    contrast: num(cfg.contrast, 0.5, 2, 1),
     autoRotate: cfg.autoRotate !== false,
+    wireframe: !!cfg.wireframe,
+    fitContain: !!cfg.fitContain,
   };
   await db.update(schema.quests).set({ mapGlbCfg: clean }).where(eq(schema.quests.id, questId));
   await audit(admin.id, "quest.map_glb_cfg", questId);

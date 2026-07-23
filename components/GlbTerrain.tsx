@@ -6,10 +6,11 @@ import { DEFAULT_MAP_GLB_CFG, type MapGlbCfg } from "@/lib/quest-game";
 // Three.js 3D terrain viewer for a quest map's GLB mesh (Higgsfield image→3D).
 // The flat quest map art is projected onto the mesh UNLIT (never dark) so the
 // terrain always shows the exact art colours. By default the art is draped
-// top-down by world XZ ("planar") so features land in their correct place on
-// the 3D rock; admins can nudge offset / scale / rotation / flip / yaw /
-// brightness to line it up perfectly (all live). three.js is loaded lazily so
-// it never enters the main bundle.
+// top-down by world XZ ("planar", axis "y") so features land in their correct
+// place on the 3D rock; admins can pick a different projection plane and nudge
+// offset / scale / rotation / flip / yaw / pitch / brightness / contrast to line
+// it up perfectly (all live). three.js is loaded lazily so it never enters the
+// main bundle.
 export default function GlbTerrain({
   url, textureUrl, accent = "#8b5cf6", cfg,
 }: { url: string; textureUrl?: string | null; accent?: string; cfg?: MapGlbCfg | null }) {
@@ -19,8 +20,10 @@ export default function GlbTerrain({
   const cfgRef = useRef<Required<MapGlbCfg>>({ ...DEFAULT_MAP_GLB_CFG, ...(cfg ?? {}) });
   useEffect(() => { cfgRef.current = { ...DEFAULT_MAP_GLB_CFG, ...(cfg ?? {}) }; }, [cfg]);
 
-  // Structural settings that require a rebuild (projection + which mesh UVs).
+  // Structural settings that require a rebuild (projection plane / axis / fit).
   const projection = cfg?.projection ?? DEFAULT_MAP_GLB_CFG.projection;
+  const planarAxis = cfg?.planarAxis ?? DEFAULT_MAP_GLB_CFG.planarAxis;
+  const fitContain = cfg?.fitContain ?? DEFAULT_MAP_GLB_CFG.fitContain;
 
   useEffect(() => {
     const el = ref.current;
@@ -68,30 +71,47 @@ export default function GlbTerrain({
         if (stop) return;
         const obj = g.scene;
 
-        // Normalise to a unit-ish size centred at origin FIRST so planar UVs use
-        // the local geometry box.
+        // IMPORTANT: flush every node's world matrix BEFORE we read it. The old
+        // code captured `mesh.matrixWorld` before calling updateWorldMatrix, so
+        // the UVs were baked from a stale (often identity) matrix — the #1 reason
+        // the art never lined up. Update the whole tree once up front instead.
+        obj.updateMatrixWorld(true);
+
+        // Measure the mesh footprint in WORLD space (matches the baked vertices).
         const box0 = new THREE.Box3().setFromObject(obj);
         const size0 = box0.getSize(new THREE.Vector3());
-        const minXZ = new THREE.Vector3(box0.min.x, 0, box0.min.z);
-        const spanX = size0.x || 1, spanZ = size0.z || 1;
+
+        // Pick the two axes to drape the art across, based on the chosen plane.
+        //   "y" top-down  → U=X, V=Z   (default; features land like a map)
+        //   "z" front     → U=X, V=Y
+        //   "x" side      → U=Z, V=Y
+        const axisMap = {
+          y: { u: "x", v: "z" },
+          z: { u: "x", v: "y" },
+          x: { u: "z", v: "y" },
+        } as const;
+        const { u: uAxis, v: vAxis } = axisMap[planarAxis];
+        const uMin = box0.min[uAxis], vMin = box0.min[vAxis];
+        let uSpan = size0[uAxis] || 1, vSpan = size0[vAxis] || 1;
+        // fitContain: use the SAME span on both axes (the larger one) so the art
+        // keeps its aspect ratio and covers the footprint once without stretching.
+        if (fitContain) { const m = Math.max(uSpan, vSpan); uSpan = m; vSpan = m; }
 
         obj.traverse((child) => {
           const mesh = child as import("three").Mesh;
           if (!mesh.isMesh) return;
 
-          // Planar top-down UVs: project each vertex onto the XZ plane so the
-          // flat art lays over the terrain in the right position.
+          // Planar UVs: project each vertex (in world space) onto the chosen
+          // plane so the flat art lays over the terrain in the right position.
           if (projection === "planar" && mesh.geometry) {
             const pos = mesh.geometry.getAttribute("position");
             if (pos) {
               const uv = new Float32Array(pos.count * 2);
               const v = new THREE.Vector3();
-              const worldMatrix = mesh.matrixWorld;
-              mesh.updateWorldMatrix(true, false);
               for (let i = 0; i < pos.count; i++) {
-                v.fromBufferAttribute(pos, i).applyMatrix4(worldMatrix);
-                uv[i * 2] = (v.x - minXZ.x) / spanX;
-                uv[i * 2 + 1] = (v.z - minXZ.z) / spanZ;
+                v.fromBufferAttribute(pos, i).applyMatrix4(mesh.matrixWorld);
+                uv[i * 2] = (v[uAxis] - uMin) / uSpan;
+                uv[i * 2 + 1] = (v[vAxis] - vMin) / vSpan;
               }
               mesh.geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
             }
@@ -106,6 +126,7 @@ export default function GlbTerrain({
           materials.push(mat);
         });
 
+        // Now (AFTER UVs are baked from world space) centre + scale to fit view.
         const box = new THREE.Box3().setFromObject(obj);
         const size = box.getSize(new THREE.Vector3()).length() || 1;
         const center = box.getCenter(new THREE.Vector3());
@@ -135,10 +156,19 @@ export default function GlbTerrain({
           tex.rotation = (c.rotation * Math.PI) / 180;
           tex.needsUpdate = true;
         }
-        for (const m of materials) { const b = c.brightness; m.color.setRGB(b, b, b); }
-        // Model yaw + optional auto-rotate.
+        // Brightness + a gentle contrast curve baked into the flat colour tint.
+        for (const m of materials) {
+          const b = c.brightness;
+          // contrast>1 darkens mid-lows a touch to fake depth; applied around 0.5.
+          const k = c.contrast;
+          const tint = Math.min(3, Math.max(0.1, 0.5 + (b - 0.5) * k));
+          m.color.setRGB(tint, tint, tint);
+          if (m.wireframe !== c.wireframe) m.wireframe = c.wireframe;
+        }
+        // Model yaw + pitch + optional auto-rotate.
         const terrain = scene.getObjectByName("terrain");
         if (terrain) {
+          terrain.rotation.x = (c.pitch * Math.PI) / 180;
           if (c.autoRotate) terrain.rotation.y += 0.006;
           else { terrain.rotation.y += ((c.yaw * Math.PI) / 180) - lastYaw; lastYaw = (c.yaw * Math.PI) / 180; }
         }
@@ -155,7 +185,7 @@ export default function GlbTerrain({
       renderer?.dispose();
       if (el) el.innerHTML = "";
     };
-  }, [url, textureUrl, accent, projection]);
+  }, [url, textureUrl, accent, projection, planarAxis, fitContain]);
 
   return <div ref={ref} className="absolute inset-0" style={{ touchAction: "none" }} />;
 }
