@@ -12,6 +12,7 @@ import Avatar from "@/components/Avatar";
 import CpIcon from "@/components/CpIcon";
 import ZoomPan from "@/components/ZoomPan";
 import LoopVideo from "@/components/LoopVideo";
+import QuestFlashGame, { FLASH_KINDS, defaultFlashKind, type FlashKind } from "@/components/QuestFlashGame";
 import { useTr } from "@/components/LocaleProvider";
 import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
@@ -28,8 +29,13 @@ import type { QuestView, QuestGamer } from "@/lib/quests";
 
 type Panel = "rules" | "log" | "guide" | "missions" | null;
 
+// A lightweight descriptor of a sibling quest the player can jump to while
+// staying inside the game (left/right switcher). Supplied by QuestMapHero.
+export type QuestSwitchItem = { key: string; name: string; color: string; accent2: string; logoUrl: string | null };
+
 export default function QuestGame({
   quest, holders, game, rocketUrl, initialTier, onClose,
+  switchItems, activeKey, onSwitchQuest,
 }: {
   quest: QuestView;
   holders: Record<string, QuestGamer[]>;
@@ -37,9 +43,20 @@ export default function QuestGame({
   rocketUrl?: string;
   initialTier?: number | null;
   onClose: () => void;
+  // In-game quest switching (left/right). When 2+ items are supplied the game
+  // shows prev/next arrows that hot-swap the loaded quest without closing.
+  switchItems?: QuestSwitchItem[];
+  activeKey?: string;
+  onSwitchQuest?: (key: string) => void;
 }) {
   const tr = useTr();
   const [mounted, setMounted] = useState(false);
+  // Which game engine is showing: the classic trail/map game, or the new
+  // HTML5 "FlashPlayer" arcade built from this quest's own art + actions.
+  const [mode, setMode] = useState<"classic" | "arcade">("classic");
+  // Which arcade variation is active (reset to the quest's default on switch).
+  const [flashKind, setFlashKind] = useState<FlashKind>(() => defaultFlashKind(quest.key));
+  useEffect(() => { setFlashKind(defaultFlashKind(quest.key)); }, [quest.key]);
   const [panel, setPanel] = useState<Panel>(null);
   const [sel, setSel] = useState<number | null>(null);
   const [walking, setWalking] = useState(false);
@@ -55,6 +72,15 @@ export default function QuestGame({
 
   const tiers = quest.tiers;
   const { rules, log, totalCp, art, missions } = game;
+
+  // ===== In-game quest switcher (left/right) =====
+  const items = switchItems ?? [];
+  const curKey = activeKey ?? quest.key;
+  const curIdx = items.findIndex((i) => i.key === curKey);
+  const canSwitch = items.length > 1 && curIdx >= 0 && !!onSwitchQuest;
+  const prevItem = canSwitch ? items[(curIdx - 1 + items.length) % items.length] : null;
+  const nextItem = canSwitch ? items[(curIdx + 1) % items.length] : null;
+  const switchTo = (key: string | undefined) => { if (key && key !== curKey) { setPanel(null); setSel(null); onSwitchQuest?.(key); } };
 
   // ===== Stage sizing — the world keeps the hero's aspect (pins line up with
   // the art) and is fitted as large as possible into the free screen area. =====
@@ -293,6 +319,17 @@ export default function QuestGame({
             </span>
           </div>
         </div>
+        {/* Classic ⇄ Arcade toggle — the old game is untouched; Arcade is the
+            new HTML5 "FlashPlayer" version of this same quest. */}
+        <div className="hidden sm:flex items-center rounded-xl border border-white/15 bg-black/50 p-0.5 shrink-0">
+          {(["classic", "arcade"] as const).map((m) => (
+            <button key={m} onClick={() => { setMode(m); setPanel(null); setSel(null); }}
+              className={`rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wide transition-colors ${mode === m ? "text-white" : "text-white/55 hover:text-white/80"}`}
+              style={mode === m ? { background: `linear-gradient(90deg, ${quest.color}, ${quest.accent2})` } : undefined}>
+              {m === "classic" ? tr("Map") : tr("Arcade")}
+            </button>
+          ))}
+        </div>
         {canFs && (
           <button onClick={toggleFs} aria-label={fs ? tr("Exit full screen") : tr("Full screen")}
             className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/50 text-muted hover:text-white shrink-0">
@@ -305,9 +342,65 @@ export default function QuestGame({
         </button>
       </div>
 
+      {/* Mobile mode toggle (top bar is tight on phones) */}
+      <div className="relative z-[45] flex sm:hidden items-center justify-center px-3 pt-2">
+        <div className="flex items-center rounded-xl border border-white/15 bg-black/50 p-0.5">
+          {(["classic", "arcade"] as const).map((m) => (
+            <button key={m} onClick={() => { setMode(m); setPanel(null); setSel(null); }}
+              className={`rounded-lg px-4 py-1 text-[11px] font-black uppercase tracking-wide transition-colors ${mode === m ? "text-white" : "text-white/55"}`}
+              style={mode === m ? { background: `linear-gradient(90deg, ${quest.color}, ${quest.accent2})` } : undefined}>
+              {m === "classic" ? tr("Map") : tr("Arcade")}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ===== Game stage ===== */}
       <div ref={areaRef} className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-1 py-1">
-        {sw > 0 && (
+        {/* Left / right quest switcher — jump to the prev/next quest's game
+            without leaving the overlay. Only shown with 2+ sibling quests. */}
+        {canSwitch && (
+          <>
+            <button onClick={() => switchTo(prevItem?.key)} aria-label={tr("Previous quest")}
+              className="absolute left-1.5 top-1/2 z-[46] -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/55 backdrop-blur text-white hover:border-cyan-400/60 active:scale-95"
+              title={prevItem?.name}>
+              <Icon name="arrowLeft" size={20} style={{ color: prevItem?.accent2 }} />
+            </button>
+            <button onClick={() => switchTo(nextItem?.key)} aria-label={tr("Next quest")}
+              className="absolute right-1.5 top-1/2 z-[46] -translate-y-1/2 flex h-11 w-11 items-center justify-center rounded-full border border-white/15 bg-black/55 backdrop-blur text-white hover:border-cyan-400/60 active:scale-95"
+              title={nextItem?.name}>
+              <Icon name="arrowRight" size={20} style={{ color: nextItem?.accent2 }} />
+            </button>
+            {/* Quest dots — which sibling you're on */}
+            <div className="pointer-events-none absolute bottom-1.5 left-1/2 z-[46] -translate-x-1/2 flex items-center gap-1.5">
+              {items.map((it) => (
+                <span key={it.key} className="h-1.5 rounded-full transition-all"
+                  style={{ width: it.key === curKey ? 16 : 6, background: it.key === curKey ? quest.accent2 : "rgba(255,255,255,0.3)" }} />
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* ---- ARCADE (HTML5 FlashPlayer) mode ---- */}
+        {mode === "arcade" ? (
+          sw > 0 && (
+            <div className="relative" style={{ width: sw, height: sh }}>
+              {/* Variation switcher — which arcade game this quest plays as */}
+              <div className="absolute top-2 left-1/2 z-30 -translate-x-1/2 flex items-center gap-1 rounded-full border border-white/15 bg-black/60 backdrop-blur px-1 py-1">
+                {FLASH_KINDS.map((f) => (
+                  <button key={f.key} onClick={() => setFlashKind(f.key)}
+                    title={f.label}
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide transition-colors ${flashKind === f.key ? "text-white" : "text-white/55 hover:text-white/85"}`}
+                    style={flashKind === f.key ? { background: `linear-gradient(90deg, ${quest.color}, ${quest.accent2})` } : undefined}>
+                    <Icon name={f.icon} size={12} /> <span className="hidden sm:inline">{tr(f.label)}</span>
+                  </button>
+                ))}
+              </div>
+              <QuestFlashGame quest={quest} game={game} rocketUrl={rocketUrl} kind={flashKind} onKindChange={setFlashKind} />
+            </div>
+          )
+        ) : (
+        sw > 0 && (
           <div className="relative" style={{ width: sw, height: sh }}>
             {/* 2D map ⇄ 3D terrain toggle (when this quest has a GLB mesh) */}
             {quest.mapGlbUrl && (
@@ -404,6 +497,7 @@ export default function QuestGame({
               </button>
             )}
           </div>
+        )
         )}
       </div>
 
