@@ -336,10 +336,16 @@ export default function QuestMapHero({
         </div>
       </div>
 
-      {/* The full-screen playable quest game (popup overlay, web + mobile) */}
+      {/* The full-screen playable quest game (popup overlay, web + mobile).
+          When we're in the multi-quest hero (inFrame), pass the sibling quests
+          so the game's left/right arrows can hot-swap between quests without
+          closing — switching just moves activeKey, which re-feeds q/holders/game. */}
       {gameData && play && (
         <QuestGame quest={q} holders={holders} game={gameData}
-          rocketUrl={rocketUrl} initialTier={playTier} onClose={() => setPlay(false)} />
+          rocketUrl={rocketUrl} initialTier={playTier} onClose={() => setPlay(false)}
+          switchItems={inFrame ? variants!.filter((v) => v.game).map((v) => ({ key: v.key, name: v.quest.name, color: v.quest.color, accent2: v.quest.accent2, logoUrl: v.quest.logoUrl })) : undefined}
+          activeKey={activeKey}
+          onSwitchQuest={inFrame ? (key) => { setActiveKey(key); setPlayTier(null); } : undefined} />
       )}
     </section>
   );

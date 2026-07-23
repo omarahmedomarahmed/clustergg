@@ -64,18 +64,25 @@ export type QuestGameUi = { rules?: PanelCfg; log?: PanelCfg; guide?: PanelCfg; 
 // nudge the art to line up perfectly; yaw spins the model; brightness tints it.
 export type MapGlbCfg = {
   projection?: "planar" | "uv";
+  planarAxis?: "y" | "x" | "z";         // which world plane to drape the art on
+                                        //   "y" = top-down (XZ) · "z" = front (XY) · "x" = side (ZY)
   offsetX?: number; offsetY?: number;   // 0..1
   scaleX?: number; scaleY?: number;     // repeat (1 = fill once)
   rotation?: number;                    // degrees (texture)
   flipX?: boolean; flipY?: boolean;
-  yaw?: number;                         // degrees (model spin)
+  yaw?: number;                         // degrees (model spin, Y)
+  pitch?: number;                       // degrees (model tilt, X) — see the top of the rock
   brightness?: number;                  // 0.4..2 (1 = as-is)
+  contrast?: number;                    // 0.5..2 (1 = as-is) via material — subtle depth
   autoRotate?: boolean;
+  wireframe?: boolean;                  // debug: show the mesh edges over the art
+  fitContain?: boolean;                 // auto-fit: scale the art so it covers the mesh footprint once
 };
 
 export const DEFAULT_MAP_GLB_CFG: Required<MapGlbCfg> = {
-  projection: "planar", offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1,
-  rotation: 0, flipX: false, flipY: false, yaw: 0, brightness: 1, autoRotate: true,
+  projection: "planar", planarAxis: "y", offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1,
+  rotation: 0, flipX: false, flipY: false, yaw: 0, pitch: 0, brightness: 1, contrast: 1,
+  autoRotate: true, wireframe: false, fitContain: false,
 };
 
 // Admin-set CSS `background` values for the in-game panels (from the universal
