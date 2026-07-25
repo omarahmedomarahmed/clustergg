@@ -87,15 +87,16 @@ export async function broadcast(_prev: BotActionState, formData: FormData): Prom
   return { ok: `Sent to ${res.sent} of ${res.targets} server${res.targets === 1 ? "" : "s"}.` };
 }
 
-// Announce a challenge to Discord on demand. A public one reaches every
-// server; a server-gated one reaches only its own, with extra hype.
+// Announce a challenge to Discord on demand. This is also how a server-gated
+// challenge's entry key gets delivered — the owning server is told the key, and
+// every other server is told the challenge exists.
 export async function announceChallenge(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
   await requireAdmin();
   if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
   const id = String(formData.get("challengeId") ?? "").trim();
   if (!id) return { error: "Missing challenge." };
   await announceChallengeLaunched(id);
-  return { ok: "Announced. Check the server's Cluster channel." };
+  return { ok: "Announced. A server challenge also sends its entry key to the server it belongs to." };
 }
 
 // Run the full install flow by hand, for a server that already has the bot.

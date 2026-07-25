@@ -6,7 +6,7 @@ import { cardRef, embedColor } from "@/lib/discord/cards";
 import { gamerForDiscordId, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
-import { liveChallenges, challengeUrl } from "@/lib/challenges";
+import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo } from "@/lib/challenges";
 import { guildStats, attributeMember } from "@/lib/discord/guilds";
 import { findByInGameName, findByDiscordName } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
@@ -401,7 +401,7 @@ async function leaderboardScreen(game: string, ctx: ScreenCtx, trail: Frame[]): 
 // ===== Challenges =====
 
 async function challengesScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
-  const live = await liveChallenges(game || null, 5, ctx.guildId ?? null);
+  const live = await liveChallenges(game || null, 5);
   if (!live.length) {
     return notYet(game ? `No live challenges on **${game}** right now.` : "No challenges are live right now.", trail, [
       navButton("Browse planets", frame("planets"), trail, ButtonStyle.Secondary, "🪐"),
@@ -430,26 +430,56 @@ async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Prom
   const { url, data } = await cardRef("challenge", { id });
   if (!data || data.kind !== "challenge") return notYet("That challenge is no longer live.", trail);
 
-  const [joined, webUrl] = await Promise.all([
+  const [joined, webUrl, gate] = await Promise.all([
     ctx.gamer ? hasJoined(ctx.gamer.userId, id) : Promise.resolve(false),
     challengeUrl(siteUrl(), id),
+    challengeGate(id),
   ]);
+
+  // The key was sent to the server the challenge belongs to, so in THAT server
+  // the bot can show it and joining is one tap. Anywhere else you can watch the
+  // whole thing and are asked for the key to enter.
+  const ownHere = gate.locked && keyVisibleTo(gate, ctx.guildId ?? null);
+  const footer = joined
+    ? "You're in — your standing updates on every sync."
+    : gate.locked
+      ? (ownHere ? `Your server's entry key: ${gate.accessKey}` : "Entry needs the key sent to this challenge's server.")
+      : undefined;
+
   return {
-    embeds: [embed(url, {
-      title: data.title,
-      color: data.theme.accent,
-      footer: joined ? "You're in — your standing updates on every sync." : undefined,
-    })],
+    embeds: [embed(url, { title: data.title, color: data.theme.accent, footer })],
     components: rows([
       !ctx.gamer
         ? linkButton("Continue with Discord to join", signInUrl(siteUrl(), new URL(webUrl).pathname), "🚀")
         : joined
           ? button("You've joined", actionId("noop", [], trail), ButtonStyle.Secondary, "✅")
-          : button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆"),
+          : gate.locked && !ownHere
+            ? button("Enter with key", `open-key|${id}`, ButtonStyle.Primary, "🔑")
+            : button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆"),
       navButton(`${data.game} planet`.slice(0, 24), frame("planet", data.game), trail, ButtonStyle.Secondary, "🪐"),
       linkButton("Full details", webUrl, "🔗"),
       backButton(trail),
     ]),
+  };
+}
+
+// The door to a server-gated challenge. Everything else about the challenge is
+// already on screen — this asks only for the code that server was given.
+export function keyModal(challengeId: string) {
+  return {
+    type: InteractionResponseType.Modal,
+    data: {
+      custom_id: `key|${challengeId}`.slice(0, 100),
+      title: "Enter the challenge key",
+      components: [{
+        type: ComponentType.ActionRow,
+        components: [{
+          type: ComponentType.TextInput, custom_id: "key", style: 1, required: true,
+          label: "Entry key", max_length: 32,
+          placeholder: "The code sent to the server running this challenge",
+        }],
+      }],
+    },
   };
 }
 

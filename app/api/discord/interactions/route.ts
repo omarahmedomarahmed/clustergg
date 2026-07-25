@@ -7,11 +7,11 @@ import {
 } from "@/lib/discord/types";
 import { parseId, frame, type Frame } from "@/lib/discord/components";
 import { gameChoices, questChoices, guideChoices, showChoices } from "@/lib/discord/catalog";
-import { renderScreen, screenForCommand, loadCtx, linkModal } from "@/lib/discord/screens";
+import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
-import { joinChallengeFor } from "@/lib/challenges";
+import { joinChallengeFor, challengeGate, keyVisibleTo } from "@/lib/challenges";
 import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS } from "@/lib/providers/registry";
 import { logCommand } from "@/lib/discord/guilds";
@@ -94,19 +94,25 @@ export async function POST(req: NextRequest) {
   return json({ type: InteractionResponseType.Pong });
 }
 
-// ===== Modal submit (the game-link form) =====
+// ===== Modal submit (the two forms: linking an account, entering a key) =====
+
+type Who = NonNullable<ReturnType<typeof actor>>;
 
 function modalSubmit(i: Interaction) {
   const who = actor(i);
-  const [kind, provider, game] = (i.data?.custom_id ?? "").split("|");
-  if (!who || kind !== "link" || !provider) {
-    return json({ type: InteractionResponseType.DeferredUpdateMessage });
-  }
+  const [kind, arg] = (i.data?.custom_id ?? "").split("|");
+  if (!who || !arg) return json({ type: InteractionResponseType.DeferredUpdateMessage });
 
   const fields = new Map(
     (i.data?.components ?? []).flatMap((row) => row.components.map((c) => [c.custom_id, c.value] as const)),
   );
 
+  if (kind === "key") return keySubmit(i, who, arg, (fields.get("key") ?? "").trim());
+  if (kind === "link") return linkSubmit(i, who, arg, fields);
+  return json({ type: InteractionResponseType.DeferredUpdateMessage });
+}
+
+function linkSubmit(i: Interaction, who: Who, provider: string, fields: Map<string, string>) {
   after(async () => {
     try {
       const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
@@ -132,6 +138,41 @@ function modalSubmit(i: Interaction) {
       });
     } catch {
       await editWithError(i.token, `Couldn't link that account. Try again, or link it at ${siteUrl()}/profile.`);
+    }
+  });
+
+  return json({
+    type: InteractionResponseType.DeferredChannelMessageWithSource,
+    data: { flags: MessageFlags.Ephemeral },
+  });
+}
+
+// Entering a server-gated challenge. Everything about it was already visible —
+// standings, trophies, countdown, everyone's progress. This is only the door,
+// and the key is checked inside joinChallengeFor so web and Discord can't drift.
+function keySubmit(i: Interaction, who: Who, challengeId: string, key: string) {
+  after(async () => {
+    try {
+      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      if (!ctx.gamer) {
+        await editOriginal(i.token, { content: `Continue with Discord first, then link your game account: ${siteUrl()}/login` });
+        return;
+      }
+      const res = await joinChallengeFor(ctx.gamer.userId, challengeId, { source: "discord", accessKey: key });
+      if (!res.ok) {
+        await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }] });
+        return;
+      }
+      const payload = await renderScreen(frame("challenge", challengeId), [frame("home")], ctx);
+      await editOriginal(i.token, {
+        content: res.already
+          ? `You were already in **${res.title}**.`
+          : `Key accepted — you're in **${res.title}**. Only activity from now on counts.`,
+        embeds: payload.embeds ?? [],
+        components: payload.components ?? [],
+      });
+    } catch {
+      await editWithError(i.token, "Couldn't check that key just now. Try again in a moment.");
     }
   });
 
@@ -217,6 +258,14 @@ function componentPress(i: Interaction) {
     if (!provider) return json({ type: InteractionResponseType.DeferredUpdateMessage });
     return json(linkModal(game, provider));
   }
+  // Same rule for the entry key on a server-gated challenge. No database work
+  // here on purpose — a modal has to be the immediate answer, and the key is
+  // verified on submit anyway.
+  if (customId.startsWith("open-key|")) {
+    const id = customId.slice("open-key|".length);
+    if (!id) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    return json(keyModal(id));
+  }
 
   const parsed = parseId(customId);
   if (!who || !parsed) return json({ type: InteractionResponseType.DeferredUpdateMessage });
@@ -266,7 +315,13 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
   // the site (lib/challenges.ts) — same entry gate, same baseline snapshot,
   // same CP award. Only `joinedFrom` differs, which is the funnel metric.
   if (target.screen === "join" && ctx.gamer) {
-    const res = await joinChallengeFor(ctx.gamer.userId, target.args[0] ?? "", { source: "discord" });
+    const id = target.args[0] ?? "";
+    // Inside the server a gated challenge belongs to, the key is already on the
+    // card — so joining there is one tap instead of retyping what you can see.
+    // Everywhere else this button isn't rendered; the key modal is.
+    const gate = await challengeGate(id);
+    const key = gate.locked && keyVisibleTo(gate, i.guild_id ?? null) ? gate.accessKey : null;
+    const res = await joinChallengeFor(ctx.gamer.userId, id, { source: "discord", accessKey: key });
     if (!res.ok) {
       await editOriginal(i.token, {
         embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }],
@@ -313,6 +368,8 @@ function joinFailure(reason: string): string {
   switch (reason) {
     case "no_account": return "You need a linked account for that game first — run `/cluster link`.";
     case "gated": return "This challenge requires quest badges you haven't earned yet.";
+    case "locked": return "This one needs an entry key — it was sent to the server running the challenge.";
+    case "bad_key": return "That key isn't right. Ask a mod in the server running this challenge for the current one.";
     case "not_active": return "That challenge isn't live anymore.";
     default: return "Couldn't join that challenge.";
   }

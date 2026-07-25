@@ -361,7 +361,7 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
     ended: ch.status === "completed",
     participants: participants.length,
     prize: ch.prizeDescription || null,
-    isPrivate: ch.visibility === "private",
+    isPrivate: ch.visibility === "private" && !!ch.accessKey,
     serverName,
     standings: standings.map((s) => ({ place: s.place, name: s.displayName, points: s.points })),
     trophies,

@@ -25,25 +25,29 @@ function defaultChannel(): string | null {
   return process.env.DISCORD_DEFAULT_CHANNEL_ID || null;
 }
 
-// Where should this announcement go? Optionally restricted to one server, which
-// is what a private, server-gated challenge needs.
-async function targets(onlyGuildId?: string | null): Promise<string[]> {
+// Where should this announcement go? A server-gated challenge needs both sides
+// of this: the message carrying the entry key goes ONLY to the server that owns
+// it, and the "this exists, come watch" message goes to everyone EXCEPT them.
+type Scope = { only?: string | null; except?: string | null };
+
+async function targets(scope: Scope = {}): Promise<string[]> {
   const out: string[] = [];
   const fallback = defaultChannel();
-  if (fallback && !onlyGuildId) out.push(fallback);
+  if (fallback && !scope.only) out.push(fallback);
   try {
     const guilds = await announcingGuilds();
     for (const g of guilds) {
-      if (onlyGuildId && g.guildId !== onlyGuildId) continue;
+      if (scope.only && g.guildId !== scope.only) continue;
+      if (scope.except && g.guildId === scope.except) continue;
       if (g.channelId) out.push(g.channelId);
     }
   } catch { /* fall back to whatever we already have */ }
   return [...new Set(out)];
 }
 
-async function announce(payload: Record<string, unknown>, onlyGuildId?: string | null): Promise<void> {
+async function announce(payload: Record<string, unknown>, scope: Scope = {}): Promise<void> {
   if (!canAct()) return;
-  const channels = await targets(onlyGuildId);
+  const channels = await targets(scope);
   // Sequential on purpose: a burst of parallel posts is the fastest way to get
   // rate-limited across every server at once.
   for (const channel of channels) {
@@ -111,8 +115,12 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
   });
 }
 
-// A new challenge is live. A public one goes everywhere; a server-gated one
-// goes ONLY to its server, with the extra hype that makes it feel like theirs.
+// A new challenge is live.
+//
+// A server-gated one is NOT hidden — it's announced everywhere, because a
+// competition other servers can watch but not enter is the best advertising a
+// server challenge has. What's restricted is the entry key, and this is the one
+// place it's ever delivered: a message to the server the challenge belongs to.
 export async function announceChallengeLaunched(challengeId: string): Promise<void> {
   if (!canAct()) return;
   const db = await getDb();
@@ -120,25 +128,36 @@ export async function announceChallengeLaunched(challengeId: string): Promise<vo
     .where(eq(schema.challenges.id, challengeId)).limit(1);
   if (!ch || ch.status !== "active") return;
 
-  const isPrivate = ch.visibility === "private" && !!ch.guildId;
   const [card, url] = await Promise.all([
     cardRef("challenge", { id: challengeId }),
     challengeUrl(siteUrl(), challengeId),
   ]);
   if (!card.data || card.data.kind !== "challenge") return;
 
-  const content = isPrivate
-    ? `${ch.announceHype ? "@here " : ""}**${ch.title}** is live — and it's only for this server. Nobody else can enter it.`
-    : `**${ch.title}** is live on **${ch.game}**.`;
+  const embeds = [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }];
+  const components = rows([
+    navButton("Join now", frame("challenge", challengeId), [frame("home")], ButtonStyle.Success, "🏆"),
+    linkButton("Details", url, "🔗"),
+  ]);
 
-  await announce({
-    content,
-    embeds: [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }],
-    components: rows([
-      navButton("Join now", frame("challenge", challengeId), [frame("home")], ButtonStyle.Success, "🏆"),
-      linkButton("Details", url, "🔗"),
-    ]),
-  }, isPrivate ? ch.guildId : null);
+  const gated = ch.visibility === "private" && !!ch.guildId && !!ch.accessKey;
+  if (gated) {
+    await announce({
+      content: [
+        `${ch.announceHype ? "@here " : ""}**${ch.title}** is live, and it's yours — this server is the only one holding the key.`,
+        `Entry key: **\`${ch.accessKey}\`** — tap Join now, or enter it on the site.`,
+      ].join("\n"),
+      embeds, components,
+    }, { only: ch.guildId });
+
+    await announce({
+      content: `**${ch.title}** is live on **${ch.game}** — a server challenge. Anyone can follow the standings; entering needs that server's key.`,
+      embeds, components,
+    }, { except: ch.guildId });
+    return;
+  }
+
+  await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components });
 }
 
 // A challenge finished — the podium, with what each winner actually earned.

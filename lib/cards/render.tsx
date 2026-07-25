@@ -347,7 +347,8 @@ function ChallengeBody(d: ChallengeCard) {
         </Pill>
         {d.isPrivate ? (
           <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)">
-            {clamp(d.serverName ? `${d.serverName.toUpperCase()} EXCLUSIVE` : "SERVER EXCLUSIVE", 28)}
+            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 3, background: "#fbbf24" }} />
+            {clamp(d.serverName ? `${d.serverName.toUpperCase()} · KEY TO JOIN` : "KEY TO JOIN", 30)}
           </Pill>
         ) : null}
         <Pill>{d.game}</Pill>

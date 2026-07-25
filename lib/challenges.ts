@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
@@ -13,18 +13,29 @@ import { announceChallengeJoined, announceChallengeEnded } from "@/lib/discord/a
 
 export type JoinResult =
   | { ok: true; already: boolean; game: string; title: string }
-  | { ok: false; reason: "not_found" | "not_active" | "no_account" | "gated" };
+  | { ok: false; reason: "not_found" | "not_active" | "no_account" | "gated" | "locked" | "bad_key" };
 
 export async function joinChallengeFor(
   userId: string,
   challengeId: string,
-  opts: { linkedAccountId?: string; source?: "web" | "discord" } = {},
+  opts: { linkedAccountId?: string; source?: "web" | "discord"; accessKey?: string | null } = {},
 ): Promise<JoinResult> {
   const db = await getDb();
   const [challenge] = await db.select().from(schema.challenges)
     .where(eq(schema.challenges.id, challengeId)).limit(1);
   if (!challenge) return { ok: false, reason: "not_found" };
   if (challenge.status !== "active") return { ok: false, reason: "not_active" };
+
+  // Server-gated: anyone can watch, only key-holders can enter. The key was
+  // sent to the server the challenge belongs to, which is what makes it that
+  // community's competition without hiding it from everyone else.
+  if (joinLocked(challenge)) {
+    const given = (opts.accessKey ?? "").trim();
+    if (!given) return { ok: false, reason: "locked" };
+    if (given.toUpperCase() !== (challenge.accessKey ?? "").trim().toUpperCase()) {
+      return { ok: false, reason: "bad_key" };
+    }
+  }
 
   // The account must be one of theirs AND match the challenge's provider —
   // you can't enter a Valorant challenge with a Chess account.
@@ -86,32 +97,51 @@ export async function challengeUrl(base: string, challengeId: string): Promise<s
   } catch { return `${base}/planets`; }
 }
 
-// Live challenges, optionally for one game. Shared by the bot's challenge
-// screens and anywhere else that needs "what's on right now".
-// `guildId` scopes visibility: inside a server you see the public challenges
-// PLUS that server's own private ones. Anywhere else, only the public ones —
-// a server-exclusive challenge that leaked into other servers wouldn't be
-// exclusive, and that exclusivity is the whole product for an owner.
-export async function liveChallenges(game?: string | null, limit = 8, guildId?: string | null) {
+// Every live challenge. Server-gated ones are NOT hidden — they show up on the
+// planet, on the homepage and in every server, with their full standings,
+// trophies and countdown. Hiding them would waste the best advertising a server
+// challenge has: everyone else watching a competition they can't enter.
+//
+// The gate is on JOINING, not on looking (see `joinLocked`).
+export async function liveChallenges(game?: string | null, limit = 8) {
   const db = await getDb();
-  const visible = guildId
-    ? or(eq(schema.challenges.visibility, "public"), eq(schema.challenges.guildId, guildId))
-    : eq(schema.challenges.visibility, "public");
   const where = game
-    ? and(eq(schema.challenges.status, "active"), eq(schema.challenges.game, game), visible)
-    : and(eq(schema.challenges.status, "active"), visible);
+    ? and(eq(schema.challenges.status, "active"), eq(schema.challenges.game, game))
+    : eq(schema.challenges.status, "active");
   return db.select().from(schema.challenges).where(where).orderBy(schema.challenges.endAt).limit(limit);
 }
 
-// Can this viewer open this challenge? Public ones: always. Private ones: only
-// from the owning server, or with the access key.
-export async function canSeeChallenge(
-  challenge: { visibility: string | null; guildId: string | null; accessKey: string | null },
-  ctx: { guildId?: string | null; accessKey?: string | null },
-): Promise<boolean> {
-  if ((challenge.visibility ?? "public") !== "private") return true;
-  if (challenge.guildId && ctx.guildId && challenge.guildId === ctx.guildId) return true;
-  return !!challenge.accessKey && challenge.accessKey === ctx.accessKey;
+// Does joining this challenge need a key?
+export function joinLocked(challenge: { visibility?: string | null; accessKey?: string | null }): boolean {
+  return (challenge.visibility ?? "public") === "private" && !!challenge.accessKey;
+}
+
+// The key belongs to the server the challenge was assigned to — it was sent
+// there, so the bot can show it to that server's members and nobody else.
+export function keyVisibleTo(
+  challenge: { guildId?: string | null },
+  guildId?: string | null,
+): boolean {
+  return !!challenge.guildId && !!guildId && challenge.guildId === guildId;
+}
+
+export type ChallengeGate = { locked: boolean; accessKey: string | null; guildId: string | null };
+
+// Just the gate fields, for deciding which door to show. Deliberately never
+// throws: a failed lookup must render an unlocked challenge rather than a
+// broken screen, because `joinChallengeFor` re-checks the key anyway.
+export async function challengeGate(challengeId: string): Promise<ChallengeGate> {
+  const open: ChallengeGate = { locked: false, accessKey: null, guildId: null };
+  try {
+    const db = await getDb();
+    const [c] = await db.select({
+      visibility: schema.challenges.visibility,
+      accessKey: schema.challenges.accessKey,
+      guildId: schema.challenges.guildId,
+    }).from(schema.challenges).where(eq(schema.challenges.id, challengeId)).limit(1);
+    if (!c) return open;
+    return { locked: joinLocked(c), accessKey: c.accessKey ?? null, guildId: c.guildId ?? null };
+  } catch { return open; }
 }
 
 // ===== Ending a challenge =====

@@ -13,6 +13,7 @@ import AdSlot from "@/components/AdSlot";
 import Countdown from "@/components/Countdown";
 import LiveChallengeBoard from "@/components/LiveChallengeBoard";
 import { joinChallenge } from "@/app/actions/social";
+import { joinLocked } from "@/lib/challenges";
 import { getQuestCompletions } from "@/lib/quests";
 
 export const dynamic = "force-dynamic";
@@ -89,6 +90,18 @@ export default async function ChallengePage({
       const have = viewer ? await getQuestCompletions(db, viewer.id, challenge.gateQuestId) : 0;
       gate = { questName: gq.name, logoUrl: gq.logoUrl, need: challenge.gateMinBadges, have, ok: have >= challenge.gateMinBadges };
     }
+  }
+
+  // A server-gated challenge is fully visible — standings, trophies, countdown,
+  // everyone's progress. Only ENTERING needs the key that was sent to the
+  // server it belongs to. Hiding it would waste the best advertising it has:
+  // people watching a competition they can't join.
+  const keyRequired = joinLocked(challenge);
+  let ownerServer: string | null = null;
+  if (keyRequired && challenge.guildId) {
+    const [g] = await db.select({ name: schema.discordGuilds.name })
+      .from(schema.discordGuilds).where(eq(schema.discordGuilds.guildId, challenge.guildId)).limit(1);
+    ownerServer = g?.name || null;
   }
 
   const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -219,6 +232,26 @@ export default async function ChallengePage({
                   {gate && (
                     <div className="mb-2 inline-flex items-center gap-1.5 text-xs text-emerald-300 font-semibold">
                       <Icon name="check" size={14} /> {gate.questName} {tr("badges")} {gate.have}/{gate.need} — {tr("you qualify")}
+                    </div>
+                  )}
+                  {/* A server challenge is open to watch but needs the key that
+                      was sent to its server before you can enter. */}
+                  {keyRequired && (
+                    <div className="mb-3 rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4">
+                      <div className="flex items-center gap-2 font-semibold text-amber-200 text-sm">
+                        <Icon name="lock" size={15} />
+                        {ownerServer
+                          ? <>{tr("Entry key required — ask in")} <b>{ownerServer}</b></>
+                          : tr("Entry key required")}
+                      </div>
+                      <p className="text-xs text-muted mt-1">
+                        {tr("This challenge belongs to a Discord server. Anyone can follow it, but the key to enter was sent to that server.")}
+                      </p>
+                      <input
+                        name="accessKey" required
+                        placeholder={tr("Entry key")}
+                        className="input-cosmic mt-3 w-full sm:w-64 uppercase"
+                      />
                     </div>
                   )}
                   <button className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white flex sm:inline-flex w-full sm:w-auto items-center justify-center gap-2">
