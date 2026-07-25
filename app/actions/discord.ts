@@ -10,6 +10,8 @@ import { postGuides, onboardGuild } from "@/lib/discord/onboard";
 import { broadcastToGuilds, announceChallengeLaunched } from "@/lib/discord/announce";
 import { JOBS, runJob, type JobKey } from "@/lib/jobs";
 import { postAdsToGuilds } from "@/lib/discord/ads";
+import { runHqSetup } from "@/lib/discord/hq";
+import { setContent } from "@/lib/cms";
 
 // Everything the bot needs operationally, as buttons in Mission Control rather
 // than curl commands. Staff run this from a browser; nobody should need a
@@ -131,6 +133,37 @@ export async function broadcastAd(_prev: BotActionState, formData: FormData): Pr
   }
   revalidatePath("/admin/discord/broadcast");
   return { ok: `Posted to ${res.posted} of ${res.considered} server${res.considered === 1 ? "" : "s"}.` };
+}
+
+// ===== HQ: our own server =====
+
+export async function saveHqServer(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  const id = String(formData.get("guildId") ?? "").trim();
+  if (id && !/^\d{15,25}$/.test(id)) {
+    return { error: "That doesn't look like a Discord server id — it should be 17-20 digits. Turn on Developer Mode, right-click your server, Copy Server ID." };
+  }
+  await setContent("discord.hq.guildId", id);
+  revalidatePath("/admin/discord/hq");
+  return {
+    ok: id
+      ? "Saved. Review the plan below, then build it — nothing is created until you press the button."
+      : "HQ server cleared.",
+  };
+}
+
+// Build our server. Creates only what's missing, and records which server was
+// built so it can't run twice on the same one.
+export async function buildHqServer(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  const force = formData.get("force") === "on";
+  const res = await runHqSetup(force);
+  if (!res.ok) return { error: res.reason ?? "Couldn't build HQ." };
+  revalidatePath("/admin/discord/hq");
+  if (!res.created && res.reason) return { ok: res.reason };
+  return {
+    ok: `Built ${res.created} channel${res.created === 1 ? "" : "s"}, pinned ${res.pinned} starter${res.pinned === 1 ? "" : "s"}, left ${res.skipped} that already existed.`,
+  };
 }
 
 // Run the full install flow by hand, for a server that already has the bot.

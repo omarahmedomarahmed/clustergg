@@ -17,6 +17,7 @@ import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS } from "@/lib/providers/registry";
 import { logCommand } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
+import { reportToHq } from "@/lib/discord/hq";
 import { dmUser } from "@/lib/discord/rest";
 import { castDiscordVote } from "@/lib/identity";
 import { inGameNameChoices } from "@/lib/gamer-lookup";
@@ -233,8 +234,16 @@ function requestSubmit(i: Interaction, who: Who, game: string, fields: Map<strin
       });
 
       // Tell staff there's something waiting, so approval isn't gated on
-      // somebody happening to open the admin page.
+      // somebody happening to open the admin page — in-app, and in our own
+      // Discord where staff actually are.
       void notifyStaffOfRequest(res.id).catch(() => {});
+      void reportToHq({
+        type: "request",
+        guildName: (await guildName(i.guild_id)) ?? i.guild_id,
+        title: fields.get("title") ?? "",
+        game,
+        prize: fields.get("prize") ? `${fields.get("prize")} ${fields.get("currency") ?? "USD"}` : "",
+      }).catch(() => {});
     } catch {
       await editWithError(i.token, "Couldn't send that request just now. Try again in a moment.");
     }
@@ -254,6 +263,16 @@ function requestFailure(reason: string): string {
     case "too_many_pending": return "You already have three requests waiting on us. We'll get to them shortly.";
     default: return "Couldn't send that request. Try again in a moment.";
   }
+}
+
+async function guildName(guildId?: string): Promise<string | null> {
+  if (!guildId) return null;
+  try {
+    const db = await getDb();
+    const [g] = await db.select({ name: schema.discordGuilds.name })
+      .from(schema.discordGuilds).where(eq(schema.discordGuilds.guildId, guildId)).limit(1);
+    return g?.name || null;
+  } catch { return null; }
 }
 
 async function notifyStaffOfRequest(requestId: string): Promise<void> {

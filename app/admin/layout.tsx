@@ -26,6 +26,7 @@ const NAV: {
       { href: "/admin/discord", label: "Bot status & setup", exact: true },
       { href: "/admin/discord/requests", label: "Challenge requests", badge: "requests" },
       { href: "/admin/discord/broadcast", label: "Broadcast & ads" },
+      { href: "/admin/discord/hq", label: "HQ server" },
     ],
   },
   {

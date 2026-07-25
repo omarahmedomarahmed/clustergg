@@ -65,10 +65,26 @@ export function listChannels(guildId: string) {
   return call<Channel[]>(`/guilds/${guildId}/channels`);
 }
 
-export function createChannel(guildId: string, name: string, topic?: string) {
+// Discord channel types we build with.
+export const CHANNEL = { text: 0, voice: 2, category: 4, forum: 15 } as const;
+export type ChannelKind = keyof typeof CHANNEL;
+
+export function createChannel(
+  guildId: string,
+  name: string,
+  topic?: string,
+  opts: { kind?: ChannelKind; parentId?: string | null; position?: number } = {},
+) {
   return call<Channel>(`/guilds/${guildId}/channels`, {
     method: "POST",
-    body: JSON.stringify({ name, type: 0, topic }),
+    body: JSON.stringify({
+      name,
+      type: CHANNEL[opts.kind ?? "text"],
+      // Discord rejects `topic` on voice and category channels.
+      ...(topic && (opts.kind ?? "text") === "text" ? { topic } : {}),
+      ...(opts.parentId ? { parent_id: opts.parentId } : {}),
+      ...(opts.position != null ? { position: opts.position } : {}),
+    }),
   });
 }
 
@@ -82,6 +98,14 @@ export async function ensureChannel(guildId: string, name: string, topic?: strin
   }
   const made = await createChannel(guildId, name, topic);
   return made.ok ? made.data : null;
+}
+
+// Discord normalises text channel names to lowercase-with-dashes; categories
+// and voice channels keep their case. Compare the way Discord stores them or
+// a second run creates duplicates of everything.
+export function sameChannelName(a: string | undefined, b: string): boolean {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-");
+  return !!a && norm(a) === norm(b);
 }
 
 // ===== Messages =====
