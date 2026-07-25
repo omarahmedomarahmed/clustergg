@@ -187,6 +187,18 @@ const COLUMN_MIGRATIONS = [
     "updated_at" timestamp with time zone NOT NULL DEFAULT now()
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "geo_game_kind_entity_idx" ON "game_entity_overrides" ("game","kind","entity_id")`,
+  `CREATE TABLE IF NOT EXISTS "card_renders" (
+    "id" text PRIMARY KEY NOT NULL,
+    "kind" text NOT NULL,
+    "cache_key" text NOT NULL,
+    "data_hash" text NOT NULL,
+    "url" text NOT NULL,
+    "bytes" integer NOT NULL DEFAULT 0,
+    "hits" integer NOT NULL DEFAULT 0,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "card_render_idx" ON "card_renders" ("kind","cache_key")`,
 ];
 
 async function runColumnMigrations(db: DB) {

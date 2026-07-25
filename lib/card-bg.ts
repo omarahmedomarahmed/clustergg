@@ -13,6 +13,15 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "quest_log", label: "Quest game · My log screen", note: "Background art of the in-game CP history panel." },
   { key: "quest_guide", label: "Quest game · Guide screen", note: "Background art of the in-game how-to-play panel." },
   { key: "quest_missions", label: "Quest game · Missions screen", note: "Background art of the in-game starter-missions panel." },
+  // Discord bot PNG cards — the art behind every card the bot posts.
+  { key: "bot_welcome", label: "Bot · Welcome card", note: "Backdrop of the bot's welcome + fallback cards." },
+  { key: "bot_profile", label: "Bot · Profile snapshot", note: "Backdrop when a gamer has no custom banner." },
+  { key: "bot_game", label: "Bot · Game stats card", note: "Backdrop for game stat cards (game art wins when set)." },
+  { key: "bot_quest", label: "Bot · Quest + CP cards", note: "Backdrop for quest progress and CP summary cards." },
+  { key: "bot_challenge", label: "Bot · Challenge card", note: "Backdrop for challenge cards (challenge cover wins)." },
+  { key: "bot_leaderboard", label: "Bot · Leaderboard card", note: "Backdrop for leaderboard cards." },
+  { key: "bot_planet", label: "Bot · Planet card", note: "Backdrop for the game planet hub card." },
+  { key: "bot_guide", label: "Bot · How-to guide cards", note: "Backdrop for the pinned how-to guide PNGs." },
 ];
 
 export const CARD_BG_KEYS = CARD_BG_TYPES.map((t) => t.key);

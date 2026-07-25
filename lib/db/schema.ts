@@ -609,6 +609,26 @@ export const userQuestTiers = pgTable("user_quest_tiers", {
   awardedAt: now("awarded_at"),
 }, (t) => [uniqueIndex("uqt_user_tier_idx").on(t.userId, t.questTierId)]);
 
+// ===== Rendered PNG cards =====
+// Every "glorified snapshot" the Discord bot attaches (and every OG image a
+// shared profile link produces) is a PNG rendered from live platform data.
+// Rendering on every request would be slow AND would burn Vercel Blob data
+// transfer, so each render is stored once in Blob and reused until the data
+// behind it actually changes. `dataHash` is a hash of the exact card payload:
+// same hash → serve the stored URL, different hash → re-render, replace, and
+// delete the stale Blob object so storage never grows unbounded.
+export const cardRenders = pgTable("card_renders", {
+  id: id(),
+  kind: text("kind").notNull(),         // profile | quest | leaderboard | guide | …
+  cacheKey: text("cache_key").notNull(), // identity within the kind, e.g. a slug or "game:quest"
+  dataHash: text("data_hash").notNull(),
+  url: text("url").notNull(),
+  bytes: integer("bytes").notNull().default(0),
+  hits: integer("hits").notNull().default(0),
+  createdAt: now("created_at"),
+  updatedAt: now("updated_at"),
+}, (t) => [uniqueIndex("card_render_idx").on(t.kind, t.cacheKey)]);
+
 // ===== Light user projection =====
 // The `users` row carries three heavy columns — `avatarUrl`/`bannerUrl` (which
 // can be inline base64 data URLs when Vercel Blob isn't configured) and `theme`
