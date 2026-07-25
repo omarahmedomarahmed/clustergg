@@ -7,10 +7,13 @@ import {
 } from "@/lib/discord/types";
 import { parseId, frame, type Frame } from "@/lib/discord/components";
 import { gameChoices, questChoices, guideChoices, showChoices } from "@/lib/discord/catalog";
-import { renderScreen, screenForCommand, loadCtx } from "@/lib/discord/screens";
+import { renderScreen, screenForCommand, loadCtx, linkModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
+import { joinChallengeFor } from "@/lib/challenges";
+import { linkGameAccountFor } from "@/lib/link-account";
+import { PROVIDERS } from "@/lib/providers/registry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +51,56 @@ export async function POST(req: NextRequest) {
 
   if (i.type === InteractionType.MessageComponent) return componentPress(i);
 
+  if (i.type === InteractionType.ModalSubmit) return modalSubmit(i);
+
   return json({ type: InteractionResponseType.Pong });
+}
+
+// ===== Modal submit (the game-link form) =====
+
+function modalSubmit(i: Interaction) {
+  const who = actor(i);
+  const [kind, provider, game] = (i.data?.custom_id ?? "").split("|");
+  if (!who || kind !== "link" || !provider) {
+    return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  }
+
+  const fields = new Map(
+    (i.data?.components ?? []).flatMap((row) => row.components.map((c) => [c.custom_id, c.value] as const)),
+  );
+
+  after(async () => {
+    try {
+      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      if (!ctx.gamer) {
+        await editOriginal(i.token, { content: `Sign in with Discord first: ${siteUrl()}/login` });
+        return;
+      }
+      const res = await linkGameAccountFor(
+        ctx.gamer.userId, provider,
+        fields.get("ign") ?? "", (fields.get("region") ?? "").trim() || undefined,
+      );
+      if (!res.ok) {
+        await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: res.error }] });
+        return;
+      }
+      // Re-render the stats screen so they immediately see what they just linked.
+      const target = frame("show", `game:${res.game}`);
+      const payload = await renderScreen(target, [frame("home")], { ...ctx });
+      await editOriginal(i.token, {
+        content: `**${res.name}** linked. Your ${res.game} stats sync from here on.`,
+        embeds: payload.embeds ?? [],
+        components: payload.components ?? [],
+      });
+    } catch {
+      await editWithError(i.token, `Couldn't link that account. Try again, or link it at ${siteUrl()}/profile.`);
+    }
+  });
+
+  return json({
+    type: InteractionResponseType.DeferredChannelMessageWithSource,
+    data: { flags: MessageFlags.Ephemeral },
+  });
 }
 
 // ===== Autocomplete (must answer synchronously) =====
@@ -101,7 +153,19 @@ function command(i: Interaction) {
 
 function componentPress(i: Interaction) {
   const who = actor(i);
-  const parsed = parseId(i.data?.custom_id ?? "");
+  const customId = i.data?.custom_id ?? "";
+
+  // A modal MUST be the immediate response to a fresh interaction — it cannot
+  // be opened from a deferred edit. So "open-link|<game>" is handled before the
+  // normal nav dispatch and answers synchronously.
+  if (customId.startsWith("open-link|")) {
+    const game = customId.slice("open-link|".length);
+    const provider = providerForGame(game);
+    if (!provider) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    return json(linkModal(game, provider));
+  }
+
+  const parsed = parseId(customId);
   if (!who || !parsed) return json({ type: InteractionResponseType.DeferredUpdateMessage });
 
   after(async () => {
@@ -136,12 +200,47 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
     await share(i.token, ctx, true);
     return;
   }
-  const payload = await renderScreen(trail[0] ?? frame("home"), trail.slice(1), ctx);
+
+  // Joining a challenge from Discord runs the exact same rules as joining on
+  // the site (lib/challenges.ts) — same entry gate, same baseline snapshot,
+  // same CP award. Only `joinedFrom` differs, which is the funnel metric.
+  if (target.screen === "join" && ctx.gamer) {
+    const res = await joinChallengeFor(ctx.gamer.userId, target.args[0] ?? "", { source: "discord" });
+    if (!res.ok) {
+      await editOriginal(i.token, {
+        embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }],
+      });
+      return;
+    }
+  }
+
+  // Re-render whatever screen the action was launched from, so the button
+  // state (e.g. "Join" → "You've joined") reflects what just happened.
+  const back = trail[0] ?? frame("home");
+  const payload = await renderScreen(back, trail.slice(1), ctx);
   await editOriginal(i.token, {
     content: payload.content ?? "",
     embeds: payload.embeds ?? [],
     components: payload.components ?? [],
   });
+}
+
+function joinFailure(reason: string): string {
+  switch (reason) {
+    case "no_account": return "You need a linked account for that game first — run `/cluster link`.";
+    case "gated": return "This challenge requires quest badges you haven't earned yet.";
+    case "not_active": return "That challenge isn't live anymore.";
+    default: return "Couldn't join that challenge.";
+  }
+}
+
+// Which provider backs a game, so `/cluster link game:Chess` knows what to
+// create. Uses the same registry the website links through.
+function providerForGame(game: string): string | null {
+  // Identity-only providers (Discord, Epic) have no stats to sync, so they
+  // aren't linkable as a game account.
+  const p = PROVIDERS.find((x) => x.game.toLowerCase() === game.toLowerCase() && !x.identityOnly);
+  return p?.id ?? null;
 }
 
 // ===== Share =====

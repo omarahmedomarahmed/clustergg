@@ -1,5 +1,5 @@
 import { getOrRenderCard } from "@/lib/cards/cache";
-import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard } from "@/lib/cards/data";
+import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, challengeCard } from "@/lib/cards/data";
 import { guideCard } from "@/lib/cards/guides";
 import { siteUrl } from "@/lib/discord/config";
 import type { CardData } from "@/lib/cards/types";
@@ -20,6 +20,8 @@ const loaders: Record<string, (a: Record<string, string>) => Promise<CardData | 
   quest: (a) => questCard(a.slug || null, a.quest),
   cp: (a) => cpSummaryCard(a.slug),
   leaderboard: (a) => leaderboardCard(a.game, a.metric || null),
+  planet: (a) => planetCard(a.game),
+  challenge: (a) => challengeCard(a.id),
   guide: (a) => guideCard(a.topic || "getting-started", a.quest || null),
 };
 

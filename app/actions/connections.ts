@@ -10,6 +10,7 @@ import { getProvider, isProviderLive } from "@/lib/providers/registry";
 import { syncAccount } from "@/lib/sync";
 import { evaluateBadgesForUser } from "@/lib/badges";
 import { awardQuestAction } from "@/lib/quests";
+import { linkGameAccountFor } from "@/lib/link-account";
 
 export type LinkState = { error?: string; ok?: boolean } | undefined;
 
@@ -20,37 +21,10 @@ export async function linkGameAccount(_prev: LinkState, formData: FormData): Pro
   const identifier = String(formData.get("identifier") ?? "").trim();
   const region = String(formData.get("region") ?? "").trim() || undefined;
 
-  const provider = getProvider(providerId);
-  const adapter = ADAPTERS[providerId];
-  if (!provider || !adapter) return { error: "Unknown provider." };
-  if (!identifier) return { error: `Enter your ${provider.identifierLabel}.` };
-  if (!isProviderLive(provider)) {
-    return { error: `${provider.name} needs ${provider.envVars.join(" + ")} configured by the platform admin.` };
-  }
-
-  const verified = await adapter.verify(identifier, region);
-  if (!verified.ok) return { error: verified.error };
-
-  const db = await getDb();
-  const [existing] = await db.select().from(schema.linkedGameAccounts).where(and(
-    eq(schema.linkedGameAccounts.userId, me.id),
-    eq(schema.linkedGameAccounts.provider, providerId),
-    eq(schema.linkedGameAccounts.providerAccountId, verified.accountId),
-  )).limit(1);
-  if (existing) return { error: "That account is already linked." };
-
-  const id = uid();
-  await db.insert(schema.linkedGameAccounts).values({
-    id, userId: me.id, provider: providerId,
-    providerAccountId: verified.accountId, inGameName: verified.name,
-    region: verified.region ?? region ?? null, verified: true, syncStatus: "pending",
-  });
-
-  const [account] = await db.select().from(schema.linkedGameAccounts)
-    .where(eq(schema.linkedGameAccounts.id, id)).limit(1);
-  if (account) await syncAccount(db, account);
-  try { await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
-  await awardQuestAction(db, me.id, "connect_account", { refType: "account", refId: id });
+  // Verification, storage, first sync and the CP award all live in
+  // lib/link-account.ts so a Discord link and a web link are identical.
+  const res = await linkGameAccountFor(me.id, providerId, identifier, region);
+  if (!res.ok) return { error: res.error };
 
   revalidatePath("/settings/connections");
   revalidatePath("/profile");

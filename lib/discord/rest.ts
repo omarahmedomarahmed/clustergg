@@ -94,8 +94,13 @@ export function editMessage(channelId: string, messageId: string, payload: Json)
   return call<Message>(`/channels/${channelId}/messages/${messageId}`, { method: "PATCH", body: JSON.stringify(payload) });
 }
 
-export function pinMessage(channelId: string, messageId: string) {
-  return call<void>(`/channels/${channelId}/messages/pins/${messageId}`, { method: "PUT" });
+// Discord moved pins to /messages/pins/ and kept the old route working. Try the
+// current one, fall back to the legacy one — a failed pin is invisible in the
+// channel (the message is still there), so it must not depend on one route.
+export async function pinMessage(channelId: string, messageId: string): Promise<RestResult<void>> {
+  const res = await call<void>(`/channels/${channelId}/messages/pins/${messageId}`, { method: "PUT" });
+  if (res.ok || res.status !== 404) return res;
+  return call<void>(`/channels/${channelId}/pins/${messageId}`, { method: "PUT" });
 }
 
 // ===== Direct messages =====
@@ -114,6 +119,14 @@ export function registerGlobalCommands(commands: Json[]) {
   const id = appId();
   if (!id) return Promise.resolve({ ok: false as const, status: 0, error: "no_app_id" });
   return call<unknown[]>(`/applications/${id}/commands`, { method: "PUT", body: JSON.stringify(commands) });
+}
+
+// Guild-scoped registration appears INSTANTLY, where global commands can take
+// up to an hour to propagate. Use this while developing against a test server.
+export function registerGuildCommands(guildId: string, commands: Json[]) {
+  const id = appId();
+  if (!id) return Promise.resolve({ ok: false as const, status: 0, error: "no_app_id" });
+  return call<unknown[]>(`/applications/${id}/guilds/${guildId}/commands`, { method: "PUT", body: JSON.stringify(commands) });
 }
 
 export { canAct };

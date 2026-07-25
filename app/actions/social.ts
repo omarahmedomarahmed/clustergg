@@ -9,6 +9,7 @@ import { uid } from "@/lib/utils";
 import { evaluateBadgesForUser } from "@/lib/badges";
 import { recomputeExpertScores } from "@/lib/experts";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
+import { joinChallengeFor } from "@/lib/challenges";
 
 // ---------- Feed control panel ----------
 // Persist the gamer's feed dashboard prefs: which stat tiles show + which
@@ -242,31 +243,8 @@ export async function markAllNotificationsRead() {
 // ---------- Challenges ----------
 export async function joinChallenge(challengeId: string, linkedAccountId: string, path: string) {
   const me = await requireUser();
-  const db = await getDb();
-  const [challenge] = await db.select().from(schema.challenges)
-    .where(eq(schema.challenges.id, challengeId)).limit(1);
-  if (!challenge || challenge.status !== "active") return;
-  const [account] = await db.select().from(schema.linkedGameAccounts).where(and(
-    eq(schema.linkedGameAccounts.id, linkedAccountId),
-    eq(schema.linkedGameAccounts.userId, me.id),
-  )).limit(1);
-  if (!account || account.provider !== challenge.provider) return;
-
-  // Quest-badge entry gate: require N completion badges of a given quest.
-  if (challenge.gateQuestId && challenge.gateMinBadges > 0) {
-    const have = await getQuestCompletions(db, me.id, challenge.gateQuestId);
-    if (have < challenge.gateMinBadges) return; // page already hides the button
-  }
-
-  // Snapshot current stats as the baseline: only activity AFTER joining counts.
-  const stats = await db.select().from(schema.statCurrent)
-    .where(eq(schema.statCurrent.linkedAccountId, account.id));
-  const baseline: Record<string, number> = {};
-  for (const s of stats) baseline[s.metricKey] = s.metricValue;
-
-  await db.insert(schema.challengeParticipants).values({
-    id: uid(), challengeId, userId: me.id, linkedAccountId: account.id, baseline,
-  }).onConflictDoNothing();
-  await awardQuestAction(db, me.id, "join_challenge", { refType: "challenge", refId: challengeId });
+  // The rules (provider match, entry gate, baseline snapshot, CP award) live in
+  // lib/challenges.ts so a Discord join and a web join are exactly equivalent.
+  await joinChallengeFor(me.id, challengeId, { linkedAccountId, source: "web" });
   revalidatePath(path);
 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderCard } from "@/lib/cards/render";
 import { getOrRenderCard } from "@/lib/cards/cache";
-import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, cardBg } from "@/lib/cards/data";
+import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, challengeCard, cardBg } from "@/lib/cards/data";
 import { guideCard, GUIDE_TOPICS } from "@/lib/cards/guides";
 import type { CardData } from "@/lib/cards/types";
 
@@ -48,6 +48,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
       case "leaderboard":
         if (game) data = await leaderboardCard(game, q.get("metric"));
         break;
+      case "planet":
+        if (game) data = await planetCard(game);
+        break;
+      case "challenge":
+        if (q.get("id")) data = await challengeCard(q.get("id")!);
+        break;
       case "guide":
         data = await guideCard(q.get("topic") ?? "getting-started", q.get("quest"));
         break;
@@ -75,7 +81,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
 
   if (!fresh) {
     // Cache key = everything that identifies this card within its kind.
-    const key = [slug, game, q.get("quest"), q.get("topic"), q.get("metric")].filter(Boolean).join("|") || "default";
+    const key = [slug, game, q.get("quest"), q.get("topic"), q.get("metric"), q.get("id")].filter(Boolean).join("|") || "default";
     const hit = await getOrRenderCard(kind, key, data).catch(() => null);
     if (hit) return NextResponse.redirect(hit.url, { status: 302, headers: { "x-card-cache": hit.cached ? "hit" : "miss" } });
   }

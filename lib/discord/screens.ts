@@ -1,9 +1,12 @@
-import { ButtonStyle } from "@/lib/discord/types";
+import { and, eq } from "drizzle-orm";
+import { getDb, schema } from "@/lib/db";
+import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
 import { frame, navButton, backButton, rows, linkButton, actionId, button, type Frame, type Button } from "@/lib/discord/components";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { gamerForDiscordId, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
+import { liveChallenges, challengeUrl } from "@/lib/challenges";
 
 // Every screen is "a PNG card + buttons underneath it".
 //
@@ -242,13 +245,214 @@ async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
   };
 }
 
-// Screens that arrive in the navigation phase. Registered now so a command can
-// never dead-end with a raw error.
+// ===== Planets =====
+
+async function planetsScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const c = await catalog();
+  if (!c.games.length) return notYet("No planets are live yet.", trail);
+  return {
+    embeds: [{
+      title: "Pick a planet",
+      description: "Every game is a world: its own challenges, leaderboard and top gamers.",
+      color: embedColor("#8b5cf6"),
+    }],
+    // 24 games won't fit in 25 buttons alongside Back, so the first 20 get
+    // buttons and `/cluster planet game:` autocompletes the rest.
+    components: rows([
+      ...c.games.slice(0, 20).map((g) => navButton(g.name.slice(0, 24), frame("planet", g.value), trail)),
+      backButton(trail),
+    ]),
+  };
+}
+
+async function planetScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  if (!game) return planetsScreen(ctx, trail);
+  const { url, data } = await cardRef("planet", { game });
+  if (!data) return notYet(`No planet for **${game}** yet.`, trail);
+  return {
+    embeds: [embed(url, { title: `${game} Planet`, color: "theme" in data ? data.theme.accent : null })],
+    components: rows([
+      navButton("Challenges", frame("challenges", game), trail, ButtonStyle.Primary, "🏆"),
+      navButton("Leaderboard", frame("leaderboard", game), trail, ButtonStyle.Secondary, "📊"),
+      ctx.gamer
+        ? navButton("My stats", frame("show", `game:${game}`), trail, ButtonStyle.Secondary, "📈")
+        : null,
+      navButton("All planets", frame("planets"), trail, ButtonStyle.Secondary, "🪐"),
+      backButton(trail),
+    ]),
+  };
+}
+
+// ===== Leaderboard =====
+
+async function leaderboardScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  if (!game) {
+    const c = await catalog();
+    game = c.games[0]?.value ?? "";
+  }
+  const { url, data } = await cardRef("leaderboard", { game });
+  if (!data) return notYet(`No leaderboard for **${game}** yet.`, trail);
+  return {
+    embeds: [embed(url, {
+      title: data.kind === "leaderboard" ? data.title : `${game} leaderboard`,
+      color: data.theme.accent,
+      footer: "Standings update every time stats sync from the game API.",
+    })],
+    components: rows([
+      navButton(`${game} planet`.slice(0, 24), frame("planet", game), trail, ButtonStyle.Primary, "🪐"),
+      navButton("Challenges", frame("challenges", game), trail, ButtonStyle.Secondary, "🏆"),
+      linkButton("Full board", `${siteUrl()}/leaderboards`, "🔗"),
+      backButton(trail),
+    ]),
+  };
+}
+
+// ===== Challenges =====
+
+async function challengesScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const live = await liveChallenges(game || null, 5);
+  if (!live.length) {
+    return notYet(game ? `No live challenges on **${game}** right now.` : "No challenges are live right now.", trail, [
+      navButton("Browse planets", frame("planets"), trail, ButtonStyle.Secondary, "🪐"),
+    ]);
+  }
+  if (live.length === 1) return challengeScreen(live[0].id, ctx, trail);
+
+  const lines = live.map((ch) => {
+    const days = Math.max(0, Math.ceil((ch.endAt.getTime() - Date.now()) / 86400000));
+    return `**${ch.title}** — ${ch.game} · ${days}d left`;
+  });
+  return {
+    embeds: [{
+      title: game ? `Live on ${game}` : "Live challenges",
+      description: `${lines.join("\n")}\n\nYour stats are snapshotted when you join — only NEW activity counts.`,
+      color: embedColor("#8b5cf6"),
+    }],
+    components: rows([
+      ...live.map((ch) => navButton(ch.title.slice(0, 32), frame("challenge", ch.id), trail, ButtonStyle.Secondary)),
+      backButton(trail),
+    ]),
+  };
+}
+
+async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const { url, data } = await cardRef("challenge", { id });
+  if (!data || data.kind !== "challenge") return notYet("That challenge is no longer live.", trail);
+
+  const [joined, webUrl] = await Promise.all([
+    ctx.gamer ? hasJoined(ctx.gamer.userId, id) : Promise.resolve(false),
+    challengeUrl(siteUrl(), id),
+  ]);
+  return {
+    embeds: [embed(url, {
+      title: data.title,
+      color: data.theme.accent,
+      footer: joined ? "You're in — your standing updates on every sync." : undefined,
+    })],
+    components: rows([
+      !ctx.gamer
+        ? linkButton("Sign in to join", signInUrl(siteUrl(), new URL(webUrl).pathname), "🚀")
+        : joined
+          ? button("You've joined", actionId("noop", [], trail), ButtonStyle.Secondary, "✅")
+          : button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆"),
+      navButton(`${data.game} planet`.slice(0, 24), frame("planet", data.game), trail, ButtonStyle.Secondary, "🪐"),
+      linkButton("Full details", webUrl, "🔗"),
+      backButton(trail),
+    ]),
+  };
+}
+
+async function hasJoined(userId: string, challengeId: string): Promise<boolean> {
+  try {
+    const db = await getDb();
+    const [row] = await db.select({ id: schema.challengeParticipants.id })
+      .from(schema.challengeParticipants)
+      .where(and(
+        eq(schema.challengeParticipants.userId, userId),
+        eq(schema.challengeParticipants.challengeId, challengeId),
+      )).limit(1);
+    return !!row;
+  } catch { return false; }
+}
+
+// ===== Link a game account =====
+
+// Discord modals are the one place a true modal is correct: a short form with
+// text inputs. Everything else in this bot is an embed + buttons.
+export function linkModal(game: string, provider: string) {
+  return {
+    type: InteractionResponseType.Modal,
+    data: {
+      custom_id: `link|${provider}|${game}`.slice(0, 100),
+      title: `Link your ${game} account`.slice(0, 45),
+      components: [
+        {
+          type: ComponentType.ActionRow,
+          components: [{
+            type: ComponentType.TextInput, custom_id: "ign", style: 1, required: true,
+            label: "In-game name", max_length: 64,
+            placeholder: "Exactly as it appears in game",
+          }],
+        },
+        {
+          type: ComponentType.ActionRow,
+          components: [{
+            type: ComponentType.TextInput, custom_id: "region", style: 1, required: false,
+            label: "Region / server (if the game has one)", max_length: 24,
+            placeholder: "e.g. EUW, NA, ASIA",
+          }],
+        },
+      ],
+    },
+  };
+}
+
+async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  if (!ctx.gamer) return signInPrompt(ctx, trail);
+  const c = await catalog();
+  if (!game) {
+    return {
+      embeds: [{
+        title: "Link a game account",
+        description: "Pick a game, then enter your in-game name. Stats sync from the official API — never self-reported.",
+        color: embedColor("#8b5cf6"),
+      }],
+      components: rows([
+        ...c.games.slice(0, 20).map((g) => navButton(g.name.slice(0, 24), frame("link", g.value), trail)),
+        backButton(trail),
+      ]),
+    };
+  }
+  // The modal has to open from a fresh interaction, so this screen hands over a
+  // button that triggers it rather than trying to open one from a deferred edit.
+  return {
+    embeds: [{
+      title: `Link ${game}`,
+      description: "Tap below and enter your in-game name. That's the whole setup — your rank, wins and more sync automatically from then on.",
+      color: embedColor("#8b5cf6"),
+    }],
+    components: rows([
+      button(`Link my ${game} account`.slice(0, 40), `open-link|${game}`, ButtonStyle.Primary, "🔗"),
+      linkButton("Link on the site instead", `${siteUrl()}/profile?tab=accounts`, "🌐"),
+      backButton(trail),
+    ]),
+  };
+}
+
+// An honest empty state — never a raw error, never a dead end.
+function notYet(message: string, trail: Frame[], extra: (Button | null)[] = []): ScreenPayload {
+  return {
+    embeds: [{ description: message, color: embedColor("#8b5cf6") }],
+    components: rows([...extra, linkButton("Open Cluster", siteUrl(), "🔗"), backButton(trail)]),
+  };
+}
+
+// Screens that arrive with the growth + admin phases.
 async function comingSoon(name: string, trail: Frame[]): Promise<ScreenPayload> {
   return {
     embeds: [{
-      title: "Not wired up yet",
-      description: `The **${name}** screen is part of the next release. Everything on the site works today.`,
+      title: "Coming with the next release",
+      description: `**${name}** isn't wired up yet. Everything on the site works today.`,
       color: embedColor("#8b5cf6"),
     }],
     components: rows([linkButton("Open Cluster", siteUrl(), "🔗"), backButton(trail)]),
@@ -267,14 +471,14 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
     case "quest": return questScreen(a, ctx, trail);
     case "quests": return questsScreen(ctx, trail);
     case "guide": return guideScreen(a, ctx, trail);
-    case "planet": return comingSoon("planet", trail);
-    case "planets": return comingSoon("planets", trail);
-    case "leaderboard": return comingSoon("leaderboard", trail);
-    case "challenge":
-    case "challenges": return comingSoon("challenges", trail);
-    case "link": return comingSoon("link", trail);
-    case "server": return comingSoon("server", trail);
-    case "admin": return comingSoon("admin", trail);
+    case "planet": return planetScreen(a, ctx, trail);
+    case "planets": return planetsScreen(ctx, trail);
+    case "leaderboard": return leaderboardScreen(a, ctx, trail);
+    case "challenge": return challengeScreen(a, ctx, trail);
+    case "challenges": return challengesScreen(a, ctx, trail);
+    case "link": return linkScreen(a, ctx, trail);
+    case "server": return comingSoon("Server growth", trail);
+    case "admin": return comingSoon("Server settings", trail);
     default: return homeScreen(ctx, trail);
   }
 }

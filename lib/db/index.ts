@@ -199,6 +199,7 @@ const COLUMN_MIGRATIONS = [
     "updated_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "card_render_idx" ON "card_renders" ("kind","cache_key")`,
+  `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "joined_from" text NOT NULL DEFAULT 'web'`,
 ];
 
 async function runColumnMigrations(db: DB) {

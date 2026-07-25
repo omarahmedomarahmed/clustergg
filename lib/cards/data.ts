@@ -155,6 +155,109 @@ export async function cpSummaryCard(slug: string): Promise<CardData | null> {
   };
 }
 
+// A game planet: what's live there right now.
+export async function planetCard(game: string): Promise<CardData | null> {
+  const db = await getDb();
+  const [g] = await db.select().from(schema.games).where(eq(schema.games.name, game)).limit(1);
+  if (!g) return null;
+
+  const [challenges, ranked, bg] = await Promise.all([
+    db.select({ id: schema.challenges.id }).from(schema.challenges)
+      .where(and(eq(schema.challenges.game, game), eq(schema.challenges.status, "active"))),
+    db.select({ id: schema.statCurrent.id }).from(schema.statCurrent).where(eq(schema.statCurrent.game, game)),
+    cardBg("bot_planet"),
+  ]);
+
+  // Top gamer on the game's primary board — the social proof on the card.
+  let topGamer: { name: string; value: string } | null = null;
+  try {
+    const [board] = await db.select().from(schema.leaderboards)
+      .where(and(eq(schema.leaderboards.game, game), eq(schema.leaderboards.isActive, true))).limit(1);
+    if (board) {
+      const rows = await db.select({
+        value: schema.statCurrent.metricValue, rankLabel: schema.statCurrent.rankLabel,
+        name: schema.users.displayName,
+      }).from(schema.statCurrent)
+        .innerJoin(schema.linkedGameAccounts, eq(schema.statCurrent.linkedAccountId, schema.linkedGameAccounts.id))
+        .innerJoin(schema.users, eq(schema.linkedGameAccounts.userId, schema.users.id))
+        .where(and(eq(schema.statCurrent.game, game), eq(schema.statCurrent.metricKey, board.metricKey)));
+      const sorted = [...rows].sort((a, b) => board.sortDir === "asc" ? a.value - b.value : b.value - a.value);
+      if (sorted[0]) topGamer = { name: sorted[0].name, value: sorted[0].rankLabel ?? String(Math.round(sorted[0].value * 100) / 100) };
+    }
+  } catch { /* a card without a top gamer is still a good card */ }
+
+  return {
+    kind: "planet",
+    game: g.name,
+    logoUrl: slimImg(g.logoUrl, 300000),
+    description: g.description || null,
+    challenges: challenges.length,
+    ranked: ranked.length,
+    serverGamers: null,
+    topGamer,
+    theme: {
+      accent: g.accent || BRAND.accent,
+      accent2: g.accent2 || BRAND.accent2,
+      bgUrl: slimImg(g.planetBgUrl ?? g.coverUrl, 800000) || bg.bgUrl,
+      dim: bg.dim,
+    },
+  };
+}
+
+// One challenge, with its podium trophies and their dollar values.
+export async function challengeCard(challengeId: string): Promise<CardData | null> {
+  const db = await getDb();
+  const [ch] = await db.select().from(schema.challenges).where(eq(schema.challenges.id, challengeId)).limit(1);
+  if (!ch) return null;
+
+  const [participants, [g], bg] = await Promise.all([
+    db.select({ id: schema.challengeParticipants.id }).from(schema.challengeParticipants)
+      .where(eq(schema.challengeParticipants.challengeId, ch.id)),
+    db.select({ logoUrl: schema.games.logoUrl, accent: schema.games.accent, accent2: schema.games.accent2 })
+      .from(schema.games).where(eq(schema.games.name, ch.game)).limit(1),
+    cardBg("bot_challenge"),
+  ]);
+
+  // Podium prizes are trophy-id lists per place; resolve them to art + value.
+  const prizes = ch.prizes ?? {};
+  const wanted: { id: string; place: number }[] = [
+    ...(prizes.first ?? []).map((id) => ({ id, place: 1 })),
+    ...(prizes.second ?? []).map((id) => ({ id, place: 2 })),
+    ...(prizes.third ?? []).map((id) => ({ id, place: 3 })),
+  ];
+  let trophies: { name: string; imageUrl: string; value: number; place: number }[] = [];
+  if (wanted.length) {
+    const rows = await db.select().from(schema.trophies)
+      .where(inArray(schema.trophies.id, wanted.map((w) => w.id)));
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    trophies = wanted
+      .map((w) => {
+        const t = byId.get(w.id);
+        return t ? { name: t.name, imageUrl: slimImg(t.imageUrl, 300000) ?? "", value: t.value ?? 0, place: w.place } : null;
+      })
+      .filter((t): t is NonNullable<typeof t> => !!t && !!t.imageUrl)
+      .slice(0, 3);
+  }
+
+  return {
+    kind: "challenge",
+    title: ch.title,
+    game: ch.game,
+    logoUrl: slimImg(g?.logoUrl ?? null, 300000),
+    description: ch.description || null,
+    endsAt: ch.endAt.toISOString(),
+    participants: participants.length,
+    prize: ch.prizeDescription || null,
+    trophies,
+    theme: {
+      accent: g?.accent || BRAND.accent,
+      accent2: g?.accent2 || BRAND.accent2,
+      bgUrl: slimImg(ch.coverUrl ?? ch.heroUrl, 800000) || bg.bgUrl,
+      dim: bg.dim,
+    },
+  };
+}
+
 // A game's leaderboard (top N).
 export async function leaderboardCard(game: string, metricKey?: string | null): Promise<CardData | null> {
   const db = await getDb();
