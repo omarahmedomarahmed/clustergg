@@ -10,6 +10,10 @@ export type CardTheme = {
   accent2: string;  // secondary
   bgUrl?: string | null; // background artwork (admin-controlled)
   dim?: number;     // 0-100 veil strength over the artwork
+  // Filled in by the renderer, not by the data loaders: the astronaut mascot and
+  // the Cluster logo mark that every card carries.
+  astronautUrl?: string | null;
+  markUrl?: string | null;
 };
 
 export type ProfileCard = {
