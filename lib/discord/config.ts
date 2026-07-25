@@ -48,11 +48,21 @@ export function siteUrl(): string {
 // The "Add ClusterBot" URL a server owner clicks. `guild_id` comes back to
 // /api/discord/installed, which is how we onboard a server without a gateway.
 //
-// Permissions integer (see docs/DISCORD_BOT.md):
-//   Manage Channels 16 | Send Messages 2048 | Embed Links 16384
-//   Attach Files 32768 | Read History 65536 | Mention Everyone 131072
-//   Manage Messages 8192 (pinning)
-export const BOT_PERMISSIONS = "277025508432";
+// Permissions integer. Every bit here is load-bearing — in particular
+// MANAGE_MESSAGES, without which the install-time guide PINS silently 403 while
+// the posts themselves succeed, which looks like everything worked.
+//   View Channel        1024        (see the channel it just made)
+//   Manage Channels       16        (create #clustergg)
+//   Send Messages       2048
+//   Manage Messages     8192        (PIN the guides)
+//   Embed Links        16384        (the card embeds)
+//   Attach Files       32768
+//   Read History       65536
+//   Mention Everyone  131072        (@here on private-challenge announcements)
+//   Add Reactions         64
+//   Use App Commands  2^31          (/cluster)
+//   Send in Threads   2^38
+export const BOT_PERMISSIONS = "277025647696";
 
 export function installUrl(): string | null {
   const id = appId();

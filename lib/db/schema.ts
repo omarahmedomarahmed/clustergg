@@ -289,6 +289,9 @@ export const challengeParticipants = pgTable("challenge_participants", {
   currentPoints: integer("current_points").notNull().default(0),
   status: text("status").notNull().default("active"), // active | completed | disqualified
   finalPlacement: integer("final_placement"),
+  // web | discord — the funnel metric that shows whether the bot actually
+  // drives participation, rather than just being installed somewhere.
+  joinedFrom: text("joined_from").notNull().default("web"),
   joinedAt: now("joined_at"),
 }, (t) => [uniqueIndex("cp_challenge_user_idx").on(t.challengeId, t.userId)]);
 

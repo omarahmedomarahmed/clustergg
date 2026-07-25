@@ -131,6 +131,77 @@ check `/admin/settings` for a live status table.
 2. Add redirect: `https://clustergg.com/api/auth/discord/callback`.
 3. Copy Client ID + Client Secret into the env vars.
 
+### ClusterBot for Discord (`DISCORD_BOT_TOKEN` + `DISCORD_PUBLIC_KEY` + `BOT_API_SECRET`)
+
+The bot runs inside this Next app — HTTP interactions, no gateway, no separate
+process. Add it to the **same application** you created for Discord sign-in, so
+one app holds both the OAuth credentials and the bot.
+
+**1. Bot tab** → **Add Bot** → **Reset Token** → copy into `DISCORD_BOT_TOKEN`.
+The token is shown once; if you lose it, reset again.
+- **Public Bot: OFF** while testing, so only you can add it.
+- **Message Content Intent: leave OFF.** Cluster never reads message text, and
+  requesting that intent triggers Discord verification past 75 servers.
+
+**2. General Information tab** → copy **Public Key** into `DISCORD_PUBLIC_KEY`
+and **Application ID** into `DISCORD_APP_ID`. (The App ID is optional if
+`DISCORD_CLIENT_ID` is already set — the code falls back to it.)
+
+**3. OAuth2 → Redirects** → add **both**:
+```
+https://clustergg.com/api/auth/discord/callback   # sign-in
+https://clustergg.com/api/discord/installed       # bot install — REQUIRED
+```
+The install URL is load-bearing: Discord returns `guild_id` to it, which is the
+only thing install-time onboarding needs. Without it, installs fail with
+`invalid_redirect_uri`.
+
+**4. Generate `BOT_API_SECRET`** (`openssl rand -hex 32`). It guards command
+registration and the screen-preview endpoint, mirroring `CRON_SECRET`.
+
+**5. Deploy** the env vars (Production + Preview), then set
+**General Information → Interactions Endpoint URL**:
+```
+https://clustergg.com/api/discord/interactions
+```
+Set this **last**. Clicking Save makes Discord send a signed PING; if the public
+key isn't live yet the endpoint returns 401/503 and Discord refuses the URL.
+
+**6. Register the slash command** (once, and after any change to
+`lib/discord/commands.ts`):
+```bash
+curl -X POST https://clustergg.com/api/discord/register \
+     -H "Authorization: Bearer $BOT_API_SECRET"
+```
+While testing, append `?guild_id=<your server id>` — guild-scoped commands
+appear **immediately**, where global ones can take up to an hour.
+
+**7. Install it.** Open `https://clustergg.com/discord-bot` and click
+**Add ClusterBot**. On authorising, the bot creates `#clustergg`, posts and pins
+a how-to guide PNG for every topic and every quest, and DMs the owner.
+
+**Permissions.** The invite requests exactly what the bot uses: Manage Channels
+(create the channel), Send Messages, **Manage Messages (pin the guides)**, Embed
+Links, Attach Files, Read History, Mention Everyone (private-challenge
+announcements), Add Reactions, Use Application Commands. If Manage Messages is
+missing the guides post but silently fail to pin.
+
+**Troubleshooting**
+
+| Symptom | Cause |
+|---|---|
+| Portal won't save the interactions URL | `DISCORD_PUBLIC_KEY` wrong, or env not redeployed |
+| `/cluster` doesn't appear | Registration not run, or global propagation — use `?guild_id=` |
+| "The application did not respond" | A handler threw before the ACK — check runtime logs |
+| Guides posted but not pinned | Missing Manage Messages — re-invite from `/discord-bot` |
+| No `#clustergg` channel | Missing Manage Channels — the owner is DM'd with this exact reason |
+
+To see what any bot screen will render without opening Discord:
+```bash
+curl -H "Authorization: Bearer $BOT_API_SECRET" \
+  "https://clustergg.com/api/discord/preview?screen=home&discord_id=<snowflake>"
+```
+
 ### Epic / Battle.net (identity only)
 - Epic: https://dev.epicgames.com/portal → create product → OAuth client → `EPIC_CLIENT_ID/SECRET`.
 - Battle.net: https://develop.battle.net/access → create client → `BATTLENET_CLIENT_ID/SECRET`.

@@ -85,6 +85,17 @@ function Title({ text, sub, accent, accent2 }: { text: string; sub?: string | nu
 
 const nf = (n: number) => n.toLocaleString("en-US");
 
+// Truncate on a word boundary. A hard slice reads as a bug ("…from the Che"),
+// and these strings are admin-written, so they can be any length.
+function clamp(s: string | null | undefined, max: number): string | undefined {
+  if (!s) return undefined;
+  const text = s.trim();
+  if (text.length <= max) return text;
+  const cut = text.slice(0, max);
+  const space = cut.lastIndexOf(" ");
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[,;:.\-–—]$/, "")}…`;
+}
+
 // ===== Bodies =====
 
 function ProfileBody(d: ProfileCard) {
@@ -122,7 +133,7 @@ function ProfileBody(d: ProfileCard) {
                   <img src={a.logoUrl} alt="" width={44} height={44} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
                 ) : <div style={{ width: 44, height: 44, borderRadius: 10, display: "flex", background: `${t.accent}33` }} />}
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div style={{ fontSize: 23, fontWeight: 700 }}>{a.tag.slice(0, 20)}</div>
+                  <div style={{ fontSize: 23, fontWeight: 700 }}>{clamp(a.tag, 20)}</div>
                   <div style={{ fontSize: 18, color: MUTED }}>{a.headline || a.game}</div>
                 </div>
               </div>
@@ -150,7 +161,7 @@ function GameStatsBody(d: GameStatsCard) {
         <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 16, marginTop: 34, flex: 1 }}>
           {d.stats.slice(0, 6).map((s, i) => (
             <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, width: 336, padding: "20px 24px", borderRadius: 20, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.10)" }}>
-              <div style={{ fontSize: 19, letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{s.label.toUpperCase().slice(0, 22)}</div>
+              <div style={{ fontSize: 19, letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{clamp(s.label.toUpperCase(), 22)}</div>
               <div style={{ fontSize: 40, fontWeight: 700, color: t.accent2 }}>{s.value}</div>
             </div>
           ))}
@@ -240,7 +251,7 @@ function LeaderboardBody(d: LeaderboardCard) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src={r.avatarUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: 19, objectFit: "cover" }} />
             ) : null}
-            <div style={{ fontSize: 27, fontWeight: 700, flex: 1 }}>{`${r.name.slice(0, 26)}${r.you ? " · you" : ""}`}</div>
+            <div style={{ fontSize: 27, fontWeight: 700, flex: 1 }}>{`${clamp(r.name, 26)}${r.you ? " · you" : ""}`}</div>
             <div style={{ fontSize: 27, fontWeight: 700, color: t.accent2 }}>{r.value}</div>
           </div>
         ))}
@@ -268,12 +279,12 @@ function ChallengeBody(d: ChallengeCard) {
         <Pill>{d.game}</Pill>
       </div>
       <div style={{ display: "flex", marginTop: 18 }}>
-        <Title text={d.title.slice(0, 40)} sub={d.description?.slice(0, 90)} accent={t.accent} accent2={t.accent2} />
+        <Title text={clamp(d.title, 44) ?? ""} sub={clamp(d.description, 92)} accent={t.accent} accent2={t.accent2} />
       </div>
       <div style={{ display: "flex", gap: 14, marginTop: 26 }}>
         <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">{`${days}d left`}</Pill>
         <Pill>{`${nf(d.participants)} joined`}</Pill>
-        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{d.prize.slice(0, 30)}</Pill> : null}
+        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{clamp(d.prize, 30)}</Pill> : null}
       </div>
       <div style={{ display: "flex", gap: 16, marginTop: 26, flex: 1, alignItems: "flex-end" }}>
         {d.trophies.slice(0, 3).map((tr, i) => (
@@ -297,7 +308,7 @@ function PlanetBody(d: PlanetCard) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={86} height={86} style={{ width: 86, height: 86, borderRadius: 20, objectFit: "cover" }} />
     ) : undefined}>
-      <Title text={`${d.game} Planet`} sub={d.description?.slice(0, 96)} accent={t.accent} accent2={t.accent2} />
+      <Title text={`${d.game} Planet`} sub={clamp(d.description, 96)} accent={t.accent} accent2={t.accent2} />
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 36, flex: 1 }}>
         {[
           { k: "CHALLENGES LIVE", v: nf(d.challenges) },
@@ -331,8 +342,8 @@ function GuideBody(d: GuideCard) {
           <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 42, height: 42, borderRadius: 21, background: `${t.accent}2b`, color: t.accent, fontSize: 23, fontWeight: 700 }}>{i + 1}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
-              <div style={{ fontSize: 26, fontWeight: 700 }}>{s.title.slice(0, 46)}</div>
-              <div style={{ fontSize: 20, color: MUTED, lineHeight: 1.32 }}>{s.body.slice(0, 116)}</div>
+              <div style={{ fontSize: 26, fontWeight: 700 }}>{clamp(s.title, 46)}</div>
+              <div style={{ fontSize: 20, color: MUTED, lineHeight: 1.32 }}>{clamp(s.body, 116)}</div>
             </div>
           </div>
         ))}
