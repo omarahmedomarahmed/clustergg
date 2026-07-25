@@ -41,6 +41,13 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
     ],
   },
   {
+    title: "Sharing",
+    note: "Used by the profile share button on the site AND by /cluster share in Discord. {name} and {url} are replaced automatically.",
+    keys: [
+      { key: "share.profile.message", label: "Profile share message", long: true },
+    ],
+  },
+  {
     title: "Background imagery",
     note: "Any hosted image URL. These back the challenges section, games pages and default profile banners.",
     keys: [

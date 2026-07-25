@@ -199,6 +199,16 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   const lyra = await mkUser({ slug: "lyra", displayName: "Lyra", email: "lyra@demo.gg", bio: "Puzzle rating > blitz rating and I will die on this hill.", country: "FR" });
   const atlas = await mkUser({ slug: "atlas", displayName: "Atlas", email: "atlas@demo.gg", bio: "Roblox dev by day, ranked grinder by night.", country: "BR" });
 
+  // Discord identities for the demo gamers. This is the exact row a real
+  // "Sign in with Discord" writes, and it's the ONLY join the bot needs — so
+  // seeding it means /cluster can be exercised end-to-end against demo data.
+  const mkDiscord = async (userId: string, discordId: string, username: string) => {
+    await db.insert(schema.oauthIdentities).values({
+      id: uid(), userId, provider: "discord", providerUserId: discordId, scopes: "identify email",
+    });
+    await db.update(schema.users).set({ discordUsername: username }).where(eq(schema.users.id, userId));
+  };
+
   const mkAccount = async (userId: string, provider: string, providerAccountId: string, inGameName: string) => {
     const id = uid();
     await db.insert(schema.linkedGameAccounts).values({
@@ -207,6 +217,12 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     });
     return id;
   };
+
+  await mkDiscord(nova, "900000000000000001", "nova");
+  await mkDiscord(orion, "900000000000000002", "orion");
+  await mkDiscord(vega, "900000000000000003", "vega");
+  await mkDiscord(lyra, "900000000000000004", "lyra");
+  await mkDiscord(atlas, "900000000000000005", "atlas");
 
   const novaChess = await mkAccount(nova, "chesscom", "hikaru", "hikaru");
   await mkAccount(nova, "lichess", "penguingim1", "penguingim1");

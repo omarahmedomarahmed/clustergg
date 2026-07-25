@@ -1,0 +1,166 @@
+import { NextRequest, NextResponse, after } from "next/server";
+import { verifyInteraction } from "@/lib/discord/verify";
+import { canVerify, siteUrl } from "@/lib/discord/config";
+import {
+  InteractionType, InteractionResponseType, MessageFlags,
+  actor, readCommand, type Interaction,
+} from "@/lib/discord/types";
+import { parseId, frame, type Frame } from "@/lib/discord/components";
+import { gameChoices, questChoices, guideChoices, showChoices } from "@/lib/discord/catalog";
+import { renderScreen, screenForCommand, loadCtx } from "@/lib/discord/screens";
+import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
+import { cardRef } from "@/lib/discord/cards";
+import { shareMessage } from "@/lib/discord/share";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// The single entry point for everything the bot does. Discord POSTs here for
+// slash commands, button clicks, autocomplete and modal submits.
+//
+// Two rules shape this whole file:
+//  1. Every request must be Ed25519-verified, and an invalid signature MUST be
+//     401 — the developer portal refuses to save an endpoint that doesn't.
+//  2. Discord kills an interaction that isn't acknowledged within 3 SECONDS.
+//     So we ACK immediately and do the database + card work in `after()`,
+//     patching the real content in through the interaction webhook.
+
+const json = (body: unknown) => NextResponse.json(body);
+
+export async function POST(req: NextRequest) {
+  if (!canVerify()) {
+    return NextResponse.json({ error: "discord_not_configured" }, { status: 503 });
+  }
+
+  // The signature covers the exact bytes, so the body must be read as text.
+  const raw = await req.text();
+  const check = verifyInteraction(raw, req.headers.get("x-signature-ed25519"), req.headers.get("x-signature-timestamp"));
+  if (!check.ok) return new NextResponse(check.reason, { status: 401 });
+
+  let i: Interaction;
+  try { i = JSON.parse(raw) as Interaction; } catch { return new NextResponse("bad json", { status: 400 }); }
+
+  if (i.type === InteractionType.Ping) return json({ type: InteractionResponseType.Pong });
+
+  if (i.type === InteractionType.Autocomplete) return json(await autocomplete(i));
+
+  if (i.type === InteractionType.ApplicationCommand) return command(i);
+
+  if (i.type === InteractionType.MessageComponent) return componentPress(i);
+
+  return json({ type: InteractionResponseType.Pong });
+}
+
+// ===== Autocomplete (must answer synchronously) =====
+
+async function autocomplete(i: Interaction) {
+  const { sub, opts, focused } = readCommand(i);
+  const q = focused ? (opts[focused] ?? "") : "";
+  let choices: { name: string; value: string }[] = [];
+  try {
+    if (focused === "game") choices = await gameChoices(q);
+    else if (focused === "name") choices = await questChoices(q);
+    else if (focused === "topic") choices = await guideChoices(q);
+    else if (focused === "what") choices = await showChoices(q);
+    else if (sub === "show") choices = await showChoices(q);
+  } catch { choices = []; }
+  return { type: InteractionResponseType.AutocompleteResult, data: { choices } };
+}
+
+// ===== Slash commands =====
+
+function command(i: Interaction) {
+  const { sub, opts } = readCommand(i);
+  const who = actor(i);
+  if (!who) return json({ type: InteractionResponseType.Pong });
+
+  // `share` posts publicly on purpose — that's the point of sharing. Everything
+  // else is ephemeral so the bot never floods a channel.
+  const isShare = sub === "share";
+  const flags = isShare ? undefined : MessageFlags.Ephemeral;
+
+  after(async () => {
+    try {
+      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      if (isShare) return void (await share(i.token, ctx));
+      const target = screenForCommand(sub, opts);
+      const payload = await renderScreen(target, target.screen === "home" ? [] : [frame("home")], ctx);
+      await editOriginal(i.token, { ...payload, flags: payload.flags ?? flags });
+    } catch {
+      await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
+    }
+  });
+
+  return json({
+    type: InteractionResponseType.DeferredChannelMessageWithSource,
+    ...(flags ? { data: { flags } } : {}),
+  });
+}
+
+// ===== Buttons =====
+
+function componentPress(i: Interaction) {
+  const who = actor(i);
+  const parsed = parseId(i.data?.custom_id ?? "");
+  if (!who || !parsed) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+
+  after(async () => {
+    try {
+      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+
+      if (parsed.kind === "a") return void (await runAction(i, parsed.target, parsed.trail, ctx));
+
+      // "Back" pops the trail: the first trail frame becomes the destination.
+      const [target, trail] = parsed.kind === "b"
+        ? [parsed.trail[0] ?? frame("home"), parsed.trail.slice(1)]
+        : [parsed.target, parsed.trail];
+
+      const payload = await renderScreen(target, trail, ctx);
+      await editOriginal(i.token, {
+        content: payload.content ?? "",
+        embeds: payload.embeds ?? [],
+        components: payload.components ?? [],
+      });
+    } catch {
+      await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
+    }
+  });
+
+  // Acknowledge by editing the SAME message — this is what makes navigation
+  // feel in-place instead of spawning a new message per click.
+  return json({ type: InteractionResponseType.DeferredUpdateMessage });
+}
+
+async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awaited<ReturnType<typeof loadCtx>>) {
+  if (target.screen === "share") {
+    await share(i.token, ctx, true);
+    return;
+  }
+  const payload = await renderScreen(trail[0] ?? frame("home"), trail.slice(1), ctx);
+  await editOriginal(i.token, {
+    content: payload.content ?? "",
+    embeds: payload.embeds ?? [],
+    components: payload.components ?? [],
+  });
+}
+
+// ===== Share =====
+
+async function share(token: string, ctx: Awaited<ReturnType<typeof loadCtx>>, asFollowUp = false) {
+  if (!ctx.gamer) {
+    await editOriginal(token, {
+      content: `Sign in with Discord first and your profile is ready to share: ${siteUrl()}/login`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  const { url } = await cardRef("profile", { slug: ctx.gamer.slug });
+  const msg = await shareMessage(ctx.gamer.displayName, `${siteUrl()}/u/${ctx.gamer.slug}`);
+  const payload = {
+    content: msg,
+    embeds: [{ color: 0x8b5cf6, image: { url } }],
+    components: [],
+  };
+  if (asFollowUp) await followUp(token, payload);
+  else await editOriginal(token, payload);
+}
