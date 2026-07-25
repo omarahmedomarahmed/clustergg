@@ -907,19 +907,19 @@ export async function seedHouseAds(db: DB) {
 // end time has passed roll their window forward to now, so they always show a
 // real live countdown instead of "ends just now". Custom-cadence challenges
 // keep their explicit dates. Cheap + filtered; runs every boot.
-export async function refreshStaleChallengeWindows(db: DB) {
-  const now = new Date();
-  const cadenceDays: Record<string, number> = { daily: 1, weekly: 7, monthly: 30 };
-  const rows = await db.select({ id: schema.challenges.id, cadence: schema.challenges.cadence })
-    .from(schema.challenges)
-    .where(and(eq(schema.challenges.status, "active"), lt(schema.challenges.endAt, now)));
-  for (const r of rows) {
-    const days = cadenceDays[r.cadence];
-    if (!days) continue;
-    await db.update(schema.challenges)
-      .set({ startAt: now, endAt: new Date(now.getTime() + days * 86400000) })
-      .where(eq(schema.challenges.id, r.id));
-  }
+// A challenge ENDS on its end date.
+//
+// This used to slide the window forward on every boot for anything with a
+// daily/weekly/monthly cadence, which meant no challenge ever finished, no
+// placements were ever frozen and no trophy was ever awarded — the competition
+// ran forever and nobody won. `cadence` now describes how often staff intend to
+// run a NEW challenge, not a window that renews itself.
+//
+// Expired challenges are closed by closeExpiredChallenges() in lib/challenges.ts
+// (daily cron, or the "End now" button in admin), which freezes the standings
+// into final placements and hands out the trophies.
+export async function refreshStaleChallengeWindows(_db: DB) {
+  return;
 }
 
 export async function ensureTopBannerAd(db: DB) {

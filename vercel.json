@@ -4,6 +4,6 @@
   "buildCommand": "next build",
   "crons": [
     { "path": "/api/cron/sync", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/discord-ads", "schedule": "0 */6 * * *" }
+    { "path": "/api/cron/daily", "schedule": "0 12 * * *" }
   ]
 }

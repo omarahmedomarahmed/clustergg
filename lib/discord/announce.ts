@@ -6,7 +6,7 @@ import { postMessage } from "@/lib/discord/rest";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
-import { challengeUrl } from "@/lib/challenges";
+import { challengeUrl, challengeStandings } from "@/lib/challenges";
 
 // Proactive posts into #ClusterGG.
 //
@@ -57,6 +57,34 @@ async function anyTarget(): Promise<boolean> {
   return (await targets()).length > 0;
 }
 
+// Staff broadcast: one message to every server with the bot, or to chosen ones.
+// Returns real counts so the admin UI can say what actually happened rather
+// than claiming success.
+export async function broadcastToGuilds(
+  message: string,
+  onlyGuildIds?: string[],
+): Promise<{ targets: number; sent: number }> {
+  if (!canAct()) return { targets: 0, sent: 0 };
+
+  const guilds = await announcingGuilds();
+  const wanted = onlyGuildIds?.length
+    ? guilds.filter((g) => onlyGuildIds.includes(g.guildId))
+    : guilds;
+  const channels = wanted.map((g) => g.channelId).filter((c): c is string => !!c);
+
+  let sent = 0;
+  for (const channel of channels) {
+    try {
+      const res = await postMessage(channel, {
+        content: message.slice(0, 1900),
+        components: rows([linkButton("Open Cluster", siteUrl(), "🚀")]),
+      });
+      if (res.ok) sent++;
+    } catch { /* keep going — one bad server shouldn't stop the rest */ }
+  }
+  return { targets: channels.length, sent };
+}
+
 async function slugFor(userId: string): Promise<{ slug: string; name: string } | null> {
   try {
     const db = await getDb();
@@ -80,6 +108,33 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
       navButton("Join too", frame("challenge", challengeId), [frame("home")], ButtonStyle.Success, "🏆"),
       linkButton("See standings", url, "📊"),
     ]),
+  });
+}
+
+// A challenge finished — the podium, with what each winner actually earned.
+export async function announceChallengeEnded(challengeId: string): Promise<void> {
+  if (!(await anyTarget())) return;
+  const [card, standings, url] = await Promise.all([
+    cardRef("challenge", { id: challengeId }),
+    challengeStandings(challengeId, 3),
+    challengeUrl(siteUrl(), challengeId),
+  ]);
+  if (!card.data || card.data.kind !== "challenge") return;
+
+  const medals = ["🥇", "🥈", "🥉"];
+  const podium = standings.length
+    ? standings.map((s, i) => `${medals[i] ?? ""} **${s.displayName}** — ${s.points.toLocaleString()} pts`).join("\n")
+    : "No one joined this one.";
+
+  await announce({
+    content: `**${card.data.title}** has ended.`,
+    embeds: [{
+      description: podium,
+      color: embedColor(card.data.theme.accent),
+      image: { url: card.url },
+      footer: { text: "Trophies are in the winners' trophy cases and can be redeemed for real value." },
+    }],
+    components: rows([linkButton("Final standings", url, "🏆")]),
   });
 }
 

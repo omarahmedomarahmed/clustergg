@@ -60,6 +60,44 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             .map(([k, v]) => `${v}× ${k.replace(/_/g, " ")}`)
             .join(", ") || "participation only"}
         </p>
+
+        {/* Lifecycle. A challenge ends on its end date — the daily job closes
+            anything overdue — but staff need to be able to end one on the spot,
+            and to reopen one closed by mistake. */}
+        <div className="mt-5 pt-5 border-t border-violet-500/15 flex flex-wrap gap-3 items-center">
+          {challenge.status === "completed" ? (
+            <>
+              <span className="text-sm text-emerald-300 font-bold">
+                Ended · placements frozen and trophies awarded
+              </span>
+              <form action={async () => {
+                "use server";
+                const { reopenChallenge } = await import("@/app/actions/admin");
+                await reopenChallenge(id, new Date(Date.now() + 7 * 86400000).toISOString());
+              }}>
+                <button className="ghost-btn pressable rounded-full px-5 py-2 text-sm">
+                  Reopen for 7 more days
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <form action={async () => {
+                "use server";
+                const { endChallengeNow } = await import("@/app/actions/admin");
+                await endChallengeNow(id);
+              }}>
+                <button className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold">
+                  End now &amp; award trophies
+                </button>
+              </form>
+              <span className="text-xs text-muted">
+                Freezes the current standings as final placements, marks it completed, and gives the
+                podium their trophies. Everyone who took part is notified where they finished.
+              </span>
+            </>
+          )}
+        </div>
       </div>
 
       <details className="glass p-6 group">

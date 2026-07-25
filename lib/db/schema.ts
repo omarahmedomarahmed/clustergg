@@ -29,6 +29,8 @@ export const users = pgTable("users", {
   primarySignupProvider: text("primary_signup_provider"),
   discordUsername: text("discord_username"), // Discord handle — the gamer's universal identity, shown everywhere
   profileViews: integer("profile_views").notNull().default(0), // public view counter (brag number)
+  discordViews: integer("discord_views").notNull().default(0), // views that came from someone showing this profile in Discord
+  voteCount: integer("vote_count").notNull().default(0),       // Best Profile votes, denormalized for cheap sorting
   payoutMethod: jsonb("payout_method").$type<{ currency: string; method: string; details: Record<string, string> }>(), // saved trophy-redeem payout method
   payoutChanges: integer("payout_changes").notNull().default(0), // method edits used (locks at 3)
   profileVisibility: text("profile_visibility").notNull().default("public"), // public | followers | private
@@ -264,6 +266,13 @@ export const challenges = pgTable("challenges", {
   // Entry gate: require N completion badges of a given quest to join.
   gateQuestId: text("gate_quest_id"),
   gateMinBadges: integer("gate_min_badges").notNull().default(0),
+  // Server-gated challenges: a challenge that belongs to one Discord server.
+  // Announced only there (with extra hype), hidden on the web behind an access
+  // key. This is the thing a server owner gets that no other server has.
+  visibility: text("visibility").notNull().default("public"), // public | private
+  guildId: text("guild_id"),
+  accessKey: text("access_key"),
+  announceHype: boolean("announce_hype").notNull().default(false),
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
   endAt: timestamp("end_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("draft"), // draft | active | completed | cancelled
@@ -615,6 +624,35 @@ export const userQuestTiers = pgTable("user_quest_tiers", {
   questTierId: text("quest_tier_id").notNull().references(() => questTiers.id, { onDelete: "cascade" }),
   awardedAt: now("awarded_at"),
 }, (t) => [uniqueIndex("uqt_user_tier_idx").on(t.userId, t.questTierId)]);
+
+// ===== Gamer identity: votes and views =====
+// A vote for someone's profile in the Best Profile race. Deliberately allows
+// BOTH a signed-in web voter and a Discord voter who hasn't linked an account —
+// the point is to let a whole server back one of their own, and requiring a
+// sign-up first would kill exactly that moment. Uniqueness is enforced per
+// identity by partial indexes, so nobody votes twice either way.
+export const profileVotes = pgTable("profile_votes", {
+  id: id(),
+  profileUserId: text("profile_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  voterUserId: text("voter_user_id"),        // set for web votes
+  voterDiscordId: text("voter_discord_id"),  // set for Discord votes
+  guildId: text("guild_id"),                 // which server the vote came from
+  source: text("source").notNull().default("web"), // web | discord
+  createdAt: now("created_at"),
+});
+
+// Where a profile was seen. This is what powers a gamer's own analytics — how
+// many people saw them on the site vs in Discord, and in which servers.
+export const profileViews = pgTable("profile_views", {
+  id: id(),
+  profileUserId: text("profile_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  source: text("source").notNull().default("web"), // web | discord
+  guildId: text("guild_id"),
+  guildName: text("guild_name"),
+  viewerUserId: text("viewer_user_id"),
+  viewerDiscordId: text("viewer_discord_id"),
+  createdAt: now("created_at"),
+}, (t) => [index("pvw_profile_idx").on(t.profileUserId, t.createdAt)]);
 
 // ===== Discord servers =====
 // A server that has installed ClusterBot. This is the unit the whole growth

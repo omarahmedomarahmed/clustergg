@@ -2,8 +2,9 @@ import { headers } from "next/headers";
 import {
   publicKeyShape, canAct, appId, installUrl, discordConfigured, siteUrl, botApiSecret, CLUSTER_CHANNEL,
 } from "@/lib/discord/config";
-import { RegisterCommands, GuideTools } from "@/components/DiscordBotPanel";
+import { RegisterCommands, GuideTools, JobRunner, Broadcast } from "@/components/DiscordBotPanel";
 import { listGuilds } from "@/lib/discord/guilds";
+import { JOBS } from "@/lib/jobs";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Discord bot" };
@@ -124,6 +125,9 @@ export default async function AdminDiscordPage() {
       </section>
 
       <GuideTools ready={ready} />
+
+      <div className="mt-6"><JobRunner jobs={JOBS} /></div>
+      <div className="mt-6"><Broadcast ready={ready} /></div>
 
       <section className="mt-6">
         <h2 className="font-bold mb-3">Servers</h2>

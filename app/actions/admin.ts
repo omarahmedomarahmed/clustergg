@@ -463,6 +463,37 @@ export async function setParticipantStatus(participantId: string, status: "activ
   revalidatePath(`/admin/challenges/${challengeId}`);
 }
 
+// End a challenge on demand: freeze the standings as final placements, mark it
+// completed and award the podium trophies. Staff need this for a challenge that
+// should stop early, and to close one out without waiting for the daily job.
+export async function endChallengeNow(challengeId: string) {
+  const admin = await requireStaff();
+  const { closeChallenge } = await import("@/lib/challenges");
+  const res = await closeChallenge(challengeId);
+  await audit(admin.id, "challenge.ended", "challenge", challengeId);
+  revalidatePath(`/admin/challenges/${challengeId}`);
+  revalidatePath("/admin/challenges");
+  return res;
+}
+
+// Re-open a challenge that was ended by mistake. Placements and trophies that
+// were already awarded stay — taking a trophy back off someone's profile would
+// be worse than an extra day of competition.
+export async function reopenChallenge(challengeId: string, endAtIso: string) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const endAt = new Date(endAtIso);
+  if (Number.isNaN(endAt.getTime())) return;
+  await db.update(schema.challenges)
+    .set({ status: "active", endAt })
+    .where(eq(schema.challenges.id, challengeId));
+  await db.update(schema.challengeParticipants)
+    .set({ status: "active" })
+    .where(eq(schema.challengeParticipants.challengeId, challengeId));
+  await audit(admin.id, "challenge.reopened", "challenge", challengeId);
+  revalidatePath(`/admin/challenges/${challengeId}`);
+}
+
 // ---------- Brands / campaigns / creatives ----------
 export async function saveBrand(formData: FormData) {
   const admin = await requireArea("ads");
