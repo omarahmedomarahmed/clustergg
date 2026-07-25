@@ -3,7 +3,7 @@
 
 export type CardKind =
   | "profile" | "game-stats" | "quest" | "cp-summary"
-  | "leaderboard" | "challenge" | "planet" | "guide";
+  | "leaderboard" | "challenge" | "planet" | "planets" | "guide";
 
 export type CardTheme = {
   accent: string;   // primary brand/game/quest colour
@@ -31,12 +31,20 @@ export type ProfileCard = {
 export type GameStatsCard = {
   kind: "game-stats";
   displayName: string;
+  slug?: string | null;
+  avatarUrl?: string | null;
   game: string;
   logoUrl?: string | null;
   tag: string;
   region?: string | null;
   stats: { label: string; value: string }[];
   rank?: { place: number; total: number; board: string } | null;
+  // The things that make a game account feel like a game account rather than a
+  // row of numbers: who you main, and how the last few games actually went.
+  champions?: { name: string; iconUrl?: string | null; level?: number; points?: number }[];
+  matches?: { champion: string; iconUrl?: string | null; win: boolean; kda: string; queue?: string | null; when?: string | null }[];
+  gameAvatarUrl?: string | null;   // in-game profile icon, when the game has one
+  live?: { champion?: string | null; queue?: string | null } | null;
   theme: CardTheme;
 };
 
@@ -84,6 +92,12 @@ export type ChallengeCard = {
   prize?: string | null;
   trophies: { name: string; imageUrl: string; value: number; place: number }[];
   isPrivate?: boolean;
+  serverName?: string | null;   // for a server-gated challenge
+  ended?: boolean;
+  startsAt?: string | null;     // ISO — so the card can show the full window
+  // Live standings. A challenge card without them is a poster; with them it's a
+  // scoreboard people come back to.
+  standings?: { place: number; name: string; points: number; you?: boolean }[];
   theme: CardTheme;
 };
 
@@ -96,6 +110,16 @@ export type PlanetCard = {
   ranked: number;
   serverGamers?: number | null;
   topGamer?: { name: string; value: string } | null;
+  theme: CardTheme;
+};
+
+// The game picker: every world, as its own logo tile. This is what START HERE
+// opens, so it has to look like the galaxy the site promises.
+export type PlanetsCard = {
+  kind: "planets";
+  title: string;
+  subtitle?: string | null;
+  games: { name: string; logoUrl?: string | null; accent?: string | null }[];
   theme: CardTheme;
 };
 
@@ -112,4 +136,4 @@ export type GuideCard = {
 
 export type CardData =
   | ProfileCard | GameStatsCard | QuestCard | CpSummaryCard
-  | LeaderboardCard | ChallengeCard | PlanetCard | GuideCard;
+  | LeaderboardCard | ChallengeCard | PlanetCard | PlanetsCard | GuideCard;

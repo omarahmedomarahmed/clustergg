@@ -8,6 +8,9 @@ import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
 import { liveChallenges, challengeUrl } from "@/lib/challenges";
 import { guildStats, attributeMember } from "@/lib/discord/guilds";
+import { findByInGameName, findByDiscordName } from "@/lib/gamer-lookup";
+import { recordProfileView, hasVoted } from "@/lib/identity";
+import { getProvider, PROVIDERS } from "@/lib/providers/registry";
 
 // Every screen is "a PNG card + buttons underneath it".
 //
@@ -56,17 +59,24 @@ function customizeButton(): Button {
   return linkButton("Customize profile", `${siteUrl()}/profile`, "✨");
 }
 
+// Every card carries a way back to the beginning. Someone who lands on a guide
+// pinned six months ago should be one tap from picking their game — that's the
+// whole funnel, and it shouldn't depend on them knowing a command.
+function startHereButton(trail: Frame[]): Button {
+  return navButton("START HERE", frame("planets"), trail, ButtonStyle.Primary, "🚀");
+}
+
 function signInPrompt(ctx: ScreenCtx, trail: Frame[]): ScreenPayload {
   return {
     embeds: [{
       title: "One step first",
       description:
-        "Sign in with Discord once and this bot knows you everywhere.\n\n" +
+        "Continue with Discord — one tap, and this bot knows you everywhere.\n\n" +
         "Your Cluster profile carries every game you play, your Cluster Points, your quests and your trophies — one identity instead of a dozen scattered accounts.",
       color: embedColor("#8b5cf6"),
     }],
     components: rows([
-      linkButton("Sign in with Discord", signInUrl(siteUrl(), "/feed"), "🚀"),
+      linkButton("Continue with Discord", signInUrl(siteUrl(), "/feed"), "🚀"),
       backButton(trail),
     ]),
   };
@@ -103,13 +113,72 @@ async function welcomeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayl
   return {
     embeds: [embed(url, {
       title: "Welcome to Cluster",
-      description: "Every game you play, one identity. Sign in with Discord and your profile is created instantly.",
+      description: "Every game you play, one identity. Continue with Discord and your profile is ready instantly.",
       color: "#8b5cf6",
     })],
     components: rows([
-      linkButton("Sign in with Discord", signInUrl(siteUrl(), "/feed"), "🚀"),
+      startHereButton([here]),
+      linkButton("Continue with Discord", signInUrl(siteUrl(), "/feed"), "🔗"),
       navButton("How it works", frame("guide", "getting-started"), [here], ButtonStyle.Secondary, "📖"),
-      navButton("Planets", frame("planets"), [here], ButtonStyle.Secondary, "🪐"),
+      backButton(trail),
+    ]),
+  };
+}
+
+// Someone else's snapshot — the whole point of `/cluster show <game> <tag>`.
+// Works for ANY gamer on the platform, from any server: that's what makes the
+// bot worth having in a server where nobody has signed up yet.
+async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const isDiscordLookup = /^discord$/i.test(what);
+  const game = what.startsWith("game:") ? what.slice(5) : what;
+
+  const found = isDiscordLookup
+    ? await findByDiscordName(gamer)
+    : (await findByInGameName(game, gamer)) ?? (await findByDiscordName(gamer));
+
+  if (!found) {
+    return notYet(
+      isDiscordLookup
+        ? `No Cluster gamer with the Discord handle **${gamer}**.`
+        : `No one on Cluster has linked **${gamer}** on **${game}** yet.`,
+      trail,
+      [linkButton("Link yours", `${siteUrl()}/profile?tab=accounts`, "🔗")],
+    );
+  }
+
+  // Being shown in a server IS a profile view — it's how the person gets seen,
+  // and a gamer should get credit for it.
+  void recordProfileView(found.userId, {
+    source: "discord", guildId: ctx.guildId ?? null,
+    viewerDiscordId: ctx.discordId,
+  }).catch(() => {});
+
+  // A specific game was asked for → the account snapshot. Otherwise the whole
+  // profile, which is what a Discord-handle lookup means.
+  const wantsGame = !isDiscordLookup && !!found.game;
+  const kind = wantsGame ? "game-stats" : "profile";
+  const args: Record<string, string> = wantsGame
+    ? { slug: found.slug, game: found.game! }
+    : { slug: found.slug };
+  const { url, data } = await cardRef(kind, args);
+
+  const voted = await hasVoted(found.userId, ctx.gamer?.userId ?? null, ctx.discordId);
+  const here = frame("gamer", what, gamer);
+
+  return {
+    embeds: [embed(url, {
+      title: wantsGame ? `${found.inGameName ?? gamer} · ${found.game}` : found.displayName,
+      description: wantsGame ? `${found.displayName} on Cluster` : undefined,
+      color: data && "theme" in data ? data.theme.accent : null,
+    })],
+    components: rows([
+      voted
+        ? button("Voted", actionId("noop", [], [here, ...trail]), ButtonStyle.Secondary, "✅")
+        : button("Vote for this profile", actionId("vote", [found.slug], [here, ...trail]), ButtonStyle.Success, "⭐"),
+      wantsGame
+        ? navButton("Full profile", frame("gamer", "discord", found.slug), trail, ButtonStyle.Primary, "👤")
+        : null,
+      linkButton("Open profile", `${siteUrl()}/u/${found.slug}`, "🔗"),
       backButton(trail),
     ]),
   };
@@ -177,12 +246,13 @@ async function questScreen(key: string, ctx: ScreenCtx, trail: Frame[]): Promise
     embeds: [embed(url, {
       title: c.quests.find((q) => q.value === questKey)?.name ?? "Quest",
       color: data && "theme" in data ? data.theme.accent : null,
-      footer: ctx.gamer ? undefined : "Sign in to track your own progress.",
+      footer: ctx.gamer ? undefined : "Continue with Discord to track your own progress.",
     })],
     components: rows([
       navButton("How to win", frame("guide", `quest:${questKey}`), trail, ButtonStyle.Primary, "📖"),
       ...others.map((q) => navButton(q.name, frame("show", `quest:${q.value}`), trail)),
       linkButton("Play the quest map", `${siteUrl()}/quests/${questKey}`, "🎮"),
+      startHereButton(trail),
       backButton(trail),
     ]),
   };
@@ -216,6 +286,7 @@ async function guideScreen(topic: string, ctx: ScreenCtx, trail: Frame[]): Promi
       color: data && "theme" in data ? data.theme.accent : null,
     })],
     components: rows([
+      startHereButton(trail),
       ...others.map((g) => navButton(g.name.slice(0, 40), frame("guide", g.value), trail)),
       customizeButton(),
       backButton(trail),
@@ -243,7 +314,8 @@ async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       color: embedColor("#8b5cf6"),
     }],
     components: rows([
-      navButton("My hub", frame("home"), [], ButtonStyle.Primary, "🏠"),
+      startHereButton([here]),
+      navButton("My hub", frame("home"), [], ButtonStyle.Secondary, "🏠"),
       navButton("Getting started", frame("guide", "getting-started"), [here], ButtonStyle.Secondary, "📖"),
       linkButton("Open Cluster", siteUrl(), "🔗"),
       backButton(trail),
@@ -253,19 +325,32 @@ async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
 
 // ===== Planets =====
 
+// Discord button styles are a fixed palette of four, so "a different colour per
+// game" means spreading games across them deterministically — the same game is
+// always the same colour, everywhere in the bot.
+const BUTTON_PALETTE = [ButtonStyle.Primary, ButtonStyle.Success, ButtonStyle.Danger, ButtonStyle.Secondary];
+function gameStyle(name: string): number {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return BUTTON_PALETTE[h % BUTTON_PALETTE.length];
+}
+
+// The screen every "START HERE" button lands on: every game, as its own
+// coloured button, over the games-galaxy art.
 async function planetsScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   const c = await catalog();
   if (!c.games.length) return notYet("No planets are live yet.", trail);
+  const { url } = await cardRef("planets", {});
   return {
-    embeds: [{
-      title: "Pick a planet",
-      description: "Every game is a world: its own challenges, leaderboard and top gamers.",
-      color: embedColor("#8b5cf6"),
-    }],
+    embeds: [embed(url, {
+      title: "Pick your game",
+      description: "Every game is a world: its own challenges, leaderboard and top gamers. Tap one to land there.",
+      color: "#8b5cf6",
+    })],
     // 24 games won't fit in 25 buttons alongside Back, so the first 20 get
     // buttons and `/cluster planet game:` autocompletes the rest.
     components: rows([
-      ...c.games.slice(0, 20).map((g) => navButton(g.name.slice(0, 24), frame("planet", g.value), trail)),
+      ...c.games.slice(0, 20).map((g) => navButton(g.name.slice(0, 24), frame("planet", g.value), trail, gameStyle(g.value))),
       backButton(trail),
     ]),
   };
@@ -357,7 +442,7 @@ async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Prom
     })],
     components: rows([
       !ctx.gamer
-        ? linkButton("Sign in to join", signInUrl(siteUrl(), new URL(webUrl).pathname), "🚀")
+        ? linkButton("Continue with Discord to join", signInUrl(siteUrl(), new URL(webUrl).pathname), "🚀")
         : joined
           ? button("You've joined", actionId("noop", [], trail), ButtonStyle.Secondary, "✅")
           : button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆"),
@@ -386,32 +471,59 @@ async function hasJoined(userId: string, challengeId: string): Promise<boolean> 
 // Discord modals are the one place a true modal is correct: a short form with
 // text inputs. Everything else in this bot is an embed + buttons.
 export function linkModal(game: string, provider: string) {
+  // Each game asks for a DIFFERENT thing — Dota wants a numeric Friend ID,
+  // Riot wants Name#TAG, Chess.com wants a username. Asking everyone for a
+  // generic "game ID and region" is how you get accounts that fail to verify,
+  // so the modal uses the registry's real label and hint for that provider.
+  const p = getProvider(provider);
+  const label = (p?.identifierLabel ?? "In-game name").slice(0, 45);
+  const hint = (p?.identifierHint ?? "Exactly as it appears in game").slice(0, 100);
+  const regions = REGION_HINTS[provider];
+
+  const components: unknown[] = [
+    {
+      type: ComponentType.ActionRow,
+      components: [{
+        type: ComponentType.TextInput, custom_id: "ign", style: 1, required: true,
+        label, max_length: 64, placeholder: hint,
+      }],
+    },
+  ];
+
+  // Only ask for a region when the game actually has one — an unnecessary
+  // field is a reason to abandon the form.
+  if (regions) {
+    components.push({
+      type: ComponentType.ActionRow,
+      components: [{
+        type: ComponentType.TextInput, custom_id: "region", style: 1, required: false,
+        label: regions.label.slice(0, 45), max_length: 24, placeholder: regions.hint.slice(0, 100),
+      }],
+    });
+  }
+
   return {
     type: InteractionResponseType.Modal,
     data: {
       custom_id: `link|${provider}|${game}`.slice(0, 100),
       title: `Link your ${game} account`.slice(0, 45),
-      components: [
-        {
-          type: ComponentType.ActionRow,
-          components: [{
-            type: ComponentType.TextInput, custom_id: "ign", style: 1, required: true,
-            label: "In-game name", max_length: 64,
-            placeholder: "Exactly as it appears in game",
-          }],
-        },
-        {
-          type: ComponentType.ActionRow,
-          components: [{
-            type: ComponentType.TextInput, custom_id: "region", style: 1, required: false,
-            label: "Region / server (if the game has one)", max_length: 24,
-            placeholder: "e.g. EUW, NA, ASIA",
-          }],
-        },
-      ],
+      components,
     },
   };
 }
+
+// Games where the account lives on a specific server/shard, and what that
+// game actually calls it.
+const REGION_HINTS: Record<string, { label: string; hint: string }> = {
+  "riot-lol": { label: "Region", hint: "EUW, NA, KR, EUNE, BR, TR, JP…" },
+  "riot-valorant": { label: "Region", hint: "eu, na, ap, kr" },
+  pubg: { label: "Platform / shard", hint: "steam, psn, xbox, kakao" },
+  activision: { label: "Platform", hint: "battle, psn, xbl, steam" },
+  faceit: { label: "Region", hint: "EU, NA, SA — optional" },
+  "mobile-legends": { label: "Server (Zone) ID", hint: "The number after your Player ID" },
+  battlenet: { label: "Region", hint: "us, eu, kr, tw" },
+  osu: { label: "Mode", hint: "osu, taiko, fruits, mania — optional" },
+};
 
 async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!ctx.gamer) return signInPrompt(ctx, trail);
@@ -495,7 +607,7 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
 function notYet(message: string, trail: Frame[], extra: (Button | null)[] = []): ScreenPayload {
   return {
     embeds: [{ description: message, color: embedColor("#8b5cf6") }],
-    components: rows([...extra, linkButton("Open Cluster", siteUrl(), "🔗"), backButton(trail)]),
+    components: rows([...extra, startHereButton(trail), linkButton("Open Cluster", siteUrl(), "🔗"), backButton(trail)]),
   };
 }
 
@@ -520,6 +632,7 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
     case "home": return homeScreen(ctx, trail);
     case "help": return helpScreen(ctx, trail);
     case "show": return showScreen(a, ctx, trail);
+    case "gamer": return otherGamerScreen(a, f.args[1] ?? "", ctx, trail);
     case "quest": return questScreen(a, ctx, trail);
     case "quests": return questsScreen(ctx, trail);
     case "guide": return guideScreen(a, ctx, trail);
@@ -538,7 +651,11 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
 // The screen a `/cluster <sub>` invocation lands on.
 export function screenForCommand(sub: string, opts: Record<string, string>): Frame {
   switch (sub) {
-    case "show": return frame("show", opts.what ?? "profile");
+    // `/cluster show <what> <gamer>` looks someone else up; without a gamer it
+    // shows your own.
+    case "show": return opts.gamer
+      ? frame("gamer", opts.what ?? "discord", opts.gamer)
+      : frame("show", opts.what ?? "profile");
     case "planet": return frame("planet", opts.game ?? "");
     case "leaderboard": return frame("leaderboard", opts.game ?? "");
     case "challenge": return frame("challenges", opts.game ?? "");

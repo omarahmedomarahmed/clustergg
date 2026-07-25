@@ -131,17 +131,19 @@ export async function questGuideCard(questKey: string): Promise<CardData | null>
     cardBg("bot_guide"),
   ]);
 
-  // Default steps: the quest's top scoring rules + its milestone ladder.
-  const topRules = q.rules.slice(0, 2).map((r) => ({
-    title: `${r.label} → +${r.points} CP`,
-    body: r.cap ? `Earn up to ${r.cap} of these a day.` : "Counts every time you do it.",
-  }));
+  // EVERY way to earn CP on this quest, not a sample. A guide that lists two of
+  // six actions is worse than no guide — people conclude the other four don't
+  // pay. They're packed into one step so a quest with eight actions still fits.
   const ladder = q.tiers.map((t) => `${t.name} ${t.thresholdQp.toLocaleString()}`).join(" · ");
+  const earnLines = q.rules
+    .map((r) => `+${r.points} ${r.label}${r.cap ? ` (max ${r.cap}/day)` : ""}`)
+    .join(" · ");
+
   let steps = [
     { title: "What this quest rewards", body: q.lore || q.tagline },
-    ...topRules,
+    { title: `Every way to earn CP here (${q.rules.length})`, body: earnLines || "Scoring for this quest is being set up." },
     { title: "Milestones", body: ladder || "Climb each tier to unlock its badge." },
-  ].slice(0, 4);
+  ];
 
   const raw = c[`bot.guide.${topic}.steps`];
   if (raw) {

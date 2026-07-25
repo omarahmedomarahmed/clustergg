@@ -20,7 +20,8 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "bot_quest", label: "Bot · Quest + CP cards", note: "Backdrop for quest progress and CP summary cards." },
   { key: "bot_challenge", label: "Bot · Challenge card", note: "Backdrop for challenge cards (challenge cover wins)." },
   { key: "bot_leaderboard", label: "Bot · Leaderboard card", note: "Backdrop for leaderboard cards." },
-  { key: "bot_planet", label: "Bot · Planet card", note: "Backdrop for the game planet hub card." },
+  { key: "bot_planet", label: "Bot · Planet card", note: "Backdrop for a game planet card (that game's own globe art wins when set)." },
+  { key: "bot_planets", label: "Bot · Game picker card", note: "Backdrop of the 'pick your game' card that every START HERE button opens." },
   { key: "bot_guide", label: "Bot · How-to guide cards", note: "Backdrop for the pinned how-to guide PNGs." },
 ];
 

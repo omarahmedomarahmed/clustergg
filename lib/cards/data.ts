@@ -46,7 +46,7 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     : [];
   const logoByGame = new Map(games.map((g) => [g.name, g.logoUrl]));
 
-  const theme = (user.theme ?? {}) as { accent?: string; accent2?: string };
+  const theme = (user.theme ?? {}) as { accent?: string; accent2?: string; bgImage?: string | null };
   return {
     kind: "profile",
     displayName: user.displayName,
@@ -57,7 +57,7 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     totalCp,
     level: levelFromCp(totalCp).level,
     views: user.profileViews ?? 0,
-    votes: 0, // wired to profile_votes in the identity phase
+    votes: user.voteCount ?? 0,
     award: null,
     accounts: accounts.map((a) => {
       const p = getProvider(a.provider);
@@ -70,11 +70,22 @@ export async function profileCard(slug: string): Promise<CardData | null> {
         headline: s ? (s.rankLabel ?? `${s.metricKey.replace(/_/g, " ")}: ${s.metricValue}`) : game,
       };
     }),
-    theme: { accent: theme.accent || BRAND.accent, accent2: theme.accent2 || BRAND.accent2, bgUrl: slimImg(user.bannerUrl, 800000) || bg.bgUrl, dim: bg.dim },
+    theme: {
+      accent: theme.accent || BRAND.accent,
+      accent2: theme.accent2 || BRAND.accent2,
+      // The gamer's OWN art, in the order they'd expect to see it: the page
+      // background they picked in the profile builder, then their banner, then
+      // the platform default. A shared card should look like their profile.
+      bgUrl: slimImg(theme.bgImage ?? null, 800000)
+        || slimImg(user.bannerUrl, 800000)
+        || bg.bgUrl,
+      dim: bg.dim,
+    },
   };
 }
 
-// One linked game's stats for a gamer.
+// One linked game's stats for a gamer — the same snapshot the public profile
+// shows: rank and metrics, who they main, and how the last few games went.
 export async function gameStatsCard(slug: string, game: string): Promise<CardData | null> {
   const db = await getDb();
   const [user] = await db.select().from(schema.users).where(eq(schema.users.slug, slug)).limit(1);
@@ -87,14 +98,19 @@ export async function gameStatsCard(slug: string, game: string): Promise<CardDat
   const caps = p?.capabilities ?? [];
   const [stats, [g], bg] = await Promise.all([
     db.select().from(schema.statCurrent).where(eq(schema.statCurrent.linkedAccountId, acc.id)),
-    db.select({ logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl, planetBgUrl: schema.games.planetBgUrl })
+    db.select({ logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl, planetBgUrl: schema.games.planetBgUrl, accent: schema.games.accent, accent2: schema.games.accent2 })
       .from(schema.games).where(eq(schema.games.name, p?.game ?? game)).limit(1),
     cardBg("bot_game"),
   ]);
 
+  const rich = await richAccountBits(acc);
+  const theme = (user.theme ?? {}) as { accent?: string; accent2?: string };
+
   return {
     kind: "game-stats",
     displayName: user.displayName,
+    slug: user.slug,
+    avatarUrl: slimImg(user.avatarUrl, 300000),
     game: p?.game ?? game,
     logoUrl: slimImg(g?.logoUrl ?? null, 300000),
     tag: acc.inGameName,
@@ -104,8 +120,69 @@ export async function gameStatsCard(slug: string, game: string): Promise<CardDat
       value: s.rankLabel ?? String(Math.round(s.metricValue * 100) / 100),
     })),
     rank: null,
-    theme: { ...BRAND, bgUrl: slimImg(g?.planetBgUrl ?? g?.coverUrl ?? null, 800000) || bg.bgUrl, dim: bg.dim },
+    ...rich,
+    theme: {
+      accent: g?.accent || theme.accent || BRAND.accent,
+      accent2: g?.accent2 || theme.accent2 || BRAND.accent2,
+      bgUrl: slimImg(g?.planetBgUrl ?? g?.coverUrl ?? null, 800000) || bg.bgUrl,
+      dim: bg.dim,
+    },
   };
+}
+
+// Champions/heroes and recent matches, from whatever the provider persisted at
+// sync time. Read from `providerData` rather than calling the game API live —
+// a Discord interaction has three seconds, and a Riot round-trip does not fit.
+async function richAccountBits(acc: typeof schema.linkedGameAccounts.$inferSelect): Promise<{
+  champions?: { name: string; iconUrl?: string | null; level?: number; points?: number }[];
+  matches?: { champion: string; iconUrl?: string | null; win: boolean; kda: string; queue?: string | null; when?: string | null }[];
+  gameAvatarUrl?: string | null;
+}> {
+  const data = (acc.providerData ?? {}) as Record<string, unknown>;
+  const out: Awaited<ReturnType<typeof richAccountBits>> = {};
+
+  const gameAvatar = typeof data.gameAvatar === "string" ? data.gameAvatar : null;
+  if (gameAvatar) out.gameAvatarUrl = slimImg(gameAvatar, 300000);
+
+  // League persists mastery at sync. Other providers can populate the same
+  // shapes under `champions` / `matches` and this picks them up for free.
+  const champs = (data.lolChampions ?? data.champions) as unknown;
+  if (Array.isArray(champs)) {
+    out.champions = champs.slice(0, 5).map((c) => {
+      const o = c as Record<string, unknown>;
+      return {
+        name: String(o.name ?? o.champion ?? ""),
+        iconUrl: slimImg(typeof o.iconUrl === "string" ? o.iconUrl : null, 200000),
+        level: Number(o.level ?? 0) || undefined,
+        points: Number(o.points ?? 0) || undefined,
+      };
+    }).filter((c) => c.name);
+  }
+
+  const matches = data.matches as unknown;
+  if (Array.isArray(matches)) {
+    out.matches = matches.slice(0, 5).map((m) => {
+      const o = m as Record<string, unknown>;
+      return {
+        champion: String(o.champion ?? ""),
+        iconUrl: slimImg(typeof o.championIconUrl === "string" ? o.championIconUrl : (typeof o.iconUrl === "string" ? o.iconUrl : null), 200000),
+        win: !!o.win,
+        kda: String(o.kda ?? `${o.kills ?? 0}/${o.deaths ?? 0}/${o.assists ?? 0}`),
+        queue: typeof o.queue === "string" ? o.queue : null,
+        when: typeof o.gameEndMs === "number" ? relTime(o.gameEndMs) : null,
+      };
+    }).filter((m) => m.champion);
+  }
+
+  return out;
+}
+
+function relTime(ms: number): string {
+  const mins = Math.max(0, Math.round((Date.now() - ms) / 60000));
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.round(hours / 24)}d ago`;
 }
 
 // A quest's progress for a gamer (or the quest itself when signed out).
@@ -204,6 +281,28 @@ export async function planetCard(game: string): Promise<CardData | null> {
   };
 }
 
+// Every game as a logo tile — what the START HERE button opens.
+export async function planetsCard(): Promise<CardData | null> {
+  const db = await getDb();
+  const [games, bg] = await Promise.all([
+    db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl, accent: schema.games.accent })
+      .from(schema.games).where(eq(schema.games.isActive, true)).orderBy(schema.games.sortOrder),
+    cardBg("bot_planets"),
+  ]);
+  if (!games.length) return null;
+  return {
+    kind: "planets",
+    title: "The Game Galaxy",
+    subtitle: `${games.length} worlds · pick yours below`,
+    games: games.slice(0, 12).map((g) => ({
+      name: g.name,
+      logoUrl: slimImg(g.logoUrl, 300000),
+      accent: g.accent,
+    })),
+    theme: { ...BRAND, bgUrl: bg.bgUrl, dim: bg.dim },
+  };
+}
+
 // One challenge, with its podium trophies and their dollar values.
 export async function challengeCard(challengeId: string): Promise<CardData | null> {
   const db = await getDb();
@@ -239,15 +338,32 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
       .slice(0, 3);
   }
 
+  // Live standings turn a poster into a scoreboard — the reason to keep
+  // re-opening the card while a challenge is running.
+  const { challengeStandings } = await import("@/lib/challenges");
+  const standings = await challengeStandings(ch.id, 5).catch(() => []);
+
+  let serverName: string | null = null;
+  if (ch.guildId) {
+    const [guild] = await db.select({ name: schema.discordGuilds.name })
+      .from(schema.discordGuilds).where(eq(schema.discordGuilds.guildId, ch.guildId)).limit(1);
+    serverName = guild?.name || null;
+  }
+
   return {
     kind: "challenge",
     title: ch.title,
     game: ch.game,
     logoUrl: slimImg(g?.logoUrl ?? null, 300000),
     description: ch.description || null,
+    startsAt: ch.startAt.toISOString(),
     endsAt: ch.endAt.toISOString(),
+    ended: ch.status === "completed",
     participants: participants.length,
     prize: ch.prizeDescription || null,
+    isPrivate: ch.visibility === "private",
+    serverName,
+    standings: standings.map((s) => ({ place: s.place, name: s.displayName, points: s.points })),
     trophies,
     theme: {
       accent: g?.accent || BRAND.accent,

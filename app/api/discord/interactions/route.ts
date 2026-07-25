@@ -15,6 +15,10 @@ import { joinChallengeFor } from "@/lib/challenges";
 import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS } from "@/lib/providers/registry";
 import { logCommand } from "@/lib/discord/guilds";
+import { castDiscordVote } from "@/lib/identity";
+import { inGameNameChoices } from "@/lib/gamer-lookup";
+import { eq } from "drizzle-orm";
+import { getDb, schema } from "@/lib/db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -107,7 +111,7 @@ function modalSubmit(i: Interaction) {
     try {
       const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
       if (!ctx.gamer) {
-        await editOriginal(i.token, { content: `Sign in with Discord first: ${siteUrl()}/login` });
+        await editOriginal(i.token, { content: `Continue with Discord first, then link your game account: ${siteUrl()}/login` });
         return;
       }
       const res = await linkGameAccountFor(
@@ -147,6 +151,13 @@ async function autocomplete(i: Interaction) {
     if (focused === "game") choices = await gameChoices(q);
     else if (focused === "name") choices = await questChoices(q);
     else if (focused === "topic") choices = await guideChoices(q);
+    else if (focused === "gamer") {
+      // Suggest real in-game names for whichever game they picked, so
+      // `/cluster show valorant …` completes to people who actually exist.
+      const what = opts.what ?? "";
+      const game = what.startsWith("game:") ? what.slice(5) : what;
+      choices = game && !/^(profile|cp|discord)$/i.test(game) ? await inGameNameChoices(game, q) : [];
+    }
     else if (focused === "what") choices = await showChoices(q);
     else if (sub === "show") choices = await showChoices(q);
   } catch { choices = []; }
@@ -264,6 +275,20 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
     }
   }
 
+  // Voting from Discord is deliberate: requiring a sign-up before a server can
+  // back one of their own would kill the exact moment worth capturing. One vote
+  // per Discord identity, enforced in the database.
+  if (target.screen === "vote") {
+    const slug = target.args[0] ?? "";
+    const res = await voteForSlug(slug, ctx.discordId, i.guild_id);
+    if (!res.ok) {
+      await editOriginal(i.token, {
+        embeds: [{ color: 0xf59e0b, description: res.reason === "self" ? "You can't vote for your own profile." : "Couldn't record that vote." }],
+      });
+      return;
+    }
+  }
+
   // Re-render whatever screen the action was launched from, so the button
   // state (e.g. "Join" → "You've joined") reflects what just happened.
   const back = trail[0] ?? frame("home");
@@ -273,6 +298,15 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
     embeds: payload.embeds ?? [],
     components: payload.components ?? [],
   });
+}
+
+// Resolve a profile slug then record the vote.
+async function voteForSlug(slug: string, discordId: string, guildId?: string) {
+  const db = await getDb();
+  const [u] = await db.select({ id: schema.users.id })
+    .from(schema.users).where(eq(schema.users.slug, slug)).limit(1);
+  if (!u) return { ok: false as const, reason: "not_found" };
+  return castDiscordVote(u.id, discordId, guildId ?? null);
 }
 
 function joinFailure(reason: string): string {
@@ -298,7 +332,7 @@ function providerForGame(game: string): string | null {
 async function share(token: string, ctx: Awaited<ReturnType<typeof loadCtx>>, asFollowUp = false) {
   if (!ctx.gamer) {
     await editOriginal(token, {
-      content: `Sign in with Discord first and your profile is ready to share: ${siteUrl()}/login`,
+      content: `Continue with Discord first — then your profile is ready to share: ${siteUrl()}/login`,
       flags: MessageFlags.Ephemeral,
     });
     return;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderCard } from "@/lib/cards/render";
 import { getOrRenderCard } from "@/lib/cards/cache";
-import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, challengeCard, cardBg } from "@/lib/cards/data";
+import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, cardBg } from "@/lib/cards/data";
 import { guideCard, GUIDE_TOPICS } from "@/lib/cards/guides";
 import type { CardData } from "@/lib/cards/types";
 
@@ -50,6 +50,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
         break;
       case "planet":
         if (game) data = await planetCard(game);
+        break;
+      case "planets":
+        data = await planetsCard();
         break;
       case "challenge":
         if (q.get("id")) data = await challengeCard(q.get("id")!);
