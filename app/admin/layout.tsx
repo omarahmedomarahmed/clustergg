@@ -2,17 +2,30 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin, isStaff } from "@/lib/auth";
 import { areaAllowed, getStaffGrants } from "@/lib/permissions";
-import Icon from "@/components/Icon";
+import { AdminRail, AdminMobileNav } from "@/components/AdminNav";
+import { countPendingRequests } from "@/lib/challenge-requests";
 
 // Grouped so each thing is edited in exactly one place. Items/sections carry an
 // optional `area`: undefined = staff-default; "ads"/"storage"/"audit" = grantable
 // (admin can delegate to staff on /admin/roles); "roles"/"settings" = admin-only.
-const NAV: { section: string; area?: string; items: { href: string; label: string; area?: string }[] }[] = [
+const NAV: {
+  section: string; area?: string; icon?: string;
+  items: { href: string; label: string; area?: string; exact?: boolean; badge?: "requests" }[];
+}[] = [
   {
     section: "Overview",
     items: [
-      { href: "/admin", label: "Dashboard" },
+      { href: "/admin", label: "Dashboard", exact: true },
       { href: "/admin/audit-log", label: "Audit log", area: "audit" },
+    ],
+  },
+  {
+    section: "Discord",
+    icon: "link",
+    items: [
+      { href: "/admin/discord", label: "Bot status & setup", exact: true },
+      { href: "/admin/discord/requests", label: "Challenge requests", badge: "requests" },
+      { href: "/admin/discord/broadcast", label: "Broadcast & ads" },
     ],
   },
   {
@@ -69,12 +82,6 @@ const NAV: { section: string; area?: string; items: { href: string; label: strin
     ],
   },
   {
-    section: "Discord bot",
-    items: [
-      { href: "/admin/discord", label: "Bot status & setup" },
-    ],
-  },
-  {
     section: "Platform",
     items: [
       { href: "/admin/storage", label: "Image storage", area: "storage" },
@@ -95,48 +102,32 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .map((g) => ({ ...g, items: g.items.filter((i) => areaAllowed(admin, i.area, grants)) }))
     .filter((g) => g.items.length > 0);
 
+  // Counts that belong in the nav: a queue nobody can see from the rail is a
+  // queue nobody works.
+  const pendingRequests = admin ? await countPendingRequests() : 0;
+
+  const groups = nav.map((g) => ({
+    section: g.section,
+    icon: g.icon,
+    items: g.items.map((i) => ({
+      href: i.href,
+      label: i.label,
+      exact: i.exact,
+      badge: i.badge === "requests" ? pendingRequests : undefined,
+    })),
+  }));
+
+  const staffNote = admin ? undefined
+    : `Staff access: edit planets, games, challenges, content, badges, trophies & leaderboards${
+      grants.length > 0 ? `, plus ${grants.join(", ")} (granted by an admin)` : ""
+    }. Roles & settings stay admin-only.`;
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 lg:py-8 lg:flex lg:gap-8">
-      {/* Mobile admin nav — horizontal scroll of every area (Mission Control on mobile) */}
-      <div className="lg:hidden mb-4 -mx-4 px-4">
-        <div className="flex items-center gap-2 mb-2 text-xs uppercase tracking-widest text-amber-300"><Icon name="shield" size={14} /> Mission Control</div>
-        <div className="flex gap-1.5 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none]">
-          {nav.flatMap((g) => g.items).map((item) => (
-            <Link key={item.href} href={item.href} className="shrink-0 rounded-full border border-white/12 px-3 py-1.5 text-xs text-muted hover:text-ink hover:border-cyan-400/40 whitespace-nowrap">
-              {item.label}
-            </Link>
-          ))}
-        </div>
-      </div>
+      <AdminMobileNav groups={groups} />
 
-      <aside className="hidden lg:block w-52 shrink-0">
-        {/* Independently scrollable — hovering the rail scrolls only the rail
-            (overscroll-contain stops the wheel from chaining to the page). */}
-        <div className="glass p-4 sticky top-20 space-y-5 max-h-[calc(100vh-6rem)] overflow-y-auto overscroll-contain">
-          <div className="text-xs uppercase tracking-widest text-amber-300 flex items-center gap-2">
-            <Icon name="shield" size={14} /> Mission Control
-          </div>
-          {!admin && (
-            <div className="text-[10px] text-muted border border-amber-400/25 rounded-lg p-2">
-              Staff access: edit planets, games, challenges, content, badges, trophies &amp; leaderboards
-              {grants.length > 0 ? `, plus ${grants.join(", ")} (granted by an admin)` : ""}. Roles &amp; settings stay admin-only.
-            </div>
-          )}
-          {nav.map((group) => (
-            <div key={group.section}>
-              <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">{group.section}</div>
-              <ul className="space-y-1">
-                {group.items.map((item) => (
-                  <li key={item.href}>
-                    <Link href={item.href} className="block rounded-lg px-2.5 py-1.5 text-sm text-muted hover:text-ink hover:bg-violet-500/10">
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
+      <aside className="hidden lg:block w-56 shrink-0">
+        <AdminRail groups={groups} staffNote={staffNote} />
       </aside>
       <div className="min-w-0 flex-1">{children}</div>
     </div>

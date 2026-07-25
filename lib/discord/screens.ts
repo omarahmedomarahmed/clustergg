@@ -578,9 +578,10 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
     ]);
   }
   const here = frame("admin", arg);
-  const [mine, pending] = await Promise.all([
+  const [mine, pending, portal] = await Promise.all([
     challengesForGuild(ctx.guildId),
     listRequests({ guildId: ctx.guildId, status: "pending" }),
+    ensurePortal(ctx.guildId),
   ]);
 
   const live = mine.filter((c) => c.status === "active" || c.status === "paused");
@@ -602,6 +603,10 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
     lines.push("");
   }
   if (done.length) lines.push(`**${done.length} finished** — trophies already handed out.`);
+  if (portal) {
+    lines.push("");
+    lines.push(`**Your portal:** ${siteUrl()}/servers/${portal.slug} — every member's progress, the traffic your challenges send you, your tier and your badges. The key was DM'd to you at install; tap below to have it sent again.`);
+  }
   if (!lines.length) {
     lines.push("You haven't run a challenge yet.");
     lines.push("");
@@ -622,12 +627,17 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
       title: "Your server's challenges",
       description: lines.join("\n").slice(0, 3800),
       color: embedColor("#8b5cf6"),
-      footer: { text: "Ending a challenge freezes the standings and hands out the trophies straight away." },
+      footer: { text: "Full control — progress, analytics, editing — lives in your server portal on the site." },
     }],
     components: rows([
       button("Request a challenge", `nav-req|${ctx.guildId}`, ButtonStyle.Primary, "🏆"),
+      // Discord is a good remote control and a poor dashboard. Everything with
+      // depth — per-member progress, the traffic we send you, editing — is on
+      // the site, so every owner screen points there rather than trying to
+      // reproduce it in an embed.
+      portal ? linkButton("Open your server portal", `${siteUrl()}/servers/${portal.slug}`, "🛰") : null,
       ...controls,
-      navButton("Server growth", frame("server"), [here], ButtonStyle.Secondary, "📈"),
+      button("DM me my portal key", actionId("portal-key", [], [here]), ButtonStyle.Secondary, "🔑"),
       ...live.slice(0, 2).map((c) => navButton(`View ${c.title}`.slice(0, 24), frame("challenge", c.id), [here], ButtonStyle.Secondary, "👁")),
       backButton(trail),
     ]),
