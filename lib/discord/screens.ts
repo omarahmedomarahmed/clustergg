@@ -9,6 +9,7 @@ import { catalog } from "@/lib/discord/catalog";
 import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild } from "@/lib/challenges";
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember } from "@/lib/discord/guilds";
+import { ensurePortal } from "@/lib/server-portal";
 import { findByInGameName, findByDiscordName } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
 import { getProvider, PROVIDERS } from "@/lib/providers/registry";
@@ -140,6 +141,28 @@ async function welcomeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayl
   };
 }
 
+// The games a gamer has actually linked. A profile card can only LIST them;
+// these are what turn each one into a button you can press to see the real
+// stats behind it.
+async function linkedGamesOf(userId: string): Promise<{ game: string; tag: string }[]> {
+  try {
+    const db = await getDb();
+    const accounts = await db.select({
+      provider: schema.linkedGameAccounts.provider,
+      inGameName: schema.linkedGameAccounts.inGameName,
+    }).from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, userId));
+    const seen = new Set<string>();
+    const out: { game: string; tag: string }[] = [];
+    for (const a of accounts) {
+      const p = getProvider(a.provider);
+      if (!p || p.identityOnly || seen.has(p.game)) continue;
+      seen.add(p.game);
+      out.push({ game: p.game, tag: a.inGameName });
+    }
+    return out;
+  } catch { return []; }
+}
+
 // Someone else's snapshot — the whole point of `/cluster show <game> <tag>`.
 // Works for ANY gamer on the platform, from any server: that's what makes the
 // bot worth having in a server where nobody has signed up yet.
@@ -177,22 +200,35 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
     : { slug: found.slug };
   const { url, data } = await cardRef(kind, args);
 
-  const voted = await hasVoted(found.userId, ctx.gamer?.userId ?? null, ctx.discordId);
+  const [voted, games] = await Promise.all([
+    hasVoted(found.userId, ctx.gamer?.userId ?? null, ctx.discordId),
+    linkedGamesOf(found.userId),
+  ]);
   const here = frame("gamer", what, gamer);
+
+  // One button per game they've linked. A profile card can only LIST the games;
+  // seeing someone's actual rank, champions and recent matches is the reason
+  // you looked them up, and it shouldn't need a second command.
+  const gameButtons = games
+    .filter((g) => !wantsGame || g.game.toLowerCase() !== (found.game ?? "").toLowerCase())
+    .slice(0, 5)
+    .map((g) => navButton(g.game.slice(0, 24), frame("gamer", `game:${g.game}`, g.tag), [here, ...trail], gameStyle(g.game), "🎮"));
 
   return {
     embeds: [embed(url, {
       title: wantsGame ? `${found.inGameName ?? gamer} · ${found.game}` : found.displayName,
       description: wantsGame ? `${found.displayName} on Cluster` : undefined,
       color: data && "theme" in data ? data.theme.accent : null,
+      footer: games.length && !wantsGame ? "Tap a game to see their real stats." : undefined,
     })],
     components: rows([
-      voted
-        ? button("Voted", actionId("noop", [], [here, ...trail]), ButtonStyle.Secondary, "✅")
-        : button("Vote for this profile", actionId("vote", [found.slug], [here, ...trail]), ButtonStyle.Success, "⭐"),
+      ...gameButtons,
       wantsGame
         ? navButton("Full profile", frame("gamer", "discord", found.slug), trail, ButtonStyle.Primary, "👤")
         : null,
+      voted
+        ? button("Voted", actionId("noop", [], [here, ...trail]), ButtonStyle.Secondary, "✅")
+        : button("Vote for this profile", actionId("vote", [found.slug], [here, ...trail]), ButtonStyle.Success, "⭐"),
       linkButton("Open profile", `${siteUrl()}/u/${found.slug}`, "🔗"),
       backButton(trail),
     ]),
@@ -205,15 +241,28 @@ async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[]): Promise
   if (target === "profile" || target === "cp") {
     if (!ctx.gamer) return signInPrompt(ctx, trail);
     const kind = target === "cp" ? "cp" : "profile";
-    const { url, data } = await cardRef(kind, { slug: ctx.gamer.slug });
+    const [{ url, data }, games] = await Promise.all([
+      cardRef(kind, { slug: ctx.gamer.slug }),
+      target === "profile" ? linkedGamesOf(ctx.gamer.userId) : Promise.resolve([]),
+    ]);
     const accent = data && "theme" in data ? data.theme.accent : null;
+    const here = frame("show", target);
     return {
-      embeds: [embed(url, { title: target === "cp" ? "Your Cluster Points" : `${ctx.gamer.displayName} on Cluster`, color: accent })],
+      embeds: [embed(url, {
+        title: target === "cp" ? "Your Cluster Points" : `${ctx.gamer.displayName} on Cluster`,
+        color: accent,
+        footer: games.length ? "Tap a game for your live stats." : undefined,
+      })],
       components: rows([
+        // Your own games, one button each — the same jump anyone looking you up
+        // gets, so the card behaves the same way whoever is holding it.
+        ...games.slice(0, 5).map((g) => navButton(g.game.slice(0, 24), frame("show", `game:${g.game}`), [here, ...trail], gameStyle(g.game), "🎮")),
         target === "cp"
           ? navButton("My profile", frame("show", "profile"), trail, ButtonStyle.Primary, "👤")
           : navButton("My Cluster Points", frame("show", "cp"), trail, ButtonStyle.Primary, "⚡"),
-        navButton("Quests", frame("quests"), trail, ButtonStyle.Secondary, "🗺"),
+        games.length === 0 && target === "profile"
+          ? navButton("Link a game account", frame("link", ""), [here, ...trail], ButtonStyle.Success, "🎮")
+          : null,
         customizeButton(),
         backButton(trail),
       ]),
@@ -529,9 +578,10 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
     ]);
   }
   const here = frame("admin", arg);
-  const [mine, pending] = await Promise.all([
+  const [mine, pending, portal] = await Promise.all([
     challengesForGuild(ctx.guildId),
     listRequests({ guildId: ctx.guildId, status: "pending" }),
+    ensurePortal(ctx.guildId),
   ]);
 
   const live = mine.filter((c) => c.status === "active" || c.status === "paused");
@@ -553,6 +603,10 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
     lines.push("");
   }
   if (done.length) lines.push(`**${done.length} finished** — trophies already handed out.`);
+  if (portal) {
+    lines.push("");
+    lines.push(`**Your portal:** ${siteUrl()}/servers/${portal.slug} — every member's progress, the traffic your challenges send you, your tier and your badges. The key was DM'd to you at install; tap below to have it sent again.`);
+  }
   if (!lines.length) {
     lines.push("You haven't run a challenge yet.");
     lines.push("");
@@ -573,12 +627,17 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
       title: "Your server's challenges",
       description: lines.join("\n").slice(0, 3800),
       color: embedColor("#8b5cf6"),
-      footer: { text: "Ending a challenge freezes the standings and hands out the trophies straight away." },
+      footer: { text: "Full control — progress, analytics, editing — lives in your server portal on the site." },
     }],
     components: rows([
       button("Request a challenge", `nav-req|${ctx.guildId}`, ButtonStyle.Primary, "🏆"),
+      // Discord is a good remote control and a poor dashboard. Everything with
+      // depth — per-member progress, the traffic we send you, editing — is on
+      // the site, so every owner screen points there rather than trying to
+      // reproduce it in an embed.
+      portal ? linkButton("Open your server portal", `${siteUrl()}/servers/${portal.slug}`, "🛰") : null,
       ...controls,
-      navButton("Server growth", frame("server"), [here], ButtonStyle.Secondary, "📈"),
+      button("DM me my portal key", actionId("portal-key", [], [here]), ButtonStyle.Secondary, "🔑"),
       ...live.slice(0, 2).map((c) => navButton(`View ${c.title}`.slice(0, 24), frame("challenge", c.id), [here], ButtonStyle.Secondary, "👁")),
       backButton(trail),
     ]),
@@ -745,6 +804,9 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   }
   const stats = await guildStats(ctx.guildId);
   if (!stats) return notYet("No data for this server yet. Members appear here as they start using Cluster.", trail);
+  // The portal link is only useful to someone who can act on it, and the key
+  // must never appear in a channel — so it's offered to managers as a DM.
+  const portal = ctx.isManager ? await ensurePortal(ctx.guildId) : null;
 
   // A text bar reads better than a number in Discord, and it makes progress feel
   // like progress even at 3%.
@@ -776,7 +838,13 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       footer: { text: "Only gamers who linked a game count — that's what advertisers pay for." },
     }],
     components: rows([
-      navButton("Share the invite", frame("guide", "getting-started"), trail, ButtonStyle.Primary, "📢"),
+      ctx.isManager
+        ? button("DM me my portal key", actionId("portal-key", [], trail), ButtonStyle.Primary, "🛰")
+        : null,
+      portal ? linkButton("Server portal", `${siteUrl()}/servers/${portal.slug}`, "📊") : null,
+      ctx.isManager
+        ? navButton("Run a challenge", frame("admin", ""), trail, ButtonStyle.Success, "🏆")
+        : null,
       linkButton("Server owner guide", `${siteUrl()}/discord-bot`, "📈"),
       backButton(trail),
     ]),

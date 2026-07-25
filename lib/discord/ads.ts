@@ -25,24 +25,36 @@ const PLACEMENT = "discord_bot_post";
 
 export type AdRunResult = { considered: number; posted: number; skipped: number };
 
-export async function postAdsToGuilds(): Promise<AdRunResult> {
+export type ManualAdOptions = {
+  // Post to these servers only. Empty/undefined means every eligible server.
+  guildIds?: string[];
+  // Which creative to send. Omitted means "whatever rotation picks".
+  campaignCreativeId?: string;
+  // Staff sending on purpose can override the one-ad-per-interval rule; the
+  // cron never can.
+  force?: boolean;
+};
+
+export async function postAdsToGuilds(opts: ManualAdOptions = {}): Promise<AdRunResult> {
   const result: AdRunResult = { considered: 0, posted: 0, skipped: 0 };
   if (!canAct()) return result;
 
-  const guilds = await adEligibleGuilds();
+  let guilds = await adEligibleGuilds();
+  if (opts.guildIds?.length) guilds = guilds.filter((g) => opts.guildIds!.includes(g.guildId));
   result.considered = guilds.length;
   if (!guilds.length) return result;
 
   const db = await getDb();
   // One ad selection for the whole run — every eligible server sees the same
   // creative in a given cycle, which is also what a brand expects to buy.
-  const served = await serveAds(db, PLACEMENT, "both").catch(() => null);
-  const creative = served?.creatives?.[0];
+  const creative = opts.campaignCreativeId
+    ? await creativeById(db, opts.campaignCreativeId)
+    : (await serveAds(db, PLACEMENT, "both").catch(() => null))?.creatives?.[0] ?? null;
   if (!creative) return result;
 
   for (const g of guilds) {
     if (!g.channelId) { result.skipped++; continue; }
-    if (await postedRecently(g.guildId)) { result.skipped++; continue; }
+    if (!opts.force && await postedRecently(g.guildId)) { result.skipped++; continue; }
 
     const res = await postMessage(g.channelId, {
       embeds: [{
@@ -76,6 +88,48 @@ export async function postAdsToGuilds(): Promise<AdRunResult> {
   }
 
   return result;
+}
+
+// One specific creative, shaped like what `serveAds` returns so the posting
+// loop doesn't care which way it was chosen.
+async function creativeById(db: Awaited<ReturnType<typeof getDb>>, campaignCreativeId: string) {
+  try {
+    const [row] = await db.select({
+      campaignCreativeId: schema.adCampaignCreatives.id,
+      fileUrl: schema.adCreatives.fileUrl,
+      clickUrl: schema.adCreatives.clickUrl,
+      brandName: schema.brands.name,
+    })
+      .from(schema.adCampaignCreatives)
+      .innerJoin(schema.adCreatives, eq(schema.adCampaignCreatives.creativeId, schema.adCreatives.id))
+      .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id))
+      .innerJoin(schema.brands, eq(schema.adCampaigns.brandId, schema.brands.id))
+      .where(eq(schema.adCampaignCreatives.id, campaignCreativeId))
+      .limit(1);
+    return row ?? null;
+  } catch { return null; }
+}
+
+// Every creative staff can send by hand, newest campaign first.
+export async function sendableCreatives(): Promise<{
+  campaignCreativeId: string; fileUrl: string; brandName: string; campaignName: string; placement: string | null;
+}[]> {
+  try {
+    const db = await getDb();
+    return await db.select({
+      campaignCreativeId: schema.adCampaignCreatives.id,
+      fileUrl: schema.adCreatives.fileUrl,
+      brandName: schema.brands.name,
+      campaignName: schema.adCampaigns.name,
+      placement: schema.adPlacements.key,
+    })
+      .from(schema.adCampaignCreatives)
+      .innerJoin(schema.adCreatives, eq(schema.adCampaignCreatives.creativeId, schema.adCreatives.id))
+      .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id))
+      .innerJoin(schema.brands, eq(schema.adCampaigns.brandId, schema.brands.id))
+      .innerJoin(schema.adPlacements, eq(schema.adCampaignCreatives.placementId, schema.adPlacements.id))
+      .limit(60);
+  } catch { return []; }
 }
 
 async function postedRecently(guildId: string): Promise<boolean> {

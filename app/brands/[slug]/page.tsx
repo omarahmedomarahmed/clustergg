@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { unlockPortal } from "@/lib/portal-auth";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness, getBrandInbox } from "@/lib/brands";
@@ -27,7 +28,10 @@ export default async function BrandPortalPage({
   const brand = await getBrandBySlugOrId(db, slug);
   if (!brand) notFound();
 
-  const unlocked = !!brand.accessKey && brand.accessKey === key;
+  // Same hardening as the server portal: constant-time comparison, then the key
+  // is exchanged for an httpOnly session so it stops travelling in the query
+  // string (browser history, logs, the Referer of every link on this page).
+  const unlocked = await unlockPortal("brand", brand.id, brand.accessKey, key);
   const cover = brand.coverUrl;
   const base = `/brands/${brand.slug}?key=${encodeURIComponent(key)}`;
   const num = (n: number) => n.toLocaleString();

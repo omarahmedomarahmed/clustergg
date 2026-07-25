@@ -9,6 +9,7 @@ import { discordConfigured, CLUSTER_CHANNEL } from "@/lib/discord/config";
 import { postGuides, onboardGuild } from "@/lib/discord/onboard";
 import { broadcastToGuilds, announceChallengeLaunched } from "@/lib/discord/announce";
 import { JOBS, runJob, type JobKey } from "@/lib/jobs";
+import { postAdsToGuilds } from "@/lib/discord/ads";
 
 // Everything the bot needs operationally, as buttons in Mission Control rather
 // than curl commands. Staff run this from a browser; nobody should need a
@@ -97,6 +98,39 @@ export async function announceChallenge(_prev: BotActionState, formData: FormDat
   if (!id) return { error: "Missing challenge." };
   await announceChallengeLaunched(id);
   return { ok: "Announced. A server challenge also sends its entry key to the server it belongs to." };
+}
+
+// Send one ad creative into Discord servers on demand.
+//
+// The cron picks a creative by rotation and respects the one-ad-per-interval
+// rule. This is the other case: staff sending a SPECIFIC creative to specific
+// servers because a brand asked for it — so it takes both overrides.
+export async function broadcastAd(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
+
+  const campaignCreativeId = String(formData.get("campaignCreativeId") ?? "").trim();
+  const guildIds = formData.getAll("guildIds").map(String).map((g) => g.trim()).filter(Boolean);
+  const force = formData.get("force") === "on";
+
+  const res = await postAdsToGuilds({
+    campaignCreativeId: campaignCreativeId || undefined,
+    guildIds: guildIds.length ? guildIds : undefined,
+    force,
+  });
+
+  if (!res.considered) {
+    return { error: "No eligible servers. A server receives ads once it has unlocked revenue share and opted in." };
+  }
+  if (!res.posted) {
+    return {
+      error: res.skipped
+        ? `Nothing sent — ${res.skipped} server${res.skipped === 1 ? "" : "s"} skipped (already had an ad recently, or the bot can't post there). Tick "send anyway" to override the interval.`
+        : "Nothing sent — no creative was available for the Discord placement.",
+    };
+  }
+  revalidatePath("/admin/discord/broadcast");
+  return { ok: `Posted to ${res.posted} of ${res.considered} server${res.considered === 1 ? "" : "s"}.` };
 }
 
 // Run the full install flow by hand, for a server that already has the bot.

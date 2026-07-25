@@ -679,6 +679,11 @@ export const discordGuilds = pgTable("discord_guilds", {
   // so the only way to GET the key is to be in the server — which makes this
   // link the thing that turns our challenge pages into traffic for them.
   inviteUrl: text("invite_url"),
+  // The owner's portal: /servers/<slug>, unlocked by <portal_key>. Same shape
+  // as the brand portal, because it's the same job — someone who doesn't have
+  // a Cluster account needs to see their own numbers.
+  slug: text("slug"),
+  portalKey: text("portal_key"),
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
   installedAt: now("installed_at"),
   removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
@@ -713,6 +718,22 @@ export const discordCommandLogs = pgTable("discord_command_logs", {
   latencyMs: integer("latency_ms").notNull().default(0),
   createdAt: now("created_at"),
 }, (t) => [index("dcl_guild_idx").on(t.guildId, t.createdAt)]);
+
+// What a private challenge page did for the server that owns it.
+//
+// A gated challenge is public to watch, and the only way to get the key is to
+// be in the server — so these three numbers are the whole value exchange, and
+// the owner should be able to see it: people looked, people clicked through to
+// your invite, people joined you.
+export const serverEvents = pgTable("server_events", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  type: text("type").notNull(),          // challenge_view | invite_click | member_joined
+  challengeId: text("challenge_id"),
+  userId: text("user_id"),
+  sessionId: text("session_id"),
+  createdAt: now("created_at"),
+}, (t) => [index("sev_guild_idx").on(t.guildId, t.type, t.createdAt)]);
 
 // A server owner asking us to run a challenge for their community.
 //

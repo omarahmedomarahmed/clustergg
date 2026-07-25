@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { keysMatch } from "@/lib/portal-auth";
 import { uploadDataUrlToBlob } from "@/lib/blob";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
 
   const db = await getDb();
   const [brand] = await db.select({ accessKey: schema.brands.accessKey }).from(schema.brands).where(eq(schema.brands.id, brandId)).limit(1);
-  if (!brand || !brand.accessKey || brand.accessKey !== key) {
+  if (!brand || !keysMatch(brand.accessKey, key)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

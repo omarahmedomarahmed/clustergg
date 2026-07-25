@@ -29,38 +29,55 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
         <img src={theme.bgUrl} alt="" width={CARD_W} height={CARD_H}
           style={{ position: "absolute", inset: 0, width: CARD_W, height: CARD_H, objectFit: "cover" }} />
       ) : null}
-      <div style={{ position: "absolute", inset: 0, display: "flex", background: theme.bgUrl ? veil(theme.dim ?? 62) : VOID }} />
+      {/* Readability scrim. A flat veil isn't enough over real artwork — a
+          bright patch anywhere behind a line of text loses that line. So it's
+          a flat veil PLUS gradients that darken hardest exactly where the
+          content sits: the left column and the bottom strip. */}
+      {/* Sized explicitly, not with `inset: 0`: Satori lays out absolutely
+          positioned elements through Yoga, which gives an empty div zero size
+          unless it is told otherwise — so an inset-only overlay silently
+          renders as nothing and the artwork comes through at full brightness. */}
+      <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: theme.bgUrl ? veil(theme.dim ?? 62) : VOID }} />
+      {theme.bgUrl ? (
+        <>
+          <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: "linear-gradient(90deg, rgba(4,5,26,0.94) 0%, rgba(4,5,26,0.78) 48%, rgba(4,5,26,0.46) 100%)" }} />
+          <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: "linear-gradient(180deg, rgba(4,5,26,0.62) 0%, rgba(4,5,26,0.30) 38%, rgba(4,5,26,0.90) 100%)" }} />
+        </>
+      ) : null}
       {/* accent glows */}
       <div style={{ position: "absolute", top: -220, left: -160, width: 720, height: 720, borderRadius: 999, display: "flex", background: `${theme.accent}22` }} />
       <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: `${theme.accent2}1c` }} />
       {/* top accent bar */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
-      {/* The astronaut. Drawn BEFORE the content so a dense card (a full
-          leaderboard, a long standings list) overlaps it instead of colliding
-          with it — it's brand furniture, not a element competing for space. */}
+      {/* The astronaut, bottom-LEFT and behind the content. It shares the
+          bottom strip with the logo but sits at the opposite end, so the two
+          pieces of brand furniture can never sit on top of each other. */}
       {theme.astronautUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={theme.astronautUrl} alt="" height={210}
-          style={{ position: "absolute", right: 34, bottom: 62, height: 210, objectFit: "contain", opacity: 0.92 }} />
+        <img src={theme.astronautUrl} alt="" height={200}
+          style={{ position: "absolute", left: 10, bottom: 0, height: 200, objectFit: "contain", opacity: 0.85 }} />
       ) : null}
-      <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", padding: "48px 56px" }}>
+      {/* Content reserves the bottom-right corner so it can't run under the
+          logo — the logo is drawn last and nothing is allowed to cover it. */}
+      <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", padding: "44px 190px 56px 56px" }}>
         {children}
       </div>
-      {/* The real logo mark, bottom-right. Falls back to the wordmark only when
-          no logo is configured, so a card is never unbranded. */}
-      <div style={{ position: "absolute", bottom: 26, right: 44, display: "flex", alignItems: "center", gap: 10 }}>
+      {/* The real logo mark, bottom-right, big, drawn on top of everything.
+          Falls back to the wordmark only when no logo is configured, so a card
+          is never unbranded. */}
+      <div style={{ position: "absolute", bottom: 24, right: 36, display: "flex", alignItems: "center", gap: 12 }}>
         {theme.markUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={theme.markUrl} alt="" width={42} height={42}
-            style={{ width: 42, height: 42, borderRadius: 12, objectFit: "contain" }} />
+          <img src={theme.markUrl} alt="" width={104} height={104}
+            style={{ width: 104, height: 104, borderRadius: 24, objectFit: "contain" }} />
         ) : (
           <>
-            <div style={{ width: 26, height: 26, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: 17, fontWeight: 700, color: "#fff" }}>C</div>
-            <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: 2, color: INK, opacity: 0.85 }}>CLUSTER</div>
+            <div style={{ width: 60, height: 60, borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: 38, fontWeight: 700, color: "#fff" }}>C</div>
+            <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: 3, color: INK }}>CLUSTER</div>
           </>
         )}
       </div>
-      {corner ? <div style={{ position: "absolute", top: 38, right: 44, display: "flex" }}>{corner}</div> : null}
+      {corner ? <div style={{ position: "absolute", top: 34, right: 40, display: "flex" }}>{corner}</div> : null}
     </div>
   );
 }
@@ -354,10 +371,26 @@ function ChallengeBody(d: ChallengeCard) {
   const ends = new Date(d.endsAt);
   const days = Math.max(0, Math.ceil((ends.getTime() - Date.now()) / 86400000));
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
-    ) : undefined}>
+    <Frame theme={t} corner={(
+      // Trophies live top-RIGHT, stacked under the game logo. They used to sit
+      // at the bottom of the content row, which is where the mascot stands —
+      // the prize is the reason to enter and can't be the thing that collides.
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+        {d.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={d.logoUrl} alt="" width={64} height={64} style={{ width: 64, height: 64, borderRadius: 16, objectFit: "cover" }} />
+        ) : null}
+        {d.trophies.slice(0, 3).map((tr, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", fontSize: 18, fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
+              {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
+            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={tr.imageUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
+          </div>
+        ))}
+      </div>
+    )}>
       <div style={{ display: "flex", gap: 12 }}>
         <Pill color="#34d399" bg="rgba(52,211,153,0.14)">
           <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#34d399" }} />
@@ -393,7 +426,7 @@ function ChallengeBody(d: ChallengeCard) {
       ) : null}
 
       <div style={{ display: "flex", gap: 22, marginTop: 18, flex: 1 }}>
-        {/* Standings */}
+        {/* Standings — full width now that the trophies moved to the corner. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
           <div style={{ fontSize: 16, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>
             {d.ended ? "FINAL STANDINGS" : "STANDINGS"}
@@ -411,20 +444,7 @@ function ChallengeBody(d: ChallengeCard) {
           )}
         </div>
 
-        {/* Trophies — what the podium actually takes home. */}
-        {d.trophies.length ? (
-          <div style={{ display: "flex", gap: 14, alignItems: "flex-end" }}>
-            {d.trophies.slice(0, 3).map((tr, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={tr.imageUrl} alt="" width={92} height={92} style={{ width: 92, height: 92, objectFit: "contain" }} />
-                <div style={{ fontSize: 18, fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
-                  {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : null}
+
       </div>
     </Frame>
   );
@@ -641,4 +661,28 @@ export async function renderCard(data: CardData): Promise<ImageResponse> {
 export async function renderCardBuffer(data: CardData): Promise<Buffer> {
   const res = await renderCard(data);
   return Buffer.from(await res.arrayBuffer());
+}
+
+// A PNG of a photographic background is 2-3 MB. That's slow for Discord to
+// fetch, and Blob transfer is the tightest resource we have — so past this,
+// the card is re-encoded as JPEG, which takes the same picture to a few
+// hundred KB. Flat, graphic cards stay PNG, where it's the better format.
+const JPEG_OVER_BYTES = 900_000;
+
+export type CardImage = { body: Buffer; contentType: string; ext: "png" | "jpg" };
+
+export async function renderCardImage(data: CardData): Promise<CardImage> {
+  const png = await renderCardBuffer(data);
+  if (png.byteLength <= JPEG_OVER_BYTES) {
+    return { body: png, contentType: "image/png", ext: "png" };
+  }
+  try {
+    const sharp = (await import("sharp")).default;
+    const jpg = await sharp(png).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+    // Only take the trade if it actually paid off.
+    if (jpg.byteLength < png.byteLength) {
+      return { body: jpg, contentType: "image/jpeg", ext: "jpg" };
+    }
+  } catch { /* no transcoder — a big PNG still works, it's just heavier */ }
+  return { body: png, contentType: "image/png", ext: "png" };
 }

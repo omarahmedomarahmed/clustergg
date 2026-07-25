@@ -14,6 +14,7 @@ import Countdown from "@/components/Countdown";
 import LiveChallengeBoard from "@/components/LiveChallengeBoard";
 import { joinChallenge } from "@/app/actions/social";
 import { joinLocked } from "@/lib/challenges";
+import { recordServerEvent } from "@/lib/server-portal";
 import { getQuestCompletions } from "@/lib/quests";
 
 export const dynamic = "force-dynamic";
@@ -112,6 +113,14 @@ export default async function ChallengePage({
     : [];
   const ownerServer = holders.find((h) => h.guildId === challenge.guildId)?.name
     ?? holders[0]?.name ?? null;
+
+  // Somebody looked at a server's competition. That's the first step of the
+  // only funnel a server owner is paid in, so it's recorded here rather than
+  // inferred later. Fire-and-forget: analytics must never fail a page.
+  if (keyRequired && challenge.guildId) {
+    void recordServerEvent(challenge.guildId, "challenge_view", { challengeId: challenge.id })
+      .catch(() => {});
+  }
 
   const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const embed = challenge.heroType === "stream" && challenge.heroUrl ? streamEmbed(challenge.heroUrl) : null;

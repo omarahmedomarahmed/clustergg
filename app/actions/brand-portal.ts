@@ -4,13 +4,19 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
+import { keysMatch, hasPortalSession } from "@/lib/portal-auth";
 
 // The brand portal is unauthenticated but gated by the brand's access key. Every
 // action re-validates the key against the brand before doing anything.
 async function requireBrand(brandId: string, key: string) {
   const db = await getDb();
   const [brand] = await db.select().from(schema.brands).where(eq(schema.brands.id, brandId)).limit(1);
-  if (!brand || !brand.accessKey || brand.accessKey !== key) throw new Error("Invalid brand access key");
+  if (!brand) throw new Error("Invalid brand access key");
+  // Accept either the key itself or a session already granted for THIS brand.
+  // The comparison is constant-time: a plain `!==` leaks a short shared secret
+  // one byte at a time to anyone willing to measure.
+  const ok = keysMatch(brand.accessKey, key) || (await hasPortalSession("brand", brand.id));
+  if (!ok) throw new Error("Invalid brand access key");
   return { db, brand };
 }
 

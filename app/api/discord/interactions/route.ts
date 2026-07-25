@@ -16,6 +16,8 @@ import { submitChallengeRequest } from "@/lib/challenge-requests";
 import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS } from "@/lib/providers/registry";
 import { logCommand } from "@/lib/discord/guilds";
+import { ensurePortal } from "@/lib/server-portal";
+import { dmUser } from "@/lib/discord/rest";
 import { castDiscordVote } from "@/lib/identity";
 import { inGameNameChoices } from "@/lib/gamer-lookup";
 import { eq } from "drizzle-orm";
@@ -476,6 +478,37 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
       });
       return;
     }
+  }
+
+  // The portal key opens a server's whole dashboard, so it is DM'd, never
+  // posted. Discord refuses DMs from people who have them closed, and the
+  // difference matters to the person waiting for it — so say which happened.
+  if (target.screen === "portal-key" && i.guild_id) {
+    const portal = await ensurePortal(i.guild_id);
+    const sent = portal
+      ? await dmUser(ctx.discordId, {
+        embeds: [{
+          title: "Your Cluster server portal",
+          description: [
+            `${siteUrl()}/servers/${portal.slug}`,
+            "",
+            `Portal key: **\`${portal.key}\`**`,
+            "",
+            "Keep this private — it opens your growth numbers, your challenges, the traffic we send you, and everything your members do with the bot.",
+          ].join("\n"),
+          color: 0x8b5cf6,
+        }],
+      }).catch(() => false)
+      : false;
+    await editOriginal(i.token, {
+      embeds: [{
+        color: sent ? 0x34d399 : 0xf59e0b,
+        description: sent
+          ? "Sent — check your DMs."
+          : "I couldn't DM you. Turn on direct messages from server members, then try again.",
+      }],
+    });
+    return;
   }
 
   // Voting from Discord is deliberate: requiring a sign-up before a server can

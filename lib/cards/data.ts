@@ -76,9 +76,14 @@ export async function profileCard(slug: string): Promise<CardData | null> {
       // The gamer's OWN art, in the order they'd expect to see it: the page
       // background they picked in the profile builder, then their banner, then
       // the platform default. A shared card should look like their profile.
-      bgUrl: slimImg(theme.bgImage ?? null, 800000)
-        || slimImg(user.bannerUrl, 800000)
-        || bg.bgUrl,
+      //
+      // Deliberately NOT run through `slimImg`. That guard exists to keep
+      // megabyte data URLs out of page HTML, and a real uploaded background is
+      // 2-10 MB — so it silently discarded the art of every gamer who had
+      // actually customised their profile, which is exactly the group whose
+      // card is worth sharing. The renderer decodes and downscales this to the
+      // 1200px the card uses, so size is its problem to solve, not ours.
+      bgUrl: theme.bgImage || user.bannerUrl || bg.bgUrl,
       dim: bg.dim,
     },
   };
