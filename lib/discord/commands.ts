@@ -63,7 +63,7 @@ export const CLUSTER_COMMAND = {
       name: "server", description: "Server owners: your growth toward unlocking ad revenue", type: OptionType.SubCommand,
     },
     {
-      name: "admin", description: "Server admins: channel, announcements and ad settings", type: OptionType.SubCommand,
+      name: "admin", description: "Server admins: run challenges for your community", type: OptionType.SubCommand,
     },
     {
       name: "help", description: "What Cluster is and everything this bot can do", type: OptionType.SubCommand,

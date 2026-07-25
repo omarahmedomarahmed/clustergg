@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, gte, isNotNull, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { getContent } from "@/lib/cms";
@@ -266,4 +266,129 @@ export async function logCommand(entry: {
       latencyMs: entry.latencyMs ?? 0,
     });
   } catch { /* analytics must never break an interaction */ }
+}
+
+export type UsageRow = { label: string; uses: number; avgMs: number };
+export type DayRow = { day: string; uses: number };
+
+export type CommandAnalytics = {
+  total: number;
+  gamers: number;
+  avgMs: number;
+  slowest: number;
+  byCommand: UsageRow[];
+  byScreen: UsageRow[];
+  byDay: DayRow[];
+};
+
+const EMPTY_ANALYTICS: CommandAnalytics = {
+  total: 0, gamers: 0, avgMs: 0, slowest: 0, byCommand: [], byScreen: [], byDay: [],
+};
+
+// What people actually do with the bot. Latency is in here on purpose: Discord
+// kills an interaction at 3 seconds, so a command creeping toward that is a
+// live incident, not a curiosity — and this is the only place it's visible.
+export async function commandAnalytics(guildId: string | null = null, days = 14): Promise<CommandAnalytics> {
+  try {
+    const db = await getDb();
+    const t = schema.discordCommandLogs;
+    const since = new Date(Date.now() - days * 86400000);
+    const scope = guildId
+      ? and(gte(t.createdAt, since), eq(t.guildId, guildId))
+      : gte(t.createdAt, since);
+
+    const [totals, byCommand, byScreen, byDay] = await Promise.all([
+      db.select({
+        uses: sql<number>`count(*)`,
+        gamers: sql<number>`count(distinct ${t.discordId})`,
+        avgMs: sql<number>`coalesce(avg(${t.latencyMs}), 0)`,
+        slowest: sql<number>`coalesce(max(${t.latencyMs}), 0)`,
+      }).from(t).where(scope),
+      db.select({
+        label: t.command,
+        uses: sql<number>`count(*)`,
+        avgMs: sql<number>`coalesce(avg(${t.latencyMs}), 0)`,
+      }).from(t).where(scope).groupBy(t.command).orderBy(sql`count(*) desc`).limit(20),
+      db.select({
+        label: sql<string>`coalesce(${t.screen}, '—')`,
+        uses: sql<number>`count(*)`,
+        avgMs: sql<number>`coalesce(avg(${t.latencyMs}), 0)`,
+      }).from(t).where(and(scope, isNotNull(t.screen))).groupBy(t.screen).orderBy(sql`count(*) desc`).limit(20),
+      db.select({
+        day: sql<string>`to_char(${t.createdAt}, 'YYYY-MM-DD')`,
+        uses: sql<number>`count(*)`,
+      }).from(t).where(scope).groupBy(sql`to_char(${t.createdAt}, 'YYYY-MM-DD')`).orderBy(sql`1`),
+    ]);
+
+    const num = (v: unknown) => Math.round(Number(v ?? 0));
+    return {
+      total: num(totals[0]?.uses),
+      gamers: num(totals[0]?.gamers),
+      avgMs: num(totals[0]?.avgMs),
+      slowest: num(totals[0]?.slowest),
+      byCommand: byCommand.map((r) => ({ label: r.label, uses: num(r.uses), avgMs: num(r.avgMs) })),
+      byScreen: byScreen.map((r) => ({ label: r.label, uses: num(r.uses), avgMs: num(r.avgMs) })),
+      byDay: byDay.map((r) => ({ day: r.day, uses: num(r.uses) })),
+    };
+  } catch { return EMPTY_ANALYTICS; }
+}
+
+export type GuildMemberRow = {
+  userId: string; displayName: string; slug: string; avatarUrl: string | null;
+  joinedAt: Date | null; firstLinkedAt: Date | null; attributedVia: string;
+};
+
+export type GuildDetail = {
+  stats: GuildStats;
+  row: GuildRow | null;
+  members: GuildMemberRow[];
+  challengeJoins: number;
+  adPosts: number;
+  adImpressions: number;
+  commands: CommandAnalytics;
+};
+
+// Everything about one server, for the admin drill-down. Each piece degrades on
+// its own — a server whose ad tables are empty still shows its members.
+export async function guildDetail(guildId: string, days = 14): Promise<GuildDetail | null> {
+  const stats = await guildStats(guildId);
+  if (!stats) return null;
+
+  const db = await getDb();
+  const members = await db.select({
+    userId: schema.discordGuildMembers.userId,
+    joinedAt: schema.discordGuildMembers.joinedAt,
+    firstLinkedAt: schema.discordGuildMembers.firstLinkedAt,
+    attributedVia: schema.discordGuildMembers.attributedVia,
+    displayName: schema.users.displayName,
+    slug: schema.users.slug,
+    avatarUrl: schema.users.avatarUrl,
+  })
+    .from(schema.discordGuildMembers)
+    .innerJoin(schema.users, eq(schema.discordGuildMembers.userId, schema.users.id))
+    .where(eq(schema.discordGuildMembers.guildId, guildId))
+    .orderBy(sql`${schema.discordGuildMembers.firstLinkedAt} desc nulls last`)
+    .limit(50)
+    .catch(() => []);
+
+  const count = async (q: Promise<{ n: unknown }[]>) => {
+    try { return Math.round(Number((await q)[0]?.n ?? 0)); } catch { return 0; }
+  };
+
+  const [row, challengeJoins, adPosts, adImpressions, commands] = await Promise.all([
+    getGuildRow(guildId),
+    // Challenge entries by this server's attributed members — the funnel metric
+    // that proves the bot converts, not just that people press buttons.
+    count(db.select({ n: sql`count(*)` })
+      .from(schema.challengeParticipants)
+      .innerJoin(schema.discordGuildMembers, eq(schema.challengeParticipants.userId, schema.discordGuildMembers.userId))
+      .where(eq(schema.discordGuildMembers.guildId, guildId))),
+    count(db.select({ n: sql`count(*)` })
+      .from(schema.discordAdPosts).where(eq(schema.discordAdPosts.guildId, guildId))),
+    count(db.select({ n: sql`count(*)` })
+      .from(schema.adImpressions).where(eq(schema.adImpressions.guildId, guildId))),
+    commandAnalytics(guildId, days),
+  ]);
+
+  return { stats, row, members, challengeJoins, adPosts, adImpressions, commands };
 }

@@ -422,6 +422,13 @@ export async function saveChallenge(formData: FormData) {
     // be invisible everywhere, so it falls back to public rather than vanishing.
     visibility: String(formData.get("guildId") ?? "").trim() && String(formData.get("visibility") ?? "") === "private" ? "private" : "public",
     guildId: String(formData.get("guildId") ?? "").trim() || null,
+    // Every server the challenge runs in, owner first. All of them get the
+    // announcement and the key; all of them appear on the challenge page.
+    guildIds: (() => {
+      const owner = String(formData.get("guildId") ?? "").trim();
+      const also = formData.getAll("alsoGuildIds").map(String).map((s) => s.trim()).filter(Boolean);
+      return [...new Set([owner, ...also].filter(Boolean))];
+    })(),
     accessKey: String(formData.get("accessKey") ?? "").trim() || null,
     announceHype: formData.get("announceHype") === "on",
     startAt,

@@ -28,17 +28,22 @@ function defaultChannel(): string | null {
 // Where should this announcement go? A server-gated challenge needs both sides
 // of this: the message carrying the entry key goes ONLY to the server that owns
 // it, and the "this exists, come watch" message goes to everyone EXCEPT them.
-type Scope = { only?: string | null; except?: string | null };
+type Scope = { only?: string[] | string | null; except?: string[] | string | null };
+
+const asList = (v: Scope["only"]): string[] =>
+  v == null ? [] : Array.isArray(v) ? v.filter(Boolean) : [v];
 
 async function targets(scope: Scope = {}): Promise<string[]> {
+  const only = asList(scope.only);
+  const except = new Set(asList(scope.except));
   const out: string[] = [];
   const fallback = defaultChannel();
-  if (fallback && !scope.only) out.push(fallback);
+  if (fallback && !only.length) out.push(fallback);
   try {
     const guilds = await announcingGuilds();
     for (const g of guilds) {
-      if (scope.only && g.guildId !== scope.only) continue;
-      if (scope.except && g.guildId === scope.except) continue;
+      if (only.length && !only.includes(g.guildId)) continue;
+      if (except.has(g.guildId)) continue;
       if (g.channelId) out.push(g.channelId);
     }
   } catch { /* fall back to whatever we already have */ }
@@ -110,6 +115,7 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
     embeds: [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }],
     components: rows([
       navButton("Join too", frame("challenge", challengeId), [frame("home")], ButtonStyle.Success, "🏆"),
+      navButton("START HERE", frame("planets"), [frame("home")], ButtonStyle.Primary, "🚀"),
       linkButton("See standings", url, "📊"),
     ]),
   });
@@ -135,25 +141,33 @@ export async function announceChallengeLaunched(challengeId: string): Promise<vo
   if (!card.data || card.data.kind !== "challenge") return;
 
   const embeds = [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }];
+  // An announcement is the first thing most people ever see from this bot, so
+  // it carries the whole path: enter this, or start from the beginning.
   const components = rows([
     navButton("Join now", frame("challenge", challengeId), [frame("home")], ButtonStyle.Success, "🏆"),
+    navButton("Link a game account", frame("link", ""), [frame("home")], ButtonStyle.Primary, "🎮"),
+    navButton("START HERE", frame("planets"), [frame("home")], ButtonStyle.Secondary, "🚀"),
     linkButton("Details", url, "🔗"),
   ]);
 
-  const gated = ch.visibility === "private" && !!ch.guildId && !!ch.accessKey;
+  // Every server this challenge was launched on holds the key. `guildId` is the
+  // one it belongs to; `guildIds` is the full set staff have added it to.
+  const holders = [...new Set([ch.guildId, ...(ch.guildIds ?? [])].filter((g): g is string => !!g))];
+  const gated = ch.visibility === "private" && holders.length > 0 && !!ch.accessKey;
+
   if (gated) {
     await announce({
       content: [
-        `${ch.announceHype ? "@here " : ""}**${ch.title}** is live, and it's yours — this server is the only one holding the key.`,
+        `${ch.announceHype ? "@here " : ""}**${ch.title}** is live, and it's yours — this server holds the key.`,
         `Entry key: **\`${ch.accessKey}\`** — tap Join now, or enter it on the site.`,
       ].join("\n"),
       embeds, components,
-    }, { only: ch.guildId });
+    }, { only: holders });
 
     await announce({
-      content: `**${ch.title}** is live on **${ch.game}** — a server challenge. Anyone can follow the standings; entering needs that server's key.`,
+      content: `**${ch.title}** is live on **${ch.game}** — a server challenge. Anyone can follow the standings; entering needs a key from the server running it.`,
       embeds, components,
-    }, { except: ch.guildId });
+    }, { except: holders });
     return;
   }
 

@@ -30,7 +30,7 @@ export type ChallengeEdit = {
   trophyId: string | null; status: string; prizeDescription: string | null;
   prizes?: { first?: string[]; second?: string[]; third?: string[] } | null;
   gateQuestId: string | null; gateMinBadges: number;
-  visibility: string; guildId: string | null; accessKey: string | null; announceHype: boolean;
+  visibility: string; guildId: string | null; guildIds?: string[]; accessKey: string | null; announceHype: boolean;
 };
 
 // Points recommendation: reward the primary "win-like" metric heavily, add a
@@ -264,7 +264,7 @@ export default function ChallengeBuilder({
             <div className="flex flex-wrap gap-2">
               {[
                 { v: "public", label: "Public", note: "Announced in every server with the bot" },
-                { v: "private", label: "Server-only", note: "One server, hidden on the web" },
+                { v: "private", label: "Server-gated", note: "Public to watch, key needed to enter" },
               ].map((o) => (
                 <button
                   key={o.v} type="button" onClick={() => setVisibility(o.v)}
@@ -288,6 +288,32 @@ export default function ChallengeBuilder({
                   {guilds.length === 0 && (
                     <div className="text-[10px] text-amber-300 mt-1">No servers have installed the bot yet.</div>
                   )}
+                  <div className="text-[10px] text-muted mt-1">
+                    Its logo leads on the challenge page, and it can pause or end the challenge itself.
+                  </div>
+                </div>
+
+                {/* A challenge can run across several servers at once. Each one
+                    gets the announcement and the same key, and appears on the
+                    challenge page with an invite — which is what turns our
+                    audience into traffic for them. */}
+                <div>
+                  <div className="text-[11px] text-muted mb-1">Also run it in these servers (optional)</div>
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-violet-400/20 p-2 space-y-1">
+                    {guilds.filter((g) => g.guildId !== guildId).map((g) => (
+                      <label key={g.guildId} className="flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox" name="alsoGuildIds" value={g.guildId}
+                          defaultChecked={(challenge?.guildIds ?? []).includes(g.guildId)}
+                          className="accent-violet-500"
+                        />
+                        {g.name || g.guildId}
+                      </label>
+                    ))}
+                    {guilds.filter((g) => g.guildId !== guildId).length === 0 && (
+                      <div className="text-[10px] text-muted">No other servers yet.</div>
+                    )}
+                  </div>
                 </div>
                 <div>
                   <div className="text-[11px] text-muted mb-1">Access key — needed to open it on the web</div>
@@ -300,7 +326,7 @@ export default function ChallengeBuilder({
                 </div>
                 <label className="flex items-center gap-2 text-xs">
                   <input type="checkbox" name="announceHype" defaultChecked={challenge?.announceHype ?? true} className="accent-violet-500" />
-                  Announce it loudly in that server (pinned, @here if allowed)
+                  Announce it loudly in those servers (@here if allowed)
                 </label>
               </>
             )}

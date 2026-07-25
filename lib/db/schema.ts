@@ -271,6 +271,11 @@ export const challenges = pgTable("challenges", {
   // key. This is the thing a server owner gets that no other server has.
   visibility: text("visibility").notNull().default("public"), // public | private
   guildId: text("guild_id"),
+  // A private challenge can run across SEVERAL servers. `guildId` stays the
+  // server it belongs to (the one that requested it, whose logo leads); this is
+  // every server it's been launched on, all of which get the key and the
+  // announcement. Empty means "just guildId".
+  guildIds: jsonb("guild_ids").$type<string[]>().notNull().default([]),
   accessKey: text("access_key"),
   announceHype: boolean("announce_hype").notNull().default(false),
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
@@ -670,6 +675,10 @@ export const discordGuilds = pgTable("discord_guilds", {
   adOptIn: boolean("ad_opt_in").notNull().default(true),
   adUnlockedAt: timestamp("ad_unlocked_at", { withTimezone: true, mode: "date" }),
   revenueSharePct: integer("revenue_share_pct").notNull().default(70),
+  // Public invite to this server. A private challenge is visible to everyone,
+  // so the only way to GET the key is to be in the server — which makes this
+  // link the thing that turns our challenge pages into traffic for them.
+  inviteUrl: text("invite_url"),
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
   installedAt: now("installed_at"),
   removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
@@ -704,6 +713,41 @@ export const discordCommandLogs = pgTable("discord_command_logs", {
   latencyMs: integer("latency_ms").notNull().default(0),
   createdAt: now("created_at"),
 }, (t) => [index("dcl_guild_idx").on(t.guildId, t.createdAt)]);
+
+// A server owner asking us to run a challenge for their community.
+//
+// This is the engine of the growth loop: an owner needs linked gamers to unlock
+// revenue, and the way to get them is a competition their members actually want
+// to enter. They build it here — game, dates, trophies, prize value — and staff
+// approve it. Approval is what creates the real `challenges` row, generates the
+// access key, and announces it to their server.
+export const challengeRequests = pgTable("challenge_requests", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  requestedByDiscordId: text("requested_by_discord_id"),
+  requestedByUserId: text("requested_by_user_id"),
+  game: text("game").notNull(),
+  provider: text("provider").notNull(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  format: text("format").notNull().default("top3"),
+  metric: text("metric"),                  // which tracked stat decides it
+  days: integer("days").notNull().default(7),
+  // What the owner is putting up. `prizeValue` is their own money, in whole
+  // currency units — we record it so staff can sanity-check a request before
+  // it goes live with our name on it.
+  prizeValue: integer("prize_value").notNull().default(0),
+  prizeCurrency: text("prize_currency").notNull().default("USD"),
+  prizeDescription: text("prize_description"),
+  // Trophies picked from OUR catalogue, per placement.
+  prizes: jsonb("prizes").$type<{ first?: string[]; second?: string[]; third?: string[] }>(),
+  status: text("status").notNull().default("pending"), // pending | approved | rejected
+  reviewNote: text("review_note"),
+  reviewedBy: text("reviewed_by"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
+  challengeId: text("challenge_id"),       // set once approved
+  createdAt: now("created_at"),
+}, (t) => [index("creq_guild_idx").on(t.guildId, t.createdAt), index("creq_status_idx").on(t.status)]);
 
 // Ads the bot has posted into a server, linked to the existing ad pipeline.
 export const discordAdPosts = pgTable("discord_ad_posts", {

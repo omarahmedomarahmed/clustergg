@@ -144,6 +144,71 @@ export async function challengeGate(challengeId: string): Promise<ChallengeGate>
   } catch { return open; }
 }
 
+// ===== Running a challenge: pause, resume, end =====
+
+// Who is allowed to change a challenge's state.
+//
+// Staff can act on anything. A server owner can act only on a challenge that
+// belongs to THEIR server — that's the deal: they requested it, they run it,
+// and they can't touch anyone else's.
+export type Controller = { staff: true } | { staff: false; guildId: string };
+
+export type ControlResult =
+  | { ok: true; status: string; title: string }
+  | { ok: false; reason: "not_found" | "forbidden" | "bad_state" | "error" };
+
+export function controlsChallenge(
+  challenge: { guildId?: string | null; guildIds?: string[] | null },
+  by: Controller,
+): boolean {
+  if (by.staff) return true;
+  const holders = [challenge.guildId, ...(challenge.guildIds ?? [])].filter(Boolean);
+  // Only the server it BELONGS to can run it — a server it was merely also
+  // launched on is a participant, not an owner.
+  return challenge.guildId === by.guildId && holders.includes(by.guildId);
+}
+
+export async function setChallengeState(
+  challengeId: string,
+  next: "paused" | "active" | "completed",
+  by: Controller,
+): Promise<ControlResult> {
+  try {
+    const db = await getDb();
+    const [c] = await db.select().from(schema.challenges)
+      .where(eq(schema.challenges.id, challengeId)).limit(1);
+    if (!c) return { ok: false, reason: "not_found" };
+    if (!controlsChallenge(c, by)) return { ok: false, reason: "forbidden" };
+    if (c.status === "completed") return { ok: false, reason: "bad_state" };
+
+    if (next === "completed") {
+      const res = await closeChallenge(challengeId);
+      return res.ok
+        ? { ok: true, status: "completed", title: c.title }
+        : { ok: false, reason: "error" };
+    }
+
+    // Resuming a challenge whose window already elapsed would end it again on
+    // the next sweep, so give it back the time it was paused for.
+    const patch: Record<string, unknown> = { status: next };
+    if (next === "active" && c.endAt.getTime() <= Date.now()) {
+      patch.endAt = new Date(Date.now() + 7 * 86400000);
+    }
+    await db.update(schema.challenges).set(patch).where(eq(schema.challenges.id, challengeId));
+    return { ok: true, status: next, title: c.title };
+  } catch { return { ok: false, reason: "error" }; }
+}
+
+// Every challenge a server runs or takes part in — the owner's dashboard.
+export async function challengesForGuild(guildId: string) {
+  try {
+    const db = await getDb();
+    const rows = await db.select().from(schema.challenges)
+      .orderBy(desc(schema.challenges.createdAt)).limit(200);
+    return rows.filter((c) => c.guildId === guildId || (c.guildIds ?? []).includes(guildId));
+  } catch { return []; }
+}
+
 // ===== Ending a challenge =====
 
 export type StandingRow = {

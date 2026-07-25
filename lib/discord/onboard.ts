@@ -61,6 +61,10 @@ export async function postGuides(channelId: string): Promise<{ posted: number; p
 
   const intro = await postMessage(channelId, {
     content: "**Welcome to Cluster.** Everything you need is pinned right here — one guide per topic. Type `/cluster` any time.",
+    components: rows([
+      navButton("START HERE", frame("planets"), [frame("home")], ButtonStyle.Primary, "🚀"),
+      navButton("Link a game account", frame("link", ""), [frame("home")], ButtonStyle.Success, "🎮"),
+    ]),
   });
   if (intro.ok) {
     posted++;
@@ -76,8 +80,13 @@ export async function postGuides(channelId: string): Promise<{ posted: number; p
         color: embedColor(data && "theme" in data ? data.theme.accent : null),
         image: { url },
       }],
+      // A pinned guide is read months after it was posted, by someone who has
+      // never typed a slash command. So every one of them carries the two
+      // buttons that actually start the funnel: pick a game, link an account.
       components: rows([
-        navButton("Open in bot", frame("guide", t.topic), [frame("home")], ButtonStyle.Primary, "📖"),
+        navButton("START HERE", frame("planets"), [frame("home")], ButtonStyle.Primary, "🚀"),
+        navButton("Link a game account", frame("link", ""), [frame("home")], ButtonStyle.Success, "🎮"),
+        navButton("Open in bot", frame("guide", t.topic), [frame("home")], ButtonStyle.Secondary, "📖"),
         linkButton("Open Cluster", siteUrl(), "🔗"),
       ]),
     });
@@ -103,13 +112,18 @@ async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: 
         "**What you get**",
         `Run \`/cluster server\` any time to see how many of your members have joined Cluster and linked a game. At **${threshold.toLocaleString()} linked gamers your server unlocks ad revenue share** — you earn from every ad Cluster runs in your community.`,
         "",
-        "You can also request **private, server-only challenges** that no other server can see.",
+        "**How to get there fastest**",
+        "Run `/cluster admin` and request a challenge for your community. You pick the game, the length, the prize and the trophies; we review it, then post it here with an entry key only your server has. Your members link a game to enter — which is exactly the number that unlocks your revenue share.",
+        "",
+        "The challenge itself is public on Cluster: everyone can see your standings, your trophies and your server — but only people with your key can enter. That puts your community in front of our whole audience.",
       ].join("\n"),
       color: embedColor("#8b5cf6"),
     }],
     components: rows([
+      navButton("Request a challenge", frame("admin", ""), [frame("home")], ButtonStyle.Primary, "🏆"),
+      navButton("Your growth so far", frame("server"), [frame("home")], ButtonStyle.Secondary, "📈"),
       linkButton("Open Cluster", siteUrl(), "🔗"),
-      linkButton("Server owner guide", `${siteUrl()}/discord-bot`, "📈"),
+      linkButton("Server owner guide", `${siteUrl()}/discord-bot`, "📖"),
     ]),
   });
 }
