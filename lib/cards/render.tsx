@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
-import { toEmbeddable } from "@/lib/cards/img";
+import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import type {
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
@@ -17,6 +17,10 @@ export const CARD_H = 630;
 const INK = "#f2f3ff";
 const MUTED = "#9aa0c3";
 const VOID = "#04051a";
+
+// Avatars, game logos, champion and match icons are drawn small. Resolving them
+// at full card width costs decode time for pixels nobody sees.
+const ICON = { maxWidth: 160 } as const;
 
 const veil = (dim = 62) => `rgba(4,5,26,${Math.max(0, Math.min(100, dim)) / 100})`;
 
@@ -579,17 +583,37 @@ async function preparedBrand(): Promise<{ astronautUrl: string | null; markUrl: 
 }
 
 async function prepareCard(d: CardData): Promise<CardData> {
-  const [body, brand] = await Promise.all([prepareBody(d), preparedBrand()]);
+  // The whole image step gets one deadline. Past it the card is drawn with
+  // whatever resolved — a person who tapped a button gets a card, not a spinner
+  // that eventually times out in Discord's proxy.
+  const [body, brand] = await Promise.all([
+    withDeadline(prepareBody(d), d),
+    withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
+  ]);
   return { ...body, theme: { ...body.theme, ...brand } } as CardData;
 }
 
+// The background, with fallbacks. Tried in order and stops at the first that
+// actually produces drawable bytes — a gamer's custom art failing to load is a
+// reason to show the next-best image, not to show none.
+async function resolveBackground(theme: CardTheme): Promise<string | null> {
+  const seen = new Set<string>();
+  for (const candidate of [theme.bgUrl, ...(theme.bgFallbacks ?? [])]) {
+    if (!candidate || seen.has(candidate)) continue;
+    seen.add(candidate);
+    const out = await toEmbeddable(candidate);
+    if (out) return out;
+  }
+  return null;
+}
+
 async function prepareBody(d: CardData): Promise<CardData> {
-  const bg = toEmbeddable(d.theme.bgUrl);
+  const bg = resolveBackground(d.theme);
 
   switch (d.kind) {
     case "profile": {
       const [bgUrl, avatarUrl, ...logos] = await Promise.all([
-        bg, toEmbeddable(d.avatarUrl), ...d.accounts.map((a) => toEmbeddable(a.logoUrl)),
+        bg, toEmbeddable(d.avatarUrl, ICON), ...d.accounts.map((a) => toEmbeddable(a.logoUrl, ICON)),
       ]);
       return {
         ...d, avatarUrl,
@@ -599,7 +623,7 @@ async function prepareBody(d: CardData): Promise<CardData> {
     }
     case "leaderboard": {
       const [bgUrl, logoUrl, ...avatars] = await Promise.all([
-        bg, toEmbeddable(d.logoUrl), ...d.rows.map((r) => toEmbeddable(r.avatarUrl)),
+        bg, toEmbeddable(d.logoUrl, ICON), ...d.rows.map((r) => toEmbeddable(r.avatarUrl, ICON)),
       ]);
       return {
         ...d, logoUrl,
@@ -609,7 +633,7 @@ async function prepareBody(d: CardData): Promise<CardData> {
     }
     case "challenge": {
       const [bgUrl, logoUrl, ...trophies] = await Promise.all([
-        bg, toEmbeddable(d.logoUrl), ...d.trophies.map((t) => toEmbeddable(t.imageUrl)),
+        bg, toEmbeddable(d.logoUrl, ICON), ...d.trophies.map((t) => toEmbeddable(t.imageUrl, { maxWidth: 240 })),
       ]);
       return {
         ...d, logoUrl,
@@ -622,9 +646,12 @@ async function prepareBody(d: CardData): Promise<CardData> {
       const champs = d.champions ?? [];
       const matches = d.matches ?? [];
       const [bgUrl, logoUrl, avatarUrl, gameAvatarUrl, ...rest] = await Promise.all([
-        bg, toEmbeddable(d.logoUrl), toEmbeddable(d.avatarUrl), toEmbeddable(d.gameAvatarUrl),
-        ...champs.map((c) => toEmbeddable(c.iconUrl)),
-        ...matches.map((m) => toEmbeddable(m.iconUrl)),
+        bg,
+        toEmbeddable(d.logoUrl, ICON),
+        toEmbeddable(d.avatarUrl, ICON),
+        toEmbeddable(d.gameAvatarUrl, ICON),
+        ...champs.map((c) => toEmbeddable(c.iconUrl, ICON)),
+        ...matches.map((m) => toEmbeddable(m.iconUrl, ICON)),
       ]);
       return {
         ...d, logoUrl, avatarUrl, gameAvatarUrl,
@@ -636,11 +663,11 @@ async function prepareBody(d: CardData): Promise<CardData> {
     case "quest":
     case "planet":
     case "guide": {
-      const [bgUrl, logoUrl] = await Promise.all([bg, toEmbeddable(d.logoUrl)]);
+      const [bgUrl, logoUrl] = await Promise.all([bg, toEmbeddable(d.logoUrl, ICON)]);
       return { ...d, logoUrl, theme: { ...d.theme, bgUrl } };
     }
     case "planets": {
-      const [bgUrl, ...logos] = await Promise.all([bg, ...d.games.map((g) => toEmbeddable(g.logoUrl))]);
+      const [bgUrl, ...logos] = await Promise.all([bg, ...d.games.map((g) => toEmbeddable(g.logoUrl, ICON))]);
       return { ...d, games: d.games.map((g, i) => ({ ...g, logoUrl: logos[i] })), theme: { ...d.theme, bgUrl } };
     }
     default:

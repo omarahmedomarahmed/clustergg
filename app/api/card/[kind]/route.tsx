@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderCard } from "@/lib/cards/render";
+import { toEmbeddable } from "@/lib/cards/img";
 import { getOrRenderCard } from "@/lib/cards/cache";
 import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, cardBg } from "@/lib/cards/data";
 import { guideCard, GUIDE_TOPICS } from "@/lib/cards/guides";
@@ -69,6 +70,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
 
   if (!data) return fallbackCard("This card had no data — link a game account to fill it in.");
 
+  // `?debug=1` answers "why doesn't my art show?" in a browser, without a
+  // terminal and without guessing. It reports which source the background came
+  // from and whether it actually resolved into bytes the renderer can draw —
+  // those are different failures with the same symptom.
+  if (q.get("debug") === "1") return NextResponse.json(await explain(data));
+
   if (!fresh) {
     // Cache key = everything that identifies this card within its kind.
     const key = [slug, game, q.get("quest"), q.get("topic"), q.get("metric"), q.get("id")].filter(Boolean).join("|") || "default";
@@ -84,6 +91,33 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
   } catch {
     return fallbackCard("This card couldn't be drawn just now.");
   }
+}
+
+async function explain(data: CardData) {
+  const src = data.theme.bgUrl ?? null;
+  const started = Date.now();
+  const resolved = await toEmbeddable(src);
+  return {
+    kind: data.kind,
+    background: {
+      configured: !!src,
+      source: !src ? "none"
+        : src.startsWith("data:") ? `inline ${src.slice(5, src.indexOf(";"))} (${src.length.toLocaleString()} chars)`
+          : src.slice(0, 120),
+      resolved: !!resolved,
+      resolvedAs: resolved ? resolved.slice(5, resolved.indexOf(";")) : null,
+      resolvedBytes: resolved ? Math.round((resolved.length * 3) / 4) : 0,
+      tookMs: Date.now() - started,
+      why: !src
+        ? "No background is set for this card. For a profile, set one in the profile builder under Page background image."
+        : resolved
+          ? "The background resolved and is drawn on the card."
+          : "The background is set but could NOT be turned into drawable bytes — it timed out, was unreachable, or is a format we can't decode.",
+    },
+    accent: data.theme.accent,
+    accent2: data.theme.accent2,
+    dim: data.theme.dim ?? 62,
+  };
 }
 
 async function fallbackCard(subtitle: string) {

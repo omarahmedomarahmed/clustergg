@@ -9,6 +9,9 @@ export type CardTheme = {
   accent: string;   // primary brand/game/quest colour
   accent2: string;  // secondary
   bgUrl?: string | null; // background artwork (admin-controlled)
+  // Fallbacks, tried in order when `bgUrl` can't be fetched or decoded. A
+  // gamer's uploaded art failing shouldn't leave the card with no art at all.
+  bgFallbacks?: (string | null | undefined)[];
   dim?: number;     // 0-100 veil strength over the artwork
   // Filled in by the renderer, not by the data loaders: the astronaut mascot and
   // the Cluster logo mark that every card carries.
