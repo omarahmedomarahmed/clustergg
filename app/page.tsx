@@ -18,6 +18,9 @@ import { getT } from "@/lib/i18n/t-server";
 import { localizeQuest } from "@/lib/i18n/entities";
 import { slimImg } from "@/lib/img";
 import { timeAgo } from "@/lib/utils";
+import { networkStats, publicServers } from "@/lib/network";
+import { installUrl } from "@/lib/discord/config";
+import { DiscordSection } from "@/components/DiscordSection";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +35,11 @@ export default async function LandingPage() {
   // Full quests + CP tops for the "Chart your quests" card grid.
   const homeQuests = await getUserQuests(db, viewer?.id ?? null);
   const questTops = await getQuestTops(db, homeQuests.map((q) => q.id), 6);
+  const [network, topServers] = await Promise.all([networkStats(), publicServers(6)]);
+  const install = installUrl();
   const c = await getContent([
+    "discord.badge", "discord.title", "discord.subtitle",
+    "discord.cta.primary", "discord.cta.secondary",
     "hero.badge", "hero.title.line1", "hero.title.line2", "hero.subtitle",
     "hero.cta.primary", "hero.cta.secondary", "hero.image",
     "section.challenges.title", "section.challenges.subtitle",
@@ -119,6 +126,12 @@ export default async function LandingPage() {
       {skinnedPlanets.length > 0 && (
         <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading={tr("The Cluster galaxy — pick a game")} quest={questHero} />
       )}
+
+      {/* ===== THE PRODUCT: ClusterBot for Discord =====
+          Placed immediately under the hero because it is what Cluster now is:
+          the engagement layer for Discord communities. The galaxy above is how
+          you browse the games; this is what you actually adopt. */}
+      <DiscordSection stats={network} servers={topServers} installUrl={install} copy={c} />
 
       {/* ===== HERO ===== */}
       {skinnedPlanets.length > 0 ? (
