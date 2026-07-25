@@ -642,3 +642,27 @@ export async function renderCardBuffer(data: CardData): Promise<Buffer> {
   const res = await renderCard(data);
   return Buffer.from(await res.arrayBuffer());
 }
+
+// A PNG of a photographic background is 2-3 MB. That's slow for Discord to
+// fetch, and Blob transfer is the tightest resource we have — so past this,
+// the card is re-encoded as JPEG, which takes the same picture to a few
+// hundred KB. Flat, graphic cards stay PNG, where it's the better format.
+const JPEG_OVER_BYTES = 900_000;
+
+export type CardImage = { body: Buffer; contentType: string; ext: "png" | "jpg" };
+
+export async function renderCardImage(data: CardData): Promise<CardImage> {
+  const png = await renderCardBuffer(data);
+  if (png.byteLength <= JPEG_OVER_BYTES) {
+    return { body: png, contentType: "image/png", ext: "png" };
+  }
+  try {
+    const sharp = (await import("sharp")).default;
+    const jpg = await sharp(png).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+    // Only take the trade if it actually paid off.
+    if (jpg.byteLength < png.byteLength) {
+      return { body: jpg, contentType: "image/jpeg", ext: "jpg" };
+    }
+  } catch { /* no transcoder — a big PNG still works, it's just heavier */ }
+  return { body: png, contentType: "image/png", ext: "png" };
+}

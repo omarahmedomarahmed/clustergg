@@ -74,22 +74,32 @@ function guessType(url: string, header: string | null): string {
   }
 }
 
-// Turn whatever we got into bytes Satori can actually decode.
+// Above this, an image is worth recompressing even if Satori could read it —
+// a gamer's uploaded profile background is routinely 2-10 MB, and handing that
+// to the renderer wastes far more time than the conversion costs.
+const RECOMPRESS_OVER_BYTES = 400_000;
+
+// Turn whatever we got into bytes Satori can actually decode, at a size a
+// 1200x630 card can actually use.
 async function toNativeBytes(buf: Buffer, type: string, maxWidth: number): Promise<{ data: Buffer; type: string } | null> {
   const sharp = await getSharp();
 
-  // Already decodable and small enough to leave alone.
-  if (NATIVE.has(type) && !sharp) return { data: buf, type };
-
-  if (!sharp) return null;
+  if (!sharp) {
+    // No transcoder: pass through what Satori reads natively, drop the rest.
+    return NATIVE.has(type) ? { data: buf, type } : null;
+  }
   if (!NATIVE.has(type) && !CONVERTIBLE.has(type)) return null;
 
   try {
+    const meta = await sharp(buf).metadata();
+    const tooWide = (meta.width ?? 0) > maxWidth;
+    const tooHeavy = buf.byteLength > RECOMPRESS_OVER_BYTES;
+
+    // Small, already-native, already-sized: nothing to gain from a round trip.
+    if (NATIVE.has(type) && !tooWide && !tooHeavy) return { data: buf, type };
+
     let pipeline = sharp(buf);
-    const meta = await pipeline.metadata();
-    // Re-create the pipeline: metadata() consumes the first one for some inputs.
-    pipeline = sharp(buf);
-    if ((meta.width ?? 0) > maxWidth) pipeline = pipeline.resize({ width: maxWidth });
+    if (tooWide) pipeline = pipeline.resize({ width: maxWidth });
     const data = await pipeline.png({ compressionLevel: 9 }).toBuffer();
     return { data, type: "image/png" };
   } catch {

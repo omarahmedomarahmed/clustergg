@@ -4,7 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import { putBuffer, blobConfigured } from "@/lib/blob";
 import { delBlobObject } from "@/lib/storage-audit";
 import { uid } from "@/lib/utils";
-import { renderCardBuffer } from "@/lib/cards/render";
+import { renderCardImage } from "@/lib/cards/render";
 import type { CardData } from "@/lib/cards/types";
 
 // Blob-backed cache for rendered PNG cards.
@@ -22,7 +22,7 @@ import type { CardData } from "@/lib/cards/types";
 // Bump when the RENDERER changes in a way that should invalidate stored art.
 // The hash is of the card's data, so without this a layout or image-pipeline
 // fix would never reach cards that were already rendered.
-const RENDER_VERSION = 3;
+const RENDER_VERSION = 4;
 
 export function cardHash(data: unknown): string {
   return createHash("sha1").update(`v${RENDER_VERSION}:${JSON.stringify(data)}`).digest("hex").slice(0, 20);
@@ -55,9 +55,9 @@ export async function getOrRenderCard(kind: string, cacheKey: string, data: Card
   let url: string | null = null;
   let bytes = 0;
   try {
-    const buffer = await renderCardBuffer(data);
-    bytes = buffer.byteLength;
-    url = await putBuffer(buffer, "image/png", "png", `cards/${kind}`);
+    const img = await renderCardImage(data);
+    bytes = img.body.byteLength;
+    url = await putBuffer(img.body, img.contentType, img.ext, `cards/${kind}`);
   } catch { return null; }
   if (!url) return null;
 
