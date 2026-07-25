@@ -1,0 +1,371 @@
+import { ImageResponse } from "next/og";
+import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
+import type {
+  CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
+  LeaderboardCard, ChallengeCard, PlanetCard, GuideCard,
+} from "@/lib/cards/types";
+
+// Server-rendered "glorified" PNG cards, shared by the Discord bot and the web
+// (they double as OpenGraph images). Built on next/og's ImageResponse — no extra
+// dependency, no headless browser. One cosmic frame, one body per card kind.
+
+export const CARD_W = 1200;
+export const CARD_H = 630;
+
+const INK = "#f2f3ff";
+const MUTED = "#9aa0c3";
+const VOID = "#04051a";
+
+const veil = (dim = 62) => `rgba(4,5,26,${Math.max(0, Math.min(100, dim)) / 100})`;
+
+// The shared frame: artwork → veil → accent glows → content → wordmark.
+function Frame({ theme, children, corner }: { theme: CardTheme; children: React.ReactNode; corner?: React.ReactNode }) {
+  return (
+    <div style={{ width: CARD_W, height: CARD_H, display: "flex", position: "relative", background: VOID, color: INK }}>
+      {theme.bgUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={theme.bgUrl} alt="" width={CARD_W} height={CARD_H}
+          style={{ position: "absolute", inset: 0, width: CARD_W, height: CARD_H, objectFit: "cover" }} />
+      ) : null}
+      <div style={{ position: "absolute", inset: 0, display: "flex", background: theme.bgUrl ? veil(theme.dim ?? 62) : VOID }} />
+      {/* accent glows */}
+      <div style={{ position: "absolute", top: -220, left: -160, width: 720, height: 720, borderRadius: 999, display: "flex", background: `${theme.accent}22` }} />
+      <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: `${theme.accent2}1c` }} />
+      {/* top accent bar */}
+      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
+      <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", padding: "48px 56px" }}>
+        {children}
+      </div>
+      {/* brand wordmark */}
+      <div style={{ position: "absolute", bottom: 30, right: 44, display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ width: 26, height: 26, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: 17, fontWeight: 700, color: "#fff" }}>C</div>
+        <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: 2, color: INK, opacity: 0.85 }}>CLUSTER</div>
+      </div>
+      {corner ? <div style={{ position: "absolute", top: 38, right: 44, display: "flex" }}>{corner}</div> : null}
+    </div>
+  );
+}
+
+function Pill({ children, color = MUTED, bg = "rgba(255,255,255,0.07)" }: { children: React.ReactNode; color?: string; bg?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 16px", borderRadius: 999, background: bg, color, fontSize: 21, fontWeight: 700 }}>
+      {children}
+    </div>
+  );
+}
+
+function Avatar({ url, size = 104, ring }: { url?: string | null; size?: number; ring: string }) {
+  return url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={url} alt="" width={size} height={size}
+      style={{ width: size, height: size, borderRadius: size / 2, objectFit: "cover", border: `4px solid ${ring}` }} />
+  ) : (
+    <div style={{ width: size, height: size, borderRadius: size / 2, display: "flex", alignItems: "center", justifyContent: "center", background: `${ring}33`, border: `4px solid ${ring}`, fontSize: size * 0.42, fontWeight: 700 }}>C</div>
+  );
+}
+
+function Bar({ pct, accent, accent2, h = 16 }: { pct: number; accent: string; accent2: string; h?: number }) {
+  const w = Math.max(2, Math.min(100, pct));
+  return (
+    <div style={{ display: "flex", width: "100%", height: h, borderRadius: 999, background: "rgba(255,255,255,0.10)", overflow: "hidden" }}>
+      <div style={{ display: "flex", width: `${w}%`, height: h, borderRadius: 999, background: `linear-gradient(90deg, ${accent}, ${accent2})` }} />
+    </div>
+  );
+}
+
+function Title({ text, sub, accent, accent2 }: { text: string; sub?: string | null; accent: string; accent2: string }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ fontSize: 58, fontWeight: 700, lineHeight: 1.05, color: INK }}>{text}</div>
+      {sub ? <div style={{ fontSize: 26, color: MUTED }}>{sub}</div> : null}
+      <div style={{ display: "flex", width: 132, height: 6, borderRadius: 999, marginTop: 8, background: `linear-gradient(90deg, ${accent}, ${accent2})` }} />
+    </div>
+  );
+}
+
+const nf = (n: number) => n.toLocaleString("en-US");
+
+// ===== Bodies =====
+
+function ProfileBody(d: ProfileCard) {
+  const t = d.theme;
+  return (
+    <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
+      <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+        <Avatar url={d.avatarUrl} ring={t.accent} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1.05 }}>{d.displayName}</div>
+          <div style={{ fontSize: 25, color: MUTED }}>{`clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`}</div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 14, marginTop: 26 }}>
+        <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{`${nf(d.totalCp)} CP`}</Pill>
+        <Pill>{`${nf(d.views)} views`}</Pill>
+        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">
+          <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#fbbf24" }} />
+          {`${nf(d.votes)} votes`}
+        </Pill>
+        {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)">{d.award}</Pill> : null}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 30, gap: 12, flex: 1 }}>
+        <div style={{ fontSize: 19, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>LINKED ACCOUNTS</div>
+        {d.accounts.length === 0 ? (
+          <div style={{ fontSize: 26, color: MUTED }}>No games linked yet — link one to unlock quests.</div>
+        ) : (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+            {d.accounts.slice(0, 6).map((a, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderRadius: 18, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.10)", width: 340 }}>
+                {a.logoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={a.logoUrl} alt="" width={44} height={44} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
+                ) : <div style={{ width: 44, height: 44, borderRadius: 10, display: "flex", background: `${t.accent}33` }} />}
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  <div style={{ fontSize: 23, fontWeight: 700 }}>{a.tag.slice(0, 20)}</div>
+                  <div style={{ fontSize: 18, color: MUTED }}>{a.headline || a.game}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Frame>
+  );
+}
+
+function GameStatsBody(d: GameStatsCard) {
+  const t = d.theme;
+  return (
+    <Frame theme={t} corner={d.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={d.logoUrl} alt="" width={78} height={78} style={{ width: 78, height: 78, borderRadius: 18, objectFit: "cover" }} />
+    ) : undefined}>
+      <Title text={d.game} sub={`${d.displayName} · ${d.tag}${d.region ? ` · ${d.region}` : ""}`} accent={t.accent} accent2={t.accent2} />
+      {d.stats.length === 0 ? (
+        <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: MUTED }}>
+          Stats sync shortly after linking — check back in a few minutes.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 16, marginTop: 34, flex: 1 }}>
+          {d.stats.slice(0, 6).map((s, i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, width: 336, padding: "20px 24px", borderRadius: 20, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.10)" }}>
+              <div style={{ fontSize: 19, letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{s.label.toUpperCase().slice(0, 22)}</div>
+              <div style={{ fontSize: 40, fontWeight: 700, color: t.accent2 }}>{s.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      {d.rank ? (
+        <Pill color={t.accent} bg="rgba(255,255,255,0.08)">{`#${d.rank.place} of ${nf(d.rank.total)} · ${d.rank.board}`}</Pill>
+      ) : null}
+    </Frame>
+  );
+}
+
+function QuestBody(d: QuestCard) {
+  const t = d.theme;
+  const next = d.nextThreshold ?? 0;
+  const pct = next > 0 ? (d.cp / next) * 100 : 100;
+  return (
+    <Frame theme={t} corner={d.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={d.logoUrl} alt="" width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain" }} />
+    ) : undefined}>
+      <Title text={d.questName} sub={d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline} accent={t.accent} accent2={t.accent2} />
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginTop: 30 }}>
+        <div style={{ fontSize: 74, fontWeight: 700, color: t.accent2, lineHeight: 1 }}>{nf(d.cp)}</div>
+        <div style={{ fontSize: 27, color: MUTED, paddingBottom: 10 }}>
+          {`CP${next > 0 ? ` / ${nf(next)} → ${d.nextTier ?? ""}` : " · max tier"}`}
+        </div>
+      </div>
+      <div style={{ display: "flex", marginTop: 18 }}><Bar pct={pct} accent={t.accent} accent2={t.accent2} h={18} /></div>
+      {/* alignItems keeps the tier chips sized to their content instead of
+          stretching to fill the remaining card height. */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 34, flex: 1 }}>
+        {d.tiers.slice(0, 5).map((tier, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, padding: "18px 10px", borderRadius: 20, background: tier.earned ? `${t.accent}1f` : "rgba(0,0,0,0.42)", border: `1px solid ${tier.earned ? `${t.accent}88` : "rgba(255,255,255,0.10)"}` }}>
+            <div style={{ display: "flex", width: 22, height: 22, borderRadius: 11, background: tier.earned ? t.accent : "transparent", border: `3px solid ${tier.earned ? t.accent : "rgba(255,255,255,0.32)"}` }} />
+            <div style={{ fontSize: 21, fontWeight: 700, color: tier.earned ? t.accent : MUTED }}>{tier.name}</div>
+            <div style={{ fontSize: 18, color: MUTED }}>{`${nf(tier.threshold)} CP`}</div>
+          </div>
+        ))}
+      </div>
+    </Frame>
+  );
+}
+
+function CpSummaryBody(d: CpSummaryCard) {
+  const t = d.theme;
+  return (
+    <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
+      <Title text={`${d.displayName}'s quests`} sub={`${nf(d.totalCp)} total Cluster Points`} accent={t.accent} accent2={t.accent2} />
+      <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 30, flex: 1 }}>
+        {d.quests.slice(0, 4).map((q, i) => {
+          const pct = q.target > 0 ? (q.cp / q.target) * 100 : 100;
+          return (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <div style={{ fontSize: 26, fontWeight: 700, color: q.accent }}>{q.name}</div>
+                <div style={{ fontSize: 23, color: MUTED }}>{`${nf(q.cp)} / ${nf(q.target)} CP · ${q.tier}`}</div>
+              </div>
+              <Bar pct={pct} accent={q.accent} accent2={t.accent2} h={14} />
+            </div>
+          );
+        })}
+      </div>
+    </Frame>
+  );
+}
+
+function LeaderboardBody(d: LeaderboardCard) {
+  const t = d.theme;
+  const medal = ["#fbbf24", "#cbd5e1", "#b45309"];
+  return (
+    <Frame theme={t} corner={d.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
+    ) : undefined}>
+      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
+      {d.rows.length === 0 ? (
+        <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: MUTED }}>
+          No one has posted a score yet — link an account and you top this board.
+        </div>
+      ) : (
+      <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 24, flex: 1 }}>
+        {d.rows.slice(0, 8).map((r) => (
+          <div key={r.rank} style={{ display: "flex", alignItems: "center", gap: 16, padding: "10px 20px", borderRadius: 14, background: r.you ? `${t.accent}26` : "rgba(0,0,0,0.42)", border: `1px solid ${r.you ? `${t.accent}88` : "rgba(255,255,255,0.08)"}` }}>
+            <div style={{ fontSize: 27, fontWeight: 700, width: 52, color: medal[r.rank - 1] ?? MUTED }}>{`#${r.rank}`}</div>
+            {r.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={r.avatarUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: 19, objectFit: "cover" }} />
+            ) : null}
+            <div style={{ fontSize: 27, fontWeight: 700, flex: 1 }}>{`${r.name.slice(0, 26)}${r.you ? " · you" : ""}`}</div>
+            <div style={{ fontSize: 27, fontWeight: 700, color: t.accent2 }}>{r.value}</div>
+          </div>
+        ))}
+      </div>
+      )}
+    </Frame>
+  );
+}
+
+function ChallengeBody(d: ChallengeCard) {
+  const t = d.theme;
+  const ends = new Date(d.endsAt);
+  const days = Math.max(0, Math.ceil((ends.getTime() - Date.now()) / 86400000));
+  return (
+    <Frame theme={t} corner={d.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
+    ) : undefined}>
+      <div style={{ display: "flex", gap: 12 }}>
+        <Pill color="#34d399" bg="rgba(52,211,153,0.14)">
+          <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#34d399" }} />
+          LIVE
+        </Pill>
+        {d.isPrivate ? <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)">SERVER EXCLUSIVE</Pill> : null}
+        <Pill>{d.game}</Pill>
+      </div>
+      <div style={{ display: "flex", marginTop: 18 }}>
+        <Title text={d.title.slice(0, 40)} sub={d.description?.slice(0, 90)} accent={t.accent} accent2={t.accent2} />
+      </div>
+      <div style={{ display: "flex", gap: 14, marginTop: 26 }}>
+        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">{`${days}d left`}</Pill>
+        <Pill>{`${nf(d.participants)} joined`}</Pill>
+        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{d.prize.slice(0, 30)}</Pill> : null}
+      </div>
+      <div style={{ display: "flex", gap: 16, marginTop: 26, flex: 1, alignItems: "flex-end" }}>
+        {d.trophies.slice(0, 3).map((tr, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={tr.imageUrl} alt="" width={104} height={104} style={{ width: 104, height: 104, objectFit: "contain" }} />
+            <div style={{ fontSize: 20, fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
+              {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Frame>
+  );
+}
+
+function PlanetBody(d: PlanetCard) {
+  const t = d.theme;
+  return (
+    <Frame theme={t} corner={d.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={d.logoUrl} alt="" width={86} height={86} style={{ width: 86, height: 86, borderRadius: 20, objectFit: "cover" }} />
+    ) : undefined}>
+      <Title text={`${d.game} Planet`} sub={d.description?.slice(0, 96)} accent={t.accent} accent2={t.accent2} />
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 36, flex: 1 }}>
+        {[
+          { k: "CHALLENGES LIVE", v: nf(d.challenges) },
+          { k: "GAMERS RANKED", v: nf(d.ranked) },
+          ...(d.serverGamers != null ? [{ k: "FROM THIS SERVER", v: nf(d.serverGamers) }] : []),
+        ].map((s, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, padding: "26px 28px", borderRadius: 22, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.10)" }}>
+            <div style={{ fontSize: 19, letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{s.k}</div>
+            <div style={{ fontSize: 52, fontWeight: 700, color: t.accent2 }}>{s.v}</div>
+          </div>
+        ))}
+      </div>
+      {d.topGamer ? <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">{`TOP · ${d.topGamer.name} · ${d.topGamer.value}`}</Pill> : null}
+    </Frame>
+  );
+}
+
+function GuideBody(d: GuideCard) {
+  const t = d.theme;
+  return (
+    <Frame theme={t} corner={d.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={d.logoUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
+    ) : undefined}>
+      {d.badge ? <div style={{ display: "flex", marginBottom: 14 }}><Pill color={t.accent} bg={`${t.accent}1f`}>{d.badge}</Pill></div> : null}
+      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
+      {/* overflow:hidden keeps a long admin-written guide from ever pushing the
+          footer off the card — the steps clip instead of breaking the layout. */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 13, marginTop: 24, flex: 1, overflow: "hidden" }}>
+        {d.steps.slice(0, 4).map((s, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 42, height: 42, borderRadius: 21, background: `${t.accent}2b`, color: t.accent, fontSize: 23, fontWeight: 700 }}>{i + 1}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+              <div style={{ fontSize: 26, fontWeight: 700 }}>{s.title.slice(0, 46)}</div>
+              <div style={{ fontSize: 20, color: MUTED, lineHeight: 1.32 }}>{s.body.slice(0, 116)}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      {d.footer ? <div style={{ display: "flex", marginTop: 14, fontSize: 21, color: t.accent2, fontWeight: 700 }}>{d.footer}</div> : null}
+    </Frame>
+  );
+}
+
+function body(d: CardData) {
+  switch (d.kind) {
+    case "profile": return ProfileBody(d);
+    case "game-stats": return GameStatsBody(d);
+    case "quest": return QuestBody(d);
+    case "cp-summary": return CpSummaryBody(d);
+    case "leaderboard": return LeaderboardBody(d);
+    case "challenge": return ChallengeBody(d);
+    case "planet": return PlanetBody(d);
+    case "guide": return GuideBody(d);
+  }
+}
+
+// Render a card to an ImageResponse (streamable PNG response).
+export async function renderCard(data: CardData): Promise<ImageResponse> {
+  const fonts = await loadCardFonts();
+  return new ImageResponse(
+    <div style={{ display: "flex", width: CARD_W, height: CARD_H, fontFamily: cardFontFamily(fonts) }}>{body(data)}</div>,
+    { width: CARD_W, height: CARD_H, ...(fonts.length ? { fonts } : {}) },
+  );
+}
+
+// Render a card to a raw PNG Buffer (for storing in Blob / attaching to Discord).
+export async function renderCardBuffer(data: CardData): Promise<Buffer> {
+  const res = await renderCard(data);
+  return Buffer.from(await res.arrayBuffer());
+}
