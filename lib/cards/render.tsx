@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable } from "@/lib/cards/img";
+import { brandCardArt } from "@/lib/cards/brand";
 import type {
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
   LeaderboardCard, ChallengeCard, PlanetCard, PlanetsCard, GuideCard,
@@ -34,13 +35,30 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
       <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: `${theme.accent2}1c` }} />
       {/* top accent bar */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
+      {/* The astronaut. Drawn BEFORE the content so a dense card (a full
+          leaderboard, a long standings list) overlaps it instead of colliding
+          with it — it's brand furniture, not a element competing for space. */}
+      {theme.astronautUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={theme.astronautUrl} alt="" height={210}
+          style={{ position: "absolute", right: 34, bottom: 62, height: 210, objectFit: "contain", opacity: 0.92 }} />
+      ) : null}
       <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", padding: "48px 56px" }}>
         {children}
       </div>
-      {/* brand wordmark */}
-      <div style={{ position: "absolute", bottom: 30, right: 44, display: "flex", alignItems: "center", gap: 10 }}>
-        <div style={{ width: 26, height: 26, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: 17, fontWeight: 700, color: "#fff" }}>C</div>
-        <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: 2, color: INK, opacity: 0.85 }}>CLUSTER</div>
+      {/* The real logo mark, bottom-right. Falls back to the wordmark only when
+          no logo is configured, so a card is never unbranded. */}
+      <div style={{ position: "absolute", bottom: 26, right: 44, display: "flex", alignItems: "center", gap: 10 }}>
+        {theme.markUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={theme.markUrl} alt="" width={42} height={42}
+            style={{ width: 42, height: 42, borderRadius: 12, objectFit: "contain" }} />
+        ) : (
+          <>
+            <div style={{ width: 26, height: 26, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: 17, fontWeight: 700, color: "#fff" }}>C</div>
+            <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: 2, color: INK, opacity: 0.85 }}>CLUSTER</div>
+          </>
+        )}
       </div>
       {corner ? <div style={{ position: "absolute", top: 38, right: 44, display: "flex" }}>{corner}</div> : null}
     </div>
@@ -526,7 +544,26 @@ function body(d: CardData) {
 // animated .gif avatar it can't decode — takes down the entire card. Doing it
 // up front means a bad image degrades to its placeholder instead, and the
 // render itself touches the network zero times.
+// The mascot and the logo mark, as inline bytes. Resolved once per render and
+// merged onto every card kind here rather than in each data loader, so a card
+// kind added later can't forget them.
+async function preparedBrand(): Promise<{ astronautUrl: string | null; markUrl: string | null }> {
+  try {
+    const b = await brandCardArt();
+    const [astronautUrl, markUrl] = await Promise.all([
+      toEmbeddable(b.astronautUrl, { maxWidth: 420 }),
+      toEmbeddable(b.markUrl, { maxWidth: 128 }),
+    ]);
+    return { astronautUrl, markUrl };
+  } catch { return { astronautUrl: null, markUrl: null }; }
+}
+
 async function prepareCard(d: CardData): Promise<CardData> {
+  const [body, brand] = await Promise.all([prepareBody(d), preparedBrand()]);
+  return { ...body, theme: { ...body.theme, ...brand } } as CardData;
+}
+
+async function prepareBody(d: CardData): Promise<CardData> {
   const bg = toEmbeddable(d.theme.bgUrl);
 
   switch (d.kind) {

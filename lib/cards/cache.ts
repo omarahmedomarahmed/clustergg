@@ -22,7 +22,7 @@ import type { CardData } from "@/lib/cards/types";
 // Bump when the RENDERER changes in a way that should invalidate stored art.
 // The hash is of the card's data, so without this a layout or image-pipeline
 // fix would never reach cards that were already rendered.
-const RENDER_VERSION = 2;
+const RENDER_VERSION = 3;
 
 export function cardHash(data: unknown): string {
   return createHash("sha1").update(`v${RENDER_VERSION}:${JSON.stringify(data)}`).digest("hex").slice(0, 20);

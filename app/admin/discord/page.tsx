@@ -3,8 +3,11 @@ import {
   publicKeyShape, canAct, appId, installUrl, discordConfigured, siteUrl, botApiSecret, CLUSTER_CHANNEL,
 } from "@/lib/discord/config";
 import { RegisterCommands, GuideTools, JobRunner, Broadcast } from "@/components/DiscordBotPanel";
-import { listGuilds } from "@/lib/discord/guilds";
+import { listGuilds, commandAnalytics } from "@/lib/discord/guilds";
+import { countPendingRequests } from "@/lib/challenge-requests";
+import { BotUsage } from "@/components/DiscordAnalytics";
 import { JOBS } from "@/lib/jobs";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Discord bot" };
@@ -124,6 +127,8 @@ export default async function AdminDiscordPage() {
         </p>
       </section>
 
+      <RequestInbox />
+
       <GuideTools ready={ready} />
 
       <div className="mt-6"><JobRunner jobs={JOBS} /></div>
@@ -133,8 +138,41 @@ export default async function AdminDiscordPage() {
         <h2 className="font-bold mb-3">Servers</h2>
         <ServerTable />
       </section>
+
+      <div className="mt-6"><Usage /></div>
     </div>
   );
+}
+
+// Servers asking us to run a challenge for them. Surfaced on the main bot page
+// because an unreviewed request is a server owner waiting on us — the one queue
+// here where delay costs growth.
+async function RequestInbox() {
+  const pending = await countPendingRequests();
+  return (
+    <section className={`glass p-6 mb-6 border ${pending ? "border-amber-400/30" : "border-white/10"}`}>
+      <h2 className="font-bold mb-1">Challenge requests</h2>
+      <p className="text-xs text-muted mb-4">
+        Server admins build a challenge for their community with <code className="text-cyan-300">/cluster admin</code>.
+        Approving one creates the challenge, mints its entry key and posts it into their server.
+      </p>
+      <Link
+        href="/admin/discord/requests"
+        className={pending
+          ? "grad-btn pressable rounded-full px-6 py-2.5 font-bold inline-block"
+          : "rounded-full border border-white/15 px-6 py-2.5 text-sm inline-block hover:bg-white/5"}
+      >
+        {pending ? `Review ${pending} waiting request${pending === 1 ? "" : "s"}` : "No requests waiting"}
+      </Link>
+    </section>
+  );
+}
+
+// What people actually do with the bot. `discord_command_logs` has been written
+// since launch; this reads it.
+async function Usage() {
+  const a = await commandAnalytics(null, 14);
+  return <BotUsage a={a} days={14} title="Bot usage — all servers" />;
 }
 
 // Every server with the bot, and how close each is to unlocking ad revenue —
@@ -165,7 +203,9 @@ async function ServerTable() {
           {rows.map((g) => (
             <tr key={g.guildId} className="border-t border-white/5">
               <td className="px-4 py-3">
-                <div className="font-bold">{g.name || g.guildId}</div>
+                <Link href={`/admin/discord/${g.guildId}`} className="font-bold hover:text-cyan-300">
+                  {g.name || g.guildId}
+                </Link>
                 <div className="text-[11px] text-muted font-mono">{g.guildId}</div>
               </td>
               <td className="px-4 py-3">{g.memberCount.toLocaleString()}</td>

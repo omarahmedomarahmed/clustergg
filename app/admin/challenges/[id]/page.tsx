@@ -49,7 +49,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     trophyId: challenge.trophyId, status: challenge.status, prizeDescription: challenge.prizeDescription,
     prizes: challenge.prizes ?? null,
     gateQuestId: challenge.gateQuestId, gateMinBadges: challenge.gateMinBadges ?? 0,
-    visibility: challenge.visibility ?? "public", guildId: challenge.guildId,
+    visibility: challenge.visibility ?? "public", guildId: challenge.guildId, guildIds: challenge.guildIds ?? [],
     accessKey: challenge.accessKey, announceHype: challenge.announceHype ?? false,
   };
 

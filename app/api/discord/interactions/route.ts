@@ -3,15 +3,16 @@ import { verifyInteraction } from "@/lib/discord/verify";
 import { canVerify, canAct, appId, publicKeyShape, siteUrl } from "@/lib/discord/config";
 import {
   InteractionType, InteractionResponseType, MessageFlags,
-  actor, readCommand, type Interaction,
+  actor, readCommand, isGuildManager, type Interaction,
 } from "@/lib/discord/types";
 import { parseId, frame, type Frame } from "@/lib/discord/components";
 import { gameChoices, questChoices, guideChoices, showChoices } from "@/lib/discord/catalog";
-import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal } from "@/lib/discord/screens";
+import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
-import { joinChallengeFor, challengeGate, keyVisibleTo } from "@/lib/challenges";
+import { joinChallengeFor, challengeGate, keyVisibleTo, setChallengeState } from "@/lib/challenges";
+import { submitChallengeRequest } from "@/lib/challenge-requests";
 import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS } from "@/lib/providers/registry";
 import { logCommand } from "@/lib/discord/guilds";
@@ -19,6 +20,7 @@ import { castDiscordVote } from "@/lib/identity";
 import { inGameNameChoices } from "@/lib/gamer-lookup";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { uid } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,13 +111,14 @@ function modalSubmit(i: Interaction) {
 
   if (kind === "key") return keySubmit(i, who, arg, (fields.get("key") ?? "").trim());
   if (kind === "link") return linkSubmit(i, who, arg, fields);
+  if (kind === "req") return requestSubmit(i, who, arg, fields);
   return json({ type: InteractionResponseType.DeferredUpdateMessage });
 }
 
 function linkSubmit(i: Interaction, who: Who, provider: string, fields: Map<string, string>) {
   after(async () => {
     try {
-      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
       if (!ctx.gamer) {
         await editOriginal(i.token, { content: `Continue with Discord first, then link your game account: ${siteUrl()}/login` });
         return;
@@ -153,7 +156,7 @@ function linkSubmit(i: Interaction, who: Who, provider: string, fields: Map<stri
 function keySubmit(i: Interaction, who: Who, challengeId: string, key: string) {
   after(async () => {
     try {
-      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
       if (!ctx.gamer) {
         await editOriginal(i.token, { content: `Continue with Discord first, then link your game account: ${siteUrl()}/login` });
         return;
@@ -180,6 +183,96 @@ function keySubmit(i: Interaction, who: Who, challengeId: string, key: string) {
     type: InteractionResponseType.DeferredChannelMessageWithSource,
     data: { flags: MessageFlags.Ephemeral },
   });
+}
+
+// A server owner submitting a challenge for their community. This creates a
+// REQUEST, not a challenge: it will run under Cluster's name, on our
+// leaderboards, with our trophies, so a human approves it first.
+function requestSubmit(i: Interaction, who: Who, game: string, fields: Map<string, string>) {
+  after(async () => {
+    try {
+      if (!i.guild_id) {
+        await editOriginal(i.token, { content: "Run this inside your server." });
+        return;
+      }
+      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
+      const res = await submitChallengeRequest({
+        guildId: i.guild_id,
+        game,
+        title: fields.get("title") ?? "",
+        description: fields.get("description") ?? "",
+        days: Number(fields.get("days") ?? 7),
+        prizeValue: Number((fields.get("prize") ?? "").replace(/[^0-9]/g, "")) || 0,
+        prizeCurrency: (fields.get("currency") ?? "USD").trim() || "USD",
+        requestedByDiscordId: who.id,
+        requestedByUserId: ctx.gamer?.userId ?? null,
+      });
+
+      if (!res.ok) {
+        await editOriginal(i.token, {
+          embeds: [{ color: 0xf59e0b, description: requestFailure(res.reason) }],
+        });
+        return;
+      }
+
+      await editOriginal(i.token, {
+        embeds: [{
+          title: "Request sent",
+          description: [
+            `**${fields.get("title")}** on **${game}** is with us for review.`,
+            "",
+            "We check every server challenge before it goes live — it runs under Cluster's name, on our leaderboards, with our trophies.",
+            "",
+            "When it's approved the bot posts it here with your server's entry key, and your members join in one tap.",
+          ].join("\n"),
+          color: 0x34d399,
+        }],
+        components: [],
+      });
+
+      // Tell staff there's something waiting, so approval isn't gated on
+      // somebody happening to open the admin page.
+      void notifyStaffOfRequest(res.id).catch(() => {});
+    } catch {
+      await editWithError(i.token, "Couldn't send that request just now. Try again in a moment.");
+    }
+  });
+
+  return json({
+    type: InteractionResponseType.DeferredChannelMessageWithSource,
+    data: { flags: MessageFlags.Ephemeral },
+  });
+}
+
+function requestFailure(reason: string): string {
+  switch (reason) {
+    case "no_title": return "Give the challenge a name your members will recognise.";
+    case "no_game": return "Pick a game first.";
+    case "unknown_game": return "We don't sync stats for that game yet, so we couldn't score the challenge fairly.";
+    case "too_many_pending": return "You already have three requests waiting on us. We'll get to them shortly.";
+    default: return "Couldn't send that request. Try again in a moment.";
+  }
+}
+
+async function notifyStaffOfRequest(requestId: string): Promise<void> {
+  const { getRequest } = await import("@/lib/challenge-requests");
+  const req = await getRequest(requestId);
+  if (!req) return;
+  const db = await getDb();
+  const staff = await db.select({ id: schema.users.id })
+    .from(schema.users).where(eq(schema.users.role, "admin")).limit(20);
+  for (const s of staff) {
+    try {
+      await db.insert(schema.notifications).values({
+        id: uid(),
+        userId: s.id,
+        type: "system",
+        title: "A server wants to run a challenge",
+        body: `${req.title} on ${req.game}${req.prizeValue ? ` — ${req.prizeValue} ${req.prizeCurrency} prize` : ""}.`,
+        href: "/admin/discord/requests",
+      }).onConflictDoNothing();
+    } catch { /* non-fatal */ }
+  }
 }
 
 // ===== Autocomplete (must answer synchronously) =====
@@ -221,7 +314,7 @@ function command(i: Interaction) {
   after(async () => {
     let ctx: Awaited<ReturnType<typeof loadCtx>> | null = null;
     try {
-      ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
       if (isShare) return void (await share(i.token, ctx));
       const target = screenForCommand(sub, opts);
       const payload = await renderScreen(target, target.screen === "home" ? [] : [frame("home")], ctx);
@@ -266,6 +359,17 @@ function componentPress(i: Interaction) {
     if (!id) return json({ type: InteractionResponseType.DeferredUpdateMessage });
     return json(keyModal(id));
   }
+  // A server owner filling in their challenge request.
+  if (customId.startsWith("open-req|")) {
+    const game = customId.slice("open-req|".length);
+    if (!game) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    return json(requestModal(game));
+  }
+  // "Request a challenge" — a plain nav to the game picker, but it can't use the
+  // normal nav grammar because it isn't reached from a trail.
+  if (customId.startsWith("nav-req|")) {
+    return navigate(i, frame("req-game"), [frame("admin", "")]);
+  }
 
   const parsed = parseId(customId);
   if (!who || !parsed) return json({ type: InteractionResponseType.DeferredUpdateMessage });
@@ -274,7 +378,7 @@ function componentPress(i: Interaction) {
   after(async () => {
     let ctx: Awaited<ReturnType<typeof loadCtx>> | null = null;
     try {
-      ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
 
       if (parsed.kind === "a") return void (await runAction(i, parsed.target, parsed.trail, ctx));
 
@@ -305,7 +409,51 @@ function componentPress(i: Interaction) {
   return json({ type: InteractionResponseType.DeferredUpdateMessage });
 }
 
+// Render a screen into the message that was clicked. Used by the few buttons
+// that don't carry a nav trail in their custom_id.
+function navigate(i: Interaction, target: Frame, trail: Frame[]) {
+  const who = actor(i);
+  if (!who) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  after(async () => {
+    try {
+      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
+      const payload = await renderScreen(target, trail, ctx);
+      await editOriginal(i.token, {
+        content: payload.content ?? "",
+        embeds: payload.embeds ?? [],
+        components: payload.components ?? [],
+      });
+    } catch {
+      await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
+    }
+  });
+  return json({ type: InteractionResponseType.DeferredUpdateMessage });
+}
+
 async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awaited<ReturnType<typeof loadCtx>>) {
+  // Running a challenge: pause, resume, end. A server owner may do this to a
+  // challenge that belongs to THEIR server; the permission check lives in
+  // lib/challenges.ts so the web admin and the bot can't disagree about it.
+  const state = ({ "ch-pause": "paused", "ch-resume": "active", "ch-end": "completed" } as const)[
+    target.screen as "ch-pause" | "ch-resume" | "ch-end"
+  ];
+  if (state) {
+    const res = await setChallengeState(target.args[0] ?? "", state, { staff: false, guildId: i.guild_id ?? "" });
+    if (!res.ok) {
+      await editOriginal(i.token, {
+        embeds: [{
+          color: 0xf59e0b,
+          description: res.reason === "forbidden"
+            ? "Only the server a challenge belongs to can run it."
+            : res.reason === "bad_state"
+              ? "That challenge has already finished."
+              : "Couldn't change that challenge just now.",
+        }],
+      });
+      return;
+    }
+  }
+
   if (target.screen === "share") {
     await share(i.token, ctx, true);
     return;

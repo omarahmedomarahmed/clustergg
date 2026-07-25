@@ -3,10 +3,11 @@ import { getDb, schema } from "@/lib/db";
 import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
 import { frame, navButton, backButton, rows, linkButton, actionId, button, type Frame, type Button } from "@/lib/discord/components";
 import { cardRef, embedColor } from "@/lib/discord/cards";
-import { gamerForDiscordId, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
+import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
-import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo } from "@/lib/challenges";
+import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild } from "@/lib/challenges";
+import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember } from "@/lib/discord/guilds";
 import { findByInGameName, findByDiscordName } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
@@ -32,15 +33,29 @@ export type ScreenCtx = {
   discordName: string;
   guildId?: string;
   gamer: LinkedGamer | null;
+  // Does Discord consider this person a manager of the server they're in?
+  // Running a challenge is a server-staff action, so it can't be inferred from
+  // "is in the guild" — every member is.
+  isManager?: boolean;
 };
 
-export async function loadCtx(discordId: string, discordName: string, guildId?: string): Promise<ScreenCtx> {
-  const gamer = await gamerForDiscordId(discordId);
+export async function loadCtx(
+  discordId: string,
+  discordName: string,
+  guildId?: string,
+  avatar?: string | null,
+  isManager = false,
+): Promise<ScreenCtx> {
+  // Using the bot is the sign-up. Sending someone to the website before they
+  // can even see their own card is the biggest drop-off in the funnel and buys
+  // nothing — the interaction is signed and carries everything the OAuth
+  // callback would have given us.
+  const gamer = await ensureGamerForDiscord(discordId, discordName, discordAvatarUrl(discordId, avatar));
   // Using the bot inside a server is the moment we know which server a gamer
   // came from — so that's where attribution is recorded. It's insert-if-absent,
   // so the first server they use it in gets the credit.
   if (gamer && guildId) void attributeMember(guildId, gamer.userId).catch(() => {});
-  return { discordId, discordName, guildId, gamer };
+  return { discordId, discordName, guildId, gamer, isManager };
 }
 
 function embed(url: string, opts: { title?: string; description?: string; color?: string | null; footer?: string } = {}) {
@@ -496,6 +511,133 @@ async function hasJoined(userId: string, challengeId: string): Promise<boolean> 
   } catch { return false; }
 }
 
+// ===== Server owner: run challenges for your community =====
+
+// `/cluster admin challenges`. A server owner's whole reason to recruit for us
+// is the revenue unlock, and the way they get there is a competition their
+// members actually want to enter. This is where they run one.
+async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  if (!ctx.guildId) {
+    return notYet("Run this inside your server — it manages that server's challenges.", trail);
+  }
+  // Requesting and running a challenge commits the server's name and the
+  // owner's prize money, so it is gated on Discord's own permissions rather
+  // than on merely being in the server.
+  if (!ctx.isManager) {
+    return notYet("Only this server's admins and moderators can run challenges here.", trail, [
+      navButton("Server growth", frame("server"), trail, ButtonStyle.Secondary, "📈"),
+    ]);
+  }
+  const here = frame("admin", arg);
+  const [mine, pending] = await Promise.all([
+    challengesForGuild(ctx.guildId),
+    listRequests({ guildId: ctx.guildId, status: "pending" }),
+  ]);
+
+  const live = mine.filter((c) => c.status === "active" || c.status === "paused");
+  const done = mine.filter((c) => c.status === "completed");
+
+  const lines: string[] = [];
+  if (pending.length) {
+    lines.push(`**${pending.length} awaiting our review** — ${pending.map((p) => p.title).join(", ")}`);
+    lines.push("We check every request before it goes live with Cluster's name on it. You'll get the key here the moment it's approved.");
+    lines.push("");
+  }
+  if (live.length) {
+    lines.push("**Running now**");
+    for (const c of live) {
+      const days = Math.max(0, Math.ceil((c.endAt.getTime() - Date.now()) / 86400000));
+      const owned = c.guildId === ctx.guildId;
+      lines.push(`• **${c.title}** — ${c.game} · ${c.status === "paused" ? "paused" : `${days}d left`}${owned ? "" : " *(hosted elsewhere)*"}`);
+    }
+    lines.push("");
+  }
+  if (done.length) lines.push(`**${done.length} finished** — trophies already handed out.`);
+  if (!lines.length) {
+    lines.push("You haven't run a challenge yet.");
+    lines.push("");
+    lines.push("A challenge is the fastest way to get your members linking their game accounts — which is what counts toward your revenue unlock. Pick a game, set the prize, and we review it before it goes live.");
+  }
+
+  // Managing a specific challenge: pause/resume/end, owner-only.
+  const ownedLive = live.filter((c) => c.guildId === ctx.guildId);
+  const controls: Button[] = ownedLive.slice(0, 2).flatMap((c) => ([
+    c.status === "paused"
+      ? button(`Resume ${c.title}`.slice(0, 40), actionId("ch-resume", [c.id], [here]), ButtonStyle.Success, "▶")
+      : button(`Pause ${c.title}`.slice(0, 40), actionId("ch-pause", [c.id], [here]), ButtonStyle.Secondary, "⏸"),
+    button(`End ${c.title}`.slice(0, 40), actionId("ch-end", [c.id], [here]), ButtonStyle.Danger, "🏁"),
+  ]));
+
+  return {
+    embeds: [{
+      title: "Your server's challenges",
+      description: lines.join("\n").slice(0, 3800),
+      color: embedColor("#8b5cf6"),
+      footer: { text: "Ending a challenge freezes the standings and hands out the trophies straight away." },
+    }],
+    components: rows([
+      button("Request a challenge", `nav-req|${ctx.guildId}`, ButtonStyle.Primary, "🏆"),
+      ...controls,
+      navButton("Server growth", frame("server"), [here], ButtonStyle.Secondary, "📈"),
+      ...live.slice(0, 2).map((c) => navButton(`View ${c.title}`.slice(0, 24), frame("challenge", c.id), [here], ButtonStyle.Secondary, "👁")),
+      backButton(trail),
+    ]),
+  };
+}
+
+// Step one of a request: which game. Shown as the games card so the owner picks
+// from what we actually track, not from memory.
+async function requestGameScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  if (!ctx.guildId) return notYet("Run this inside your server.", trail);
+  if (!ctx.isManager) return notYet("Only this server's admins and moderators can request a challenge.", trail);
+  const games = await requestableGames();
+  if (!games.length) return notYet("No games are available for challenges right now.", trail);
+
+  const { url, data } = await cardRef("planets", {});
+  return {
+    embeds: [embed(url, {
+      title: "Which game?",
+      description:
+        "Pick the game your community actually plays. We sync its stats from the official API, so the standings are real and nobody can inflate them.\n\n"
+        + "Next you'll set the length, the prize and the trophies — then we review it.",
+      color: data && "theme" in data ? data.theme.accent : "#8b5cf6",
+    })],
+    components: rows([
+      ...games.slice(0, 20).map((g) => button(g.name.slice(0, 24), `open-req|${g.name}`, gameStyle(g.name), "🎮")),
+      backButton(trail),
+    ]),
+  };
+}
+
+// The request form itself. Discord modals allow five text inputs, which is
+// exactly enough for the things only the owner can decide.
+export function requestModal(game: string) {
+  return {
+    type: InteractionResponseType.Modal,
+    data: {
+      custom_id: `req|${game}`.slice(0, 100),
+      title: `Challenge on ${game}`.slice(0, 45),
+      components: [
+        textRow("title", "Challenge name", 1, true, `e.g. ${game} Ladder Week`, 80),
+        textRow("description", "What are they competing for?", 2, false, "Tell your members what winning looks like", 400),
+        textRow("days", "How many days should it run?", 1, true, "7", 3),
+        textRow("prize", "Prize money you're putting up", 1, false, "e.g. 100 — leave blank for trophies only", 8),
+        textRow("currency", "Currency", 1, false, "USD", 8),
+      ],
+    },
+  };
+}
+
+function textRow(id: string, label: string, style: 1 | 2, required: boolean, placeholder: string, max: number) {
+  return {
+    type: ComponentType.ActionRow,
+    components: [{
+      type: ComponentType.TextInput, custom_id: id, style, required,
+      label: label.slice(0, 45), max_length: max, placeholder: placeholder.slice(0, 100),
+    }],
+  };
+}
+
 // ===== Link a game account =====
 
 // Discord modals are the one place a true modal is correct: a short form with
@@ -559,14 +701,22 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
   if (!ctx.gamer) return signInPrompt(ctx, trail);
   const c = await catalog();
   if (!game) {
+    // The picker is a real card — every game's logo, in one image — with a
+    // coloured button per game underneath it. "Which games can I link?" should
+    // be answered by looking, not by reading a list of names.
+    const { url, data } = await cardRef("planets", {});
+    const games = c.games.slice(0, 20);
     return {
-      embeds: [{
+      embeds: [embed(url, {
         title: "Link a game account",
-        description: "Pick a game, then enter your in-game name. Stats sync from the official API — never self-reported.",
-        color: embedColor("#8b5cf6"),
-      }],
+        description: "Pick your game, enter your in-game name, done. Stats sync from the official API — never self-reported.",
+        color: data && "theme" in data ? data.theme.accent : "#8b5cf6",
+      })],
       components: rows([
-        ...c.games.slice(0, 20).map((g) => navButton(g.name.slice(0, 24), frame("link", g.value), trail)),
+        // Straight to the modal for each game: one tap from here to typing a
+        // name, rather than a screen in between that says the same thing.
+        ...games.map((g) => button(g.name.slice(0, 24), `open-link|${g.value}`, gameStyle(g.name), "🎮")),
+        linkButton("Link on the site instead", `${siteUrl()}/profile?tab=accounts`, "🌐"),
         backButton(trail),
       ]),
     };
@@ -673,7 +823,8 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
     case "challenges": return challengesScreen(a, ctx, trail);
     case "link": return linkScreen(a, ctx, trail);
     case "server": return serverScreen(ctx, trail);
-    case "admin": return comingSoon("Server settings", trail);
+    case "admin": return adminScreen(a, ctx, trail);
+    case "req-game": return requestGameScreen(ctx, trail);
     default: return homeScreen(ctx, trail);
   }
 }

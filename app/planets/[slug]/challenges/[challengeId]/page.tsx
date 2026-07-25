@@ -97,12 +97,21 @@ export default async function ChallengePage({
   // server it belongs to. Hiding it would waste the best advertising it has:
   // people watching a competition they can't join.
   const keyRequired = joinLocked(challenge);
-  let ownerServer: string | null = null;
-  if (keyRequired && challenge.guildId) {
-    const [g] = await db.select({ name: schema.discordGuilds.name })
-      .from(schema.discordGuilds).where(eq(schema.discordGuilds.guildId, challenge.guildId)).limit(1);
-    ownerServer = g?.name || null;
-  }
+  // Every server holding the key. Showing them — with their invite — is the
+  // whole trade: we put their competition in front of our whole audience, and
+  // the only way to enter is to be in their server.
+  const holderIds = [...new Set([challenge.guildId, ...(challenge.guildIds ?? [])].filter((g): g is string => !!g))];
+  const holders = keyRequired && holderIds.length
+    ? await db.select({
+      guildId: schema.discordGuilds.guildId,
+      name: schema.discordGuilds.name,
+      iconUrl: schema.discordGuilds.iconUrl,
+      inviteUrl: schema.discordGuilds.inviteUrl,
+      memberCount: schema.discordGuilds.memberCount,
+    }).from(schema.discordGuilds).where(inArray(schema.discordGuilds.guildId, holderIds))
+    : [];
+  const ownerServer = holders.find((h) => h.guildId === challenge.guildId)?.name
+    ?? holders[0]?.name ?? null;
 
   const fmtDate = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
   const embed = challenge.heroType === "stream" && challenge.heroUrl ? streamEmbed(challenge.heroUrl) : null;
@@ -247,6 +256,33 @@ export default async function ChallengePage({
                       <p className="text-xs text-muted mt-1">
                         {tr("This challenge belongs to a Discord server. Anyone can follow it, but the key to enter was sent to that server.")}
                       </p>
+                      {/* Where to actually get the key. Without this the gate is
+                          a dead end; with it, it's a door into their community. */}
+                      {holders.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {holders.map((h) => (
+                            h.inviteUrl ? (
+                              <a
+                                key={h.guildId} href={h.inviteUrl} target="_blank" rel="noreferrer"
+                                className="inline-flex items-center gap-2 rounded-full border border-violet-400/40 bg-violet-500/10 px-3 py-1.5 text-xs font-semibold hover:bg-violet-500/20"
+                              >
+                                {h.iconUrl && /* eslint-disable-next-line @next/next/no-img-element */ (
+                                  <img src={h.iconUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
+                                )}
+                                {tr("Join")} {h.name || tr("the server")}
+                                {h.memberCount > 0 && <span className="text-muted">· {h.memberCount.toLocaleString()}</span>}
+                              </a>
+                            ) : (
+                              <span key={h.guildId} className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1.5 text-xs text-muted">
+                                {h.iconUrl && /* eslint-disable-next-line @next/next/no-img-element */ (
+                                  <img src={h.iconUrl} alt="" className="h-5 w-5 rounded-full object-cover" />
+                                )}
+                                {h.name || tr("A Discord server")}
+                              </span>
+                            )
+                          ))}
+                        </div>
+                      )}
                       <input
                         name="accessKey" required
                         placeholder={tr("Entry key")}
