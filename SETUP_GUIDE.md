@@ -134,73 +134,141 @@ check `/admin/settings` for a live status table.
 ### ClusterBot for Discord (`DISCORD_BOT_TOKEN` + `DISCORD_PUBLIC_KEY` + `BOT_API_SECRET`)
 
 The bot runs inside this Next app — HTTP interactions, no gateway, no separate
-process. Add it to the **same application** you created for Discord sign-in, so
-one app holds both the OAuth credentials and the bot.
+process. **You never need a terminal.** Everything below is a browser page, a
+value to copy, or a button to press.
 
-**1. Bot tab** → **Add Bot** → **Reset Token** → copy into `DISCORD_BOT_TOKEN`.
-The token is shown once; if you lose it, reset again.
-- **Public Bot: OFF** while testing, so only you can add it.
+Add the bot to the **same Discord application** you created for Discord sign-in,
+so one app holds both the OAuth credentials and the bot.
+
+#### 1. Create the bot and copy two values
+
+In https://discord.com/developers/applications → your app:
+
+- **Bot** tab → **Reset Token** → copy into `DISCORD_BOT_TOKEN`. Shown once; if
+  you lose it, reset again.
 - **Message Content Intent: leave OFF.** Cluster never reads message text, and
-  requesting that intent triggers Discord verification past 75 servers.
+  requesting that intent forces Discord verification past 75 servers.
+- **General Information** tab → copy **Public Key** into `DISCORD_PUBLIC_KEY`
+  and **Application ID** into `DISCORD_APP_ID`.
 
-**2. General Information tab** → copy **Public Key** into `DISCORD_PUBLIC_KEY`
-and **Application ID** into `DISCORD_APP_ID`. (The App ID is optional if
-`DISCORD_CLIENT_ID` is already set — the code falls back to it.)
+> The single most common setup failure is pasting the wrong value into
+> `DISCORD_PUBLIC_KEY`. It must be the **Public Key** from General Information —
+> 64 hex characters. The Application ID (a ~19-digit number), the client secret
+> and the bot token all look plausible and all fail.
 
-**3. OAuth2 → Redirects** → add **both**:
-```
-https://clustergg.com/api/auth/discord/callback   # sign-in
-https://clustergg.com/api/discord/installed       # bot install — REQUIRED
-```
-The install URL is load-bearing: Discord returns `guild_id` to it, which is the
-only thing install-time onboarding needs. Without it, installs fail with
-`invalid_redirect_uri`.
+Also generate `BOT_API_SECRET` — any long random string. (In Vercel you can use
+any password generator; it never leaves your project.)
 
-**4. Generate `BOT_API_SECRET`** (`openssl rand -hex 32`). It guards command
-registration and the screen-preview endpoint, mirroring `CRON_SECRET`.
+#### 2. Add the env vars and REDEPLOY
 
-**5. Deploy** the env vars (Production + Preview), then set
-**General Information → Interactions Endpoint URL**:
-```
-https://clustergg.com/api/discord/interactions
-```
-Set this **last**. Clicking Save makes Discord send a signed PING; if the public
-key isn't live yet the endpoint returns 401/503 and Discord refuses the URL.
+Vercel → your project → **Settings → Environment Variables**, scope
+**Production** (and Preview if you test there):
 
-**6. Register the slash command** (once, and after any change to
-`lib/discord/commands.ts`):
-```bash
-curl -X POST https://clustergg.com/api/discord/register \
-     -H "Authorization: Bearer $BOT_API_SECRET"
-```
-While testing, append `?guild_id=<your server id>` — guild-scoped commands
-appear **immediately**, where global ones can take up to an hour.
-
-**7. Install it.** Open `https://clustergg.com/discord-bot` and click
-**Add ClusterBot**. On authorising, the bot creates `#clustergg`, posts and pins
-a how-to guide PNG for every topic and every quest, and DMs the owner.
-
-**Permissions.** The invite requests exactly what the bot uses: Manage Channels
-(create the channel), Send Messages, **Manage Messages (pin the guides)**, Embed
-Links, Attach Files, Read History, Mention Everyone (private-challenge
-announcements), Add Reactions, Use Application Commands. If Manage Messages is
-missing the guides post but silently fail to pin.
-
-**Troubleshooting**
-
-| Symptom | Cause |
+| Variable | Value |
 |---|---|
-| Portal won't save the interactions URL | `DISCORD_PUBLIC_KEY` wrong, or env not redeployed |
-| `/cluster` doesn't appear | Registration not run, or global propagation — use `?guild_id=` |
-| "The application did not respond" | A handler threw before the ACK — check runtime logs |
-| Guides posted but not pinned | Missing Manage Messages — re-invite from `/discord-bot` |
-| No `#clustergg` channel | Missing Manage Channels — the owner is DM'd with this exact reason |
+| `DISCORD_BOT_TOKEN` | Bot tab → Reset Token |
+| `DISCORD_PUBLIC_KEY` | General Information → Public Key (64 hex chars) |
+| `DISCORD_APP_ID` | General Information → Application ID |
+| `BOT_API_SECRET` | Any long random string you generate |
 
-To see what any bot screen will render without opening Discord:
-```bash
-curl -H "Authorization: Bearer $BOT_API_SECRET" \
-  "https://clustergg.com/api/discord/preview?screen=home&discord_id=<snowflake>"
-```
+Then **Deployments → ⋯ → Redeploy**. Environment variables do **not** apply to
+an already-built deployment — this step is mandatory, and skipping it is the
+second most common reason Discord can't verify the endpoint.
+
+#### 3. Check it from your browser
+
+Open **`https://clustergg.com/admin/discord`** (Mission Control → Discord bot).
+
+That page tells you, in plain language, whether each value is present and
+correctly shaped, and shows the **exact URLs to paste into Discord**, built from
+the domain you are actually on. Every check must be green before step 4.
+
+You can also open `https://clustergg.com/api/discord/interactions` directly —
+it returns a plain-English diagnosis of anything that's wrong. (Discord only
+ever POSTs to that URL, so viewing it in a browser is safe and changes nothing.)
+
+#### 4. Paste the URLs into Discord
+
+Copy these from `/admin/discord` — **no trailing slash on any of them**:
+
+- **OAuth2 → Redirects** — add both:
+  - `https://clustergg.com/api/auth/discord/callback` (sign-in; likely already there)
+  - `https://clustergg.com/api/discord/installed` (bot install — **required**)
+- **General Information → Interactions Endpoint URL** — set this **last**:
+  - `https://clustergg.com/api/discord/interactions`
+
+Saving the interactions URL makes Discord send a real signed test request. If
+`/admin/discord` isn't all green, Discord will reject it with *"The specified
+interactions endpoint url could not be verified."*
+
+#### 5. Installation settings (public vs private app)
+
+Discord's **Installation** tab controls how people add your bot.
+
+- **Install Link → Custom URL** → `https://clustergg.com/api/discord/install`
+
+This matters. When the app is **Public**, Discord shows an "Add App" button and,
+if you leave the install link on *Discord Provided Link*, that button carries no
+`redirect_uri` — so no `guild_id` comes back to us, and the server gets **no
+`#clustergg` channel and no pinned guides**. Pointing the custom install link at
+`/api/discord/install` means every route in, including Discord's own button,
+runs the full onboarding.
+
+If you keep the app **Private** while testing, set Install Link to **None** and
+add the bot using the **Add ClusterBot** button on
+`https://clustergg.com/admin/discord` — that button is the same OAuth URL and
+works whether the app is public or private.
+
+Under **Default Install Settings**, set the scopes to `bot` and
+`applications.commands`. The permissions come from our install link, which
+requests exactly what the bot uses — including **Manage Messages**, without
+which the how-to guides post but silently fail to pin.
+
+#### 6. Register `/cluster` — a button, not a command line
+
+On `/admin/discord`, use **Register the /cluster command**:
+
+- **Leave the server ID blank** → registers globally. Discord can take up to an
+  hour to show it everywhere.
+- **Paste a server ID** → registers to that one server, where it appears
+  **immediately**. This is what you want while testing.
+
+To get a server ID: Discord → Settings → Advanced → turn on **Developer Mode**,
+then right-click your server icon → **Copy Server ID**.
+
+Re-run this after any change to the command list.
+
+#### 7. Add it and test
+
+Click **Add ClusterBot to a server** on `/admin/discord` (or open
+`https://clustergg.com/discord-bot`).
+
+| Check | Expected |
+|---|---|
+| The server | `#clustergg` exists, guide cards posted **and pinned**, owner DM'd |
+| Type `/cluster` | All subcommands listed with descriptions |
+| Type `/cluster show ` (with the space) | Autocomplete: profile, CP, every game, every quest |
+| `/cluster home` | Your profile card — sign in with Discord on the site first |
+| Click a button | The **same message** changes; no new message appears |
+| Click **Back** | Returns to the previous screen, still in place |
+| `/cluster share` | Posts publicly with the "vote for me" message |
+
+If the guides posted but didn't pin, the bot is missing **Manage Messages** —
+re-add it using the button on `/admin/discord`, which requests the correct
+permissions. `/admin/discord` also has **Run setup** and **Re-post guides**
+buttons to fix a server by hand.
+
+#### Troubleshooting
+
+| Symptom | Cause and fix |
+|---|---|
+| "The specified interactions endpoint url could not be verified" | Open `/admin/discord`. Almost always `DISCORD_PUBLIC_KEY` is missing, is the wrong value, or the deployment wasn't redeployed after adding it. |
+| Same error, all checks green | You pasted the URL with a trailing slash, or a different domain than the one you're deployed on. Copy the URL shown on `/admin/discord` exactly. |
+| `/cluster` doesn't appear | Registration not run, or global propagation delay — register to your server ID for instant results. |
+| "The application did not respond" | A handler failed before replying. Check Vercel → Deployments → Runtime Logs. |
+| Guides posted but not pinned | Missing Manage Messages — re-add the bot from `/admin/discord`. |
+| No `#clustergg` channel | Missing Manage Channels — the owner gets a DM saying exactly this. |
+| Bot added but nothing happened | It was added with Discord's provided link, so we never got `guild_id`. Set the custom install link (step 5), or use **Run setup** on `/admin/discord` with the server ID. |
 
 ### Epic / Battle.net (identity only)
 - Epic: https://dev.epicgames.com/portal → create product → OAuth client → `EPIC_CLIENT_ID/SECRET`.
