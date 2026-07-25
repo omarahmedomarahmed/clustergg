@@ -418,6 +418,12 @@ export async function saveChallenge(formData: FormData) {
     thresholdTarget: Number(formData.get("thresholdTarget")) || null,
     gateQuestId: String(formData.get("gateQuestId") ?? "").trim() || null,
     gateMinBadges: Math.max(0, Number(formData.get("gateMinBadges")) || 0),
+    // Server-gated challenge. A private challenge with no server assigned would
+    // be invisible everywhere, so it falls back to public rather than vanishing.
+    visibility: String(formData.get("guildId") ?? "").trim() && String(formData.get("visibility") ?? "") === "private" ? "private" : "public",
+    guildId: String(formData.get("guildId") ?? "").trim() || null,
+    accessKey: String(formData.get("accessKey") ?? "").trim() || null,
+    announceHype: formData.get("announceHype") === "on",
     startAt,
     endAt,
     cadence,

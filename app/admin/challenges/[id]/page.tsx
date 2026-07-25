@@ -16,7 +16,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
   const [challenge] = await db.select().from(schema.challenges).where(eq(schema.challenges.id, id)).limit(1);
   if (!challenge) notFound();
 
-  const [participants, events, spaces, trophies, quests] = await Promise.all([
+  const [participants, events, spaces, trophies, quests, guilds] = await Promise.all([
     db.select({ p: schema.challengeParticipants, u: schema.users, a: schema.linkedGameAccounts })
       .from(schema.challengeParticipants)
       .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
@@ -29,6 +29,9 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     db.select().from(schema.spaces),
     db.select().from(schema.trophies),
     db.select({ id: schema.quests.id, name: schema.quests.name, logoUrl: schema.quests.logoUrl }).from(schema.quests).orderBy(schema.quests.sortOrder),
+    // Servers with the bot — the picker for a server-gated challenge.
+    db.select({ guildId: schema.discordGuilds.guildId, name: schema.discordGuilds.name })
+      .from(schema.discordGuilds).where(eq(schema.discordGuilds.status, "active")),
   ]);
 
   const builderProviders = PROVIDERS
@@ -46,6 +49,8 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     trophyId: challenge.trophyId, status: challenge.status, prizeDescription: challenge.prizeDescription,
     prizes: challenge.prizes ?? null,
     gateQuestId: challenge.gateQuestId, gateMinBadges: challenge.gateMinBadges ?? 0,
+    visibility: challenge.visibility ?? "public", guildId: challenge.guildId,
+    accessKey: challenge.accessKey, announceHype: challenge.announceHype ?? false,
   };
 
   return (
@@ -112,6 +117,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
             trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
             quests={quests}
+            guilds={guilds.map((g) => ({ guildId: g.guildId, name: g.name }))}
           />
         </div>
       </details>

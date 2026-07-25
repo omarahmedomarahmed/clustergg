@@ -111,6 +111,36 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
   });
 }
 
+// A new challenge is live. A public one goes everywhere; a server-gated one
+// goes ONLY to its server, with the extra hype that makes it feel like theirs.
+export async function announceChallengeLaunched(challengeId: string): Promise<void> {
+  if (!canAct()) return;
+  const db = await getDb();
+  const [ch] = await db.select().from(schema.challenges)
+    .where(eq(schema.challenges.id, challengeId)).limit(1);
+  if (!ch || ch.status !== "active") return;
+
+  const isPrivate = ch.visibility === "private" && !!ch.guildId;
+  const [card, url] = await Promise.all([
+    cardRef("challenge", { id: challengeId }),
+    challengeUrl(siteUrl(), challengeId),
+  ]);
+  if (!card.data || card.data.kind !== "challenge") return;
+
+  const content = isPrivate
+    ? `${ch.announceHype ? "@here " : ""}**${ch.title}** is live — and it's only for this server. Nobody else can enter it.`
+    : `**${ch.title}** is live on **${ch.game}**.`;
+
+  await announce({
+    content,
+    embeds: [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }],
+    components: rows([
+      navButton("Join now", frame("challenge", challengeId), [frame("home")], ButtonStyle.Success, "🏆"),
+      linkButton("Details", url, "🔗"),
+    ]),
+  }, isPrivate ? ch.guildId : null);
+}
+
 // A challenge finished — the podium, with what each winner actually earned.
 export async function announceChallengeEnded(challengeId: string): Promise<void> {
   if (!(await anyTarget())) return;

@@ -19,6 +19,8 @@ export type BuilderSpace = { id: string; name: string; game: string | null };
 export type BuilderTrophy = { id: string; name: string; tier: string; imageUrl: string };
 export type BuilderQuest = { id: string; name: string; logoUrl: string | null };
 // An existing challenge to edit (all fields pre-filled). Omitted when creating.
+export type BuilderGuild = { guildId: string; name: string };
+
 export type ChallengeEdit = {
   id: string; spaceId: string; provider: string; game: string; title: string; description: string;
   format: string; cadence: string; heroType: string; heroUrl: string | null;
@@ -28,6 +30,7 @@ export type ChallengeEdit = {
   trophyId: string | null; status: string; prizeDescription: string | null;
   prizes?: { first?: string[]; second?: string[]; third?: string[] } | null;
   gateQuestId: string | null; gateMinBadges: number;
+  visibility: string; guildId: string | null; accessKey: string | null; announceHype: boolean;
 };
 
 // Points recommendation: reward the primary "win-like" metric heavily, add a
@@ -62,8 +65,8 @@ const IDEAS = [
 const OPS = [">=", ">", "<=", "<", "=="];
 
 export default function ChallengeBuilder({
-  providers, spaces, trophies, quests = [], challenge,
-}: { providers: BuilderProvider[]; spaces: BuilderSpace[]; trophies: BuilderTrophy[]; quests?: BuilderQuest[]; challenge?: ChallengeEdit }) {
+  providers, spaces, trophies, quests = [], guilds = [], challenge,
+}: { providers: BuilderProvider[]; spaces: BuilderSpace[]; trophies: BuilderTrophy[]; quests?: BuilderQuest[]; guilds?: BuilderGuild[]; challenge?: ChallengeEdit }) {
   const editing = !!challenge;
   const [providerId, setProviderId] = useState(challenge?.provider ?? providers[0]?.id ?? "");
   const [cadence, setCadence] = useState(challenge?.cadence ?? "weekly");
@@ -74,6 +77,9 @@ export default function ChallengeBuilder({
   const [pointsMap, setPointsMap] = useState<Record<string, number>>(() => challenge?.pointsEngine ?? recommendPoints(providers[0]?.capabilities ?? []));
   const [conditions, setConditions] = useState<{ metric: string; op: string; value: number }[]>(challenge?.conditions ?? []);
   const [gateQuestId, setGateQuestId] = useState(challenge?.gateQuestId ?? "");
+  const [visibility, setVisibility] = useState(challenge?.visibility ?? "public");
+  const [guildId, setGuildId] = useState(challenge?.guildId ?? "");
+  const [accessKey, setAccessKey] = useState(challenge?.accessKey ?? "");
 
   const provider = useMemo(() => providers.find((p) => p.id === providerId), [providers, providerId]);
   const caps = provider?.capabilities ?? [];
@@ -248,6 +254,58 @@ export default function ChallengeBuilder({
             </div>
           </div>
         )}
+
+        {/* Server-gated challenge. This is the thing a server owner gets that
+            no other server has — named after their community, announced only
+            there, and hidden on the web behind an access key. */}
+        <div className="mt-3">
+          <div className="text-xs text-muted mb-1.5">Who can see this challenge</div>
+          <div className="glass !rounded-lg p-3 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { v: "public", label: "Public", note: "Announced in every server with the bot" },
+                { v: "private", label: "Server-only", note: "One server, hidden on the web" },
+              ].map((o) => (
+                <button
+                  key={o.v} type="button" onClick={() => setVisibility(o.v)}
+                  className={`rounded-lg px-3 py-2 text-left text-xs border transition ${visibility === o.v ? "border-cyan-400/70 bg-cyan-500/10" : "border-violet-400/20"}`}
+                >
+                  <div className="font-bold">{o.label}</div>
+                  <div className="text-[10px] text-muted">{o.note}</div>
+                </button>
+              ))}
+            </div>
+            <input type="hidden" name="visibility" value={visibility} />
+
+            {visibility === "private" && (
+              <>
+                <div>
+                  <div className="text-[11px] text-muted mb-1">Which server owns it</div>
+                  <select name="guildId" value={guildId} onChange={(e) => setGuildId(e.target.value)} className="input-cosmic !py-1 text-sm w-full">
+                    <option value="">— pick a server with the bot —</option>
+                    {guilds.map((g) => <option key={g.guildId} value={g.guildId}>{g.name || g.guildId}</option>)}
+                  </select>
+                  {guilds.length === 0 && (
+                    <div className="text-[10px] text-amber-300 mt-1">No servers have installed the bot yet.</div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-[11px] text-muted mb-1">Access key — needed to open it on the web</div>
+                  <div className="flex gap-2">
+                    <input name="accessKey" value={accessKey} onChange={(e) => setAccessKey(e.target.value)}
+                      placeholder="e.g. NEBULA-CUP-2026" className="input-cosmic !py-1 text-sm flex-1" />
+                    <button type="button" onClick={() => setAccessKey(Math.random().toString(36).slice(2, 8).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase())}
+                      className="ghost-btn pressable rounded-lg px-3 py-1 text-xs">Generate</button>
+                  </div>
+                </div>
+                <label className="flex items-center gap-2 text-xs">
+                  <input type="checkbox" name="announceHype" defaultChecked={challenge?.announceHype ?? true} className="accent-violet-500" />
+                  Announce it loudly in that server (pinned, @here if allowed)
+                </label>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Step 5: presentation */}

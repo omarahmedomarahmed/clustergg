@@ -401,7 +401,7 @@ async function leaderboardScreen(game: string, ctx: ScreenCtx, trail: Frame[]): 
 // ===== Challenges =====
 
 async function challengesScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
-  const live = await liveChallenges(game || null, 5);
+  const live = await liveChallenges(game || null, 5, ctx.guildId ?? null);
   if (!live.length) {
     return notYet(game ? `No live challenges on **${game}** right now.` : "No challenges are live right now.", trail, [
       navButton("Browse planets", frame("planets"), trail, ButtonStyle.Secondary, "🪐"),

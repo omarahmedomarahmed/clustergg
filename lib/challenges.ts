@@ -1,4 +1,4 @@
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, lt, or } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
@@ -88,12 +88,30 @@ export async function challengeUrl(base: string, challengeId: string): Promise<s
 
 // Live challenges, optionally for one game. Shared by the bot's challenge
 // screens and anywhere else that needs "what's on right now".
-export async function liveChallenges(game?: string | null, limit = 8) {
+// `guildId` scopes visibility: inside a server you see the public challenges
+// PLUS that server's own private ones. Anywhere else, only the public ones —
+// a server-exclusive challenge that leaked into other servers wouldn't be
+// exclusive, and that exclusivity is the whole product for an owner.
+export async function liveChallenges(game?: string | null, limit = 8, guildId?: string | null) {
   const db = await getDb();
+  const visible = guildId
+    ? or(eq(schema.challenges.visibility, "public"), eq(schema.challenges.guildId, guildId))
+    : eq(schema.challenges.visibility, "public");
   const where = game
-    ? and(eq(schema.challenges.status, "active"), eq(schema.challenges.game, game))
-    : eq(schema.challenges.status, "active");
+    ? and(eq(schema.challenges.status, "active"), eq(schema.challenges.game, game), visible)
+    : and(eq(schema.challenges.status, "active"), visible);
   return db.select().from(schema.challenges).where(where).orderBy(schema.challenges.endAt).limit(limit);
+}
+
+// Can this viewer open this challenge? Public ones: always. Private ones: only
+// from the owning server, or with the access key.
+export async function canSeeChallenge(
+  challenge: { visibility: string | null; guildId: string | null; accessKey: string | null },
+  ctx: { guildId?: string | null; accessKey?: string | null },
+): Promise<boolean> {
+  if ((challenge.visibility ?? "public") !== "private") return true;
+  if (challenge.guildId && ctx.guildId && challenge.guildId === ctx.guildId) return true;
+  return !!challenge.accessKey && challenge.accessKey === ctx.accessKey;
 }
 
 // ===== Ending a challenge =====

@@ -7,7 +7,7 @@ import { ALL_COMMANDS } from "@/lib/discord/commands";
 import { clearCatalog } from "@/lib/discord/catalog";
 import { discordConfigured, CLUSTER_CHANNEL } from "@/lib/discord/config";
 import { postGuides, onboardGuild } from "@/lib/discord/onboard";
-import { broadcastToGuilds } from "@/lib/discord/announce";
+import { broadcastToGuilds, announceChallengeLaunched } from "@/lib/discord/announce";
 import { JOBS, runJob, type JobKey } from "@/lib/jobs";
 
 // Everything the bot needs operationally, as buttons in Mission Control rather
@@ -85,6 +85,17 @@ export async function broadcast(_prev: BotActionState, formData: FormData): Prom
     return { error: res.targets === 0 ? "No servers to send to yet." : "Couldn't deliver to any server — check the bot can post in their channels." };
   }
   return { ok: `Sent to ${res.sent} of ${res.targets} server${res.targets === 1 ? "" : "s"}.` };
+}
+
+// Announce a challenge to Discord on demand. A public one reaches every
+// server; a server-gated one reaches only its own, with extra hype.
+export async function announceChallenge(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
+  const id = String(formData.get("challengeId") ?? "").trim();
+  if (!id) return { error: "Missing challenge." };
+  await announceChallengeLaunched(id);
+  return { ok: "Announced. Check the server's Cluster channel." };
 }
 
 // Run the full install flow by hand, for a server that already has the bot.
