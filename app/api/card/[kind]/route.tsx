@@ -64,20 +64,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
     data = null;
   }
 
-  if (!data) {
-    // Never 500 into a Discord attachment — render a branded fallback instead.
-    const bg = await cardBg("bot_welcome").catch(() => ({ bgUrl: null, dim: 62 }));
-    data = {
-      kind: "guide",
-      title: "Nothing to show yet",
-      subtitle: "This card had no data — link a game account to fill it in.",
-      badge: "CLUSTER",
-      steps: GUIDE_TOPICS["getting-started"].steps.slice(0, 3),
-      footer: "clustergg.com",
-      theme: { accent: "#8b5cf6", accent2: "#22d3ee", bgUrl: bg.bgUrl, dim: bg.dim },
-    };
-    return renderCard(data); // never cache a fallback
-  }
+  if (!data) return fallbackCard("This card had no data — link a game account to fill it in.");
 
   if (!fresh) {
     // Cache key = everything that identifies this card within its kind.
@@ -86,5 +73,31 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
     if (hit) return NextResponse.redirect(hit.url, { status: 302, headers: { "x-card-cache": hit.cached ? "hit" : "miss" } });
   }
 
-  return renderCard(data);
+  // A render can still fail on something outside our control (a font, a
+  // pathological string). Discord shows a broken-image box for any non-image
+  // response, so this endpoint must always answer with a picture.
+  try {
+    return await renderCard(data);
+  } catch {
+    return fallbackCard("This card couldn't be drawn just now.");
+  }
+}
+
+async function fallbackCard(subtitle: string) {
+  const bg = await cardBg("bot_welcome").catch(() => ({ bgUrl: null, dim: 62 }));
+  const data: CardData = {
+    kind: "guide",
+    title: "Nothing to show yet",
+    subtitle,
+    badge: "CLUSTER",
+    steps: GUIDE_TOPICS["getting-started"].steps.slice(0, 3),
+    footer: "clustergg.com",
+    theme: { accent: "#8b5cf6", accent2: "#22d3ee", bgUrl: bg.bgUrl, dim: bg.dim },
+  };
+  try {
+    return await renderCard(data);
+  } catch {
+    // Absolute last resort: art with no data at all still beats a 500.
+    return renderCard({ ...data, theme: { accent: "#8b5cf6", accent2: "#22d3ee" } });
+  }
 }

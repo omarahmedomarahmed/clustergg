@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
+import { toEmbeddable } from "@/lib/cards/img";
 import type {
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
   LeaderboardCard, ChallengeCard, PlanetCard, GuideCard,
@@ -366,11 +367,64 @@ function body(d: CardData) {
   }
 }
 
+// Resolve every image on a card to inline bytes before drawing.
+//
+// Satori fetches remote images itself, and one unreachable host — or one
+// animated .gif avatar it can't decode — takes down the entire card. Doing it
+// up front means a bad image degrades to its placeholder instead, and the
+// render itself touches the network zero times.
+async function prepareCard(d: CardData): Promise<CardData> {
+  const bg = toEmbeddable(d.theme.bgUrl);
+
+  switch (d.kind) {
+    case "profile": {
+      const [bgUrl, avatarUrl, ...logos] = await Promise.all([
+        bg, toEmbeddable(d.avatarUrl), ...d.accounts.map((a) => toEmbeddable(a.logoUrl)),
+      ]);
+      return {
+        ...d, avatarUrl,
+        accounts: d.accounts.map((a, i) => ({ ...a, logoUrl: logos[i] })),
+        theme: { ...d.theme, bgUrl },
+      };
+    }
+    case "leaderboard": {
+      const [bgUrl, logoUrl, ...avatars] = await Promise.all([
+        bg, toEmbeddable(d.logoUrl), ...d.rows.map((r) => toEmbeddable(r.avatarUrl)),
+      ]);
+      return {
+        ...d, logoUrl,
+        rows: d.rows.map((r, i) => ({ ...r, avatarUrl: avatars[i] })),
+        theme: { ...d.theme, bgUrl },
+      };
+    }
+    case "challenge": {
+      const [bgUrl, logoUrl, ...trophies] = await Promise.all([
+        bg, toEmbeddable(d.logoUrl), ...d.trophies.map((t) => toEmbeddable(t.imageUrl)),
+      ]);
+      return {
+        ...d, logoUrl,
+        // A trophy with no usable art is dropped rather than drawn as a gap.
+        trophies: d.trophies.map((t, i) => ({ ...t, imageUrl: trophies[i] ?? "" })).filter((t) => t.imageUrl),
+        theme: { ...d.theme, bgUrl },
+      };
+    }
+    case "game-stats":
+    case "quest":
+    case "planet":
+    case "guide": {
+      const [bgUrl, logoUrl] = await Promise.all([bg, toEmbeddable(d.logoUrl)]);
+      return { ...d, logoUrl, theme: { ...d.theme, bgUrl } };
+    }
+    default:
+      return { ...d, theme: { ...d.theme, bgUrl: await bg } };
+  }
+}
+
 // Render a card to an ImageResponse (streamable PNG response).
 export async function renderCard(data: CardData): Promise<ImageResponse> {
-  const fonts = await loadCardFonts();
+  const [fonts, prepared] = await Promise.all([loadCardFonts(), prepareCard(data)]);
   return new ImageResponse(
-    <div style={{ display: "flex", width: CARD_W, height: CARD_H, fontFamily: cardFontFamily(fonts) }}>{body(data)}</div>,
+    <div style={{ display: "flex", width: CARD_W, height: CARD_H, fontFamily: cardFontFamily(fonts) }}>{body(prepared)}</div>,
     { width: CARD_W, height: CARD_H, ...(fonts.length ? { fonts } : {}) },
   );
 }
