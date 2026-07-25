@@ -418,6 +418,12 @@ export async function saveChallenge(formData: FormData) {
     thresholdTarget: Number(formData.get("thresholdTarget")) || null,
     gateQuestId: String(formData.get("gateQuestId") ?? "").trim() || null,
     gateMinBadges: Math.max(0, Number(formData.get("gateMinBadges")) || 0),
+    // Server-gated challenge. A private challenge with no server assigned would
+    // be invisible everywhere, so it falls back to public rather than vanishing.
+    visibility: String(formData.get("guildId") ?? "").trim() && String(formData.get("visibility") ?? "") === "private" ? "private" : "public",
+    guildId: String(formData.get("guildId") ?? "").trim() || null,
+    accessKey: String(formData.get("accessKey") ?? "").trim() || null,
+    announceHype: formData.get("announceHype") === "on",
     startAt,
     endAt,
     cadence,
@@ -460,6 +466,37 @@ export async function setParticipantStatus(participantId: string, status: "activ
   await db.update(schema.challengeParticipants).set({ status })
     .where(eq(schema.challengeParticipants.id, participantId));
   await audit(admin.id, `challenge_participant.${status}`, "challenge_participant", participantId);
+  revalidatePath(`/admin/challenges/${challengeId}`);
+}
+
+// End a challenge on demand: freeze the standings as final placements, mark it
+// completed and award the podium trophies. Staff need this for a challenge that
+// should stop early, and to close one out without waiting for the daily job.
+export async function endChallengeNow(challengeId: string) {
+  const admin = await requireStaff();
+  const { closeChallenge } = await import("@/lib/challenges");
+  const res = await closeChallenge(challengeId);
+  await audit(admin.id, "challenge.ended", "challenge", challengeId);
+  revalidatePath(`/admin/challenges/${challengeId}`);
+  revalidatePath("/admin/challenges");
+  return res;
+}
+
+// Re-open a challenge that was ended by mistake. Placements and trophies that
+// were already awarded stay — taking a trophy back off someone's profile would
+// be worse than an extra day of competition.
+export async function reopenChallenge(challengeId: string, endAtIso: string) {
+  const admin = await requireStaff();
+  const db = await getDb();
+  const endAt = new Date(endAtIso);
+  if (Number.isNaN(endAt.getTime())) return;
+  await db.update(schema.challenges)
+    .set({ status: "active", endAt })
+    .where(eq(schema.challenges.id, challengeId));
+  await db.update(schema.challengeParticipants)
+    .set({ status: "active" })
+    .where(eq(schema.challengeParticipants.challengeId, challengeId));
+  await audit(admin.id, "challenge.reopened", "challenge", challengeId);
   revalidatePath(`/admin/challenges/${challengeId}`);
 }
 

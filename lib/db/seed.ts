@@ -163,6 +163,9 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { key: "challenge_sidebar", pageScope: "Challenge detail rail", device: "desktop", width: 300, height: 600, mobileWidth: null, mobileHeight: null },
     { key: "messages_footer", pageScope: "Above message compose box", device: "both", width: 320, height: 50, mobileWidth: 320, mobileHeight: 50 },
     { key: "interstitial_video", pageScope: "Between page transitions", device: "both", width: 640, height: 360, mobileWidth: 320, mobileHeight: 180 },
+    // Posted by ClusterBot into servers that have unlocked revenue share.
+    // Sized for a Discord embed image, which renders about 1200 wide.
+    { key: "discord_bot_post", pageScope: "ClusterBot posts in Discord servers", device: "both", width: 1200, height: 400, mobileWidth: 600, mobileHeight: 200 },
   ];
   const placementIds: Record<string, string> = {};
   for (const p of placementDefs) {
@@ -862,6 +865,13 @@ export async function seedHouseAds(db: DB) {
     width: 300, height: 250, mobileWidth: null, mobileHeight: null,
   }).onConflictDoNothing();
 
+  // Back-fill the Discord bot placement into databases seeded before it existed,
+  // so bot ads can be sold without a manual step.
+  await db.insert(schema.adPlacements).values({
+    id: uid(), key: "discord_bot_post", pageScope: "ClusterBot posts in Discord servers",
+    device: "both", width: 1200, height: 400, mobileWidth: 600, mobileHeight: 200,
+  }).onConflictDoNothing();
+
   await db.insert(schema.brands).values({
     id: HOUSE_BRAND_ID, name: "Cluster", industry: "gaming", status: "active", logoUrl: BANNER_ART.logo,
   }).onConflictDoNothing();
@@ -897,19 +907,19 @@ export async function seedHouseAds(db: DB) {
 // end time has passed roll their window forward to now, so they always show a
 // real live countdown instead of "ends just now". Custom-cadence challenges
 // keep their explicit dates. Cheap + filtered; runs every boot.
-export async function refreshStaleChallengeWindows(db: DB) {
-  const now = new Date();
-  const cadenceDays: Record<string, number> = { daily: 1, weekly: 7, monthly: 30 };
-  const rows = await db.select({ id: schema.challenges.id, cadence: schema.challenges.cadence })
-    .from(schema.challenges)
-    .where(and(eq(schema.challenges.status, "active"), lt(schema.challenges.endAt, now)));
-  for (const r of rows) {
-    const days = cadenceDays[r.cadence];
-    if (!days) continue;
-    await db.update(schema.challenges)
-      .set({ startAt: now, endAt: new Date(now.getTime() + days * 86400000) })
-      .where(eq(schema.challenges.id, r.id));
-  }
+// A challenge ENDS on its end date.
+//
+// This used to slide the window forward on every boot for anything with a
+// daily/weekly/monthly cadence, which meant no challenge ever finished, no
+// placements were ever frozen and no trophy was ever awarded — the competition
+// ran forever and nobody won. `cadence` now describes how often staff intend to
+// run a NEW challenge, not a window that renews itself.
+//
+// Expired challenges are closed by closeExpiredChallenges() in lib/challenges.ts
+// (daily cron, or the "End now" button in admin), which freezes the standings
+// into final placements and hands out the trophies.
+export async function refreshStaleChallengeWindows(_db: DB) {
+  return;
 }
 
 export async function ensureTopBannerAd(db: DB) {

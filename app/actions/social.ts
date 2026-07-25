@@ -241,10 +241,14 @@ export async function markAllNotificationsRead() {
 }
 
 // ---------- Challenges ----------
-export async function joinChallenge(challengeId: string, linkedAccountId: string, path: string) {
+// Bound as a form action, so the trailing argument is the submitted FormData —
+// that's where an entry key comes from for a server-gated challenge.
+export async function joinChallenge(challengeId: string, linkedAccountId: string, path: string, formData?: FormData) {
   const me = await requireUser();
-  // The rules (provider match, entry gate, baseline snapshot, CP award) live in
-  // lib/challenges.ts so a Discord join and a web join are exactly equivalent.
-  await joinChallengeFor(me.id, challengeId, { linkedAccountId, source: "web" });
+  const accessKey = formData ? String(formData.get("accessKey") ?? "") : undefined;
+  // The rules (provider match, entry gate, access key, baseline snapshot, CP
+  // award) live in lib/challenges.ts so a Discord join and a web join are
+  // exactly equivalent.
+  await joinChallengeFor(me.id, challengeId, { linkedAccountId, source: "web", accessKey });
   revalidatePath(path);
 }

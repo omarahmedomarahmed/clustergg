@@ -19,8 +19,13 @@ import type { CardData } from "@/lib/cards/types";
 // DB write fails, callers fall back to the always-available live route
 // (`/api/card/<kind>?…`), which renders on demand.
 
+// Bump when the RENDERER changes in a way that should invalidate stored art.
+// The hash is of the card's data, so without this a layout or image-pipeline
+// fix would never reach cards that were already rendered.
+const RENDER_VERSION = 2;
+
 export function cardHash(data: unknown): string {
-  return createHash("sha1").update(JSON.stringify(data)).digest("hex").slice(0, 20);
+  return createHash("sha1").update(`v${RENDER_VERSION}:${JSON.stringify(data)}`).digest("hex").slice(0, 20);
 }
 
 export type CachedCard = { url: string; cached: boolean };

@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import Avatar from "@/components/Avatar";
 import { getT } from "@/lib/i18n/t-server";
 import { timeAgo } from "@/lib/utils";
+import { searchGamers } from "@/lib/gamer-lookup";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Search" };
@@ -17,9 +18,10 @@ export default async function SearchPage({
 
   const [gamers, spaces, posts] = query
     ? await Promise.all([
-        db.select().from(schema.users)
-          .where(or(ilike(schema.users.displayName, `%${query}%`), ilike(schema.users.slug, `%${query}%`)))
-          .limit(10),
+        // Searches every identity a gamer has, not just their Cluster name —
+        // people look for the tag they see IN GAME ("hikaru"), and a search
+        // that can't find that looks broken.
+        searchGamers(query, 12),
         db.select().from(schema.spaces)
           .where(or(ilike(schema.spaces.name, `%${query}%`), ilike(schema.spaces.description, `%${query}%`)))
           .limit(6),
@@ -52,11 +54,17 @@ export default async function SearchPage({
             {gamers.length === 0 ? <p className="text-muted text-sm">{tr("No gamers found.")}</p> : (
               <div className="grid sm:grid-cols-2 gap-3">
                 {gamers.map((g) => (
-                  <Link key={g.id} href={`/u/${g.slug}`} className="glass glass-hover flex items-center gap-3 p-3">
+                  <Link key={g.userId} href={`/u/${g.slug}`} className="glass glass-hover flex items-center gap-3 p-3">
                     <Avatar name={g.displayName} src={g.avatarUrl} size={40} />
                     <div className="min-w-0">
                       <div className="font-semibold">{g.displayName}</div>
-                      <div className="text-xs text-muted truncate">@{g.slug}</div>
+                      {/* Show WHY they matched — otherwise searching an in-game
+                          name returns a list of unfamiliar Cluster names. */}
+                      <div className="text-xs text-muted truncate">
+                        {g.inGameName
+                          ? <>{g.inGameName}{g.game ? ` · ${g.game}` : ""}</>
+                          : `@${g.slug}`}
+                      </div>
                     </div>
                   </Link>
                 ))}

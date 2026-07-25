@@ -7,6 +7,7 @@ import { syncAccount } from "@/lib/sync";
 import { evaluateBadgesForUser } from "@/lib/badges";
 import { awardQuestAction } from "@/lib/quests";
 import { announceAccountLinked } from "@/lib/discord/announce";
+import { markMemberLinked } from "@/lib/discord/guilds";
 
 // Linking a game account, in one place.
 //
@@ -59,6 +60,9 @@ export async function linkGameAccountFor(
   try { await evaluateBadgesForUser(db, userId); } catch { /* non-fatal */ }
   await awardQuestAction(db, userId, "connect_account", { refType: "account", refId: id });
 
+  // A linked game account is what counts toward a server's ad-revenue unlock,
+  // so this is the moment the counter moves — and possibly crosses the line.
+  void markMemberLinked(userId).catch(() => {});
   // Never awaited into the result — a failed announcement must not fail a link.
   void announceAccountLinked(userId, provider.game).catch(() => {});
 

@@ -23,8 +23,14 @@ export const CLUSTER_COMMAND = {
       name: "home", description: "Your Cluster hub — profile, CP and quick actions", type: OptionType.SubCommand,
     },
     {
-      name: "show", description: "Show a card: your profile, CP, a game or a quest", type: OptionType.SubCommand,
-      options: [{ name: "what", description: "profile, cp, a game or a quest", type: OptionType.String, required: false, autocomplete: true }],
+      name: "show", description: "Show a card: yours, or any gamer on Cluster", type: OptionType.SubCommand,
+      options: [
+        { name: "what", description: "profile, cp, a game or a quest", type: OptionType.String, required: false, autocomplete: true },
+        // `/cluster show valorant SomeTag` — any gamer on the platform, from any
+        // server. This is the command that makes the bot useful in a server
+        // where nobody has signed up yet.
+        { name: "gamer", description: "An in-game name, or a Discord handle", type: OptionType.String, required: false, autocomplete: true },
+      ],
     },
     {
       name: "planet", description: "Open a game planet — challenges, leaderboard, top gamers", type: OptionType.SubCommand,

@@ -7,6 +7,8 @@ import { ALL_COMMANDS } from "@/lib/discord/commands";
 import { clearCatalog } from "@/lib/discord/catalog";
 import { discordConfigured, CLUSTER_CHANNEL } from "@/lib/discord/config";
 import { postGuides, onboardGuild } from "@/lib/discord/onboard";
+import { broadcastToGuilds, announceChallengeLaunched } from "@/lib/discord/announce";
+import { JOBS, runJob, type JobKey } from "@/lib/jobs";
 
 // Everything the bot needs operationally, as buttons in Mission Control rather
 // than curl commands. Staff run this from a browser; nobody should need a
@@ -51,6 +53,50 @@ export async function repostGuides(_prev: BotActionState, formData: FormData): P
     return { ok: `Posted ${posted} guides but only pinned ${pinned}. The bot is missing the Manage Messages permission — re-invite it from the Discord bot page.` };
   }
   return { ok: `Posted and pinned ${posted} guides in #${CLUSTER_CHANNEL}.` };
+}
+
+// Run a maintenance job on demand. Vercel's Hobby plan only allows a daily
+// cron, so these buttons are how staff get a job done *now* rather than
+// tomorrow — and they're the same code the cron runs.
+export async function runJobNow(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  const key = String(formData.get("job") ?? "") as JobKey;
+  if (!JOBS.some((j) => j.key === key)) return { error: "Unknown job." };
+  const res = await runJob(key);
+  revalidatePath("/admin/discord");
+  revalidatePath("/admin/challenges");
+  return res.ok ? { ok: res.summary } : { error: res.summary };
+}
+
+// Send a message to every server with the bot, or to a chosen few.
+export async function broadcast(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
+
+  const message = String(formData.get("message") ?? "").trim();
+  if (!message) return { error: "Write a message first." };
+  if (message.length > 1900) return { error: "Discord caps a message at 2000 characters." };
+
+  const only = String(formData.get("guildIds") ?? "")
+    .split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+
+  const res = await broadcastToGuilds(message, only.length ? only : undefined);
+  if (!res.sent) {
+    return { error: res.targets === 0 ? "No servers to send to yet." : "Couldn't deliver to any server — check the bot can post in their channels." };
+  }
+  return { ok: `Sent to ${res.sent} of ${res.targets} server${res.targets === 1 ? "" : "s"}.` };
+}
+
+// Announce a challenge to Discord on demand. This is also how a server-gated
+// challenge's entry key gets delivered — the owning server is told the key, and
+// every other server is told the challenge exists.
+export async function announceChallenge(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
+  const id = String(formData.get("challengeId") ?? "").trim();
+  if (!id) return { error: "Missing challenge." };
+  await announceChallengeLaunched(id);
+  return { ok: "Announced. A server challenge also sends its entry key to the server it belongs to." };
 }
 
 // Run the full install flow by hand, for a server that already has the bot.

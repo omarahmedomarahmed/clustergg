@@ -200,6 +200,83 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "card_render_idx" ON "card_renders" ("kind","cache_key")`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "joined_from" text NOT NULL DEFAULT 'web'`,
+  `CREATE TABLE IF NOT EXISTS "discord_guilds" (
+    "guild_id" text PRIMARY KEY NOT NULL,
+    "name" text NOT NULL DEFAULT '',
+    "icon_url" text,
+    "owner_discord_id" text,
+    "member_count" integer NOT NULL DEFAULT 0,
+    "channel_id" text,
+    "status" text NOT NULL DEFAULT 'active',
+    "announcements_enabled" boolean NOT NULL DEFAULT true,
+    "ad_opt_in" boolean NOT NULL DEFAULT true,
+    "ad_unlocked_at" timestamp with time zone,
+    "revenue_share_pct" integer NOT NULL DEFAULT 70,
+    "settings" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "installed_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "removed_at" timestamp with time zone
+  )`,
+  `CREATE TABLE IF NOT EXISTS "discord_guild_members" (
+    "guild_id" text NOT NULL,
+    "user_id" text NOT NULL,
+    "attributed_via" text NOT NULL DEFAULT 'bot',
+    "joined_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "first_linked_at" timestamp with time zone,
+    "left_at" timestamp with time zone,
+    PRIMARY KEY ("guild_id","user_id")
+  )`,
+  `CREATE INDEX IF NOT EXISTS "dgm_guild_idx" ON "discord_guild_members" ("guild_id","first_linked_at")`,
+  `CREATE TABLE IF NOT EXISTS "discord_command_logs" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text,
+    "user_id" text,
+    "discord_id" text,
+    "command" text NOT NULL,
+    "screen" text,
+    "arg" text,
+    "latency_ms" integer NOT NULL DEFAULT 0,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "dcl_guild_idx" ON "discord_command_logs" ("guild_id","created_at")`,
+  `CREATE TABLE IF NOT EXISTS "discord_ad_posts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "campaign_creative_id" text,
+    "channel_id" text,
+    "message_id" text,
+    "status" text NOT NULL DEFAULT 'posted',
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "dap_guild_idx" ON "discord_ad_posts" ("guild_id","created_at")`,
+  `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "guild_id" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "visibility" text NOT NULL DEFAULT 'public'`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "guild_id" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "access_key" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announce_hype" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "vote_count" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_views" integer NOT NULL DEFAULT 0`,
+  `CREATE TABLE IF NOT EXISTS "profile_votes" (
+    "profile_user_id" text NOT NULL,
+    "voter_user_id" text,
+    "voter_discord_id" text,
+    "guild_id" text,
+    "source" text NOT NULL DEFAULT 'web',
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "id" text PRIMARY KEY NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "pv_web_idx" ON "profile_votes" ("profile_user_id","voter_user_id") WHERE "voter_user_id" IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "pv_discord_idx" ON "profile_votes" ("profile_user_id","voter_discord_id") WHERE "voter_discord_id" IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS "profile_views" (
+    "id" text PRIMARY KEY NOT NULL,
+    "profile_user_id" text NOT NULL,
+    "source" text NOT NULL DEFAULT 'web',
+    "guild_id" text,
+    "guild_name" text,
+    "viewer_user_id" text,
+    "viewer_discord_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "pvw_profile_idx" ON "profile_views" ("profile_user_id","created_at")`,
 ];
 
 async function runColumnMigrations(db: DB) {

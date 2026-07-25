@@ -13,7 +13,8 @@ export type QuestActionKey =
   | "join_planet" | "write_post" | "write_comment" | "reaction_given" | "reaction_received"
   | "follower_gained" | "message_new" | "profile_views_25"
   | "connect_account" | "stat_levelup"
-  | "ad_impression" | "ad_click";
+  | "ad_impression" | "ad_click"
+  | "profile_vote_received" | "best_profile_award";
 
 export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string; defaultWeight: number; defaultCap?: number }[] = [
   { key: "join_challenge",   label: "Join a challenge",        group: "conquest",  defaultWeight: 15, defaultCap: 5 },
@@ -28,6 +29,10 @@ export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string
   { key: "follower_gained",  label: "Gain a follower",         group: "orbit",     defaultWeight: 8 },
   { key: "message_new",      label: "Message a new gamer",     group: "orbit",     defaultWeight: 4, defaultCap: 15 },
   { key: "profile_views_25", label: "Every 25 profile views",  group: "orbit",     defaultWeight: 10 },
+  // Identity: being voted for is the purest form of "other gamers orbit you",
+  // which is exactly what this quest measures.
+  { key: "profile_vote_received", label: "Someone votes for your profile", group: "orbit", defaultWeight: 15 },
+  { key: "best_profile_award",    label: "Place in Best Profile",          group: "orbit", defaultWeight: 250 },
   { key: "connect_account",  label: "Connect a game account",  group: "ascension", defaultWeight: 120 },
   { key: "stat_levelup",     label: "A tracked stat rises",    group: "ascension", defaultWeight: 25, defaultCap: 20 },
   { key: "ad_impression",    label: "See an ad (impression)",  group: "signal",    defaultWeight: 1, defaultCap: 60 },

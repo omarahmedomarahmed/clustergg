@@ -10,6 +10,7 @@ import { resolveGame } from "@/lib/game-logos";
 import { syncUserAccountsIfStale } from "@/lib/sync";
 import { getContent } from "@/lib/cms";
 import { slimImg } from "@/lib/img";
+import { hasVoted, recordProfileView } from "@/lib/identity";
 import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip, sectionArtStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
 import Flag from "@/components/Flag";
@@ -23,6 +24,7 @@ import CopyLinkButton from "@/components/CopyLinkButton";
 import DiscordTag from "@/components/DiscordTag";
 import QuestCard from "@/components/QuestCard";
 import CpIcon from "@/components/CpIcon";
+import VoteButton from "@/components/VoteButton";
 import { getUserQuests } from "@/lib/quests";
 import { getTrophyCase, getMyRedeems } from "@/lib/trophies";
 import TrophyCase from "@/components/TrophyCase";
@@ -68,6 +70,10 @@ export default async function ProfilePage({ params }: Props) {
   }
 
   try { await syncUserAccountsIfStale(db, user.id); } catch { /* render regardless */ }
+
+  // Has this visitor already voted for them? Drives the button's state, so a
+  // second click removes the vote rather than silently doing nothing.
+  const alreadyVoted = viewer ? await hasVoted(user.id, viewer.id) : false;
 
   // Count a profile view when someone other than the owner looks — a brag
   // number the gamer can show off. Owners viewing their own page don't count.
@@ -401,6 +407,17 @@ export default async function ProfilePage({ params }: Props) {
           <Link href={`/u/${user.slug}/followers`} style={{ color: theme.text }}><b>{Number(followerRow?.c ?? 0)}</b> <span className="p-muted">{tr("followers")}</span></Link>
           <Link href={`/u/${user.slug}/following`} style={{ color: theme.text }}><b>{Number(followingRow?.c ?? 0)}</b> <span className="p-muted">{tr("following")}</span></Link>
           <span style={{ color: theme.text }} title="Profile views"><Icon name="eye" size={14} className="inline mr-1" style={{ color: theme.accent2 }} /><b>{viewCount.toLocaleString()}</b> <span className="p-muted">{tr("views")}</span></span>
+          {/* Votes sit right beside views — the two brag numbers together. */}
+          <span style={{ color: theme.text }}>
+            <VoteButton
+              slug={user.slug}
+              votes={user.voteCount ?? 0}
+              voted={alreadyVoted}
+              canVote={!!viewer && viewer.id !== user.id}
+              mine={viewer?.id === user.id}
+              accent={theme.accent}
+            />
+          </span>
           {bestStanding && S.standings && <span style={{ color: theme.accent }}><Icon name="chart" size={14} className="inline mr-1" /> {tr("Top")} {Math.max(1, Math.round((bestStanding.rank / bestStanding.total) * 100))}% · {bestStanding.title}</span>}
         </div>
 

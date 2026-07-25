@@ -1,8 +1,9 @@
 import { ImageResponse } from "next/og";
 import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
+import { toEmbeddable } from "@/lib/cards/img";
 import type {
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
-  LeaderboardCard, ChallengeCard, PlanetCard, GuideCard,
+  LeaderboardCard, ChallengeCard, PlanetCard, PlanetsCard, GuideCard,
 } from "@/lib/cards/types";
 
 // Server-rendered "glorified" PNG cards, shared by the Discord bot and the web
@@ -147,28 +148,97 @@ function ProfileBody(d: ProfileCard) {
 
 function GameStatsBody(d: GameStatsCard) {
   const t = d.theme;
+  const champs = d.champions ?? [];
+  const matches = d.matches ?? [];
+  const hasRich = champs.length > 0 || matches.length > 0;
+  // With champions and match history there's no room for six stat tiles, so the
+  // stats compress into a single row and the game content gets the space.
+  const statCount = hasRich ? 3 : 6;
+
   return (
     <Frame theme={t} corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={78} height={78} style={{ width: 78, height: 78, borderRadius: 18, objectFit: "cover" }} />
+      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
     ) : undefined}>
-      <Title text={d.game} sub={`${d.displayName} · ${d.tag}${d.region ? ` · ${d.region}` : ""}`} accent={t.accent} accent2={t.accent2} />
-      {d.stats.length === 0 ? (
+      {/* Identity first: the in-game name people searched for, and the human behind it. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <Avatar url={d.gameAvatarUrl || d.avatarUrl} size={84} ring={t.accent} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div style={{ fontSize: 46, fontWeight: 700, lineHeight: 1.05 }}>{clamp(d.tag, 24)}</div>
+          <div style={{ fontSize: 23, color: MUTED }}>
+            {`${d.game}${d.region ? ` · ${d.region}` : ""} · ${d.displayName}${d.slug ? ` (clustergg.com/u/${d.slug})` : ""}`}
+          </div>
+        </div>
+      </div>
+
+      {d.live?.champion ? (
+        <div style={{ display: "flex", marginTop: 14 }}>
+          <Pill color="#34d399" bg="rgba(52,211,153,0.14)">
+            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#34d399" }} />
+            {`IN GAME · ${d.live.champion}`}
+          </Pill>
+        </div>
+      ) : null}
+
+      {d.stats.length === 0 && !hasRich ? (
         <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: MUTED }}>
           Stats sync shortly after linking — check back in a few minutes.
         </div>
       ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 16, marginTop: 34, flex: 1 }}>
-          {d.stats.slice(0, 6).map((s, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 6, width: 336, padding: "20px 24px", borderRadius: 20, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.10)" }}>
-              <div style={{ fontSize: 19, letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{clamp(s.label.toUpperCase(), 22)}</div>
-              <div style={{ fontSize: 40, fontWeight: 700, color: t.accent2 }}>{s.value}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 12, marginTop: 22 }}>
+          {d.stats.slice(0, statCount).map((s, i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 4, width: hasRich ? 352 : 336, padding: "14px 20px", borderRadius: 18, background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.10)" }}>
+              <div style={{ fontSize: 17, letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{clamp(s.label.toUpperCase(), 22)}</div>
+              <div style={{ fontSize: 34, fontWeight: 700, color: t.accent2 }}>{s.value}</div>
             </div>
           ))}
         </div>
       )}
+
+      {champs.length ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 20 }}>
+          <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>MOST PLAYED</div>
+          <div style={{ display: "flex", gap: 12 }}>
+            {champs.slice(0, 5).map((c, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 122 }}>
+                {c.iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={c.iconUrl} alt="" width={64} height={64} style={{ width: 64, height: 64, borderRadius: 32, objectFit: "cover", border: `3px solid ${t.accent}88` }} />
+                ) : (
+                  <div style={{ display: "flex", width: 64, height: 64, borderRadius: 32, background: `${t.accent}33`, border: `3px solid ${t.accent}88` }} />
+                )}
+                <div style={{ fontSize: 17, fontWeight: 700 }}>{clamp(c.name, 12)}</div>
+                {c.points ? <div style={{ fontSize: 14, color: MUTED }}>{`${Math.round(c.points / 1000)}k`}</div> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {matches.length ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18, flex: 1 }}>
+          <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>RECENT MATCHES</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {matches.slice(0, 4).map((m, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 16px", borderRadius: 12, background: m.win ? "rgba(52,211,153,0.14)" : "rgba(239,68,68,0.12)", border: `1px solid ${m.win ? "rgba(52,211,153,0.35)" : "rgba(239,68,68,0.3)"}` }}>
+                {m.iconUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={m.iconUrl} alt="" width={34} height={34} style={{ width: 34, height: 34, borderRadius: 17, objectFit: "cover" }} />
+                ) : null}
+                <div style={{ fontSize: 20, fontWeight: 700, width: 62, color: m.win ? "#34d399" : "#f87171" }}>{m.win ? "WIN" : "LOSS"}</div>
+                <div style={{ fontSize: 20, fontWeight: 700, flex: 1 }}>{clamp(m.champion, 18)}</div>
+                <div style={{ fontSize: 20, color: INK }}>{m.kda}</div>
+                <div style={{ fontSize: 17, color: MUTED, width: 110 }}>{clamp(m.queue ?? m.when ?? "", 14)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {d.rank ? (
-        <Pill color={t.accent} bg="rgba(255,255,255,0.08)">{`#${d.rank.place} of ${nf(d.rank.total)} · ${d.rank.board}`}</Pill>
+        <div style={{ display: "flex", marginTop: 12 }}>
+          <Pill color={t.accent} bg="rgba(255,255,255,0.08)">{`#${d.rank.place} of ${nf(d.rank.total)} · ${d.rank.board}`}</Pill>
+        </div>
       ) : null}
     </Frame>
   );
@@ -275,30 +345,86 @@ function ChallengeBody(d: ChallengeCard) {
           <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#34d399" }} />
           LIVE
         </Pill>
-        {d.isPrivate ? <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)">SERVER EXCLUSIVE</Pill> : null}
+        {d.isPrivate ? (
+          <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)">
+            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 3, background: "#fbbf24" }} />
+            {clamp(d.serverName ? `${d.serverName.toUpperCase()} · KEY TO JOIN` : "KEY TO JOIN", 30)}
+          </Pill>
+        ) : null}
         <Pill>{d.game}</Pill>
       </div>
       <div style={{ display: "flex", marginTop: 18 }}>
         <Title text={clamp(d.title, 44) ?? ""} sub={clamp(d.description, 92)} accent={t.accent} accent2={t.accent2} />
       </div>
-      <div style={{ display: "flex", gap: 14, marginTop: 26 }}>
-        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">{`${days}d left`}</Pill>
+      <div style={{ display: "flex", gap: 14, marginTop: 22 }}>
+        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">{d.ended ? "FINISHED" : `${days}d left`}</Pill>
         <Pill>{`${nf(d.participants)} joined`}</Pill>
-        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{clamp(d.prize, 30)}</Pill> : null}
+        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{clamp(d.prize, 26)}</Pill> : null}
       </div>
-      <div style={{ display: "flex", gap: 16, marginTop: 26, flex: 1, alignItems: "flex-end" }}>
-        {d.trophies.slice(0, 3).map((tr, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={tr.imageUrl} alt="" width={104} height={104} style={{ width: 104, height: 104, objectFit: "contain" }} />
-            <div style={{ fontSize: 20, fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
-              {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
-            </div>
+
+      {/* Timeline: the whole window, not just "5d left". People want to know if
+          they're early enough to still matter. */}
+      {d.startsAt ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 16 }}>
+          <Bar pct={windowPct(d.startsAt, d.endsAt)} accent={t.accent} accent2={t.accent2} h={10} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, color: MUTED }}>
+            <div style={{ display: "flex" }}>{dayLabel(d.startsAt)}</div>
+            <div style={{ display: "flex" }}>{dayLabel(d.endsAt)}</div>
           </div>
-        ))}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", gap: 22, marginTop: 18, flex: 1 }}>
+        {/* Standings */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
+          <div style={{ fontSize: 16, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>
+            {d.ended ? "FINAL STANDINGS" : "STANDINGS"}
+          </div>
+          {(d.standings ?? []).length === 0 ? (
+            <div style={{ display: "flex", fontSize: 21, color: MUTED }}>No one has scored yet — first mover takes the lead.</div>
+          ) : (
+            (d.standings ?? []).slice(0, 4).map((s) => (
+              <div key={s.place} style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 14px", borderRadius: 12, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                <div style={{ fontSize: 20, fontWeight: 700, width: 40, color: ["#fbbf24", "#cbd5e1", "#b45309"][s.place - 1] ?? MUTED }}>{`#${s.place}`}</div>
+                <div style={{ fontSize: 21, fontWeight: 700, flex: 1 }}>{clamp(s.name, 20)}</div>
+                <div style={{ fontSize: 21, fontWeight: 700, color: t.accent2 }}>{`${nf(s.points)} pts`}</div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Trophies — what the podium actually takes home. */}
+        {d.trophies.length ? (
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-end" }}>
+            {d.trophies.slice(0, 3).map((tr, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={tr.imageUrl} alt="" width={92} height={92} style={{ width: 92, height: 92, objectFit: "contain" }} />
+                <div style={{ fontSize: 18, fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
+                  {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
     </Frame>
   );
+}
+
+// How far through its window a challenge is.
+function windowPct(startIso: string, endIso: string): number {
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return 100;
+  return Math.max(0, Math.min(100, ((Date.now() - start) / (end - start)) * 100));
+}
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? ""
+    : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 function PlanetBody(d: PlanetCard) {
@@ -326,6 +452,28 @@ function PlanetBody(d: PlanetCard) {
   );
 }
 
+function PlanetsBody(d: PlanetsCard) {
+  const t = d.theme;
+  return (
+    <Frame theme={t}>
+      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
+      <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 14, marginTop: 26, flex: 1 }}>
+        {d.games.slice(0, 12).map((g, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, width: 168, height: 132, borderRadius: 20, background: "rgba(0,0,0,0.45)", border: `1px solid ${g.accent ? `${g.accent}66` : "rgba(255,255,255,0.10)"}` }}>
+            {g.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={g.logoUrl} alt="" width={56} height={56} style={{ width: 56, height: 56, borderRadius: 14, objectFit: "cover" }} />
+            ) : (
+              <div style={{ display: "flex", width: 56, height: 56, borderRadius: 14, background: `${g.accent ?? t.accent}44` }} />
+            )}
+            <div style={{ fontSize: 19, fontWeight: 700, color: g.accent ?? INK }}>{clamp(g.name, 15)}</div>
+          </div>
+        ))}
+      </div>
+    </Frame>
+  );
+}
+
 function GuideBody(d: GuideCard) {
   const t = d.theme;
   return (
@@ -337,16 +485,21 @@ function GuideBody(d: GuideCard) {
       <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
       {/* overflow:hidden keeps a long admin-written guide from ever pushing the
           footer off the card — the steps clip instead of breaking the layout. */}
+      {/* Fewer steps means each one can say more. A quest guide listing every
+          scoring action needs the room; a four-step guide doesn't. */}
       <div style={{ display: "flex", flexDirection: "column", gap: 13, marginTop: 24, flex: 1, overflow: "hidden" }}>
-        {d.steps.slice(0, 4).map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 42, height: 42, borderRadius: 21, background: `${t.accent}2b`, color: t.accent, fontSize: 23, fontWeight: 700 }}>{i + 1}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
-              <div style={{ fontSize: 26, fontWeight: 700 }}>{clamp(s.title, 46)}</div>
-              <div style={{ fontSize: 20, color: MUTED, lineHeight: 1.32 }}>{clamp(s.body, 116)}</div>
+        {d.steps.slice(0, 4).map((s, i) => {
+          const room = d.steps.length <= 3 ? 210 : 116;
+          return (
+            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 42, height: 42, borderRadius: 21, background: `${t.accent}2b`, color: t.accent, fontSize: 23, fontWeight: 700 }}>{i + 1}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                <div style={{ fontSize: 26, fontWeight: 700 }}>{clamp(s.title, 46)}</div>
+                <div style={{ fontSize: d.steps.length <= 3 ? 19 : 20, color: MUTED, lineHeight: 1.32 }}>{clamp(s.body, room)}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {d.footer ? <div style={{ display: "flex", marginTop: 14, fontSize: 21, color: t.accent2, fontWeight: 700 }}>{d.footer}</div> : null}
     </Frame>
@@ -362,15 +515,87 @@ function body(d: CardData) {
     case "leaderboard": return LeaderboardBody(d);
     case "challenge": return ChallengeBody(d);
     case "planet": return PlanetBody(d);
+    case "planets": return PlanetsBody(d);
     case "guide": return GuideBody(d);
+  }
+}
+
+// Resolve every image on a card to inline bytes before drawing.
+//
+// Satori fetches remote images itself, and one unreachable host — or one
+// animated .gif avatar it can't decode — takes down the entire card. Doing it
+// up front means a bad image degrades to its placeholder instead, and the
+// render itself touches the network zero times.
+async function prepareCard(d: CardData): Promise<CardData> {
+  const bg = toEmbeddable(d.theme.bgUrl);
+
+  switch (d.kind) {
+    case "profile": {
+      const [bgUrl, avatarUrl, ...logos] = await Promise.all([
+        bg, toEmbeddable(d.avatarUrl), ...d.accounts.map((a) => toEmbeddable(a.logoUrl)),
+      ]);
+      return {
+        ...d, avatarUrl,
+        accounts: d.accounts.map((a, i) => ({ ...a, logoUrl: logos[i] })),
+        theme: { ...d.theme, bgUrl },
+      };
+    }
+    case "leaderboard": {
+      const [bgUrl, logoUrl, ...avatars] = await Promise.all([
+        bg, toEmbeddable(d.logoUrl), ...d.rows.map((r) => toEmbeddable(r.avatarUrl)),
+      ]);
+      return {
+        ...d, logoUrl,
+        rows: d.rows.map((r, i) => ({ ...r, avatarUrl: avatars[i] })),
+        theme: { ...d.theme, bgUrl },
+      };
+    }
+    case "challenge": {
+      const [bgUrl, logoUrl, ...trophies] = await Promise.all([
+        bg, toEmbeddable(d.logoUrl), ...d.trophies.map((t) => toEmbeddable(t.imageUrl)),
+      ]);
+      return {
+        ...d, logoUrl,
+        // A trophy with no usable art is dropped rather than drawn as a gap.
+        trophies: d.trophies.map((t, i) => ({ ...t, imageUrl: trophies[i] ?? "" })).filter((t) => t.imageUrl),
+        theme: { ...d.theme, bgUrl },
+      };
+    }
+    case "game-stats": {
+      const champs = d.champions ?? [];
+      const matches = d.matches ?? [];
+      const [bgUrl, logoUrl, avatarUrl, gameAvatarUrl, ...rest] = await Promise.all([
+        bg, toEmbeddable(d.logoUrl), toEmbeddable(d.avatarUrl), toEmbeddable(d.gameAvatarUrl),
+        ...champs.map((c) => toEmbeddable(c.iconUrl)),
+        ...matches.map((m) => toEmbeddable(m.iconUrl)),
+      ]);
+      return {
+        ...d, logoUrl, avatarUrl, gameAvatarUrl,
+        champions: champs.map((c, i) => ({ ...c, iconUrl: rest[i] })),
+        matches: matches.map((m, i) => ({ ...m, iconUrl: rest[champs.length + i] })),
+        theme: { ...d.theme, bgUrl },
+      };
+    }
+    case "quest":
+    case "planet":
+    case "guide": {
+      const [bgUrl, logoUrl] = await Promise.all([bg, toEmbeddable(d.logoUrl)]);
+      return { ...d, logoUrl, theme: { ...d.theme, bgUrl } };
+    }
+    case "planets": {
+      const [bgUrl, ...logos] = await Promise.all([bg, ...d.games.map((g) => toEmbeddable(g.logoUrl))]);
+      return { ...d, games: d.games.map((g, i) => ({ ...g, logoUrl: logos[i] })), theme: { ...d.theme, bgUrl } };
+    }
+    default:
+      return { ...d, theme: { ...d.theme, bgUrl: await bg } };
   }
 }
 
 // Render a card to an ImageResponse (streamable PNG response).
 export async function renderCard(data: CardData): Promise<ImageResponse> {
-  const fonts = await loadCardFonts();
+  const [fonts, prepared] = await Promise.all([loadCardFonts(), prepareCard(data)]);
   return new ImageResponse(
-    <div style={{ display: "flex", width: CARD_W, height: CARD_H, fontFamily: cardFontFamily(fonts) }}>{body(data)}</div>,
+    <div style={{ display: "flex", width: CARD_W, height: CARD_H, fontFamily: cardFontFamily(fonts) }}>{body(prepared)}</div>,
     { width: CARD_W, height: CARD_H, ...(fonts.length ? { fonts } : {}) },
   );
 }

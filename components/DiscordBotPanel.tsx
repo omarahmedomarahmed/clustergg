@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { registerCommands, repostGuides, runOnboarding, type BotActionState } from "@/app/actions/discord";
+import { registerCommands, repostGuides, runOnboarding, runJobNow, broadcast, type BotActionState } from "@/app/actions/discord";
 
 // The operational buttons for the bot. Everything here is deliberately a form
 // with a button — running the platform should never require a terminal.
@@ -76,5 +76,62 @@ export function GuideTools({ ready }: { ready: boolean }) {
         <Result state={postState} />
       </form>
     </div>
+  );
+}
+
+export function JobRunner({ jobs }: { jobs: { key: string; label: string; description: string }[] }) {
+  const [state, action, pending] = useActionState(runJobNow, undefined);
+  return (
+    <form action={action} className="glass p-6">
+      <h2 className="font-bold mb-1">Maintenance jobs</h2>
+      <p className="text-xs text-muted mb-4">
+        These run automatically once a day. Vercel&apos;s plan only allows a daily schedule, so run
+        one here whenever you need it now instead of waiting — they&apos;re the same code, and safe
+        to run repeatedly.
+      </p>
+      <div className="space-y-3">
+        {jobs.map((j) => (
+          <div key={j.key} className="flex flex-wrap gap-3 items-start justify-between border-t border-white/5 pt-3 first:border-0 first:pt-0">
+            <div className="flex-1 min-w-[220px]">
+              <div className="font-bold text-sm">{j.label}</div>
+              <div className="text-xs text-muted">{j.description}</div>
+            </div>
+            <button
+              name="job" value={j.key} disabled={pending}
+              className="ghost-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-50"
+            >
+              {pending ? "Running…" : "Run now"}
+            </button>
+          </div>
+        ))}
+      </div>
+      <Result state={state} />
+    </form>
+  );
+}
+
+export function Broadcast({ ready }: { ready: boolean }) {
+  const [state, action, pending] = useActionState(broadcast, undefined);
+  return (
+    <form action={action} className="glass p-6">
+      <h2 className="font-bold mb-1">Message every server</h2>
+      <p className="text-xs text-muted mb-4">
+        Posts to the Cluster channel of every server with the bot. Emoji and Discord markdown
+        (**bold**, *italic*, `code`) all work. Leave the server list blank to reach everyone.
+      </p>
+      <textarea
+        name="message" rows={4} maxLength={1900}
+        placeholder="Something worth interrupting people for — a new challenge, a big winner, a change they need to know about."
+        className="input-cosmic w-full mb-3"
+      />
+      <input
+        name="guildIds" placeholder="Server IDs, comma separated — blank means all servers"
+        className="input-cosmic w-full mb-3"
+      />
+      <button disabled={!ready || pending} className="grad-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-50">
+        {pending ? "Sending…" : "Send broadcast"}
+      </button>
+      <Result state={state} />
+    </form>
   );
 }
