@@ -14,6 +14,7 @@ import { shareMessage } from "@/lib/discord/share";
 import { joinChallengeFor } from "@/lib/challenges";
 import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS } from "@/lib/providers/registry";
+import { logCommand } from "@/lib/discord/guilds";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -164,15 +165,23 @@ function command(i: Interaction) {
   const isShare = sub === "share";
   const flags = isShare ? undefined : MessageFlags.Ephemeral;
 
+  const started = Date.now();
   after(async () => {
+    let ctx: Awaited<ReturnType<typeof loadCtx>> | null = null;
     try {
-      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
       if (isShare) return void (await share(i.token, ctx));
       const target = screenForCommand(sub, opts);
       const payload = await renderScreen(target, target.screen === "home" ? [] : [frame("home")], ctx);
       await editOriginal(i.token, { ...payload, flags: payload.flags ?? flags });
     } catch {
       await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
+    } finally {
+      void logCommand({
+        guildId: i.guild_id, discordId: who.id, userId: ctx?.gamer?.userId ?? null,
+        command: `cluster ${sub}`, arg: Object.values(opts)[0] ?? null,
+        latencyMs: Date.now() - started,
+      });
     }
   });
 
@@ -201,9 +210,11 @@ function componentPress(i: Interaction) {
   const parsed = parseId(customId);
   if (!who || !parsed) return json({ type: InteractionResponseType.DeferredUpdateMessage });
 
+  const started = Date.now();
   after(async () => {
+    let ctx: Awaited<ReturnType<typeof loadCtx>> | null = null;
     try {
-      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
+      ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id);
 
       if (parsed.kind === "a") return void (await runAction(i, parsed.target, parsed.trail, ctx));
 
@@ -220,6 +231,12 @@ function componentPress(i: Interaction) {
       });
     } catch {
       await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
+    } finally {
+      void logCommand({
+        guildId: i.guild_id, discordId: who.id, userId: ctx?.gamer?.userId ?? null,
+        command: "button", screen: parsed.target.screen, arg: parsed.target.args[0] ?? null,
+        latencyMs: Date.now() - started,
+      });
     }
   });
 

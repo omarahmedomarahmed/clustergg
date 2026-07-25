@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { canAct, siteUrl } from "@/lib/discord/config";
+import { announcingGuilds } from "@/lib/discord/guilds";
 import { postMessage } from "@/lib/discord/rest";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
@@ -15,19 +16,45 @@ import { challengeUrl } from "@/lib/challenges";
 // the bot isn't configured — an announcement failing is not a reason for a
 // challenge join to fail.
 //
-// Guild targeting lands with the growth phase (discord_guilds). Until then
-// these post to a single default channel if one is configured, which is enough
-// to exercise the path end-to-end in a test server.
+// Announcements go to every server that has the bot installed with
+// announcements enabled — that's the whole point of a distribution channel.
+// `DISCORD_DEFAULT_CHANNEL_ID` remains as a testing override for a single
+// channel before any server has installed.
 
 function defaultChannel(): string | null {
   return process.env.DISCORD_DEFAULT_CHANNEL_ID || null;
 }
 
-async function announce(payload: Record<string, unknown>): Promise<void> {
+// Where should this announcement go? Optionally restricted to one server, which
+// is what a private, server-gated challenge needs.
+async function targets(onlyGuildId?: string | null): Promise<string[]> {
+  const out: string[] = [];
+  const fallback = defaultChannel();
+  if (fallback && !onlyGuildId) out.push(fallback);
+  try {
+    const guilds = await announcingGuilds();
+    for (const g of guilds) {
+      if (onlyGuildId && g.guildId !== onlyGuildId) continue;
+      if (g.channelId) out.push(g.channelId);
+    }
+  } catch { /* fall back to whatever we already have */ }
+  return [...new Set(out)];
+}
+
+async function announce(payload: Record<string, unknown>, onlyGuildId?: string | null): Promise<void> {
   if (!canAct()) return;
-  const channel = defaultChannel();
-  if (!channel) return;
-  try { await postMessage(channel, payload); } catch { /* never break the caller */ }
+  const channels = await targets(onlyGuildId);
+  // Sequential on purpose: a burst of parallel posts is the fastest way to get
+  // rate-limited across every server at once.
+  for (const channel of channels) {
+    try { await postMessage(channel, payload); } catch { /* never break the caller */ }
+  }
+}
+
+// Nothing to announce into? Then skip the (expensive) card rendering entirely.
+async function anyTarget(): Promise<boolean> {
+  if (!canAct()) return false;
+  return (await targets()).length > 0;
 }
 
 async function slugFor(userId: string): Promise<{ slug: string; name: string } | null> {
@@ -41,7 +68,7 @@ async function slugFor(userId: string): Promise<{ slug: string; name: string } |
 
 // Someone joined a challenge — the strongest "come do this too" signal we have.
 export async function announceChallengeJoined(userId: string, challengeId: string): Promise<void> {
-  if (!canAct() || !defaultChannel()) return;
+  if (!(await anyTarget())) return;
   const [who, card, url] = await Promise.all([
     slugFor(userId), cardRef("challenge", { id: challengeId }), challengeUrl(siteUrl(), challengeId),
   ]);
@@ -58,7 +85,7 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
 
 // A gamer reached a new quest tier.
 export async function announceQuestTier(userId: string, questKey: string, tierName: string): Promise<void> {
-  if (!canAct() || !defaultChannel()) return;
+  if (!(await anyTarget())) return;
   const who = await slugFor(userId);
   if (!who) return;
   const card = await cardRef("quest", { slug: who.slug, quest: questKey });
@@ -75,7 +102,7 @@ export async function announceQuestTier(userId: string, questKey: string, tierNa
 // A new game account was linked — a good moment to nudge profile customization,
 // because a default profile is the least shareable it will ever be.
 export async function announceAccountLinked(userId: string, game: string): Promise<void> {
-  if (!canAct() || !defaultChannel()) return;
+  if (!(await anyTarget())) return;
   const who = await slugFor(userId);
   if (!who) return;
   const card = await cardRef("profile", { slug: who.slug });

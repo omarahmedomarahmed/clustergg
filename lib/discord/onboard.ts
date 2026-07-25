@@ -4,6 +4,7 @@ import { allGuideTopics } from "@/lib/cards/guides";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
+import { upsertGuild, getGuildRow, unlockThreshold } from "@/lib/discord/guilds";
 
 // What happens the moment a server owner adds the bot.
 //
@@ -42,7 +43,12 @@ export async function onboardGuild(guildId: string, ownerDiscordId?: string): Pr
 
   const guide = await postGuides(channel.id);
 
-  if (ownerDiscordId) await welcomeOwner(ownerDiscordId, guildId, channel.id);
+  // Record the install so the server appears in admin and starts accruing
+  // attribution from its very first member.
+  await upsertGuild(guildId, { channelId: channel.id, ...(ownerDiscordId ? { ownerDiscordId } : {}) });
+
+  const owner = ownerDiscordId ?? (await getGuildRow(guildId))?.ownerDiscordId ?? null;
+  if (owner) await welcomeOwner(owner, guildId, channel.id);
 
   return { ok: true, channelId: channel.id, posted: guide.posted, pinned: guide.pinned };
 }
@@ -84,6 +90,7 @@ export async function postGuides(channelId: string): Promise<{ posted: number; p
 }
 
 async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: string): Promise<void> {
+  const threshold = await unlockThreshold();
   await dmUser(ownerDiscordId, {
     embeds: [{
       title: "Cluster is live in your server",
@@ -94,7 +101,7 @@ async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: 
         "One profile that carries every game they play, stats synced from official APIs, Cluster Points across four quests, and challenges with real trophies.",
         "",
         "**What you get**",
-        "Run `/cluster server` any time to see how many of your members have joined Cluster and linked a game. At **500 linked gamers your server unlocks ad revenue share** — you earn from every ad Cluster runs in your community.",
+        `Run \`/cluster server\` any time to see how many of your members have joined Cluster and linked a game. At **${threshold.toLocaleString()} linked gamers your server unlocks ad revenue share** — you earn from every ad Cluster runs in your community.`,
         "",
         "You can also request **private, server-only challenges** that no other server can see.",
       ].join("\n"),

@@ -3,6 +3,7 @@ import {
   publicKeyShape, canAct, appId, installUrl, discordConfigured, siteUrl, botApiSecret, CLUSTER_CHANNEL,
 } from "@/lib/discord/config";
 import { RegisterCommands, GuideTools } from "@/components/DiscordBotPanel";
+import { listGuilds } from "@/lib/discord/guilds";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Discord bot" };
@@ -123,6 +124,61 @@ export default async function AdminDiscordPage() {
       </section>
 
       <GuideTools ready={ready} />
+
+      <section className="mt-6">
+        <h2 className="font-bold mb-3">Servers</h2>
+        <ServerTable />
+      </section>
+    </div>
+  );
+}
+
+// Every server with the bot, and how close each is to unlocking ad revenue —
+// the number a server owner cares about, visible to staff without asking them.
+async function ServerTable() {
+  const rows = await listGuilds();
+  if (!rows.length) {
+    return (
+      <div className="glass p-6 text-sm text-muted">
+        No servers yet. They appear here the moment someone adds the bot.
+      </div>
+    );
+  }
+  return (
+    <div className="glass overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="text-xs text-muted">
+          <tr className="text-left">
+            <th className="px-4 py-3">Server</th>
+            <th className="px-4 py-3">Members</th>
+            <th className="px-4 py-3">On Cluster</th>
+            <th className="px-4 py-3">Linked a game</th>
+            <th className="px-4 py-3">To unlock</th>
+            <th className="px-4 py-3">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((g) => (
+            <tr key={g.guildId} className="border-t border-white/5">
+              <td className="px-4 py-3">
+                <div className="font-bold">{g.name || g.guildId}</div>
+                <div className="text-[11px] text-muted font-mono">{g.guildId}</div>
+              </td>
+              <td className="px-4 py-3">{g.memberCount.toLocaleString()}</td>
+              <td className="px-4 py-3">{g.joined.toLocaleString()}</td>
+              <td className="px-4 py-3 font-bold text-cyan-300">{g.linked.toLocaleString()}</td>
+              <td className="px-4 py-3">
+                {g.unlocked ? <span className="text-emerald-300">—</span> : `${g.remaining.toLocaleString()} more`}
+              </td>
+              <td className="px-4 py-3">
+                {g.unlocked
+                  ? <span className="text-emerald-300 font-bold">{g.revenueSharePct}% unlocked</span>
+                  : <span className="text-muted">{g.pct}%</span>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

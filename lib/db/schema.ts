@@ -398,6 +398,10 @@ export const adImpressions = pgTable("ad_impressions", {
   geoCountry: text("geo_country"),
   geoCity: text("geo_city"),
   durationViewedMs: integer("duration_viewed_ms"),
+  // Set when the impression came from a bot post in a Discord server, so
+  // Discord revenue flows through the EXISTING ad analytics rather than a
+  // parallel pipeline that would have to be reconciled later.
+  guildId: text("guild_id"),
   createdAt: now("created_at"),
 }, (t) => [index("imp_cc_idx").on(t.campaignCreativeId, t.createdAt)]);
 
@@ -611,6 +615,68 @@ export const userQuestTiers = pgTable("user_quest_tiers", {
   questTierId: text("quest_tier_id").notNull().references(() => questTiers.id, { onDelete: "cascade" }),
   awardedAt: now("awarded_at"),
 }, (t) => [uniqueIndex("uqt_user_tier_idx").on(t.userId, t.questTierId)]);
+
+// ===== Discord servers =====
+// A server that has installed ClusterBot. This is the unit the whole growth
+// loop is measured in: an owner installs, watches their members join Cluster,
+// and unlocks ad revenue share once enough of them have linked a game.
+export const discordGuilds = pgTable("discord_guilds", {
+  guildId: text("guild_id").primaryKey(),
+  name: text("name").notNull().default(""),
+  iconUrl: text("icon_url"),
+  ownerDiscordId: text("owner_discord_id"),
+  memberCount: integer("member_count").notNull().default(0),
+  channelId: text("channel_id"),                       // the #clustergg channel we created
+  status: text("status").notNull().default("active"),  // active | removed | paused
+  announcementsEnabled: boolean("announcements_enabled").notNull().default(true),
+  adOptIn: boolean("ad_opt_in").notNull().default(true),
+  adUnlockedAt: timestamp("ad_unlocked_at", { withTimezone: true, mode: "date" }),
+  revenueSharePct: integer("revenue_share_pct").notNull().default(70),
+  settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
+  installedAt: now("installed_at"),
+  removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
+});
+
+// The attribution ledger: which Cluster gamers came from which server.
+// `firstLinkedAt` is the one that counts — a member who signed up but never
+// linked a game hasn't yet become the thing advertisers pay for, so the unlock
+// threshold deliberately measures LINKED gamers, not sign-ups.
+export const discordGuildMembers = pgTable("discord_guild_members", {
+  guildId: text("guild_id").notNull(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  attributedVia: text("attributed_via").notNull().default("bot"), // bot | announcement | manual
+  joinedAt: now("joined_at"),
+  firstLinkedAt: timestamp("first_linked_at", { withTimezone: true, mode: "date" }),
+  leftAt: timestamp("left_at", { withTimezone: true, mode: "date" }),
+}, (t) => [
+  primaryKey({ columns: [t.guildId, t.userId] }),
+  index("dgm_guild_idx").on(t.guildId, t.firstLinkedAt),
+]);
+
+// Every command and button press, per server. Powers the admin analytics and
+// tells us which screens people actually use.
+export const discordCommandLogs = pgTable("discord_command_logs", {
+  id: id(),
+  guildId: text("guild_id"),
+  userId: text("user_id"),
+  discordId: text("discord_id"),
+  command: text("command").notNull(),   // e.g. "cluster show" or "button"
+  screen: text("screen"),
+  arg: text("arg"),
+  latencyMs: integer("latency_ms").notNull().default(0),
+  createdAt: now("created_at"),
+}, (t) => [index("dcl_guild_idx").on(t.guildId, t.createdAt)]);
+
+// Ads the bot has posted into a server, linked to the existing ad pipeline.
+export const discordAdPosts = pgTable("discord_ad_posts", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  campaignCreativeId: text("campaign_creative_id"),
+  channelId: text("channel_id"),
+  messageId: text("message_id"),
+  status: text("status").notNull().default("posted"), // posted | failed
+  createdAt: now("created_at"),
+}, (t) => [index("dap_guild_idx").on(t.guildId, t.createdAt)]);
 
 // ===== Rendered PNG cards =====
 // Every "glorified snapshot" the Discord bot attaches (and every OG image a

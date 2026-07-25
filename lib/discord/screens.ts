@@ -7,6 +7,7 @@ import { gamerForDiscordId, signInUrl, type LinkedGamer } from "@/lib/discord/id
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
 import { liveChallenges, challengeUrl } from "@/lib/challenges";
+import { guildStats, attributeMember } from "@/lib/discord/guilds";
 
 // Every screen is "a PNG card + buttons underneath it".
 //
@@ -31,7 +32,12 @@ export type ScreenCtx = {
 };
 
 export async function loadCtx(discordId: string, discordName: string, guildId?: string): Promise<ScreenCtx> {
-  return { discordId, discordName, guildId, gamer: await gamerForDiscordId(discordId) };
+  const gamer = await gamerForDiscordId(discordId);
+  // Using the bot inside a server is the moment we know which server a gamer
+  // came from — so that's where attribution is recorded. It's insert-if-absent,
+  // so the first server they use it in gets the credit.
+  if (gamer && guildId) void attributeMember(guildId, gamer.userId).catch(() => {});
+  return { discordId, discordName, guildId, gamer };
 }
 
 function embed(url: string, opts: { title?: string; description?: string; color?: string | null; footer?: string } = {}) {
@@ -439,6 +445,52 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
   };
 }
 
+// ===== Server growth (the owner's reason to recruit for us) =====
+
+async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  if (!ctx.guildId) {
+    return notYet("Run this inside a server — it shows that server's growth toward ad revenue.", trail);
+  }
+  const stats = await guildStats(ctx.guildId);
+  if (!stats) return notYet("No data for this server yet. Members appear here as they start using Cluster.", trail);
+
+  // A text bar reads better than a number in Discord, and it makes progress feel
+  // like progress even at 3%.
+  const filled = Math.round((stats.pct / 100) * 20);
+  const bar = `${"█".repeat(filled)}${"░".repeat(20 - filled)}`;
+
+  const lines = stats.unlocked
+    ? [
+      `**${bar}** ${stats.pct}%`,
+      "",
+      `**Ad revenue is unlocked.** ${stats.name} earns a ${stats.revenueSharePct}% share of what Cluster makes from your community.`,
+      "",
+      `**${stats.linked.toLocaleString()}** members have linked a game · **${stats.joined.toLocaleString()}** have a Cluster profile`,
+    ]
+    : [
+      `**${bar}** ${stats.pct}%`,
+      "",
+      `**${stats.linked.toLocaleString()} / ${stats.threshold.toLocaleString()}** members have joined Cluster *and* linked a game account.`,
+      `**${stats.remaining.toLocaleString()} more** unlocks a ${stats.revenueSharePct}% share of the ad revenue Cluster earns from this community.`,
+      "",
+      `${stats.joined.toLocaleString()} have a Cluster profile so far — linking a game is what counts.`,
+    ];
+
+  return {
+    embeds: [{
+      title: `${stats.name} — growth`,
+      description: lines.join("\n"),
+      color: embedColor(stats.unlocked ? "#34d399" : "#8b5cf6"),
+      footer: { text: "Only gamers who linked a game count — that's what advertisers pay for." },
+    }],
+    components: rows([
+      navButton("Share the invite", frame("guide", "getting-started"), trail, ButtonStyle.Primary, "📢"),
+      linkButton("Server owner guide", `${siteUrl()}/discord-bot`, "📈"),
+      backButton(trail),
+    ]),
+  };
+}
+
 // An honest empty state — never a raw error, never a dead end.
 function notYet(message: string, trail: Frame[], extra: (Button | null)[] = []): ScreenPayload {
   return {
@@ -477,7 +529,7 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
     case "challenge": return challengeScreen(a, ctx, trail);
     case "challenges": return challengesScreen(a, ctx, trail);
     case "link": return linkScreen(a, ctx, trail);
-    case "server": return comingSoon("Server growth", trail);
+    case "server": return serverScreen(ctx, trail);
     case "admin": return comingSoon("Server settings", trail);
     default: return homeScreen(ctx, trail);
   }
