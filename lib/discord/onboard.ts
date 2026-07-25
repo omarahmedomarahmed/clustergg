@@ -5,6 +5,7 @@ import { cardRef, embedColor } from "@/lib/discord/cards";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
 import { upsertGuild, getGuildRow, unlockThreshold } from "@/lib/discord/guilds";
+import { ensurePortal } from "@/lib/server-portal";
 
 // What happens the moment a server owner adds the bot.
 //
@@ -100,6 +101,10 @@ export async function postGuides(channelId: string): Promise<{ posted: number; p
 
 async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: string): Promise<void> {
   const threshold = await unlockThreshold();
+  // Their own dashboard, and the key that opens it. This is the ONLY place the
+  // key is delivered, which is what makes a DM to the server owner the proof of
+  // ownership — nobody else ever sees it.
+  const portal = await ensurePortal(guildId);
   await dmUser(ownerDiscordId, {
     embeds: [{
       title: "Cluster is live in your server",
@@ -116,13 +121,19 @@ async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: 
         "Run `/cluster admin` and request a challenge for your community. You pick the game, the length, the prize and the trophies; we review it, then post it here with an entry key only your server has. Your members link a game to enter — which is exactly the number that unlocks your revenue share.",
         "",
         "The challenge itself is public on Cluster: everyone can see your standings, your trophies and your server — but only people with your key can enter. That puts your community in front of our whole audience.",
+        ...(portal ? [
+          "",
+          "**Your server portal**",
+          `${siteUrl()}/servers/${portal.slug}`,
+          `Portal key: **\`${portal.key}\`** — keep this private. It opens your growth numbers, your challenges, the traffic we send you, and what your members do with the bot.`,
+        ] : []),
       ].join("\n"),
       color: embedColor("#8b5cf6"),
     }],
     components: rows([
       navButton("Request a challenge", frame("admin", ""), [frame("home")], ButtonStyle.Primary, "🏆"),
+      ...(portal ? [linkButton("Open your portal", `${siteUrl()}/servers/${portal.slug}?key=${encodeURIComponent(portal.key)}`, "🛰")] : []),
       navButton("Your growth so far", frame("server"), [frame("home")], ButtonStyle.Secondary, "📈"),
-      linkButton("Open Cluster", siteUrl(), "🔗"),
       linkButton("Server owner guide", `${siteUrl()}/discord-bot`, "📖"),
     ]),
   });

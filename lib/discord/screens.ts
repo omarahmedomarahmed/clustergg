@@ -9,6 +9,7 @@ import { catalog } from "@/lib/discord/catalog";
 import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild } from "@/lib/challenges";
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember } from "@/lib/discord/guilds";
+import { ensurePortal } from "@/lib/server-portal";
 import { findByInGameName, findByDiscordName } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
 import { getProvider, PROVIDERS } from "@/lib/providers/registry";
@@ -793,6 +794,9 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   }
   const stats = await guildStats(ctx.guildId);
   if (!stats) return notYet("No data for this server yet. Members appear here as they start using Cluster.", trail);
+  // The portal link is only useful to someone who can act on it, and the key
+  // must never appear in a channel — so it's offered to managers as a DM.
+  const portal = ctx.isManager ? await ensurePortal(ctx.guildId) : null;
 
   // A text bar reads better than a number in Discord, and it makes progress feel
   // like progress even at 3%.
@@ -824,7 +828,13 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       footer: { text: "Only gamers who linked a game count — that's what advertisers pay for." },
     }],
     components: rows([
-      navButton("Share the invite", frame("guide", "getting-started"), trail, ButtonStyle.Primary, "📢"),
+      ctx.isManager
+        ? button("DM me my portal key", actionId("portal-key", [], trail), ButtonStyle.Primary, "🛰")
+        : null,
+      portal ? linkButton("Server portal", `${siteUrl()}/servers/${portal.slug}`, "📊") : null,
+      ctx.isManager
+        ? navButton("Run a challenge", frame("admin", ""), trail, ButtonStyle.Success, "🏆")
+        : null,
       linkButton("Server owner guide", `${siteUrl()}/discord-bot`, "📈"),
       backButton(trail),
     ]),

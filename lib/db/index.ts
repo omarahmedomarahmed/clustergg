@@ -255,6 +255,19 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announce_hype" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "guild_ids" jsonb NOT NULL DEFAULT '[]'::jsonb`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "invite_url" text`,
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "slug" text`,
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "portal_key" text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "dg_slug_idx" ON "discord_guilds" ("slug") WHERE "slug" IS NOT NULL`,
+  `CREATE TABLE IF NOT EXISTS "server_events" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "type" text NOT NULL,
+    "challenge_id" text,
+    "user_id" text,
+    "session_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "sev_guild_idx" ON "server_events" ("guild_id","type","created_at")`,
   `CREATE TABLE IF NOT EXISTS "challenge_requests" (
     "id" text PRIMARY KEY NOT NULL,
     "guild_id" text NOT NULL,
