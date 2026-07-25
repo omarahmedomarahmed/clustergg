@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { verifyInteraction } from "@/lib/discord/verify";
-import { canVerify, siteUrl } from "@/lib/discord/config";
+import { canVerify, canAct, appId, publicKeyShape, siteUrl } from "@/lib/discord/config";
 import {
   InteractionType, InteractionResponseType, MessageFlags,
   actor, readCommand, type Interaction,
@@ -29,6 +29,39 @@ export const dynamic = "force-dynamic";
 //     patching the real content in through the interaction webhook.
 
 const json = (body: unknown) => NextResponse.json(body);
+
+// Discord only ever POSTs here. A GET is therefore free to be a self-diagnosis
+// page you can open in a browser — which is the fastest way to answer "why does
+// Discord say it can't verify my endpoint?" without a terminal.
+//
+// It deliberately exposes NO secret values: only whether each one is present
+// and whether the public key is the right shape.
+export function GET(req: NextRequest) {
+  const shape = publicKeyShape();
+  const expected = `${siteUrl()}/api/discord/interactions`;
+  const actual = `${req.nextUrl.origin}${req.nextUrl.pathname}`;
+
+  const problems: string[] = [];
+  if (!shape.present) problems.push("DISCORD_PUBLIC_KEY is not set on this deployment. Add it in Vercel → Settings → Environment Variables (Production), then REDEPLOY — env changes don't apply to an existing build.");
+  else if (!shape.looksValid) problems.push(`DISCORD_PUBLIC_KEY is set but is ${shape.length} characters and not 64 hex characters. It should be the "Public Key" from the General Information tab — not the Application ID, not the client secret, not the bot token.`);
+  if (!canAct()) problems.push("DISCORD_BOT_TOKEN is not set, so the bot cannot create channels, post or pin. Interactions can still verify without it.");
+  if (!appId()) problems.push("Neither DISCORD_APP_ID nor DISCORD_CLIENT_ID is set — replies cannot be delivered.");
+  if (actual !== expected) problems.push(`This deployment answers on ${actual}, but NEXT_PUBLIC_APP_URL says ${expected}. Give Discord the URL you actually reached this page on, with no trailing slash.`);
+
+  return json({
+    ok: problems.length === 0,
+    interactionsUrl: actual,
+    checks: {
+      publicKey: shape.present ? (shape.looksValid ? "ok" : `wrong shape (${shape.length} chars)`) : "missing",
+      botToken: canAct() ? "ok" : "missing",
+      appId: appId() ? "ok" : "missing",
+    },
+    problems,
+    next: problems.length === 0
+      ? "Everything needed to verify is in place. Paste this exact interactionsUrl into Discord → General Information → Interactions Endpoint URL and click Save."
+      : "Fix the problems above, redeploy, then reload this page.",
+  });
+}
 
 export async function POST(req: NextRequest) {
   if (!canVerify()) {

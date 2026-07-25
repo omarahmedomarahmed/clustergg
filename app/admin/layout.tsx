@@ -69,6 +69,12 @@ const NAV: { section: string; area?: string; items: { href: string; label: strin
     ],
   },
   {
+    section: "Discord bot",
+    items: [
+      { href: "/admin/discord", label: "Bot status & setup" },
+    ],
+  },
+  {
     section: "Platform",
     items: [
       { href: "/admin/storage", label: "Image storage", area: "storage" },

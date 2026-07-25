@@ -12,16 +12,35 @@ export const DISCORD_API = "https://discord.com/api/v10";
 // The channel the bot creates on install and pins its how-to guides in.
 export const CLUSTER_CHANNEL = "clustergg";
 
+// Env values pasted into a dashboard pick up stray whitespace and quotes
+// astonishingly often, and a public key with a trailing newline fails EVERY
+// signature check while looking perfectly correct in the UI. Normalise once,
+// here, rather than debugging it later.
+function env(name: string): string | undefined {
+  const v = process.env[name];
+  if (!v) return undefined;
+  const clean = v.trim().replace(/^["']|["']$/g, "");
+  return clean || undefined;
+}
+
 export function botToken(): string | undefined {
-  return process.env.DISCORD_BOT_TOKEN || undefined;
+  return env("DISCORD_BOT_TOKEN");
 }
 
 export function publicKey(): string | undefined {
-  return process.env.DISCORD_PUBLIC_KEY || undefined;
+  return env("DISCORD_PUBLIC_KEY");
 }
 
 export function appId(): string | undefined {
-  return process.env.DISCORD_APP_ID || process.env.DISCORD_CLIENT_ID || undefined;
+  return env("DISCORD_APP_ID") || env("DISCORD_CLIENT_ID");
+}
+
+// Is the public key even shaped like an Ed25519 key? (64 hex characters.)
+// Pasting the Application ID or the client secret in by mistake is the single
+// most common reason Discord refuses to verify an interactions URL.
+export function publicKeyShape(): { present: boolean; length: number; looksValid: boolean } {
+  const k = publicKey();
+  return { present: !!k, length: k?.length ?? 0, looksValid: !!k && /^[0-9a-f]{64}$/i.test(k) };
 }
 
 // Can we *receive* interactions? (needs only the public key)
@@ -81,7 +100,7 @@ export function installUrl(): string | null {
 // Shared secret for server-to-server bot endpoints, mirroring the CRON_SECRET
 // pattern already used by /api/cron/sync.
 export function botApiSecret(): string | undefined {
-  return process.env.BOT_API_SECRET || undefined;
+  return env("BOT_API_SECRET");
 }
 
 export function authorizeBotRequest(headers: Headers): boolean {
