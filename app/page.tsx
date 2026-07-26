@@ -20,6 +20,9 @@ import { slimImg } from "@/lib/img";
 import { timeAgo } from "@/lib/utils";
 import { networkStats, publicServers } from "@/lib/network";
 import { DiscordSection } from "@/components/DiscordSection";
+import BotShowcase from "@/components/BotShowcase";
+import { botShowcaseSteps } from "@/lib/bot-showcase";
+import { installUrl } from "@/lib/discord/config";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +37,10 @@ export default async function LandingPage() {
   // Full quests + CP tops for the "Chart your quests" card grid.
   const homeQuests = await getUserQuests(db, viewer?.id ?? null);
   const questTops = await getQuestTops(db, homeQuests.map((q) => q.id), 6);
-  const [network, topServers] = await Promise.all([networkStats(), publicServers(6)]);
+  const [network, topServers, botSteps] = await Promise.all([
+    networkStats(), publicServers(6), botShowcaseSteps(),
+  ]);
+  const install = installUrl();
   const c = await getContent([
     "discord.badge", "discord.title", "discord.subtitle",
     "discord.cta.primary", "discord.cta.secondary",
@@ -111,6 +117,8 @@ export default async function LandingPage() {
   const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
   const { tr, te } = await getT();
   const homeQuestsL = homeQuests.map((q) => localizeQuest(q, te));
+  // Only the art-only fallback hero uses these now: with planets present, the
+  // Discord section above carries the network numbers that actually matter.
   const statCards = [
     { n: counts.users, label: tr("Gamers"), icon: "users" },
     { n: counts.accounts, label: tr("Linked accounts"), icon: "link" },
@@ -131,6 +139,13 @@ export default async function LandingPage() {
           you browse the games; this is what you actually adopt. */}
       <DiscordSection stats={network} servers={topServers} copy={c} />
 
+      {/* ===== HOW THE BOT WORKS =====
+          Shown, not described. Every frame is a real card from our own
+          renderer inside a mock of Discord's chrome, and the buttons work —
+          because "pressing a button edits the message in place" is the thing
+          that has to land, and nobody believes it from a paragraph. */}
+      {botSteps.length > 1 && <BotShowcase steps={botSteps} installUrl={install} />}
+
       {/* ===== HERO ===== */}
       {skinnedPlanets.length > 0 ? (
         // The interactive globe above is the hero. Keep only a slim guest CTA
@@ -143,15 +158,6 @@ export default async function LandingPage() {
               <Link href="/leaderboards" className="text-sm text-cyan-300 hover:underline">{c["hero.cta.secondary"]} →</Link>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 max-w-3xl mx-auto">
-            {statCards.map((s) => (
-              <div key={s.label} className="glass card-lift px-4 py-4 text-center">
-                <Icon name={s.icon} size={16} className="text-violet-300 mb-1.5" />
-                <div className="text-3xl font-bold grad-text">{Number(s.n).toLocaleString()}</div>
-                <div className="text-xs uppercase tracking-widest text-muted mt-1">{s.label}</div>
-              </div>
-            ))}
-          </div>
         </section>
       ) : (
         <section className="relative">
