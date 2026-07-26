@@ -293,7 +293,7 @@ async function maybeCompleteQuest(db: DB, userId: string, questId: string, quest
     .where(and(eq(schema.userQuestProgress.userId, userId), eq(schema.userQuestProgress.questId, questId)));
   await db.insert(schema.notifications).values({
     id: uid(), userId, type: "badge",
-    title: `Quest complete: ${questName}! 🏆`,
+    title: `Quest complete: ${questName}`,
     body: `You finished ${questName}${completed > 1 ? ` ×${completed}` : ""} — re-enrolled from the start, and your total CP keeps stacking.`,
     href: "/quests",
   });

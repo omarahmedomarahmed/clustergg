@@ -224,7 +224,7 @@ function SetupBody({ liveOrigin, checks, ready, install }: {
         {checks.map((c) => (
           <div key={c.label} className="flex gap-3 items-start">
             <span className={`mt-0.5 shrink-0 w-5 h-5 rounded-full grid place-items-center text-xs font-bold ${c.ok ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"}`}>
-              {c.ok ? "✓" : "!"}
+              <Icon name={c.ok ? "check" : "alert"} size={12} />
             </span>
             <div>
               <div className="font-bold text-sm">{c.label}</div>

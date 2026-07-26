@@ -36,35 +36,23 @@ const STYLE: Record<string, string> = {
   link: "bg-[#4e5058] text-white hover:bg-[#6d6f78]",
 };
 
-export default function BotShowcase({ steps, heading, blurb, installUrl }: {
+export default function BotShowcase({ steps, heading, blurb, installUrl, bare }: {
   steps: BotStep[];
   heading?: string;
   blurb?: string;
   /** Passed in rather than read here — this runs in the browser and the
    *  install URL is built from server-only config. Omit to hide the CTA. */
   installUrl?: string | null;
+  /** Drop the section chrome and render only the demo, for embedding inside a
+   *  section that already has its own heading. */
+  bare?: boolean;
 }) {
   const [id, setId] = useState(steps[0]?.id ?? "");
   const step = steps.find((s) => s.id === id) ?? steps[0];
   if (!step) return null;
 
-  return (
-    <section className="relative py-16 sm:py-20 overflow-hidden">
-      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-violet-600/10 via-transparent to-cyan-500/10" />
-      <div className="relative mx-auto max-w-6xl px-4">
-        <div className="text-center max-w-2xl mx-auto mb-10">
-          <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/40 bg-violet-500/10 px-4 py-1.5 text-xs uppercase tracking-widest text-violet-200">
-            <BrandGlyph provider="discord" size={14} /> Inside Discord
-          </span>
-          <h2 className="text-3xl sm:text-4xl font-black mt-4 leading-tight">
-            {heading ?? "This is what your members see."}
-          </h2>
-          <p className="text-muted mt-3">
-            {blurb ?? "Real cards from the live bot, not mockups. Press a button — it works the same way it does in your server."}
-          </p>
-        </div>
-
-        <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
+  const demo = (
+    <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6 items-start">
           {/* The Discord frame. */}
           <div className="rounded-2xl border border-white/10 bg-[#313338] overflow-hidden shadow-2xl">
             <div className="flex items-center gap-2 px-4 py-2.5 border-b border-black/30 bg-[#2b2d31]">
@@ -164,7 +152,27 @@ export default function BotShowcase({ steps, heading, blurb, installUrl }: {
               </div>
             )}
           </div>
+    </div>
+  );
+
+  if (bare) return demo;
+
+  return (
+    <section className="relative py-16 sm:py-20 overflow-hidden">
+      <div aria-hidden className="absolute inset-0 bg-gradient-to-b from-violet-600/10 via-transparent to-cyan-500/10" />
+      <div className="relative mx-auto max-w-6xl px-4">
+        <div className="text-center max-w-2xl mx-auto mb-10">
+          <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/40 bg-violet-500/10 px-4 py-1.5 text-xs uppercase tracking-widest text-violet-200">
+            <BrandGlyph provider="discord" size={14} /> Inside Discord
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-black mt-4 leading-tight">
+            {heading ?? "This is what your members see."}
+          </h2>
+          <p className="text-muted mt-3">
+            {blurb ?? "Real cards from the live bot, not mockups. Press a button — it works the same way it does in your server."}
+          </p>
         </div>
+        {demo}
       </div>
     </section>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { saveDoc, deleteDoc, addSection, savePerson, deletePerson, movePerson, type DocActionState } from "@/app/actions/dataroom";
+import { saveDoc, deleteDoc, reseedDocSections, addSection, savePerson, deletePerson, movePerson, type DocActionState } from "@/app/actions/dataroom";
 import ImageUpload from "@/components/ImageUpload";
 import Icon from "@/components/Icon";
 import { SECTION_KINDS, type Doc, type Person } from "@/lib/dataroom/types";
@@ -124,6 +124,42 @@ export function DeleteDoc({ doc }: { doc: Doc }) {
         </button>
         <button type="button" onClick={() => setArmed(false)} className="text-xs text-muted hover:text-ink">Cancel</button>
       </div>
+      {state?.error && <p className="text-xs text-amber-300">{state.error}</p>}
+    </form>
+  );
+}
+
+// Pull the shipped deck back in.
+//
+// Seeding runs once, so a document seeded months ago never sees a redesign.
+// This is the way to take one — and it is destructive, so it is armed and
+// confirmed exactly like deleting is.
+export function ReseedDoc({ doc }: { doc: Doc }) {
+  const [state, act, busy] = useActionState<DocActionState, FormData>(reseedDocSections, undefined);
+  const [armed, setArmed] = useState(false);
+  if (!armed) {
+    return (
+      <button type="button" onClick={() => setArmed(true)} className="text-xs text-muted hover:text-cyan-300">
+        Restore the shipped sections
+      </button>
+    );
+  }
+  return (
+    <form action={act} className="rounded-xl border border-cyan-400/30 bg-cyan-500/10 p-4 space-y-2">
+      <input type="hidden" name="id" value={doc.id} />
+      <p className="text-xs text-cyan-100">
+        Replaces every section in this document with the version we ship — the visual one, with the
+        graphic explainers and the live product cards. <b>Your own sections and text are deleted.</b>{" "}
+        The document&apos;s title, colours and contact details are untouched. Type <b>{doc.slug}</b> to confirm.
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input name="confirm" placeholder={doc.slug} className="input-cosmic w-48 font-mono text-sm" />
+        <button disabled={busy} className="rounded-full bg-cyan-500/20 border border-cyan-400/50 px-4 py-1.5 text-xs font-semibold text-cyan-100">
+          {busy ? "Restoring…" : "Restore"}
+        </button>
+        <button type="button" onClick={() => setArmed(false)} className="text-xs text-muted hover:text-ink">Cancel</button>
+      </div>
+      {state?.ok && <p className="text-xs text-emerald-300">{state.ok}</p>}
       {state?.error && <p className="text-xs text-amber-300">{state.error}</p>}
     </form>
   );

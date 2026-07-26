@@ -2,7 +2,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
 import BotShowcase from "@/components/BotShowcase";
-import { Milestones, GtmStages, TeamGrid, Gallery, MetricTiles } from "@/components/dataroom/Interactive";
+import { Milestones, GtmStages, TeamGrid, Gallery, MetricTiles, Explainer, CardShowcase } from "@/components/dataroom/Interactive";
 import { ladder, metricValueFor, INVESTOR_AD_PLACEMENT, type LiveData, type Person, type Section } from "@/lib/dataroom";
 import type { BotStep } from "@/components/BotShowcase";
 
@@ -182,11 +182,27 @@ function Body({ section, doc, live, people, steps, installUrl }: {
           <Heading section={section} accent={accent} />
           {steps.length > 1 ? (
             <div className="-mx-4 sm:mx-0">
-              <BotShowcase steps={focusSteps(steps, d.focus)} installUrl={installUrl} heading="" blurb="" />
+              <BotShowcase steps={focusSteps(steps, d.focus)} installUrl={installUrl} bare />
             </div>
           ) : (
             <p className="text-sm text-muted">The live demo needs a game and a profile in the database to draw from.</p>
           )}
+        </>
+      );
+
+    case "explainer":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <Explainer steps={d.steps ?? []} loop={d.loop} accent={accent} accent2={accent2} />
+        </>
+      );
+
+    case "showcase":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <CardShowcase cards={showcaseCards(d.cards)} accent={accent} />
         </>
       );
 
@@ -205,7 +221,7 @@ function Body({ section, doc, live, people, steps, installUrl }: {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={s.iconUrl} alt="" className="h-12 w-12 rounded-xl object-cover mx-auto" />
                   ) : (
-                    <div className="h-12 w-12 rounded-xl grid place-items-center mx-auto text-xl" style={{ background: `${accent}26` }}>🛰</div>
+                    <div className="h-12 w-12 rounded-xl grid place-items-center mx-auto text-xl" style={{ background: `${accent}26` }}><Icon name="satellite" size={20} className="text-violet-200" /></div>
                   )}
                   <div className="font-semibold text-xs mt-2 truncate">{s.name}</div>
                   <div className="text-[10px] text-muted">{nf(s.memberCount)} members</div>
@@ -224,7 +240,7 @@ function Body({ section, doc, live, people, steps, installUrl }: {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {live.tiers.map((t) => (
               <div key={t.key} className="glass rounded-2xl p-5">
-                <div className="text-3xl">{t.badge}</div>
+                <Icon name={t.icon} size={28} style={{ color: accent2 }} />
                 <div className="font-bold mt-2">{t.name}</div>
                 <div className="text-xs mt-0.5" style={{ color: accent2 }}>
                   {t.threshold === 0 ? "From day one" : `${nf(t.threshold)}+ verified members`}
@@ -369,6 +385,28 @@ function Body({ section, doc, live, people, steps, installUrl }: {
 
 // Which slice of the live demo this section is about. A "challenges" section
 // should open on a challenge, not on the welcome card.
+// The real cards, requested live from the renderer that serves Discord.
+//
+// `preview=1` fills in the identifiers from actual platform data, so a section
+// can ask for "a challenge card" without the deck having to know which
+// challenge — and can never end up showing one that was deleted.
+function showcaseCards(cards: { kind: string; caption?: string }[] | undefined) {
+  const chosen = cards?.length ? cards : DEFAULT_SHOWCASE;
+  return chosen.map((c) => ({
+    ...c,
+    url: `/api/card/${encodeURIComponent(c.kind)}?preview=1`,
+  }));
+}
+
+// What "everything we built" looks like when nobody has picked: one card from
+// each of the four things the product actually is.
+const DEFAULT_SHOWCASE = [
+  { kind: "profile", caption: "A gamer's profile — their own art, their trophies, every game they play" },
+  { kind: "planet", caption: "A game world — live challenges, standings, and who's ranked on it" },
+  { kind: "challenge", caption: "A live challenge — stats snapshotted on join, trophies with real value" },
+  { kind: "leaderboard", caption: "A leaderboard, straight from the game's official API" },
+];
+
 function focusSteps(steps: BotStep[], focus?: string): BotStep[] {
   const first: Record<string, string> = {
     profile: "profile", challenges: "challenge", leaderboards: "leaderboard",

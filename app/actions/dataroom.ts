@@ -5,6 +5,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
+import { reseedDoc } from "@/lib/dataroom";
 import type { SectionData, SectionKind } from "@/lib/dataroom/types";
 
 // Editing a data room document.
@@ -122,6 +123,29 @@ export async function deleteDoc(_prev: DocActionState, fd: FormData): Promise<Do
   return { ok: `Deleted ${doc.title}.` };
 }
 
+// Pull the shipped sections back in over this document's own.
+//
+// Destructive and irreversible, so it's gated the same way deleting a document
+// is: type the slug. It exists because seeding is once-only — an admin whose
+// deck was seeded months ago would otherwise never see a redesign, and the
+// alternative (re-applying on deploy) silently overwrites their edits.
+export async function reseedDocSections(_prev: DocActionState, fd: FormData): Promise<DocActionState> {
+  await requireAdmin();
+  const id = str(fd, "id");
+  if (!id) return { error: "No document." };
+  const db = await getDb();
+  const [doc] = await db.select().from(schema.dataroomDocs).where(eq(schema.dataroomDocs.id, id)).limit(1);
+  if (!doc) return { error: "No such document." };
+  if (str(fd, "confirm") !== doc.slug) {
+    return { error: `Type "${doc.slug}" to confirm — every section in this document is replaced.` };
+  }
+  const res = await reseedDoc(doc.slug);
+  if (!res.ok) return { error: "This document has no shipped version to restore." };
+  await touch(doc.id);
+  refresh("/admin/dataroom", `/admin/dataroom/${doc.slug}`, `/dataroom/${doc.slug}`);
+  return { ok: `Restored ${res.sections} shipped sections. Your own text is gone.` };
+}
+
 // ===== Sections =====
 
 export async function addSection(_prev: DocActionState, fd: FormData): Promise<DocActionState> {
@@ -164,6 +188,16 @@ function defaultDataFor(kind: SectionKind): SectionData {
     case "gtm": return { stages: [{ name: "Stage one", status: "current", summary: "What's happening now." }] };
     case "metrics": return { metricKeys: ["guilds", "guildMembers", "linkedAccounts", "games"] };
     case "faq": return { qa: [{ q: "A question people ask", a: "The answer." }] };
+    case "explainer": return {
+      steps: [
+        { icon: "gamepad", label: "They play" },
+        { icon: "link", label: "We read it" },
+        { icon: "trophy", label: "They compete" },
+        { icon: "users", label: "Server grows" },
+      ],
+      loop: true,
+    };
+    case "showcase": return {};
     default: return {};
   }
 }
@@ -238,6 +272,26 @@ function readSectionData(kind: SectionKind, fd: FormData): SectionData {
     case "product":
       d.focus = (str(fd, "focus") || "bot") as SectionData["focus"];
       break;
+    case "explainer": {
+      const labels = fd.getAll("stepLabel").map(String);
+      d.steps = labels.map((label, i) => ({
+        // Capped at the point of entry, not just in the input: a diagram whose
+        // labels grow into sentences stops being a diagram.
+        label: label.trim().slice(0, 22),
+        icon: String(fd.getAll("stepIcon")[i] ?? "spark").trim() || "spark",
+        note: String(fd.getAll("stepNote")[i] ?? "").trim() || undefined,
+      })).filter((x) => x.label);
+      d.loop = fd.get("loop") === "on";
+      break;
+    }
+    case "showcase": {
+      const kinds = fd.getAll("cardKind").map(String);
+      d.cards = kinds.map((kind, i) => ({
+        kind: kind.trim(),
+        caption: String(fd.getAll("cardCaption")[i] ?? "").trim() || undefined,
+      })).filter((c) => c.kind);
+      break;
+    }
     case "logos": {
       const names = fd.getAll("logoName").map(String);
       d.logos = names.map((name, i) => ({

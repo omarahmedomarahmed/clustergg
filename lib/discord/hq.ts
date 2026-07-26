@@ -9,7 +9,7 @@ import {
 } from "@/lib/discord/rest";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
-import { embedColor } from "@/lib/discord/cards";
+import { cardRef, embedColor } from "@/lib/discord/cards";
 
 // Our own Discord server — "HQ".
 //
@@ -382,7 +382,7 @@ export async function runHqSetup(force = false): Promise<HqSetupResult> {
       created++;
 
       if (ch.pin && ch.kind === "text") {
-        const res = await postMessage(made.data.id, starter(ch.pin));
+        const res = await postMessage(made.data.id, await starter(ch.pin));
         if (res.ok && (await pinMessage(made.data.id, res.data.id)).ok) pinned++;
       }
     }
@@ -399,7 +399,7 @@ function slugName(g: string): string {
   return g.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-function starter(pin: NonNullable<PlannedChannel["pin"]>) {
+async function starter(pin: NonNullable<PlannedChannel["pin"]>) {
   const buttons = pin.buttons === "link"
     ? rows([
       navButton("Link a game account", frame("link", ""), [frame("home")], ButtonStyle.Success, "🎮"),
@@ -415,10 +415,16 @@ function starter(pin: NonNullable<PlannedChannel["pin"]>) {
         navButton("Link a game account", frame("link", ""), [frame("home")], ButtonStyle.Success, "🎮"),
       ]);
 
+  const { url } = await cardRef("guide", { topic: guideForPin(pin.buttons) });
   return {
-    embeds: [{ title: pin.title, description: pin.body, color: embedColor("#8b5cf6") }],
+    embeds: [{ title: pin.title, description: pin.body, color: embedColor("#8b5cf6"), image: { url } }],
     components: buttons,
   };
+}
+
+// Which pinned guide card fits the channel this starter message opens.
+function guideForPin(buttons: "start" | "link" | "portal" | undefined): string {
+  return buttons === "link" ? "connect-account" : buttons === "portal" ? "everything" : "getting-started";
 }
 
 // ===== Reporting home =====
@@ -459,8 +465,9 @@ export async function reportToHq(event: HqEvent): Promise<void> {
     if (!channel) return;
 
     const { title, body, color } = describe(event);
+    const { url } = await cardRef("guide", { topic: "everything" });
     await postMessage(channel, {
-      embeds: [{ title, description: body, color: embedColor(color) }],
+      embeds: [{ title, description: body, color: embedColor(color), image: { url } }],
     });
   } catch { /* reporting is never worth breaking the thing being reported */ }
 }

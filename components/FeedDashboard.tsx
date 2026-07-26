@@ -199,7 +199,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
         fullHref: "/profile",
         compact: (
           <div className="flex items-center gap-3">
-            <span className="grid place-items-center h-9 w-9 rounded-lg bg-[#c89b3c]/20 text-[#c89b3c] font-bold">⚡</span>
+            <span className="grid place-items-center h-9 w-9 rounded-lg bg-[#c89b3c]/20 text-[#c89b3c] font-bold"><Icon name="zap" size={16} /></span>
             <div className="min-w-0"><div className="text-sm font-bold truncate">{la.tag}</div><div className="text-[10px] text-muted">League of Legends · tap for full snapshot</div></div>
           </div>
         ),

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { renderCard } from "@/lib/cards/render";
 import { toEmbeddable } from "@/lib/cards/img";
+import { DEFAULT_LAYOUT } from "@/lib/cards/layout";
+import { previewFixtures } from "@/lib/cards/preview";
 import { getOrRenderCard } from "@/lib/cards/cache";
 import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, cardBg } from "@/lib/cards/data";
 import { guideCard, GUIDE_TOPICS } from "@/lib/cards/guides";
@@ -26,9 +28,13 @@ export const runtime = "nodejs";
 export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: string }> }) {
   const { kind } = await ctx.params;
   const q = req.nextUrl.searchParams;
-  const slug = q.get("slug");
-  const game = q.get("game");
   const fresh = q.get("fresh") === "1";
+  // `?preview=1` fills in whatever identifiers weren't given from real platform
+  // data, so the admin layout editor can ask for "a challenge card" without
+  // knowing which challenge. Read-only, and every card it produces is public.
+  const fx = q.get("preview") === "1" ? await previewFixtures() : null;
+  const slug = q.get("slug") ?? fx?.slug ?? null;
+  const game = q.get("game") ?? fx?.game ?? null;
 
   let data: CardData | null = null;
   try {
@@ -40,7 +46,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
         if (slug && game) data = await gameStatsCard(slug, game);
         break;
       case "quest":
-        data = await questCard(slug, q.get("quest") ?? "");
+        data = await questCard(slug, q.get("quest") ?? fx?.questKey ?? "");
         break;
       case "cp":
       case "cp-summary":
@@ -55,9 +61,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
       case "planets":
         data = await planetsCard();
         break;
-      case "challenge":
-        if (q.get("id")) data = await challengeCard(q.get("id")!);
+      case "challenge": {
+        const id = q.get("id") ?? fx?.challengeId;
+        if (id) data = await challengeCard(id);
         break;
+      }
       case "guide":
         data = await guideCard(q.get("topic") ?? "getting-started", q.get("quest"));
         break;
@@ -116,12 +124,12 @@ async function explain(data: CardData) {
     },
     accent: data.theme.accent,
     accent2: data.theme.accent2,
-    dim: data.theme.dim ?? 62,
+    dim: data.theme.layout?.dim ?? DEFAULT_LAYOUT.dim,
   };
 }
 
 async function fallbackCard(subtitle: string) {
-  const bg = await cardBg("bot_welcome").catch(() => ({ bgUrl: null, dim: 62 }));
+  const bg = await cardBg("bot_welcome").catch(() => ({ bgUrl: null }));
   const data: CardData = {
     kind: "guide",
     title: "Nothing to show yet",
@@ -129,7 +137,7 @@ async function fallbackCard(subtitle: string) {
     badge: "CLUSTER",
     steps: GUIDE_TOPICS["getting-started"].steps.slice(0, 3),
     footer: "clustergg.com",
-    theme: { accent: "#8b5cf6", accent2: "#22d3ee", bgUrl: bg.bgUrl, dim: bg.dim },
+    theme: { accent: "#8b5cf6", accent2: "#22d3ee", bgUrl: bg.bgUrl },
   };
   try {
     return await renderCard(data);

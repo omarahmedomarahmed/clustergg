@@ -190,7 +190,7 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-8">
             {TIERS.map((t) => (
               <div key={t.key} className="glass rounded-2xl p-5">
-                <div className="text-2xl">{t.badge}</div>
+                <Icon name={t.icon} size={26} className="text-cyan-300" />
                 <div className="font-bold mt-1.5">{t.name}</div>
                 <div className="text-xs text-cyan-300 mt-0.5">
                   {t.threshold === 0 ? "From day one" : `${t.threshold.toLocaleString()}+ linked members`}
@@ -248,7 +248,7 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={s.iconUrl} alt="" className="h-11 w-11 rounded-xl object-cover mx-auto" />
                 ) : (
-                  <div className="h-11 w-11 rounded-xl grid place-items-center bg-violet-500/20 text-lg mx-auto">🛰</div>
+                  <div className="h-11 w-11 rounded-xl grid place-items-center bg-violet-500/20 text-lg mx-auto"><Icon name="satellite" size={20} className="text-violet-200" /></div>
                 )}
                 <div className="font-semibold text-xs mt-2 truncate">{s.name}</div>
                 <div className="text-[10px] text-muted">{nf(s.memberCount)}</div>

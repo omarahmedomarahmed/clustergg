@@ -38,7 +38,7 @@ export default function ProfileLocaleFlag({ countries, country, locale }: { coun
       </div>
       <div className="mt-4 flex items-center gap-3">
         <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving…" : "Save"}</button>
-        {saved && !pending && <span className="text-xs text-emerald-300">Saved ✓</span>}
+        {saved && !pending && <span className="text-xs text-emerald-300">Saved</span>}
       </div>
     </section>
   );

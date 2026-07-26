@@ -59,6 +59,37 @@ export async function ensureSeeded(): Promise<void> {
   } catch { /* a data room that can't seed still renders its empty state */ }
 }
 
+// Replace one document's sections with the shipped set.
+//
+// Seeding is deliberately once-only, which is right for protecting an admin's
+// copy and wrong when the shipped deck is genuinely better than what's stored —
+// a redesign that only new installs can see helps nobody. So this exists as an
+// explicit, per-document, admin-pressed action: it says what it will destroy
+// before it does it, and it never runs on its own.
+//
+// The document's own identity (slug, title, accent, contact) is left alone.
+// Only the sections are replaced, because they are what a redesign changes.
+export async function reseedDoc(slug: string): Promise<{ ok: boolean; sections: number }> {
+  const seed = SEED_DOCS.find((d) => d.slug === slug);
+  if (!seed) return { ok: false, sections: 0 };
+  try {
+    const db = await getDb();
+    const [doc] = await db.select({ id: schema.dataroomDocs.id })
+      .from(schema.dataroomDocs).where(eq(schema.dataroomDocs.slug, slug)).limit(1);
+    if (!doc) return { ok: false, sections: 0 };
+
+    await db.delete(schema.dataroomSections).where(eq(schema.dataroomSections.docId, doc.id));
+    for (const [j, sec] of seed.sections.entries()) {
+      await db.insert(schema.dataroomSections).values({
+        id: uid(), docId: doc.id, kind: sec.kind, anchor: sec.anchor, navLabel: sec.navLabel,
+        title: sec.title ?? null, subtitle: sec.subtitle ?? null, body: sec.body ?? null,
+        data: (sec.data ?? {}) as Record<string, unknown>, sortOrder: j,
+      });
+    }
+    return { ok: true, sections: seed.sections.length };
+  } catch { return { ok: false, sections: 0 }; }
+}
+
 // ===== Reading =====
 
 export async function listDocs(includeUnpublished = false): Promise<Doc[]> {

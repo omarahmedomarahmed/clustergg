@@ -10,7 +10,7 @@ import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesFo
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
-import { findByInGameName, findByDiscordName } from "@/lib/gamer-lookup";
+import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
 import { getProvider, PROVIDERS } from "@/lib/providers/registry";
 
@@ -129,15 +129,16 @@ function tail(ctx: ScreenCtx, here: Frame, trail: Frame[]): (Button | null)[] {
   ];
 }
 
-function signInPrompt(ctx: ScreenCtx, trail: Frame[]): ScreenPayload {
+async function signInPrompt(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const { url } = await cardRef("guide", { topic: "getting-started" });
   return {
-    embeds: [{
+    embeds: [embed(url, {
       title: "One step first",
       description:
         "Continue with Discord — one tap, and this bot knows you everywhere.\n\n" +
         "Your Cluster profile carries every game you play, your Cluster Points, your quests and your trophies — one identity instead of a dozen scattered accounts.",
-      color: embedColor("#8b5cf6"),
-    }],
+      color: "#8b5cf6",
+    })],
     components: rows([
       linkButton("Continue with Discord", signInUrl(siteUrl(), "/feed"), "🚀"),
       ...tail(ctx, frame("signin"), trail),
@@ -190,18 +191,15 @@ async function homeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
 async function moreScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   const here = frame("more");
   const t = [here, ...trail];
+  const { url } = await cardRef("guide", { topic: "everything" });
   return {
-    embeds: [{
+    embeds: [embed(url, {
       title: "Everything Cluster does",
-      description: [
-        "**Planets** — every game we sync, with its own challenges, leaderboard and top gamers.",
-        "**Challenges** — live competitions with real trophies. Your stats are snapshotted when you join, so only new activity counts.",
-        "**Quests** — earn Cluster Points across every game you play.",
-        "**Leaderboards** — every board we run, updated on each sync.",
-        ctx.isManager ? "**Server** — your growth toward ad revenue, and running your own challenges." : null,
-      ].filter(Boolean).join("\n"),
-      color: embedColor("#8b5cf6"),
-    }],
+      description: ctx.isManager
+        ? "Your server's growth toward ad revenue, and the tools to run your own challenges, are in here too."
+        : undefined,
+      color: "#8b5cf6",
+    })],
     components: rows([
       navButton("Planets", frame("planets"), t, ButtonStyle.Primary, "🪐"),
       navButton("Challenges", frame("challenges"), t, ButtonStyle.Success, "🏆"),
@@ -264,9 +262,15 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
   const isDiscordLookup = /^discord$/i.test(what);
   const game = what.startsWith("game:") ? what.slice(5) : what;
 
+  // `/cluster <a name>` is now the main way anyone looks somebody up, and a
+  // person typing a name knows the name — not whether it's that gamer's Discord
+  // handle, their Cluster display name or the tag they use in one game. So an
+  // exact handle match is tried first and a broad search catches everything
+  // else, rather than answering "no such Discord handle" to a real player's
+  // real in-game name.
   const found = isDiscordLookup
-    ? await findByDiscordName(gamer)
-    : (await findByInGameName(game, gamer)) ?? (await findByDiscordName(gamer));
+    ? (await findByDiscordName(gamer)) ?? (await searchGamers(gamer, 1))[0] ?? null
+    : (await findByInGameName(game, gamer)) ?? (await findByDiscordName(gamer)) ?? (await searchGamers(gamer, 1))[0] ?? null;
 
   if (!found) {
     return notYet(
@@ -448,23 +452,18 @@ async function guideScreen(topic: string, ctx: ScreenCtx, trail: Frame[]): Promi
 
 async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   const here = frame("home");
+  const { url } = await cardRef("guide", { topic: "commands" });
   return {
-    embeds: [{
+    embeds: [embed(url, {
       title: "Cluster — every game, one identity",
       description: [
-        "Link your game accounts once. Your stats sync from the official APIs, you earn Cluster Points across four quests, and you compete in challenges with real trophies.",
-        "",
-        "**Type `/cluster` and Discord lists everything.** The main ones:",
-        "`/cluster home` — your hub",
-        "`/cluster show` — profile, CP, a game or a quest",
-        "`/cluster planet game:` — a game's challenges, leaderboard and top gamers",
-        "`/cluster challenge` — what's live right now",
-        "`/cluster link game:` — link an account",
-        "`/cluster share` — post your profile so people can vote for it",
-        "`/cluster server` — server owners: your growth toward ad revenue",
-      ].join("\n"),
-      color: embedColor("#8b5cf6"),
-    }],
+        "**`/cluster`** — your own card.",
+        "**`/cluster <anything>`** — a game, a quest, a guide, or another gamer's name. Start typing and the suggestions fill in from live data.",
+        ctx.isManager ? "**`/cluster admin`** — run a challenge for this server, and see your growth toward ad revenue." : null,
+        "**`/cluster share`** — post your card publicly so people can vote for it.",
+      ].filter(Boolean).join("\n"),
+      color: "#8b5cf6",
+    })],
     components: rows([
       startHereButton([here]),
       navButton("Getting started", frame("guide", "getting-started"), [here], ButtonStyle.Secondary, "📖"),
@@ -551,12 +550,13 @@ async function leaderboardScreen(game: string, metric: string, ctx: ScreenCtx, t
     const c = await catalog();
     if (c.games.length > 1) {
       const here = frame("leaderboard", "");
+      const { url } = await cardRef("planets", {});
       return {
-        embeds: [{
+        embeds: [embed(url, {
           title: "Leaderboards",
           description: "Every game we sync runs its own boards — rank, wins, and whatever else that game measures. Pick a game.",
-          color: embedColor("#8b5cf6"),
-        }],
+          color: "#8b5cf6",
+        })],
         components: rows([
           ...c.games.slice(0, 18).map((g) => navButton(g.name.slice(0, 24), frame("leaderboard", g.value), [here, ...trail], gameStyle(g.value), "📊")),
           ...tail(ctx, here, trail),
@@ -613,12 +613,13 @@ async function challengesScreen(game: string, ctx: ScreenCtx, trail: Frame[]): P
     const days = Math.max(0, Math.ceil((ch.endAt.getTime() - Date.now()) / 86400000));
     return `**${ch.title}** — ${ch.game} · ${days}d left`;
   });
+  const { url } = await cardRef("challenge", { id: live[0].id });
   return {
-    embeds: [{
+    embeds: [embed(url, {
       title: game ? `Live on ${game}` : "Live challenges",
       description: `${lines.join("\n")}\n\nYour stats are snapshotted when you join — only NEW activity counts.`,
-      color: embedColor("#8b5cf6"),
-    }],
+      color: "#8b5cf6",
+    })],
     components: rows([
       ...live.map((ch) => navButton(ch.title.slice(0, 32), frame("challenge", ch.id), trail, ButtonStyle.Success, "🏆")),
       ...tail(ctx, frame("challenges", game), trail),
@@ -759,13 +760,16 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
     button(`End ${c.title}`.slice(0, 40), actionId("ch-end", [c.id], [here]), ButtonStyle.Danger, "🏁"),
   ]));
 
+  const { url } = live[0]
+    ? await cardRef("challenge", { id: live[0].id })
+    : await cardRef("guide", { topic: "challenges" });
   return {
-    embeds: [{
+    embeds: [embed(url, {
       title: "Your server's challenges",
       description: lines.join("\n").slice(0, 3800),
-      color: embedColor("#8b5cf6"),
-      footer: { text: "Full control — progress, analytics, editing — lives in your server portal on the site." },
-    }],
+      color: "#8b5cf6",
+      footer: "Full control — progress, analytics, editing — lives in your server portal on the site.",
+    })],
     components: rows([
       button("Request a challenge", `nav-req|${ctx.guildId}`, ButtonStyle.Primary, "🏆"),
       // Discord is a good remote control and a poor dashboard. Everything with
@@ -920,12 +924,13 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
   }
   // The modal has to open from a fresh interaction, so this screen hands over a
   // button that triggers it rather than trying to open one from a deferred edit.
+  const { url } = await cardRef("guide", { topic: "connect-account" });
   return {
-    embeds: [{
+    embeds: [embed(url, {
       title: `Link ${game}`,
       description: "Tap below and enter your in-game name. That's the whole setup — your rank, wins and more sync automatically from then on.",
-      color: embedColor("#8b5cf6"),
-    }],
+      color: "#8b5cf6",
+    })],
     components: rows([
       button(`Link my ${game} account`.slice(0, 40), `open-link|${game}`, ButtonStyle.Primary, "🔗"),
       navButton("A different game", frame("link", ""), trail, ButtonStyle.Secondary, "🎮"),
@@ -969,13 +974,14 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       `${stats.joined.toLocaleString()} have a Cluster profile so far — linking a game is what counts.`,
     ];
 
+  const { url } = await cardRef("guide", { topic: "everything" });
   return {
-    embeds: [{
+    embeds: [embed(url, {
       title: `${stats.name} — growth`,
       description: lines.join("\n"),
-      color: embedColor(stats.unlocked ? "#34d399" : "#8b5cf6"),
-      footer: { text: "Only gamers who linked a game count — that's what advertisers pay for." },
-    }],
+      color: stats.unlocked ? "#34d399" : "#8b5cf6",
+      footer: "Only gamers who linked a game count — that's what advertisers pay for.",
+    })],
     components: rows([
       ctx.isManager
         ? button("DM me my portal key", actionId("portal-key", [], trail), ButtonStyle.Primary, "🛰")
@@ -991,9 +997,15 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
 }
 
 // An honest empty state — never a raw error, never a dead end.
-function notYet(message: string, trail: Frame[], extra: (Button | null)[] = [], ctx?: ScreenCtx): ScreenPayload {
+//
+// Carries a card like every other reply. An empty state is exactly where a bare
+// line of text reads as "the bot is broken" rather than "there's nothing here
+// yet", and it's the screen a first-time visitor to a quiet server is most
+// likely to hit.
+async function notYet(message: string, trail: Frame[], extra: (Button | null)[] = [], ctx?: ScreenCtx): Promise<ScreenPayload> {
+  const { url } = await cardRef("guide", { topic: "getting-started" });
   return {
-    embeds: [{ description: message, color: embedColor("#8b5cf6") }],
+    embeds: [embed(url, { description: message, color: "#8b5cf6" })],
     components: rows([
       ...extra,
       startHereButton(trail),
@@ -1005,12 +1017,13 @@ function notYet(message: string, trail: Frame[], extra: (Button | null)[] = [], 
 
 // Screens that arrive with the growth + admin phases.
 async function comingSoon(name: string, trail: Frame[]): Promise<ScreenPayload> {
+  const { url } = await cardRef("guide", { topic: "everything" });
   return {
-    embeds: [{
+    embeds: [embed(url, {
       title: "Coming with the next release",
       description: `**${name}** isn't wired up yet. Everything on the site works today.`,
-      color: embedColor("#8b5cf6"),
-    }],
+      color: "#8b5cf6",
+    })],
     components: rows([linkButton("Open Cluster", siteUrl(), "🔗"), backButton(trail)]),
     flags: 64,
   };
@@ -1042,24 +1055,59 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
   }
 }
 
-// The screen a `/cluster <sub>` invocation lands on.
-export function screenForCommand(sub: string, opts: Record<string, string>): Frame {
-  switch (sub) {
-    // `/cluster show <what> <gamer>` looks someone else up; without a gamer it
-    // shows your own.
-    case "show": return opts.gamer
-      ? frame("gamer", opts.what ?? "discord", opts.gamer)
-      : frame("show", opts.what ?? "profile");
-    case "planet": return frame("planet", opts.game ?? "");
-    case "leaderboard": return frame("leaderboard", opts.game ?? "");
-    case "challenge": return frame("challenges", opts.game ?? "");
-    case "quest": return frame("quest", opts.name ?? "");
-    case "link": return frame("link", opts.game ?? "");
-    case "guide": return frame("guide", opts.topic ?? "getting-started");
+// Where `/cluster <anything>` lands.
+//
+// The whole command is one box, so this is the parser for it. Values picked
+// from the autocomplete arrive as `kind:arg` tokens and resolve exactly.
+// Anything typed by hand and sent without picking — which people do constantly
+// — is resolved against real data instead of being rejected: a game name opens
+// that planet, a quest name opens that quest, and anything else is treated as
+// somebody's name and looked up. Failing to a gamer search is the right last
+// resort, because a name is what a person is most likely to have typed.
+export async function screenForCommand(query: string): Promise<Frame> {
+  const raw = (query ?? "").trim();
+  if (!raw) return frame("home");
+
+  const at = raw.indexOf(":");
+  const kind = (at >= 0 ? raw.slice(0, at) : raw).toLowerCase();
+  const arg = at >= 0 ? raw.slice(at + 1).trim() : "";
+
+  switch (kind) {
+    case "profile": return frame("show", "profile");
+    case "cp": return frame("show", "cp");
+    case "game": return frame("show", `game:${arg}`);
+    case "gamer": return frame("gamer", "discord", arg);
+    case "planet": return arg ? frame("planet", arg) : frame("planets");
+    case "planets": return frame("planets");
+    case "board":
+    case "leaderboard": return frame("leaderboard", arg);
+    case "challenge":
+    case "challenges": return frame("challenges", arg);
+    case "quest": return frame("quest", arg);
+    case "quests": return frame("quests");
+    case "link": return frame("link", arg);
+    case "guide": return frame("guide", arg || "getting-started");
     case "share": return frame("show", "profile");
-    case "server": return frame("server");
-    case "admin": return frame("admin");
     case "help": return frame("help");
-    default: return frame("home");
+    case "more": return frame("more");
+    // `/cluster server` folded into admin — the growth numbers and the tools to
+    // act on them were two commands describing one job.
+    case "server": return frame("server");
+    case "admin": return arg === "growth" ? frame("server") : frame("admin", arg);
+    default: break;
   }
+
+  // Free text. Match what exists before assuming it's a person.
+  const needle = raw.toLowerCase();
+  try {
+    const c = await catalog();
+    const game = c.games.find((g) => g.name.toLowerCase() === needle)
+      ?? c.games.find((g) => g.name.toLowerCase().includes(needle));
+    if (game) return frame("planet", game.value);
+    const quest = c.quests.find((q) => q.name.toLowerCase() === needle || q.value.toLowerCase() === needle)
+      ?? c.quests.find((q) => q.name.toLowerCase().includes(needle));
+    if (quest) return frame("quest", quest.value);
+  } catch { /* fall through to a name lookup */ }
+
+  return frame("gamer", "discord", raw);
 }

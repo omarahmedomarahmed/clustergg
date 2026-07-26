@@ -1,4 +1,5 @@
 import type { CardKind } from "@/lib/cards/types";
+import { DEFAULT_LAYOUT, type CardLayout, type Spot } from "@/lib/cards/layout";
 
 // The design guide for card background art.
 //
@@ -170,14 +171,34 @@ export function guideFor(kind: string): CardGuide | null {
 
 // A short brief staff can hand to an artist (or paste into an image prompt)
 // when commissioning seasonal art for a card.
-export function artBrief(guide: CardGuide): string {
-  const clear = guide.regions.filter((r) => r.kind === "brand").map((r) => r.label);
+//
+// Built from the card's LIVE layout, not from the diagram. An admin who drags
+// the mascot to the top-right and then hands an artist a brief still saying
+// "keep the bottom-left clear" has been given the wrong instructions by their
+// own tool — which is worse than having no tool.
+export function artBrief(guide: CardGuide, layout: CardLayout = DEFAULT_LAYOUT): string {
   const busy = guide.regions.filter((r) => r.kind === "text").map((r) => r.label);
+  const clear = [
+    layout.mascot.hidden ? null : `the mascot at ${where(layout.mascot)}`,
+    layout.mark.hidden ? null : `the Cluster logo at ${where(layout.mark)}`,
+    layout.badge.hidden ? null : `the badge at ${where(layout.badge)}`,
+    layout.bar ? "the accent strip along the top edge" : null,
+  ].filter(Boolean);
   return [
     `${guide.name} card — ${GUIDE_W}x${GUIDE_H}px.`,
     guide.summary,
-    `Keep clear: ${clear.join(", ")}.`,
+    clear.length ? `Keep clear: ${clear.join(", ")}.` : "",
     `Text is drawn over: ${busy.join(", ")} — keep these areas low-contrast and free of faces, text or logos.`,
-    "The renderer darkens the left half and the bottom strip, so a focal point works best in the upper-right third.",
-  ].join(" ");
+    layout.scrim
+      ? "The renderer darkens the left half and the bottom strip, so a focal point works best in the upper-right third."
+      : `The renderer darkens the whole image by ${layout.dim}% and nothing else, so the art carries evenly across the card.`,
+  ].filter(Boolean).join(" ");
+}
+
+// "the upper-left", "the centre" — a position an artist can work from, rather
+// than a percentage pair they'd have to convert.
+function where(s: Spot): string {
+  const v = s.y < 34 ? "top" : s.y > 66 ? "bottom" : "middle";
+  const h = s.x < 34 ? "left" : s.x > 66 ? "right" : "centre";
+  return v === "middle" && h === "centre" ? "the centre" : `${v}-${h}`;
 }

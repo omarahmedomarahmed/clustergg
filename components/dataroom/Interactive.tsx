@@ -134,7 +134,7 @@ export function GtmStages({ stages, accent, accent2 }: {
             >
               <div className="flex items-center gap-2.5">
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-black" style={{ background: `${c}2b`, color: c }}>
-                  {s.status === "done" ? "✓" : i + 1}
+                  {s.status === "done" ? <Icon name="check" size={12} /> : i + 1}
                 </span>
                 <span className="text-[10px] uppercase tracking-widest" style={{ color: c }}>
                   {s.status === "done" ? "Done" : s.status === "current" ? "Now" : "Next"}
@@ -279,6 +279,110 @@ export function MetricTiles({ metrics, accent }: {
           <div className="text-[10px] text-muted mt-1.5 inline-flex items-center gap-1">
             What this counts <Icon name="arrowRight" size={10} />
           </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ===== Graphic explainer =====
+//
+// A mechanic, drawn instead of described. Icons and one-word labels on a
+// connecting line, with the detail behind a click — so the section reads in two
+// seconds and still rewards someone who wants the argument. Labels are short by
+// contract: this section physically cannot become a paragraph, which is the
+// point of having it.
+export function Explainer({ steps, loop, accent, accent2 }: {
+  steps: NonNullable<SectionData["steps"]>; loop?: boolean; accent: string; accent2: string;
+}) {
+  const openDetail = useDetail();
+  if (!steps.length) return null;
+
+  return (
+    <div className="relative">
+      {/* The connecting line, behind the nodes. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-0 right-0 top-[38px] hidden h-0.5 md:block"
+        style={{ background: `linear-gradient(90deg, transparent, ${accent}, ${accent2}, ${loop ? accent : "transparent"})` }}
+      />
+      <div className={`grid gap-4 sm:grid-cols-2 ${steps.length >= 5 ? "lg:grid-cols-5" : steps.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+        {steps.map((s, i) => {
+          const c = i % 2 ? accent2 : accent;
+          const body = s.note ?? null;
+          return (
+            <button
+              key={i}
+              type="button"
+              disabled={!body}
+              onClick={() => body && openDetail({ title: s.label, subtitle: `Step ${i + 1}`, body, accent: c })}
+              className="group relative flex flex-col items-center text-center disabled:cursor-default"
+            >
+              <span
+                className="relative grid h-[76px] w-[76px] place-items-center rounded-2xl border-2 transition group-enabled:group-hover:scale-105"
+                style={{ borderColor: c, background: `${c}1f`, boxShadow: `0 0 34px -12px ${c}` }}
+              >
+                <Icon name={s.icon} size={30} style={{ color: c }} />
+                <span
+                  className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full text-[11px] font-black text-[#04051a]"
+                  style={{ background: c }}
+                >
+                  {i + 1}
+                </span>
+              </span>
+              <span className="mt-3 text-sm font-bold">{s.label.slice(0, 22)}</span>
+              {body && (
+                <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted group-hover:text-ink">
+                  Why <Icon name="arrowRight" size={9} />
+                </span>
+              )}
+              {/* The loop-back arrow, on the last node only. */}
+              {loop && i === steps.length - 1 && (
+                <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold" style={{ color: accent }}>
+                  <Icon name="arrowLeft" size={10} /> repeats
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ===== Product showcase =====
+//
+// The real cards the product renders, at full size, requested live. A deck full
+// of screenshots goes stale the week after it's written and quietly starts
+// lying; these are drawn by the same renderer that serves Discord, so what an
+// investor sees is what a member sees this morning.
+export function CardShowcase({ cards, accent }: {
+  cards: { kind: string; caption?: string; url: string }[]; accent: string;
+}) {
+  const openDetail = useDetail();
+  if (!cards.length) return null;
+  return (
+    <div className={`grid gap-4 ${cards.length === 1 ? "" : "md:grid-cols-2"}`}>
+      {cards.map((c, i) => (
+        <button
+          key={i}
+          type="button"
+          onClick={() => openDetail({ title: c.caption || c.kind, imageUrl: c.url, accent })}
+          className="group text-left"
+        >
+          <div
+            className="overflow-hidden rounded-2xl border transition group-hover:-translate-y-0.5"
+            style={{ borderColor: `${accent}33`, boxShadow: `0 24px 60px -40px ${accent}` }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={c.url} alt={c.caption ?? ""} loading="lazy" className="w-full" style={{ aspectRatio: "1200 / 630" }} />
+          </div>
+          {c.caption && (
+            <div className="mt-2 flex items-center gap-1.5 text-xs text-muted group-hover:text-ink">
+              <span className="h-1 w-1 rounded-full" style={{ background: accent }} />
+              {c.caption}
+            </div>
+          )}
         </button>
       ))}
     </div>

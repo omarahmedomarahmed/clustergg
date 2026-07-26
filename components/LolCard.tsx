@@ -77,7 +77,7 @@ export default function LolCard({
             <Stat label="Mastery points" value={ch.points.toLocaleString()} c={c} soft={soft} />
             <Stat label="Mastery level" value={String(ch.level)} c={c} soft={soft} />
             {ch.tokensEarned != null && <Stat label="Tokens earned" value={String(ch.tokensEarned)} c={c} soft={soft} />}
-            {ch.chestGranted != null && <Stat label="Chest" value={ch.chestGranted ? "Earned ✓" : "Available"} c={c} soft={soft} />}
+            {ch.chestGranted != null && <Stat label="Chest" value={ch.chestGranted ? "Earned" : "Available"} c={c} soft={soft} />}
             {ch.lastPlayed && <Stat label="Last played" value={ago(ch.lastPlayed)} c={c} soft={soft} />}
           </div>
         </div>

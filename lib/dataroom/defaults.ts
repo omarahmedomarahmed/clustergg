@@ -64,42 +64,93 @@ export const SEED_DOCS: SeedDoc[] = [
         },
       },
       {
-        kind: "text",
+        kind: "explainer",
         anchor: "problem",
         navLabel: "Problem",
-        title: "The audience is enormous and completely illegible.",
-        body:
-          "Hundreds of millions of gamers organise themselves into Discord servers. Those servers are where games are actually discussed, played and bought — and they are invisible to everyone who would pay to reach them.\n\nA brand that wants gamers buys Twitch or YouTube, where it rents attention it cannot verify. A server owner with 40,000 members has no way to prove what those members play, so they monetise with a $5 subscription tier or not at all. And the members themselves have their identity scattered across a dozen games with nothing that carries between them.\n\nEveryone in that triangle loses to the same missing thing: nobody can measure a Discord community.",
+        title: "Nobody can measure a Discord community.",
         data: {
-          bullets: [
-            "Server owners have reach they can't prove and therefore can't sell.",
-            "Brands buy creators because communities aren't purchasable.",
-            "Gamers rebuild their identity from scratch in every game they play.",
+          steps: [
+            { icon: "users", label: "Huge audience", note: "Hundreds of millions of gamers organise themselves into Discord servers. That is where games are discussed, played and bought." },
+            { icon: "eye", label: "Invisible", note: "A server owner with 40,000 members has no way to prove what those members play — and what can't be described can't be sold." },
+            { icon: "chart", label: "Unsellable", note: "So brands buy Twitch and YouTube instead, renting attention they can't verify, because communities aren't purchasable." },
+            { icon: "gamepad", label: "Scattered gamer", note: "And members rebuild their identity from scratch in every game they play, with nothing carrying between them." },
           ],
         },
       },
       {
-        kind: "text",
+        kind: "explainer",
         anchor: "solution",
         navLabel: "Solution",
-        title: "Measure the community by making the measurement worth having.",
-        body:
-          "Cluster's bot installs in one click and gives every member something they want: a ranked profile with live stats pulled from the games they already play, Cluster Points that accumulate across all of them, and challenges with real, redeemable trophies.\n\nThey link a game account to get it. That link is the measurement — it's verified against the game's own API, so it can't be inflated, and it tells us exactly what that community plays.\n\nA server that reaches 500 linked members unlocks a share of the ad revenue Cluster earns from it. The owner's incentive is now to recruit for us, and the thing they're recruiting toward is the thing that makes the audience sellable.",
+        title: "Make the measurement the thing they want.",
+        subtitle: "One click to install. Nothing to configure. It never reads a message.",
         data: {
-          bullets: [
-            "One click to install, nothing to configure, no permission to read messages.",
-            "Stats come from official game APIs — League, Valorant, Apex, CS2, Fortnite and 19 more.",
-            "The bot never asks a member to leave Discord, which is where every competitor loses them.",
+          loop: true,
+          steps: [
+            { icon: "rocket", label: "Install", note: "One click. The bot builds its own channel, posts a guide for everything and pins it. There is nothing to configure." },
+            { icon: "link", label: "Members link", note: "A member links a game account to get a ranked profile. That link is the measurement — verified against the game's own API, so it can't be inflated." },
+            { icon: "trophy", label: "They compete", note: "Challenges with real, redeemable trophies. Stats are snapshotted the moment somebody joins, so only new play counts." },
+            { icon: "crown", label: "Server earns", note: "At 500 linked members the server unlocks a share of the ad revenue Cluster earns from it. The owner's incentive becomes recruiting for us." },
           ],
         },
       },
       {
         kind: "product",
         anchor: "product",
-        navLabel: "Product",
+        navLabel: "The bot",
         title: "This is the product, running.",
-        subtitle: "Not a screenshot. These are live cards from our renderer — press a button and it behaves exactly as it does in a server right now.",
+        subtitle: "Not a screenshot. Press a button — it behaves exactly as it does in a server right now.",
         data: { focus: "bot" },
+      },
+      {
+        kind: "showcase",
+        anchor: "everything",
+        navLabel: "What it renders",
+        title: "Every reply is art.",
+        subtitle: "Drawn live by the same renderer that serves Discord.",
+        data: {
+          cards: [
+            { kind: "profile", caption: "A gamer's profile — their own art, their trophies, every game they play" },
+            { kind: "planet", caption: "A game world — live challenges, standings, who's ranked on it" },
+            { kind: "challenge", caption: "A live challenge — trophies with real, redeemable value" },
+            { kind: "leaderboard", caption: "A leaderboard, straight from the game's official API" },
+          ],
+        },
+      },
+      {
+        kind: "product",
+        anchor: "gamer",
+        navLabel: "The gamer",
+        title: "One identity, every game.",
+        subtitle: "Ranks, Cluster Points and every account they play, on one card they can share anywhere.",
+        data: { focus: "profile" },
+      },
+      {
+        kind: "product",
+        anchor: "worlds",
+        navLabel: "Game worlds",
+        title: "Every game is a world.",
+        subtitle: "Its own planet, its own leaderboards, its own live competitions.",
+        data: { focus: "leaderboards" },
+      },
+      {
+        kind: "product",
+        anchor: "arena",
+        navLabel: "Challenges",
+        title: "Competitions nobody can fake.",
+        subtitle: "Stats snapshotted on join, scored from the game's own API, paid in trophies with real value.",
+        data: { focus: "challenges" },
+      },
+      {
+        kind: "showcase",
+        anchor: "quests",
+        navLabel: "Quests",
+        title: "Playing anything moves one ladder.",
+        data: {
+          cards: [
+            { kind: "quest", caption: "A quest map — milestones earned across every game at once" },
+            { kind: "cp", caption: "Cluster Points, the score that carries between games" },
+          ],
+        },
       },
       {
         kind: "traction",
@@ -125,17 +176,16 @@ export const SEED_DOCS: SeedDoc[] = [
         data: { targets: MAU_LADDER, metric: "reach" },
       },
       {
-        kind: "text",
+        kind: "explainer",
         anchor: "business",
         navLabel: "Business model",
-        title: "We sell a measured audience, and pay the people who built it.",
-        body:
-          "Revenue is advertising and sponsored competition, sold against an audience we can describe precisely: this many verified players of this game, in communities of this size.\n\nServers keep a share. That is not generosity — it is the acquisition channel. A server owner who earns from us recruits for us, and their recruiting is more credible than any ad we could buy.\n\nThe cost side is deliberately thin: the bot runs inside the same web application as the site, with no gateway process and no always-on host, so a new server costs us close to nothing to serve.",
+        title: "Sell a measured audience. Pay the people who built it.",
         data: {
-          bullets: [
-            "Advertising against verified gaming audiences.",
-            "Sponsored challenges — a brand's name on a competition the community actually enters.",
-            "Server revenue share, which is the growth engine rather than a cost line.",
+          steps: [
+            { icon: "shield", label: "Verified audience", note: "This many verified players of this game, in communities of this size — described precisely, because every account was read from an official API." },
+            { icon: "send", label: "Ads & sponsorship", note: "Advertising against verified gaming audiences, and sponsored challenges: a brand's name on a competition the community actually enters." },
+            { icon: "crown", label: "Servers keep a share", note: "Not generosity — the acquisition channel. An owner who earns from us recruits for us, and their recruiting is more credible than any ad we could buy." },
+            { icon: "zap", label: "Near-zero to serve", note: "The bot runs inside the same web application as the site — no gateway process, no always-on host — so a new server costs close to nothing." },
           ],
         },
       },
@@ -298,17 +348,16 @@ export const SEED_DOCS: SeedDoc[] = [
         },
       },
       {
-        kind: "text",
+        kind: "explainer",
         anchor: "why",
-        navLabel: "Why Discord",
+        navLabel: "Why here",
         title: "The room the audience is already in.",
-        body:
-          "Gaming attention moved from forums to Discord and nothing followed it. Media buying still routes through creators, where you rent someone else's audience for the length of a video and inherit whatever their comment section does that week.\n\nA Discord community is the opposite: persistent, self-selected, and organised around exactly the game you care about. The reason nobody sells it is that nobody could describe it — until the members' accounts are linked and verified.\n\nThat's the only thing Cluster does that matters to you. We can tell you how many verified players of your game are reachable, in communities of what size, and put your activation in front of them without anyone leaving the app.",
         data: {
-          bullets: [
-            "Persistent audiences rather than a video's half-life.",
-            "Verified play, not declared interest.",
-            "Activations that happen in the community, not adjacent to it.",
+          steps: [
+            { icon: "users", label: "They're on Discord", note: "Gaming communities don't gather on a platform you rent — they gather in servers they run themselves, and they stay for years." },
+            { icon: "shield", label: "Verified, not claimed", note: "Every account was read from the game's own API. There is no self-reporting anywhere in the product, which is what makes the audience describable at all." },
+            { icon: "target", label: "Bought by the game", note: "Not by a demographic guess: verified players of a named title, in communities of a known size." },
+            { icon: "flame", label: "Native, not an ad", note: "An activation is a competition members enter, not an impression they scroll past. It runs where they already are." },
           ],
         },
       },
@@ -327,19 +376,16 @@ export const SEED_DOCS: SeedDoc[] = [
         subtitle: "Real servers, real member counts, each with a public page.",
       },
       {
-        kind: "text",
+        kind: "explainer",
         anchor: "activations",
         navLabel: "Activations",
-        title: "What we can actually run for you",
-        body:
-          "Everything below happens inside the community, uses the same verified data the members already trust, and produces a result you can report on.",
+        title: "What we can run for you.",
         data: {
-          bullets: [
-            "Sponsored challenges — your brand on a competition members enter with their real accounts, scored on live data, with trophies you fund and we distribute.",
-            "Game activations — a campaign scoped to one title, reaching only the communities and members who verifiably play it.",
-            "Community building — we set up, populate and run the competitive layer of your own Discord, using the same bot the network runs on.",
-            "Brand exposure — rotating placements across the network's cards, pages and channels, reported per placement.",
-            "Publisher partnerships — a planet for your game with its own leaderboards, quests and challenges, and the audience that follows.",
+          steps: [
+            { icon: "trophy", label: "Sponsored challenge", note: "Your name on a competition the community actually enters, scored from the game's own API and paid out in real trophies." },
+            { icon: "send", label: "In-server placement", note: "The live ad slot inside every opted-in community — the same rotation you can see running further down this page." },
+            { icon: "planet", label: "Game world takeover", note: "A game's whole planet in your colours: its leaderboards, its challenges, its landing page." },
+            { icon: "grid", label: "We build the server", note: "Channels, roles, guides and competitions, run for publishers who want the community without staffing it." },
           ],
         },
       },
@@ -348,8 +394,23 @@ export const SEED_DOCS: SeedDoc[] = [
         anchor: "product",
         navLabel: "The product",
         title: "What your activation sits inside",
-        subtitle: "The live bot. Press a button — this is what a member sees when your challenge lands in their server.",
+        subtitle: "Press a button — this is what a member sees when your challenge lands in their server.",
         data: { focus: "challenges" },
+      },
+      {
+        kind: "showcase",
+        anchor: "surfaces",
+        navLabel: "Your surfaces",
+        title: "Where your brand can land.",
+        subtitle: "Every one drawn live, in your colours if you want them.",
+        data: {
+          cards: [
+            { kind: "challenge", caption: "A sponsored challenge — your name on the competition" },
+            { kind: "planet", caption: "A game world you can take over entirely" },
+            { kind: "profile", caption: "The gamer profile your audience builds and shares" },
+            { kind: "leaderboard", caption: "A leaderboard your campaign can own" },
+          ],
+        },
       },
       {
         kind: "ad",

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import { useTr } from "@/components/LocaleProvider";
@@ -44,6 +45,12 @@ export default function QuestMapHero({
   const [playTier, setPlayTier] = useState<number | null>(null);
   const openGame = (tier: number | null) => { setPlayTier(tier); setSel(null); setPlay(true); };
   const tr = useTr();
+  const router = useRouter();
+  const params = useSearchParams();
+  // Switching quests from inside the game navigates with ?play=1, so the next
+  // quest's map opens straight back into the game rather than dropping the
+  // player onto a page they then have to press Play on again.
+  useEffect(() => { if (params.get("play") === "1") setPlay(true); }, [params]);
   // The hero map is 4:5 below the `sm` breakpoint — on phones use the admin's
   // mobile-specific trail so the line hugs the mobile crop of the art.
   const [isMobile, setIsMobile] = useState(false);
@@ -97,6 +104,26 @@ export default function QuestMapHero({
   const ahead = pointAtLength(samples, Math.min(totalLen, markerLen + 1));
   const youX = you.x, youY = you.y;
 
+  // ===== Moving between quests =====
+  //
+  // The tab row is fine when there are three quests and unusable when there
+  // are ten, and it doesn't exist at all inside the game. Prev/next wraps, so
+  // there is always somewhere to go.
+  const idx = Math.max(0, tabs.findIndex((t) => t.key === q.key));
+  const at = (d: number) => tabs[(idx + d + tabs.length) % tabs.length];
+  const switchTo = (key: string, keepPlaying = false) => {
+    setSel(null);
+    if (inFrame) { setActiveKey(key); return; }
+    router.push(keepPlaying ? `/quests/${key}?play=1` : `/quests/${key}`);
+  };
+  const canSwitch = tabs.length > 1;
+  const arrow = (d: number, label: string) => (
+    <button type="button" onClick={() => switchTo(at(d).key)} aria-label={label} title={at(d).name}
+      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-black/40 text-muted transition-colors hover:border-cyan-400/50 hover:text-white">
+      <Icon name="chevronRight" size={16} className={d < 0 ? "rotate-180" : ""} />
+    </button>
+  );
+
   return (
     <section className="relative overflow-hidden">
       {/* Space backdrop (quest theme) */}
@@ -124,8 +151,10 @@ export default function QuestMapHero({
 
       <div className="mx-auto max-w-6xl px-4 pt-4 pb-8 md:pb-10">
         {/* Quest toggle — glorified cards, navigate between quest maps */}
-        {tabs.length > 1 && (
-          <div className="flex flex-wrap justify-center gap-2 mb-5">
+        {canSwitch && (
+          <div className="flex items-center justify-center gap-2 mb-5">
+            {arrow(-1, tr("Previous quest"))}
+            <div className="flex flex-wrap justify-center gap-2">
             {tabs.map((t) => {
               const on = t.key === q.key;
               const inner = (
@@ -142,6 +171,8 @@ export default function QuestMapHero({
                 ? <button key={t.key} onClick={() => { setActiveKey(t.key); setSel(null); }} className={cls} style={style}>{inner}</button>
                 : <Link key={t.key} href={`/quests/${t.key}`} className={cls} style={style}>{inner}</Link>;
             })}
+            </div>
+            {arrow(1, tr("Next quest"))}
           </div>
         )}
 
@@ -174,8 +205,9 @@ export default function QuestMapHero({
         {/* Glorified milestone ladder — the 4 tiers with their art + CP, ON TOP of the map */}
         <div className="relative z-20 mx-auto max-w-4xl mb-4 grid grid-cols-4 gap-2 md:gap-3">
           {tiers.map((t, i) => (
-            <button key={t.id} onClick={() => setSel(sel === i ? null : i)}
-              className={`group relative flex flex-col items-center gap-1.5 rounded-2xl border p-2.5 transition-all ${t.earned ? "" : "opacity-70"}`}
+            <button key={t.id} onClick={() => (gameData ? openGame(i) : setSel(sel === i ? null : i))}
+              title={gameData ? `${t.name} — ${tr("play this milestone")}` : t.name}
+              className={`group relative flex flex-col items-center gap-1.5 rounded-2xl border p-2.5 transition-all hover:scale-[1.03] ${t.earned ? "" : "opacity-70"}`}
               style={{ borderColor: t.earned ? `${(t.color || q.color)}88` : "rgba(255,255,255,0.12)", background: t.earned ? `${(t.color || q.color)}14` : "rgba(4,5,26,0.5)" }}>
               <span className="flex items-center justify-center rounded-xl" style={{ width: 48, height: 48, background: t.earned ? `${(t.color || q.color)}26` : "rgba(255,255,255,0.05)", boxShadow: t.earned ? `0 0 18px -4px ${t.color || q.color}` : "none" }}>
                 {t.iconUrl
@@ -184,7 +216,7 @@ export default function QuestMapHero({
               </span>
               <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-wide truncate w-full text-center" style={{ color: t.earned ? (t.color || q.color) : "#8b8ba7" }}>{t.name}</span>
               <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-muted"><CpIcon size={10} /> {t.thresholdQp.toLocaleString()}</span>
-              {t.earned && <span className="absolute top-1 right-1 text-emerald-300 text-[10px]">✓</span>}
+              {t.earned && <span className="absolute top-1 right-1 text-emerald-300"><Icon name="check" size={10} /></span>}
             </button>
           ))}
         </div>
@@ -305,7 +337,7 @@ export default function QuestMapHero({
                 <div className="font-bold flex items-center gap-2" style={{ color: tiers[sel].color || q.color }}>
                   {tiers[sel].name}
                   <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5" style={{ background: tiers[sel].earned ? "#10b98122" : "#ffffff10", color: tiers[sel].earned ? "#34d399" : "#94a3b8" }}>
-                    {tiers[sel].earned ? "✓ Unlocked" : "Locked"}
+                    {tiers[sel].earned ? <><Icon name="check" size={12} className="inline mr-1" />Unlocked</> : "Locked"}
                   </span>
                 </div>
                 <button onClick={() => setSel(null)} className="text-muted hover:text-ink"><Icon name="x" size={14} /></button>
@@ -330,7 +362,7 @@ export default function QuestMapHero({
           {tiers.map((t) => (
             <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
               style={{ borderColor: t.earned ? `${t.color || q.color}88` : "rgba(255,255,255,0.12)", color: t.earned ? (t.color || q.color) : "#8b8ba7", background: t.earned ? `${t.color || q.color}14` : "transparent" }}>
-              {t.earned ? "✓" : "○"} {t.name} · {t.thresholdQp.toLocaleString()} CP
+              <Icon name={t.earned ? "check" : "circle"} size={10} className="inline mr-1" />{t.name} · {t.thresholdQp.toLocaleString()} CP
             </span>
           ))}
         </div>
@@ -339,7 +371,14 @@ export default function QuestMapHero({
       {/* The full-screen playable quest game (popup overlay, web + mobile) */}
       {gameData && play && (
         <QuestGame quest={q} holders={holders} game={gameData}
-          rocketUrl={rocketUrl} initialTier={playTier} onClose={() => setPlay(false)} />
+          rocketUrl={rocketUrl} initialTier={playTier}
+          switcher={canSwitch ? {
+            onPrev: () => switchTo(at(-1).key, true),
+            onNext: () => switchTo(at(1).key, true),
+            prevName: at(-1).name,
+            nextName: at(1).name,
+          } : undefined}
+          onClose={() => setPlay(false)} />
       )}
     </section>
   );

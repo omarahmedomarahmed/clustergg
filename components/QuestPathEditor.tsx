@@ -134,7 +134,7 @@ export default function QuestPathEditor({
           <Icon name="rocket" size={14} /> {pending ? "Saving…" : variant === "mobile" ? "Save mobile trail" : "Save desktop trail"}
         </button>
         <span className="text-xs text-muted">{pts.length} point{pts.length === 1 ? "" : "s"}</span>
-        {state?.ok && <span className="text-xs text-emerald-300">✓ {state.message}</span>}
+        {state?.ok && <span className="text-xs text-emerald-300"><Icon name="check" size={12} className="inline mr-1" />{state.message}</span>}
         {state?.error && <span className="text-xs text-rose-300">{state.error}</span>}
       </div>
     </form>

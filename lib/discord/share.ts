@@ -7,7 +7,7 @@ import { getContent } from "@/lib/cms";
 // The ask matters: "vote for me" is what turns a shared link into a vote on the
 // Best Profile board, which is what makes sharing worth doing.
 export const SHARE_KEY = "share.profile.message";
-export const SHARE_DEFAULT = "Check out my profile on Cluster — and vote for me 🚀";
+export const SHARE_DEFAULT = "Check out my profile on Cluster — and vote for me";
 
 export async function shareCopy(locale?: "en" | "ar"): Promise<string> {
   try {

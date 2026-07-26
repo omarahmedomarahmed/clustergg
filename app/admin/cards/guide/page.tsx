@@ -1,66 +1,86 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
-import { CARD_GUIDES, GUIDE_W, GUIDE_H, artBrief, type CardGuide, type Region } from "@/lib/cards/layout-guide";
+import { CARD_GUIDES, GUIDE_W, GUIDE_H, artBrief } from "@/lib/cards/layout-guide";
+import { allLayouts } from "@/lib/cards/layout-store";
+import { brandCardArt } from "@/lib/cards/brand";
+import { cardBg } from "@/lib/cards/data";
+import { previewUrlFor } from "@/lib/cards/preview";
+import CardLayoutEditor from "@/components/CardLayoutEditor";
 import { AdminHeader, AdminSection } from "@/components/AdminPage";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin · Card layout guide" };
+export const metadata = { title: "Admin · Card layouts" };
 
-// Where everything lands on a card, so background art can be designed to fit.
+// Where everything lands on a card — and now, where you decide it lands.
 //
-// Seasonal art is the reason this exists: swapping a Halloween background
-// shouldn't mean discovering afterwards that the pumpkin sits behind the
-// standings. Each card is drawn to scale with its regions overlaid and a
-// ready-to-paste brief underneath.
-export default async function CardGuidePage() {
+// This began as a read-only diagram so seasonal background art could be
+// designed to fit. The diagram was right and useless: it told you the mascot
+// stands bottom-left and left you no way to move it off the thing your artist
+// drew there. So every card is editable here. Drag the mascot, the logo and the
+// top-right badge, resize the content block, set how dark the art goes and
+// whether text sits on a plate — then look at the real rendered PNG underneath.
+//
+// Nothing is per-card-instance: a layout applies to a card KIND, which is what
+// makes it worth setting once.
+export default async function CardLayoutPage() {
   await requireStaff();
+  const [layouts, brand] = await Promise.all([allLayouts(), brandCardArt()]);
+  const backgrounds = await Promise.all(CARD_GUIDES.map((g) => cardBg(g.bgKey)));
+
   return (
     <div className="max-w-5xl">
       <AdminHeader
-        title="Card layout guide"
-        subtitle={`Every Discord card is ${GUIDE_W}×${GUIDE_H}. This is exactly where the renderer puts text, the mascot and the logo — design backgrounds against it, and seasonal art lands right the first time.`}
+        title="Card layouts"
+        subtitle={`Every card the bot posts is a ${GUIDE_W}×${GUIDE_H} PNG we render. This is where you decide what goes where on each one — and design background art against it.`}
         back={{ href: "/admin/cards", label: "Card backgrounds" }}
       />
 
       <AdminSection
-        title="The rules that apply to every card"
-        hint="These hold whatever the card kind."
+        title="How these work"
+        hint="A layout applies to a card kind, everywhere that kind is rendered — Discord, the site's share images, the bot preview on the homepage."
       >
         <ul className="text-sm text-muted space-y-2 list-disc pl-5">
           <li>
-            <b className="text-ink">The left half is darkened.</b> The renderer lays a scrim over the
-            artwork — strongest down the left column and across the bottom — so text stays readable on
-            any image. Put atmosphere there, not your subject.
+            <b className="text-ink">Positions are percentages</b>, so a layout means the same thing at any
+            size. Sizes are in canvas pixels of the {GUIDE_W}×{GUIDE_H} card.
           </li>
           <li>
-            <b className="text-ink">The focal point belongs in the upper-right third.</b> It is the only
-            large area no card fills with text.
+            <b className="text-ink">Saving clears that card&apos;s cached PNGs.</b> Rendered cards are stored
+            and reused by content hash, so without this a moved logo would never reach a card
+            somebody had already generated. They re-render the next time they&apos;re used.
           </li>
           <li>
-            <b className="text-ink">Two corners are reserved.</b> Bottom-left is the astronaut, bottom-right
-            is the Cluster logo. The logo is drawn last and nothing may cover it.
+            <b className="text-ink">The dark overlay is the first control to reach for.</b> Bright artwork
+            eats text. Raise the overlay, or turn on the plate to darken only what sits under the
+            headline and leave the rest of the art alone.
           </li>
           <li>
-            <b className="text-ink">Export at {GUIDE_W}×{GUIDE_H}</b> (or the same 40:21 ratio, larger).
-            Art is cover-fitted and downscaled to {GUIDE_W}px, and anything over ~400KB is recompressed.
-          </li>
-          <li>
-            <b className="text-ink">PNG, JPEG, WebP, AVIF and SVG all work.</b> Non-PNG formats are
-            converted before rendering.
+            <b className="text-ink">Export art at {GUIDE_W}×{GUIDE_H}</b> (or the same 40:21 ratio, larger).
+            PNG, JPEG, WebP, AVIF and SVG all work; anything else is converted before rendering.
           </li>
         </ul>
       </AdminSection>
 
-      {CARD_GUIDES.map((g) => (
+      {CARD_GUIDES.map((g, i) => (
         <AdminSection key={g.kind} title={g.name} hint={g.summary}>
-          <CardMap guide={g} />
-          <div className="mt-4 grid md:grid-cols-2 gap-4">
+          <CardLayoutEditor
+            kind={g.kind}
+            name={g.name}
+            initial={layouts[g.kind]}
+            art={{
+              bgUrl: backgrounds[i].bgUrl,
+              astronautUrl: brand.astronautUrl,
+              markUrl: brand.markUrl,
+            }}
+            previewUrl={previewUrlFor(g.kind)}
+          />
+          <div className="mt-5 grid md:grid-cols-2 gap-4">
             <div>
-              <div className="text-[11px] uppercase tracking-widest text-muted mb-2">Regions</div>
+              <div className="text-[11px] uppercase tracking-widest text-muted mb-2">What this card draws</div>
               <div className="space-y-1.5">
-                {g.regions.map((r) => (
+                {g.regions.filter((r) => r.kind === "text").map((r) => (
                   <div key={r.key} className="text-xs flex gap-2">
-                    <span className={`shrink-0 mt-0.5 w-2.5 h-2.5 rounded-sm ${swatch(r.kind)}`} />
+                    <span className="shrink-0 mt-0.5 w-2.5 h-2.5 rounded-sm bg-cyan-400/70" />
                     <span>
                       <b className="text-ink">{r.label}</b>
                       <span className="text-muted"> — {r.note}</span>
@@ -74,7 +94,7 @@ export default async function CardGuidePage() {
                 Brief for an artist or an image prompt
               </div>
               <p className="text-xs bg-black/40 border border-white/10 rounded-lg p-3 select-all leading-relaxed">
-                {artBrief(g)}
+                {artBrief(g, layouts[g.kind])}
               </p>
               <p className="text-[11px] text-muted mt-2">
                 Upload the finished art under{" "}
@@ -87,51 +107,4 @@ export default async function CardGuidePage() {
       ))}
     </div>
   );
-}
-
-// The canvas, to scale, with every region drawn on it.
-function CardMap({ guide }: { guide: CardGuide }) {
-  return (
-    <div
-      className="relative w-full rounded-xl overflow-hidden border border-white/15 bg-[#04051a]"
-      style={{ aspectRatio: `${GUIDE_W} / ${GUIDE_H}` }}
-    >
-      {/* The scrim, so the darkened half is visible rather than described. */}
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.94) 0%, rgba(4,5,26,0.78) 48%, rgba(4,5,26,0.46) 100%)" }}
-      />
-      {guide.regions.map((r) => (
-        <div
-          key={r.key}
-          className={`absolute rounded ${border(r.kind)} flex items-start`}
-          style={{ left: `${r.x}%`, top: `${r.y}%`, width: `${r.w}%`, height: `${r.h}%` }}
-          title={r.note}
-        >
-          <span className={`text-[9px] sm:text-[10px] px-1 py-0.5 rounded-br font-semibold ${label(r.kind)}`}>
-            {r.label}
-          </span>
-        </div>
-      ))}
-      <div className="absolute bottom-1 right-2 text-[10px] text-muted">{GUIDE_W} × {GUIDE_H}</div>
-    </div>
-  );
-}
-
-function swatch(kind: Region["kind"]): string {
-  return kind === "text" ? "bg-cyan-400/70"
-    : kind === "brand" ? "bg-amber-400/70"
-      : kind === "art" ? "bg-violet-400/70" : "bg-white/40";
-}
-function border(kind: Region["kind"]): string {
-  return kind === "text" ? "border border-cyan-400/60 bg-cyan-400/10"
-    : kind === "brand" ? "border border-amber-400/70 bg-amber-400/10"
-      : kind === "art" ? "border border-violet-400/60 bg-violet-400/10"
-        : "border border-white/30";
-}
-function label(kind: Region["kind"]): string {
-  return kind === "text" ? "bg-cyan-400/25 text-cyan-100"
-    : kind === "brand" ? "bg-amber-400/25 text-amber-100"
-      : kind === "art" ? "bg-violet-400/25 text-violet-100" : "bg-white/15";
 }

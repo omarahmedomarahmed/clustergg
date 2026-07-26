@@ -171,7 +171,7 @@ export default function ProfileBuilder({
             </span>
           </button>
           <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-5 py-2 text-xs font-bold text-white disabled:opacity-60 shrink-0">
-            {pending ? tr("Saving…") : saved ? tr("Saved ✓") : tr("Save")}
+            {pending ? tr("Saving…") : saved ? tr("Saved") : tr("Save")}
           </button>
         </div>
 
@@ -350,7 +350,7 @@ export default function ProfileBuilder({
           <div className="flex items-center gap-3">
             {saveError && <span className="text-xs text-rose-300">{saveError}</span>}
             <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">
-              {pending ? tr("Saving…") : saved ? tr("Saved ✓") : tr("Save changes")}
+              {pending ? tr("Saving…") : saved ? tr("Saved") : tr("Save changes")}
             </button>
           </div>
         </div>

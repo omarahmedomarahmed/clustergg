@@ -149,7 +149,7 @@ export default function TrophyCase({
                       <div className="text-[10px] font-bold text-amber-300 mt-0.5">{place(a.placement)}</div>
                       {a.value > 0 && <span className="absolute top-1.5 right-1.5 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-black text-white">${a.value.toLocaleString()}</span>}
                       {a.status === "pending" && <span className="absolute top-1.5 left-1.5 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[9px] font-black text-black uppercase">{tr("in redeem")}</span>}
-                      {on && <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[11px] font-black ring-2 ring-[#070826]">✓</span>}
+                      {on && <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[11px] font-black ring-2 ring-[#070826]"><Icon name="check" size={11} /></span>}
                     </button>
                   );
                 })}

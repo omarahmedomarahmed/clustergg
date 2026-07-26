@@ -116,8 +116,10 @@ async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: 
   // key is delivered, which is what makes a DM to the server owner the proof of
   // ownership — nobody else ever sees it.
   const portal = await ensurePortal(guildId);
+  const { url: welcomeCard } = await cardRef("guide", { topic: "everything" });
   await dmUser(ownerDiscordId, {
     embeds: [{
+      image: { url: welcomeCard },
       title: "Cluster is live in your server",
       description: [
         `I've created <#${channelId}> and pinned a how-to guide for every part of the platform.`,

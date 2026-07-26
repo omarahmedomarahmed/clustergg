@@ -115,7 +115,7 @@ export default function QuestGameScreensEditor({
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-7 py-2 text-sm font-semibold text-white disabled:opacity-60">
-          {pending ? "Saving…" : saved ? "Saved ✓" : "Save game screens"}
+          {pending ? "Saving…" : saved ? "Saved" : "Save game screens"}
         </button>
         <button onClick={() => { setUi({}); setMissions(DEFAULT_MISSIONS); }} className="ghost-btn rounded-full px-4 py-2 text-xs">Reset to defaults</button>
       </div>

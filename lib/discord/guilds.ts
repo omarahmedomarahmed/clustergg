@@ -5,7 +5,7 @@ import { getContent } from "@/lib/cms";
 import { dmUser, getGuild, guildIconUrl } from "@/lib/discord/rest";
 import { canAct, siteUrl } from "@/lib/discord/config";
 import { linkButton, rows } from "@/lib/discord/components";
-import { embedColor } from "@/lib/discord/cards";
+import { cardRef, embedColor } from "@/lib/discord/cards";
 
 // The server-owner growth loop.
 //
@@ -199,8 +199,10 @@ export async function checkUnlock(guildId: string): Promise<boolean> {
   } catch { /* non-fatal */ }
 
   if (row?.ownerDiscordId && canAct()) {
+    const { url: unlockCard } = await cardRef("guide", { topic: "everything" });
     await dmUser(row.ownerDiscordId, {
       embeds: [{
+        image: { url: unlockCard },
         title: "Your server just unlocked ad revenue",
         description: [
           `**${stats.linked.toLocaleString()} of your members** have joined Cluster and linked a game account.`,

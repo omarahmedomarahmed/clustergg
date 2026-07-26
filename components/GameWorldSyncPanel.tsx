@@ -37,7 +37,7 @@ function GwRow({ row }: { row: Row }) {
           {row.syncedAt
             ? <>Synced {new Date(row.syncedAt).toLocaleString()} · {row.count} entries · {row.art ? <span className="text-emerald-300">art on Blob</span> : "data only"}</>
             : "Not cached yet — served live from the game API"}
-          {msg?.ok && <span className="text-emerald-300"> · ✓ {msg.message}</span>}
+          {msg?.ok && <span className="text-emerald-300"> · <Icon name="check" size={12} className="inline mr-1" />{msg.message}</span>}
           {msg?.error && <span className="text-rose-300"> · {msg.error}</span>}
         </div>
       </div>

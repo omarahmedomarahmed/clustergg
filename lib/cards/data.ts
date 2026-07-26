@@ -15,12 +15,15 @@ const BRAND: CardTheme = { accent: "#8b5cf6", accent2: "#22d3ee" };
 
 // Admin-controlled background art for a bot/card surface, from the existing
 // Card-backgrounds editor (Admin → Card backgrounds).
-export async function cardBg(type: string): Promise<{ bgUrl: string | null; dim: number }> {
+//
+// Only the art. How dark the veil over it sits is part of the card's LAYOUT
+// (Admin → Card layouts), not part of the image — one number, edited in the one
+// place that shows you the result, instead of two that quietly disagree.
+export async function cardBg(type: string): Promise<{ bgUrl: string | null }> {
   try {
     const map = buildCardBgMap(await getContent(cardBgCmsKeys));
-    const e = map[type];
-    return { bgUrl: e?.url || null, dim: e?.dim ?? 62 };
-  } catch { return { bgUrl: null, dim: 62 }; }
+    return { bgUrl: map[type]?.url || null };
+  } catch { return { bgUrl: null }; }
 }
 
 // A gamer's full profile snapshot.
@@ -29,10 +32,26 @@ export async function profileCard(slug: string): Promise<CardData | null> {
   const [user] = await db.select().from(schema.users).where(eq(schema.users.slug, slug)).limit(1);
   if (!user) return null;
 
-  const [accounts, totalCp, bg] = await Promise.all([
+  const [accounts, totalCp, bg, won, entered] = await Promise.all([
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
     getTotalCp(db, user.id),
     cardBg("bot_profile"),
+    // Trophies they hold, newest first. A redeemed trophy still counts as won —
+    // cashing out a prize isn't the same as never having earned it.
+    db.select({ name: schema.trophies.name, imageUrl: schema.trophies.imageUrl, awardedAt: schema.userTrophies.awardedAt })
+      .from(schema.userTrophies)
+      .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
+      .where(eq(schema.userTrophies.userId, user.id)),
+    db.select({
+      title: schema.challenges.title,
+      status: schema.challenges.status,
+      points: schema.challengeParticipants.currentPoints,
+      place: schema.challengeParticipants.finalPlacement,
+      joinedAt: schema.challengeParticipants.joinedAt,
+    })
+      .from(schema.challengeParticipants)
+      .innerJoin(schema.challenges, eq(schema.challengeParticipants.challengeId, schema.challenges.id))
+      .where(eq(schema.challengeParticipants.userId, user.id)),
   ]);
 
   // Headline stat per account (first tracked metric) for a richer card.
@@ -46,6 +65,16 @@ export async function profileCard(slug: string): Promise<CardData | null> {
   const logoByGame = new Map(games.map((g) => [g.name, g.logoUrl]));
 
   const theme = (user.theme ?? {}) as { accent?: string; accent2?: string; bgImage?: string | null };
+
+  // A live challenge outranks a finished one whatever the score: the card is
+  // an invitation, and only a live one can be joined.
+  const challenges = [...entered]
+    .sort((a, b) => {
+      const live = Number(b.status === "active") - Number(a.status === "active");
+      return live !== 0 ? live : b.joinedAt.getTime() - a.joinedAt.getTime();
+    })
+    .map((c) => ({ title: c.title, live: c.status === "active", points: c.points, place: c.place }));
+
   return {
     kind: "profile",
     displayName: user.displayName,
@@ -69,6 +98,11 @@ export async function profileCard(slug: string): Promise<CardData | null> {
         headline: s ? (s.rankLabel ?? `${s.metricKey.replace(/_/g, " ")}: ${s.metricValue}`) : game,
       };
     }),
+    trophies: [...won]
+      .sort((a, b) => b.awardedAt.getTime() - a.awardedAt.getTime())
+      .map((t) => ({ name: t.name, imageUrl: t.imageUrl })),
+    trophyCount: won.length,
+    challenges,
     theme: {
       accent: theme.accent || BRAND.accent,
       accent2: theme.accent2 || BRAND.accent2,
@@ -86,7 +120,6 @@ export async function profileCard(slug: string): Promise<CardData | null> {
       // If their own upload can't be fetched (slow host, dead Blob URL), the
       // card falls back down this list rather than rendering bare.
       bgFallbacks: [user.bannerUrl, bg.bgUrl],
-      dim: bg.dim,
     },
   };
 }
@@ -133,7 +166,6 @@ export async function gameStatsCard(slug: string, game: string): Promise<CardDat
       accent2: g?.accent2 || theme.accent2 || BRAND.accent2,
       bgUrl: g?.planetBgUrl || g?.coverUrl || bg.bgUrl,
       bgFallbacks: [g?.coverUrl, bg.bgUrl],
-      dim: bg.dim,
     },
   };
 }
@@ -212,7 +244,7 @@ export async function questCard(slug: string | null, questKey: string): Promise<
     currentTier: q.currentTierIndex >= 0 ? q.tiers[q.currentTierIndex].name : null,
     nextTier: q.nextTier?.name ?? null,
     tiers: q.tiers.map((t) => ({ name: t.name, threshold: t.thresholdQp, earned: t.earned })),
-    theme: { accent: q.color, accent2: q.accent2, bgUrl: q.cardBgUrl || q.mapArtUrl || bg.bgUrl, bgFallbacks: [q.mapArtUrl, bg.bgUrl], dim: bg.dim },
+    theme: { accent: q.color, accent2: q.accent2, bgUrl: q.cardBgUrl || q.mapArtUrl || bg.bgUrl, bgFallbacks: [q.mapArtUrl, bg.bgUrl] },
   };
 }
 
@@ -236,7 +268,7 @@ export async function cpSummaryCard(slug: string): Promise<CardData | null> {
       tier: q.currentTierIndex >= 0 ? q.tiers[q.currentTierIndex].name : "Just starting",
       accent: q.color,
     })),
-    theme: { ...BRAND, bgUrl: bg.bgUrl, dim: bg.dim },
+    theme: { ...BRAND, bgUrl: bg.bgUrl },
   };
 }
 
@@ -285,7 +317,6 @@ export async function planetCard(game: string): Promise<CardData | null> {
       accent2: g.accent2 || BRAND.accent2,
       bgUrl: g.planetBgUrl || g.coverUrl || bg.bgUrl,
       bgFallbacks: [g.coverUrl, bg.bgUrl],
-      dim: bg.dim,
     },
   };
 }
@@ -308,7 +339,7 @@ export async function planetsCard(): Promise<CardData | null> {
       logoUrl: g.logoUrl,
       accent: g.accent,
     })),
-    theme: { ...BRAND, bgUrl: bg.bgUrl, dim: bg.dim },
+    theme: { ...BRAND, bgUrl: bg.bgUrl },
   };
 }
 
@@ -379,7 +410,6 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
       accent2: g?.accent2 || BRAND.accent2,
       bgUrl: ch.coverUrl || ch.heroUrl || bg.bgUrl,
       bgFallbacks: [ch.heroUrl, bg.bgUrl],
-      dim: bg.dim,
     },
   };
 }
@@ -419,6 +449,6 @@ export async function leaderboardCard(game: string, metricKey?: string | null): 
       value: r.rankLabel ?? String(Math.round(r.value * 100) / 100),
       avatarUrl: r.avatarUrl,
     })),
-    theme: { ...BRAND, bgUrl: g[0]?.coverUrl || bg.bgUrl, bgFallbacks: [bg.bgUrl], dim: bg.dim },
+    theme: { ...BRAND, bgUrl: g[0]?.coverUrl || bg.bgUrl, bgFallbacks: [bg.bgUrl] },
   };
 }
