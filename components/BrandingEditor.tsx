@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { saveBranding, type ActionState } from "@/app/actions/admin";
 import ImageUpload from "@/components/ImageUpload";
+import BrandGlyph from "@/components/BrandGlyph";
 
 type Mode = "mark" | "wordmark" | "both";
 
@@ -34,7 +35,8 @@ export default function BrandingEditor({
   defaultWordmark, defaultWordmarkZoom, defaultNavMode, defaultFooterMode, defaultLoadingColor, defaultLoadingLogo, defaultLoadingPhrases, defaultPlanetsIcon,
   defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultOrbColor, defaultQuestRocket,
   defaultLoadingInterval = 3, defaultLoadingAstronaut = "", defaultLoadingBg = "", defaultLoadingWordmark = true, defaultLoadingOrbSize = 80,
-  defaultOrbSize = 56, defaultHidePlanets = false,
+  defaultOrbSize = 72, defaultHidePlanets = false,
+  defaultDiscordOrbIcon = "", defaultDiscordOrbColor = "#5865f2", defaultDiscordOrbSize = 72,
 }: {
   defaultWordmark: string;
   defaultWordmarkZoom: number;
@@ -58,6 +60,9 @@ export default function BrandingEditor({
   defaultLoadingWordmark?: boolean;
   defaultLoadingOrbSize?: number;
   defaultOrbSize?: number;
+  defaultDiscordOrbIcon?: string;
+  defaultDiscordOrbColor?: string;
+  defaultDiscordOrbSize?: number;
   defaultHidePlanets?: boolean;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
@@ -65,6 +70,9 @@ export default function BrandingEditor({
   const [orbIcon, setOrbIcon] = useState(defaultOrbIcon);
   const [orbColor, setOrbColor] = useState(defaultOrbColor || "#8b5cf6");
   const [orbSize, setOrbSize] = useState(defaultOrbSize);
+  const [dOrbIcon, setDOrbIcon] = useState(defaultDiscordOrbIcon);
+  const [dOrbColor, setDOrbColor] = useState(defaultDiscordOrbColor || "#5865f2");
+  const [dOrbSize, setDOrbSize] = useState(defaultDiscordOrbSize);
   const [questRocket, setQuestRocket] = useState(defaultQuestRocket);
   const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
   const [hidePlanets, setHidePlanets] = useState(!!defaultHidePlanets);
@@ -128,10 +136,38 @@ export default function BrandingEditor({
             <input type="color" name="orbColor" value={orbColor} onChange={(e) => setOrbColor(e.target.value)} className="h-9 w-12 cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
           </label>
         </div>
-        <label className="mt-3 block text-xs text-muted">Orb size <span className="text-cyan-300">{orbSize}px</span>
-          <input type="range" min={44} max={120} step={2} value={orbSize} onChange={(e) => setOrbSize(Number(e.target.value))} className="w-full accent-violet-500" />
+        <label className="mt-3 block text-xs text-muted">
+          Orb size <span className="text-cyan-300">{orbSize === 0 ? "hidden" : `${orbSize}px`}</span>
+          <input type="range" min={0} max={140} step={2} value={orbSize} onChange={(e) => setOrbSize(Number(e.target.value))} className="w-full accent-violet-500" />
         </label>
+        <p className="text-[11px] text-muted">Drag to 0 to hide the orb entirely.</p>
         <input type="hidden" name="orbSize" value={orbSize} />
+      </div>
+
+      {/* Floating Discord orb — the second orb on the same rail */}
+      <div>
+        <div className="font-semibold text-sm mb-1">Floating &ldquo;add the bot&rdquo; orb</div>
+        <p className="text-xs text-muted mb-3">
+          The second floating orb, above the quest orb. It opens a short pitch with the live server count and an
+          add-to-server button. Empty icon = the Discord mark.
+        </p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4 flex items-center gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full shrink-0 text-white font-black" style={{ background: `radial-gradient(circle at 35% 30%, ${dOrbColor}, ${dOrbColor}bb 60%, ${dOrbColor}66)` }}>
+            {dOrbIcon
+              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={dOrbIcon} alt="" className="h-8 w-8 object-contain" />
+              : <BrandGlyph provider="discord" size={24} />}
+          </span>
+          <div className="flex-1"><ImageUpload name="discordOrbIcon" value={dOrbIcon} onChange={setDOrbIcon} aspect="1/1" rounded="rounded-full" maxDim={256} scope="content" hint="Square icon. Empty = the Discord mark." /></div>
+          <label className="text-xs text-muted flex flex-col items-center gap-1">Orb color
+            <input type="color" name="discordOrbColor" value={dOrbColor} onChange={(e) => setDOrbColor(e.target.value)} className="h-9 w-12 cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
+          </label>
+        </div>
+        <label className="mt-3 block text-xs text-muted">
+          Orb size <span className="text-cyan-300">{dOrbSize === 0 ? "hidden" : `${dOrbSize}px`}</span>
+          <input type="range" min={0} max={140} step={2} value={dOrbSize} onChange={(e) => setDOrbSize(Number(e.target.value))} className="w-full accent-violet-500" />
+        </label>
+        <p className="text-[11px] text-muted">Drag to 0 to hide it.</p>
+        <input type="hidden" name="discordOrbSize" value={dOrbSize} />
       </div>
 
       {/* Quest-map "you are here" marker */}

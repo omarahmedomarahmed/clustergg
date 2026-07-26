@@ -13,6 +13,9 @@ export type OrbQuest = {
 // The always-present, glorified Quest orb. Game-agnostic → shown on every page.
 // Click toggles a popover of quest cards (each showing that quest's background
 // art). The orb icon defaults to the CP coin and is admin-editable.
+//
+// Positioning belongs to FloatingOrbs, which stacks this with the Discord orb —
+// two fixed elements each claiming bottom-right would sit on top of each other.
 export default function FloatingQuestOrb({ quests, icon, color = "#8b5cf6", size = 56 }: { quests: OrbQuest[]; icon?: string; color?: string; size?: number }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement | null>(null);
@@ -27,7 +30,7 @@ export default function FloatingQuestOrb({ quests, icon, color = "#8b5cf6", size
   if (quests.length === 0) return null;
 
   return (
-    <div ref={wrap} className="fixed bottom-4 right-4 z-40 print:hidden">
+    <div ref={wrap} className="print:hidden">
       {open && (
         <div className="mb-3 w-[320px] max-w-[calc(100vw-2rem)] rounded-2xl border border-violet-400/25 bg-[#0a0a1c]/95 backdrop-blur-xl p-3 shadow-2xl animate-[fadeIn_.15s_ease]">
           <div className="flex items-center justify-between px-1 pb-2">

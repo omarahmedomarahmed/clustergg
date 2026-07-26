@@ -71,8 +71,14 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // Floating quest orb icon (bottom-right). Empty = default CP coin.
   "brand.orb.icon": "",
   "brand.orb.color": "#8b5cf6",
-  // Size of the floating quest orb in px (44–120).
-  "brand.orb.size": "56",
+  // Size of the floating quest orb in px (44–140). 0 hides it.
+  "brand.orb.size": "72",
+  // The second floating orb: "add ClusterBot to your server". Same controls as
+  // the quest orb, and 0 hides it. Defaults to Discord's own blurple, because
+  // the whole point of it is to be recognised as the Discord button.
+  "brand.discordOrb.icon": "",
+  "brand.discordOrb.color": "#5865f2",
+  "brand.discordOrb.size": "72",
   // "You are here" marker image on the quest map. Empty = the gamified astronaut
   // (below), which faces the direction it's travelling. Set to override with a
   // single static marker image.

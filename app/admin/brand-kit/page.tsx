@@ -16,7 +16,8 @@ export default async function BrandKitPage() {
     "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.nav.hidePlanets", "brand.footer.mode",
     "brand.loading.color", "brand.loading.logo", "brand.loading.phrases",
     "brand.loading.interval", "brand.loading.astronaut", "brand.loading.bg", "brand.loading.wordmark", "brand.loading.orbSize",
-    "brand.nav.bg", "brand.footer.bg", "brand.favicon", "brand.favicon.zoom", "brand.cpIcon", "brand.orb.icon", "brand.orb.color", "brand.orb.size", "brand.quest.rocket",
+    "brand.nav.bg", "brand.footer.bg", "brand.favicon", "brand.favicon.zoom", "brand.cpIcon", "brand.orb.icon", "brand.orb.color", "brand.orb.size",
+    "brand.discordOrb.icon", "brand.discordOrb.color", "brand.discordOrb.size", "brand.quest.rocket",
   ]);
 
   return (
@@ -65,7 +66,10 @@ export default async function BrandKitPage() {
           defaultLoadingBg={c["brand.loading.bg"] || ""}
           defaultLoadingWordmark={(c["brand.loading.wordmark"] ?? "1") !== "0"}
           defaultLoadingOrbSize={Number(c["brand.loading.orbSize"]) || 80}
-          defaultOrbSize={Number(c["brand.orb.size"]) || 56}
+          defaultOrbSize={orbPx(c["brand.orb.size"], 72)}
+          defaultDiscordOrbIcon={c["brand.discordOrb.icon"] || ""}
+          defaultDiscordOrbColor={c["brand.discordOrb.color"] || "#5865f2"}
+          defaultDiscordOrbSize={orbPx(c["brand.discordOrb.size"], 72)}
         />
       </section>
 
@@ -111,4 +115,11 @@ export default async function BrandKitPage() {
       </div>
     </div>
   );
+}
+
+// 0 means "hide this orb", so it must survive the read — `Number(x) || 72`
+// would quietly turn a deliberate 0 back into a visible orb.
+function orbPx(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 && raw !== "" && raw !== undefined ? n : fallback;
 }
