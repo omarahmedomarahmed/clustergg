@@ -112,7 +112,7 @@ export async function guideCard(topic: string, questKey?: string | null): Promis
     badge: base.badge,
     steps,
     footer: c[`bot.guide.${topic}.footer`] || base.footer,
-    theme: { accent, accent2: "#22d3ee", bgUrl: c[`bot.guide.${topic}.bg`] || bg.bgUrl, dim: bg.dim },
+    theme: { accent, accent2: "#22d3ee", bgUrl: c[`bot.guide.${topic}.bg`] || bg.bgUrl },
   };
   return card;
 }
@@ -161,7 +161,7 @@ export async function questGuideCard(questKey: string): Promise<CardData | null>
     logoUrl: slimImg(q.logoUrl, 300000),
     steps,
     footer: c[`bot.guide.${topic}.footer`] || `/cluster quest ${q.key}`,
-    theme: { accent: q.color, accent2: q.accent2, bgUrl: c[`bot.guide.${topic}.bg`] || slimImg(q.cardBgUrl ?? q.mapArtUrl, 800000) || bg.bgUrl, dim: bg.dim },
+    theme: { accent: q.color, accent2: q.accent2, bgUrl: c[`bot.guide.${topic}.bg`] || slimImg(q.cardBgUrl ?? q.mapArtUrl, 800000) || bg.bgUrl },
   };
   return card;
 }

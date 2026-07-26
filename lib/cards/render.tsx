@@ -2,6 +2,10 @@ import { ImageResponse } from "next/og";
 import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
+import {
+  DEFAULT_LAYOUT, contentBox, plateBg, spotBox,
+} from "@/lib/cards/layout";
+import { layoutFor } from "@/lib/cards/layout-store";
 import type {
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
   LeaderboardCard, ChallengeCard, PlanetCard, PlanetsCard, GuideCard,
@@ -92,8 +96,17 @@ function safeTheme(theme: CardTheme): CardTheme {
   };
 }
 
-// The shared frame: artwork → veil → accent glows → content → wordmark.
+// The shared frame: artwork → veil → content → mascot → logo → badge.
+//
+// Every position here comes from the card's LAYOUT (Admin → Card layouts), not
+// from constants. The defaults reproduce the geometry this frame used to
+// hard-code, so an unedited card is pixel-identical to what it drew before.
 function Frame({ theme, children, corner }: { theme: CardTheme; children: React.ReactNode; corner?: React.ReactNode }) {
+  const l = theme.layout ?? DEFAULT_LAYOUT;
+  const mascot = spotBox(l.mascot, 1);
+  const mark = spotBox(l.mark, 1);
+  const badge = spotBox(l.badge, 1);
+  const content = contentBox(l.content);
   return (
     <div style={{ width: CARD_W, height: CARD_H, display: "flex", position: "relative", background: VOID, color: INK }}>
       {theme.bgUrl ? (
@@ -109,47 +122,93 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
           positioned elements through Yoga, which gives an empty div zero size
           unless it is told otherwise — so an inset-only overlay silently
           renders as nothing and the artwork comes through at full brightness. */}
-      <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: theme.bgUrl ? veil(theme.dim ?? 62) : VOID }} />
-      {theme.bgUrl ? (
+      <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: theme.bgUrl ? veil(l.dim) : VOID }} />
+      {theme.bgUrl && l.scrim ? (
         <>
           <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: "linear-gradient(90deg, rgba(4,5,26,0.94) 0%, rgba(4,5,26,0.78) 48%, rgba(4,5,26,0.46) 100%)" }} />
           <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: "linear-gradient(180deg, rgba(4,5,26,0.62) 0%, rgba(4,5,26,0.30) 38%, rgba(4,5,26,0.90) 100%)" }} />
         </>
       ) : null}
-      {/* accent glows */}
-      <div style={{ position: "absolute", top: -220, left: -160, width: 720, height: 720, borderRadius: 999, display: "flex", background: alpha(theme.accent, 0.13) }} />
-      <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: alpha(theme.accent2, 0.11, FALLBACK_ACCENT2) }} />
-      {/* top accent bar */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
-      {/* The astronaut, bottom-LEFT and behind the content. It shares the
-          bottom strip with the logo but sits at the opposite end, so the two
-          pieces of brand furniture can never sit on top of each other. */}
-      {theme.astronautUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={theme.astronautUrl} alt="" height={200}
-          style={{ position: "absolute", left: 10, bottom: 0, height: 200, objectFit: "contain", opacity: 0.85 }} />
+      {/* The two corner glows. Off by default now: at 1200x630 they read as
+          two grey discs bleeding off opposite corners rather than as light,
+          and they sat on top of whatever the artwork put there. */}
+      {l.glows ? (
+        <>
+          <div style={{ position: "absolute", top: -220, left: -160, width: 720, height: 720, borderRadius: 999, display: "flex", background: alpha(theme.accent, 0.13) }} />
+          <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: alpha(theme.accent2, 0.11, FALLBACK_ACCENT2) }} />
+        </>
       ) : null}
-      {/* Content reserves the bottom-right corner so it can't run under the
-          logo — the logo is drawn last and nothing is allowed to cover it. */}
-      <div style={{ position: "relative", display: "flex", flexDirection: "column", width: "100%", height: "100%", padding: "44px 190px 56px 56px" }}>
+      {l.bar ? (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
+      ) : null}
+      {/* The astronaut, behind the content. */}
+      {theme.astronautUrl && !l.mascot.hidden ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={theme.astronautUrl} alt="" width={mascot.width} height={mascot.height}
+          style={{ position: "absolute", left: mascot.left, top: mascot.top, width: mascot.width, height: mascot.height, objectFit: "contain", opacity: 0.85 }} />
+      ) : null}
+      {/* The content block. Its box is part of the layout, so moving the logo
+          out of a corner can actually give the card that corner back. */}
+      <div style={{ position: "absolute", left: content.left, top: content.top, width: content.width, height: content.height, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {children}
       </div>
-      {/* The real logo mark, bottom-right, big, drawn on top of everything.
-          Falls back to the wordmark only when no logo is configured, so a card
-          is never unbranded. */}
-      <div style={{ position: "absolute", bottom: 24, right: 36, display: "flex", alignItems: "center", gap: 12 }}>
-        {theme.markUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={theme.markUrl} alt="" width={104} height={104}
-            style={{ width: 104, height: 104, borderRadius: 24, objectFit: "contain" }} />
-        ) : (
-          <>
-            <div style={{ width: 60, height: 60, borderRadius: 18, display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: 38, fontWeight: 700, color: "#fff" }}>C</div>
-            <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: 3, color: INK }}>CLUSTER</div>
-          </>
-        )}
-      </div>
-      {corner ? <div style={{ position: "absolute", top: 34, right: 40, display: "flex" }}>{corner}</div> : null}
+      {/* The real logo mark, drawn on top of everything. Falls back to the
+          wordmark only when no logo is configured, so a card is never
+          unbranded. */}
+      {!l.mark.hidden ? (
+        <div style={{ position: "absolute", left: mark.left, top: mark.top, width: mark.width, height: mark.height, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          {theme.markUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={theme.markUrl} alt="" width={mark.width} height={mark.height}
+              style={{ width: mark.width, height: mark.height, borderRadius: Math.round(mark.width * 0.23), objectFit: "contain" }} />
+          ) : (
+            <div style={{ width: mark.width, height: mark.width, borderRadius: Math.round(mark.width * 0.17), display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: Math.round(mark.width * 0.55), fontWeight: 700, color: "#fff" }}>C</div>
+          )}
+        </div>
+      ) : null}
+      {/* Top-right furniture: game logo, level pill, or the trophy stack. Right
+          edge pinned to the spot so a stack of different heights still hangs
+          from the same line. */}
+      {corner && !l.badge.hidden ? (
+        <div style={{ position: "absolute", right: CARD_W - (badge.left + badge.width), top: badge.top, display: "flex", justifyContent: "flex-end" }}>{corner}</div>
+      ) : null}
+    </div>
+  );
+}
+
+// The dark plate behind a block of text.
+//
+// Over real artwork the veil alone loses a line the moment the image has a
+// bright patch behind it, and the fix that scales is not "darken the whole
+// card" — that kills the art everywhere to save text in one place. It's a
+// local plate under the text that needs it. Admin-controlled per card kind, so
+// a flat graphic background can turn it off entirely.
+//
+// Two rules keep it from costing anything:
+//
+//  - No background art, no plate. On a flat card there is nothing to be
+//    illegible against, and a dark rectangle on a dark card is just a smudge.
+//  - The padding is cancelled by an equal negative margin, so the plate grows
+//    OUTWARD from the text instead of pushing it. Without that, every card
+//    gained ~28px of height at the title and the dense ones (challenge, guide)
+//    pushed their last row off the bottom of the canvas.
+function Plate({ theme, children, style }: {
+  theme: CardTheme;
+  children: React.ReactNode;
+  style?: React.CSSProperties;
+}) {
+  const layout = theme.layout ?? DEFAULT_LAYOUT;
+  if (layout.plate <= 0 || !theme.bgUrl) {
+    return <div style={{ display: "flex", flexDirection: "column", ...style }}>{children}</div>;
+  }
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignSelf: "flex-start",
+      padding: "10px 18px", margin: "-10px -18px", borderRadius: layout.plateRadius,
+      background: plateBg(layout),
+      ...style,
+    }}>
+      {children}
     </div>
   );
 }
@@ -183,14 +242,16 @@ function Bar({ pct, accent: a1, accent2: a2, h = 16 }: { pct: number; accent: st
   );
 }
 
-function Title({ text, sub, accent: a1, accent2: a2 }: { text: string; sub?: string | null; accent: string; accent2: string }) {
+function Title({ text, sub, accent: a1, accent2: a2, theme }: {
+  text: string; sub?: string | null; accent: string; accent2: string; theme: CardTheme;
+}) {
   const [accent, accent2] = [safeColor(a1), safeColor(a2, FALLBACK_ACCENT2)];
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+    <Plate theme={theme} style={{ gap: 6 }}>
       <div style={{ fontSize: 58, fontWeight: 700, lineHeight: 1.05, color: INK }}>{text}</div>
       {sub ? <div style={{ fontSize: 26, color: MUTED }}>{sub}</div> : null}
       <div style={{ display: "flex", width: 132, height: 6, borderRadius: 999, marginTop: 8, background: `linear-gradient(90deg, ${accent}, ${accent2})` }} />
-    </div>
+    </Plate>
   );
 }
 
@@ -211,17 +272,26 @@ function clamp(s: string | null | undefined, max: number): string | undefined {
 
 function ProfileBody(d: ProfileCard) {
   const t = d.theme;
+  const l = t.layout ?? DEFAULT_LAYOUT;
+  const trophies = (d.trophies ?? []).slice(0, 5);
+  const challenges = (d.challenges ?? []).slice(0, 3);
+  // With a trophy shelf and live challenges below it, six account tiles no
+  // longer fit. Four keeps every row full-width and readable, and the profile
+  // link on the card is there for the rest.
+  const accounts = d.accounts.slice(0, trophies.length || challenges.length ? 4 : 6);
   return (
     <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
-      <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-        <Avatar url={d.avatarUrl} ring={t.accent} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1.05 }}>{d.displayName}</div>
-          <div style={{ fontSize: 25, color: MUTED }}>{`clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`}</div>
+      <Plate theme={t} style={{ gap: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
+          <Avatar url={d.avatarUrl} ring={t.accent} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1.05 }}>{d.displayName}</div>
+            <div style={{ fontSize: 25, color: MUTED }}>{`clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`}</div>
+          </div>
         </div>
-      </div>
+      </Plate>
 
-      <div style={{ display: "flex", gap: 14, marginTop: 26 }}>
+      <div style={{ display: "flex", gap: 14, marginTop: 22 }}>
         <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{`${nf(d.totalCp)} CP`}</Pill>
         <Pill>{`${nf(d.views)} views`}</Pill>
         <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">
@@ -231,14 +301,52 @@ function ProfileBody(d: ProfileCard) {
         {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)">{d.award}</Pill> : null}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", marginTop: 30, gap: 12, flex: 1 }}>
-        <div style={{ fontSize: 19, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>LINKED ACCOUNTS</div>
-        {d.accounts.length === 0 ? (
+      {/* The trophy shelf. A profile card without it is a stat sheet; the
+          trophies are the part somebody actually screenshots. Won pieces are
+          drawn at full opacity with their real art — there is no placeholder,
+          because an empty shelf says the honest thing. */}
+      {trophies.length ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 20 }}>
+          <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>
+            {`TROPHY CASE${d.trophyCount && d.trophyCount > trophies.length ? ` · ${nf(d.trophyCount)}` : ""}`}
+          </div>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 14 }}>
+            {trophies.map((tr, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, width: 92 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={tr.imageUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, objectFit: "contain" }} />
+                <div style={{ fontSize: 15, color: MUTED }}>{clamp(tr.name, 13)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* What they're competing in right now — the one thing on this card that
+          another gamer can act on. */}
+      {challenges.length ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 18 }}>
+          <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>IN THE ARENA</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {challenges.map((c, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderRadius: 14, background: "rgba(0,0,0,0.48)", border: `1px solid ${c.live ? alpha(t.accent2, 0.45, FALLBACK_ACCENT2) : "rgba(255,255,255,0.10)"}` }}>
+                {c.live ? <div style={{ display: "flex", width: 10, height: 10, borderRadius: 5, background: "#34d399" }} /> : null}
+                <div style={{ fontSize: 20, fontWeight: 700 }}>{clamp(c.title, 26)}</div>
+                <div style={{ fontSize: 18, color: MUTED }}>{c.place ? `#${c.place}` : `${nf(c.points)} pts`}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", flexDirection: "column", marginTop: 20, gap: 10, flex: 1 }}>
+        <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>LINKED ACCOUNTS</div>
+        {accounts.length === 0 ? (
           <div style={{ fontSize: 26, color: MUTED }}>No games linked yet — link one to unlock quests.</div>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {d.accounts.slice(0, 6).map((a, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 18px", borderRadius: 18, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.10)", width: 340 }}>
+            {accounts.map((a, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderRadius: 18, background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.10)", width: 340 }}>
                 {a.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={a.logoUrl} alt="" width={44} height={44} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
@@ -363,7 +471,7 @@ function QuestBody(d: QuestCard) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain" }} />
     ) : undefined}>
-      <Title text={d.questName} sub={d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline} accent={t.accent} accent2={t.accent2} />
+      <Title text={d.questName} sub={d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline} accent={t.accent} accent2={t.accent2} theme={t} />
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginTop: 30 }}>
         <div style={{ fontSize: 74, fontWeight: 700, color: t.accent2, lineHeight: 1 }}>{nf(d.cp)}</div>
         <div style={{ fontSize: 27, color: MUTED, paddingBottom: 10 }}>
@@ -390,7 +498,7 @@ function CpSummaryBody(d: CpSummaryCard) {
   const t = d.theme;
   return (
     <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
-      <Title text={`${d.displayName}'s quests`} sub={`${nf(d.totalCp)} total Cluster Points`} accent={t.accent} accent2={t.accent2} />
+      <Title text={`${d.displayName}'s quests`} sub={`${nf(d.totalCp)} total Cluster Points`} accent={t.accent} accent2={t.accent2} theme={t} />
       <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 30, flex: 1 }}>
         {d.quests.slice(0, 4).map((q, i) => {
           const pct = q.target > 0 ? (q.cp / q.target) * 100 : 100;
@@ -417,7 +525,7 @@ function LeaderboardBody(d: LeaderboardCard) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
     ) : undefined}>
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
+      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} />
       {d.rows.length === 0 ? (
         <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: MUTED }}>
           No one has posted a score yet — link an account and you top this board.
@@ -480,7 +588,7 @@ function ChallengeBody(d: ChallengeCard) {
         <Pill>{d.game}</Pill>
       </div>
       <div style={{ display: "flex", marginTop: 18 }}>
-        <Title text={clamp(d.title, 44) ?? ""} sub={clamp(d.description, 92)} accent={t.accent} accent2={t.accent2} />
+        <Title text={clamp(d.title, 44) ?? ""} sub={clamp(d.description, 92)} accent={t.accent} accent2={t.accent2} theme={t} />
       </div>
       <div style={{ display: "flex", gap: 14, marginTop: 22 }}>
         <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">{d.ended ? "FINISHED" : `${days}d left`}</Pill>
@@ -547,7 +655,7 @@ function PlanetBody(d: PlanetCard) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={86} height={86} style={{ width: 86, height: 86, borderRadius: 20, objectFit: "cover" }} />
     ) : undefined}>
-      <Title text={`${d.game} Planet`} sub={clamp(d.description, 96)} accent={t.accent} accent2={t.accent2} />
+      <Title text={`${d.game} Planet`} sub={clamp(d.description, 96)} accent={t.accent} accent2={t.accent2} theme={t} />
       <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 36, flex: 1 }}>
         {[
           { k: "CHALLENGES LIVE", v: nf(d.challenges) },
@@ -569,7 +677,7 @@ function PlanetsBody(d: PlanetsCard) {
   const t = d.theme;
   return (
     <Frame theme={t}>
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
+      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} />
       <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 14, marginTop: 26, flex: 1 }}>
         {d.games.slice(0, 12).map((g, i) => (
           <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, width: 168, height: 132, borderRadius: 20, background: "rgba(0,0,0,0.45)", border: `1px solid ${g.accent ? alpha(g.accent, 0.4) : "rgba(255,255,255,0.10)"}` }}>
@@ -595,7 +703,7 @@ function GuideBody(d: GuideCard) {
       <img src={d.logoUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
     ) : undefined}>
       {d.badge ? <div style={{ display: "flex", marginBottom: 14 }}><Pill color={t.accent} bg={alpha(t.accent, 0.12)}>{d.badge}</Pill></div> : null}
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
+      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} />
       {/* overflow:hidden keeps a long admin-written guide from ever pushing the
           footer off the card — the steps clip instead of breaking the layout. */}
       {/* Fewer steps means each one can say more. A quest guide listing every
@@ -657,13 +765,14 @@ async function prepareCard(d: CardData): Promise<CardData> {
   // The whole image step gets one deadline. Past it the card is drawn with
   // whatever resolved — a person who tapped a button gets a card, not a spinner
   // that eventually times out in Discord's proxy.
-  const [body, brand] = await Promise.all([
+  const [body, brand, layout] = await Promise.all([
     withDeadline(prepareBody(d), d),
     withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
+    withDeadline(layoutFor(d.kind), DEFAULT_LAYOUT),
   ]);
   // Colours are normalised here, once, on the way in — so every card body can
   // use `theme.accent` directly and no unparseable value ever reaches Satori.
-  return { ...body, theme: safeTheme({ ...body.theme, ...brand }) } as CardData;
+  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout }) } as CardData;
 }
 
 // The background, with fallbacks. Tried in order and stops at the first that
@@ -685,12 +794,22 @@ async function prepareBody(d: CardData): Promise<CardData> {
 
   switch (d.kind) {
     case "profile": {
-      const [bgUrl, avatarUrl, ...logos] = await Promise.all([
-        bg, toEmbeddable(d.avatarUrl, ICON), ...d.accounts.map((a) => toEmbeddable(a.logoUrl, ICON)),
+      // Only the trophies the card can actually show are fetched — decoding a
+      // shelf of forty to draw five is time this render doesn't have.
+      const shelf = (d.trophies ?? []).slice(0, 5);
+      const [bgUrl, avatarUrl, ...rest] = await Promise.all([
+        bg,
+        toEmbeddable(d.avatarUrl, ICON),
+        ...d.accounts.map((a) => toEmbeddable(a.logoUrl, ICON)),
+        ...shelf.map((t) => toEmbeddable(t.imageUrl, { maxWidth: 240 })),
       ]);
       return {
         ...d, avatarUrl,
-        accounts: d.accounts.map((a, i) => ({ ...a, logoUrl: logos[i] })),
+        accounts: d.accounts.map((a, i) => ({ ...a, logoUrl: rest[i] })),
+        // A trophy whose art won't load is dropped, not drawn as a hole.
+        trophies: shelf
+          .map((t, i) => ({ ...t, imageUrl: rest[d.accounts.length + i] ?? "" }))
+          .filter((t) => t.imageUrl),
         theme: { ...d.theme, bgUrl },
       };
     }

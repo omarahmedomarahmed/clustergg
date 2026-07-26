@@ -1,3 +1,5 @@
+import type { CardLayout } from "@/lib/cards/layout";
+
 // Data shapes for every generated PNG card. Kept free of server imports so both
 // the renderer and the data loaders can share them.
 
@@ -12,11 +14,12 @@ export type CardTheme = {
   // Fallbacks, tried in order when `bgUrl` can't be fetched or decoded. A
   // gamer's uploaded art failing shouldn't leave the card with no art at all.
   bgFallbacks?: (string | null | undefined)[];
-  dim?: number;     // 0-100 veil strength over the artwork
-  // Filled in by the renderer, not by the data loaders: the astronaut mascot and
-  // the Cluster logo mark that every card carries.
+  // Filled in by the renderer, not by the data loaders: the astronaut mascot,
+  // the Cluster logo mark every card carries, and the admin-edited geometry
+  // that says where all three of them go.
   astronautUrl?: string | null;
   markUrl?: string | null;
+  layout?: CardLayout;
 };
 
 export type ProfileCard = {
@@ -32,6 +35,11 @@ export type ProfileCard = {
   votes: number;
   award?: string | null;          // e.g. "Best Profile — Week 12"
   accounts: { game: string; logoUrl?: string | null; tag: string; headline?: string | null }[];
+  // What they've actually won, and what they're competing in right now. A
+  // profile card without these is a stat sheet; with them it's a trophy case.
+  trophies?: { name: string; imageUrl: string }[];
+  trophyCount?: number;           // total won, when more than the card can show
+  challenges?: { title: string; live: boolean; points: number; place?: number | null }[];
   theme: CardTheme;
 };
 
