@@ -181,6 +181,15 @@ export async function approveRequest(
       .from(schema.spaces).where(eq(schema.spaces.game, req.game)).limit(1);
     if (!space) return { ok: false, reason: "no_planet" };
 
+    // A prize pool with no trophies behind it pays out nothing.
+    //
+    // An owner requesting a challenge names a monetary value — "$250" — but
+    // has no way to pick trophies from a Discord modal (five inputs, and
+    // they'd have to know our catalogue by id). Without this, approval created
+    // a challenge whose winners got a prize DESCRIPTION and an empty trophy
+    // case, which is the worst possible version of "real trophies".
+    const podium = req.prizes?.first?.length ? req.prizes : await podiumFor(req.game, req.prizeValue);
+
     const days = clampDays(overrides.days ?? req.days);
     const startAt = new Date();
     const endAt = new Date(startAt.getTime() + days * 86400000);
@@ -207,8 +216,8 @@ export async function approveRequest(
       startAt, endAt,
       status: "active",
       cadence: "custom",
-      prizes: req.prizes ?? null,
-      trophyId: req.prizes?.first?.[0] ?? null,
+      prizes: podium,
+      trophyId: podium?.first?.[0] ?? null,
       prizeDescription: req.prizeDescription
         ?? (req.prizeValue > 0 ? `${req.prizeValue} ${req.prizeCurrency} prize pool` : null),
       createdBy: reviewerId,
@@ -229,6 +238,45 @@ export async function approveRequest(
 
     return { ok: true, challengeId, accessKey };
   } catch { return { ok: false, reason: "error" }; }
+}
+
+// Pick trophies worth roughly the pool the owner promised.
+//
+// Split 60/30/10 across the podium — the standard shape, and close enough that
+// staff overriding it is a judgement call rather than a correction. Prefers a
+// trophy tagged for this game so the award looks like it belongs to the
+// competition it came from, and falls back to the general catalogue.
+async function podiumFor(
+  game: string,
+  poolValue: number,
+): Promise<{ first?: string[]; second?: string[]; third?: string[] } | null> {
+  if (!(poolValue > 0)) return null;
+  try {
+    const db = await getDb();
+    const all = await db.select().from(schema.trophies);
+    if (!all.length) return null;
+
+    const forGame = all.filter((t) => t.game === game);
+    const pool = forGame.length ? forGame : all.filter((t) => !t.game);
+    const usable = (pool.length ? pool : all).slice().sort((a, b) => b.value - a.value);
+    if (!usable.length) return null;
+
+    // The trophy closest in value to the target, without going over unless
+    // everything is over — awarding more than the owner promised is our cost,
+    // not theirs, so we never do it by accident.
+    const closest = (target: number) => {
+      const under = usable.filter((t) => t.value <= target);
+      const from = under.length ? under : usable;
+      return from.reduce((best, t) =>
+        Math.abs(t.value - target) < Math.abs(best.value - target) ? t : best, from[0]);
+    };
+
+    return {
+      first: [closest(poolValue * 0.6).id],
+      second: [closest(poolValue * 0.3).id],
+      third: [closest(poolValue * 0.1).id],
+    };
+  } catch { return null; }
 }
 
 export async function rejectRequest(requestId: string, reviewerId: string, note?: string): Promise<boolean> {
