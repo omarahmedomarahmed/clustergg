@@ -50,7 +50,17 @@ export async function cardRef(kind: string, args: Record<string, string>): Promi
 }
 
 // Discord embed colours are 24-bit integers, not CSS strings.
+//
+// Shorthand hex is accepted too: `#f0f` is a colour a gamer can genuinely have
+// on their profile, and silently falling back to house purple made their card
+// and its embed disagree.
 export function embedColor(hex?: string | null): number {
-  const m = /^#?([0-9a-f]{6})$/i.exec((hex ?? "").trim());
-  return m ? parseInt(m[1], 16) : 0x8b5cf6;
+  const raw = (hex ?? "").trim().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/i.test(raw)) {
+    return parseInt(raw[0] + raw[0] + raw[1] + raw[1] + raw[2] + raw[2], 16);
+  }
+  if (/^[0-9a-f]{6,8}$/i.test(raw)) return parseInt(raw.slice(0, 6), 16);
+  const m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(hex ?? "");
+  if (m) return (Number(m[1]) << 16) | (Number(m[2]) << 8) | Number(m[3]);
+  return 0x8b5cf6;
 }

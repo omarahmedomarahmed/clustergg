@@ -91,8 +91,26 @@ export function backButton(trail: Frame[]): Button | null {
 }
 
 // Discord allows 5 buttons per row and 5 rows per message.
+//
+// Duplicates are dropped here rather than at every call site. Screens append a
+// standard tail (connect a game · my profile · more · back) on top of their own
+// buttons, and a screen that already offers one of those would otherwise show
+// it twice — two buttons doing the same thing is the fastest way to make a card
+// look untrustworthy. Deduping centrally means a screen can add whatever it
+// needs without knowing what the tail will contribute.
 export function rows(buttons: (Button | null)[]): { type: 1; components: Button[] }[] {
-  const list = buttons.filter((b): b is Button => !!b).slice(0, 25);
+  const seen = new Set<string>();
+  const list: Button[] = [];
+  for (const b of buttons) {
+    if (!b) continue;
+    // Identity is where the button GOES, not what it says: two labels for the
+    // same destination are still one destination.
+    const key = b.custom_id ?? b.url ?? b.label;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    list.push(b);
+    if (list.length === 25) break;
+  }
   const out: { type: 1; components: Button[] }[] = [];
   for (let i = 0; i < list.length; i += 5) out.push({ type: ComponentType.ActionRow, components: list.slice(i, i + 5) });
   return out;

@@ -82,6 +82,53 @@ function startHereButton(trail: Frame[]): Button {
   return navButton("START HERE", frame("planets"), trail, ButtonStyle.Primary, "🚀");
 }
 
+// ===== The standard tail =====
+//
+// Every card ends the same way, so the bot navigates like one product instead
+// of a pile of unrelated screens. Four buttons, in this order:
+//
+//   Connect a game — the single action that turns a viewer into a gamer, and
+//                    the thing every card should be one tap from. It opens the
+//                    in-Discord picker, never a link out.
+//   My profile     — where you always are relative to everyone else.
+//   More           — everything that doesn't fit on this card, so a screen
+//                    never needs eight buttons to be complete.
+//   Back           — the trail you arrived on.
+//
+// `rows()` drops duplicates, so a screen adds its own buttons freely and the
+// tail quietly contributes only what's missing.
+
+function connectButton(ctx: ScreenCtx, trail: Frame[]): Button {
+  // In Discord, always. A "link your account" button that opens a browser is
+  // where most people stop, and the modal is right there.
+  return ctx.gamer
+    ? navButton("Connect a game", frame("link", ""), trail, ButtonStyle.Success, "🎮")
+    : linkButton("Continue with Discord", signInUrl(siteUrl(), "/feed"), "🚀");
+}
+
+function profileButton(ctx: ScreenCtx, trail: Frame[]): Button | null {
+  if (!ctx.gamer) return null;
+  // Home IS the profile card — one destination, so there is never a "home" and
+  // a "profile" that show different things.
+  return navButton("My profile", frame("home"), trail, ButtonStyle.Secondary, "👤");
+}
+
+function moreButton(trail: Frame[]): Button {
+  return navButton("More", frame("more"), trail, ButtonStyle.Secondary, "⋯");
+}
+
+// `here` is the screen being drawn, so the tail never offers a button that
+// leads back to the card you're already looking at.
+function tail(ctx: ScreenCtx, here: Frame, trail: Frame[]): (Button | null)[] {
+  const on = (screen: string) => here.screen === screen;
+  return [
+    on("link") ? null : connectButton(ctx, trail),
+    on("home") ? null : profileButton(ctx, trail),
+    on("more") ? null : moreButton(trail),
+    backButton(trail),
+  ];
+}
+
 function signInPrompt(ctx: ScreenCtx, trail: Frame[]): ScreenPayload {
   return {
     embeds: [{
@@ -93,32 +140,79 @@ function signInPrompt(ctx: ScreenCtx, trail: Frame[]): ScreenPayload {
     }],
     components: rows([
       linkButton("Continue with Discord", signInUrl(siteUrl(), "/feed"), "🚀"),
-      backButton(trail),
+      ...tail(ctx, frame("signin"), trail),
     ]),
   };
 }
 
 // ===== Screens =====
 
+// Home IS your profile card.
+//
+// There used to be a "hub" here and a separate profile screen, which meant two
+// buttons that sounded like the same thing showed different cards. Now Home and
+// My profile are one destination: your rendered profile card, with your own
+// background art, and a button per game you've linked. Everything that used to
+// crowd this screen moved to More.
 async function homeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!ctx.gamer) return welcomeScreen(ctx, trail);
-  const { url, data } = await cardRef("profile", { slug: ctx.gamer.slug });
-  const accent = data && "theme" in data ? data.theme.accent : null;
   const here = frame("home");
+  const [{ url, data }, games] = await Promise.all([
+    cardRef("profile", { slug: ctx.gamer.slug }),
+    linkedGamesOf(ctx.gamer.userId),
+  ]);
+  const accent = data && "theme" in data ? data.theme.accent : null;
   return {
     embeds: [embed(url, {
       title: `${ctx.gamer.displayName} on Cluster`,
       color: accent,
-      footer: "Everything below edits this message — no channel spam.",
+      footer: games.length
+        ? "Tap a game for your live stats. Everything below edits this message — no channel spam."
+        : "Everything below edits this message — no channel spam.",
     })],
     components: rows([
-      navButton("Cluster Points", frame("show", "cp"), [here], ButtonStyle.Primary, "⚡"),
-      navButton("Quests", frame("quests"), [here], ButtonStyle.Secondary, "🗺"),
-      navButton("Planets", frame("planets"), [here], ButtonStyle.Secondary, "🪐"),
-      navButton("Challenges", frame("challenges"), [here], ButtonStyle.Secondary, "🏆"),
-      customizeButton(),
+      // Your games first — they're the reason to look at your own card.
+      ...games.slice(0, 5).map((g) => navButton(g.game.slice(0, 24), frame("show", `game:${g.game}`), [here, ...trail], gameStyle(g.game), "🎮")),
       button("Share my profile", actionId("share", [], [here]), ButtonStyle.Success, "📣"),
-      linkButton("Open my profile", `${siteUrl()}/u/${ctx.gamer.slug}`, "🔗"),
+      navButton("Cluster Points", frame("show", "cp"), [here, ...trail], ButtonStyle.Primary, "⚡"),
+      ...tail(ctx, here, [here, ...trail].slice(1)),
+      customizeButton(),
+    ]),
+  };
+}
+
+// Everything a card doesn't have room for.
+//
+// This exists so no screen has to choose between being complete and being
+// readable: the card shows what it's about, and More holds the rest of the
+// product. It's reachable from every card, so it's also the recovery path when
+// someone lands somewhere unexpected.
+async function moreScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const here = frame("more");
+  const t = [here, ...trail];
+  return {
+    embeds: [{
+      title: "Everything Cluster does",
+      description: [
+        "**Planets** — every game we sync, with its own challenges, leaderboard and top gamers.",
+        "**Challenges** — live competitions with real trophies. Your stats are snapshotted when you join, so only new activity counts.",
+        "**Quests** — earn Cluster Points across every game you play.",
+        "**Leaderboards** — every board we run, updated on each sync.",
+        ctx.isManager ? "**Server** — your growth toward ad revenue, and running your own challenges." : null,
+      ].filter(Boolean).join("\n"),
+      color: embedColor("#8b5cf6"),
+    }],
+    components: rows([
+      navButton("Planets", frame("planets"), t, ButtonStyle.Primary, "🪐"),
+      navButton("Challenges", frame("challenges"), t, ButtonStyle.Success, "🏆"),
+      navButton("Quests", frame("quests"), t, ButtonStyle.Secondary, "🗺"),
+      navButton("Leaderboards", frame("leaderboard", ""), t, ButtonStyle.Secondary, "📊"),
+      navButton("How it works", frame("guide", "getting-started"), t, ButtonStyle.Secondary, "📖"),
+      ctx.isManager ? navButton("My server", frame("server"), t, ButtonStyle.Secondary, "🛰") : null,
+      ctx.isManager ? navButton("Run a challenge", frame("admin", ""), t, ButtonStyle.Secondary, "🎯") : null,
+      navButton("Commands", frame("help"), t, ButtonStyle.Secondary, "❓"),
+      ...tail(ctx, here, trail),
+      linkButton("Open Cluster", siteUrl(), "🔗"),
     ]),
   };
 }
@@ -136,7 +230,7 @@ async function welcomeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayl
       startHereButton([here]),
       linkButton("Continue with Discord", signInUrl(siteUrl(), "/feed"), "🔗"),
       navButton("How it works", frame("guide", "getting-started"), [here], ButtonStyle.Secondary, "📖"),
-      backButton(trail),
+      ...tail(ctx, here, trail),
     ]),
   };
 }
@@ -180,7 +274,8 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
         ? `No Cluster gamer with the Discord handle **${gamer}**.`
         : `No one on Cluster has linked **${gamer}** on **${game}** yet.`,
       trail,
-      [linkButton("Link yours", `${siteUrl()}/profile?tab=accounts`, "🔗")],
+      [button("Connect yours", `open-link|${game}`, ButtonStyle.Success, "🎮")],
+      ctx,
     );
   }
 
@@ -229,8 +324,8 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
       voted
         ? button("Voted", actionId("noop", [], [here, ...trail]), ButtonStyle.Secondary, "✅")
         : button("Vote for this profile", actionId("vote", [found.slug], [here, ...trail]), ButtonStyle.Success, "⭐"),
+      ...tail(ctx, here, trail),
       linkButton("Open profile", `${siteUrl()}/u/${found.slug}`, "🔗"),
-      backButton(trail),
     ]),
   };
 }
@@ -238,33 +333,24 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
 async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   const target = what || "profile";
 
-  if (target === "profile" || target === "cp") {
+  // `show profile` and Home are the same destination, on purpose — one profile
+  // card, whichever button you pressed to reach it.
+  if (target === "profile") return homeScreen(ctx, trail);
+
+  if (target === "cp") {
     if (!ctx.gamer) return signInPrompt(ctx, trail);
-    const kind = target === "cp" ? "cp" : "profile";
-    const [{ url, data }, games] = await Promise.all([
-      cardRef(kind, { slug: ctx.gamer.slug }),
-      target === "profile" ? linkedGamesOf(ctx.gamer.userId) : Promise.resolve([]),
-    ]);
-    const accent = data && "theme" in data ? data.theme.accent : null;
-    const here = frame("show", target);
+    const { url, data } = await cardRef("cp", { slug: ctx.gamer.slug });
+    const here = frame("show", "cp");
     return {
       embeds: [embed(url, {
-        title: target === "cp" ? "Your Cluster Points" : `${ctx.gamer.displayName} on Cluster`,
-        color: accent,
-        footer: games.length ? "Tap a game for your live stats." : undefined,
+        title: "Your Cluster Points",
+        color: data && "theme" in data ? data.theme.accent : null,
+        footer: "Cluster Points come from quests — every game you play feeds the same total.",
       })],
       components: rows([
-        // Your own games, one button each — the same jump anyone looking you up
-        // gets, so the card behaves the same way whoever is holding it.
-        ...games.slice(0, 5).map((g) => navButton(g.game.slice(0, 24), frame("show", `game:${g.game}`), [here, ...trail], gameStyle(g.game), "🎮")),
-        target === "cp"
-          ? navButton("My profile", frame("show", "profile"), trail, ButtonStyle.Primary, "👤")
-          : navButton("My Cluster Points", frame("show", "cp"), trail, ButtonStyle.Primary, "⚡"),
-        games.length === 0 && target === "profile"
-          ? navButton("Link a game account", frame("link", ""), [here, ...trail], ButtonStyle.Success, "🎮")
-          : null,
-        customizeButton(),
-        backButton(trail),
+        navButton("My quests", frame("quests"), [here, ...trail], ButtonStyle.Primary, "🗺"),
+        linkButton("CP history", `${siteUrl()}/quests`, "📜"),
+        ...tail(ctx, here, trail),
       ]),
     };
   }
@@ -283,8 +369,11 @@ async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[]): Promise
       components: rows([
         navButton(`${game} planet`, frame("planet", game), trail, ButtonStyle.Primary, "🪐"),
         navButton("Leaderboard", frame("leaderboard", game), trail, ButtonStyle.Secondary, "📊"),
-        linked ? null : linkButton(`Link ${game}`.slice(0, 80), `${siteUrl()}/profile?tab=accounts`, "🔗"),
-        backButton(trail),
+        navButton("Challenges", frame("challenges", game), trail, ButtonStyle.Secondary, "🏆"),
+        // Not linked? Then the one useful button is the one that fixes that,
+        // and it opens the modal for THIS game rather than a generic picker.
+        linked ? null : button(`Link my ${game} account`.slice(0, 40), `open-link|${game}`, ButtonStyle.Success, "🔗"),
+        ...tail(ctx, frame("show", target), trail),
       ]),
     };
   }
@@ -315,9 +404,8 @@ async function questScreen(key: string, ctx: ScreenCtx, trail: Frame[]): Promise
     components: rows([
       navButton("How to win", frame("guide", `quest:${questKey}`), trail, ButtonStyle.Primary, "📖"),
       ...others.map((q) => navButton(q.name, frame("show", `quest:${q.value}`), trail)),
+      ...tail(ctx, frame("quest", questKey), trail),
       linkButton("Play the quest map", `${siteUrl()}/quests/${questKey}`, "🎮"),
-      startHereButton(trail),
-      backButton(trail),
     ]),
   };
 }
@@ -330,7 +418,7 @@ async function questsScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       embeds: [embed(url, { title: "Your quests", color: data && "theme" in data ? data.theme.accent : null })],
       components: rows([
         ...c.quests.slice(0, 4).map((q) => navButton(q.name, frame("show", `quest:${q.value}`), trail, ButtonStyle.Secondary)),
-        backButton(trail),
+        ...tail(ctx, frame("quests"), trail),
       ]),
     };
   }
@@ -352,8 +440,8 @@ async function guideScreen(topic: string, ctx: ScreenCtx, trail: Frame[]): Promi
     components: rows([
       startHereButton(trail),
       ...others.map((g) => navButton(g.name.slice(0, 40), frame("guide", g.value), trail)),
+      ...tail(ctx, frame("guide", t), trail),
       customizeButton(),
-      backButton(trail),
     ]),
   };
 }
@@ -379,10 +467,9 @@ async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
     }],
     components: rows([
       startHereButton([here]),
-      navButton("My hub", frame("home"), [], ButtonStyle.Secondary, "🏠"),
       navButton("Getting started", frame("guide", "getting-started"), [here], ButtonStyle.Secondary, "📖"),
+      ...tail(ctx, frame("help"), trail),
       linkButton("Open Cluster", siteUrl(), "🔗"),
-      backButton(trail),
     ]),
   };
 }
@@ -403,7 +490,7 @@ function gameStyle(name: string): number {
 // coloured button, over the games-galaxy art.
 async function planetsScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   const c = await catalog();
-  if (!c.games.length) return notYet("No planets are live yet.", trail);
+  if (!c.games.length) return notYet("No planets are live yet.", trail, [], ctx);
   const { url } = await cardRef("planets", {});
   return {
     embeds: [embed(url, {
@@ -413,9 +500,11 @@ async function planetsScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayl
     })],
     // 24 games won't fit in 25 buttons alongside Back, so the first 20 get
     // buttons and `/cluster planet game:` autocompletes the rest.
+    // 20 games plus the tail is the whole 25-button budget, so the games get
+    // the room and `/cluster planet game:` autocompletes the rest.
     components: rows([
       ...c.games.slice(0, 20).map((g) => navButton(g.name.slice(0, 24), frame("planet", g.value), trail, gameStyle(g.value))),
-      backButton(trail),
+      ...tail(ctx, frame("planets"), trail),
     ]),
   };
 }
@@ -423,7 +512,7 @@ async function planetsScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayl
 async function planetScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!game) return planetsScreen(ctx, trail);
   const { url, data } = await cardRef("planet", { game });
-  if (!data) return notYet(`No planet for **${game}** yet.`, trail);
+  if (!data) return notYet(`No planet for **${game}** yet.`, trail, [], ctx);
   return {
     embeds: [embed(url, { title: `${game} Planet`, color: "theme" in data ? data.theme.accent : null })],
     components: rows([
@@ -433,31 +522,78 @@ async function planetScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promi
         ? navButton("My stats", frame("show", `game:${game}`), trail, ButtonStyle.Secondary, "📈")
         : null,
       navButton("All planets", frame("planets"), trail, ButtonStyle.Secondary, "🪐"),
-      backButton(trail),
+      ...tail(ctx, frame("planet", game), trail),
     ]),
   };
 }
 
 // ===== Leaderboard =====
 
-async function leaderboardScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+// Every board a game runs, not one.
+//
+// A game usually has several — rank, wins, KD, playtime — and showing only the
+// first quietly hid the rest, so a gamer who is #1 on the board that matters to
+// them never saw it. This lists them all and gives each one a button.
+async function boardsFor(game: string): Promise<{ metricKey: string; title: string }[]> {
+  try {
+    const db = await getDb();
+    return await db.select({ metricKey: schema.leaderboards.metricKey, title: schema.leaderboards.title })
+      .from(schema.leaderboards)
+      .where(and(eq(schema.leaderboards.game, game), eq(schema.leaderboards.isActive, true)))
+      .limit(8);
+  } catch { return []; }
+}
+
+async function leaderboardScreen(game: string, metric: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!game) {
+    // No game given: offer the picker rather than silently choosing one, so
+    // "Leaderboards" from More doesn't look like it only knows one game.
     const c = await catalog();
+    if (c.games.length > 1) {
+      const here = frame("leaderboard", "");
+      return {
+        embeds: [{
+          title: "Leaderboards",
+          description: "Every game we sync runs its own boards — rank, wins, and whatever else that game measures. Pick a game.",
+          color: embedColor("#8b5cf6"),
+        }],
+        components: rows([
+          ...c.games.slice(0, 18).map((g) => navButton(g.name.slice(0, 24), frame("leaderboard", g.value), [here, ...trail], gameStyle(g.value), "📊")),
+          ...tail(ctx, here, trail),
+        ]),
+      };
+    }
     game = c.games[0]?.value ?? "";
   }
-  const { url, data } = await cardRef("leaderboard", { game });
-  if (!data) return notYet(`No leaderboard for **${game}** yet.`, trail);
+
+  const [{ url, data }, boards] = await Promise.all([
+    cardRef("leaderboard", metric ? { game, metric } : { game }),
+    boardsFor(game),
+  ]);
+  if (!data) return notYet(`No leaderboard for **${game}** yet.`, trail, [], ctx);
+
+  const here = frame("leaderboard", game, metric);
+  const shown = data.kind === "leaderboard" ? data.title : "";
+  // One button per OTHER board on this game — the current one is already the
+  // card you're looking at.
+  const boardButtons = boards
+    .filter((b) => b.title !== shown)
+    .slice(0, 4)
+    .map((b) => navButton(b.title.slice(0, 24), frame("leaderboard", game, b.metricKey), [here, ...trail], ButtonStyle.Secondary, "📊"));
+
   return {
     embeds: [embed(url, {
-      title: data.kind === "leaderboard" ? data.title : `${game} leaderboard`,
+      title: shown || `${game} leaderboard`,
+      description: boards.length > 1 ? `${boards.length} boards on ${game} — tap another below.` : undefined,
       color: data.theme.accent,
       footer: "Standings update every time stats sync from the game API.",
     })],
     components: rows([
+      ...boardButtons,
       navButton(`${game} planet`.slice(0, 24), frame("planet", game), trail, ButtonStyle.Primary, "🪐"),
       navButton("Challenges", frame("challenges", game), trail, ButtonStyle.Secondary, "🏆"),
+      ...tail(ctx, here, trail),
       linkButton("Full board", `${siteUrl()}/leaderboards`, "🔗"),
-      backButton(trail),
     ]),
   };
 }
@@ -469,7 +605,7 @@ async function challengesScreen(game: string, ctx: ScreenCtx, trail: Frame[]): P
   if (!live.length) {
     return notYet(game ? `No live challenges on **${game}** right now.` : "No challenges are live right now.", trail, [
       navButton("Browse planets", frame("planets"), trail, ButtonStyle.Secondary, "🪐"),
-    ]);
+    ], ctx);
   }
   if (live.length === 1) return challengeScreen(live[0].id, ctx, trail);
 
@@ -484,15 +620,15 @@ async function challengesScreen(game: string, ctx: ScreenCtx, trail: Frame[]): P
       color: embedColor("#8b5cf6"),
     }],
     components: rows([
-      ...live.map((ch) => navButton(ch.title.slice(0, 32), frame("challenge", ch.id), trail, ButtonStyle.Secondary)),
-      backButton(trail),
+      ...live.map((ch) => navButton(ch.title.slice(0, 32), frame("challenge", ch.id), trail, ButtonStyle.Success, "🏆")),
+      ...tail(ctx, frame("challenges", game), trail),
     ]),
   };
 }
 
 async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   const { url, data } = await cardRef("challenge", { id });
-  if (!data || data.kind !== "challenge") return notYet("That challenge is no longer live.", trail);
+  if (!data || data.kind !== "challenge") return notYet("That challenge is no longer live.", trail, [], ctx);
 
   const [joined, webUrl, gate] = await Promise.all([
     ctx.gamer ? hasJoined(ctx.gamer.userId, id) : Promise.resolve(false),
@@ -520,9 +656,10 @@ async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Prom
           : gate.locked && !ownHere
             ? button("Enter with key", `open-key|${id}`, ButtonStyle.Primary, "🔑")
             : button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆"),
+      navButton("Standings", frame("leaderboard", data.game), trail, ButtonStyle.Secondary, "📊"),
       navButton(`${data.game} planet`.slice(0, 24), frame("planet", data.game), trail, ButtonStyle.Secondary, "🪐"),
+      ...tail(ctx, frame("challenge", id), trail),
       linkButton("Full details", webUrl, "🔗"),
-      backButton(trail),
     ]),
   };
 }
@@ -567,7 +704,7 @@ async function hasJoined(userId: string, challengeId: string): Promise<boolean> 
 // members actually want to enter. This is where they run one.
 async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!ctx.guildId) {
-    return notYet("Run this inside your server — it manages that server's challenges.", trail);
+    return notYet("Run this inside your server — it manages that server's challenges.", trail, [], ctx);
   }
   // Requesting and running a challenge commits the server's name and the
   // owner's prize money, so it is gated on Discord's own permissions rather
@@ -575,7 +712,7 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
   if (!ctx.isManager) {
     return notYet("Only this server's admins and moderators can run challenges here.", trail, [
       navButton("Server growth", frame("server"), trail, ButtonStyle.Secondary, "📈"),
-    ]);
+    ], ctx);
   }
   const here = frame("admin", arg);
   const [mine, pending, portal] = await Promise.all([
@@ -639,7 +776,8 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
       ...controls,
       button("DM me my portal key", actionId("portal-key", [], [here]), ButtonStyle.Secondary, "🔑"),
       ...live.slice(0, 2).map((c) => navButton(`View ${c.title}`.slice(0, 24), frame("challenge", c.id), [here], ButtonStyle.Secondary, "👁")),
-      backButton(trail),
+      navButton("Server growth", frame("server"), [here, ...trail], ButtonStyle.Secondary, "📈"),
+      ...tail(ctx, here, trail),
     ]),
   };
 }
@@ -647,10 +785,10 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
 // Step one of a request: which game. Shown as the games card so the owner picks
 // from what we actually track, not from memory.
 async function requestGameScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
-  if (!ctx.guildId) return notYet("Run this inside your server.", trail);
-  if (!ctx.isManager) return notYet("Only this server's admins and moderators can request a challenge.", trail);
+  if (!ctx.guildId) return notYet("Run this inside your server.", trail, [], ctx);
+  if (!ctx.isManager) return notYet("Only this server's admins and moderators can request a challenge.", trail, [], ctx);
   const games = await requestableGames();
-  if (!games.length) return notYet("No games are available for challenges right now.", trail);
+  if (!games.length) return notYet("No games are available for challenges right now.", trail, [], ctx);
 
   const { url, data } = await cardRef("planets", {});
   return {
@@ -663,7 +801,7 @@ async function requestGameScreen(ctx: ScreenCtx, trail: Frame[]): Promise<Screen
     })],
     components: rows([
       ...games.slice(0, 20).map((g) => button(g.name.slice(0, 24), `open-req|${g.name}`, gameStyle(g.name), "🎮")),
-      backButton(trail),
+      ...tail(ctx, frame("req-game"), trail),
     ]),
   };
 }
@@ -775,8 +913,8 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
         // Straight to the modal for each game: one tap from here to typing a
         // name, rather than a screen in between that says the same thing.
         ...games.map((g) => button(g.name.slice(0, 24), `open-link|${g.value}`, gameStyle(g.name), "🎮")),
+        ...tail(ctx, frame("link", ""), trail),
         linkButton("Link on the site instead", `${siteUrl()}/profile?tab=accounts`, "🌐"),
-        backButton(trail),
       ]),
     };
   }
@@ -790,8 +928,9 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
     }],
     components: rows([
       button(`Link my ${game} account`.slice(0, 40), `open-link|${game}`, ButtonStyle.Primary, "🔗"),
+      navButton("A different game", frame("link", ""), trail, ButtonStyle.Secondary, "🎮"),
+      ...tail(ctx, frame("link", game), trail),
       linkButton("Link on the site instead", `${siteUrl()}/profile?tab=accounts`, "🌐"),
-      backButton(trail),
     ]),
   };
 }
@@ -800,10 +939,10 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
 
 async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!ctx.guildId) {
-    return notYet("Run this inside a server — it shows that server's growth toward ad revenue.", trail);
+    return notYet("Run this inside a server — it shows that server's growth toward ad revenue.", trail, [], ctx);
   }
   const stats = await guildStats(ctx.guildId);
-  if (!stats) return notYet("No data for this server yet. Members appear here as they start using Cluster.", trail);
+  if (!stats) return notYet("No data for this server yet. Members appear here as they start using Cluster.", trail, [], ctx);
   // The portal link is only useful to someone who can act on it, and the key
   // must never appear in a channel — so it's offered to managers as a DM.
   const portal = ctx.isManager ? await ensurePortal(ctx.guildId) : null;
@@ -845,17 +984,22 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       ctx.isManager
         ? navButton("Run a challenge", frame("admin", ""), trail, ButtonStyle.Success, "🏆")
         : null,
+      ...tail(ctx, frame("server"), trail),
       linkButton("Server owner guide", `${siteUrl()}/discord-bot`, "📈"),
-      backButton(trail),
     ]),
   };
 }
 
 // An honest empty state — never a raw error, never a dead end.
-function notYet(message: string, trail: Frame[], extra: (Button | null)[] = []): ScreenPayload {
+function notYet(message: string, trail: Frame[], extra: (Button | null)[] = [], ctx?: ScreenCtx): ScreenPayload {
   return {
     embeds: [{ description: message, color: embedColor("#8b5cf6") }],
-    components: rows([...extra, startHereButton(trail), linkButton("Open Cluster", siteUrl(), "🔗"), backButton(trail)]),
+    components: rows([
+      ...extra,
+      startHereButton(trail),
+      ...(ctx ? tail(ctx, frame("empty"), trail) : [backButton(trail)]),
+      linkButton("Open Cluster", siteUrl(), "🔗"),
+    ]),
   };
 }
 
@@ -878,6 +1022,7 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
   const [a = ""] = f.args;
   switch (f.screen) {
     case "home": return homeScreen(ctx, trail);
+    case "more": return moreScreen(ctx, trail);
     case "help": return helpScreen(ctx, trail);
     case "show": return showScreen(a, ctx, trail);
     case "gamer": return otherGamerScreen(a, f.args[1] ?? "", ctx, trail);
@@ -886,7 +1031,7 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
     case "guide": return guideScreen(a, ctx, trail);
     case "planet": return planetScreen(a, ctx, trail);
     case "planets": return planetsScreen(ctx, trail);
-    case "leaderboard": return leaderboardScreen(a, ctx, trail);
+    case "leaderboard": return leaderboardScreen(a, f.args[1] ?? "", ctx, trail);
     case "challenge": return challengeScreen(a, ctx, trail);
     case "challenges": return challengesScreen(a, ctx, trail);
     case "link": return linkScreen(a, ctx, trail);
