@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { awardQuestAction } from "@/lib/quests";
@@ -243,7 +243,11 @@ export async function profileAnalytics(userId: string): Promise<ProfileAnalytics
 
 export type BestProfileRow = {
   userId: string; slug: string; displayName: string; avatarUrl: string | null;
-  votes: number; views: number; rank: number;
+  /** Lifetime — what this board ranks on. */
+  votes: number;
+  /** This week's, shown alongside so a current climb is visible here too. */
+  weekVotes: number;
+  views: number; rank: number;
 };
 
 export async function bestProfiles(limit = 10): Promise<BestProfileRow[]> {
@@ -257,6 +261,25 @@ export async function bestProfiles(limit = 10): Promise<BestProfileRow[]> {
       .where(and(eq(schema.users.status, "active"), eq(schema.users.profileVisibility, "public")))
       .orderBy(desc(schema.users.voteCount), desc(schema.users.profileViews))
       .limit(limit);
-    return rows.filter((r) => r.votes > 0).map((r, i) => ({ ...r, rank: i + 1 }));
+    const top = rows.filter((r) => r.votes > 0).map((r, i) => ({ ...r, rank: i + 1, weekVotes: 0 }));
+    if (!top.length) return top;
+
+    // This board ranks on lifetime votes — it's the all-time record, and the
+    // weekly race has its own board in the nav. But the week's number is shown
+    // alongside, so somebody climbing right now is visible here too.
+    const { currentWeek } = await import("@/lib/profile-week");
+    const week = await currentWeek();
+    const weekly = await db.select({
+      profileUserId: schema.profileVotes.profileUserId,
+      n: sql<number>`count(*)`,
+    })
+      .from(schema.profileVotes)
+      .where(and(
+        eq(schema.profileVotes.weekKey, week.key),
+        inArray(schema.profileVotes.profileUserId, top.map((r) => r.userId)),
+      ))
+      .groupBy(schema.profileVotes.profileUserId);
+    const byUser = new Map(weekly.map((w) => [w.profileUserId, Number(w.n)]));
+    return top.map((r) => ({ ...r, weekVotes: byUser.get(r.userId) ?? 0 }));
   } catch { return []; }
 }

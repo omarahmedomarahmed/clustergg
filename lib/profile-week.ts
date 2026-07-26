@@ -48,6 +48,9 @@ export type WeekEntry = {
   votedByMe: boolean;
 };
 
+/** The prize a closed week paid out, resolved for display. */
+export type WeekTrophy = { id: string; name: string; imageUrl: string; tier: string; value: number } | null;
+
 export type WeekBoard = {
   week: Week;
   entries: WeekEntry[];
@@ -60,6 +63,8 @@ export type WeekBoard = {
   result: {
     podium: { userId: string; slug: string; displayName: string; votes: number }[];
     announcedAt: Date | null;
+    /** What the podium won, so the announcement can show the actual prize. */
+    trophy: WeekTrophy;
   } | null;
   takenAt: string;
 };
@@ -249,6 +254,18 @@ export async function weekBoard(opts: {
     entries.forEach((e, i) => { e.rank = e.disqualified ? 0 : i + 1; });
 
     const row = stored[0];
+    // The prize is part of the announcement — "you won" without showing what
+    // you won is half a ceremony, and the winner needs somewhere to go next.
+    let trophy: WeekTrophy = null;
+    const trophyId = row?.podium?.find((p) => p.trophyId)?.trophyId;
+    if (row?.closedAt && trophyId) {
+      const [t] = await db.select({
+        id: schema.trophies.id, name: schema.trophies.name, imageUrl: schema.trophies.imageUrl,
+        tier: schema.trophies.tier, value: schema.trophies.value,
+      }).from(schema.trophies).where(eq(schema.trophies.id, trophyId)).limit(1);
+      if (t) trophy = { ...t, value: Number(t.value) };
+    }
+
     return {
       week,
       entries: entries.slice(0, limit),
@@ -259,7 +276,7 @@ export async function weekBoard(opts: {
         live: row?.streamLive || settings[STREAM_LIVE_KEY] === "1",
       },
       result: row?.closedAt
-        ? { podium: row.podium ?? [], announcedAt: row.announcedAt ?? null }
+        ? { podium: row.podium ?? [], announcedAt: row.announcedAt ?? null, trophy }
         : null,
       takenAt: new Date().toISOString(),
     };
@@ -368,3 +385,117 @@ export async function lastResult(): Promise<{ weekKey: string; podium: { slug: s
 }
 
 export { previousWeek };
+
+// ===== Closing a week =====
+
+export type CloseResult =
+  | { ok: true; podium: { userId: string; slug: string; displayName: string; votes: number }[]; trophies: number }
+  | { ok: false; reason: "no_entries" | "error" };
+
+/**
+ * Call a week: freeze its podium, hand out the trophies, tell the winners.
+ *
+ * The standings are WRITTEN here rather than recomputed on read, because they
+ * depend on votes, adjustments and disqualifications that all keep changing
+ * afterwards — and last Sunday's winner has to stay last Sunday's winner.
+ *
+ * Re-running is safe: the podium is overwritten, and trophy awards are keyed so
+ * a second pass adds nothing. That matters because closing is the one action
+ * somebody will press twice when a stream stalls.
+ */
+export async function closeWeek(weekKey: string, actorId?: string | null): Promise<CloseResult> {
+  try {
+    const db = await getDb();
+    // Wider than the three we want, because the filter below drops entries: the
+    // board pads itself with zero-vote profiles and keeps disqualified gamers on
+    // it. Reading exactly three and then filtering would make the podium's depth
+    // depend on the board's sort order, which is not a thing the ceremony should
+    // be able to lose to.
+    const board = await weekBoard({ weekKey, limit: 30 });
+    const podium = board.entries
+      .filter((e) => !e.disqualified && e.weekVotes > 0)
+      .slice(0, 3)
+      .map((e) => ({ userId: e.userId, slug: e.slug, displayName: e.displayName, votes: e.weekVotes }));
+    if (!podium.length) return { ok: false, reason: "no_entries" };
+
+    // The trophy staff picked for the podium, if any. Without one the week
+    // still closes — the result is the point, the trophy is a bonus.
+    let trophyId: string | null = null;
+    try {
+      const c = await getContent([PODIUM_TROPHY_KEY]);
+      trophyId = c[PODIUM_TROPHY_KEY]?.trim() || null;
+    } catch { /* no trophy configured */ }
+
+    let trophies = 0;
+    if (trophyId) {
+      for (const [i, p] of podium.entries()) {
+        try {
+          await db.insert(schema.userTrophies).values({
+            id: uid(),
+            userId: p.userId,
+            trophyId,
+            // Filed under the week, so a second close finds the same row and
+            // the same gamer can win again in a later week.
+            challengeId: `week:${weekKey}`,
+            placement: i + 1,
+          }).onConflictDoNothing();
+          trophies++;
+        } catch { /* a missing trophy row shouldn't stop the announcement */ }
+      }
+    }
+
+    for (const [i, p] of podium.entries()) {
+      try {
+        await db.insert(schema.notifications).values({
+          id: uid(),
+          userId: p.userId,
+          type: "badge",
+          title: i === 0 ? "You are Profile of the Week" : `You finished #${i + 1} this week`,
+          body: trophyId
+            ? `${p.votes.toLocaleString()} votes. Your trophy is in your trophy case — open it to redeem.`
+            : `${p.votes.toLocaleString()} votes.`,
+          href: "/profile",
+        }).onConflictDoNothing();
+      } catch { /* non-fatal */ }
+    }
+
+    const now = new Date();
+    await db.insert(schema.voteWeeks)
+      .values({ weekKey, podium: podium.map((p, i) => ({ ...p, trophyId: i < 3 ? trophyId : null })), announcedAt: now, closedAt: now })
+      .onConflictDoUpdate({
+        target: schema.voteWeeks.weekKey,
+        set: { podium: podium.map((p, i) => ({ ...p, trophyId: i < 3 ? trophyId : null })), announcedAt: now, closedAt: now },
+      });
+
+    if (actorId) {
+      await recordWeekAction({
+        weekKey, profileUserId: podium[0].userId, action: "adjust", delta: 0,
+        reason: `Week closed — ${podium.map((p, i) => `#${i + 1} ${p.displayName}`).join(", ")}`,
+        actorId,
+      });
+    }
+    return { ok: true, podium, trophies };
+  } catch { return { ok: false, reason: "error" }; }
+}
+
+/** Undo a close, so a mistake on stream can be corrected. */
+export async function reopenWeek(weekKey: string): Promise<boolean> {
+  try {
+    const db = await getDb();
+    await db.update(schema.voteWeeks)
+      .set({ closedAt: null, announcedAt: null, podium: [] })
+      .where(eq(schema.voteWeeks.weekKey, weekKey));
+    return true;
+  } catch { return false; }
+}
+
+/** The stream, per week — set and toggled from admin. */
+export async function setWeekStream(weekKey: string, url: string | null, live: boolean): Promise<boolean> {
+  try {
+    const db = await getDb();
+    await db.insert(schema.voteWeeks)
+      .values({ weekKey, streamUrl: url, streamLive: live })
+      .onConflictDoUpdate({ target: schema.voteWeeks.weekKey, set: { streamUrl: url, streamLive: live } });
+    return true;
+  } catch { return false; }
+}

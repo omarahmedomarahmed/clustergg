@@ -60,6 +60,11 @@ export default async function BestProfilePage() {
               <div className="text-right shrink-0">
                 <div className="font-bold text-amber-300">{r.votes.toLocaleString()}</div>
                 <div className="text-[11px] text-muted">{tr("votes")}</div>
+                {r.weekVotes > 0 && (
+                  <div className="text-[10px] font-semibold text-cyan-300">
+                    +{r.weekVotes.toLocaleString()} {tr("this week")}
+                  </div>
+                )}
               </div>
               <div className="text-right shrink-0 hidden sm:block">
                 <div className="font-bold">{r.views.toLocaleString()}</div>

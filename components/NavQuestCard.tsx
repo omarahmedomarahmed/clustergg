@@ -10,10 +10,14 @@ import type { NavQuest } from "@/lib/quests";
 // The quest bar in the nav.
 //
 // One bordered bar holding three things, left to right: the current quest (its
-// card art, name, CP and progress), the gamer's total Cluster Points, and the
-// chevron that opens the quest list. The CP coins used to sit OUTSIDE the bar
-// as a detached chip that disappeared below xl — which is what made the nav
-// look broken. They belong inside, next to the dropdown.
+// card art and name), the gamer's TOTAL Cluster Points, and the chevron that
+// opens the quest list. The CP coins used to sit OUTSIDE the bar as a detached
+// chip that disappeared below xl — which is what made the nav look broken.
+// They belong inside, next to the dropdown.
+//
+// One number, not three. The bar previously carried the current quest's own CP
+// and a progress bar as well, which meant three competing figures in a 44px
+// strip — and the total is the only one anybody reads in passing.
 //
 // Everything here navigates. The bar opens the current quest's map; every row
 // in the dropdown opens that quest's map (it also switches the bar, so the nav
@@ -47,17 +51,13 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
         )}
         <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.5), rgba(4,5,26,0.8))" }} />
 
-        <Link href={`/quests/${q.key}`} className="relative flex-1 min-w-0 flex items-center gap-2 px-2">
+        {/* The art and the name, and nothing else. The per-quest CP and its
+            progress bar used to live here too — three numbers competing in a
+            44px bar, one of which (the total) is the only one anybody reads at
+            a glance. The detail is one tap away on the quest page. */}
+        <Link href={`/quests/${q.key}`} className="relative flex min-w-0 flex-1 items-center gap-2 px-2">
           <Art art={q.art} color={q.color} size="h-8 w-8" />
-          <span className="min-w-0 flex-1 flex flex-col justify-center leading-tight">
-            <span className="flex items-center justify-between gap-2">
-              <span className="text-[12px] font-bold truncate">{q.name}</span>
-              <span className="text-[10px] font-semibold shrink-0" style={{ color: q.accent2 }}>{q.qp.toLocaleString()} CP</span>
-            </span>
-            <span className="mt-1 h-1 w-full rounded-full bg-white/10 overflow-hidden">
-              <span className="block h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} />
-            </span>
-          </span>
+          <span className="truncate text-[12px] font-bold">{q.name}</span>
         </Link>
 
         {/* Total Cluster Points — inside the bar, immediately left of the
@@ -101,7 +101,7 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
                   <span className="flex items-center gap-1.5 text-xs font-bold truncate">{qq.name}
                     {qq.earned && <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" title="New CP earned" />}
                   </span>
-                  <span className="block text-[10px]" style={{ color: qq.accent2 }}>{qq.qp.toLocaleString()} CP · {qq.pct}%</span>
+                  <span className="block text-[10px] text-muted">Open the quest map</span>
                 </span>
                 <Icon name="chevronRight" size={13} className="relative shrink-0 text-white/40" />
               </Link>

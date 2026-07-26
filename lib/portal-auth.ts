@@ -52,10 +52,23 @@ function cookieName(kind: string, id: string): string {
   return `${COOKIE_PREFIX}${kind}_${id}`.slice(0, 96);
 }
 
-// Exchange a verified key for a session. Call this only after `keysMatch`.
-export async function grantPortalSession(kind: string, id: string): Promise<void> {
-  const jar = await cookies();
-  jar.set(cookieName(kind, id), sign(kind, id), {
+type Setter = { set: (opts: {
+  name: string; value: string; httpOnly?: boolean; secure?: boolean;
+  sameSite?: "lax" | "strict" | "none"; path?: string; maxAge?: number;
+}) => unknown };
+
+// Exchange a verified key for a session. Only ever called from a Route Handler
+// or a Server Action — a Server Component render is not allowed to write
+// cookies, and doing it there throws.
+//
+// `jar` is the response's cookie store when the caller has one (a Route
+// Handler); without it we fall back to the request-scoped store, which works
+// inside a Server Action.
+export async function grantPortalSession(kind: string, id: string, jar?: Setter): Promise<void> {
+  const store = jar ?? (await cookies());
+  store.set({
+    name: cookieName(kind, id),
+    value: sign(kind, id),
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
@@ -82,24 +95,33 @@ export async function revokePortalSession(kind: string, id: string): Promise<voi
   } catch { /* nothing to clear */ }
 }
 
-// Is this portal unlocked — by a fresh key, or by a session from earlier?
-// Grants the session as a side effect when the key is correct, so the caller
-// can redirect to a URL with no key in it.
-export async function unlockPortal(
+// Is this key right? Throttled and timing-safe — but it does NOT grant the
+// session, and that separation is the whole point.
+//
+// Granting means writing a cookie, and Next refuses to let a Server Component
+// render write one: `cookies().set()` throws "Cookies can only be modified in a
+// Server Action or Route Handler". The portal pages used to grant here, during
+// their own render, so entering a CORRECT key crashed the page while a wrong
+// one quietly showed the locked view — the failure appeared only on success,
+// which is the hardest shape of bug to read from the outside.
+//
+// So verification is a pure function of the key, and the cookie is written by
+// `/api/portal/unlock`, which is a Route Handler and is allowed to.
+export type PortalCheck = "ok" | "bad" | "throttled";
+
+export function verifyPortalKey(
   kind: string,
   id: string,
   expectedKey: string | null | undefined,
   givenKey: string | null | undefined,
-): Promise<boolean> {
-  if (await hasPortalSession(kind, id)) return true;
-  if (!givenKey) return false;
-  if (!throttleOk(`${kind}:${id}`)) return false;
+): PortalCheck {
+  if (!givenKey) return "bad";
+  if (!throttleOk(`${kind}:${id}`)) return "throttled";
   if (!keysMatch(expectedKey, givenKey)) {
     noteFailure(`${kind}:${id}`);
-    return false;
+    return "bad";
   }
-  await grantPortalSession(kind, id);
-  return true;
+  return "ok";
 }
 
 // ===== Brute-force throttle =====

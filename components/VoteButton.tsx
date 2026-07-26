@@ -12,15 +12,16 @@ import Icon from "@/components/Icon";
 // in. As a `button` it sits next to Follow with the same weight, because
 // voting is the thing we actually want a visitor to do.
 export default function VoteButton({
-  slug, votes, voted, canVote, accent, mine, variant = "chip", buttonStyle = "glass",
+  slug, votes, weekVotes, voted, canVote, accent, mine, variant = "chip", buttonStyle = "glass",
 }: {
-  slug: string; votes: number; voted: boolean; canVote: boolean; accent: string; mine: boolean;
+  slug: string; votes: number; weekVotes?: number; voted: boolean; canVote: boolean; accent: string; mine: boolean;
   variant?: "chip" | "button";
   buttonStyle?: string;
 }) {
   const [state, action, pending] = useActionState(voteForProfile, undefined);
 
   const count = state?.votes ?? votes;
+  const week = state?.weekVotes ?? weekVotes;
   const isVoted = state?.voted ?? voted;
 
   if (variant === "button") {
@@ -50,11 +51,25 @@ export default function VoteButton({
     );
   }
 
+  // Both numbers, wherever the chip appears. The week is the race they're in
+  // right now; the lifetime is what they've built. Showing only one of them
+  // means either a bad week looks permanent or a good week looks invisible.
+  const Counts = () => (
+    <>
+      <Icon name="star" size={14} style={{ color: accent }} />
+      <b>{count.toLocaleString()}</b> <span className="p-muted">votes</span>
+      {week !== undefined && (
+        <span className="p-muted">
+          · <b style={{ color: accent }}>{week.toLocaleString()}</b> this week
+        </span>
+      )}
+    </>
+  );
+
   if (mine) {
     return (
-      <span title="Best Profile votes" className="inline-flex items-center gap-1.5">
-        <Icon name="star" size={14} style={{ color: accent }} />
-        <b>{count.toLocaleString()}</b> <span className="p-muted">votes</span>
+      <span title="Best Profile votes — lifetime, and this week" className="inline-flex items-center gap-1.5">
+        <Counts />
       </span>
     );
   }
@@ -62,8 +77,7 @@ export default function VoteButton({
   if (!canVote) {
     return (
       <a href="/login" title="Continue with Discord to vote" className="inline-flex items-center gap-1.5 hover:opacity-80">
-        <Icon name="star" size={14} style={{ color: accent }} />
-        <b>{count.toLocaleString()}</b> <span className="p-muted">votes</span>
+        <Counts />
       </a>
     );
   }
@@ -83,6 +97,7 @@ export default function VoteButton({
       >
         <Icon name="star" size={13} style={{ color: accent }} />
         {pending ? "…" : count.toLocaleString()} {isVoted ? "voted" : "vote"}
+        {week !== undefined && <span className="opacity-70">· {week.toLocaleString()} wk</span>}
       </button>
       {state?.error && <span className="text-[11px] text-amber-300">{state.error}</span>}
     </form>

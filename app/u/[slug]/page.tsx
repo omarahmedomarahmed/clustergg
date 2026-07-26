@@ -9,6 +9,7 @@ import { providerInfoList } from "@/lib/providers/serialize";
 import { resolveGame } from "@/lib/game-logos";
 import { syncUserAccountsIfStale } from "@/lib/sync";
 import { getContent } from "@/lib/cms";
+import { gamerWeekVotes } from "@/lib/profile-week";
 import { slimImg } from "@/lib/img";
 import { hasVoted, recordProfileView } from "@/lib/identity";
 import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip, sectionArtStyle } from "@/lib/theme";
@@ -74,6 +75,9 @@ export default async function ProfilePage({ params }: Props) {
   // Has this visitor already voted for them? Drives the button's state, so a
   // second click removes the vote rather than silently doing nothing.
   const alreadyVoted = viewer ? await hasVoted(user.id, viewer.id) : false;
+  // Both numbers on the profile: the week they're competing in right now, and
+  // the lifetime total behind it.
+  const weekVotes = (await gamerWeekVotes(user.id)).week;
 
   // Count a profile view when someone other than the owner looks — a brag
   // number the gamer can show off. Owners viewing their own page don't count.
@@ -401,7 +405,7 @@ export default async function ProfilePage({ params }: Props) {
                   variant="button"
                   buttonStyle={theme.buttonStyle === "neon" ? "glass" : "outline"}
                   slug={user.slug}
-                  votes={user.voteCount ?? 0}
+                  votes={user.voteCount ?? 0} weekVotes={weekVotes}
                   voted={alreadyVoted}
                   canVote={viewer.id !== user.id}
                   mine={viewer.id === user.id}
@@ -414,7 +418,7 @@ export default async function ProfilePage({ params }: Props) {
                 <Link href="/signup" className={`p-btn p-btn-${theme.buttonStyle}`}>{tr("Join to follow")}</Link>
                 <VoteButton
                   variant="button" buttonStyle="outline"
-                  slug={user.slug} votes={user.voteCount ?? 0} voted={false}
+                  slug={user.slug} votes={user.voteCount ?? 0} weekVotes={weekVotes} voted={false}
                   canVote={false} mine={false} accent={theme.accent}
                 />
               </>
@@ -431,7 +435,7 @@ export default async function ProfilePage({ params }: Props) {
           <span style={{ color: theme.text }}>
             <VoteButton
               slug={user.slug}
-              votes={user.voteCount ?? 0}
+              votes={user.voteCount ?? 0} weekVotes={weekVotes}
               voted={alreadyVoted}
               canVote={!!viewer && viewer.id !== user.id}
               mine={viewer?.id === user.id}

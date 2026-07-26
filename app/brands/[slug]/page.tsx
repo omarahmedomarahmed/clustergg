@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { unlockPortal } from "@/lib/portal-auth";
+import { hasPortalSession } from "@/lib/portal-auth";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness, getBrandInbox } from "@/lib/brands";
@@ -11,6 +11,7 @@ import BrandChartBuilder from "@/components/BrandChartBuilder";
 import Tabs from "@/components/Tabs";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import Icon from "@/components/Icon";
+import PortalKeyHandoff from "@/components/PortalKeyHandoff";
 
 export const dynamic = "force-dynamic";
 
@@ -21,19 +22,26 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function BrandPortalPage({
   params, searchParams,
-}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; campaign?: string; filter?: string }> }) {
+}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; unlock?: string; campaign?: string; filter?: string }> }) {
   const { slug } = await params;
-  const { key = "", campaign: campaignId = "", filter = "all" } = await searchParams;
+  const { key = "", unlock = "", campaign: campaignId = "", filter = "all" } = await searchParams;
   const db = await getDb();
   const brand = await getBrandBySlugOrId(db, slug);
   if (!brand) notFound();
 
-  // Same hardening as the server portal: constant-time comparison, then the key
-  // is exchanged for an httpOnly session so it stops travelling in the query
-  // string (browser history, logs, the Referer of every link on this page).
-  const unlocked = await unlockPortal("brand", brand.id, brand.accessKey, key);
+  // Same hardening as the server portal, and the same reason it can't happen
+  // here: writing a cookie during a Server Component render throws in Next, so
+  // the exchange belongs to a Route Handler. A shared `?key=` link hands off to
+  // it and comes back with a session and a clean URL.
+  // Hand a shared `?key=` link to the unlock route with a real form
+  // submission. The page can't do the exchange itself (a Server Component
+  // render may not write cookies) and can't `redirect()` there either — App
+  // Router redirects go through the client router, which doesn't reliably
+  // follow a route handler's 307.
+  if (key) return <PortalKeyHandoff kind="brand" slug={brand.slug ?? brand.id} portalKey={key} />;
+  const unlocked = await hasPortalSession("brand", brand.id);
   const cover = brand.coverUrl;
-  const base = `/brands/${brand.slug}?key=${encodeURIComponent(key)}`;
+  const base = `/brands/${brand.slug}`;
   const num = (n: number) => n.toLocaleString();
 
   // Locked: ask for the key + show the creative-requirements teaser.
@@ -46,11 +54,14 @@ export default async function BrandPortalPage({
           <div className="glass p-6">
             <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="lock" size={18} className="text-amber-300" /> Enter your access key</h2>
             <p className="text-sm text-muted mt-1">Your Cluster account manager shared a key that unlocks this dashboard. No login needed.</p>
-            <form method="get" className="mt-4 flex gap-2">
-              <input name="key" defaultValue={key} placeholder="CLSTR-XXXX-XXXX-XXXX" className="input-cosmic flex-1 font-mono" />
+            <form method="POST" action="/api/portal/unlock" className="mt-4 flex gap-2">
+              <input type="hidden" name="kind" value="brand" />
+              <input type="hidden" name="slug" value={brand.slug ?? brand.id} />
+              <input name="key" required placeholder="CLSTR-XXXX-XXXX-XXXX" className="input-cosmic flex-1 font-mono" />
               <button className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">Unlock</button>
             </form>
-            {key && <p className="mt-2 text-xs text-rose-300">That key didn&apos;t match. Double-check it or reach out to your manager.</p>}
+            {unlock === "bad" && <p className="mt-2 text-xs text-rose-300">That key didn&apos;t match. Double-check it or reach out to your manager.</p>}
+            {unlock === "throttled" && <p className="mt-2 text-xs text-amber-300">Too many attempts. Wait a few minutes before trying again.</p>}
           </div>
 
           <div className="glass p-6">

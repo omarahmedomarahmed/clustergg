@@ -51,7 +51,11 @@ export type BandData = {
   votingOpen: boolean;
   closedReason: "announcement" | "frozen" | null;
   stream: { url: string | null; live: boolean };
-  result: { podium: { userId: string; slug: string; displayName: string; votes: number }[]; announcedAt: string | null } | null;
+  result: {
+    podium: { userId: string; slug: string; displayName: string; votes: number }[];
+    announcedAt: string | null;
+    trophy: { id: string; name: string; imageUrl: string; tier: string; value: number } | null;
+  } | null;
   takenAt: string;
   signedIn: boolean;
   me: { id: string; slug: string } | null;
@@ -160,7 +164,7 @@ export default function WeekBand({ initial }: { initial: BandData }) {
                 the winners being called is the event, the standings are context. */}
             {streaming && <Stream url={data.stream.url!} />}
 
-            {data.result && <Called result={data.result} />}
+            {data.result && <Called result={data.result} me={data.me} />}
 
             {podium.length > 0 && <Podium entries={podium} onOpen={setOpenSlug} data={data} note={note} setNote={setNote} onVoted={refresh} />}
 
@@ -278,7 +282,14 @@ function Countdown({ data, className = "" }: { data: BandData; className?: strin
 function Stream({ url }: { url: string }) {
   const embed = embedUrl(url);
   return (
-    <div className="mb-6 overflow-hidden rounded-2xl border border-rose-400/30" style={{ boxShadow: "0 30px 80px -50px #f43f5e" }}>
+    // Capped, not full-width. At 16:9 the full column is ~630px tall, and with
+    // the band expanded by default on every page that puts the leaderboard —
+    // and the page itself — below the fold on a laptop. The stream still leads;
+    // it just doesn't take the whole screen to do it.
+    <div
+      className="mx-auto mb-6 w-full overflow-hidden rounded-2xl border border-rose-400/30"
+      style={{ boxShadow: "0 30px 80px -50px #f43f5e", maxWidth: "calc(56vh * 16 / 9)" }}
+    >
       <div className="flex items-center gap-2 border-b border-rose-400/20 bg-rose-500/10 px-4 py-2.5">
         <span className="h-2 w-2 animate-pulse rounded-full bg-rose-400" />
         <span className="text-xs font-black uppercase tracking-widest text-rose-200">Announcing the winners</span>
@@ -335,22 +346,97 @@ function embedUrl(raw: string): string | null {
 
 // ===== Called result =====
 
-function Called({ result }: { result: NonNullable<BandData["result"]> }) {
+// The ceremony. This is the payoff of the whole week, so it is deliberately the
+// loudest thing on the page: the three names, the medals, the trophy they were
+// actually handed, and — if you are one of them — the way to cash it in. A
+// result that reads as a status line makes winning feel like a database row.
+function Called({ result, me }: { result: NonNullable<BandData["result"]>; me: BandData["me"] }) {
   if (!result.podium.length) return null;
+  const order = result.podium.length >= 3 ? [1, 0, 2] : result.podium.map((_, i) => i);
+  const mine = me ? result.podium.findIndex((p) => p.slug === me.slug) : -1;
+  const trophy = result.trophy;
+
   return (
-    <div className="mb-6 rounded-2xl border border-emerald-400/30 bg-emerald-500/[0.07] px-5 py-4">
-      <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-emerald-300">
-        <Icon name="check" size={12} /> Called
+    <div
+      className="mb-6 overflow-hidden rounded-3xl border border-amber-400/40"
+      style={{ background: "radial-gradient(120% 100% at 50% 0%, rgba(251,191,36,0.16), rgba(4,5,26,0) 62%)", boxShadow: "0 40px 110px -60px #fbbf24" }}
+    >
+      <div className="flex flex-wrap items-center gap-3 border-b border-amber-400/20 px-5 py-3">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-amber-300">
+          <Icon name="crown" size={13} /> Winners called
+        </span>
+        <span className="text-xs text-muted">
+          {result.announcedAt
+            ? new Date(result.announcedAt).toLocaleString(undefined, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+            : "this week"}
+        </span>
+        {trophy && (
+          <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-[11px] font-bold text-amber-100">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            {trophy.imageUrl
+              ? <img src={trophy.imageUrl} alt="" className="h-5 w-5 rounded object-contain" />
+              : <Icon name="trophy" size={13} />}
+            {trophy.name}
+            {trophy.value > 0 && <span className="text-amber-300">${nf(trophy.value)}</span>}
+            <span className="text-muted">· awarded to all three</span>
+          </span>
+        )}
       </div>
-      <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2">
-        {result.podium.map((p, i) => (
-          <Link key={p.userId} href={`/u/${p.slug}`} className="flex items-center gap-2 hover:underline">
-            <span className="grid h-6 w-6 place-items-center rounded-full text-[11px] font-black text-[#04051a]" style={{ background: MEDAL[i] ?? "#94a3b8" }}>{i + 1}</span>
-            <span className="font-bold">{p.displayName}</span>
-            <span className="text-xs text-muted">{nf(p.votes)} votes</span>
+
+      <div className={`grid items-end gap-3 px-5 py-5 ${COLS[Math.min(result.podium.length, 3)] ?? COLS[3]}`}>
+        {order.map((pos) => {
+          const p = result.podium[pos];
+          if (!p) return null;
+          const medal = MEDAL[pos] ?? "#94a3b8";
+          const first = pos === 0;
+          return (
+            <Link
+              key={p.userId}
+              href={`/u/${p.slug}`}
+              className={`group relative flex flex-col items-center gap-2 rounded-2xl border px-4 text-center transition hover:-translate-y-0.5 ${first ? "py-7" : "py-5"}`}
+              style={{
+                borderColor: first ? medal : `${medal}55`,
+                background: `linear-gradient(180deg, ${medal}1f, rgba(4,5,26,0.5))`,
+                boxShadow: first ? `0 0 0 1px ${medal}66, 0 30px 70px -50px ${medal}` : undefined,
+              }}
+            >
+              <span
+                className={`grid place-items-center rounded-full ${first ? "h-14 w-14" : "h-11 w-11"}`}
+                style={{ background: `${medal}22`, border: `2px solid ${medal}`, boxShadow: `0 0 30px -6px ${medal}` }}
+              >
+                <Icon name={first ? "crown" : pos === 1 ? "medal" : "trophy"} size={first ? 26 : 20} style={{ color: medal }} />
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-widest" style={{ color: medal }}>
+                {PLACE_LABEL[pos] ?? `#${pos + 1}`}
+              </span>
+              <span className={`font-black leading-tight ${first ? "text-xl" : "text-base"}`}>{p.displayName}</span>
+              <span className="text-xs text-muted">{nf(p.votes)} votes</span>
+              {trophy && (
+                <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-amber-200">
+                  <Icon name="trophy" size={10} /> trophy awarded
+                </span>
+              )}
+            </Link>
+          );
+        })}
+      </div>
+
+      {/* Winning and being told to go and find your prize are two different
+          experiences. If this is you, the next step is one tap away. */}
+      {mine >= 0 && (
+        <div className="flex flex-wrap items-center gap-3 border-t border-amber-400/20 bg-amber-500/[0.06] px-5 py-3.5">
+          <span className="text-sm font-bold text-amber-100">
+            You finished {mine === 0 ? "first" : mine === 1 ? "second" : "third"}
+            {trophy ? ` — the ${trophy.name} is in your trophy case.` : "."}
+          </span>
+          <Link
+            href={`/u/${me?.slug ?? ""}#trophies`}
+            className="pressable ml-auto inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-black text-[#04051a] hover:bg-amber-300"
+          >
+            <Icon name="trophy" size={14} /> {trophy ? "Redeem your trophy" : "Open your trophy case"}
           </Link>
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -371,7 +457,7 @@ function Podium({ entries, data, onOpen, note, setNote, onVoted }: {
 }) {
   const order = entries.length >= 3 ? [1, 0, 2] : entries.map((_, i) => i);
   return (
-    <div className="mb-5 grid items-end gap-3 sm:grid-cols-[1fr_1.24fr_1fr]">
+    <div className={`mb-5 grid items-end gap-3 ${COLS[Math.min(entries.length, 3)] ?? COLS[3]}`}>
       {order.map((pos) => {
         const e = entries[pos];
         if (!e) return null;
@@ -393,6 +479,16 @@ function Podium({ entries, data, onOpen, note, setNote, onVoted }: {
 }
 
 const PLACE_LABEL = ["Profile of the Week", "Second", "Third"];
+
+// A podium that isn't full yet centres rather than hugging the left column —
+// early in a week there is often only one name on it, and a lone card pinned to
+// the left reads as a broken grid rather than as a leader.
+const COLS: Record<number, string> = {
+  0: "",
+  1: "sm:mx-auto sm:max-w-sm",
+  2: "sm:mx-auto sm:max-w-2xl sm:grid-cols-2",
+  3: "sm:grid-cols-[1fr_1.24fr_1fr]",
+};
 
 function PodiumCard({ entry: e, place, data, onOpen, note, setNote, onVoted }: {
   entry: BandEntry;

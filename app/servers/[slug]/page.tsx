@@ -1,11 +1,12 @@
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getServerBySlugOrId, portalData, serverBoard, serverCommandFeed, TIERS } from "@/lib/server-portal";
-import { unlockPortal, hasPortalSession } from "@/lib/portal-auth";
+import { hasPortalSession } from "@/lib/portal-auth";
 import { challengesForGuild } from "@/lib/challenges";
 import { listRequests } from "@/lib/challenge-requests";
 import Tabs from "@/components/Tabs";
 import Icon from "@/components/Icon";
+import PortalKeyHandoff from "@/components/PortalKeyHandoff";
 import { ServerBoard, TierLadder, FunnelPanel, ChallengeRow, CommandFeed } from "@/components/ServerPortal";
 
 export const dynamic = "force-dynamic";
@@ -27,26 +28,35 @@ export default async function ServerPortalPage({
   params, searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ key?: string }>;
+  searchParams: Promise<{ key?: string; unlock?: string }>;
 }) {
   const { slug } = await params;
-  const { key = "" } = await searchParams;
+  const { key = "", unlock = "" } = await searchParams;
 
   const server = await getServerBySlugOrId(slug);
   if (!server) notFound();
 
-  // The key is exchanged for an httpOnly session and then dropped from the URL.
-  // Leaving it in the query string would leak it into browser history, server
-  // logs and the Referer header of every outbound link on this page.
-  const unlocked = await unlockPortal("server", server.guildId, server.portalKey, key);
-  if (key && unlocked) redirect(`/servers/${server.slug ?? server.guildId}`);
+  // A shared `?key=` link hands off to the unlock handler rather than doing the
+  // exchange here. Setting a cookie during a Server Component render throws in
+  // Next, so this page used to crash on a CORRECT key while a wrong one showed
+  // the locked view — the failure only appeared on success. The handler sets
+  // the session and sends the reader back here with no key in the URL, which is
+  // also what keeps it out of browser history, logs and the Referer of every
+  // outbound link on the page.
+  // Hand a shared `?key=` link to the unlock route with a real form
+  // submission. The page can't do the exchange itself (a Server Component
+  // render may not write cookies) and can't `redirect()` there either — App
+  // Router redirects go through the client router, which doesn't reliably
+  // follow a route handler's 307.
+  if (key) return <PortalKeyHandoff kind="server" slug={server.slug ?? server.guildId} portalKey={key} />;
+  const unlocked = await hasPortalSession("server", server.guildId);
 
   const data = await portalData(server);
   if (!data) notFound();
 
   const base = `/servers/${server.slug ?? server.guildId}`;
 
-  if (!unlocked) return <PublicView server={server} data={data} base={base} />;
+  if (!unlocked) return <PublicView server={server} data={data} base={base} unlock={unlock} />;
 
   const [challenges, requests, board, feed] = await Promise.all([
     challengesForGuild(server.guildId),
@@ -193,10 +203,11 @@ export default async function ServerPortalPage({
 
 // ===== Locked / public =====
 
-async function PublicView({ server, data, base }: {
+async function PublicView({ server, data, base, unlock }: {
   server: Awaited<ReturnType<typeof getServerBySlugOrId>> & object;
   data: NonNullable<Awaited<ReturnType<typeof portalData>>>;
   base: string;
+  unlock?: string;
 }) {
   const challenges = await challengesForGuild(server.guildId);
   const live = challenges.filter((c) => c.status === "active");
@@ -250,7 +261,11 @@ async function PublicView({ server, data, base }: {
             Enter the portal key we DM&apos;d you when you added ClusterBot. It unlocks your growth
             numbers, your challenges, and what your members do with the bot.
           </p>
-          <form method="GET" action={base} className="flex flex-wrap gap-2">
+          {/* POSTs to the handler, so the key never enters a URL at all — not
+              the address bar, not history, not a server log. */}
+          <form method="POST" action="/api/portal/unlock" className="flex flex-wrap gap-2">
+            <input type="hidden" name="kind" value="server" />
+            <input type="hidden" name="slug" value={server.slug ?? server.guildId} />
             <input
               name="key" required autoComplete="off" spellCheck={false}
               placeholder="Portal key"
@@ -258,6 +273,17 @@ async function PublicView({ server, data, base }: {
             />
             <button className="grad-btn pressable rounded-full px-6 py-2.5 font-bold">Unlock</button>
           </form>
+          {unlock === "bad" && (
+            <p className="text-xs text-rose-300 mt-2">
+              That key didn&apos;t match. Check for a missing dash, or run <code className="text-cyan-300">/cluster admin</code> in
+              your server and the bot will DM it again.
+            </p>
+          )}
+          {unlock === "throttled" && (
+            <p className="text-xs text-amber-300 mt-2">
+              Too many attempts. Wait a few minutes and try again — this protects your portal from being guessed at.
+            </p>
+          )}
           {alreadyIn && <p className="text-xs text-emerald-300 mt-2">You&apos;re signed in to this portal.</p>}
           <p className="text-[11px] text-muted mt-3">
             Lost it? Run <code className="text-cyan-300">/cluster server</code> in your Discord server and the bot will DM it again.

@@ -112,6 +112,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     icon: "trophy",
     blurb: "Challenges, quests, boards and the trophies they pay out.",
     items: [
+      { href: "/admin/profile-week", label: "Profile of the Week", desc: "The weekly vote: standings, adjustments, disqualifications, the Sunday stream and the podium." },
       { href: "/admin/challenges", label: "Challenges", desc: "Build, gate, pause and end every challenge.", metric: "challenges" },
       { href: "/admin/quests", label: "Quests", desc: "Tiers, thresholds, maps and Cluster Point rewards.", metric: "quests" },
       { href: "/admin/leaderboards", label: "Leaderboards", desc: "Every board on every game — a game can run several.", metric: "leaderboards" },
