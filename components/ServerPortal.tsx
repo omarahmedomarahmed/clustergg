@@ -1,11 +1,12 @@
 import Link from "next/link";
+import Icon from "@/components/Icon";
 
 // Panels for the server-owner portal. Server components — nothing here needs
 // interactivity, and keeping them server-rendered means the owner's numbers
 // never round-trip through the client.
 
 export function TierLadder({ tiers, linked, current }: {
-  tiers: { key: string; name: string; threshold: number; badge: string; unlocks: string; detail: string }[];
+  tiers: { key: string; name: string; threshold: number; icon: string; unlocks: string; detail: string }[];
   linked: number;
   current: string;
 }) {
@@ -34,7 +35,7 @@ export function TierLadder({ tiers, linked, current }: {
             >
               <div className="flex items-baseline justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <span className="text-xl">{t.badge}</span>
+                  <Icon name={t.icon} size={20} className="text-amber-200" />
                   <span className="font-bold">{t.name}</span>
                   {isCurrent && (
                     <span className="rounded-full border border-amber-400/50 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-widest text-amber-200">
@@ -180,7 +181,7 @@ export function CommandFeed({ rows }: {
 // Every server, ranked by gamers brought to Cluster. An owner should be able to
 // see exactly where they stand — and click through to anyone above them.
 export function ServerBoard({ rows, highlight }: {
-  rows: { guildId: string; slug: string | null; name: string; iconUrl: string | null; linked: number; challenges: number; tier: string; badge: string; rank: number }[];
+  rows: { guildId: string; slug: string | null; name: string; iconUrl: string | null; linked: number; challenges: number; tier: string; icon: string; rank: number }[];
   highlight?: string;
 }) {
   return (
@@ -212,7 +213,7 @@ export function ServerBoard({ rows, highlight }: {
                     : <span className="font-semibold truncate">{r.name}</span>}
                 </div>
               </td>
-              <td className="px-4 py-3 whitespace-nowrap"><span className="mr-1">{r.badge}</span>{r.tier}</td>
+              <td className="px-4 py-3 whitespace-nowrap"><Icon name={r.icon} size={13} className="mr-1.5 text-amber-200" />{r.tier}</td>
               <td className="px-4 py-3 font-bold text-cyan-300">{r.linked.toLocaleString()}</td>
               <td className="px-4 py-3">{r.challenges.toLocaleString()}</td>
             </tr>

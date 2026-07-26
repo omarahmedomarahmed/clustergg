@@ -75,7 +75,7 @@ export default async function AdminPlanetsPage() {
                 {s.game ? <GameLogo logoUrl={logoByGame.get(s.game) ?? null} name={s.name} size={38} rounded="rounded-lg" /> : <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-rose-400/30"><Icon name="planet" size={16} className="text-rose-300" /></span>}
                 <div className="min-w-0 flex-1">
                   <div className="font-bold text-sm">{s.name} {!s.isActive && <span className="text-xs text-rose-300">(hidden)</span>}</div>
-                  <div className="text-xs text-muted truncate">{s.game ? s.game : "⚠ legacy — not tied to a game"} · {s.memberCount} members · {s.postCount} posts</div>
+                  <div className="text-xs text-muted truncate">{s.game ? s.game : "legacy — not tied to a game"} · {s.memberCount} members · {s.postCount} posts</div>
                 </div>
                 <span className="text-xs text-cyan-300">Edit</span>
               </summary>

@@ -1,4 +1,5 @@
 import { isDemoMode } from "@/lib/db";
+import Icon from "@/components/Icon";
 import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default function AdminSettingsPage() {
       <h1 className="text-2xl font-bold mb-6">Platform settings</h1>
 
       <div className={`glass p-5 mb-8 ${isDemoMode ? "!border-amber-400/40" : "!border-emerald-400/40"}`}>
-        <div className="font-bold">{isDemoMode ? "⚠ Demo mode" : "✓ Production database connected"}</div>
+        <div className="font-bold"><span className="inline-flex items-center gap-1.5"><Icon name={isDemoMode ? "alert" : "check"} size={14} />{isDemoMode ? "Demo mode" : "Production database connected"}</span></div>
         <p className="text-sm text-muted mt-1">
           {isDemoMode
             ? "Running on in-memory PGlite with seeded demo data. Everything works, but state resets on cold start. Set DATABASE_URL to a Neon connection string, redeploy, then POST /api/setup once to migrate + seed."

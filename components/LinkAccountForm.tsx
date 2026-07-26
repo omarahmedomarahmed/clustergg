@@ -78,7 +78,7 @@ export default function LinkAccountForm({
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold truncate">{p.name}</span>
                   <span className={`block text-[10px] uppercase tracking-wider ${isLinked ? "text-emerald-300" : p.oauth ? "text-cyan-300" : p.live ? "text-emerald-300" : "text-amber-300/80"}`}>
-                    {isLinked ? "✓ Linked" : p.oauth ? "OAuth" : p.live ? "Live" : "Needs key"}
+                    {isLinked ? <><Icon name="check" size={11} className="inline mr-0.5" />Linked</> : p.oauth ? "OAuth" : p.live ? "Live" : "Needs key"}
                   </span>
                 </span>
               </span>

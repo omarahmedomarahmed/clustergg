@@ -134,7 +134,7 @@ export function GtmStages({ stages, accent, accent2 }: {
             >
               <div className="flex items-center gap-2.5">
                 <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-[11px] font-black" style={{ background: `${c}2b`, color: c }}>
-                  {s.status === "done" ? "✓" : i + 1}
+                  {s.status === "done" ? <Icon name="check" size={12} /> : i + 1}
                 </span>
                 <span className="text-[10px] uppercase tracking-widest" style={{ color: c }}>
                   {s.status === "done" ? "Done" : s.status === "current" ? "Now" : "Next"}

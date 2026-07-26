@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Icon from "@/components/Icon";
 import { useRouter } from "next/navigation";
 import { setLocale } from "@/app/actions/prefs";
 import { LOCALES, localeMeta, type Locale } from "@/lib/i18n/locale";
@@ -49,7 +50,7 @@ export default function LocaleToggle({ current }: { current: Locale; compact?: b
               className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-violet-500/15 ${l.code === current ? "text-cyan-300" : "text-ink"}`}>
               <span className="text-base leading-none" aria-hidden>{l.flag}</span>
               <span className="flex-1">{l.native}</span>
-              {l.code === current && <span className="text-cyan-300">✓</span>}
+              {l.code === current && <span className="text-cyan-300"><Icon name="check" size={12} /></span>}
             </button>
           ))}
         </div>

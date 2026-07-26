@@ -31,7 +31,7 @@ export default function BrandAppearanceEditor({ brandId, keyStr, initial }: { br
   const save = () => start(async () => {
     const fd = new FormData();
     fd.set("logoUrl", vals.logoUrl); fd.set("coverUrl", vals.coverUrl); fd.set("portalBgUrl", vals.portalBgUrl);
-    try { await portalSaveAppearance(brandId, keyStr, fd); setMsg("Saved ✓ — reload to see it applied."); }
+    try { await portalSaveAppearance(brandId, keyStr, fd); setMsg("Saved — reload to see it applied."); }
     catch { setMsg("Couldn't save — check your access key."); }
   });
 

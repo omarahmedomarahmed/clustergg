@@ -112,7 +112,7 @@ export default function PlanetPinEditor({
           <button disabled={pending} className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white inline-flex items-center gap-1.5">
             <Icon name="planet" size={14} /> {pending ? "Saving…" : "Save pins"}
           </button>
-          {state?.ok && <span className="text-xs text-emerald-300">✓ {state.message}</span>}
+          {state?.ok && <span className="text-xs text-emerald-300"><Icon name="check" size={12} className="inline mr-1" />{state.message}</span>}
           {state?.error && <span className="text-xs text-rose-300">{state.error}</span>}
         </div>
       </div>

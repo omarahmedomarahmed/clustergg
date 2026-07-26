@@ -30,7 +30,7 @@ export default async function CreativeStudioPage() {
     ...challenges.map((c): StudioEntity => ({
       kind: "challenge", id: c.id, title: c.title, subtitle: c.game,
       cover: c.coverUrl || c.heroUrl || gameCover(c.game),
-      meta: [c.status === "active" ? "Live" : "Ended", c.endAt ? `ends ${whenLabel(c.endAt)}` : "", c.prize ? `🏆 ${c.prize}` : ""].filter(Boolean).join(" · "),
+      meta: [c.status === "active" ? "Live" : "Ended", c.endAt ? `ends ${whenLabel(c.endAt)}` : "", c.prize ? `${c.prize}` : ""].filter(Boolean).join(" · "),
     })),
     ...quests.map((q): StudioEntity => ({
       kind: "quest", id: q.key, title: q.name, subtitle: "Quest",

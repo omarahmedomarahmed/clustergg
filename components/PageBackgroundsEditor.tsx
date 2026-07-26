@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Icon from "@/components/Icon";
 import { savePageBackgrounds, type ActionState } from "@/app/actions/admin";
 import ImageUpload from "@/components/ImageUpload";
 import { PAGE_BG_PAGES } from "@/lib/page-bg";
@@ -26,7 +27,7 @@ export default function PageBackgroundsEditor({ current }: { current: Record<str
         <button disabled={pending} className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">
           {pending ? "Saving…" : "Save backgrounds"}
         </button>
-        {state?.ok && <span className="text-xs text-emerald-300">✓ {state.message}</span>}
+        {state?.ok && <span className="text-xs text-emerald-300"><Icon name="check" size={12} className="inline mr-1" />{state.message}</span>}
         {state?.error && <span className="text-xs text-rose-300">{state.error}</span>}
       </div>
     </form>

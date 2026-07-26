@@ -33,7 +33,7 @@ export default function AdminPasswordReset({ userId }: { userId: string }) {
         {pending ? "Setting…" : "Set password"}
       </button>
       {state?.error && <span className="text-xs text-rose-300 w-full">{state.error}</span>}
-      {state?.ok && <span className="text-xs text-emerald-300 w-full">✓ {state.message}</span>}
+      {state?.ok && <span className="text-xs text-emerald-300 w-full"><Icon name="check" size={12} className="inline mr-1" />{state.message}</span>}
     </form>
   );
 }

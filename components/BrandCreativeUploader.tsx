@@ -30,7 +30,7 @@ export default function BrandCreativeUploader({ brandId, keyStr, slot }: { brand
       fd.set("type", type);
       fd.set("clickUrl", clickUrl);
       const r = await portalUploadCreative(brandId, keyStr, fd);
-      setMsg(r?.error ?? "Saved ✓");
+      setMsg(r?.error ?? "Saved");
     });
   };
 

@@ -163,7 +163,7 @@ export async function markRedeemPaid(redeemId: string, formData: FormData) {
     .where(eq(schema.trophyRedeems.id, r.id));
   if (r.awardIds?.length) await db.update(schema.userTrophies).set({ status: "redeemed" }).where(inArray(schema.userTrophies.id, r.awardIds));
   await notify(db, r.userId,
-    "Trophy redeem paid 🎉",
+    "Trophy redeem paid",
     `Your $${Number(r.amount).toLocaleString()} ${r.currency} payout was sent${proofUrl ? " — the payment confirmation is attached to the request" : ""}. The redeemed trophies moved to your history.`,
     "/profile");
   revalidateTrophyPages();

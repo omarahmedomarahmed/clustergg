@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Icon from "@/components/Icon";
 import { requireAdmin } from "@/lib/auth";
 import { commandAnalytics, listGuilds } from "@/lib/discord/guilds";
 import { BotUsage } from "@/components/DiscordAnalytics";
@@ -83,7 +84,7 @@ export default async function BotAnalyticsPage({ searchParams }: {
           <>
             <span className="text-xs text-muted ml-2">Filtered to</span>
             <Link href={qs({ guild: "" })} className="rounded-full border border-violet-400/50 bg-violet-500/15 px-3 py-1 text-xs">
-              {guilds.find((g) => g.guildId === guild)?.name || guild} ✕
+              {guilds.find((g) => g.guildId === guild)?.name || guild} <Icon name="x" size={11} className="inline" />
             </Link>
           </>
         )}

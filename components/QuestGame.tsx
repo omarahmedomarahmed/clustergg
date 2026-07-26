@@ -423,7 +423,7 @@ export default function QuestGame({
               <div className="font-bold flex items-center gap-2" style={{ color: tiers[sel].color || quest.color }}>
                 {tiers[sel].name}
                 <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5" style={{ background: tiers[sel].earned ? "#10b98122" : "#ffffff10", color: tiers[sel].earned ? "#34d399" : "#94a3b8" }}>
-                  {tiers[sel].earned ? `✓ ${tr("Unlocked")}` : tr("Locked")}
+                  {tiers[sel].earned ? <><Icon name="check" size={12} className="inline mr-1" />{tr("Unlocked")}</> : tr("Locked")}
                 </span>
               </div>
               <button onClick={() => setSel(null)} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
@@ -480,7 +480,7 @@ export default function QuestGame({
                 {tiers.map((t) => (
                   <span key={t.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold"
                     style={{ borderColor: t.earned ? `${t.color || quest.color}88` : "rgba(255,255,255,0.12)", color: t.earned ? (t.color || quest.color) : "#8b8ba7" }}>
-                    {t.earned ? "✓" : "○"} {t.name} · {t.thresholdQp.toLocaleString()}
+                    <Icon name={t.earned ? "check" : "circle"} size={10} className="inline mr-1" />{t.name} · {t.thresholdQp.toLocaleString()}
                   </span>
                 ))}
               </div>
@@ -547,11 +547,11 @@ export default function QuestGame({
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold truncate">{tr(m.label)}</span>
                     <span className="block text-[10px] text-muted">
-                      {m.at ? `✓ ${tr("Done")} · ${fmt(m.at)}` : m.progress ? `${m.progress} · ${tr("keep going")}` : tr("Tap to go do it now")}
+                      {m.at ? <><Icon name="check" size={11} className="inline mr-1" />{tr("Done")} · {fmt(m.at)}</> : m.progress ? `${m.progress} · ${tr("keep going")}` : tr("Tap to go do it now")}
                     </span>
                   </span>
                   {m.at
-                    ? <span className="text-emerald-300 font-black">✓</span>
+                    ? <span className="text-emerald-300"><Icon name="check" size={13} /></span>
                     : m.progress
                       ? <span className="text-[10px] font-black text-rose-300">{m.progress}</span>
                       : <span className="relative flex h-2.5 w-2.5"><span className="absolute inline-flex h-full w-full rounded-full bg-rose-400 animate-ping opacity-75" /><span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-rose-500" /></span>}

@@ -33,7 +33,7 @@ export default function AdminCreativeSlot({ campaignId, slot, liveUrl }: { campa
       const fd = new FormData();
       fd.set("placementId", slot.placementId); fd.set("fileUrl", fileUrl); fd.set("type", type); fd.set("clickUrl", clickUrl);
       const r = await adminUploadCreativeToPlacement(campaignId, fd);
-      setMsg(r?.error ?? "Saved ✓");
+      setMsg(r?.error ?? "Saved");
     });
   };
   const onFile = async (file: File) => {
@@ -62,7 +62,7 @@ export default function AdminCreativeSlot({ campaignId, slot, liveUrl }: { campa
         </button>
         {filled && <button onClick={() => setPreview(true)} title="Open full size" className="text-muted hover:text-cyan-300"><Icon name="eye" size={14} /></button>}
         {liveUrl && <Link href={liveUrl} target="_blank" title="Open the live placement" className="text-muted hover:text-cyan-300"><Icon name="link" size={13} /></Link>}
-        <span className={`text-[10px] font-bold ${filled ? "text-emerald-300" : "text-amber-300"}`}>{filled ? "✓" : "todo"}</span>
+        <span className={`text-[10px] font-bold ${filled ? "text-emerald-300" : "text-amber-300"}`}>{filled ? <Icon name="check" size={11} /> : "todo"}</span>
         <button onClick={() => setOpen((v) => !v)} className="text-muted"><Icon name={open ? "chevronDown" : "chevronRight"} size={13} /></button>
       </div>
 

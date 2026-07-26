@@ -29,7 +29,7 @@ export default function CountriesEditor({ initial }: { initial: Country[] }) {
       <div className="grid sm:grid-cols-2 gap-2 max-h-[46vh] overflow-y-auto pr-1">
         {rows.map((r, i) => (
           <div key={i} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 p-1.5">
-            <span className="text-xl w-7 text-center">{flagEmoji(r.code) || "🏳️"}</span>
+            <span className="text-xl w-7 text-center">{flagEmoji(r.code) || <Icon name="globe" size={16} className="text-muted" />}</span>
             <input value={r.code} onChange={(e) => set(i, { code: e.target.value.toUpperCase().slice(0, 2) })} placeholder="US" className="input-cosmic !py-1 !w-16 text-sm uppercase text-center" />
             <input value={r.name} onChange={(e) => set(i, { name: e.target.value })} placeholder="Country name" className="input-cosmic !py-1 flex-1 text-sm" />
             <button onClick={() => remove(i)} className="text-rose-300 hover:text-rose-200 shrink-0"><Icon name="x" size={14} /></button>
@@ -39,7 +39,7 @@ export default function CountriesEditor({ initial }: { initial: Country[] }) {
       <div className="mt-4 flex items-center gap-3">
         <button onClick={add} className="ghost-btn pressable rounded-full px-4 py-1.5 text-xs inline-flex items-center gap-1"><Icon name="plus" size={12} /> Add country</button>
         <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-6 py-1.5 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Saving…" : "Save roster"}</button>
-        {saved && !pending && <span className="text-xs text-emerald-300">Saved ✓</span>}
+        {saved && !pending && <span className="text-xs text-emerald-300">Saved</span>}
         <span className="text-[11px] text-muted ml-auto">{rows.length} countries</span>
       </div>
     </section>

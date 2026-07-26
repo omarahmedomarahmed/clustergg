@@ -20,7 +20,8 @@ export type Tier = {
   key: TierKey;
   name: string;
   threshold: number;
-  badge: string;
+  /** Icon name from components/Icon — never an emoji; the site renders SVG. */
+  icon: string;
   unlocks: string;
   detail: string;
 };
@@ -30,7 +31,7 @@ export const TIERS: Tier[] = [
     key: "seed",
     name: "Seed Server",
     threshold: 0,
-    badge: "🌱",
+    icon: "spark",
     unlocks: "Private challenges for your community",
     detail: "Request challenges, run them for your members, and appear on Cluster with your own logo and invite.",
   },
@@ -38,7 +39,7 @@ export const TIERS: Tier[] = [
     key: "monetized",
     name: "Monetized Server",
     threshold: 500,
-    badge: "💠",
+    icon: "diamond",
     unlocks: "Ad revenue share",
     detail: "You earn a share of what Cluster makes from ads shown to your community.",
   },
@@ -46,7 +47,7 @@ export const TIERS: Tier[] = [
     key: "broadcaster",
     name: "Broadcaster",
     threshold: 1000,
-    badge: "📡",
+    icon: "satellite",
     unlocks: "Carry other servers' challenges",
     detail: "Public challenges and other servers' competitions can run in your server — and you're paid to carry them.",
   },
@@ -54,7 +55,7 @@ export const TIERS: Tier[] = [
     key: "sponsored",
     name: "Sponsored Server",
     threshold: 5000,
-    badge: "👑",
+    icon: "crown",
     unlocks: "Brand-sponsored challenges, 100% of the fee",
     detail:
       "Brands sponsor challenges directly in your server and you keep the whole fee. "
@@ -74,10 +75,10 @@ export function tierFor(linked: number): { current: Tier; next: Tier | null; pro
   return { current, next, progressPct: Math.max(0, Math.min(100, Math.floor((done / span) * 100))) };
 }
 
-export function badgesFor(linked: number, challengesRun: number): { badge: string; name: string; earned: boolean }[] {
-  const out = TIERS.map((t) => ({ badge: t.badge, name: t.name, earned: linked >= t.threshold }));
-  out.push({ badge: "🏆", name: "First Challenge", earned: challengesRun >= 1 });
-  out.push({ badge: "🔥", name: "Five Challenges", earned: challengesRun >= 5 });
+export function badgesFor(linked: number, challengesRun: number): { icon: string; name: string; earned: boolean }[] {
+  const out = TIERS.map((t) => ({ icon: t.icon, name: t.name, earned: linked >= t.threshold }));
+  out.push({ icon: "trophy", name: "First Challenge", earned: challengesRun >= 1 });
+  out.push({ icon: "flame", name: "Five Challenges", earned: challengesRun >= 5 });
   return out;
 }
 

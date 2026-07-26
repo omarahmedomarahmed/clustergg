@@ -88,7 +88,7 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
             <div className="font-bold text-sm flex items-center gap-2" style={{ color: q.tiers[sel].color || q.color }}>
               {q.tiers[sel].name}
               <span className="text-[9px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5" style={{ background: q.tiers[sel].earned ? "#10b98122" : "#ffffff10", color: q.tiers[sel].earned ? "#34d399" : "#94a3b8" }}>
-                {q.tiers[sel].earned ? tr("✓ Unlocked") : tr("How to reach")}
+                {q.tiers[sel].earned ? <><Icon name="check" size={12} className="inline mr-1" />{tr("Unlocked")}</> : tr("How to reach")}
               </span>
             </div>
             <button onClick={(e) => { stop(e); setSel(null); }} className="text-muted hover:text-ink"><Icon name="x" size={13} /></button>
@@ -118,7 +118,7 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
         </div>
         {tab === "progress" ? (
           <div className="text-[11px] text-muted">
-            {done ? <span style={{ color: q.color }}>{tr("★ Max tier reached — legend status.")}</span>
+            {done ? <span style={{ color: q.color }}><><Icon name="star" size={12} className="inline mr-1" />{tr("Max tier reached — legend status.")}</></span>
               : <>{into.toLocaleString()} / {span.toLocaleString()} {tr("CP to")} <b style={{ color: q.color }}>{q.nextTier!.name}</b></>}
           </div>
         ) : (

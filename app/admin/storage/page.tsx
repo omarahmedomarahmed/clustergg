@@ -15,7 +15,7 @@ export const maxDuration = 60;
 export const metadata = { title: "Admin · Image storage" };
 
 const CAT_META: Record<ImageCategory, { label: string; cls: string; note: string }> = {
-  "vercel-blob": { label: "Vercel Blob", cls: "text-emerald-300 border-emerald-400/30 bg-emerald-500/10", note: "✓ served from our own storage" },
+  "vercel-blob": { label: "Vercel Blob", cls: "text-emerald-300 border-emerald-400/30 bg-emerald-500/10", note: "served from our own storage" },
   "higgsfield": { label: "Higgsfield / CDN", cls: "text-amber-300 border-amber-400/30 bg-amber-500/10", note: "should be re-hosted to Blob" },
   "inline-dataurl": { label: "Inline data-URL", cls: "text-rose-300 border-rose-400/30 bg-rose-500/10", note: "stored IN the database — bloats Neon" },
   "external": { label: "External", cls: "text-sky-300 border-sky-400/30 bg-sky-500/10", note: "hosted elsewhere (e.g. Discord)" },

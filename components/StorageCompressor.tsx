@@ -179,8 +179,8 @@ export default function StorageCompressor({ rows }: { rows: CompRow[] }) {
                 <div className="truncate font-medium">{r.label} <span className="text-muted font-normal">· {r.table}/{r.field}</span></div>
                 <div className="text-[11px] text-muted">{kb(r.size)} · {r.cat}{k !== "image" ? ` · ${k}` : ""}</div>
               </div>
-              {st?.state === "done" ? <span className="text-[11px] text-emerald-300 shrink-0">✓ {st.msg}</span>
-                : st?.state === "err" ? <span className="text-[11px] text-rose-300 shrink-0 max-w-[140px] truncate" title={st.msg}>✗ {st.msg}</span>
+              {st?.state === "done" ? <span className="text-[11px] text-emerald-300 shrink-0 inline-flex items-center gap-1"><Icon name="check" size={11} />{st.msg}</span>
+                : st?.state === "err" ? <span className="text-[11px] text-rose-300 shrink-0 max-w-[140px] truncate" title={st.msg}><Icon name="x" size={11} className="inline mr-1" />{st.msg}</span>
                 : st?.state === "work" ? <span className="text-[11px] text-cyan-300 shrink-0">…</span> : null}
               <div className="flex items-center gap-1.5 shrink-0">
                 {k === "image" && st?.state !== "done" && <button onClick={() => compressOne(r)} disabled={running} className="ghost-btn rounded-full px-2.5 py-1 text-[11px]">Compress</button>}

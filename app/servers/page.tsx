@@ -64,7 +64,7 @@ export default async function ServersDirectoryPage() {
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={s.iconUrl} alt="" className="h-14 w-14 rounded-xl object-cover shrink-0" />
                     ) : (
-                      <div className="h-14 w-14 rounded-xl grid place-items-center bg-violet-500/20 text-2xl shrink-0">🛰</div>
+                      <div className="h-14 w-14 rounded-xl grid place-items-center bg-violet-500/20 text-2xl shrink-0"><Icon name="satellite" size={20} className="text-violet-200" /></div>
                     )}
                     <div className="min-w-0">
                       <div className="font-bold truncate">{s.name}</div>
@@ -73,7 +73,7 @@ export default async function ServersDirectoryPage() {
                   </div>
 
                   <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-100 self-start">
-                    <span>{tier.badge}</span>{tier.name}
+                    <Icon name={tier.icon} size={12} />{tier.name}
                   </div>
 
                   <div className="flex gap-4 text-xs text-muted mt-3">

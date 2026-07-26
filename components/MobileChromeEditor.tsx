@@ -82,7 +82,7 @@ export default function MobileChromeEditor({ initialBottom, initialDrawer }: { i
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-8 py-2.5 font-semibold text-white disabled:opacity-60">
-          {pending ? "Saving…" : saved ? "Saved ✓" : "Save mobile chrome"}
+          {pending ? "Saving…" : saved ? "Saved" : "Save mobile chrome"}
         </button>
         <button onClick={() => { setBottom(defaultBottomTabs(true)); setDrawer([]); }} className="ghost-btn rounded-full px-5 py-2.5 text-sm">Reset to defaults</button>
       </div>

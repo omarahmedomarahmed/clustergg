@@ -86,7 +86,7 @@ export function DiscordSection({ stats, servers, copy }: {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={s.iconUrl} alt="" className="h-12 w-12 rounded-xl object-cover mx-auto" />
                   ) : (
-                    <div className="h-12 w-12 rounded-xl grid place-items-center bg-violet-500/20 text-xl mx-auto">🛰</div>
+                    <div className="h-12 w-12 rounded-xl grid place-items-center bg-violet-500/20 text-xl mx-auto"><Icon name="satellite" size={20} className="text-violet-200" /></div>
                   )}
                   <div className="font-semibold text-sm mt-2 truncate">{s.name}</div>
                   <div className="text-[11px] text-muted">{nf(s.memberCount)} members</div>

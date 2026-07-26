@@ -205,7 +205,7 @@ function Body({ section, doc, live, people, steps, installUrl }: {
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={s.iconUrl} alt="" className="h-12 w-12 rounded-xl object-cover mx-auto" />
                   ) : (
-                    <div className="h-12 w-12 rounded-xl grid place-items-center mx-auto text-xl" style={{ background: `${accent}26` }}>🛰</div>
+                    <div className="h-12 w-12 rounded-xl grid place-items-center mx-auto text-xl" style={{ background: `${accent}26` }}><Icon name="satellite" size={20} className="text-violet-200" /></div>
                   )}
                   <div className="font-semibold text-xs mt-2 truncate">{s.name}</div>
                   <div className="text-[10px] text-muted">{nf(s.memberCount)} members</div>
@@ -224,7 +224,7 @@ function Body({ section, doc, live, people, steps, installUrl }: {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {live.tiers.map((t) => (
               <div key={t.key} className="glass rounded-2xl p-5">
-                <div className="text-3xl">{t.badge}</div>
+                <Icon name={t.icon} size={28} style={{ color: accent2 }} />
                 <div className="font-bold mt-2">{t.name}</div>
                 <div className="text-xs mt-0.5" style={{ color: accent2 }}>
                   {t.threshold === 0 ? "From day one" : `${nf(t.threshold)}+ verified members`}

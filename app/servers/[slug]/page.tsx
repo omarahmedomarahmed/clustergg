@@ -82,7 +82,7 @@ export default async function ServerPortalPage({
                               : "border-white/10 text-muted opacity-50"
                           }`}
                         >
-                          <span className="text-base">{b.badge}</span>{b.name}
+                          <Icon name={b.icon} size={14} />{b.name}
                         </span>
                       ))}
                     </div>
@@ -179,7 +179,7 @@ export default async function ServerPortalPage({
                 rows={board.map((b) => ({
                   guildId: b.guildId, slug: b.slug, name: b.name, iconUrl: b.iconUrl,
                   linked: b.linked, challenges: b.challenges,
-                  tier: b.tier.name, badge: b.tier.badge, rank: b.rank,
+                  tier: b.tier.name, icon: b.tier.icon, rank: b.rank,
                 }))}
                 highlight={server.guildId}
               />
@@ -212,7 +212,7 @@ async function PublicView({ server, data, base }: {
           <div className="flex flex-wrap gap-2">
             {data.badges.filter((b) => b.earned).map((b) => (
               <span key={b.name} className="inline-flex items-center gap-2 rounded-full border border-amber-400/50 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-100">
-                <span className="text-base">{b.badge}</span>{b.name}
+                <Icon name={b.icon} size={14} />{b.name}
               </span>
             ))}
             {data.badges.every((b) => !b.earned) && <span className="text-sm text-muted">No badges yet.</span>}
@@ -281,13 +281,13 @@ function PortalHeader({ server, data, publicView }: {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={server.iconUrl} alt="" className="h-20 w-20 rounded-2xl object-cover ring-2 ring-white/20" />
         ) : (
-          <div className="h-20 w-20 rounded-2xl grid place-items-center bg-violet-500/20 text-3xl">🛰</div>
+          <div className="h-20 w-20 rounded-2xl grid place-items-center bg-violet-500/20 text-3xl"><Icon name="satellite" size={20} className="text-violet-200" /></div>
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-3xl font-black">{server.name}</h1>
             <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/50 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-100">
-              <span>{data.tier.current.badge}</span>{data.tier.current.name}
+              <Icon name={data.tier.current.icon} size={13} />{data.tier.current.name}
             </span>
           </div>
           <p className="text-sm text-muted mt-1">

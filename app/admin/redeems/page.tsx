@@ -53,7 +53,7 @@ export default async function AdminRedeemsPage() {
 
       <div className="mt-2 text-xs text-muted">
         {r.method === "ach" ? "ACH transfer" : r.method === "wallet" ? "Mobile Wallet" : "InstaPay"} ···{payoutLast4(r.details)}
-        {r.gamerConfirmedAt && <span className="text-emerald-300 ml-2">✓ gamer confirmed {fmt(r.gamerConfirmedAt)}</span>}
+        {r.gamerConfirmedAt && <span className="text-emerald-300 ml-2 inline-flex items-center gap-1"><Icon name="check" size={11} />gamer confirmed {fmt(r.gamerConfirmedAt)}</span>}
       </div>
 
       {/* Full payout details on demand — reviewing before paying */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import Icon from "@/components/Icon";
 import { saveBranding, type ActionState } from "@/app/actions/admin";
 import ImageUpload from "@/components/ImageUpload";
 import BrandGlyph from "@/components/BrandGlyph";
@@ -326,7 +327,7 @@ export default function BrandingEditor({
         <button disabled={pending} className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">
           {pending ? "Saving…" : "Save branding"}
         </button>
-        {state?.ok && <span className="text-xs text-emerald-300">✓ {state.message}</span>}
+        {state?.ok && <span className="text-xs text-emerald-300"><Icon name="check" size={12} className="inline mr-1" />{state.message}</span>}
         {state?.error && <span className="text-xs text-rose-300">{state.error}</span>}
       </div>
     </form>

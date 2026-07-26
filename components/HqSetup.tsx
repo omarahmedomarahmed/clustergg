@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Icon from "@/components/Icon";
 import { saveHqServer, buildHqServer, type BotActionState } from "@/app/actions/discord";
 
 export type PlanRow = { category: string; name: string; kind: string; exists: boolean };
@@ -77,7 +78,7 @@ export function HqPlanTable({ rows, preview }: { rows: PlanRow[]; preview?: bool
         ) : (
           <div key={i} className="px-4 py-1.5 text-sm flex items-center justify-between gap-3 border-t border-white/5">
             <span className="text-muted truncate">
-              <span className="text-muted/60">{r.kind === "voice" ? "🔊 " : r.kind === "role" ? "@ " : "# "}</span>
+              <span className="text-muted/60">{r.kind === "voice" ? <Icon name="volume" size={11} className="inline" /> : r.kind === "role" ? "@" : "#"}{" "}</span>
               {r.name}
             </span>
             <Mark exists={r.exists} preview={preview} />

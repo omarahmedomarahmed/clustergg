@@ -55,7 +55,7 @@ export default function BrandChartBuilder({
     setMsg(null);
     const json = JSON.stringify({ widgets } satisfies BrandChartPrefs);
     const r = mode === "admin" ? await adminSaveBrandCharts(brandId, json) : await portalSaveCharts(brandId, keyStr ?? "", json);
-    setMsg(r && "error" in r && r.error ? r.error : "Saved ✓");
+    setMsg(r && "error" in r && r.error ? r.error : "Saved");
     if (!(r && "error" in r && r.error)) setEditing(false);
   });
   const reset = () => setWidgets(defaultBrandCharts().widgets);

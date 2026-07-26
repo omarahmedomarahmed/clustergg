@@ -184,7 +184,7 @@ export default function QuestMapHero({
               </span>
               <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-wide truncate w-full text-center" style={{ color: t.earned ? (t.color || q.color) : "#8b8ba7" }}>{t.name}</span>
               <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-muted"><CpIcon size={10} /> {t.thresholdQp.toLocaleString()}</span>
-              {t.earned && <span className="absolute top-1 right-1 text-emerald-300 text-[10px]">✓</span>}
+              {t.earned && <span className="absolute top-1 right-1 text-emerald-300"><Icon name="check" size={10} /></span>}
             </button>
           ))}
         </div>
@@ -305,7 +305,7 @@ export default function QuestMapHero({
                 <div className="font-bold flex items-center gap-2" style={{ color: tiers[sel].color || q.color }}>
                   {tiers[sel].name}
                   <span className="text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5" style={{ background: tiers[sel].earned ? "#10b98122" : "#ffffff10", color: tiers[sel].earned ? "#34d399" : "#94a3b8" }}>
-                    {tiers[sel].earned ? "✓ Unlocked" : "Locked"}
+                    {tiers[sel].earned ? <><Icon name="check" size={12} className="inline mr-1" />Unlocked</> : "Locked"}
                   </span>
                 </div>
                 <button onClick={() => setSel(null)} className="text-muted hover:text-ink"><Icon name="x" size={14} /></button>
@@ -330,7 +330,7 @@ export default function QuestMapHero({
           {tiers.map((t) => (
             <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
               style={{ borderColor: t.earned ? `${t.color || q.color}88` : "rgba(255,255,255,0.12)", color: t.earned ? (t.color || q.color) : "#8b8ba7", background: t.earned ? `${t.color || q.color}14` : "transparent" }}>
-              {t.earned ? "✓" : "○"} {t.name} · {t.thresholdQp.toLocaleString()} CP
+              <Icon name={t.earned ? "check" : "circle"} size={10} className="inline mr-1" />{t.name} · {t.thresholdQp.toLocaleString()} CP
             </span>
           ))}
         </div>

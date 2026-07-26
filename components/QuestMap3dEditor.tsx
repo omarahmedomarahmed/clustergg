@@ -61,7 +61,7 @@ export default function QuestMap3dEditor({
         {!cfg.autoRotate && slider("Model yaw°", "yaw", -180, 180, 1)}
         <div className="flex items-center gap-2 pt-1">
           <button onClick={save} disabled={pending} className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-60">
-            {pending ? "Saving…" : saved ? "Saved ✓" : "Save 3D mapping"}
+            {pending ? "Saving…" : saved ? "Saved" : "Save 3D mapping"}
           </button>
           <button onClick={() => setCfg({ ...DEFAULT_MAP_GLB_CFG })} className="ghost-btn rounded-full px-4 py-2 text-xs">Reset</button>
         </div>

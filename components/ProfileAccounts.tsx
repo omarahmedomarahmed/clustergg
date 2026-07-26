@@ -146,7 +146,7 @@ function AccountRow({ account: a, colors: c, active, onToggle }: { account: Acco
         )}
         <div className="min-w-0 flex-1">
           <div className="font-bold truncate flex items-center gap-1.5" style={{ color: c.text }}>
-            {a.tag} {a.verified && <span className="text-[11px]" style={{ color: c.accent2 }}>✓</span>}
+            {a.tag} {a.verified && <span className="text-[11px]" style={{ color: c.accent2 }}><Icon name="check" size={11} /></span>}
             {liveNow && <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/20 border border-rose-400/50 px-1.5 py-0.5 text-[9px] font-bold text-rose-200"><span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" /> LIVE</span>}
           </div>
           <div className="text-xs flex items-center gap-2" style={{ color: c.muted }}>
