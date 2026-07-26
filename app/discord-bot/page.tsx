@@ -9,6 +9,7 @@ import { TIERS } from "@/lib/server-portal";
 import BotShowcase from "@/components/BotShowcase";
 import BrandGlyph from "@/components/BrandGlyph";
 import Icon from "@/components/Icon";
+import { BotSchema, BotFaqSchema, BOT_FAQ } from "@/components/StructuredData";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -52,6 +53,9 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
 
   return (
     <div>
+      <BotSchema servers={network.servers} />
+      <BotFaqSchema threshold={threshold} gameCount={network.games} />
+
       <div className="mx-auto max-w-6xl px-4 pt-10">
         {installed === "1" && (
           <div className="glass p-5 mb-8 border border-emerald-400/30">
@@ -253,6 +257,23 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           </div>
         </section>
       )}
+
+      {/* ===== FAQ =====
+          On the page as well as in the structured data. Schema describing
+          content that isn't visible is both against Google's guidelines and a
+          lie to the reader — and these are the five things every owner asks
+          before installing anything. */}
+      <section className="mx-auto max-w-3xl px-4 pb-14">
+        <h2 className="text-2xl font-bold mb-5">Before you add it</h2>
+        <div className="space-y-3">
+          {BOT_FAQ.map(([q, a]) => (
+            <details key={q} className="glass rounded-2xl p-5">
+              <summary className="cursor-pointer font-semibold text-sm">{q}</summary>
+              <p className="text-sm text-muted mt-2.5 leading-relaxed">{a}</p>
+            </details>
+          ))}
+        </div>
+      </section>
 
       {/* ===== CLOSING CTA ===== */}
       <section className="mx-auto max-w-3xl px-4 pb-20 text-center">

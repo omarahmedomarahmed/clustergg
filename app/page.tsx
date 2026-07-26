@@ -23,6 +23,7 @@ import { DiscordSection } from "@/components/DiscordSection";
 import BotShowcase from "@/components/BotShowcase";
 import { botShowcaseSteps } from "@/lib/bot-showcase";
 import { installUrl } from "@/lib/discord/config";
+import { OrganizationSchema, WebSiteSchema, BotSchema } from "@/components/StructuredData";
 
 export const dynamic = "force-dynamic";
 
@@ -128,6 +129,14 @@ export default async function LandingPage() {
 
   return (
     <div className="overflow-x-clip">
+      {/* Machine-readable facts about what Cluster is. An assistant asked
+          "what's a good Discord bot for game stats" answers from what it can
+          read and reconcile — prose gets paraphrased, sometimes wrongly, and a
+          wrong claim about price or permissions is worse than no mention. */}
+      <OrganizationSchema />
+      <WebSiteSchema />
+      <BotSchema servers={network.servers} />
+
       {/* ===== INTERACTIVE HERO — planet globe ⇄ quest map toggle ===== */}
       {skinnedPlanets.length > 0 && (
         <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading={tr("The Cluster galaxy — pick a game")} quest={questHero} />
