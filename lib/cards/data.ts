@@ -5,7 +5,6 @@ import { getUserQuests, getTotalCp } from "@/lib/quests";
 import { levelFromCp } from "@/lib/level";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys } from "@/lib/card-bg";
-import { slimImg } from "@/lib/img";
 import type { CardData, CardTheme } from "@/lib/cards/types";
 
 // Server-side loaders that turn platform data into card payloads. Shared by the
@@ -51,7 +50,7 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     kind: "profile",
     displayName: user.displayName,
     slug: user.slug,
-    avatarUrl: slimImg(user.avatarUrl, 300000),
+    avatarUrl: user.avatarUrl,
     title: user.title,
     country: user.country,
     totalCp,
@@ -65,7 +64,7 @@ export async function profileCard(slug: string): Promise<CardData | null> {
       const s = stats.find((x) => x.linkedAccountId === a.id);
       return {
         game,
-        logoUrl: slimImg(logoByGame.get(game) ?? null, 300000),
+        logoUrl: logoByGame.get(game) ?? null,
         tag: a.inGameName,
         headline: s ? (s.rankLabel ?? `${s.metricKey.replace(/_/g, " ")}: ${s.metricValue}`) : game,
       };
@@ -84,6 +83,9 @@ export async function profileCard(slug: string): Promise<CardData | null> {
       // card is worth sharing. The renderer decodes and downscales this to the
       // 1200px the card uses, so size is its problem to solve, not ours.
       bgUrl: theme.bgImage || user.bannerUrl || bg.bgUrl,
+      // If their own upload can't be fetched (slow host, dead Blob URL), the
+      // card falls back down this list rather than rendering bare.
+      bgFallbacks: [user.bannerUrl, bg.bgUrl],
       dim: bg.dim,
     },
   };
@@ -115,9 +117,9 @@ export async function gameStatsCard(slug: string, game: string): Promise<CardDat
     kind: "game-stats",
     displayName: user.displayName,
     slug: user.slug,
-    avatarUrl: slimImg(user.avatarUrl, 300000),
+    avatarUrl: user.avatarUrl,
     game: p?.game ?? game,
-    logoUrl: slimImg(g?.logoUrl ?? null, 300000),
+    logoUrl: g?.logoUrl ?? null,
     tag: acc.inGameName,
     region: acc.region,
     stats: stats.slice(0, 6).map((s) => ({
@@ -129,7 +131,8 @@ export async function gameStatsCard(slug: string, game: string): Promise<CardDat
     theme: {
       accent: g?.accent || theme.accent || BRAND.accent,
       accent2: g?.accent2 || theme.accent2 || BRAND.accent2,
-      bgUrl: slimImg(g?.planetBgUrl ?? g?.coverUrl ?? null, 800000) || bg.bgUrl,
+      bgUrl: g?.planetBgUrl || g?.coverUrl || bg.bgUrl,
+      bgFallbacks: [g?.coverUrl, bg.bgUrl],
       dim: bg.dim,
     },
   };
@@ -147,7 +150,7 @@ async function richAccountBits(acc: typeof schema.linkedGameAccounts.$inferSelec
   const out: Awaited<ReturnType<typeof richAccountBits>> = {};
 
   const gameAvatar = typeof data.gameAvatar === "string" ? data.gameAvatar : null;
-  if (gameAvatar) out.gameAvatarUrl = slimImg(gameAvatar, 300000);
+  if (gameAvatar) out.gameAvatarUrl = gameAvatar;
 
   // League persists mastery at sync. Other providers can populate the same
   // shapes under `champions` / `matches` and this picks them up for free.
@@ -157,7 +160,7 @@ async function richAccountBits(acc: typeof schema.linkedGameAccounts.$inferSelec
       const o = c as Record<string, unknown>;
       return {
         name: String(o.name ?? o.champion ?? ""),
-        iconUrl: slimImg(typeof o.iconUrl === "string" ? o.iconUrl : null, 200000),
+        iconUrl: typeof o.iconUrl === "string" ? o.iconUrl : null,
         level: Number(o.level ?? 0) || undefined,
         points: Number(o.points ?? 0) || undefined,
       };
@@ -170,7 +173,7 @@ async function richAccountBits(acc: typeof schema.linkedGameAccounts.$inferSelec
       const o = m as Record<string, unknown>;
       return {
         champion: String(o.champion ?? ""),
-        iconUrl: slimImg(typeof o.championIconUrl === "string" ? o.championIconUrl : (typeof o.iconUrl === "string" ? o.iconUrl : null), 200000),
+        iconUrl: typeof o.championIconUrl === "string" ? o.championIconUrl : (typeof o.iconUrl === "string" ? o.iconUrl : null),
         win: !!o.win,
         kda: String(o.kda ?? `${o.kills ?? 0}/${o.deaths ?? 0}/${o.assists ?? 0}`),
         queue: typeof o.queue === "string" ? o.queue : null,
@@ -203,13 +206,13 @@ export async function questCard(slug: string | null, questKey: string): Promise<
     displayName: user?.displayName ?? null,
     questName: q.name,
     tagline: q.tagline,
-    logoUrl: slimImg(q.logoUrl, 300000),
+    logoUrl: q.logoUrl,
     cp: q.qp,
     nextThreshold: q.nextTier?.thresholdQp ?? null,
     currentTier: q.currentTierIndex >= 0 ? q.tiers[q.currentTierIndex].name : null,
     nextTier: q.nextTier?.name ?? null,
     tiers: q.tiers.map((t) => ({ name: t.name, threshold: t.thresholdQp, earned: t.earned })),
-    theme: { accent: q.color, accent2: q.accent2, bgUrl: slimImg(q.cardBgUrl ?? q.mapArtUrl, 800000) || bg.bgUrl, dim: bg.dim },
+    theme: { accent: q.color, accent2: q.accent2, bgUrl: q.cardBgUrl || q.mapArtUrl || bg.bgUrl, bgFallbacks: [q.mapArtUrl, bg.bgUrl], dim: bg.dim },
   };
 }
 
@@ -271,7 +274,7 @@ export async function planetCard(game: string): Promise<CardData | null> {
   return {
     kind: "planet",
     game: g.name,
-    logoUrl: slimImg(g.logoUrl, 300000),
+    logoUrl: g.logoUrl,
     description: g.description || null,
     challenges: challenges.length,
     ranked: ranked.length,
@@ -280,7 +283,8 @@ export async function planetCard(game: string): Promise<CardData | null> {
     theme: {
       accent: g.accent || BRAND.accent,
       accent2: g.accent2 || BRAND.accent2,
-      bgUrl: slimImg(g.planetBgUrl ?? g.coverUrl, 800000) || bg.bgUrl,
+      bgUrl: g.planetBgUrl || g.coverUrl || bg.bgUrl,
+      bgFallbacks: [g.coverUrl, bg.bgUrl],
       dim: bg.dim,
     },
   };
@@ -301,7 +305,7 @@ export async function planetsCard(): Promise<CardData | null> {
     subtitle: `${games.length} worlds · pick yours below`,
     games: games.slice(0, 12).map((g) => ({
       name: g.name,
-      logoUrl: slimImg(g.logoUrl, 300000),
+      logoUrl: g.logoUrl,
       accent: g.accent,
     })),
     theme: { ...BRAND, bgUrl: bg.bgUrl, dim: bg.dim },
@@ -337,7 +341,7 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
     trophies = wanted
       .map((w) => {
         const t = byId.get(w.id);
-        return t ? { name: t.name, imageUrl: slimImg(t.imageUrl, 300000) ?? "", value: t.value ?? 0, place: w.place } : null;
+        return t ? { name: t.name, imageUrl: t.imageUrl ?? "", value: t.value ?? 0, place: w.place } : null;
       })
       .filter((t): t is NonNullable<typeof t> => !!t && !!t.imageUrl)
       .slice(0, 3);
@@ -359,7 +363,7 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
     kind: "challenge",
     title: ch.title,
     game: ch.game,
-    logoUrl: slimImg(g?.logoUrl ?? null, 300000),
+    logoUrl: g?.logoUrl ?? null,
     description: ch.description || null,
     startsAt: ch.startAt.toISOString(),
     endsAt: ch.endAt.toISOString(),
@@ -373,7 +377,8 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
     theme: {
       accent: g?.accent || BRAND.accent,
       accent2: g?.accent2 || BRAND.accent2,
-      bgUrl: slimImg(ch.coverUrl ?? ch.heroUrl, 800000) || bg.bgUrl,
+      bgUrl: ch.coverUrl || ch.heroUrl || bg.bgUrl,
+      bgFallbacks: [ch.heroUrl, bg.bgUrl],
       dim: bg.dim,
     },
   };
@@ -407,13 +412,13 @@ export async function leaderboardCard(game: string, metricKey?: string | null): 
     kind: "leaderboard",
     title: board.title,
     game,
-    logoUrl: slimImg(g[0]?.logoUrl ?? null, 300000),
+    logoUrl: g[0]?.logoUrl ?? null,
     subtitle: `${game} · live standings`,
     rows: sorted.map((r, i) => ({
       rank: i + 1, name: r.name,
       value: r.rankLabel ?? String(Math.round(r.value * 100) / 100),
-      avatarUrl: slimImg(r.avatarUrl, 200000),
+      avatarUrl: r.avatarUrl,
     })),
-    theme: { ...BRAND, bgUrl: slimImg(g[0]?.coverUrl ?? null, 800000) || bg.bgUrl, dim: bg.dim },
+    theme: { ...BRAND, bgUrl: g[0]?.coverUrl || bg.bgUrl, bgFallbacks: [bg.bgUrl], dim: bg.dim },
   };
 }

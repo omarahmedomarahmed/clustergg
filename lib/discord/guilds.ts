@@ -191,6 +191,13 @@ export async function checkUnlock(guildId: string): Promise<boolean> {
   } catch { return false; }
 
   const row = await getGuildRow(guildId);
+  // A server crossing the line is the moment the growth loop pays off — worth
+  // knowing in our own server, not just in theirs.
+  try {
+    const { reportToHq } = await import("@/lib/discord/hq");
+    void reportToHq({ type: "unlock", guildName: row?.name || guildId, linked: stats.linked }).catch(() => {});
+  } catch { /* non-fatal */ }
+
   if (row?.ownerDiscordId && canAct()) {
     await dmUser(row.ownerDiscordId, {
       embeds: [{

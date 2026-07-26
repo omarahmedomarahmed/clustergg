@@ -30,7 +30,10 @@ const CONVERTIBLE = new Set([
 const MAX_FETCH_BYTES = 16_000_000;
 // A card is 1200x630, so nothing needs to arrive bigger than this.
 const DEFAULT_MAX_W = 1200;
-const TIMEOUT_MS = 4000;
+// Per-image ceiling. Deliberately tight: a game-stats card resolves an avatar,
+// a logo, up to five champion icons and five match icons, and the gamer is
+// waiting on a button press. One slow CDN must cost that image, not the card.
+const TIMEOUT_MS = 2200;
 
 type Entry = { value: string | null; at: number };
 const CACHE_TTL = 10 * 60 * 1000;
@@ -165,4 +168,19 @@ export async function toEmbeddableAll(
   opts: { maxWidth?: number } = {},
 ): Promise<(string | null)[]> {
   return Promise.all(urls.map((u) => toEmbeddable(u, opts)));
+}
+
+// A hard ceiling on the WHOLE image step for one card.
+//
+// Individual timeouts bound each fetch, but a card with a dozen images can
+// still add up past what a person will wait for after tapping a button. This
+// caps the total: whatever has resolved by the deadline is drawn, the rest
+// render as their placeholder.
+export const CARD_IMAGE_BUDGET_MS = 3200;
+
+export function withDeadline<T>(work: Promise<T>, fallback: T, ms = CARD_IMAGE_BUDGET_MS): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms).unref?.()),
+  ]);
 }

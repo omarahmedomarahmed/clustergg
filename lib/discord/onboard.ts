@@ -6,6 +6,7 @@ import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
 import { upsertGuild, getGuildRow, unlockThreshold } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
+import { reportToHq } from "@/lib/discord/hq";
 
 // What happens the moment a server owner adds the bot.
 //
@@ -50,6 +51,16 @@ export async function onboardGuild(guildId: string, ownerDiscordId?: string): Pr
 
   const owner = ownerDiscordId ?? (await getGuildRow(guildId))?.ownerDiscordId ?? null;
   if (owner) await welcomeOwner(owner, guildId, channel.id);
+
+  // Tell HQ. A new server is the single most important thing that happens to
+  // this business, and we shouldn't learn about it by refreshing a dashboard.
+  const row = await getGuildRow(guildId);
+  void reportToHq({
+    type: "install",
+    guildId,
+    guildName: row?.name || guildId,
+    members: row?.memberCount ?? 0,
+  }).catch(() => {});
 
   return { ok: true, channelId: channel.id, posted: guide.posted, pinned: guide.pinned };
 }

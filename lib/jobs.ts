@@ -1,5 +1,6 @@
 import { closeExpiredChallenges } from "@/lib/challenges";
 import { postAdsToGuilds } from "@/lib/discord/ads";
+import { postLeaderboardUpdates } from "@/lib/discord/leaderboard-feed";
 
 // Everything periodic, as named jobs.
 //
@@ -11,7 +12,7 @@ import { postAdsToGuilds } from "@/lib/discord/ads";
 // Each job must be safe to run repeatedly. Closing challenges is idempotent,
 // and ad posting has its own per-server interval.
 
-export type JobKey = "challenges" | "discord-ads";
+export type JobKey = "challenges" | "discord-ads" | "leaderboard-feed";
 
 export type JobResult = { key: JobKey; ok: boolean; summary: string };
 
@@ -26,6 +27,11 @@ export const JOBS: { key: JobKey; label: string; description: string }[] = [
     label: "Post Discord ads",
     description: "Posts one ad into each server that has unlocked revenue share and is opted in. Respects the per-server interval, so running it early is safe.",
   },
+  {
+    key: "leaderboard-feed",
+    label: "Post leaderboard updates to HQ",
+    description: "Walks EVERY active leaderboard — not one per game — and posts its current top five into that game's feed channel in our server.",
+  },
 ];
 
 export async function runJob(key: JobKey): Promise<JobResult> {
@@ -38,6 +44,15 @@ export async function runJob(key: JobKey): Promise<JobResult> {
       case "discord-ads": {
         const r = await postAdsToGuilds();
         return { key, ok: true, summary: `${r.posted} posted · ${r.skipped} skipped · ${r.considered} eligible server${r.considered === 1 ? "" : "s"}.` };
+      }
+      case "leaderboard-feed": {
+        const r = await postLeaderboardUpdates();
+        return {
+          key, ok: true,
+          summary: r.posted
+            ? `Posted ${r.posted} board${r.posted === 1 ? "" : "s"} across ${new Set(r.boards.map((b) => b.game)).size} game${new Set(r.boards.map((b) => b.game)).size === 1 ? "" : "s"}.`
+            : "No active leaderboard had anyone on it yet.",
+        };
       }
     }
   } catch (e) {

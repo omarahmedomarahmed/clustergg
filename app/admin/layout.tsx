@@ -26,6 +26,7 @@ const NAV: {
       { href: "/admin/discord", label: "Bot status & setup", exact: true },
       { href: "/admin/discord/requests", label: "Challenge requests", badge: "requests" },
       { href: "/admin/discord/broadcast", label: "Broadcast & ads" },
+      { href: "/admin/discord/hq", label: "HQ server" },
     ],
   },
   {
@@ -35,7 +36,8 @@ const NAV: {
       { href: "/admin/language", label: "Language & flags (Arabic)" },
       { href: "/admin/translations", label: "Content translations (Ar/En)" },
       { href: "/admin/backgrounds", label: "Page backgrounds" },
-      { href: "/admin/cards", label: "Card backgrounds" },
+      { href: "/admin/cards", label: "Card backgrounds", exact: true },
+      { href: "/admin/cards/guide", label: "Card layout guide" },
       { href: "/admin/brand-kit", label: "Logos & brand kit" },
       { href: "/admin/mobile", label: "Mobile chrome (nav/drawer)" },
       { href: "/admin/creative-studio", label: "Creative studio" },

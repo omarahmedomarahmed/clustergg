@@ -7,6 +7,7 @@ import { cardRef, embedColor } from "@/lib/discord/cards";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
 import { challengeUrl, challengeStandings } from "@/lib/challenges";
+import { reportToHq } from "@/lib/discord/hq";
 
 // Proactive posts into #ClusterGG.
 //
@@ -172,6 +173,16 @@ export async function announceChallengeLaunched(challengeId: string): Promise<vo
   }
 
   await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components });
+
+  // And into HQ's feed for that game, so our own server carries every game's
+  // news in its own channel rather than one undifferentiated stream.
+  void reportToHq({
+    type: "challenge",
+    game: ch.game,
+    title: `${ch.title} is live`,
+    body: `${ch.description || "A new challenge just started."}\n\nEnds ${ch.endAt.toLocaleDateString()}.`,
+    url,
+  }).catch(() => {});
 }
 
 // A challenge finished — the podium, with what each winner actually earned.

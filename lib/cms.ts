@@ -9,6 +9,16 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "hero.badge": "Live stat sync across real game networks",
   "hero.title.line1": "Every game.",
   "hero.title.line2": "One identity.",
+  // ===== The Discord section: the homepage's main pitch =====
+  // Cluster is the engagement layer for Discord communities, so this copy is
+  // the product description, not a feature blurb. Fully admin-editable.
+  "discord.badge": "ClusterBot for Discord",
+  "discord.title": "Turn your Discord into a competition.",
+  "discord.subtitle":
+    "Add the bot and your members get ranked profiles, live stats from the games they already play, and challenges with real trophies — without leaving your server. You get the audience numbers, and a share of what they earn.",
+  "discord.cta.primary": "Add ClusterBot to your server",
+  "discord.cta.secondary": "See who's running it",
+
   "hero.subtitle":
     "Cluster pulls your ranks, ratings and wins from every game you play into one shareable cosmic profile. Compete in live challenges, earn badges forged from real API data, and climb leaderboards that actually mean something.",
   "hero.cta.primary": "Claim your profile",
