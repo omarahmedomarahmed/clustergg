@@ -5,7 +5,7 @@ import type { CardLayout } from "@/lib/cards/layout";
 
 export type CardKind =
   | "profile" | "game-stats" | "quest" | "cp-summary"
-  | "leaderboard" | "challenge" | "planet" | "planets" | "guide";
+  | "leaderboard" | "challenge" | "planet" | "planets" | "guide" | "week";
 
 export type CardTheme = {
   accent: string;   // primary brand/game/quest colour
@@ -116,15 +116,51 @@ export type ChallengeCard = {
   theme: CardTheme;
 };
 
+// A game's hub, as the bot shows it.
+//
+// This card used to be three counters and a name. That is not what a planet is:
+// the reason to open one is to find out what you can actually enter and where
+// you'd stand, so it carries the real lists — every live challenge with its
+// deadline, and every board this game runs with whoever is on top of it.
 export type PlanetCard = {
   kind: "planet";
   game: string;
   logoUrl?: string | null;
   description?: string | null;
-  challenges: number;
-  ranked: number;
+  challenges: { title: string; endsAt: string; participants: number; prize?: string | null }[];
+  boards: { title: string; leader: string | null; value: string | null; entries: number }[];
+  /** Distinct gamers with a linked account on this game. */
+  gamers: number;
   serverGamers?: number | null;
-  topGamer?: { name: string; value: string } | null;
+  theme: CardTheme;
+};
+
+// Profile of the Week, in Discord.
+//
+// One card, two jobs. `race` is the daily post: where the vote stands and how
+// long is left. `result` is Sunday's: who won and what each of them was handed.
+// Same shape because it is the same competition, and a server that has been
+// watching the race all week should recognise the card that ends it.
+export type WeekCard = {
+  kind: "week";
+  mode: "race" | "result";
+  weekKey: string;
+  title: string;
+  subtitle?: string | null;
+  /** Days until voting closes — 0 on announcement day. */
+  daysLeft: number;
+  entries: {
+    rank: number;
+    name: string;
+    avatarUrl?: string | null;
+    weekVotes: number;
+    lifetimeVotes: number;
+    /** The trophy this placement was handed, on a called week. */
+    trophyUrl?: string | null;
+  }[];
+  totalVotes: number;
+  contenders: number;
+  trophy?: { name: string; imageUrl: string; value: number } | null;
   theme: CardTheme;
 };
 
@@ -151,4 +187,4 @@ export type GuideCard = {
 
 export type CardData =
   | ProfileCard | GameStatsCard | QuestCard | CpSummaryCard
-  | LeaderboardCard | ChallengeCard | PlanetCard | PlanetsCard | GuideCard;
+  | LeaderboardCard | ChallengeCard | PlanetCard | PlanetsCard | GuideCard | WeekCard;

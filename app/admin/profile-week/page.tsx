@@ -2,7 +2,8 @@ import { desc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getContent } from "@/lib/cms";
 import Icon from "@/components/Icon";
-import { EntryAdmin, WeekSettings, WeekStream } from "@/components/WeekAdmin";
+import { EntryAdmin, WeekBroadcast, WeekSettings, WeekStream } from "@/components/WeekAdmin";
+import { announcingGuilds } from "@/lib/discord/guilds";
 import {
   FREEZE_KEY, PODIUM_TROPHY_KEY, closedWeeks, weekActions, weekBoard, weekTimezone,
 } from "@/lib/profile-week";
@@ -37,13 +38,14 @@ export default async function AdminProfileWeekPage({ searchParams }: {
   const isCurrent = week.key === now.key;
 
   const db = await getDb();
-  const [board, log, archive, settings, trophies] = await Promise.all([
+  const [board, log, archive, settings, trophies, guilds] = await Promise.all([
     weekBoard({ weekKey: week.key, limit: 100 }),
     weekActions(week.key),
     closedWeeks(12),
     getContent([FREEZE_KEY, PODIUM_TROPHY_KEY]).catch(() => ({} as Record<string, string>)),
     db.select({ id: schema.trophies.id, name: schema.trophies.name, tier: schema.trophies.tier, value: schema.trophies.value })
       .from(schema.trophies).orderBy(desc(schema.trophies.value)).limit(200),
+    announcingGuilds().catch(() => []),
   ]);
 
   const prev = previousWeek(week);
@@ -127,6 +129,10 @@ export default async function AdminProfileWeekPage({ searchParams }: {
           trophyId={settings[PODIUM_TROPHY_KEY] ?? ""}
           trophies={trophies.map((t) => ({ ...t, value: Number(t.value) }))}
         />
+      </div>
+
+      <div className="mb-6">
+        <WeekBroadcast guilds={guilds.length} />
       </div>
 
       <h2 className="mb-3 flex items-center gap-2 font-bold">

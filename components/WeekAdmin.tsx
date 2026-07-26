@@ -3,7 +3,8 @@
 import { useActionState, useState } from "react";
 import Icon from "@/components/Icon";
 import {
-  adjustWeekVotes, closeWeekNow, reopenWeekNow, saveWeekSettings, saveWeekStream, setWeekDisqualified,
+  adjustWeekVotes, announceWeekAgain, closeWeekNow, postWeekUpdateNow, reopenWeekNow,
+  saveWeekSettings, saveWeekStream, setWeekDisqualified,
   type WeekAdminState,
 } from "@/app/actions/profile-week-admin";
 
@@ -97,6 +98,7 @@ export function WeekStream({ weekKey, url, live, closed, podium, announcedAt }: 
   const [stream, saveStream, savingStream] = useActionState<WeekAdminState, FormData>(saveWeekStream, undefined);
   const [close, doClose, closing] = useActionState<WeekAdminState, FormData>(closeWeekNow, undefined);
   const [reopen, doReopen, reopening] = useActionState<WeekAdminState, FormData>(reopenWeekNow, undefined);
+  const [again, doAgain, againing] = useActionState<WeekAdminState, FormData>(announceWeekAgain, undefined);
 
   return (
     <div className="glass p-5">
@@ -140,6 +142,14 @@ export function WeekStream({ weekKey, url, live, closed, podium, announcedAt }: 
                 {podium.map((p, i) => `#${i + 1} ${p.displayName} (${p.votes.toLocaleString()})`).join(" · ") || "No podium recorded."}
               </div>
             </div>
+            <form action={doAgain}>
+              <input type="hidden" name="weekKey" value={weekKey} />
+              <button disabled={againing}
+                className="rounded-full border border-cyan-400/40 px-4 py-1.5 text-sm text-cyan-200 hover:bg-cyan-500/10 disabled:opacity-60"
+                title="Re-post the winners into every server running the bot">
+                {againing ? "Announcing…" : "Announce again"}
+              </button>
+            </form>
             <form action={doReopen}>
               <input type="hidden" name="weekKey" value={weekKey} />
               <button disabled={reopening}
@@ -147,6 +157,7 @@ export function WeekStream({ weekKey, url, live, closed, podium, announcedAt }: 
                 {reopening ? "Reopening…" : "Reopen this week"}
               </button>
             </form>
+            <Note state={again} />
             <Note state={reopen} />
           </div>
         ) : (
@@ -165,6 +176,34 @@ export function WeekStream({ weekKey, url, live, closed, podium, announcedAt }: 
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ===== The bot =====
+
+export function WeekBroadcast({ guilds }: { guilds: number }) {
+  const [state, action, pending] = useActionState<WeekAdminState, FormData>(postWeekUpdateNow, undefined);
+  return (
+    <div className="glass p-5">
+      <h2 className="flex items-center gap-2 font-bold"><Icon name="send" size={15} /> The daily post</h2>
+      <p className="mt-1 text-xs text-muted">
+        Every server running the bot gets one post a day: the placements, the countdown, and the two buttons that put
+        somebody in the competition — link an account, make your profile yours. The daily cron sends it; this sends it now.
+      </p>
+      <form action={action} className="mt-4 flex flex-wrap items-center gap-3">
+        <button disabled={pending} className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
+          {pending ? "Posting…" : "Post the update now"}
+        </button>
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted">
+          <input type="checkbox" name="force" value="1" className="h-4 w-4 accent-cyan-400" />
+          Send even to servers that already had today&apos;s
+        </label>
+        <span className="ml-auto text-xs text-muted">
+          {guilds ? `${guilds} server${guilds === 1 ? "" : "s"} receiving` : "No server has announcements on yet"}
+        </span>
+      </form>
+      <div className="mt-2"><Note state={state} /></div>
     </div>
   );
 }

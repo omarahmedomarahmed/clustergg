@@ -23,6 +23,7 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "bot_planet", label: "Bot · Planet card", note: "Backdrop for a game planet card (that game's own globe art wins when set)." },
   { key: "bot_planets", label: "Bot · Game picker card", note: "Backdrop of the 'pick your game' card that every START HERE button opens." },
   { key: "bot_guide", label: "Bot · How-to guide cards", note: "Backdrop for the pinned how-to guide PNGs." },
+  { key: "bot_week", label: "Bot · Profile of the Week", note: "Backdrop of the weekly vote standings and the Sunday winners card." },
 ];
 
 export const CARD_BG_KEYS = CARD_BG_TYPES.map((t) => t.key);

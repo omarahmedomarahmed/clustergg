@@ -79,7 +79,7 @@ export const DEFAULT_LAYOUT: CardLayout = {
 
 export const LAYOUT_KINDS: CardKind[] = [
   "profile", "game-stats", "challenge", "leaderboard",
-  "planet", "planets", "quest", "cp-summary", "guide",
+  "planet", "planets", "quest", "cp-summary", "guide", "week",
 ];
 
 export const layoutKey = (kind: string) => `card.layout.${kind}`;

@@ -1,5 +1,5 @@
 import { getOrRenderCard } from "@/lib/cards/cache";
-import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard } from "@/lib/cards/data";
+import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, weekCard } from "@/lib/cards/data";
 import { guideCard } from "@/lib/cards/guides";
 import { siteUrl } from "@/lib/discord/config";
 import type { CardData } from "@/lib/cards/types";
@@ -24,6 +24,7 @@ const loaders: Record<string, (a: Record<string, string>) => Promise<CardData | 
   planets: () => planetsCard(),
   challenge: (a) => challengeCard(a.id),
   guide: (a) => guideCard(a.topic || "getting-started", a.quest || null),
+  week: (a) => weekCard({ weekKey: a.week || undefined, mode: a.mode === "result" ? "result" : a.mode === "race" ? "race" : undefined }),
 };
 
 // The always-works fallback: the public render route. Slower than a cached Blob
