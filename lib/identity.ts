@@ -1,7 +1,8 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { awardQuestAction } from "@/lib/quests";
+import { voteWindow } from "@/lib/profile-week";
 
 // The gamer identity layer: votes, views, and the analytics a gamer sees about
 // their own profile.
@@ -15,9 +16,11 @@ import { awardQuestAction } from "@/lib/quests";
 export type VoteSource = "web" | "discord";
 
 export type VoteResult =
-  | { ok: true; added: boolean; removed: boolean; votes: number }
-  | { ok: false; reason: "self" | "not_found" | "error" };
+  | { ok: true; added: boolean; removed: boolean; votes: number; weekVotes: number }
+  | { ok: false; reason: "self" | "not_found" | "error" | "closed" };
 
+// Lifetime total, denormalised onto the user so every list that sorts by votes
+// doesn't have to count rows.
 async function recount(profileUserId: string): Promise<number> {
   const db = await getDb();
   const [row] = await db.select({ n: sql<number>`count(*)` })
@@ -28,29 +31,52 @@ async function recount(profileUserId: string): Promise<number> {
   return votes;
 }
 
+// Votes banked to one week — the number the competition actually ranks on.
+async function countWeek(profileUserId: string, weekKey: string | null): Promise<number> {
+  if (!weekKey) return 0;
+  const db = await getDb();
+  const [row] = await db.select({ n: sql<number>`count(*)` })
+    .from(schema.profileVotes)
+    .where(and(
+      eq(schema.profileVotes.profileUserId, profileUserId),
+      eq(schema.profileVotes.weekKey, weekKey),
+    ));
+  return Number(row?.n ?? 0);
+}
+
 // Web vote — toggles, because a vote you can't take back is a trap.
 export async function toggleWebVote(profileUserId: string, voterUserId: string): Promise<VoteResult> {
   if (profileUserId === voterUserId) return { ok: false, reason: "self" };
   try {
+    const win = await voteWindow();
+    if (!win.open) return { ok: false, reason: "closed" };
     const db = await getDb();
+
+    // One vote per voter per profile per WEEK. Scoped to the week the vote
+    // would bank to, so backing the same gamer again next Monday is a new vote
+    // rather than an un-vote of the old one.
     const [existing] = await db.select({ id: schema.profileVotes.id })
       .from(schema.profileVotes)
       .where(and(
         eq(schema.profileVotes.profileUserId, profileUserId),
         eq(schema.profileVotes.voterUserId, voterUserId),
+        win.bankTo ? eq(schema.profileVotes.weekKey, win.bankTo) : isNull(schema.profileVotes.weekKey),
       )).limit(1);
 
     if (existing) {
       await db.delete(schema.profileVotes).where(eq(schema.profileVotes.id, existing.id));
-      return { ok: true, added: false, removed: true, votes: await recount(profileUserId) };
+      return {
+        ok: true, added: false, removed: true,
+        votes: await recount(profileUserId), weekVotes: await countWeek(profileUserId, win.bankTo),
+      };
     }
 
     await db.insert(schema.profileVotes).values({
-      id: uid(), profileUserId, voterUserId, source: "web",
+      id: uid(), profileUserId, voterUserId, source: "web", weekKey: win.bankTo,
     });
     const votes = await recount(profileUserId);
     await awardQuestAction(db, profileUserId, "profile_vote_received", { refType: "vote", refId: voterUserId });
-    return { ok: true, added: true, removed: false, votes };
+    return { ok: true, added: true, removed: false, votes, weekVotes: await countWeek(profileUserId, win.bankTo) };
   } catch { return { ok: false, reason: "error" }; }
 }
 
@@ -74,26 +100,38 @@ export async function castDiscordVote(
       )).limit(1);
     if (own?.userId === profileUserId) return { ok: false, reason: "self" };
 
+    const win = await voteWindow();
+    if (!win.open) return { ok: false, reason: "closed" };
+
     const [existing] = await db.select({ id: schema.profileVotes.id })
       .from(schema.profileVotes)
       .where(and(
         eq(schema.profileVotes.profileUserId, profileUserId),
         eq(schema.profileVotes.voterDiscordId, voterDiscordId),
+        win.bankTo ? eq(schema.profileVotes.weekKey, win.bankTo) : isNull(schema.profileVotes.weekKey),
       )).limit(1);
-    if (existing) return { ok: true, added: false, removed: false, votes: await recount(profileUserId) };
+    if (existing) {
+      return {
+        ok: true, added: false, removed: false,
+        votes: await recount(profileUserId), weekVotes: await countWeek(profileUserId, win.bankTo),
+      };
+    }
 
     await db.insert(schema.profileVotes).values({
-      id: uid(), profileUserId, voterDiscordId, guildId: guildId ?? null, source: "discord",
+      id: uid(), profileUserId, voterDiscordId, guildId: guildId ?? null, source: "discord", weekKey: win.bankTo,
     });
     const votes = await recount(profileUserId);
     await awardQuestAction(db, profileUserId, "profile_vote_received", { refType: "vote", refId: voterDiscordId });
-    return { ok: true, added: true, removed: false, votes };
+    return { ok: true, added: true, removed: false, votes, weekVotes: await countWeek(profileUserId, win.bankTo) };
   } catch { return { ok: false, reason: "error" }; }
 }
 
+// "Have I already backed them?" — scoped to the week the answer is about, so a
+// vote button reflects THIS week's race rather than something from March.
 export async function hasVoted(profileUserId: string, voterUserId?: string | null, voterDiscordId?: string | null): Promise<boolean> {
   if (!voterUserId && !voterDiscordId) return false;
   try {
+    const win = await voteWindow();
     const db = await getDb();
     const [row] = await db.select({ id: schema.profileVotes.id })
       .from(schema.profileVotes)
@@ -102,6 +140,7 @@ export async function hasVoted(profileUserId: string, voterUserId?: string | nul
         voterUserId
           ? eq(schema.profileVotes.voterUserId, voterUserId)
           : eq(schema.profileVotes.voterDiscordId, voterDiscordId!),
+        win.bankTo ? eq(schema.profileVotes.weekKey, win.bankTo) : isNull(schema.profileVotes.weekKey),
       )).limit(1);
     return !!row;
   } catch { return false; }

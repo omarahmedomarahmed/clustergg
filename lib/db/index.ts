@@ -304,8 +304,45 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL,
     "id" text PRIMARY KEY NOT NULL
   )`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS "pv_web_idx" ON "profile_votes" ("profile_user_id","voter_user_id") WHERE "voter_user_id" IS NOT NULL`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS "pv_discord_idx" ON "profile_votes" ("profile_user_id","voter_discord_id") WHERE "voter_discord_id" IS NOT NULL`,
+  `ALTER TABLE "profile_votes" ADD COLUMN IF NOT EXISTS "week_key" text`,
+  // Existing votes predate the weekly competition, so they're filed into the
+  // week they were actually cast in — a Monday-anchored ISO date, computed in
+  // SQL so the backfill needs no application pass. Sunday votes get NULL, the
+  // same as they would today.
+  `UPDATE "profile_votes" SET "week_key" = to_char(date_trunc('week', "created_at" AT TIME ZONE 'UTC'), 'YYYY-MM-DD')
+     WHERE "week_key" IS NULL AND EXTRACT(ISODOW FROM ("created_at" AT TIME ZONE 'UTC')) <> 7`,
+  // Uniqueness moves from per-lifetime to per-WEEK. The old indexes have to go
+  // first: leaving them would keep every gamer to one vote ever, which is the
+  // exact thing the weekly competition can't have.
+  `DROP INDEX IF EXISTS "pv_web_idx"`,
+  `DROP INDEX IF EXISTS "pv_discord_idx"`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "pv_web_week_idx" ON "profile_votes" ("profile_user_id","voter_user_id","week_key") WHERE "voter_user_id" IS NOT NULL AND "week_key" IS NOT NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "pv_discord_week_idx" ON "profile_votes" ("profile_user_id","voter_discord_id","week_key") WHERE "voter_discord_id" IS NOT NULL AND "week_key" IS NOT NULL`,
+  // Announcement-day votes carry no week, so the partial indexes above don't
+  // constrain them. These keep one-per-voter for that day too.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "pv_web_nullweek_idx" ON "profile_votes" ("profile_user_id","voter_user_id") WHERE "voter_user_id" IS NOT NULL AND "week_key" IS NULL`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "pv_discord_nullweek_idx" ON "profile_votes" ("profile_user_id","voter_discord_id") WHERE "voter_discord_id" IS NOT NULL AND "week_key" IS NULL`,
+  `CREATE INDEX IF NOT EXISTS "pv_week_idx" ON "profile_votes" ("week_key","profile_user_id")`,
+  `CREATE TABLE IF NOT EXISTS "vote_week_actions" (
+    "id" text PRIMARY KEY NOT NULL,
+    "week_key" text NOT NULL,
+    "profile_user_id" text NOT NULL,
+    "action" text NOT NULL,
+    "delta" integer NOT NULL DEFAULT 0,
+    "reason" text NOT NULL DEFAULT '',
+    "actor_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "vwa_week_idx" ON "vote_week_actions" ("week_key","profile_user_id")`,
+  `CREATE TABLE IF NOT EXISTS "vote_weeks" (
+    "week_key" text PRIMARY KEY NOT NULL,
+    "podium" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "stream_url" text,
+    "stream_live" boolean NOT NULL DEFAULT false,
+    "announced_at" timestamp with time zone,
+    "closed_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS "profile_views" (
     "id" text PRIMARY KEY NOT NULL,
     "profile_user_id" text NOT NULL,
