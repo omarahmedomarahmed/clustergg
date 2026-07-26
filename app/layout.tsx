@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, Cairo } from "next/font/google";
 import "./globals.css";
@@ -11,6 +12,7 @@ import BottomNav from "@/components/BottomNav";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import CookieConsent from "@/components/CookieConsent";
 import FloatingOrbs from "@/components/FloatingOrbs";
+import EmbedMode from "@/components/EmbedMode";
 import RouteProgress from "@/components/RouteProgress";
 import PageBackground from "@/components/PageBackground";
 import { getContent } from "@/lib/cms";
@@ -82,6 +84,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className={`nebula-bg min-h-screen antialiased ${locale === "ar" ? "font-arabic" : ""}`} style={cpIcon ? ({ ["--cp-icon" as string]: `url(${cpIcon})` }) : undefined}>
         <LocaleProvider locale={locale} overrides={uiOverrides}>
         <RouteProgress />
+        <Suspense fallback={null}><EmbedMode /></Suspense>
         <PageBackground map={bgMap} />
         <Starfield />
         <div className="relative z-10 flex min-h-screen flex-col">
@@ -92,9 +95,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <main className="flex-1 pb-20 md:pb-0">{children}</main>
           <Footer />
         </div>
-        <BottomNav loggedIn={!!me} globeUrl={planetsGlobe} tabs={bottomTabs ?? undefined} />
-        <FloatingOrbs />
-        <CookieConsent />
+        <div data-site-chrome>
+          <BottomNav loggedIn={!!me} globeUrl={planetsGlobe} tabs={bottomTabs ?? undefined} />
+          <FloatingOrbs />
+          <CookieConsent />
+        </div>
         </LocaleProvider>
         <Analytics />
         <SpeedInsights />

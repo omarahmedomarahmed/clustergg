@@ -13,7 +13,9 @@ import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
 import LocaleToggle from "@/components/LocaleToggle";
 import MobileHud from "@/components/MobileHud";
+import WeekBand, { SLOT_ID, type BandData } from "@/components/WeekBand";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
+import { weekBoard } from "@/lib/profile-week";
 import { parseDrawerLinks } from "@/lib/mobile-nav";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
@@ -85,6 +87,24 @@ export default async function Nav() {
   // Quest cards fill the nav between the game logos and the right-hand controls.
   const navQuests = await getNavQuests(db, user?.id ?? null, 4);
   const totalCp = user ? await getTotalCp(db, user.id) : 0;
+
+  // Profile of the Week rides under the nav on every page, so it's read here
+  // with the rest of the chrome rather than by each page separately.
+  const board = await weekBoard({ viewerId: user?.id ?? null, limit: 25 });
+  const bandData: BandData = {
+    ...board,
+    week: {
+      ...board.week,
+      startsAt: board.week.startsAt.toISOString(),
+      votingEndsAt: board.week.votingEndsAt.toISOString(),
+      endsAt: board.week.endsAt.toISOString(),
+    },
+    result: board.result
+      ? { ...board.result, announcedAt: board.result.announcedAt?.toISOString() ?? null }
+      : null,
+    signedIn: !!user,
+    me: user ? { id: user.id, slug: user.slug } : null,
+  };
   const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode", "mobile.drawer.extra"]);
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
@@ -112,6 +132,7 @@ export default async function Nav() {
   ];
 
   return (
+    <>
     <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl bg-cover bg-center"
       style={navBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${navBg})` } : undefined}>
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
@@ -191,6 +212,15 @@ export default async function Nav() {
           unreadDm={navConvos.some((c) => c.unread)}
         />
       )}
+
+      {/* Profile of the Week. The strip stays in the sticky header; the board
+          it expands into renders below, in flow, so the page underneath still
+          scrolls instead of being pinned behind a full-height panel. */}
+      <WeekBand initial={bandData} />
     </header>
+    {/* Where the expanded board lands: outside the sticky header, so it pushes
+        the page down and scrolls away with it. */}
+    <div id={SLOT_ID} />
+    </>
   );
 }

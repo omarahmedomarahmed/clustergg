@@ -642,7 +642,55 @@ export const profileVotes = pgTable("profile_votes", {
   voterUserId: text("voter_user_id"),        // set for web votes
   voterDiscordId: text("voter_discord_id"),  // set for Discord votes
   guildId: text("guild_id"),                 // which server the vote came from
-  source: text("source").notNull().default("web"), // web | discord
+  source: text("source").notNull().default("web"), // web | discord | admin
+  // Which competition week this vote banks to — the ISO date of that week's
+  // Monday. NULL means it counts toward a lifetime total and no week: votes
+  // cast on announcement day, and admin adjustments made outside a week.
+  //
+  // This is also what makes the competition weekly at all. One vote per voter
+  // per profile FOR ALL TIME would mean a gamer who won you over in week one
+  // could never be voted for again; the uniqueness is per week instead, so
+  // every Monday is a genuinely fresh race.
+  weekKey: text("week_key"),
+  createdAt: now("created_at"),
+});
+
+// Everything staff do to a competition week, and why.
+//
+// Disqualifications and manual vote adjustments decide who wins a public
+// competition with real prizes attached, so none of it is allowed to happen
+// invisibly. Each row is one act by one person with a reason attached, and the
+// weekly standings are computed from these alongside the real votes rather
+// than by editing the votes themselves — an audit trail you can delete is not
+// an audit trail.
+export const voteWeekActions = pgTable("vote_week_actions", {
+  id: id(),
+  weekKey: text("week_key").notNull(),
+  profileUserId: text("profile_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  // disqualify | reinstate | adjust
+  action: text("action").notNull(),
+  // Signed, for `adjust`. Applied on top of the counted votes.
+  delta: integer("delta").notNull().default(0),
+  reason: text("reason").notNull().default(""),
+  actorId: text("actor_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: now("created_at"),
+}, (t) => [index("vwa_week_idx").on(t.weekKey, t.profileUserId)]);
+
+// A finished week, as it was called.
+//
+// Written when staff close a week. Stored rather than recomputed because the
+// standings depend on votes, disqualifications and adjustments that can all
+// keep changing afterwards — and last Sunday's winner has to stay last
+// Sunday's winner.
+export const voteWeeks = pgTable("vote_weeks", {
+  weekKey: text("week_key").primaryKey(),
+  // The podium, in order, as it stood when the week was closed.
+  podium: jsonb("podium").$type<{ userId: string; slug: string; displayName: string; votes: number; trophyId?: string | null }[]>()
+    .notNull().default([]),
+  streamUrl: text("stream_url"),
+  streamLive: boolean("stream_live").notNull().default(false),
+  announcedAt: timestamp("announced_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
   createdAt: now("created_at"),
 });
 

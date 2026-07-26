@@ -269,3 +269,15 @@ a, button, [role="button"], select, summary { cursor: pointer; }
 
 /* Arabic / RTL mode: swap in the Arabic-capable webfont site-wide. */
 .font-arabic { font-family: var(--font-cairo), var(--font-grotesk), system-ui, sans-serif; }
+
+/* Embed mode (`?embed=1`) — the page, with none of the site around it.
+   Used by the Profile of the Week snapshot, which frames a gamer's real
+   profile so voters see exactly what they're judging. Without this the frame
+   shows the whole site inside itself, competition band and all. */
+html[data-embed="1"] header,
+html[data-embed="1"] footer,
+html[data-embed="1"] #week-band-slot,
+html[data-embed="1"] [data-site-chrome] {
+  display: none !important;
+}
+html[data-embed="1"] main { padding-bottom: 0 !important; }
