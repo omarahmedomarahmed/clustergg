@@ -1,0 +1,254 @@
+import { and, asc, count, desc, eq, gte, isNull, or, sql } from "drizzle-orm";
+import { getDb, schema } from "@/lib/db";
+import { uid } from "@/lib/utils";
+import { networkStats, publicServers, type NetworkStats, type PublicServer } from "@/lib/network";
+import { loadMetrics, METRICS, type Metrics } from "@/lib/admin-metrics";
+import { TIERS } from "@/lib/server-portal";
+import { SEED_DOCS, SEED_PEOPLE } from "@/lib/dataroom/defaults";
+import type { Doc, Person, Section, SectionData, SectionKind } from "@/lib/dataroom/types";
+
+export * from "@/lib/dataroom/types";
+
+// The data room: documents built out of ordered sections, with the numbers
+// read live at request time rather than typed into a slide.
+//
+// The whole reason this exists as data rather than a page is that a deck goes
+// stale the day it's written. An investor opening this next month sees this
+// month's servers; a partner sees the audience we can reach right now, not the
+// one we could when someone last exported a PDF.
+
+// ===== Seeding =====
+
+// Written once, on first read. Never re-applied — a deploy silently reverting
+// an admin's copy is the fastest way to make a CMS untrusted, so anything that
+// already exists is left exactly as it is.
+export async function ensureSeeded(): Promise<void> {
+  try {
+    const db = await getDb();
+    const [existing] = await db.select({ c: count() }).from(schema.dataroomDocs);
+    if (Number(existing?.c ?? 0) > 0) return;
+
+    for (const [i, d] of SEED_DOCS.entries()) {
+      const docId = uid();
+      await db.insert(schema.dataroomDocs).values({
+        id: docId, slug: d.slug, kind: d.kind, title: d.title, subtitle: d.subtitle,
+        summary: d.summary, accent: d.accent, accent2: d.accent2,
+        contactEmail: d.contactEmail, contactNote: d.contactNote, sortOrder: i,
+      }).onConflictDoNothing();
+
+      for (const [j, s] of d.sections.entries()) {
+        await db.insert(schema.dataroomSections).values({
+          id: uid(), docId, kind: s.kind, anchor: s.anchor, navLabel: s.navLabel,
+          title: s.title ?? null, subtitle: s.subtitle ?? null, body: s.body ?? null,
+          data: (s.data ?? {}) as Record<string, unknown>, sortOrder: j,
+        }).onConflictDoNothing();
+      }
+    }
+
+    // People are shared across every document by default (docId null), because
+    // the same founders appear in both and maintaining two copies guarantees
+    // they drift.
+    for (const [i, p] of SEED_PEOPLE.entries()) {
+      await db.insert(schema.dataroomPeople).values({
+        id: uid(), docId: null, name: p.name, role: p.role, bio: p.bio,
+        email: p.email, logos: p.logos, sortOrder: i,
+      }).onConflictDoNothing();
+    }
+  } catch { /* a data room that can't seed still renders its empty state */ }
+}
+
+// ===== Reading =====
+
+export async function listDocs(includeUnpublished = false): Promise<Doc[]> {
+  await ensureSeeded();
+  try {
+    const db = await getDb();
+    const rows = await db.select().from(schema.dataroomDocs)
+      .orderBy(asc(schema.dataroomDocs.sortOrder), asc(schema.dataroomDocs.title));
+    return rows.filter((r) => includeUnpublished || r.isPublished) as Doc[];
+  } catch { return []; }
+}
+
+export async function getDoc(slug: string): Promise<Doc | null> {
+  await ensureSeeded();
+  try {
+    const db = await getDb();
+    const [row] = await db.select().from(schema.dataroomDocs)
+      .where(eq(schema.dataroomDocs.slug, slug)).limit(1);
+    return (row as Doc) ?? null;
+  } catch { return null; }
+}
+
+export async function getSections(docId: string, includeHidden = false): Promise<Section[]> {
+  try {
+    const db = await getDb();
+    const rows = await db.select().from(schema.dataroomSections)
+      .where(eq(schema.dataroomSections.docId, docId))
+      .orderBy(asc(schema.dataroomSections.sortOrder));
+    return rows
+      .filter((r) => includeHidden || r.isVisible)
+      .map((r) => ({ ...r, kind: r.kind as SectionKind, data: (r.data ?? {}) as SectionData })) as Section[];
+  } catch { return []; }
+}
+
+export async function getPeople(docId: string): Promise<Person[]> {
+  try {
+    const db = await getDb();
+    const rows = await db.select().from(schema.dataroomPeople)
+      .where(or(isNull(schema.dataroomPeople.docId), eq(schema.dataroomPeople.docId, docId)))
+      .orderBy(asc(schema.dataroomPeople.sortOrder));
+    return rows.filter((r) => r.isVisible) as Person[];
+  } catch { return []; }
+}
+
+// ===== The live numbers =====
+
+export type LiveData = {
+  network: NetworkStats;
+  servers: PublicServer[];
+  metrics: Metrics;
+  metricDefs: typeof METRICS;
+  tiers: typeof TIERS;
+  takenAt: string;
+};
+
+// One pass for a whole document, handed to every section that needs it, so a
+// page with four live sections makes one set of queries rather than four.
+export async function liveData(): Promise<LiveData> {
+  const [network, servers, metrics] = await Promise.all([
+    networkStats().catch((): NetworkStats => ({ servers: 0, reach: 0, gamers: 0, linked: 0, challenges: 0, games: 0 })),
+    publicServers(12).catch(() => []),
+    loadMetrics().catch(() => ({} as Metrics)),
+  ]);
+  return { network, servers, metrics, metricDefs: METRICS, tiers: TIERS, takenAt: new Date().toISOString() };
+}
+
+// Which milestone we're on, and how far into it.
+//
+// Deliberately shows the ladder ABOVE the current rung as well: a target you've
+// passed is history, and the interesting question for a reader is what the next
+// two look like.
+export type MilestoneLadder = {
+  current: number;
+  targets: { value: number; reached: boolean; isNext: boolean; pct: number }[];
+  next: number | null;
+  toNext: number;
+  pctToNext: number;
+};
+
+export function ladder(current: number, targets: number[]): MilestoneLadder {
+  const sorted = [...new Set(targets)].filter((t) => t > 0).sort((a, b) => a - b);
+  const next = sorted.find((t) => current < t) ?? null;
+  const prev = [...sorted].reverse().find((t) => current >= t) ?? 0;
+  return {
+    current,
+    next,
+    toNext: next ? Math.max(0, next - current) : 0,
+    // Progress through the CURRENT rung, not through the whole ladder — the
+    // latter is always a rounding error early on and reads as no progress.
+    pctToNext: next ? Math.max(1, Math.min(100, Math.round(((current - prev) / (next - prev)) * 100))) : 100,
+    targets: sorted.map((t) => ({
+      value: t,
+      reached: current >= t,
+      isNext: t === next,
+      pct: Math.max(0, Math.min(100, Math.round((current / t) * 100))),
+    })),
+  };
+}
+
+export function metricValueFor(kind: SectionData["metric"], live: LiveData): number {
+  switch (kind) {
+    case "linked": return live.network.linked;
+    case "gamers": return live.network.gamers;
+    case "servers": return live.network.servers;
+    case "reach":
+    default: return live.network.reach;
+  }
+}
+
+// ===== Tracking =====
+
+// Who opened what. A data room whose owner can't say which investor read the
+// traction section is a PDF with extra steps.
+//
+// `visitorId` is a first-party random id from a cookie — enough to tell one
+// reader from ten, and deliberately not an identity.
+export async function recordDocView(input: {
+  docId: string;
+  sectionAnchor?: string | null;
+  visitorId?: string | null;
+  referrer?: string | null;
+  device?: string | null;
+  seconds?: number;
+}): Promise<void> {
+  try {
+    const db = await getDb();
+    await db.insert(schema.dataroomViews).values({
+      id: uid(),
+      docId: input.docId,
+      sectionAnchor: input.sectionAnchor ?? null,
+      visitorId: input.visitorId ?? null,
+      referrer: (input.referrer ?? "").slice(0, 300) || null,
+      device: input.device ?? null,
+      seconds: Math.max(0, Math.min(3600, Math.round(input.seconds ?? 0))),
+    });
+  } catch { /* analytics must never break a page render */ }
+}
+
+export type DocAnalytics = {
+  views: number;
+  visitors: number;
+  sections: { anchor: string; views: number; seconds: number }[];
+  referrers: { referrer: string; views: number }[];
+  byDay: { day: string; views: number }[];
+  devices: { device: string; views: number }[];
+};
+
+export async function docAnalytics(docId: string, days = 30): Promise<DocAnalytics> {
+  const empty: DocAnalytics = { views: 0, visitors: 0, sections: [], referrers: [], byDay: [], devices: [] };
+  try {
+    const db = await getDb();
+    const since = new Date(Date.now() - days * 86400000);
+    const where = and(eq(schema.dataroomViews.docId, docId), gte(schema.dataroomViews.createdAt, since));
+
+    const [totals] = await db.select({
+      views: count(),
+      visitors: sql<number>`count(distinct ${schema.dataroomViews.visitorId})`,
+    }).from(schema.dataroomViews).where(where);
+
+    const sections = await db.select({
+      anchor: schema.dataroomViews.sectionAnchor,
+      views: count(),
+      seconds: sql<number>`coalesce(sum(${schema.dataroomViews.seconds}), 0)`,
+    }).from(schema.dataroomViews)
+      .where(and(where, sql`${schema.dataroomViews.sectionAnchor} IS NOT NULL`))
+      .groupBy(schema.dataroomViews.sectionAnchor)
+      .orderBy(desc(count()));
+
+    const referrers = await db.select({ referrer: schema.dataroomViews.referrer, views: count() })
+      .from(schema.dataroomViews)
+      .where(and(where, sql`${schema.dataroomViews.referrer} IS NOT NULL`))
+      .groupBy(schema.dataroomViews.referrer).orderBy(desc(count())).limit(12);
+
+    const devices = await db.select({ device: schema.dataroomViews.device, views: count() })
+      .from(schema.dataroomViews)
+      .where(and(where, sql`${schema.dataroomViews.device} IS NOT NULL`))
+      .groupBy(schema.dataroomViews.device).orderBy(desc(count()));
+
+    const byDay = await db.select({
+      day: sql<string>`to_char(${schema.dataroomViews.createdAt}, 'YYYY-MM-DD')`,
+      views: count(),
+    }).from(schema.dataroomViews).where(where)
+      .groupBy(sql`to_char(${schema.dataroomViews.createdAt}, 'YYYY-MM-DD')`)
+      .orderBy(sql`to_char(${schema.dataroomViews.createdAt}, 'YYYY-MM-DD')`);
+
+    return {
+      views: Number(totals?.views ?? 0),
+      visitors: Number(totals?.visitors ?? 0),
+      sections: sections.map((s) => ({ anchor: s.anchor ?? "", views: Number(s.views), seconds: Number(s.seconds) })),
+      referrers: referrers.map((r) => ({ referrer: r.referrer ?? "", views: Number(r.views) })),
+      devices: devices.map((d) => ({ device: d.device ?? "", views: Number(d.views) })),
+      byDay: byDay.map((d) => ({ day: d.day, views: Number(d.views) })),
+    };
+  } catch { return empty; }
+}
