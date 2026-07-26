@@ -19,7 +19,6 @@ import { localizeQuest } from "@/lib/i18n/entities";
 import { slimImg } from "@/lib/img";
 import { timeAgo } from "@/lib/utils";
 import { networkStats, publicServers } from "@/lib/network";
-import { installUrl } from "@/lib/discord/config";
 import { DiscordSection } from "@/components/DiscordSection";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +35,6 @@ export default async function LandingPage() {
   const homeQuests = await getUserQuests(db, viewer?.id ?? null);
   const questTops = await getQuestTops(db, homeQuests.map((q) => q.id), 6);
   const [network, topServers] = await Promise.all([networkStats(), publicServers(6)]);
-  const install = installUrl();
   const c = await getContent([
     "discord.badge", "discord.title", "discord.subtitle",
     "discord.cta.primary", "discord.cta.secondary",
@@ -131,7 +129,7 @@ export default async function LandingPage() {
           Placed immediately under the hero because it is what Cluster now is:
           the engagement layer for Discord communities. The galaxy above is how
           you browse the games; this is what you actually adopt. */}
-      <DiscordSection stats={network} servers={topServers} installUrl={install} copy={c} />
+      <DiscordSection stats={network} servers={topServers} copy={c} />
 
       {/* ===== HERO ===== */}
       {skinnedPlanets.length > 0 ? (

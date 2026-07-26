@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
+import AddBotButton from "@/components/AddBotButton";
 import type { NetworkStats, PublicServer } from "@/lib/network";
 
 // The homepage's main pitch, directly under the hero.
@@ -8,10 +9,9 @@ import type { NetworkStats, PublicServer } from "@/lib/network";
 // product, the servers running it are the network, and their combined
 // membership is the reach — so those are the numbers here, not sign-up counts.
 
-export function DiscordSection({ stats, servers, installUrl, copy }: {
+export function DiscordSection({ stats, servers, copy }: {
   stats: NetworkStats;
   servers: PublicServer[];
-  installUrl: string | null;
   copy: Record<string, string>;
 }) {
   const nf = (n: number) => n.toLocaleString();
@@ -31,15 +31,10 @@ export function DiscordSection({ stats, servers, installUrl, copy }: {
               || "Add the bot and your members get ranked profiles, live stats from the games they already play, and challenges with real trophies — without leaving your server. You get the audience numbers, and a share of what they earn."}
           </p>
           <div className="flex flex-wrap justify-center gap-3 mt-7">
-            {installUrl ? (
-              <a href={installUrl} target="_blank" rel="noreferrer" className="grad-btn pressable rounded-full px-7 py-3 font-bold">
-                {copy["discord.cta.primary"] || "Add ClusterBot to your server"}
-              </a>
-            ) : (
-              <Link href="/discord-bot" className="grad-btn pressable rounded-full px-7 py-3 font-bold">
-                {copy["discord.cta.primary"] || "Add ClusterBot to your server"}
-              </Link>
-            )}
+            <AddBotButton size="lg" label={copy["discord.cta.primary"] || "Add ClusterBot to your server"} />
+            <Link href="/discord-bot" className="ghost-btn pressable rounded-full px-7 py-3 font-semibold">
+              How it works
+            </Link>
             <Link href="/servers" className="ghost-btn pressable rounded-full px-7 py-3 font-semibold">
               {copy["discord.cta.secondary"] || "See who's running it"}
             </Link>

@@ -69,12 +69,30 @@ export function listChannels(guildId: string) {
 export const CHANNEL = { text: 0, voice: 2, category: 4, forum: 15 } as const;
 export type ChannelKind = keyof typeof CHANNEL;
 
+// Permission bits we use. VIEW_CHANNEL is the one that makes a channel private:
+// deny it to @everyone and only roles granted it can see the channel at all.
+export const PERM = { viewChannel: "1024", sendMessages: "2048" } as const;
+
 export function createChannel(
   guildId: string,
   name: string,
   topic?: string,
-  opts: { kind?: ChannelKind; parentId?: string | null; position?: number } = {},
+  opts: {
+    kind?: ChannelKind;
+    parentId?: string | null;
+    position?: number;
+    // Staff-only. The @everyone role always shares the guild's id, so denying
+    // VIEW_CHANNEL to that id hides the channel from members.
+    privateToRoles?: string[];
+  } = {},
 ) {
+  const overwrites = opts.privateToRoles
+    ? [
+      { id: guildId, type: 0, deny: PERM.viewChannel },
+      ...opts.privateToRoles.map((roleId) => ({ id: roleId, type: 0, allow: PERM.viewChannel })),
+    ]
+    : undefined;
+
   return call<Channel>(`/guilds/${guildId}/channels`, {
     method: "POST",
     body: JSON.stringify({
@@ -84,7 +102,23 @@ export function createChannel(
       ...(topic && (opts.kind ?? "text") === "text" ? { topic } : {}),
       ...(opts.parentId ? { parent_id: opts.parentId } : {}),
       ...(opts.position != null ? { position: opts.position } : {}),
+      ...(overwrites ? { permission_overwrites: overwrites } : {}),
     }),
+  });
+}
+
+// ===== Roles =====
+
+export type Role = { id: string; name: string; color?: number; position?: number };
+
+export function listRoles(guildId: string) {
+  return call<Role[]>(`/guilds/${guildId}/roles`);
+}
+
+export function createRole(guildId: string, name: string, color?: number, hoist = false) {
+  return call<Role>(`/guilds/${guildId}/roles`, {
+    method: "POST",
+    body: JSON.stringify({ name, ...(color != null ? { color } : {}), hoist, mentionable: false }),
   });
 }
 

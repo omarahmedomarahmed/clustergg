@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
 import BrandHeader from "@/components/BrandHeader";
+import AddBotButton from "@/components/AddBotButton";
 import AppStoreBadges from "@/components/AppStoreBadges";
 
 export default async function Footer() {
@@ -15,11 +16,16 @@ export default async function Footer() {
         <div>
           <div className="mb-3"><BrandHeader placement="footer" /></div>
           <p className="text-muted leading-relaxed">{c["footer.tagline"]}</p>
+          {/* The install CTA belongs here as much as in the nav: the footer is
+              where someone lands after reading, which is when an owner decides. */}
+          <div className="mt-4"><AddBotButton label="Add ClusterBot to your server" /></div>
           <div className="mt-4"><AppStoreBadges className="items-start" /></div>
         </div>
         <div>
           <div className="font-semibold mb-3 text-ink">{t("footer.product")}</div>
           <ul className="space-y-2 text-muted">
+            <li><Link href="/discord-bot" className="hover:text-ink">Discord bot</Link></li>
+            <li><Link href="/servers" className="hover:text-ink">Connected servers</Link></li>
             <li><Link href="/planets" className="hover:text-ink">{t("nav.planets")}</Link></li>
             <li><Link href="/leaderboards" className="hover:text-ink">{t("nav.leaderboards")}</Link></li>
             <li><Link href="/search" className="hover:text-ink">{t("common.findGamers")}</Link></li>

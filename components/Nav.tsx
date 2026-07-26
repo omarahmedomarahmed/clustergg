@@ -7,6 +7,7 @@ import GameLogo from "@/components/GameLogo";
 import UserMenu from "@/components/UserMenu";
 import MobileMenu from "@/components/MobileMenu";
 import BrandGlyph from "@/components/BrandGlyph";
+import AddBotButton from "@/components/AddBotButton";
 import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
@@ -159,6 +160,7 @@ export default async function Nav() {
                 slug={user.slug}
                 canAdmin={isStaff(user)}
               />
+              <AddBotButton size="sm" className="hidden lg:inline-flex" />
             </>
           ) : (
             <>
@@ -166,9 +168,10 @@ export default async function Nav() {
                 <Icon name="search" size={19} />
               </Link>
               <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>
+              <AddBotButton size="sm" className="hidden md:inline-flex" />
               <a href="/api/auth/discord?next=/onboarding" title="Sign in with Discord"
                 className="pressable inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white"
-                style={{ background: "#5865f2", boxShadow: "0 6px 18px -8px #5865f2" }}>
+                style={{ background: "#404eed", boxShadow: "0 6px 18px -8px #404eed" }}>
                 <BrandGlyph provider="discord" size={16} /> <span className="hidden sm:inline">{t("nav.signIn")}</span> Discord
               </a>
             </>

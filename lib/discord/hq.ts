@@ -4,6 +4,7 @@ import { getContent, setContent } from "@/lib/cms";
 import { canAct, siteUrl, CLUSTER_CHANNEL } from "@/lib/discord/config";
 import {
   listChannels, createChannel, postMessage, pinMessage, sameChannelName,
+  listRoles, createRole,
   type Channel, type ChannelKind,
 } from "@/lib/discord/rest";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
@@ -35,15 +36,34 @@ export type PlannedChannel = {
   topic?: string;
   // A starter message pinned on creation, so a new channel is never empty.
   pin?: { title: string; body: string; buttons?: "start" | "link" | "portal" };
+  // Staff-only. Operational feeds carry other servers' data and must never be
+  // readable by members who wander in.
+  staffOnly?: boolean;
 };
 
-export type PlannedCategory = { name: string; channels: PlannedChannel[] };
+export type PlannedCategory = { name: string; channels: PlannedChannel[]; staffOnly?: boolean };
+
+// Roles the bot creates once, as the foundation everything else builds on.
+// Per-game roles are what a member picks up when they link that game — and
+// they're the hook a paid cosmetic (a game logo on the role) hangs off later.
+export type PlannedRole = { name: string; color: number; hoist?: boolean };
+
+export function hqRoles(games: string[]): PlannedRole[] {
+  return [
+    { name: "Cluster Staff", color: 0x8b5cf6, hoist: true },
+    { name: "Server Owner", color: 0xfbbf24, hoist: true },
+    { name: "Monetized Server", color: 0x22d3ee },
+    { name: "Verified Gamer", color: 0x34d399 },
+    { name: "Challenge Winner", color: 0xf59e0b },
+    ...games.slice(0, 12).map((g) => ({ name: g, color: 0x5865f2 })),
+  ];
+}
 
 // What our server looks like. Ordinary community structure first, then the
 // things that only make sense because we run a bot.
 export function hqBlueprint(games: string[]): PlannedCategory[] {
   const lfg = games.slice(0, 8).map<PlannedChannel>((g) => ({
-    name: `lfg-${g.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`,
+    name: `lfg-${slugName(g)}`,
     kind: "text",
     topic: `Looking for a group on ${g}. Post your rank, region and what you're after.`,
     pin: {
@@ -51,6 +71,14 @@ export function hqBlueprint(games: string[]): PlannedCategory[] {
       body: `Link your ${g} account and your rank shows on your Cluster profile — so "LFG" here comes with proof.`,
       buttons: "link",
     },
+  }));
+
+  // One feed per game planet: its challenges, updates and reminders land in the
+  // channel for that game rather than in one firehose nobody reads.
+  const gameFeeds = games.slice(0, 12).map<PlannedChannel>((g) => ({
+    name: `${slugName(g)}-feed`,
+    kind: "text",
+    topic: `${g}: new challenges, standings updates and deadline reminders.`,
   }));
 
   return [
@@ -125,8 +153,43 @@ export function hqBlueprint(games: string[]): PlannedCategory[] {
             buttons: "portal",
           },
         },
-        { name: "bug-reports", kind: "text", topic: "Tell us what broke and how to reproduce it." },
         { name: "feature-requests", kind: "text", topic: "What should Cluster do next?" },
+      ],
+    },
+    {
+      name: "GAME FEEDS",
+      channels: [
+        ...gameFeeds,
+        {
+          name: "leaderboard-updates", kind: "text",
+          topic: "Movement on every leaderboard we run, across every game.",
+        },
+        {
+          name: "challenge-reminders", kind: "text",
+          topic: "Deadlines approaching, challenges ending, trophies awarded.",
+        },
+      ],
+    },
+    {
+      name: "REPORTS",
+      channels: [
+        { name: "bug-reports", kind: "text", topic: "Tell us what broke and how to reproduce it." },
+        { name: "report-a-player", kind: "text", topic: "Cheating, impersonation, an account that isn't theirs." },
+        { name: "report-a-server", kind: "text", topic: "A server misusing the bot or its challenges." },
+      ],
+    },
+    // Everything below is operational: it carries other servers' data, so it is
+    // staff-only. Discord has no "private category" — each channel denies
+    // @everyone individually, which is what actually enforces it.
+    {
+      name: "OPERATIONS", staffOnly: true,
+      channels: [
+        { name: "server-reports", kind: "text", topic: "Installs, unlocks and challenge requests from every server.", staffOnly: true },
+        { name: "new-servers", kind: "text", topic: "One post per server that adds the bot.", staffOnly: true },
+        { name: "bot-activity", kind: "text", topic: "Commands and button presses across every server.", staffOnly: true },
+        { name: "owner-requests", kind: "text", topic: "Challenge requests waiting on review.", staffOnly: true },
+        { name: "moderation-queue", kind: "text", topic: "Reports triaged out of the public report channels.", staffOnly: true },
+        { name: "errors", kind: "text", topic: "Failures worth a human looking at.", staffOnly: true },
       ],
     },
     {
@@ -166,7 +229,7 @@ export async function hqStatus(): Promise<{ guildId: string | null; setupDone: b
 
 // ===== The plan =====
 
-export type PlanRow = { category: string; name: string; kind: ChannelKind; exists: boolean };
+export type PlanRow = { category: string; name: string; kind: ChannelKind | "role"; exists: boolean; staffOnly?: boolean };
 export type HqPlan = {
   ok: boolean;
   reason?: string;
@@ -188,12 +251,26 @@ export async function planHqSetup(): Promise<HqPlan> {
   }
 
   const games = await activeGames();
+  const roles = await listRoles(guildId);
+  const haveRole = (n: string) =>
+    roles.ok && roles.data.some((r) => r.name.trim().toLowerCase() === n.trim().toLowerCase());
+
   const rows: PlanRow[] = [];
   for (const cat of hqBlueprint(games)) {
-    rows.push({ category: "", name: cat.name, kind: "category", exists: hasChannel(existing.data, cat.name, "category") });
+    rows.push({
+      category: "", name: cat.name, kind: "category",
+      exists: hasChannel(existing.data, cat.name, "category"), staffOnly: cat.staffOnly,
+    });
     for (const ch of cat.channels) {
-      rows.push({ category: cat.name, name: ch.name, kind: ch.kind, exists: hasChannel(existing.data, ch.name, ch.kind) });
+      rows.push({
+        category: cat.name, name: ch.name, kind: ch.kind,
+        exists: hasChannel(existing.data, ch.name, ch.kind), staffOnly: ch.staffOnly,
+      });
     }
+  }
+  rows.push({ category: "", name: "ROLES", kind: "category", exists: true });
+  for (const r of hqRoles(games)) {
+    rows.push({ category: "ROLES", name: r.name, kind: "role", exists: haveRole(r.name) });
   }
   return { ok: true, guildId, alreadySetUp: setupDone, rows, toCreate: rows.filter((r) => !r.exists).length };
 }
@@ -214,34 +291,56 @@ async function activeGames(): Promise<string[]> {
 
 // ===== The build =====
 
-export type HqSetupResult = { ok: boolean; created: number; pinned: number; skipped: number; reason?: string };
+export type HqSetupResult = {
+  ok: boolean; created: number; pinned: number; skipped: number; roles: number; reason?: string;
+};
 
 // Build (or finish building) HQ. Idempotent by construction — every channel is
 // created only if it isn't already there — and marked done so it doesn't run
 // again. `force` re-runs the same safe pass, which only fills in gaps.
 export async function runHqSetup(force = false): Promise<HqSetupResult> {
   const { guildId, setupDone } = await hqStatus();
-  if (!guildId) return { ok: false, created: 0, pinned: 0, skipped: 0, reason: "No HQ server id is set." };
-  if (!canAct()) return { ok: false, created: 0, pinned: 0, skipped: 0, reason: "DISCORD_BOT_TOKEN isn't set." };
+  const nothing = { ok: false, created: 0, pinned: 0, skipped: 0, roles: 0 };
+  if (!guildId) return { ...nothing, reason: "No HQ server id is set." };
+  if (!canAct()) return { ...nothing, reason: "DISCORD_BOT_TOKEN isn't set." };
   if (setupDone && !force) {
-    return { ok: true, created: 0, pinned: 0, skipped: 0, reason: "HQ is already set up. Nothing to do." };
+    return { ...nothing, ok: true, reason: "HQ is already set up. Nothing to do." };
   }
 
   const existing = await listChannels(guildId);
   if (!existing.ok) {
-    return { ok: false, created: 0, pinned: 0, skipped: 0, reason: `Couldn't read that server's channels (${existing.status}).` };
+    return { ...nothing, reason: `Couldn't read that server's channels (${existing.status}).` };
   }
   const channels = [...existing.data];
 
   let created = 0;
   let pinned = 0;
   let skipped = 0;
+  let rolesMade = 0;
 
   const games = await activeGames();
+
+  // Roles first: staff-only channels need the staff role to exist before they
+  // can grant it, or the channel would be invisible to everyone including us.
+  const existingRoles = await listRoles(guildId);
+  const roleByName = new Map(
+    (existingRoles.ok ? existingRoles.data : []).map((r) => [r.name.trim().toLowerCase(), r.id]),
+  );
+  for (const role of hqRoles(games)) {
+    const key = role.name.trim().toLowerCase();
+    if (roleByName.has(key)) { skipped++; continue; }
+    const made = await createRole(guildId, role.name, role.color, role.hoist);
+    if (made.ok) { roleByName.set(key, made.data.id); rolesMade++; }
+  }
+  const staffRole = roleByName.get("cluster staff");
+
   for (const cat of hqBlueprint(games)) {
     let parent = channels.find((c) => c.type === 4 && sameChannelName(c.name, cat.name)) ?? null;
     if (!parent) {
-      const made = await createChannel(guildId, cat.name, undefined, { kind: "category" });
+      const made = await createChannel(guildId, cat.name, undefined, {
+        kind: "category",
+        ...(cat.staffOnly && staffRole ? { privateToRoles: [staffRole] } : {}),
+      });
       if (made.ok) { parent = made.data; channels.push(made.data); created++; }
     } else skipped++;
 
@@ -250,6 +349,9 @@ export async function runHqSetup(force = false): Promise<HqSetupResult> {
       const made = await createChannel(guildId, ch.name, ch.topic, {
         kind: ch.kind,
         parentId: parent?.id ?? null,
+        // Discord has no "private category" — the deny has to be repeated on
+        // every channel, or an ops channel is readable by anyone who wanders in.
+        ...((ch.staffOnly || cat.staffOnly) && staffRole ? { privateToRoles: [staffRole] } : {}),
       });
       if (!made.ok) continue;
       channels.push(made.data);
@@ -266,7 +368,11 @@ export async function runHqSetup(force = false): Promise<HqSetupResult> {
   // DOES run once if the id is ever changed.
   try { await setContent(HQ_DONE_KEY, guildId); } catch { /* the channels exist either way */ }
 
-  return { ok: true, created, pinned, skipped };
+  return { ok: true, created, pinned, skipped, roles: rolesMade };
+}
+
+function slugName(g: string): string {
+  return g.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
 function starter(pin: NonNullable<PlannedChannel["pin"]>) {
@@ -297,7 +403,26 @@ export type HqEvent =
   | { type: "install"; guildName: string; guildId: string; members: number }
   | { type: "request"; guildName: string; title: string; game: string; prize: string }
   | { type: "unlock"; guildName: string; linked: number }
-  | { type: "removed"; guildName: string; guildId: string };
+  | { type: "removed"; guildName: string; guildId: string }
+  | { type: "challenge"; game: string; title: string; body: string; url?: string }
+  | { type: "leaderboard"; game: string; board: string; body: string }
+  | { type: "activity"; body: string }
+  | { type: "error"; where: string; body: string };
+
+// Which channel an event belongs in. One firehose is a channel nobody reads,
+// so each kind of news has a home — and a game's news goes to that game's feed.
+function channelFor(e: HqEvent): string[] {
+  switch (e.type) {
+    case "install": return ["new-servers", "server-reports"];
+    case "request": return ["owner-requests", "server-reports"];
+    case "unlock": return ["server-reports"];
+    case "removed": return ["new-servers", "server-reports"];
+    case "challenge": return [`${slugName(e.game)}-feed`, "challenge-reminders"];
+    case "leaderboard": return [`${slugName(e.game)}-feed`, "leaderboard-updates"];
+    case "activity": return ["bot-activity"];
+    case "error": return ["errors"];
+  }
+}
 
 // Send something worth knowing to HQ. Never throws and never blocks the caller:
 // a failed report must not fail an install.
@@ -306,7 +431,7 @@ export async function reportToHq(event: HqEvent): Promise<void> {
     const guildId = await hqGuildId();
     if (!guildId || !canAct()) return;
 
-    const channel = await hqChannel(guildId);
+    const channel = await hqChannel(guildId, channelFor(event));
     if (!channel) return;
 
     const { title, body, color } = describe(event);
@@ -316,12 +441,18 @@ export async function reportToHq(event: HqEvent): Promise<void> {
   } catch { /* reporting is never worth breaking the thing being reported */ }
 }
 
-// Prefer a dedicated ops channel; fall back to the bot channel we know exists.
-async function hqChannel(guildId: string): Promise<string | null> {
+// First preference that exists wins, falling back to channels every HQ has.
+// A report with nowhere to go is silently dropped rather than posted somewhere
+// members can read it.
+async function hqChannel(guildId: string, preferred: string[]): Promise<string | null> {
   const res = await listChannels(guildId);
   if (!res.ok) return null;
   const byName = (n: string) => res.data.find((c) => c.type === 0 && sameChannelName(c.name, n))?.id ?? null;
-  return byName("server-reports") ?? byName("announcements") ?? byName(CLUSTER_CHANNEL) ?? null;
+  for (const name of [...preferred, "server-reports", "announcements", CLUSTER_CHANNEL]) {
+    const id = byName(name);
+    if (id) return id;
+  }
+  return null;
 }
 
 function describe(e: HqEvent): { title: string; body: string; color: string } {
@@ -350,5 +481,17 @@ function describe(e: HqEvent): { title: string; body: string; color: string } {
         body: `**${e.guildName}**\n\`${e.guildId}\``,
         color: "#f87171",
       };
+    case "challenge":
+      return {
+        title: e.title,
+        body: `${e.body}${e.url ? `\n\n${e.url}` : ""}`,
+        color: "#8b5cf6",
+      };
+    case "leaderboard":
+      return { title: `${e.game} — ${e.board}`, body: e.body, color: "#22d3ee" };
+    case "activity":
+      return { title: "Bot activity", body: e.body, color: "#9aa0c3" };
+    case "error":
+      return { title: `Problem in ${e.where}`, body: e.body, color: "#f87171" };
   }
 }
