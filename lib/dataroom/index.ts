@@ -6,8 +6,10 @@ import { loadMetrics, METRICS, type Metrics } from "@/lib/admin-metrics";
 import { TIERS } from "@/lib/server-portal";
 import { SEED_DOCS, SEED_PEOPLE } from "@/lib/dataroom/defaults";
 import type { Doc, Person, Section, SectionData, SectionKind } from "@/lib/dataroom/types";
+import type { MilestoneLadder } from "@/lib/dataroom/types-client";
 
 export * from "@/lib/dataroom/types";
+export type { MilestoneLadder } from "@/lib/dataroom/types-client";
 
 // The data room: documents built out of ordered sections, with the numbers
 // read live at request time rather than typed into a slide.
@@ -128,14 +130,6 @@ export async function liveData(): Promise<LiveData> {
 // Deliberately shows the ladder ABOVE the current rung as well: a target you've
 // passed is history, and the interesting question for a reader is what the next
 // two look like.
-export type MilestoneLadder = {
-  current: number;
-  targets: { value: number; reached: boolean; isNext: boolean; pct: number }[];
-  next: number | null;
-  toNext: number;
-  pctToNext: number;
-};
-
 export function ladder(current: number, targets: number[]): MilestoneLadder {
   const sorted = [...new Set(targets)].filter((t) => t > 0).sort((a, b) => a - b);
   const next = sorted.find((t) => current < t) ?? null;
