@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import AddBotButton from "@/components/AddBotButton";
+import BotShowcase, { type BotStep } from "@/components/BotShowcase";
 import type { NetworkStats, PublicServer } from "@/lib/network";
 
 // The homepage's main pitch, directly under the hero.
@@ -8,11 +9,18 @@ import type { NetworkStats, PublicServer } from "@/lib/network";
 // Cluster is the engagement layer for Discord communities. The bot is the
 // product, the servers running it are the network, and their combined
 // membership is the reach — so those are the numbers here, not sign-up counts.
+//
+// The numbers and the live demo are one section, not two. Split across two
+// bands they read as two different pitches and a visitor scrolls past the
+// second; together, the claim and the proof of it sit on the same screen.
 
-export function DiscordSection({ stats, servers, copy }: {
+export function DiscordSection({ stats, servers, copy, steps, installUrl }: {
   stats: NetworkStats;
   servers: PublicServer[];
   copy: Record<string, string>;
+  /** The live in-Discord demo. Omitted when there's nothing real to show. */
+  steps?: BotStep[];
+  installUrl?: string | null;
 }) {
   const nf = (n: number) => n.toLocaleString();
   return (
@@ -49,6 +57,20 @@ export function DiscordSection({ stats, servers, copy }: {
           <BigStat label="Game accounts linked" value={nf(stats.linked)} hint="Members with live synced stats" />
           <BigStat label="Live challenges" value={nf(stats.challenges)} hint={`Across ${nf(stats.games)} games we sync`} />
         </div>
+
+        {/* The product itself, live. Every frame is a real card from our own
+            renderer inside a mock of Discord's chrome, and the buttons work —
+            because "pressing a button edits the message in place" is the thing
+            that has to land, and nobody believes it from a paragraph. */}
+        {steps && steps.length > 1 && (
+          <div className="mt-12">
+            <div className="flex items-baseline justify-between gap-3 mb-4 flex-wrap">
+              <h3 className="font-bold text-lg">This is what your members see</h3>
+              <span className="text-xs text-muted">Real cards from the live bot — press a button.</span>
+            </div>
+            <BotShowcase steps={steps} installUrl={installUrl} bare />
+          </div>
+        )}
 
         {/* What it does, in the order an owner experiences it. */}
         <div className="grid md:grid-cols-3 gap-4 mt-12">

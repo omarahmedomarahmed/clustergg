@@ -21,13 +21,17 @@ async function pick(): Promise<{ slug: string | null; game: string | null; chall
       db.select({ slug: schema.users.slug, banner: schema.users.bannerUrl })
         .from(schema.users).orderBy(desc(schema.users.voteCount), desc(schema.users.profileViews)).limit(8),
       db.select({ name: schema.games.name }).from(schema.games)
-        .where(eq(schema.games.isActive, true)).limit(4),
+        .where(eq(schema.games.isActive, true)).limit(40),
       db.select({ id: schema.challenges.id }).from(schema.challenges)
         .where(eq(schema.challenges.status, "active")).orderBy(desc(schema.challenges.startAt)).limit(1),
     ]);
     return {
       slug: (profiles.find((p) => p.banner) ?? profiles[0])?.slug ?? null,
-      game: games[0]?.name ?? null,
+      // League of Legends leads the demo on purpose: it is the deepest
+      // integration we have (rank, mastery, live match, recent games), so its
+      // cards are the ones that actually prove what the bot does. Whichever
+      // game happened to be first in the catalogue was an accident of seeding.
+      game: (games.find((g) => /league of legends/i.test(g.name)) ?? games[0])?.name ?? null,
       challengeId: challenges[0]?.id ?? null,
     };
   } catch {
@@ -62,7 +66,7 @@ export async function botShowcaseSteps(): Promise<BotStep[]> {
     buttons: [
       ...(game ? [{ label: game, emoji: "🪐", style: "primary" as const, to: "planet" }] : []),
       { label: "Connect a game", emoji: "🎮", style: "success" as const, to: "link" },
-      { label: "More", emoji: "⋯", style: "secondary" as const },
+      { label: "More", emoji: "🧭", style: "secondary" as const },
       { label: "Back", emoji: "◀", style: "secondary" as const, to: "start" },
     ],
   });
@@ -136,7 +140,7 @@ export async function botShowcaseSteps(): Promise<BotStep[]> {
         ...(game ? [{ label: game, emoji: "🎮", style: "primary" as const, to: "gamestats" }] : []),
         { label: "Share my profile", emoji: "📣", style: "success" as const },
         { label: "Cluster Points", emoji: "⚡", style: "secondary" as const, to: "cp" },
-        { label: "More", emoji: "⋯", style: "secondary" as const },
+        { label: "More", emoji: "🧭", style: "secondary" as const },
       ],
     });
 

@@ -20,7 +20,6 @@ import { slimImg } from "@/lib/img";
 import { timeAgo } from "@/lib/utils";
 import { networkStats, publicServers } from "@/lib/network";
 import { DiscordSection } from "@/components/DiscordSection";
-import BotShowcase from "@/components/BotShowcase";
 import { botShowcaseSteps } from "@/lib/bot-showcase";
 import { installUrl } from "@/lib/discord/config";
 import { OrganizationSchema, WebSiteSchema, BotSchema } from "@/components/StructuredData";
@@ -145,15 +144,11 @@ export default async function LandingPage() {
       {/* ===== THE PRODUCT: ClusterBot for Discord =====
           Placed immediately under the hero because it is what Cluster now is:
           the engagement layer for Discord communities. The galaxy above is how
-          you browse the games; this is what you actually adopt. */}
-      <DiscordSection stats={network} servers={topServers} copy={c} />
+          you browse the games; this is what you actually adopt.
 
-      {/* ===== HOW THE BOT WORKS =====
-          Shown, not described. Every frame is a real card from our own
-          renderer inside a mock of Discord's chrome, and the buttons work —
-          because "pressing a button edits the message in place" is the thing
-          that has to land, and nobody believes it from a paragraph. */}
-      {botSteps.length > 1 && <BotShowcase steps={botSteps} installUrl={install} />}
+          The network numbers and the live in-Discord demo are one section:
+          the claim and the proof of it belong on the same screen. */}
+      <DiscordSection stats={network} servers={topServers} copy={c} steps={botSteps} installUrl={install} />
 
       {/* ===== HERO ===== */}
       {skinnedPlanets.length > 0 ? (
