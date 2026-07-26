@@ -24,6 +24,74 @@ const ICON = { maxWidth: 160 } as const;
 
 const veil = (dim = 62) => `rgba(4,5,26,${Math.max(0, Math.min(100, dim)) / 100})`;
 
+// ===== Colour =====
+//
+// Accents come from gamers (the profile customizer), from admins (per-game and
+// per-quest themes) and from game data, so they arrive in every shape CSS
+// allows. Two of those shapes used to destroy the whole card:
+//
+//  - Translucency was applied by string concatenation — `${accent}22` — which
+//    is only valid when the colour is 6-digit hex. A perfectly legal `#f0f`
+//    became `#f0f22`, Satori threw "Failed to parse declaration", and the
+//    render failed outright. Anyone whose accent was shorthand hex had NO
+//    profile card at all, on the site and in Discord.
+//  - Any value Satori can't parse (an empty string, a stray word) did the same
+//    to the gradients.
+//
+// So alpha is expressed as rgba(), and anything unparseable falls back to the
+// house colours. One bad colour must never cost a card.
+const FALLBACK_ACCENT = "#8b5cf6";
+const FALLBACK_ACCENT2 = "#22d3ee";
+
+const NAMED: Record<string, string> = {
+  black: "#000000", white: "#ffffff", red: "#ff0000", green: "#008000", blue: "#0000ff",
+  yellow: "#ffff00", orange: "#ffa500", purple: "#800080", pink: "#ffc0cb", cyan: "#00ffff",
+  magenta: "#ff00ff", gray: "#808080", grey: "#808080", gold: "#ffd700", silver: "#c0c0c0",
+};
+
+// → [r, g, b] for anything we can read, else null.
+function rgbOf(color: string | null | undefined): [number, number, number] | null {
+  if (!color) return null;
+  const c = NAMED[color.trim().toLowerCase()] ?? color.trim();
+  const hex = /^#([0-9a-f]{3,8})$/i.exec(c);
+  if (hex) {
+    const h = hex[1];
+    // #rgb and #rgba expand each digit; #rrggbb and #rrggbbaa are read directly.
+    const parts = h.length === 3 || h.length === 4
+      ? [h[0] + h[0], h[1] + h[1], h[2] + h[2]]
+      : h.length === 6 || h.length === 8
+        ? [h.slice(0, 2), h.slice(2, 4), h.slice(4, 6)]
+        : null;
+    if (!parts) return null;
+    return parts.map((p) => parseInt(p, 16)) as [number, number, number];
+  }
+  const fn = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(c);
+  if (fn) return [Number(fn[1]), Number(fn[2]), Number(fn[3])];
+  return null;
+}
+
+// A colour safe to hand Satori, whatever came in.
+function safeColor(color: string | null | undefined, fallback = FALLBACK_ACCENT): string {
+  const rgb = rgbOf(color);
+  return rgb ? `rgb(${rgb[0]},${rgb[1]},${rgb[2]})` : fallback;
+}
+
+// The same colour at a given opacity. Replaces every `${accent}NN`.
+function alpha(color: string | null | undefined, a: number, fallback = FALLBACK_ACCENT): string {
+  const rgb = rgbOf(color) ?? rgbOf(fallback) ?? [139, 92, 246];
+  return `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${Math.max(0, Math.min(1, a))})`;
+}
+
+// Normalised once, at the top of every render, so no card body has to think
+// about it and a broken colour can't reach Satori through some path we missed.
+function safeTheme(theme: CardTheme): CardTheme {
+  return {
+    ...theme,
+    accent: safeColor(theme.accent, FALLBACK_ACCENT),
+    accent2: safeColor(theme.accent2, FALLBACK_ACCENT2),
+  };
+}
+
 // The shared frame: artwork → veil → accent glows → content → wordmark.
 function Frame({ theme, children, corner }: { theme: CardTheme; children: React.ReactNode; corner?: React.ReactNode }) {
   return (
@@ -49,8 +117,8 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
         </>
       ) : null}
       {/* accent glows */}
-      <div style={{ position: "absolute", top: -220, left: -160, width: 720, height: 720, borderRadius: 999, display: "flex", background: `${theme.accent}22` }} />
-      <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: `${theme.accent2}1c` }} />
+      <div style={{ position: "absolute", top: -220, left: -160, width: 720, height: 720, borderRadius: 999, display: "flex", background: alpha(theme.accent, 0.13) }} />
+      <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: alpha(theme.accent2, 0.11, FALLBACK_ACCENT2) }} />
       {/* top accent bar */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
       {/* The astronaut, bottom-LEFT and behind the content. It shares the
@@ -88,24 +156,26 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
 
 function Pill({ children, color = MUTED, bg = "rgba(255,255,255,0.07)" }: { children: React.ReactNode; color?: string; bg?: string }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 16px", borderRadius: 999, background: bg, color, fontSize: 21, fontWeight: 700 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 16px", borderRadius: 999, background: bg, color: safeColor(color, MUTED), fontSize: 21, fontWeight: 700 }}>
       {children}
     </div>
   );
 }
 
-function Avatar({ url, size = 104, ring }: { url?: string | null; size?: number; ring: string }) {
+function Avatar({ url, size = 104, ring: raw }: { url?: string | null; size?: number; ring: string }) {
+  const ring = safeColor(raw);
   return url ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img src={url} alt="" width={size} height={size}
       style={{ width: size, height: size, borderRadius: size / 2, objectFit: "cover", border: `4px solid ${ring}` }} />
   ) : (
-    <div style={{ width: size, height: size, borderRadius: size / 2, display: "flex", alignItems: "center", justifyContent: "center", background: `${ring}33`, border: `4px solid ${ring}`, fontSize: size * 0.42, fontWeight: 700 }}>C</div>
+    <div style={{ width: size, height: size, borderRadius: size / 2, display: "flex", alignItems: "center", justifyContent: "center", background: alpha(ring, 0.2), border: `4px solid ${ring}`, fontSize: size * 0.42, fontWeight: 700 }}>C</div>
   );
 }
 
-function Bar({ pct, accent, accent2, h = 16 }: { pct: number; accent: string; accent2: string; h?: number }) {
+function Bar({ pct, accent: a1, accent2: a2, h = 16 }: { pct: number; accent: string; accent2: string; h?: number }) {
   const w = Math.max(2, Math.min(100, pct));
+  const [accent, accent2] = [safeColor(a1), safeColor(a2, FALLBACK_ACCENT2)];
   return (
     <div style={{ display: "flex", width: "100%", height: h, borderRadius: 999, background: "rgba(255,255,255,0.10)", overflow: "hidden" }}>
       <div style={{ display: "flex", width: `${w}%`, height: h, borderRadius: 999, background: `linear-gradient(90deg, ${accent}, ${accent2})` }} />
@@ -113,7 +183,8 @@ function Bar({ pct, accent, accent2, h = 16 }: { pct: number; accent: string; ac
   );
 }
 
-function Title({ text, sub, accent, accent2 }: { text: string; sub?: string | null; accent: string; accent2: string }) {
+function Title({ text, sub, accent: a1, accent2: a2 }: { text: string; sub?: string | null; accent: string; accent2: string }) {
+  const [accent, accent2] = [safeColor(a1), safeColor(a2, FALLBACK_ACCENT2)];
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
       <div style={{ fontSize: 58, fontWeight: 700, lineHeight: 1.05, color: INK }}>{text}</div>
@@ -171,7 +242,7 @@ function ProfileBody(d: ProfileCard) {
                 {a.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={a.logoUrl} alt="" width={44} height={44} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
-                ) : <div style={{ width: 44, height: 44, borderRadius: 10, display: "flex", background: `${t.accent}33` }} />}
+                ) : <div style={{ width: 44, height: 44, borderRadius: 10, display: "flex", background: alpha(t.accent, 0.2) }} />}
                 <div style={{ display: "flex", flexDirection: "column" }}>
                   <div style={{ fontSize: 23, fontWeight: 700 }}>{clamp(a.tag, 20)}</div>
                   <div style={{ fontSize: 18, color: MUTED }}>{a.headline || a.game}</div>
@@ -242,9 +313,9 @@ function GameStatsBody(d: GameStatsCard) {
               <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 122 }}>
                 {c.iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.iconUrl} alt="" width={64} height={64} style={{ width: 64, height: 64, borderRadius: 32, objectFit: "cover", border: `3px solid ${t.accent}88` }} />
+                  <img src={c.iconUrl} alt="" width={64} height={64} style={{ width: 64, height: 64, borderRadius: 32, objectFit: "cover", border: `3px solid ${alpha(t.accent, 0.53)}` }} />
                 ) : (
-                  <div style={{ display: "flex", width: 64, height: 64, borderRadius: 32, background: `${t.accent}33`, border: `3px solid ${t.accent}88` }} />
+                  <div style={{ display: "flex", width: 64, height: 64, borderRadius: 32, background: alpha(t.accent, 0.2), border: `3px solid ${alpha(t.accent, 0.53)}` }} />
                 )}
                 <div style={{ fontSize: 17, fontWeight: 700 }}>{clamp(c.name, 12)}</div>
                 {c.points ? <div style={{ fontSize: 14, color: MUTED }}>{`${Math.round(c.points / 1000)}k`}</div> : null}
@@ -304,7 +375,7 @@ function QuestBody(d: QuestCard) {
           stretching to fill the remaining card height. */}
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 34, flex: 1 }}>
         {d.tiers.slice(0, 5).map((tier, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, padding: "18px 10px", borderRadius: 20, background: tier.earned ? `${t.accent}1f` : "rgba(0,0,0,0.42)", border: `1px solid ${tier.earned ? `${t.accent}88` : "rgba(255,255,255,0.10)"}` }}>
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, padding: "18px 10px", borderRadius: 20, background: tier.earned ? alpha(t.accent, 0.12) : "rgba(0,0,0,0.42)", border: `1px solid ${tier.earned ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.10)"}` }}>
             <div style={{ display: "flex", width: 22, height: 22, borderRadius: 11, background: tier.earned ? t.accent : "transparent", border: `3px solid ${tier.earned ? t.accent : "rgba(255,255,255,0.32)"}` }} />
             <div style={{ fontSize: 21, fontWeight: 700, color: tier.earned ? t.accent : MUTED }}>{tier.name}</div>
             <div style={{ fontSize: 18, color: MUTED }}>{`${nf(tier.threshold)} CP`}</div>
@@ -354,7 +425,7 @@ function LeaderboardBody(d: LeaderboardCard) {
       ) : (
       <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 24, flex: 1 }}>
         {d.rows.slice(0, 8).map((r) => (
-          <div key={r.rank} style={{ display: "flex", alignItems: "center", gap: 16, padding: "10px 20px", borderRadius: 14, background: r.you ? `${t.accent}26` : "rgba(0,0,0,0.42)", border: `1px solid ${r.you ? `${t.accent}88` : "rgba(255,255,255,0.08)"}` }}>
+          <div key={r.rank} style={{ display: "flex", alignItems: "center", gap: 16, padding: "10px 20px", borderRadius: 14, background: r.you ? alpha(t.accent, 0.15) : "rgba(0,0,0,0.42)", border: `1px solid ${r.you ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.08)"}` }}>
             <div style={{ fontSize: 27, fontWeight: 700, width: 52, color: medal[r.rank - 1] ?? MUTED }}>{`#${r.rank}`}</div>
             {r.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -501,12 +572,12 @@ function PlanetsBody(d: PlanetsCard) {
       <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
       <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 14, marginTop: 26, flex: 1 }}>
         {d.games.slice(0, 12).map((g, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, width: 168, height: 132, borderRadius: 20, background: "rgba(0,0,0,0.45)", border: `1px solid ${g.accent ? `${g.accent}66` : "rgba(255,255,255,0.10)"}` }}>
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, width: 168, height: 132, borderRadius: 20, background: "rgba(0,0,0,0.45)", border: `1px solid ${g.accent ? alpha(g.accent, 0.4) : "rgba(255,255,255,0.10)"}` }}>
             {g.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={g.logoUrl} alt="" width={56} height={56} style={{ width: 56, height: 56, borderRadius: 14, objectFit: "cover" }} />
             ) : (
-              <div style={{ display: "flex", width: 56, height: 56, borderRadius: 14, background: `${g.accent ?? t.accent}44` }} />
+              <div style={{ display: "flex", width: 56, height: 56, borderRadius: 14, background: alpha(g.accent ?? t.accent, 0.27) }} />
             )}
             <div style={{ fontSize: 19, fontWeight: 700, color: g.accent ?? INK }}>{clamp(g.name, 15)}</div>
           </div>
@@ -523,7 +594,7 @@ function GuideBody(d: GuideCard) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
     ) : undefined}>
-      {d.badge ? <div style={{ display: "flex", marginBottom: 14 }}><Pill color={t.accent} bg={`${t.accent}1f`}>{d.badge}</Pill></div> : null}
+      {d.badge ? <div style={{ display: "flex", marginBottom: 14 }}><Pill color={t.accent} bg={alpha(t.accent, 0.12)}>{d.badge}</Pill></div> : null}
       <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} />
       {/* overflow:hidden keeps a long admin-written guide from ever pushing the
           footer off the card — the steps clip instead of breaking the layout. */}
@@ -534,7 +605,7 @@ function GuideBody(d: GuideCard) {
           const room = d.steps.length <= 3 ? 210 : 116;
           return (
             <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 42, height: 42, borderRadius: 21, background: `${t.accent}2b`, color: t.accent, fontSize: 23, fontWeight: 700 }}>{i + 1}</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 42, height: 42, borderRadius: 21, background: alpha(t.accent, 0.17), color: t.accent, fontSize: 23, fontWeight: 700 }}>{i + 1}</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
                 <div style={{ fontSize: 26, fontWeight: 700 }}>{clamp(s.title, 46)}</div>
                 <div style={{ fontSize: d.steps.length <= 3 ? 19 : 20, color: MUTED, lineHeight: 1.32 }}>{clamp(s.body, room)}</div>
@@ -590,7 +661,9 @@ async function prepareCard(d: CardData): Promise<CardData> {
     withDeadline(prepareBody(d), d),
     withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
   ]);
-  return { ...body, theme: { ...body.theme, ...brand } } as CardData;
+  // Colours are normalised here, once, on the way in — so every card body can
+  // use `theme.accent` directly and no unparseable value ever reaches Satori.
+  return { ...body, theme: safeTheme({ ...body.theme, ...brand }) } as CardData;
 }
 
 // The background, with fallbacks. Tried in order and stops at the first that
@@ -685,9 +758,25 @@ export async function renderCard(data: CardData): Promise<ImageResponse> {
 }
 
 // Render a card to a raw PNG Buffer (for storing in Blob / attaching to Discord).
+//
+// One retry, deliberately. Satori fails the whole render on a single bad style
+// value, and these cards ARE the bot's interface — a failed render is a button
+// that does nothing, which is far worse than a card missing its custom art. So
+// if the styled card throws, we draw it again stripped back to house colours
+// and no background, which has no untrusted input left in it.
 export async function renderCardBuffer(data: CardData): Promise<Buffer> {
-  const res = await renderCard(data);
-  return Buffer.from(await res.arrayBuffer());
+  try {
+    const res = await renderCard(data);
+    return Buffer.from(await res.arrayBuffer());
+  } catch (err) {
+    console.error("[cards] render failed, retrying plain:", (err as Error)?.message);
+    const plain = {
+      ...data,
+      theme: { ...data.theme, accent: FALLBACK_ACCENT, accent2: FALLBACK_ACCENT2, bgUrl: null, bgFallbacks: [] },
+    } as CardData;
+    const res = await renderCard(plain);
+    return Buffer.from(await res.arrayBuffer());
+  }
 }
 
 // A PNG of a photographic background is 2-3 MB. That's slow for Discord to

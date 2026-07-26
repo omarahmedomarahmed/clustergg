@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { BANNER_ART } from "@/lib/assets";
 
@@ -105,6 +105,23 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "card.bg.quest_missions": "https://d8j0ntlcm91z4.cloudfront.net/user_3AxCA7tynxuPEenQCjJiU5h0082/hf_20260722_010244_4c9666d0-355d-4ad3-a8be-0c378eae0c9a.png",
 };
 
+// `platform_settings.value` is a jsonb column, and reading it back as a JS
+// value cannot be trusted: the Postgres driver already parses jsonb, and the
+// ORM then parses the result a second time. A stored string survives that only
+// if it isn't itself valid JSON — so "Turn your Discord into a competition."
+// comes back intact while "1234567890123456789" comes back as the NUMBER
+// 1234567890123456800, silently precision-mangled and no longer a string.
+//
+// That quietly broke every numeric setting we store (a Discord server id, orb
+// size, logo zoom): the value saved, then read back as a non-string and got
+// discarded in favour of the default. So we never read the parsed value —
+// `#>>'{}'` unwraps the jsonb to text in the database, which is exact for long
+// ids and identical for ordinary copy.
+const TEXT_VALUE = {
+  key: schema.platformSettings.key,
+  text: sql<string | null>`${schema.platformSettings.value}#>>'{}'`,
+};
+
 // Content is locale-aware: Arabic values live under a "<key>@ar" namespaced key
 // and OVERLAY the English value when the active locale is Arabic (empty ar value
 // falls back to English → the site is never blank while translation is ongoing).
@@ -120,9 +137,9 @@ export async function getContent(keys: string[], localeOverride?: "en" | "ar"): 
   const fetchKeys = locale === "ar" ? [...keys, ...keys.map((k) => `${k}@ar`)] : keys;
   try {
     const db = await getDb();
-    const rows = await db.select().from(schema.platformSettings)
+    const rows = await db.select(TEXT_VALUE).from(schema.platformSettings)
       .where(inArray(schema.platformSettings.key, fetchKeys));
-    const map = new Map(rows.map((r) => [r.key, typeof r.value === "string" ? r.value : ""]));
+    const map = new Map(rows.map((r) => [r.key, r.text ?? ""]));
     for (const k of keys) {
       const base = map.get(k);
       if (typeof base === "string" && base) out[k] = base;
@@ -139,9 +156,9 @@ export async function getRawContent(keys: string[], locale: "en" | "ar"): Promis
   const storeKeys = locale === "ar" ? keys.map((k) => `${k}@ar`) : keys;
   try {
     const db = await getDb();
-    const rows = await db.select().from(schema.platformSettings)
+    const rows = await db.select(TEXT_VALUE).from(schema.platformSettings)
       .where(inArray(schema.platformSettings.key, storeKeys));
-    const map = new Map(rows.map((r) => [r.key, typeof r.value === "string" ? r.value : ""]));
+    const map = new Map(rows.map((r) => [r.key, r.text ?? ""]));
     for (const k of keys) out[k] = map.get(locale === "ar" ? `${k}@ar` : k) ?? "";
   } catch { /* empty */ }
   return out;

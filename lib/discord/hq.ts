@@ -5,7 +5,7 @@ import { canAct, siteUrl, CLUSTER_CHANNEL } from "@/lib/discord/config";
 import {
   listChannels, createChannel, postMessage, pinMessage, sameChannelName,
   listRoles, createRole,
-  type Channel, type ChannelKind,
+  type Channel, type ChannelKind, type Role,
 } from "@/lib/discord/rest";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
@@ -237,42 +237,66 @@ export type HqPlan = {
   alreadySetUp: boolean;
   rows: PlanRow[];
   toCreate: number;
+  /** True when the rows are the blueprint rather than a diff against the real
+   *  server — we couldn't read it, so nothing is known to exist yet. */
+  preview: boolean;
 };
 
 export async function planHqSetup(): Promise<HqPlan> {
   const { guildId, setupDone } = await hqStatus();
-  const empty: HqPlan = { ok: false, guildId, alreadySetUp: setupDone, rows: [], toCreate: 0 };
-  if (!guildId) return { ...empty, reason: "No HQ server id is set." };
-  if (!canAct()) return { ...empty, reason: "DISCORD_BOT_TOKEN isn't set, so the bot can't inspect or build anything." };
+  const games = await activeGames();
+
+  // The blueprint, always. Even when we can't reach the server there is a real
+  // answer to "what would this build?", and showing it beats an empty box —
+  // that's the whole reason this page asks for confirmation.
+  const blueprint = (existing: Channel[] | null, roles: Role[] | null): PlanRow[] => {
+    const haveRole = (n: string) =>
+      !!roles && roles.some((r) => r.name.trim().toLowerCase() === n.trim().toLowerCase());
+    const rows: PlanRow[] = [];
+    for (const cat of hqBlueprint(games)) {
+      rows.push({
+        category: "", name: cat.name, kind: "category",
+        exists: !!existing && hasChannel(existing, cat.name, "category"), staffOnly: cat.staffOnly,
+      });
+      for (const ch of cat.channels) {
+        rows.push({
+          category: cat.name, name: ch.name, kind: ch.kind,
+          exists: !!existing && hasChannel(existing, ch.name, ch.kind), staffOnly: ch.staffOnly,
+        });
+      }
+    }
+    rows.push({ category: "", name: "ROLES", kind: "category", exists: !!existing });
+    for (const r of hqRoles(games)) {
+      rows.push({ category: "ROLES", name: r.name, kind: "role", exists: haveRole(r.name) });
+    }
+    return rows;
+  };
+
+  const unread = (reason: string): HqPlan => {
+    const rows = blueprint(null, null);
+    return { ok: false, reason, guildId, alreadySetUp: setupDone, rows, toCreate: rows.length, preview: true };
+  };
+
+  if (!guildId) return unread("No HQ server id is set — paste it above and save.");
+  if (!canAct()) return unread("DISCORD_BOT_TOKEN isn't set, so the bot can't inspect or build anything.");
 
   const existing = await listChannels(guildId);
   if (!existing.ok) {
-    return { ...empty, reason: `Couldn't read that server's channels (${existing.status}). Is the bot in it?` };
+    return unread(
+      existing.status === 403 || existing.status === 401
+        ? `The bot can't read that server (${existing.status}). Add ClusterBot to it, and make sure it has Manage Channels and Manage Roles.`
+        : existing.status === 404
+          ? "No server with that id — check you copied the server id (not a channel or user id), and that the bot has been added to it."
+          : `Couldn't read that server's channels (${existing.status}).`,
+    );
   }
 
-  const games = await activeGames();
   const roles = await listRoles(guildId);
-  const haveRole = (n: string) =>
-    roles.ok && roles.data.some((r) => r.name.trim().toLowerCase() === n.trim().toLowerCase());
-
-  const rows: PlanRow[] = [];
-  for (const cat of hqBlueprint(games)) {
-    rows.push({
-      category: "", name: cat.name, kind: "category",
-      exists: hasChannel(existing.data, cat.name, "category"), staffOnly: cat.staffOnly,
-    });
-    for (const ch of cat.channels) {
-      rows.push({
-        category: cat.name, name: ch.name, kind: ch.kind,
-        exists: hasChannel(existing.data, ch.name, ch.kind), staffOnly: ch.staffOnly,
-      });
-    }
-  }
-  rows.push({ category: "", name: "ROLES", kind: "category", exists: true });
-  for (const r of hqRoles(games)) {
-    rows.push({ category: "ROLES", name: r.name, kind: "role", exists: haveRole(r.name) });
-  }
-  return { ok: true, guildId, alreadySetUp: setupDone, rows, toCreate: rows.filter((r) => !r.exists).length };
+  const rows = blueprint(existing.data, roles.ok ? roles.data : null);
+  return {
+    ok: true, guildId, alreadySetUp: setupDone, rows, preview: false,
+    toCreate: rows.filter((r) => !r.exists).length,
+  };
 }
 
 function hasChannel(all: Channel[], name: string, kind: ChannelKind): boolean {

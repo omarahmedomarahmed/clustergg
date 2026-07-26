@@ -32,11 +32,13 @@ export function HqServerForm({ guildId }: { guildId: string | null }) {
   );
 }
 
-export function HqBuildButton({ toCreate, alreadySetUp }: { toCreate: number; alreadySetUp: boolean }) {
+export function HqBuildButton({ toCreate, alreadySetUp, blocked }: {
+  toCreate: number; alreadySetUp: boolean; blocked?: boolean;
+}) {
   const [state, act, busy] = useActionState<BotActionState, FormData>(buildHqServer, undefined);
   return (
     <form action={act} className="space-y-3">
-      {alreadySetUp && (
+      {alreadySetUp && !blocked && (
         <label className="flex items-start gap-2 text-xs text-muted">
           <input type="checkbox" name="force" className="accent-amber-500 mt-0.5" />
           <span>
@@ -46,10 +48,12 @@ export function HqBuildButton({ toCreate, alreadySetUp }: { toCreate: number; al
         </label>
       )}
       <button
-        disabled={busy || (toCreate === 0 && !alreadySetUp)}
+        disabled={busy || blocked || (toCreate === 0 && !alreadySetUp)}
         className="grad-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-60"
       >
-        {busy ? "Building…" : toCreate > 0 ? `Build ${toCreate} missing channel${toCreate === 1 ? "" : "s"}` : "Nothing to build"}
+        {busy ? "Building…"
+          : blocked ? "Can't build yet"
+            : toCreate > 0 ? `Build ${toCreate} missing channel${toCreate === 1 ? "" : "s"}` : "Nothing to build"}
       </button>
       {state?.ok && <p className="text-sm text-emerald-300">{state.ok}</p>}
       {state?.error && <p className="text-sm text-amber-300">{state.error}</p>}
@@ -60,23 +64,23 @@ export function HqBuildButton({ toCreate, alreadySetUp }: { toCreate: number; al
 // What the build would do, before it does it. Creating channels in a real
 // server is the least reversible thing the bot does, so it is shown in full
 // first rather than described.
-export function HqPlanTable({ rows }: { rows: PlanRow[] }) {
+export function HqPlanTable({ rows, preview }: { rows: PlanRow[]; preview?: boolean }) {
   if (rows.length === 0) return null;
   return (
     <div className="rounded-xl border border-white/10 overflow-hidden">
       {rows.map((r, i) => (
         r.kind === "category" ? (
-          <div key={i} className="bg-white/5 px-4 py-2 text-[11px] uppercase tracking-widest font-bold flex items-center justify-between">
+          <div key={i} className="bg-white/5 px-4 py-2 text-[11px] uppercase tracking-widest font-bold flex items-center justify-between gap-3">
             <span>{r.name}</span>
-            <Mark exists={r.exists} />
+            <Mark exists={r.exists} preview={preview} />
           </div>
         ) : (
-          <div key={i} className="px-4 py-1.5 text-sm flex items-center justify-between border-t border-white/5">
-            <span className="text-muted">
-              <span className="text-muted/60">{r.kind === "voice" ? "🔊 " : "# "}</span>
+          <div key={i} className="px-4 py-1.5 text-sm flex items-center justify-between gap-3 border-t border-white/5">
+            <span className="text-muted truncate">
+              <span className="text-muted/60">{r.kind === "voice" ? "🔊 " : r.kind === "role" ? "@ " : "# "}</span>
               {r.name}
             </span>
-            <Mark exists={r.exists} />
+            <Mark exists={r.exists} preview={preview} />
           </div>
         )
       ))}
@@ -84,8 +88,9 @@ export function HqPlanTable({ rows }: { rows: PlanRow[] }) {
   );
 }
 
-function Mark({ exists }: { exists: boolean }) {
+function Mark({ exists, preview }: { exists: boolean; preview?: boolean }) {
+  if (preview) return <span className="text-[11px] text-muted shrink-0">planned</span>;
   return exists
-    ? <span className="text-[11px] text-muted">exists</span>
-    : <span className="text-[11px] text-emerald-300 font-semibold">will create</span>;
+    ? <span className="text-[11px] text-muted shrink-0">exists</span>
+    : <span className="text-[11px] text-emerald-300 font-semibold shrink-0">will create</span>;
 }
