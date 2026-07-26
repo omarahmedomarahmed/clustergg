@@ -157,6 +157,24 @@ export async function searchGamers(query: string, limit = 20): Promise<FoundGame
 }
 
 // Autocomplete source for `/cluster show`: in-game names for one game.
+// People, for the one autocomplete box `/cluster` now has.
+//
+// Not scoped to a game: somebody typing a name into that box knows the name,
+// not which of our twenty-four integrations it belongs to. The value carries
+// the `gamer:` prefix so the resolver never has to guess whether "Ascension"
+// meant a quest or a person.
+export async function gamerChoices(q: string, limit = 8): Promise<{ name: string; value: string }[]> {
+  const needle = q.trim();
+  if (needle.length < 2) return [];
+  try {
+    const found = await searchGamers(needle, limit);
+    return found.map((g) => ({
+      name: `${g.displayName}${g.inGameName && g.inGameName !== g.displayName ? ` · ${g.inGameName}` : ""} — gamer`.slice(0, 100),
+      value: `gamer:${(g.inGameName || g.slug).slice(0, 90)}`,
+    }));
+  } catch { return []; }
+}
+
 export async function inGameNameChoices(game: string, q: string, limit = 20): Promise<{ name: string; value: string }[]> {
   try {
     const db = await getDb();

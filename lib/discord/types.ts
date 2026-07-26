@@ -77,16 +77,45 @@ export function isGuildManager(i: Interaction): boolean {
   return (p & 0x8n) !== 0n || (p & 0x20n) !== 0n;
 }
 
-// Flatten `/cluster show what:profile` into { sub: "show", opts: { what: "profile" } }.
-export function readCommand(i: Interaction): { sub: string; opts: Record<string, string>; focused?: string } {
+// Flatten `/cluster show:profile` into { query: "profile" }.
+//
+// Options are read from the top level AND from a subcommand, because a bot that
+// was live under the old subcommand shape can still receive one: Discord serves
+// whatever command definition a client last synced, and a client that hasn't
+// refreshed will keep sending `/cluster show what:…` for a while after the flat
+// command is registered. Reading both means those users keep working instead of
+// getting silence until their client catches up.
+export function readCommand(i: Interaction): { query: string; focused?: string } {
   const top = i.data?.options ?? [];
   const subOpt = top.find((o) => o.type === OptionType.SubCommand);
-  const sub = subOpt?.name ?? "home";
+  const flat = subOpt ? subOpt.options ?? [] : top;
+
   const opts: Record<string, string> = {};
   let focused: string | undefined;
-  for (const o of subOpt?.options ?? []) {
+  for (const o of flat) {
     if (o.value != null) opts[o.name] = String(o.value);
     if (o.focused) focused = o.name;
   }
-  return { sub, opts, focused };
+
+  // The flat shape: one option, whatever it was called.
+  if (!subOpt) return { query: (opts.show ?? Object.values(opts)[0] ?? "").trim(), focused };
+
+  // A legacy `/cluster <sub> …` invocation, translated into the same token
+  // vocabulary the flat command speaks.
+  const a = (k: string) => (opts[k] ?? "").trim();
+  const legacy: Record<string, string> = {
+    home: "",
+    show: a("gamer") ? `gamer:${a("gamer")}` : a("what") || "profile",
+    planet: `planet:${a("game")}`,
+    leaderboard: `board:${a("game")}`,
+    challenge: `challenges:${a("game")}`,
+    quest: `quest:${a("name")}`,
+    link: `link:${a("game")}`,
+    guide: `guide:${a("topic") || "getting-started"}`,
+    share: "share",
+    server: "admin:growth",
+    admin: "admin",
+    help: "help",
+  };
+  return { query: legacy[subOpt.name] ?? "", focused };
 }

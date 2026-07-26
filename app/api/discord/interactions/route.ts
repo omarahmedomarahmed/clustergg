@@ -6,7 +6,7 @@ import {
   actor, readCommand, isGuildManager, ButtonStyle, type Interaction,
 } from "@/lib/discord/types";
 import { parseId, frame, rows, button, navButton, linkButton, actionId, type Frame } from "@/lib/discord/components";
-import { gameChoices, questChoices, guideChoices, showChoices } from "@/lib/discord/catalog";
+import { openChoices } from "@/lib/discord/catalog";
 import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef, embedColor } from "@/lib/discord/cards";
@@ -20,7 +20,7 @@ import { ensurePortal } from "@/lib/server-portal";
 import { reportToHq } from "@/lib/discord/hq";
 import { dmUser } from "@/lib/discord/rest";
 import { castDiscordVote } from "@/lib/identity";
-import { inGameNameChoices } from "@/lib/gamer-lookup";
+import { gamerChoices } from "@/lib/gamer-lookup";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
@@ -299,22 +299,20 @@ async function notifyStaffOfRequest(requestId: string): Promise<void> {
 // ===== Autocomplete (must answer synchronously) =====
 
 async function autocomplete(i: Interaction) {
-  const { sub, opts, focused } = readCommand(i);
-  const q = focused ? (opts[focused] ?? "") : "";
+  const { query } = readCommand(i);
   let choices: { name: string; value: string }[] = [];
   try {
-    if (focused === "game") choices = await gameChoices(q);
-    else if (focused === "name") choices = await questChoices(q);
-    else if (focused === "topic") choices = await guideChoices(q);
-    else if (focused === "gamer") {
-      // Suggest real in-game names for whichever game they picked, so
-      // `/cluster show valorant …` completes to people who actually exist.
-      const what = opts.what ?? "";
-      const game = what.startsWith("game:") ? what.slice(5) : what;
-      choices = game && !/^(profile|cp|discord)$/i.test(game) ? await inGameNameChoices(game, q) : [];
+    // One box means one list: everything the bot can open, live from the
+    // database. Discord caps it at 25, so the destinations rank ahead of the
+    // people — a short query is far more likely to be "valorant" than a name.
+    choices = await openChoices(query, { isManager: isGuildManager(i) });
+    if (choices.length < 25 && query.trim().length >= 2) {
+      const seen = new Set(choices.map((c) => c.value));
+      for (const g of await gamerChoices(query)) {
+        if (choices.length >= 25) break;
+        if (!seen.has(g.value)) choices.push(g);
+      }
     }
-    else if (focused === "what") choices = await showChoices(q);
-    else if (sub === "show") choices = await showChoices(q);
   } catch { choices = []; }
   return { type: InteractionResponseType.AutocompleteResult, data: { choices } };
 }
@@ -322,13 +320,13 @@ async function autocomplete(i: Interaction) {
 // ===== Slash commands =====
 
 function command(i: Interaction) {
-  const { sub, opts } = readCommand(i);
+  const { query } = readCommand(i);
   const who = actor(i);
   if (!who) return json({ type: InteractionResponseType.Pong });
 
   // `share` posts publicly on purpose — that's the point of sharing. Everything
   // else is ephemeral so the bot never floods a channel.
-  const isShare = sub === "share";
+  const isShare = query.trim().toLowerCase() === "share";
   const flags = isShare ? undefined : MessageFlags.Ephemeral;
 
   const started = Date.now();
@@ -337,7 +335,7 @@ function command(i: Interaction) {
     try {
       ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
       if (isShare) return void (await share(i.token, ctx));
-      const target = screenForCommand(sub, opts);
+      const target = await screenForCommand(query);
       const payload = await renderScreen(target, target.screen === "home" ? [] : [frame("home")], ctx);
       await editOriginal(i.token, { ...payload, flags: payload.flags ?? flags });
     } catch {
@@ -345,7 +343,7 @@ function command(i: Interaction) {
     } finally {
       void logCommand({
         guildId: i.guild_id, discordId: who.id, userId: ctx?.gamer?.userId ?? null,
-        command: `cluster ${sub}`, arg: Object.values(opts)[0] ?? null,
+        command: `cluster ${query.split(":")[0] || "home"}`, arg: query || null,
         latencyMs: Date.now() - started,
       });
     }

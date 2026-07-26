@@ -74,3 +74,38 @@ export async function showChoices(q: string): Promise<Choice[]> {
   ];
   return match(list, q);
 }
+
+// The whole bot, in one autocomplete.
+//
+// `/cluster` now takes a single box, so this is the entire menu — everything a
+// subcommand used to be, plus everything a subcommand's option used to be, as
+// flat destinations. Built from live data, so a game added this morning is
+// typeable this morning.
+//
+// Ordering is deliberate: with a 25-choice cap and an empty query, what shows
+// is what a first-time user sees. Identity first (it's why they typed the
+// command), then the things to do, then the reference material.
+export async function openChoices(q: string, opts: { isManager?: boolean } = {}): Promise<Choice[]> {
+  const c = await catalog();
+  const list: Choice[] = [
+    { name: "My profile card", value: "profile" },
+    { name: "My Cluster Points", value: "cp" },
+    { name: "Live challenges", value: "challenges:" },
+    { name: "All games", value: "planets" },
+    { name: "Share my profile publicly", value: "share" },
+    ...c.games.map((g) => ({ name: `${g.name} — planet`, value: `planet:${g.value}` })),
+    ...c.games.map((g) => ({ name: `${g.name} — my stats`, value: `game:${g.value}` })),
+    ...c.games.map((g) => ({ name: `${g.name} — leaderboard`, value: `board:${g.value}` })),
+    ...c.games.map((g) => ({ name: `${g.name} — link my account`, value: `link:${g.value}` })),
+    ...c.quests.map((qq) => ({ name: `${qq.name} — my progress`, value: `quest:${qq.value}` })),
+    ...(opts.isManager
+      ? [
+        { name: "Server admin — run a challenge", value: "admin" },
+        { name: "Server admin — our growth", value: "admin:growth" },
+      ]
+      : []),
+    ...c.guides.map((g) => ({ name: `Guide — ${g.name}`, value: `guide:${g.value}` })),
+    { name: "Everything this bot does", value: "help" },
+  ];
+  return match(list, q);
+}

@@ -63,6 +63,33 @@ export const GUIDE_TOPICS: Record<string, GuideTopic> = {
       { title: "Win real trophies", body: "Podium finishers earn trophies with real dollar values, redeemable from your profile." },
     ],
   },
+  // The two screens that used to be the bot's only card-less messages: More
+  // and Commands. Every other reply arrives as art with buttons under it, so a
+  // plain wall of text read as the bot having broken rather than as a menu.
+  "everything": {
+    title: "Everything Cluster does",
+    subtitle: "Four worlds, one identity",
+    badge: "THE MAP",
+    footer: "Every button below edits this message",
+    steps: [
+      { title: "Planets", body: "Every game we sync is a world with its own challenges, leaderboard and top gamers." },
+      { title: "Challenges", body: "Live competitions with real trophies. Your stats are snapshotted on join, so only new play counts." },
+      { title: "Quests", body: "Cluster Points earned across every game you play, climbing one ladder from Bronze to Platinum." },
+      { title: "Leaderboards", body: "Every board we run, refreshed from the official game APIs on each sync." },
+    ],
+  },
+  "commands": {
+    title: "How to use this bot",
+    subtitle: "One command. One box.",
+    badge: "COMMANDS",
+    footer: "/cluster",
+    steps: [
+      { title: "Type /cluster", body: "That's your own card — profile, Cluster Points, and a button for every game you've linked." },
+      { title: "Type /cluster <anything>", body: "A game, a quest, a guide or a gamer's name. The suggestions are live, so whatever exists is typeable." },
+      { title: "Press the buttons", body: "Every button edits the same message instead of posting a new one, so the channel stays clean." },
+      { title: "Everything is shareable", body: "Type /cluster share to post your card publicly — it's the only reply anyone else can see." },
+    ],
+  },
   "best-profile": {
     title: "Best Profile award",
     subtitle: "The most-voted profile in the Cluster",

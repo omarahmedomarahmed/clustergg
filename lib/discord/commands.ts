@@ -1,18 +1,23 @@
 import { OptionType } from "@/lib/discord/types";
 
-// One unified `/cluster` command. Typing `/cluster` makes Discord list every
-// subcommand with its description inline — that IS the discovery surface, so
-// the descriptions below are user-facing copy, not developer notes.
+// One command, one box. `/cluster` and you're home; `/cluster <anything>` and
+// you're wherever you asked to be.
 //
-// Note on shape: `/cluster valorant` is impossible. Discord subcommands are a
-// fixed registered enum, so a per-game subcommand would mean re-registering the
-// command every time staff add a game. Instead the game is an autocompleting
-// OPTION (`/cluster planet game:valorant`), which is live from the database and
-// needs no redeploy.
-
-const game = (desc: string) => ({
-  name: "game", description: desc, type: OptionType.String, required: true, autocomplete: true,
-});
+// This replaced thirteen subcommands, several of which carried their own named
+// options — so the real syntax was `/cluster show what:profile gamer:Faker`,
+// and the syntax was the product. Discord also forbids running a command that
+// has subcommands on its own, which meant `/cluster` by itself did nothing at
+// all: the most obvious thing anyone would type was the one thing that failed.
+//
+// Now there is a single optional option. Leave it empty for your own card; type
+// into it and the autocomplete answers live from the database with everything
+// the bot can open — your games, every planet, every quest, every guide, live
+// challenges, and the gamers other people are looking for. That is better
+// discovery than a fixed enum could ever be, because it lists what actually
+// exists right now rather than what was registered at deploy time.
+//
+// Registration matters here: this shape has no subcommands, so it is a genuine
+// re-registration, not an edit. Run the register endpoint after deploying.
 
 export const CLUSTER_COMMAND = {
   name: "cluster",
@@ -20,53 +25,13 @@ export const CLUSTER_COMMAND = {
   dm_permission: true,
   options: [
     {
-      name: "home", description: "Your Cluster hub — profile, CP and quick actions", type: OptionType.SubCommand,
-    },
-    {
-      name: "show", description: "Show a card: yours, or any gamer on Cluster", type: OptionType.SubCommand,
-      options: [
-        { name: "what", description: "profile, cp, a game or a quest", type: OptionType.String, required: false, autocomplete: true },
-        // `/cluster show valorant SomeTag` — any gamer on the platform, from any
-        // server. This is the command that makes the bot useful in a server
-        // where nobody has signed up yet.
-        { name: "gamer", description: "An in-game name, or a Discord handle", type: OptionType.String, required: false, autocomplete: true },
-      ],
-    },
-    {
-      name: "planet", description: "Open a game planet — challenges, leaderboard, top gamers", type: OptionType.SubCommand,
-      options: [game("Which game")],
-    },
-    {
-      name: "leaderboard", description: "Live standings for a game", type: OptionType.SubCommand,
-      options: [game("Which game")],
-    },
-    {
-      name: "challenge", description: "Live challenges you can join", type: OptionType.SubCommand,
-      options: [{ ...game("Which game"), required: false }],
-    },
-    {
-      name: "quest", description: "Your progress in a quest", type: OptionType.SubCommand,
-      options: [{ name: "name", description: "Which quest", type: OptionType.String, required: false, autocomplete: true }],
-    },
-    {
-      name: "link", description: "Link a game account so your stats sync automatically", type: OptionType.SubCommand,
-      options: [game("Which game to link")],
-    },
-    {
-      name: "share", description: "Post your profile card so people can vote for it", type: OptionType.SubCommand,
-    },
-    {
-      name: "guide", description: "Re-post a how-to guide", type: OptionType.SubCommand,
-      options: [{ name: "topic", description: "Which guide", type: OptionType.String, required: false, autocomplete: true }],
-    },
-    {
-      name: "server", description: "Server owners: your growth toward unlocking ad revenue", type: OptionType.SubCommand,
-    },
-    {
-      name: "admin", description: "Server admins: run challenges for your community", type: OptionType.SubCommand,
-    },
-    {
-      name: "help", description: "What Cluster is and everything this bot can do", type: OptionType.SubCommand,
+      // Named `show` so it reads as `/cluster show:<thing>` — the value goes in
+      // directly, with no second option to fill in.
+      name: "show",
+      description: "A gamer, a game, a quest — or leave blank for your own card",
+      type: OptionType.String,
+      required: false,
+      autocomplete: true,
     },
   ],
 };
