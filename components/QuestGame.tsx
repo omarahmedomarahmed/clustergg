@@ -2,11 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import dynamic from "next/dynamic";
 import Link from "next/link";
-
-// Three.js only loads when the gamer opens the 3D view.
-const GlbTerrain = dynamic(() => import("@/components/GlbTerrain"), { ssr: false });
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import CpIcon from "@/components/CpIcon";
@@ -29,13 +25,15 @@ import type { QuestView, QuestGamer } from "@/lib/quests";
 type Panel = "rules" | "log" | "guide" | "missions" | null;
 
 export default function QuestGame({
-  quest, holders, game, rocketUrl, initialTier, onClose,
+  quest, holders, game, rocketUrl, initialTier, switcher, onClose,
 }: {
   quest: QuestView;
   holders: Record<string, QuestGamer[]>;
   game: QuestGamePayload;
   rocketUrl?: string;
   initialTier?: number | null;
+  /** Move to the quest either side of this one without leaving the game. */
+  switcher?: { onPrev: () => void; onNext: () => void; prevName: string; nextName: string };
   onClose: () => void;
 }) {
   const tr = useTr();
@@ -46,7 +44,6 @@ export default function QuestGame({
   const [facing, setFacing] = useState<"front" | "left" | "right">("front");
   const [arrived, setArrived] = useState<number | null>(null); // celebration ring
   const [fs, setFs] = useState(false);
-  const [view3d, setView3d] = useState(false);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const rootRef = useRef<HTMLDivElement | null>(null);
   const areaRef = useRef<HTMLDivElement | null>(null);
@@ -246,7 +243,7 @@ export default function QuestGame({
   // never hidden by the card's rounded clipping.
   const tabBtn = (p: Exclude<Panel, null>, icon: string, label: string, dot?: number | boolean) => (
     <button key={p} onClick={() => { setSel(null); setPanel(panel === p ? null : p); }}
-      className={`relative flex flex-1 sm:flex-none sm:w-32 flex-col items-center justify-end gap-1 rounded-2xl border px-2 pt-6 pb-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide transition-all active:scale-95 ${panel === p ? "text-white scale-[1.03]" : "text-white/85"}`}
+      className={`pointer-events-auto relative flex flex-1 sm:flex-none sm:w-32 flex-col items-center justify-end gap-1 rounded-2xl border px-2 pt-6 pb-2 text-[10px] sm:text-[11px] font-bold uppercase tracking-wide transition-all active:scale-95 ${panel === p ? "text-white scale-[1.03]" : "text-white/85"}`}
       style={{ borderColor: panel === p ? `${quest.color}dd` : "rgba(255,255,255,0.14)", boxShadow: panel === p ? `0 0 22px -6px ${quest.color}` : "none" }}>
       <span aria-hidden className="absolute inset-0 overflow-hidden rounded-2xl">
         <span className="absolute inset-0" style={{ background: guBg(p) || art?.[p] || `linear-gradient(180deg, ${quest.color}30, rgba(4,5,26,0.9))` }} />
@@ -271,6 +268,15 @@ export default function QuestGame({
 
       {/* ===== HUD top bar ===== */}
       <div className="relative z-[45] flex items-center gap-2.5 px-3 pt-3 sm:px-4" style={{ paddingTop: "max(0.75rem, env(safe-area-inset-top))" }}>
+        {/* Switch quests without leaving the game. Somebody who has just walked
+            a trail to its end wants the next map, not the way back out to a
+            page and in again. */}
+        {switcher && (
+          <button onClick={switcher.onPrev} aria-label={tr("Previous quest")} title={switcher.prevName}
+            className="flex h-10 w-8 items-center justify-center rounded-xl border border-white/15 bg-black/50 text-muted hover:text-white shrink-0">
+            <Icon name="chevronRight" size={16} className="rotate-180" />
+          </button>
+        )}
         <span className="flex h-10 w-10 items-center justify-center rounded-xl border shrink-0" style={{ borderColor: `${quest.color}66`, background: `${quest.color}1f` }}>
           {quest.logoUrl
             ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={quest.logoUrl} alt="" className="h-8 w-8 object-contain" />
@@ -299,31 +305,27 @@ export default function QuestGame({
             <Icon name="monitor" size={17} />
           </button>
         )}
+        {switcher && (
+          <button onClick={switcher.onNext} aria-label={tr("Next quest")} title={switcher.nextName}
+            className="flex h-10 w-8 items-center justify-center rounded-xl border border-white/15 bg-black/50 text-muted hover:text-white shrink-0">
+            <Icon name="chevronRight" size={16} />
+          </button>
+        )}
         <button onClick={close} aria-label={tr("Close")}
           className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-black/50 text-white hover:border-rose-400/60 shrink-0">
           <Icon name="x" size={18} />
         </button>
       </div>
 
-      {/* ===== Game stage ===== */}
-      <div ref={areaRef} className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-1 py-1">
+      {/* ===== Game stage =====
+          A pointer-down anywhere in the world dismisses an open panel or
+          milestone card. This replaced a full-screen shield that sat above both
+          the milestone pins and the action bar, which made every control in the
+          game unclickable for as long as anything was open. */}
+      <div ref={areaRef} onPointerDown={() => { setPanel(null); setSel(null); }}
+        className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-1 py-1">
         {sw > 0 && (
           <div className="relative" style={{ width: sw, height: sh }}>
-            {/* 2D map ⇄ 3D terrain toggle (when this quest has a GLB mesh) */}
-            {quest.mapGlbUrl && (
-              <button onClick={() => setView3d((v) => !v)}
-                className="absolute top-3 right-3 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 backdrop-blur px-3 py-1.5 text-[11px] font-black uppercase tracking-widest text-white hover:border-cyan-400/50">
-                <Icon name="planet" size={12} style={{ color: quest.accent2 }} /> {view3d ? tr("Map") : tr("3D")}
-              </button>
-            )}
-            {view3d && quest.mapGlbUrl ? (
-              <>
-                <GlbTerrain url={quest.mapGlbUrl} textureUrl={quest.mapArtUrl} accent={quest.accent2} cfg={quest.mapGlbCfg} />
-                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 rounded-full bg-black/60 px-3 py-1 text-[10px] text-muted pointer-events-none whitespace-nowrap">
-                  {tr("Drag to orbit · pinch or scroll to zoom · switch to Map for milestones")}
-                </span>
-              </>
-            ) : (
             <ZoomPan className="h-full w-full" min={1} max={4} initial={1} wheel pan>
               {/* World art — the looping animated map (mp4) when set, played as
                   a boomerang (forward then reverse) so it never jump-cuts */}
@@ -394,10 +396,9 @@ export default function QuestGame({
                 </span>
               </div>
             </ZoomPan>
-            )}
 
             {/* Walk home — jump the astronaut back to your true CP position */}
-            {!view3d && awayFromHome && (
+            {awayFromHome && (
               <button onClick={() => { setSel(null); walkTo(youLen); }}
                 className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 backdrop-blur px-3.5 py-1.5 text-[11px] font-bold text-white">
                 <Icon name="target" size={13} style={{ color: quest.accent2 }} /> {tr("Back to my position")}
@@ -406,14 +407,6 @@ export default function QuestGame({
           </div>
         )}
       </div>
-
-      {/* Click-anywhere-to-close backdrop: any open panel or milestone card is
-          dismissed by tapping outside it (the sheets + top/bottom bars sit above
-          this layer, so their own controls keep working). */}
-      {(panel !== null || sel !== null) && (
-        <button aria-label={tr("Close")} onClick={() => { setPanel(null); setSel(null); }}
-          className="fixed inset-0 z-[38] cursor-default" />
-      )}
 
       {/* ===== Milestone card (opens when the astronaut arrives) ===== */}
       {sel !== null && tiers[sel] && (
@@ -592,7 +585,7 @@ export default function QuestGame({
           Stays above the close-backdrop on desktop (where panels float in the
           corner) so tab-switching still works; on mobile the bottom sheet
           covers it so it keeps the lower z. */}
-      <div className="relative z-30 sm:z-[45] flex items-stretch gap-2 px-3 pt-2 sm:justify-center"
+      <div className="pointer-events-none relative z-30 sm:z-[45] flex items-stretch gap-2 px-3 pt-2 sm:justify-center"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
         {tabBtn("missions", "rocket", tr("Missions"), missionsOpen > 0 ? missionsOpen : false)}
         {tabBtn("rules", "zap", tr("Rules"), rulesUnread)}

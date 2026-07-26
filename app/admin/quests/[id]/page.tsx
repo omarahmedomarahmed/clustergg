@@ -54,8 +54,8 @@ export default async function EditQuestPage({ params }: { params: Promise<{ id: 
             <input name="mapVideoUrl" defaultValue={quest.mapVideoUrl ?? ""} placeholder="https://…/map-loop.mp4 (blank = still art)" className="input-cosmic mt-1 w-full !py-1.5 text-sm" />
           </label>
           <label className="block text-xs text-muted">
-            3D terrain mesh (GLB) — enables the in-game 3D view of this map
-            <input name="mapGlbUrl" defaultValue={quest.mapGlbUrl ?? ""} placeholder="https://…/terrain.glb (blank = no 3D view)" className="input-cosmic mt-1 w-full !py-1.5 text-sm" />
+            3D terrain mesh (GLB) — kept for the terrain preview below; the quest game itself is 2D
+            <input name="mapGlbUrl" defaultValue={quest.mapGlbUrl ?? ""} placeholder="https://…/terrain.glb (blank = none)" className="input-cosmic mt-1 w-full !py-1.5 text-sm" />
           </label>
           <ImageUpload name="coverUrl" defaultValue={quest.coverUrl ?? ""} label="Cover banner (optional)" aspect="16/9" maxDim={1600} scope="quest" hint="Wide banner." />
         </div>
