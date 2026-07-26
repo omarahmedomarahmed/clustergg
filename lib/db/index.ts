@@ -317,6 +317,68 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "pvw_profile_idx" ON "profile_views" ("profile_user_id","created_at")`,
+
+  // ===== Data room: investor + partner documents =====
+  `CREATE TABLE IF NOT EXISTS "dataroom_docs" (
+    "id" text PRIMARY KEY NOT NULL,
+    "slug" text NOT NULL UNIQUE,
+    "kind" text NOT NULL DEFAULT 'deck',
+    "title" text NOT NULL,
+    "subtitle" text,
+    "summary" text,
+    "cover_url" text,
+    "accent" text NOT NULL DEFAULT '#8b5cf6',
+    "accent2" text NOT NULL DEFAULT '#22d3ee',
+    "access_key" text,
+    "is_published" boolean NOT NULL DEFAULT true,
+    "contact_email" text,
+    "contact_note" text,
+    "sort_order" integer NOT NULL DEFAULT 0,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS "dataroom_sections" (
+    "id" text PRIMARY KEY NOT NULL,
+    "doc_id" text NOT NULL,
+    "kind" text NOT NULL,
+    "anchor" text NOT NULL,
+    "nav_label" text NOT NULL,
+    "title" text,
+    "subtitle" text,
+    "body" text,
+    "bg_url" text,
+    "dim" integer NOT NULL DEFAULT 62,
+    "data" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "sort_order" integer NOT NULL DEFAULT 0,
+    "is_visible" boolean NOT NULL DEFAULT true
+  )`,
+  `CREATE INDEX IF NOT EXISTS "droom_section_idx" ON "dataroom_sections" ("doc_id","sort_order")`,
+  `CREATE TABLE IF NOT EXISTS "dataroom_people" (
+    "id" text PRIMARY KEY NOT NULL,
+    "doc_id" text,
+    "name" text NOT NULL,
+    "role" text NOT NULL,
+    "bio" text,
+    "avatar_url" text,
+    "email" text,
+    "linkedin" text,
+    "x" text,
+    "logos" jsonb NOT NULL DEFAULT '[]'::jsonb,
+    "sort_order" integer NOT NULL DEFAULT 0,
+    "is_visible" boolean NOT NULL DEFAULT true
+  )`,
+  `CREATE TABLE IF NOT EXISTS "dataroom_views" (
+    "id" text PRIMARY KEY NOT NULL,
+    "doc_id" text NOT NULL,
+    "section_anchor" text,
+    "visitor_id" text,
+    "referrer" text,
+    "country" text,
+    "device" text,
+    "seconds" integer NOT NULL DEFAULT 0,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "droom_view_idx" ON "dataroom_views" ("doc_id","created_at")`,
 ];
 
 async function runColumnMigrations(db: DB) {

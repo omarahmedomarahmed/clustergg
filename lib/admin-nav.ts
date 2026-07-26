@@ -62,6 +62,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     items: [
       { href: "/admin", label: "Command centre", desc: "Every console, every live number, in one place.", exact: true },
       { href: "/admin/analytics", label: "Product analytics", desc: "Every metric we track, filterable, with a one-page report per metric.", metric: "users" },
+      { href: "/admin/dataroom", label: "Data room", desc: "The investor deck and partner profile — every section editable, every number live.", area: "settings" },
       { href: "/admin/audit-log", label: "Audit log", desc: "Every admin and staff action, with who and when.", area: "audit" },
     ],
   },

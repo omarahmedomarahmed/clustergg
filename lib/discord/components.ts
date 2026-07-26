@@ -71,12 +71,31 @@ export type Button = {
   custom_id?: string; url?: string; emoji?: { name: string }; disabled?: boolean;
 };
 
+// Discord validates a button's unicode emoji and rejects the WHOLE message with
+// a 400 if it isn't a real one — every button in it, not just the bad one. That
+// makes a single wrong character on a shared button an outage: `⋯` (U+22EF,
+// MIDLINE HORIZONTAL ELLIPSIS) is a mathematical operator, not an emoji, and it
+// silently froze every command on every server.
+//
+// So an emoji that isn't one is dropped here rather than sent. A button missing
+// its icon is a cosmetic loss; a rejected payload is a dead bot.
+const EMOJI = /^[\p{Extended_Pictographic}\p{Emoji_Component}‍️]+$/u;
+
+function emojiOf(emoji?: string): { emoji: { name: string } } | Record<string, never> {
+  if (!emoji) return {};
+  if (!EMOJI.test(emoji)) {
+    console.warn(`[discord] dropped non-emoji button icon ${JSON.stringify(emoji)} — Discord would reject the whole message`);
+    return {};
+  }
+  return { emoji: { name: emoji } };
+}
+
 export function button(label: string, customId: string, style: number = ButtonStyle.Secondary, emoji?: string): Button {
-  return { type: ComponentType.Button, style, label: label.slice(0, 80), custom_id: customId, ...(emoji ? { emoji: { name: emoji } } : {}) };
+  return { type: ComponentType.Button, style, label: label.slice(0, 80), custom_id: customId, ...emojiOf(emoji) };
 }
 
 export function linkButton(label: string, url: string, emoji?: string): Button {
-  return { type: ComponentType.Button, style: ButtonStyle.Link, label: label.slice(0, 80), url, ...(emoji ? { emoji: { name: emoji } } : {}) };
+  return { type: ComponentType.Button, style: ButtonStyle.Link, label: label.slice(0, 80), url, ...emojiOf(emoji) };
 }
 
 export function navButton(label: string, target: Frame, trail: Frame[], style: number = ButtonStyle.Secondary, emoji?: string): Button {

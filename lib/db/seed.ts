@@ -808,6 +808,10 @@ export async function runBootMaintenance(db: DB) {
     { key: "loading_screen", pageScope: "Loading screen (between pages)", width: 728, height: 90 },
     { key: "quests_footer", pageScope: "Bottom of the quests page", width: 728, height: 90 },
     { key: "messages_footer", pageScope: "Bottom of a conversation", width: 728, height: 90 },
+    // One slot shared by both data room documents, so an investor and a partner
+    // reading different docs see the same live inventory — which is the point:
+    // it's what a brand would actually be buying.
+    { key: "investor-doc-ad-placement", pageScope: "Data room — pitch deck & company profile", width: 970, height: 250 },
   ];
   for (const p of extraPlacements) {
     const [ex] = await db.select({ id: schema.adPlacements.id }).from(schema.adPlacements)

@@ -27,6 +27,7 @@ export default async function Footer() {
             <li><Link href="/discord-bot" className="hover:text-ink">Discord bot</Link></li>
             <li><Link href="/servers" className="hover:text-ink">Connected servers</Link></li>
             <li><Link href="/blog" className="hover:text-ink">Blog &amp; guides</Link></li>
+            <li><Link href="/dataroom" className="hover:text-ink">Investors &amp; partners</Link></li>
             <li><Link href="/planets" className="hover:text-ink">{t("nav.planets")}</Link></li>
             <li><Link href="/leaderboards" className="hover:text-ink">{t("nav.leaderboards")}</Link></li>
             <li><Link href="/search" className="hover:text-ink">{t("common.findGamers")}</Link></li>

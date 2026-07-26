@@ -801,6 +801,88 @@ export const cardRenders = pgTable("card_renders", {
   updatedAt: now("updated_at"),
 }, (t) => [uniqueIndex("card_render_idx").on(t.kind, t.cacheKey)]);
 
+// ===== Data room =====
+//
+// Investor and partner documents — the pitch deck and the company profile —
+// built out of ordered sections rather than written as pages. That's the whole
+// design: an admin adds, reorders, retitles and re-arts a section without a
+// deploy, and a section that pulls live numbers keeps pulling them.
+//
+// Docs are public by default because a link you have to negotiate access to is
+// a link that doesn't get forwarded, and forwarding is the point. Setting an
+// access key gates one without changing anything else.
+export const dataroomDocs = pgTable("dataroom_docs", {
+  id: id(),
+  slug: text("slug").notNull().unique(),
+  kind: text("kind").notNull().default("deck"),   // deck | profile
+  title: text("title").notNull(),
+  subtitle: text("subtitle"),
+  summary: text("summary"),                       // meta description + the hub card
+  coverUrl: text("cover_url"),
+  accent: text("accent").notNull().default("#8b5cf6"),
+  accent2: text("accent2").notNull().default("#22d3ee"),
+  accessKey: text("access_key"),                  // null = anyone with the link
+  isPublished: boolean("is_published").notNull().default(true),
+  contactEmail: text("contact_email"),
+  contactNote: text("contact_note"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: now("created_at"),
+  updatedAt: now("updated_at"),
+});
+
+// One slide. `kind` picks the renderer; `data` carries whatever that renderer
+// needs (logo lists, gallery images, GTM stages, milestone targets…), which is
+// why it's jsonb rather than a column per feature — new section types must not
+// need a migration.
+export const dataroomSections = pgTable("dataroom_sections", {
+  id: id(),
+  docId: text("doc_id").notNull().references(() => dataroomDocs.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),                   // hero | traction | milestones | gtm | product | team | logos | gallery | text | servers | contact | ad | metrics
+  anchor: text("anchor").notNull(),               // the #id the nav jumps to
+  navLabel: text("nav_label").notNull(),
+  title: text("title"),
+  subtitle: text("subtitle"),
+  body: text("body"),                             // markdown-lite: blank-line paragraphs
+  bgUrl: text("bg_url"),
+  dim: integer("dim").notNull().default(62),      // 0-100 veil over the art
+  data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isVisible: boolean("is_visible").notNull().default(true),
+});
+
+// People, with the logos of where they've been. Shown as a card that opens a
+// modal — an investor reading a deck wants the background before the contact
+// details, and both belong in the same place.
+export const dataroomPeople = pgTable("dataroom_people", {
+  id: id(),
+  docId: text("doc_id").references(() => dataroomDocs.id, { onDelete: "cascade" }), // null = on every doc
+  name: text("name").notNull(),
+  role: text("role").notNull(),
+  bio: text("bio"),
+  avatarUrl: text("avatar_url"),
+  email: text("email"),
+  linkedin: text("linkedin"),
+  x: text("x"),
+  // [{name, logoUrl, url}] — the companies behind them.
+  logos: jsonb("logos").$type<{ name: string; logoUrl?: string | null; url?: string | null }[]>().notNull().default([]),
+  sortOrder: integer("sort_order").notNull().default(0),
+  isVisible: boolean("is_visible").notNull().default(true),
+});
+
+// Who opened what. A data room whose owner can't say which investor read the
+// traction section is a PDF with extra steps.
+export const dataroomViews = pgTable("dataroom_views", {
+  id: id(),
+  docId: text("doc_id").notNull(),
+  sectionAnchor: text("section_anchor"),          // null = a page view
+  visitorId: text("visitor_id"),                  // first-party cookie, not an identity
+  referrer: text("referrer"),
+  country: text("country"),
+  device: text("device"),                         // mobile | desktop
+  seconds: integer("seconds").notNull().default(0),
+  createdAt: now("created_at"),
+}, (t) => [index("droom_view_idx").on(t.docId, t.createdAt)]);
+
 // ===== Light user projection =====
 // The `users` row carries three heavy columns — `avatarUrl`/`bannerUrl` (which
 // can be inline base64 data URLs when Vercel Blob isn't configured) and `theme`
