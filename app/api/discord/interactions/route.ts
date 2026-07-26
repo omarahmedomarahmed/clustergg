@@ -3,13 +3,13 @@ import { verifyInteraction } from "@/lib/discord/verify";
 import { canVerify, canAct, appId, publicKeyShape, siteUrl } from "@/lib/discord/config";
 import {
   InteractionType, InteractionResponseType, MessageFlags,
-  actor, readCommand, isGuildManager, type Interaction,
+  actor, readCommand, isGuildManager, ButtonStyle, type Interaction,
 } from "@/lib/discord/types";
-import { parseId, frame, type Frame } from "@/lib/discord/components";
+import { parseId, frame, rows, button, navButton, linkButton, actionId, type Frame } from "@/lib/discord/components";
 import { gameChoices, questChoices, guideChoices, showChoices } from "@/lib/discord/catalog";
 import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
-import { cardRef } from "@/lib/discord/cards";
+import { cardRef, embedColor } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
 import { joinChallengeFor, challengeGate, keyVisibleTo, setChallengeState } from "@/lib/challenges";
 import { submitChallengeRequest } from "@/lib/challenge-requests";
@@ -594,12 +594,24 @@ async function share(token: string, ctx: Awaited<ReturnType<typeof loadCtx>>, as
     });
     return;
   }
-  const { url } = await cardRef("profile", { slug: ctx.gamer.slug });
+  const { url, data } = await cardRef("profile", { slug: ctx.gamer.slug });
   const msg = await shareMessage(ctx.gamer.displayName, `${siteUrl()}/u/${ctx.gamer.slug}`);
+  const accent = data && "theme" in data ? data.theme.accent : null;
+  // A shared card is the one message in this bot that STRANGERS read, so it
+  // carries the two things a stranger can do with it — vote for it, and get one
+  // of their own — rather than being a picture with nothing to press.
   const payload = {
     content: msg,
-    embeds: [{ color: 0x8b5cf6, image: { url } }],
-    components: [],
+    embeds: [{
+      color: embedColor(accent),
+      image: { url },
+      footer: { text: "Votes decide the Best Profile board." },
+    }],
+    components: rows([
+      button("Vote for this profile", actionId("vote", [ctx.gamer.slug], [frame("home")]), ButtonStyle.Success, "⭐"),
+      navButton("Get your own card", frame("home"), [], ButtonStyle.Primary, "🚀"),
+      linkButton("Open profile", `${siteUrl()}/u/${ctx.gamer.slug}`, "🔗"),
+    ]),
   };
   if (asFollowUp) await followUp(token, payload);
   else await editOriginal(token, payload);

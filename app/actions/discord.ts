@@ -12,6 +12,11 @@ import { JOBS, runJob, type JobKey } from "@/lib/jobs";
 import { postAdsToGuilds } from "@/lib/discord/ads";
 import { runHqSetup } from "@/lib/discord/hq";
 import { setContent } from "@/lib/cms";
+import { ensurePortal, rotatePortalKey } from "@/lib/server-portal";
+import { dmUser } from "@/lib/discord/rest";
+import { canAct, siteUrl } from "@/lib/discord/config";
+import { getDb, schema } from "@/lib/db";
+import { eq } from "drizzle-orm";
 
 // Everything the bot needs operationally, as buttons in Mission Control rather
 // than curl commands. Staff run this from a browser; nobody should need a
@@ -178,4 +183,104 @@ export async function runOnboarding(_prev: BotActionState, formData: FormData): 
   if (!res.ok) return { error: `Onboarding failed: ${res.reason ?? "unknown"}` };
   revalidatePath("/admin/discord");
   return { ok: `Set up #${CLUSTER_CHANNEL} — ${res.posted} guides posted, ${res.pinned} pinned.` };
+}
+
+// ===== Server portals =====
+//
+// A server owner's portal key opens their whole dashboard — growth numbers,
+// challenges, traffic, every member's progress. So staff need three things we
+// didn't have a UI for: see whether a server has a portal at all, hand the
+// owner a fresh key when the old one leaks, and turn announcements or ad
+// delivery off for a server that's misbehaving.
+//
+// The key is shown ONCE, here, to the admin who rotated it. It is never posted
+// into a channel — the bot DMs the owner instead.
+
+export async function resetPortalKey(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  const guildId = String(formData.get("guildId") ?? "").trim();
+  if (!guildId) return { error: "No server." };
+
+  // A server that never had a portal gets one; one that has a key gets a new
+  // one. Both end with the owner holding a key nobody else has seen.
+  const existing = await ensurePortal(guildId);
+  if (!existing) return { error: "No such server." };
+  const key = await rotatePortalKey(guildId);
+  if (!key) return { error: "Couldn't rotate that key." };
+
+  revalidatePath(`/admin/discord/${guildId}`);
+  return {
+    ok: `New key: ${key} — copy it now, it isn't shown again. The old key stopped working immediately.`,
+  };
+}
+
+// DM the owner their portal link and key, so staff never have to paste a key
+// into a channel to get it to them.
+export async function dmPortalKey(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  const guildId = String(formData.get("guildId") ?? "").trim();
+  if (!guildId) return { error: "No server." };
+  if (!canAct()) return { error: "DISCORD_BOT_TOKEN isn't set, so the bot can't DM anyone." };
+
+  const db = await getDb();
+  const [row] = await db.select().from(schema.discordGuilds)
+    .where(eq(schema.discordGuilds.guildId, guildId)).limit(1);
+  if (!row?.ownerDiscordId) return { error: "We don't know who owns that server." };
+
+  const portal = await ensurePortal(guildId);
+  if (!portal) return { error: "Couldn't build that server's portal." };
+
+  const sent = await dmUser(row.ownerDiscordId, {
+    embeds: [{
+      title: "Your Cluster server portal",
+      description: [
+        `${siteUrl()}/servers/${portal.slug}`,
+        "",
+        `Portal key: **\`${portal.key}\`**`,
+        "",
+        "Keep this private — it opens your growth numbers, your challenges, the traffic we send you, and everything your members do with the bot.",
+      ].join("\n"),
+      color: 0x8b5cf6,
+    }],
+  }).catch(() => false);
+
+  return sent
+    ? { ok: "Sent to the owner's DMs." }
+    : { error: "Discord refused the DM — the owner has direct messages from server members turned off." };
+}
+
+// Per-server switches. Announcements and ad delivery are the two things a
+// server can reasonably want off, and until now the only way to stop either was
+// to remove the bot.
+export async function setGuildFlags(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  const guildId = String(formData.get("guildId") ?? "").trim();
+  if (!guildId) return { error: "No server." };
+
+  const db = await getDb();
+  await db.update(schema.discordGuilds).set({
+    announcementsEnabled: formData.get("announcements") === "on",
+    adOptIn: formData.get("ads") === "on",
+  }).where(eq(schema.discordGuilds.guildId, guildId));
+
+  revalidatePath(`/admin/discord/${guildId}`);
+  return { ok: "Saved." };
+}
+
+// Force the revenue unlock for a server that earned it another way — an agreed
+// partnership, a migration, a fix after a miscount. Recorded as a real unlock
+// so every downstream check behaves identically.
+export async function forceUnlock(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  const guildId = String(formData.get("guildId") ?? "").trim();
+  const on = formData.get("unlock") === "on";
+  if (!guildId) return { error: "No server." };
+
+  const db = await getDb();
+  await db.update(schema.discordGuilds)
+    .set({ adUnlockedAt: on ? new Date() : null })
+    .where(eq(schema.discordGuilds.guildId, guildId));
+
+  revalidatePath(`/admin/discord/${guildId}`);
+  return { ok: on ? "Revenue share unlocked for this server." : "Revenue share locked again." };
 }

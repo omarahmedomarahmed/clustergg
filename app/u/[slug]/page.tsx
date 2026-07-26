@@ -394,10 +394,30 @@ export default async function ProfilePage({ params }: Props) {
             ) : viewer ? (
               <>
                 <FollowButton targetUserId={user.id} isFollowing={isFollowingRow.length > 0} path={`/u/${user.slug}`} />
+                {/* Right next to Follow, and weighted the same — a vote is the
+                    cheapest thing a visitor can give, and the only one that
+                    feeds the Best Profile board. */}
+                <VoteButton
+                  variant="button"
+                  buttonStyle={theme.buttonStyle === "neon" ? "glass" : "outline"}
+                  slug={user.slug}
+                  votes={user.voteCount ?? 0}
+                  voted={alreadyVoted}
+                  canVote={viewer.id !== user.id}
+                  mine={viewer.id === user.id}
+                  accent={theme.accent}
+                />
                 <form action={startConversation.bind(null, user.id)}><button className={`p-btn p-btn-${theme.buttonStyle === "neon" ? "glass" : "outline"}`}><Icon name="message" size={14} /> {tr("Message")}</button></form>
               </>
             ) : (
-              <Link href="/signup" className={`p-btn p-btn-${theme.buttonStyle}`}>{tr("Join to follow")}</Link>
+              <>
+                <Link href="/signup" className={`p-btn p-btn-${theme.buttonStyle}`}>{tr("Join to follow")}</Link>
+                <VoteButton
+                  variant="button" buttonStyle="outline"
+                  slug={user.slug} votes={user.voteCount ?? 0} voted={false}
+                  canVote={false} mine={false} accent={theme.accent}
+                />
+              </>
             )}
           </div>
         </div>

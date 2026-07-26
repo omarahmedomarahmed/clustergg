@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/auth";
 import { hqStatus, planHqSetup } from "@/lib/discord/hq";
 import { HqServerForm, HqBuildButton, HqPlanTable } from "@/components/HqSetup";
-import { AdminHeader, AdminSection, AdminSettings, EmptyState } from "@/components/AdminPage";
+import { AdminHeader, AdminSection, AdminSettings } from "@/components/AdminPage";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · HQ server" };
@@ -35,22 +35,20 @@ export default async function HqPage() {
 
       <AdminSection
         title="The plan"
-        hint="Exactly what the bot will create. Anything already there is left alone — it never renames, moves or deletes."
+        hint={plan.preview
+          ? "The full blueprint. We couldn't read the server yet, so nothing below is marked as already existing."
+          : "Exactly what the bot will create. Anything already there is left alone — it never renames, moves or deletes."}
         tone={plan.toCreate > 0 ? "warn" : undefined}
       >
-        {!plan.ok ? (
-          <EmptyState
-            title="Can't read that server yet"
-            hint={plan.reason ?? "Set the server id above, and make sure the bot has been added to it."}
-          />
-        ) : (
-          <>
-            <HqPlanTable rows={plan.rows} />
-            <div className="mt-5">
-              <HqBuildButton toCreate={plan.toCreate} alreadySetUp={plan.alreadySetUp} />
-            </div>
-          </>
+        {plan.preview && plan.reason && (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 mb-4">
+            {plan.reason}
+          </div>
         )}
+        <HqPlanTable rows={plan.rows} preview={plan.preview} />
+        <div className="mt-5">
+          <HqBuildButton toCreate={plan.toCreate} alreadySetUp={plan.alreadySetUp} blocked={plan.preview} />
+        </div>
       </AdminSection>
 
       <AdminSettings title="How this behaves">

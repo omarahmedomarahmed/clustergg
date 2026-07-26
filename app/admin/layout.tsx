@@ -1,97 +1,12 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser, isAdmin, isStaff } from "@/lib/auth";
 import { areaAllowed, getStaffGrants } from "@/lib/permissions";
 import { AdminRail, AdminMobileNav } from "@/components/AdminNav";
+import { navFor, accessOf } from "@/lib/admin-nav";
 import { countPendingRequests } from "@/lib/challenge-requests";
 
-// Grouped so each thing is edited in exactly one place. Items/sections carry an
-// optional `area`: undefined = staff-default; "ads"/"storage"/"audit" = grantable
-// (admin can delegate to staff on /admin/roles); "roles"/"settings" = admin-only.
-const NAV: {
-  section: string; area?: string; icon?: string;
-  items: { href: string; label: string; area?: string; exact?: boolean; badge?: "requests" }[];
-}[] = [
-  {
-    section: "Overview",
-    items: [
-      { href: "/admin", label: "Dashboard", exact: true },
-      { href: "/admin/audit-log", label: "Audit log", area: "audit" },
-    ],
-  },
-  {
-    section: "Discord",
-    icon: "link",
-    items: [
-      { href: "/admin/discord", label: "Bot status & setup", exact: true },
-      { href: "/admin/discord/requests", label: "Challenge requests", badge: "requests" },
-      { href: "/admin/discord/broadcast", label: "Broadcast & ads" },
-      { href: "/admin/discord/hq", label: "HQ server" },
-    ],
-  },
-  {
-    section: "Design & content",
-    items: [
-      { href: "/admin/content", label: "Site content" },
-      { href: "/admin/language", label: "Language & flags (Arabic)" },
-      { href: "/admin/translations", label: "Content translations (Ar/En)" },
-      { href: "/admin/backgrounds", label: "Page backgrounds" },
-      { href: "/admin/cards", label: "Card backgrounds", exact: true },
-      { href: "/admin/cards/guide", label: "Card layout guide" },
-      { href: "/admin/brand-kit", label: "Logos & brand kit" },
-      { href: "/admin/mobile", label: "Mobile chrome (nav/drawer)" },
-      { href: "/admin/creative-studio", label: "Creative studio" },
-      { href: "/admin/partners", label: "Partners" },
-    ],
-  },
-  {
-    section: "Games & planets",
-    items: [
-      { href: "/admin/games", label: "Games catalog" },
-      { href: "/admin/game-worlds", label: "Game worlds (heroes/lore)" },
-      { href: "/admin/connect", label: "Connect providers" },
-      { href: "/admin/spaces", label: "Planets" },
-      { href: "/admin/spaces/requests", label: "Planet requests" },
-    ],
-  },
-  {
-    section: "Competition",
-    items: [
-      { href: "/admin/challenges", label: "Challenges" },
-      { href: "/admin/quests", label: "Quests" },
-      { href: "/admin/leaderboards", label: "Leaderboards" },
-      { href: "/admin/trophies", label: "Trophies" },
-      { href: "/admin/redeems", label: "Trophy redemptions" },
-    ],
-  },
-  {
-    section: "Community",
-    items: [
-      { href: "/admin/users", label: "Users" },
-      { href: "/admin/roles", label: "Roles & staff access", area: "roles" },
-      { href: "/admin/linked-accounts", label: "Linked accounts" },
-    ],
-  },
-  {
-    section: "Ads (offline sales)",
-    area: "ads",
-    items: [
-      { href: "/admin/brands", label: "Brands" },
-      { href: "/admin/creatives", label: "Creatives" },
-      { href: "/admin/placements", label: "Placements" },
-      { href: "/admin/ads/schedule", label: "Ad schedule" },
-      { href: "/admin/ads/analytics", label: "Ad analytics" },
-    ],
-  },
-  {
-    section: "Platform",
-    items: [
-      { href: "/admin/storage", label: "Image storage", area: "storage" },
-      { href: "/admin/settings", label: "Settings", area: "settings" },
-    ],
-  },
-];
-
+// The chrome only. Which pages exist, what they do and who may open them all
+// live in lib/admin-nav.ts, shared with the command centre.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
@@ -99,10 +14,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const admin = isAdmin(user);
   const grants = admin ? [] : await getStaffGrants();
 
-  const nav = NAV
-    .filter((g) => areaAllowed(admin, g.area, grants))
-    .map((g) => ({ ...g, items: g.items.filter((i) => areaAllowed(admin, i.area, grants)) }))
-    .filter((g) => g.items.length > 0);
+  // The rail and the command centre read the SAME map (lib/admin-nav.ts), so a
+  // page can't exist in one and not the other.
+  const nav = navFor(admin, grants, areaAllowed);
 
   // Counts that belong in the nav: a queue nobody can see from the rail is a
   // queue nobody works.
@@ -115,14 +29,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       href: i.href,
       label: i.label,
       exact: i.exact,
-      badge: i.badge === "requests" ? pendingRequests : undefined,
+      access: accessOf(i.area),
+      badge: i.href === "/admin/discord/requests" ? pendingRequests : undefined,
     })),
   }));
 
-  const staffNote = admin ? undefined
-    : `Staff access: edit planets, games, challenges, content, badges, trophies & leaderboards${
-      grants.length > 0 ? `, plus ${grants.join(", ")} (granted by an admin)` : ""
-    }. Roles & settings stay admin-only.`;
+  // Staff see what they have, not a list of locked doors. Admins see the same
+  // rail with each item marked, so delegating is a visible decision.
+  const staffNote = admin
+    ? undefined
+    : `You have staff access${grants.length > 0 ? `, plus ${grants.join(", ")} granted by an admin` : ""}. Anything admin-only is hidden rather than shown locked — ask an admin on /admin/roles.`;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 lg:py-8 lg:flex lg:gap-8">

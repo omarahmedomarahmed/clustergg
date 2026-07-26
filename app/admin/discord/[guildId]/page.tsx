@@ -6,6 +6,8 @@ import { challengesForGuild } from "@/lib/challenges";
 import { listRequests } from "@/lib/challenge-requests";
 import { BotUsage } from "@/components/DiscordAnalytics";
 import { ChallengeControls } from "@/components/ChallengeRequestReview";
+import { PortalAdmin, DeliveryAdmin } from "@/components/ServerAdmin";
+import { AdminSettings } from "@/components/AdminPage";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Server" };
@@ -158,6 +160,32 @@ export default async function GuildDetailPage({ params }: { params: Promise<{ gu
           </div>
         )}
       </section>
+
+      {/* Staff control over this server. Below the numbers, because looking is
+          the common visit and changing something is the rare one — and every
+          control here has a real consequence for a community we don't own. */}
+      <AdminSettings title="Manage this server">
+        <section className="glass p-6">
+          <h2 className="font-bold text-sm mb-1">Owner&apos;s portal</h2>
+          <p className="text-xs text-muted mb-4">
+            The portal key opens this server&apos;s whole dashboard — growth, challenges, traffic, every
+            member&apos;s progress. We never display an existing key; rotating is the only way to change it.
+          </p>
+          <PortalAdmin guildId={guildId} slug={row?.slug ?? null} hasKey={!!row?.portalKey} />
+        </section>
+
+        <section className="glass p-6">
+          <h2 className="font-bold text-sm mb-4">Delivery &amp; revenue</h2>
+          <DeliveryAdmin
+            guildId={guildId}
+            announcements={row?.announcementsEnabled ?? true}
+            ads={row?.adOptIn ?? false}
+            unlocked={stats.unlocked}
+            linked={stats.linked}
+            threshold={stats.threshold}
+          />
+        </section>
+      </AdminSettings>
     </div>
   );
 }

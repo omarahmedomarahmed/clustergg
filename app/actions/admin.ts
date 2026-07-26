@@ -83,7 +83,17 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.loading.orbSize", String(Math.max(72, Math.min(200, Number.isFinite(orbSize) && orbSize > 0 ? orbSize : 80))));
   if (formData.has("orbIcon")) await setContent("brand.orb.icon", String(formData.get("orbIcon") ?? "").trim());
   if (formData.has("orbColor")) await setContent("brand.orb.color", String(formData.get("orbColor") ?? "#8b5cf6").trim() || "#8b5cf6");
-  if (formData.has("orbSize")) { const os = Number(formData.get("orbSize")); await setContent("brand.orb.size", String(Math.max(44, Math.min(120, Number.isFinite(os) && os > 0 ? os : 56)))); }
+  // 0 is meaningful here — it hides the orb — so it is kept rather than
+  // clamped up to the minimum size.
+  const orbPx = (raw: FormDataEntryValue | null, fallback: number) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return fallback;
+    return n === 0 ? 0 : Math.max(44, Math.min(140, n));
+  };
+  if (formData.has("orbSize")) await setContent("brand.orb.size", String(orbPx(formData.get("orbSize"), 72)));
+  if (formData.has("discordOrbIcon")) await setContent("brand.discordOrb.icon", String(formData.get("discordOrbIcon") ?? "").trim());
+  if (formData.has("discordOrbColor")) await setContent("brand.discordOrb.color", String(formData.get("discordOrbColor") ?? "#5865f2").trim() || "#5865f2");
+  if (formData.has("discordOrbSize")) await setContent("brand.discordOrb.size", String(orbPx(formData.get("discordOrbSize"), 72)));
   if (formData.has("questRocket")) await setContent("brand.quest.rocket", String(formData.get("questRocket") ?? "").trim());
   await setContent("brand.nav.bg", String(formData.get("navBg") ?? "").trim());
   await setContent("brand.footer.bg", String(formData.get("footerBg") ?? "").trim());

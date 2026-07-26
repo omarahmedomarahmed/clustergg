@@ -10,7 +10,7 @@ import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import { LocaleProvider } from "@/components/LocaleProvider";
 import CookieConsent from "@/components/CookieConsent";
-import QuestOrbMount from "@/components/QuestOrbMount";
+import FloatingOrbs from "@/components/FloatingOrbs";
 import RouteProgress from "@/components/RouteProgress";
 import PageBackground from "@/components/PageBackground";
 import { getContent } from "@/lib/cms";
@@ -93,7 +93,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Footer />
         </div>
         <BottomNav loggedIn={!!me} globeUrl={planetsGlobe} tabs={bottomTabs ?? undefined} />
-        <QuestOrbMount />
+        <FloatingOrbs />
         <CookieConsent />
         </LocaleProvider>
         <Analytics />
