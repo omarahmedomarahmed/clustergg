@@ -15,6 +15,8 @@ export type SectionKind =
   | "milestones"  // the MAU ladder, with where we actually are
   | "gtm"         // go-to-market, stage by stage, clickable
   | "product"     // the live bot demo, or one named part of the product
+  | "explainer"   // a wordless flow diagram: icons, one-word labels, arrows
+  | "showcase"    // the real rendered product cards, at size, in a grid
   | "servers"     // the real servers running the bot
   | "logos"       // a logo wall
   | "gallery"     // an image gallery
@@ -32,6 +34,8 @@ export const SECTION_KINDS: { kind: SectionKind; label: string; blurb: string; l
   { kind: "milestones", label: "Milestone ladder", blurb: "Targets with the real current number against them. Grows as you grow.", live: true },
   { kind: "gtm", label: "Go-to-market", blurb: "Stages you can click through, with the current one marked." },
   { kind: "product", label: "Live product", blurb: "The real bot, playable in the page. Optionally scoped to one part of it.", live: true },
+  { kind: "explainer", label: "Graphic explainer", blurb: "A flow diagram — icons and one-word labels, no paragraphs. For explaining a mechanic visually.", },
+  { kind: "showcase", label: "Product showcase", blurb: "The actual cards the product renders, at full size, live. Nothing here is a mockup.", live: true },
   { kind: "servers", label: "Connected servers", blurb: "The actual communities running the bot, with their member counts.", live: true },
   { kind: "logos", label: "Logo wall", blurb: "Partners, investors, integrations — a row of logos with names." },
   { kind: "gallery", label: "Image gallery", blurb: "Screenshots or art, in a grid, each opening full size." },
@@ -69,6 +73,16 @@ export type SectionData = {
 
   // product — which part of the product to show
   focus?: "bot" | "profile" | "challenges" | "leaderboards" | "quests" | "portal";
+
+  // explainer — a wordless flow. Labels are short by contract, not by
+  // convention: the whole point of this section is that it cannot become prose.
+  steps?: { icon: string; label: string; note?: string }[];
+  /** Draw the flow as a loop rather than a line — for mechanics that repeat. */
+  loop?: boolean;
+
+  // showcase — which rendered cards to show. These are the real PNGs the
+  // product draws, requested live, so a deck can never show a stale mockup.
+  cards?: { kind: string; caption?: string }[];
 
   // logos
   logos?: { name: string; logoUrl?: string | null; url?: string | null; note?: string }[];

@@ -19,6 +19,28 @@ import { SECTION_KINDS, type Section, type SectionKind } from "@/lib/dataroom/ty
 
 const KIND = Object.fromEntries(SECTION_KINDS.map((k) => [k.kind, k]));
 
+// The icons an explainer can use. A closed list on purpose: a free-text icon
+// name that doesn't exist silently renders as the fallback, and a diagram with
+// one wrong glyph looks broken rather than incomplete.
+const EXPLAINER_ICONS = [
+  "spark", "rocket", "gamepad", "trophy", "users", "chart", "zap", "target",
+  "planet", "satellite", "link", "shield", "crown", "medal", "flame", "globe",
+  "eye", "send", "grid", "layers", "clock", "check",
+];
+
+// Every card kind the renderer can draw, by the name the API route uses.
+const SHOWCASE_CARDS = [
+  { kind: "profile", label: "Gamer profile card" },
+  { kind: "game-stats", label: "A gamer's live game stats" },
+  { kind: "planet", label: "Game planet — a game world" },
+  { kind: "planets", label: "All games" },
+  { kind: "challenge", label: "A live challenge" },
+  { kind: "leaderboard", label: "Leaderboard" },
+  { kind: "quest", label: "Quest progress" },
+  { kind: "cp", label: "Cluster Points summary" },
+  { kind: "guide", label: "How-to guide card" },
+];
+
 export function SectionEditor({ section, metricOptions }: {
   section: Section;
   metricOptions: { key: string; label: string }[];
@@ -248,6 +270,55 @@ function PerKind({ section, metricOptions }: {
             <option value="quests">Cluster Points &amp; quests</option>
           </select>
         </Field>
+      );
+
+    case "explainer":
+      return (
+        <Rows
+          label="Steps"
+          name="stepLabel"
+          hint="Two or three words each — this section is a diagram, and the length limit is what keeps it one. The note opens in a modal when someone wants the detail."
+          initial={(d.steps ?? []).map((x) => JSON.stringify(x))}
+          blank={JSON.stringify({ icon: "spark", label: "" })}
+          render={(raw) => {
+            let x: { icon?: string; label?: string; note?: string } = {};
+            try { x = JSON.parse(raw); } catch { /* new row */ }
+            return (
+              <div className="grid gap-2 rounded-xl border border-white/10 p-3">
+                <div className="grid sm:grid-cols-[10rem_1fr] gap-2">
+                  <select name="stepIcon" defaultValue={x.icon ?? "spark"} className="input-cosmic w-full">
+                    {EXPLAINER_ICONS.map((i) => <option key={i} value={i}>{i}</option>)}
+                  </select>
+                  <input name="stepLabel" defaultValue={x.label ?? ""} maxLength={22} placeholder="Label (max 22 characters)" className="input-cosmic w-full" />
+                </div>
+                <textarea name="stepNote" defaultValue={x.note ?? ""} rows={2} placeholder="The detail, behind a click (optional)" className="input-cosmic w-full" />
+              </div>
+            );
+          }}
+        />
+      );
+
+    case "showcase":
+      return (
+        <Rows
+          label="Cards to show"
+          name="cardKind"
+          hint="These are the real PNGs the product renders, requested live — never a screenshot, so they can't go stale. Leave empty for the default set of four."
+          initial={(d.cards ?? []).map((x) => JSON.stringify(x))}
+          blank={JSON.stringify({ kind: "profile" })}
+          render={(raw) => {
+            let x: { kind?: string; caption?: string } = {};
+            try { x = JSON.parse(raw); } catch { /* new row */ }
+            return (
+              <div className="grid gap-2 rounded-xl border border-white/10 p-3">
+                <select name="cardKind" defaultValue={x.kind ?? "profile"} className="input-cosmic w-full sm:w-72">
+                  {SHOWCASE_CARDS.map((c) => <option key={c.kind} value={c.kind}>{c.label}</option>)}
+                </select>
+                <input name="cardCaption" defaultValue={x.caption ?? ""} placeholder="Caption (optional)" className="input-cosmic w-full" />
+              </div>
+            );
+          }}
+        />
       );
 
     case "logos":

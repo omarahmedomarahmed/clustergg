@@ -7,7 +7,7 @@ import { getSections, docAnalytics, type Doc } from "@/lib/dataroom";
 import { METRICS } from "@/lib/admin-metrics";
 import { AdminHeader, AdminSection, AdminSettings } from "@/components/AdminPage";
 import { SectionEditor } from "@/components/dataroom/SectionEditor";
-import { DocSettings, AddSection, DeleteDoc } from "@/components/dataroom/DocForms";
+import { DocSettings, AddSection, DeleteDoc, ReseedDoc } from "@/components/dataroom/DocForms";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Edit document" };
@@ -86,10 +86,14 @@ export default async function EditDocPage({ params }: { params: Promise<{ docId:
         <div className="glass p-6">
           <h3 className="font-bold text-sm mb-1">Danger zone</h3>
           <p className="text-xs text-muted mb-4">
-            Deleting removes the document and every section in it, and anyone holding the link gets a 404.
-            Unpublishing does the same thing reversibly.
+            Restoring pulls in the sections we ship — the visual version, with graphic explainers and
+            live product cards — and deletes the ones here. Deleting removes the document entirely and
+            anyone holding the link gets a 404; unpublishing does that reversibly.
           </p>
-          <DeleteDoc doc={doc} />
+          <div className="flex flex-wrap items-center gap-4">
+            <ReseedDoc doc={doc} />
+            <DeleteDoc doc={doc} />
+          </div>
         </div>
       </AdminSettings>
     </div>
