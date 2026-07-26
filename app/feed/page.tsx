@@ -20,7 +20,6 @@ import { getProvider } from "@/lib/providers/registry";
 import { resolveTheme, themeToVars, bgLayerStyle } from "@/lib/theme";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
-import { cardBgCmsKeys, buildCardBgMap, cardBgStyle } from "@/lib/card-bg";
 import { timeAgo } from "@/lib/utils";
 import { slimImg } from "@/lib/img";
 
@@ -61,7 +60,7 @@ export default async function FeedPage() {
   if (mySpaceIds.length) filters.push(inArray(schema.posts.spaceId, mySpaceIds));
   if (followingIds.length) filters.push(inArray(schema.posts.authorId, followingIds));
 
-  const [posts, challenges, suggested] = await Promise.all([
+  const [posts, challenges] = await Promise.all([
     filters.length
       ? db.select({ post: schema.posts, author: schema.publicUserColumns, space: schema.spaces })
           .from(schema.posts)
@@ -73,9 +72,6 @@ export default async function FeedPage() {
     db.select({ c: schema.challenges, space: schema.spaces }).from(schema.challenges)
       .innerJoin(schema.spaces, eq(schema.challenges.spaceId, schema.spaces.id))
       .where(eq(schema.challenges.status, "active")).orderBy(desc(schema.challenges.startAt)).limit(24),
-    mySpaceIds.length
-      ? db.select().from(schema.spaces).where(and(eq(schema.spaces.isActive, true), notInArray(schema.spaces.id, mySpaceIds))).limit(6)
-      : db.select().from(schema.spaces).where(eq(schema.spaces.isActive, true)).limit(6),
   ]);
   const liveChallenges = challenges.slice(0, 4);
 
@@ -138,7 +134,6 @@ export default async function FeedPage() {
   });
   const lolAccounts = accounts.filter((a) => a.provider === "riot-lol").map((a) => ({ accountId: a.id, tag: a.inGameName, region: a.region ?? null }));
   const dashboardWidgets = (Array.isArray(prefs.dashboard) ? prefs.dashboard : []) as Widget[];
-  const cardBg = buildCardBgMap(await getContent(cardBgCmsKeys));
 
   return (
     <div className="profile-root relative" style={{ ...(themeToVars(theme) as React.CSSProperties), background: theme.bgImage ? "transparent" : undefined }}>
@@ -170,64 +165,17 @@ export default async function FeedPage() {
           savedMethod={user.payoutMethod ?? null} changesUsed={user.payoutChanges ?? 0} />
       </div>
 
-      {/* ===== My planets + Explore planets — ON TOP of the hero, side by side ===== */}
-      <div className="grid sm:grid-cols-2 gap-4 mb-8">
-        {/* My planets */}
-        <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_myplanets") }}>
-          <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="planet" size={15} className="text-cyan-300" /> {t("feed.myPlanets")}</h3>
-          {mySpaceRows.length === 0 ? (
-            <p className="text-xs text-muted">You haven&apos;t joined any planets yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {mySpaceRows.map(({ s }) => {
-                const g = s.game ? gameByName.get(s.game) : undefined;
-                const cover = slimImg(g?.coverUrl ?? null);
-                return (
-                  <Link key={s.id} href={`/planets/${s.slug}`} className="relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/10 p-2 group">
-                    {cover && <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-35 group-hover:opacity-50 transition-opacity" style={{ backgroundImage: `url(${cover})` }} />}
-                    <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.85), rgba(4,5,26,0.55))" }} />
-                    {g ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={28} rounded="rounded-lg" className="relative ring-1 ring-white/15" /> : <span className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
-                    <span className="relative text-sm font-semibold truncate">{s.name}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Explore planets */}
-        <div className="glass p-5 bg-cover bg-center" style={{ background: cardBgStyle(cardBg, "feed_explore") }}>
-          <h3 className="font-bold text-sm mb-3 flex items-center gap-2"><Icon name="rocket" size={15} className="text-violet-300" /> Explore planets</h3>
-          <div className="space-y-2">
-            {suggested.map((s) => {
-              const g = s.game ? gameByName.get(s.game) : undefined;
-              const cover = slimImg(g?.coverUrl ?? null);
-              return (
-                <Link key={s.id} href={`/planets/${s.slug}`} className="relative flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/10 p-2 group">
-                  {cover && <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-35 group-hover:opacity-50 transition-opacity" style={{ backgroundImage: `url(${cover})` }} />}
-                  <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.85), rgba(4,5,26,0.55))" }} />
-                  {g ? <GameLogo logoUrl={slimImg(g.logoUrl)} name={s.name} size={28} rounded="rounded-lg" className="relative ring-1 ring-white/15" /> : <span className="relative flex h-7 w-7 items-center justify-center rounded-lg border border-violet-400/25"><Icon name="planet" size={14} className="text-violet-200" /></span>}
-                  <span className="relative text-sm font-semibold truncate flex-1">{s.name}</span>
-                  <Icon name="chevronRight" size={14} className="relative text-muted" />
-                </Link>
-              );
-            })}
-          </div>
-          <Link href="/planets" className="mt-3 block text-center text-xs text-cyan-300 hover:underline">See all planets</Link>
-        </div>
-      </div>
       </div>
 
-      {/* ===== Planets/quests hero — FULL WIDTH of the screen, undivided ===== */}
+      {/* ===== Planets/quests hero =====
+          The same stage the homepage opens with, at the same size — one way to
+          browse the galaxy, not a shrunken second version of it. It replaces
+          the old "My planets" and "Explore planets" lists, which were the same
+          links in a worse form. */}
       {skinnedPlanets.length > 0 && (
-        <section className="w-full mb-8">
-          <div className="mx-auto max-w-6xl px-4">
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="planet" size={18} className="text-cyan-300" /> {t("feed.explore")}</h2>
-          </div>
-          <div className="w-full border-y border-violet-400/15 overflow-hidden">
-            <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading="Tap a game to explore its planet" quest={questHero} compact />
-          </div>
-        </section>
+        <div className="mb-8">
+          <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading={t("feed.explore")} quest={questHero} />
+        </div>
       )}
 
       <div className="mx-auto max-w-6xl px-4 pb-8">

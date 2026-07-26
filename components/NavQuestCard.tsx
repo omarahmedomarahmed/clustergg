@@ -7,9 +7,23 @@ import CpIcon from "@/components/CpIcon";
 import { markQuestsSeen } from "@/app/actions/social";
 import type { NavQuest } from "@/lib/quests";
 
-// One wide quest card in the nav (art background, name, CP, progress). A dropdown
-// (the chevron) picks which quest is shown. The card body links to the quest map.
-// A red dot flags quests where the gamer has earned new CP since they last looked.
+// The quest bar in the nav.
+//
+// One bordered bar holding three things, left to right: the current quest (its
+// card art, name, CP and progress), the gamer's total Cluster Points, and the
+// chevron that opens the quest list. The CP coins used to sit OUTSIDE the bar
+// as a detached chip that disappeared below xl — which is what made the nav
+// look broken. They belong inside, next to the dropdown.
+//
+// Everything here navigates. The bar opens the current quest's map; every row
+// in the dropdown opens that quest's map (it also switches the bar, so the nav
+// still reflects where you went); the coins open the quest index. A menu whose
+// items only change a label is a dead end, and this is the most-used control
+// on the site.
+//
+// The thumbnails show quest CARD ART, not the quest logo — the art is what the
+// quest looks like everywhere else on the site, so it's what makes a row
+// recognisable at 28px.
 export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; totalCp?: number }) {
   const [idx, setIdx] = useState(0);
   const [open, setOpen] = useState(false);
@@ -24,8 +38,7 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
   };
 
   return (
-    <div className="relative flex-1 min-w-0 max-w-md flex items-center gap-2">
-      <div className="relative flex-1 min-w-0">
+    <div className="relative flex-1 min-w-0 max-w-xl">
       <div className="relative h-11 overflow-hidden rounded-xl border border-white/10 hover:border-cyan-400/40 transition-colors flex">
         {q.art ? (
           <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-45" style={{ backgroundImage: `url(${q.art})` }} />
@@ -35,11 +48,7 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
         <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.5), rgba(4,5,26,0.8))" }} />
 
         <Link href={`/quests/${q.key}`} className="relative flex-1 min-w-0 flex items-center gap-2 px-2">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg ring-1 ring-white/15" style={{ background: `${q.color}33` }}>
-            {q.logoUrl
-              ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={q.logoUrl} alt="" className="h-full w-full object-cover" />
-              : <Icon name="spark" size={14} style={{ color: q.color }} />}
-          </span>
+          <Art art={q.art} color={q.color} size="h-8 w-8" />
           <span className="min-w-0 flex-1 flex flex-col justify-center leading-tight">
             <span className="flex items-center justify-between gap-2">
               <span className="text-[12px] font-bold truncate">{q.name}</span>
@@ -51,9 +60,21 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
           </span>
         </Link>
 
+        {/* Total Cluster Points — inside the bar, immediately left of the
+            dropdown, so the two controls read as one unit. */}
+        {totalCp !== undefined && (
+          <Link
+            href="/quests"
+            title="Your total Cluster Points"
+            className="relative flex shrink-0 items-center gap-1 border-l border-white/10 px-2.5 text-[11px] font-bold text-cyan-200 hover:bg-white/5"
+          >
+            <CpIcon size={15} /> {totalCp.toLocaleString()}
+          </Link>
+        )}
+
         {quests.length > 1 && (
-          <button type="button" onClick={openMenu} aria-label="Switch quest"
-            className="relative flex w-9 shrink-0 items-center justify-center border-l border-white/10 text-white/70 hover:text-white">
+          <button type="button" onClick={openMenu} aria-label="All quests" aria-expanded={open}
+            className="relative flex w-9 shrink-0 items-center justify-center border-l border-white/10 text-white/70 hover:text-white hover:bg-white/5">
             <Icon name={open ? "chevronDown" : "chevronRight"} size={16} />
             {anyEarned && <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-[#04051a] animate-pulse" />}
           </button>
@@ -65,34 +86,46 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
       {open && quests.length > 1 && (
         <>
           <button aria-hidden className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-50 mt-1.5 w-64 rounded-xl border border-white/10 bg-[#0a0a1c]/95 backdrop-blur-xl p-1.5 shadow-2xl">
+          <div className="absolute right-0 top-full z-50 mt-1.5 w-72 rounded-xl border border-white/10 bg-[#0a0a1c]/95 backdrop-blur-xl p-1.5 shadow-2xl">
             {quests.map((qq, i) => (
-              <button key={qq.key} type="button" onClick={() => { setIdx(i); setOpen(false); }}
-                className={`relative flex w-full items-center gap-2 overflow-hidden rounded-lg px-2 py-2 text-left ${i === idx ? "ring-1 ring-cyan-400/40" : "hover:bg-white/5"}`}>
+              <Link
+                key={qq.key}
+                href={`/quests/${qq.key}`}
+                onClick={() => { setIdx(i); setOpen(false); }}
+                className={`relative flex w-full items-center gap-2 overflow-hidden rounded-lg px-2 py-2 text-left ${i === idx ? "ring-1 ring-cyan-400/40" : "hover:bg-white/5"}`}
+              >
                 {qq.art && <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-25" style={{ backgroundImage: `url(${qq.art})` }} />}
                 <span aria-hidden className="absolute inset-0" style={{ background: "rgba(4,5,26,0.7)" }} />
-                <span className="relative flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-md ring-1 ring-white/10" style={{ background: `${qq.color}55` }}>
-                  {qq.logoUrl
-                    ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={qq.logoUrl} alt="" className="h-full w-full object-cover" />
-                    : <Icon name="spark" size={13} style={{ color: qq.color }} />}
-                </span>
+                <Art art={qq.art} color={qq.color} size="h-7 w-7" />
                 <span className="relative min-w-0 flex-1">
                   <span className="flex items-center gap-1.5 text-xs font-bold truncate">{qq.name}
                     {qq.earned && <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" title="New CP earned" />}
                   </span>
                   <span className="block text-[10px]" style={{ color: qq.accent2 }}>{qq.qp.toLocaleString()} CP · {qq.pct}%</span>
                 </span>
-              </button>
+                <Icon name="chevronRight" size={13} className="relative shrink-0 text-white/40" />
+              </Link>
             ))}
+            <Link
+              href="/quests"
+              onClick={() => setOpen(false)}
+              className="mt-1 flex items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold text-cyan-300 hover:bg-white/5"
+            >
+              All quests {totalCp !== undefined && <span className="inline-flex items-center gap-1"><CpIcon size={14} /> {totalCp.toLocaleString()}</span>}
+            </Link>
           </div>
         </>
       )}
-      </div>
-      {totalCp !== undefined && (
-        <Link href="/quests" title="Your total Cluster Points" className="hidden xl:inline-flex items-center gap-1 shrink-0 rounded-lg border border-white/10 bg-black/30 px-2 py-1 text-[11px] font-bold text-cyan-200 hover:border-cyan-400/40">
-          <CpIcon size={15} /> {totalCp.toLocaleString()}
-        </Link>
-      )}
     </div>
+  );
+}
+
+function Art({ art, color, size }: { art: string | null; color: string; size: string }) {
+  return (
+    <span className={`relative ${size} shrink-0 overflow-hidden rounded-lg ring-1 ring-white/15`} style={{ background: `${color}33` }}>
+      {art
+        ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={art} alt="" className="h-full w-full object-cover" />
+        : <span className="flex h-full w-full items-center justify-center"><Icon name="spark" size={14} style={{ color }} /></span>}
+    </span>
   );
 }
