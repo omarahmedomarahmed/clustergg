@@ -114,7 +114,7 @@ function profileButton(ctx: ScreenCtx, trail: Frame[]): Button | null {
 }
 
 function moreButton(trail: Frame[]): Button {
-  return navButton("More", frame("more"), trail, ButtonStyle.Secondary, "⋯");
+  return navButton("More", frame("more"), trail, ButtonStyle.Secondary, "🧭");
 }
 
 // `here` is the screen being drawn, so the tail never offers a button that
