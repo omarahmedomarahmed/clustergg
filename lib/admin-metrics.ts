@@ -43,6 +43,7 @@ export const METRICS: MetricDef[] = [
   { key: "trophies", label: "Trophies awarded", definition: "Trophies handed to winners.", group: "competition", href: "/admin/trophies", goodWhenUp: true },
   { key: "redeems", label: "Redemptions waiting", definition: "Winners asking to cash a trophy in. Each is money we owe.", group: "competition", href: "/admin/redeems" },
 
+  { key: "brandEnquiries", label: "New enquiries", definition: "Brands who asked to buy and have not been contacted yet. Each one is a reply we owe.", group: "revenue", href: "/admin/brand-enquiries", goodWhenUp: true },
   { key: "brands", label: "Brands", definition: "Advertisers with a portal.", group: "revenue", href: "/admin/brands", goodWhenUp: true },
   { key: "creatives", label: "Creatives", definition: "Ad artwork loaded and ready to run.", group: "revenue", href: "/admin/creatives" },
   { key: "placements", label: "Placements", definition: "Slots a creative can appear in.", group: "revenue", href: "/admin/placements" },
@@ -90,6 +91,7 @@ export async function loadMetrics(since?: Date): Promise<Metrics> {
       one("trophies", () => db.select({ c: count() }).from(schema.userTrophies)),
       one("redeems", () => db.select({ c: count() }).from(schema.trophyRedeems).where(eq(schema.trophyRedeems.status, "pending"))),
 
+      one("brandEnquiries", () => db.select({ c: count() }).from(schema.brandEnquiries).where(eq(schema.brandEnquiries.status, "new"))),
       one("brands", () => db.select({ c: count() }).from(schema.brands)),
       one("creatives", () => db.select({ c: count() }).from(schema.adCampaignCreatives)),
       one("placements", () => db.select({ c: count() }).from(schema.adPlacements)),

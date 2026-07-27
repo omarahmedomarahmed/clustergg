@@ -13,6 +13,16 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "quest_log", label: "Quest game · My log screen", note: "Background art of the in-game CP history panel." },
   { key: "quest_guide", label: "Quest game · Guide screen", note: "Background art of the in-game how-to-play panel." },
   { key: "quest_missions", label: "Quest game · Missions screen", note: "Background art of the in-game starter-missions panel." },
+  // The commercial story sections. Each is a full-width band on the home and
+  // pricing pages, so the art here is doing marketing work rather than card work
+  // — wide, atmospheric, and quiet enough to hold a headline.
+  { key: "sec_problem", label: "Story · The problem", note: "Behind 'reaching gamers costs a fortune'. Home + pricing." },
+  { key: "sec_insight", label: "Story · The Discord insight", note: "Behind 'gamers don't live where you're buying'. The biggest band on the site." },
+  { key: "sec_solution", label: "Story · The solution", note: "Behind 'we built the handle'." },
+  { key: "sec_loop", label: "Story · The loyalty loop", note: "Behind the four-step loop that keeps gamers coming back." },
+  { key: "sec_pricing", label: "Story · Pricing section", note: "Behind the brand pricing cards and the game slider." },
+  { key: "sec_servers", label: "Story · Server earnings", note: "Behind the 500 / 1,000 / 5,000 earning stages." },
+  { key: "sec_cta", label: "Story · Closing CTA", note: "Behind the final call to action at the bottom of the home page." },
   // Discord bot PNG cards — the art behind every card the bot posts.
   { key: "bot_welcome", label: "Bot · Welcome card", note: "Backdrop of the bot's welcome + fallback cards." },
   { key: "bot_profile", label: "Bot · Profile snapshot", note: "Backdrop when a gamer has no custom banner." },
@@ -24,6 +34,8 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "bot_planets", label: "Bot · Game picker card", note: "Backdrop of the 'pick your game' card that every START HERE button opens." },
   { key: "bot_guide", label: "Bot · How-to guide cards", note: "Backdrop for the pinned how-to guide PNGs." },
   { key: "bot_week", label: "Bot · Profile of the Week", note: "Backdrop of the weekly vote standings and the Sunday winners card." },
+  { key: "bot_world", label: "Bot · Game world / lore card", note: "Fallback behind a champion, agent, weapon or map. That entity's own splash art wins when it has one." },
+  { key: "bot_search", label: "Bot · Search results card", note: "Backdrop of the 'did you mean' card when a search matches more than one thing." },
 ];
 
 export const CARD_BG_KEYS = CARD_BG_TYPES.map((t) => t.key);

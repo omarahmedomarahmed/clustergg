@@ -818,6 +818,32 @@ export const challengeRequests = pgTable("challenge_requests", {
   createdAt: now("created_at"),
 }, (t) => [index("creq_guild_idx").on(t.guildId, t.createdAt), index("creq_status_idx").on(t.status)]);
 
+// A brand asking to buy.
+//
+// The pricing page states the rate card, so the next click has to be a real one.
+// This records what they configured on the slider alongside who they are, which
+// means the first sales reply already knows the plan, the games and the budget
+// instead of opening with "what were you looking for?".
+export const brandEnquiries = pgTable("brand_enquiries", {
+  id: id(),
+  company: text("company").notNull(),
+  contactName: text("contact_name").notNull().default(""),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  website: text("website"),
+  message: text("message").notNull().default(""),
+  // The configuration they were looking at when they clicked.
+  tier: text("tier").notNull().default("reach"),      // reach | challenge | ultimate
+  games: integer("games").notNull().default(0),
+  addon: boolean("addon").notNull().default(false),
+  billing: text("billing").notNull().default("monthly"), // monthly | yearly
+  quotedMonthly: integer("quoted_monthly").notNull().default(0),
+  status: text("status").notNull().default("new"),    // new | contacted | won | lost
+  note: text("note"),                                  // staff note
+  brandId: text("brand_id"),                           // set once converted to a brand
+  createdAt: now("created_at"),
+}, (t) => [index("benq_status_idx").on(t.status, t.createdAt)]);
+
 // Ads the bot has posted into a server, linked to the existing ad pipeline.
 export const discordAdPosts = pgTable("discord_ad_posts", {
   id: id(),

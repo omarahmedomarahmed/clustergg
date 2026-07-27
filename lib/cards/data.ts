@@ -582,3 +582,58 @@ export async function weekCard(opts: { weekKey?: string; mode?: "race" | "result
     theme: { ...BRAND, accent: "#fbbf24", accent2: "#f472b6", bgUrl: bg.bgUrl },
   };
 }
+
+// A game-world entity — a champion, agent, legend, weapon or map.
+//
+// The splash IS the card. Lore and abilities sit on it, which is the whole
+// reason this is a PNG rather than an embed: Discord cannot put text on art.
+// `skin` picks which splash, so switching skins re-renders the same card
+// instead of opening a different one.
+export async function worldCard(game: string, kind: string, id: string, skin?: string | null): Promise<CardData | null> {
+  const { getCachedEntityDetail } = await import("@/lib/game-world-cache");
+  const e = await getCachedEntityDetail(game, kind, id);
+  if (!e) return null;
+
+  const db = await getDb();
+  const [[g], bg] = await Promise.all([
+    db.select({ logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl, planetBgUrl: schema.games.planetBgUrl, accent: schema.games.accent, accent2: schema.games.accent2 })
+      .from(schema.games).where(eq(schema.games.name, game)).limit(1),
+    cardBg("bot_world"),
+  ]);
+
+  // The chosen skin's art, or the entity's own splash. A skin name that doesn't
+  // exist falls back rather than rendering an empty card.
+  const picked = skin ? e.skins.find((s) => s.name.toLowerCase() === skin.toLowerCase()) : null;
+  const art = picked?.image || e.splash || e.image || null;
+
+  return {
+    kind: "world",
+    game,
+    entityKind: e.kind,
+    name: e.name,
+    role: e.role,
+    lore: e.lore,
+    skinName: picked?.name ?? null,
+    skinCount: e.skins.length,
+    meta: e.meta.slice(0, 4),
+    abilities: e.abilities.slice(0, 4).map((a) => ({ name: a.name, desc: a.desc })),
+    logoUrl: g?.logoUrl ?? null,
+    theme: {
+      accent: g?.accent || BRAND.accent,
+      accent2: g?.accent2 || BRAND.accent2,
+      bgUrl: art || g?.planetBgUrl || bg.bgUrl,
+      bgFallbacks: [e.splash, e.image, g?.planetBgUrl, g?.coverUrl, bg.bgUrl],
+    },
+  };
+}
+
+// "Did you mean…" — the only card a search produces when it can't answer.
+export async function searchCard(query: string, results: { label: string; sub: string; kind: string; imageUrl?: string | null }[]): Promise<CardData> {
+  const bg = await cardBg("bot_search");
+  return {
+    kind: "search",
+    query: query.slice(0, 60),
+    results: results.slice(0, 6),
+    theme: { ...BRAND, bgUrl: bg.bgUrl },
+  };
+}

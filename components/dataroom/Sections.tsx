@@ -6,6 +6,7 @@ import { Milestones, GtmStages, TeamGrid, Gallery, MetricTiles, Explainer, CardS
 import { ladder, metricValueFor, INVESTOR_AD_PLACEMENT, type LiveData, type Person, type Section } from "@/lib/dataroom";
 import type { BotStep } from "@/components/BotShowcase";
 import { optImg } from "@/lib/img";
+import { money } from "@/lib/pricing";
 
 const nf = (n: number) => n.toLocaleString();
 
@@ -254,6 +255,49 @@ function Body({ section, doc, live, people, steps, installUrl }: {
         </>
       );
 
+    case "pricing": {
+      // The rate card, read from the same config the pricing page charges from.
+      //
+      // This is the one slide a reader will check against reality, so it is the
+      // last one that can be allowed to go stale. Nothing here is typed into the
+      // deck — change a price in Admin → Site content and this slide changes.
+      const p = live.pricing;
+      const { reach, entry, full } = live.quotes;
+      const plans = [
+        { name: "Reach", price: reach.monthly, note: "Every placement, the brand portal, full analytics.", detail: "Placements only" },
+        { name: "Challenge", price: entry.monthly, note: `${money(p.challengeBase, p.currency)} base + ${money(p.perGame, p.currency)} per game. ${p.challengesPerGame} sponsored challenges a month, per game, with naming rights.`, detail: "From one game" },
+        { name: "Ultimate", price: full.monthly, note: `All ${p.games} games, ${full.challengesPerMonth} challenges a month, premium and Discord placement, the Sunday shout-out.`, detail: "The whole network" },
+      ];
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <div className="grid sm:grid-cols-3 gap-3">
+            {plans.map((pl, i) => (
+              <div key={pl.name} className={`glass rounded-2xl p-5 ${i === 2 ? "ring-1" : ""}`} style={i === 2 ? { borderColor: accent2 } : undefined}>
+                <div className="text-[11px] uppercase tracking-widest" style={{ color: accent2 }}>{pl.detail}</div>
+                <div className="font-bold text-lg mt-1.5">{pl.name}</div>
+                <div className="text-3xl font-black mt-2">{money(pl.price, p.currency)}<span className="text-sm font-normal text-muted">/mo</span></div>
+                <p className="text-xs text-muted mt-2.5 leading-snug">{pl.note}</p>
+              </div>
+            ))}
+          </div>
+          {/* The cost side, so the margin question is answered before it's asked. */}
+          <div className="grid sm:grid-cols-4 gap-3 mt-4">
+            <PriceFact label="challenges a month" value={nf(p.games * p.challengesPerGame)} accent={accent2} />
+            <PriceFact label="minimum prize pool each" value={money(p.prizePool, p.currency)} accent={accent2} />
+            <PriceFact label="prize money we fund monthly" value={money(p.games * p.challengesPerGame * p.prizePool, p.currency)} accent={accent2} />
+            <PriceFact label="of it kept by the server that hosted it" value={`${Math.round(p.serverSharePct)}%`} accent={accent2} />
+          </div>
+          <p className="text-xs text-muted mt-4 max-w-2xl leading-relaxed">
+            Annual is {Math.round(p.yearlyDiscountPct)}% off. The Sunday broadcast sponsorship is a
+            {" "}{money(p.streamAddon, p.currency)}/month add-on on any plan. Every figure here is read from the
+            live rate card, not written into this document.
+          </p>
+          <LiveNote takenAt={live.takenAt} />
+        </>
+      );
+    }
+
     case "logos": {
       // An empty logo wall on the "games we sync" section fills itself from the
       // real catalogue rather than sitting blank waiting for an admin.
@@ -449,5 +493,14 @@ function LiveNote({ takenAt }: { takenAt: string }) {
       <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
       Counted from production at {new Date(takenAt).toUTCString()} — refresh for the current figure.
     </p>
+  );
+}
+
+function PriceFact({ label, value, accent }: { label: string; value: string; accent: string }) {
+  return (
+    <div className="rounded-2xl bg-black/25 border border-white/10 p-4">
+      <div className="text-2xl font-black leading-none" style={{ color: accent }}>{value}</div>
+      <div className="text-[11px] uppercase tracking-wider text-muted mt-2 leading-snug">{label}</div>
+    </div>
   );
 }

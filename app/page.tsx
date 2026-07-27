@@ -7,9 +7,14 @@ import GameLogo from "@/components/GameLogo";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
-import HeroStage from "@/components/HeroStage";
+import HeroBanner from "@/components/HeroBanner";
 import QuestCard from "@/components/QuestCard";
 import OAuthButtons from "@/components/OAuthButtons";
+import PricingPlans from "@/components/PricingPlans";
+import ServerEarnCards from "@/components/ServerEarnCards";
+import { BrandHero, ProblemSection, InsightSection, SolutionSection, LoopSection, PrizeSection } from "@/components/BrandStory";
+import { pricingLive } from "@/lib/pricing-live";
+import { money } from "@/lib/pricing";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { getQuestHeroData } from "@/lib/quest-hero";
 import { getUserQuests, getQuestTops } from "@/lib/quests";
@@ -37,8 +42,8 @@ export default async function LandingPage() {
   // Full quests + CP tops for the "Chart your quests" card grid.
   const homeQuests = await getUserQuests(db, viewer?.id ?? null);
   const questTops = await getQuestTops(db, homeQuests.map((q) => q.id), 6);
-  const [network, topServers, botSteps] = await Promise.all([
-    networkStats(), publicServers(6), botShowcaseSteps(),
+  const [network, topServers, botSteps, pricing] = await Promise.all([
+    networkStats(), publicServers(6), botShowcaseSteps(), pricingLive(),
   ]);
   const install = installUrl();
   const c = await getContent([
@@ -46,12 +51,22 @@ export default async function LandingPage() {
     "discord.cta.primary", "discord.cta.secondary",
     "hero.badge", "hero.title.line1", "hero.title.line2", "hero.subtitle",
     "hero.cta.primary", "hero.cta.secondary", "hero.image",
+    "hero.banner.label", "hero.banner.note",
     "section.challenges.title", "section.challenges.subtitle",
     "section.games.title", "section.games.subtitle",
     "section.badges.title", "section.badges.subtitle",
     "section.partners.title",
     "section.cta.title", "section.cta.subtitle", "section.cta.button",
     "banner.arena",
+    // The brand story — the guest homepage's spine.
+    "brand.hero.badge", "brand.hero.title", "brand.hero.title2", "brand.hero.subtitle",
+    "brand.hero.cta.primary", "brand.hero.cta.secondary",
+    "brand.problem.title", "brand.problem.subtitle", "brand.problem.items",
+    "brand.insight.title", "brand.insight.body", "brand.insight.stat", "brand.insight.statLabel",
+    "brand.insight.stat2", "brand.insight.stat2Label",
+    "brand.solution.title", "brand.solution.subtitle", "brand.solution.items",
+    "brand.loop.title", "brand.loop.subtitle", "brand.loop.items",
+    "brand.prize.title", "brand.prize.body",
   ]);
 
   const [activeChallenges, games, partners, statCounts, tickerRows] = await Promise.all([
@@ -136,34 +151,93 @@ export default async function LandingPage() {
       <WebSiteSchema />
       <BotSchema servers={network.servers} />
 
-      {/* ===== INTERACTIVE HERO — planet globe ⇄ quest map toggle ===== */}
+      {/* ===== THE GALAXY, COLLAPSED =====
+          A banner of game logos rather than 700px of globe. A gamer opens it in
+          one tap; everyone else reads the argument first. Signed-in gamers get
+          it open by default — they came to play, not to be sold to. */}
       {skinnedPlanets.length > 0 && (
-        <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading={tr("The Cluster galaxy — pick a game")} quest={questHero} />
+        <HeroBanner
+          planets={skinnedPlanets}
+          quest={questHero}
+          heading={tr("The Cluster galaxy — pick a game")}
+          label={c["hero.banner.label"]}
+          note={c["hero.banner.note"]}
+          defaultOpen={Boolean(viewer)}
+        />
+      )}
+
+      {/* ===== THE COMMERCIAL ARGUMENT (guests only) =====
+          A signed-in gamer has already bought in; showing them a rate card is
+          noise. A guest is far more likely to be a brand or a server owner, and
+          this is the order the argument has to arrive in: what it costs to reach
+          gamers today → why → what we built → what it costs here. */}
+      {!viewer && (
+        <>
+          <BrandHero
+            c={c}
+            stats={[
+              { label: "ad placements", value: pricing.placements.toLocaleString() },
+              { label: "games, one challenge a week each", value: String(pricing.games.length || pricing.cfg.games) },
+              { label: "challenges a month", value: String(pricing.cfg.games * pricing.cfg.challengesPerGame) },
+              network.reach > 0
+                ? { label: "gamers reachable", value: network.reach.toLocaleString() }
+                : { label: "prize money a month", value: money(pricing.cfg.games * pricing.cfg.challengesPerGame * pricing.cfg.prizePool, pricing.cfg.currency) },
+            ]}
+          />
+          <ProblemSection c={c} bg={cardBg} />
+          <InsightSection c={c} bg={cardBg} />
+          <SolutionSection c={c} bg={cardBg} />
+        </>
       )}
 
       {/* ===== THE PRODUCT: ClusterBot for Discord =====
-          Placed immediately under the hero because it is what Cluster now is:
-          the engagement layer for Discord communities. The galaxy above is how
-          you browse the games; this is what you actually adopt.
-
-          The network numbers and the live in-Discord demo are one section:
-          the claim and the proof of it belong on the same screen. */}
+          The proof under the claim: the network numbers and a live in-Discord
+          demo on the same screen. */}
       <DiscordSection stats={network} servers={topServers} copy={c} steps={botSteps} installUrl={install} />
 
-      {/* ===== HERO ===== */}
-      {skinnedPlanets.length > 0 ? (
-        // The interactive globe above is the hero. Keep only a slim guest CTA
-        // and the platform numbers — the old marketing hero is retired.
-        <section className="mx-auto max-w-6xl px-4 pt-2 pb-14">
-          {!viewer && (
-            <div className="flex flex-col items-center gap-4 mb-12 text-center">
-              <p className="text-lg text-muted max-w-xl">{c["hero.subtitle"]}</p>
-              <div className="w-full max-w-xs"><OAuthButtons next="/onboarding" /></div>
-              <Link href="/leaderboards" className="text-sm text-cyan-300 hover:underline">{c["hero.cta.secondary"]} →</Link>
+      {/* ===== PRICING (guests only) ===== */}
+      {!viewer && (
+        <>
+          <PrizeSection c={c} cfg={pricing.cfg} bg={cardBg} />
+
+          <section id="pricing" className="relative py-20 scroll-mt-24" style={{ background: cardBgStyle(cardBg, "sec_pricing") }}>
+            <div className="relative mx-auto max-w-6xl px-4">
+              <div className="text-center max-w-2xl mx-auto mb-10">
+                <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-xs text-cyan-200/90 mb-5">
+                  <Icon name="grid" size={12} /> {pricing.copy["pricing.eyebrow"]}
+                </div>
+                <h2 className="text-3xl md:text-5xl font-bold leading-tight">{pricing.copy["pricing.title"]}</h2>
+                <p className="text-muted mt-4 leading-relaxed">{pricing.copy["pricing.subtitle"]}</p>
+              </div>
+              <PricingPlans
+                cfg={pricing.cfg}
+                copy={pricing.copy}
+                games={pricing.games.map((g) => ({ slug: g.slug, name: g.name, logoUrl: g.logoUrl, gamers: g.gamers }))}
+                reach={network.reach}
+                placements={{ total: pricing.placements, web: pricing.webPlacements, discord: pricing.discordPlacements }}
+                compact
+              />
+              <div className="mt-8 text-center">
+                <Link href="/pricing" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm inline-flex items-center gap-2">
+                  {tr("Full rate card, add-ons and FAQ")} <Icon name="arrowRight" size={15} />
+                </Link>
+              </div>
             </div>
-          )}
-        </section>
-      ) : (
+          </section>
+
+          <LoopSection c={c} bg={cardBg} />
+
+          {/* ===== THE OTHER SIDE: servers get paid ===== */}
+          <section className="relative py-20 border-y border-violet-500/15" style={{ background: cardBgStyle(cardBg, "sec_servers") }}>
+            <div className="relative mx-auto max-w-6xl px-4">
+              <ServerEarnCards installUrl={install || undefined} />
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* ===== ART-ONLY FALLBACK HERO (no planets configured yet) ===== */}
+      {skinnedPlanets.length > 0 ? null : (
         <section className="relative">
           <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-80" style={{ backgroundImage: `url(${optImg(c["hero.image"], 1200)})` }} />
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a]/30 via-[#04051a]/60 to-[#04051a]" />
@@ -376,18 +450,57 @@ export default async function LandingPage() {
         </section>
       )}
 
-      {/* ===== CTA ===== */}
-      <section className="mx-auto max-w-4xl px-4 py-24 text-center">
-        <div className="glass p-12 relative overflow-hidden glow-sweep">
+      {/* ===== CTA =====
+          Three doors, because there are three people on this page: a brand with
+          a budget, an owner with a community, and a gamer with an account. One
+          generic "sign up" button served exactly one of them. */}
+      <section className="relative mx-auto max-w-6xl px-4 py-24" style={{ background: cardBgStyle(cardBg, "sec_cta") }}>
+        <div className="text-center max-w-2xl mx-auto mb-10">
           <h2 className="text-3xl md:text-4xl font-bold">
-            {c["section.cta.title"].split(",")[0]}, <span className="grad-text">{c["section.cta.title"].split(",")[1]?.trim() ?? "one link"}</span>
+            {c["section.cta.title"].split(",")[0]},{" "}
+            <span className="grad-text">{c["section.cta.title"].split(",").slice(1).join(",").trim() || "one network"}</span>
           </h2>
-          <p className="text-muted mt-4 max-w-md mx-auto">{c["section.cta.subtitle"]}</p>
-          <Link href="/signup" className="glow-btn pressable mt-8 inline-block rounded-full px-10 py-4 font-semibold text-white text-lg">
-            {c["section.cta.button"]}
-          </Link>
+          <p className="text-muted mt-4">{c["section.cta.subtitle"]}</p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-5">
+          <DoorCard
+            icon="target" tone="violet" title="I'm a brand"
+            body={`Placements and sponsored challenges from ${money(pricing.cfg.reachBase, pricing.cfg.currency)} a month. Your name on the competition, not a banner they scroll past.`}
+            href="/pricing" cta="See pricing"
+          />
+          <DoorCard
+            icon="satellite" tone="emerald" title="I run a Discord"
+            body="Install the bot free, link 500 gamers, and start earning from the brands sponsoring the games your members already play."
+            href="/discord-bot" cta="Add ClusterBot"
+          />
+          <DoorCard
+            icon="gamepad" tone="cyan" title="I'm a gamer"
+            body={`Link your accounts, get one profile for every game, and compete each week for ${money(pricing.cfg.prize1, pricing.cfg.currency)} a win.`}
+            href="/signup" cta={c["section.cta.button"]}
+          />
         </div>
       </section>
     </div>
+  );
+}
+
+// One of the three doors at the bottom of the page. Kept local: this layout is
+// the closing argument of the home page specifically, not a shared pattern.
+function DoorCard({
+  icon, tone, title, body, href, cta,
+}: { icon: string; tone: "violet" | "emerald" | "cyan"; title: string; body: string; href: string; cta: string }) {
+  const ring = tone === "violet" ? "border-violet-400/25" : tone === "emerald" ? "border-emerald-400/25" : "border-cyan-400/25";
+  const chip = tone === "violet" ? "bg-violet-500/15 text-violet-200" : tone === "emerald" ? "bg-emerald-500/15 text-emerald-200" : "bg-cyan-500/15 text-cyan-200";
+  return (
+    <Link href={href} className={`glass rounded-3xl p-6 card-lift border ${ring} flex flex-col`}>
+      <div className={`h-11 w-11 rounded-xl grid place-items-center ${chip}`}>
+        <Icon name={icon} size={20} />
+      </div>
+      <div className="font-bold text-lg mt-4">{title}</div>
+      <p className="text-sm text-muted mt-2 leading-relaxed flex-1">{body}</p>
+      <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-300">
+        {cta} <Icon name="arrowRight" size={14} />
+      </span>
+    </Link>
   );
 }

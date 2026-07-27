@@ -5,7 +5,8 @@ import type { CardLayout } from "@/lib/cards/layout";
 
 export type CardKind =
   | "profile" | "game-stats" | "quest" | "cp-summary"
-  | "leaderboard" | "challenge" | "planet" | "planets" | "guide" | "week";
+  | "leaderboard" | "challenge" | "planet" | "planets" | "guide" | "week"
+  | "world" | "search";
 
 export type CardTheme = {
   accent: string;   // primary brand/game/quest colour
@@ -185,6 +186,43 @@ export type GuideCard = {
   theme: CardTheme;
 };
 
+// A game-world entity: a champion, agent, legend, weapon, map — and the skin
+// currently being shown.
+//
+// This is the card `/cluster show <any lore name>` produces. It's deliberately
+// art-led: the splash IS the card, and the text sits on it. Skins are the
+// reason people open it twice, so switching skin re-renders the same card with
+// a different splash rather than opening a new one.
+export type WorldCard = {
+  kind: "world";
+  game: string;
+  entityKind: string;          // champion | agent | weapon | legend | map | hero
+  name: string;
+  role?: string | null;
+  lore?: string | null;
+  /** The skin being shown, when it isn't the base look. */
+  skinName?: string | null;
+  /** How many skins exist, so the card can say what the buttons are for. */
+  skinCount: number;
+  meta: { label: string; value: string }[];
+  abilities: { name: string; desc: string }[];
+  logoUrl?: string | null;
+  theme: CardTheme;
+};
+
+// "Did you mean…" — the one case where a search can't answer straight.
+//
+// Only rendered when a query genuinely resolves to more than one thing (two
+// gamers with the same tag on different games, a word that is both a champion
+// and a map). One hit renders that hit; zero hits says so.
+export type SearchCard = {
+  kind: "search";
+  query: string;
+  results: { label: string; sub: string; kind: string; imageUrl?: string | null }[];
+  theme: CardTheme;
+};
+
 export type CardData =
   | ProfileCard | GameStatsCard | QuestCard | CpSummaryCard
-  | LeaderboardCard | ChallengeCard | PlanetCard | PlanetsCard | GuideCard | WeekCard;
+  | LeaderboardCard | ChallengeCard | PlanetCard | PlanetsCard | GuideCard | WeekCard
+  | WorldCard | SearchCard;

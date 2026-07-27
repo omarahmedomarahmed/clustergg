@@ -19,7 +19,7 @@ This repository is the entire product: a single Next.js app that serves the publ
 | [`SETUP_GUIDE.md`](./SETUP_GUIDE.md) | Devs | First-run setup, every environment variable, seeding the superadmin. |
 | [`DEPLOYMENT.md`](./DEPLOYMENT.md) | Devs / ops | Deploying to Vercel, Neon + Blob wiring, cron, promotion. |
 | [`docs/PRODUCT_BRIEF.md`](./docs/PRODUCT_BRIEF.md) | Product / investors | Plain-language product overview. |
-| [`docs/PITCH_DECK.md`](./docs/PITCH_DECK.md) | Investors | Slide-by-slide preseed narrative. |
+| [`docs/COMMERCIAL_MODEL.md`](./docs/COMMERCIAL_MODEL.md) | Sales / product / investors | How we make money: what we charge, what prizes cost us, what servers earn, and where every number lives. |
 | [`docs/GAMIFICATION_PLAN.md`](./docs/GAMIFICATION_PLAN.md) | Product / devs | Quests, tiers and CP design. |
 
 ---
