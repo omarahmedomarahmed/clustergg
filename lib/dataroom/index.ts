@@ -4,6 +4,8 @@ import { uid } from "@/lib/utils";
 import { networkStats, publicServers, type NetworkStats, type PublicServer } from "@/lib/network";
 import { loadMetrics, METRICS, type Metrics } from "@/lib/admin-metrics";
 import { TIERS } from "@/lib/server-portal";
+import { buildPricing, quote, type PricingConfig, type Quote, PRICING_NUMBER_KEYS } from "@/lib/pricing";
+import { getContent } from "@/lib/cms";
 import { SEED_DOCS, SEED_PEOPLE } from "@/lib/dataroom/defaults";
 import type { Doc, Person, Section, SectionData, SectionKind } from "@/lib/dataroom/types";
 import type { MilestoneLadder } from "@/lib/dataroom/types-client";
@@ -142,18 +144,31 @@ export type LiveData = {
   metrics: Metrics;
   metricDefs: typeof METRICS;
   tiers: typeof TIERS;
+  /** The live rate card, so a deck can never quote a price we stopped charging. */
+  pricing: PricingConfig;
+  quotes: { reach: Quote; entry: Quote; full: Quote };
   takenAt: string;
 };
 
 // One pass for a whole document, handed to every section that needs it, so a
 // page with four live sections makes one set of queries rather than four.
 export async function liveData(): Promise<LiveData> {
-  const [network, servers, metrics] = await Promise.all([
+  const [network, servers, metrics, priceContent] = await Promise.all([
     networkStats().catch((): NetworkStats => ({ servers: 0, reach: 0, gamers: 0, linked: 0, challenges: 0, games: 0 })),
     publicServers(12).catch(() => []),
     loadMetrics().catch(() => ({} as Metrics)),
+    getContent(PRICING_NUMBER_KEYS).catch(() => ({} as Record<string, string>)),
   ]);
-  return { network, servers, metrics, metricDefs: METRICS, tiers: TIERS, takenAt: new Date().toISOString() };
+  const pricing = buildPricing(priceContent);
+  return {
+    network, servers, metrics, metricDefs: METRICS, tiers: TIERS, pricing,
+    quotes: {
+      reach: quote(pricing, { games: 0 }),
+      entry: quote(pricing, { games: 1 }),
+      full: quote(pricing, { games: pricing.games }),
+    },
+    takenAt: new Date().toISOString(),
+  };
 }
 
 // Which milestone we're on, and how far into it.

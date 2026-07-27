@@ -23,6 +23,7 @@ export type SectionKind =
   | "team"        // people, each opening a modal
   | "metrics"     // a chosen set of tracked metrics
   | "tiers"       // the server revenue ladder
+  | "pricing"     // the live brand rate card
   | "faq"         // questions with answers
   | "ad"          // the investor-doc ad placement, live
   | "contact";    // how to reach us
@@ -42,6 +43,7 @@ export const SECTION_KINDS: { kind: SectionKind; label: string; blurb: string; l
   { kind: "team", label: "Team", blurb: "People, each opening a modal with their bio, past companies and contact." },
   { kind: "metrics", label: "Chosen metrics", blurb: "Pick from everything the platform tracks; the numbers stay live.", live: true },
   { kind: "tiers", label: "Server revenue ladder", blurb: "The tier ladder servers climb, straight from the product." },
+  { kind: "pricing", label: "Brand rate card", blurb: "What brands actually pay, read live from Admin → Site content. A deck can't quote a stale price.", live: true },
   { kind: "faq", label: "FAQ", blurb: "Questions with answers, collapsed until asked." },
   { kind: "ad", label: "Ad placement", blurb: "The live investor-doc ad slot — shows a partner exactly what they'd buy.", live: true },
   { kind: "contact", label: "Contact", blurb: "Email, a note, and a button." },

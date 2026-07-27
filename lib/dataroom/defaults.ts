@@ -42,9 +42,9 @@ export const SEED_DOCS: SeedDoc[] = [
     slug: "pitch-deck",
     kind: "deck",
     title: "ClusterGG",
-    subtitle: "The engagement layer for Discord gaming communities",
+    subtitle: "The only structured way to advertise to gamers on Discord",
     summary:
-      "Our investor deck: what Cluster is, the traction behind it, how it makes money, and where it goes next — with every number read live from production.",
+      "Our investor deck: the audience nobody can buy, the product that opens it, how we price it, and where it goes next — with every number read live from production.",
     accent: "#8b5cf6",
     accent2: "#22d3ee",
     contactEmail: "founders@clustergg.com",
@@ -54,11 +54,11 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "hero",
         anchor: "top",
         navLabel: "Overview",
-        title: "Gaming communities live on Discord. Nothing measures them.",
+        title: "Every gamer is on Discord. Nobody can advertise there.",
         subtitle:
-          "Cluster is a Discord bot that turns a server's members into ranked, verified gamers — then turns that measured audience into revenue the server shares.",
+          "Cluster is a gaming platform and a Discord bot. We turn communities into a measured audience and sell it as the one ad unit gamers actually enter: a weekly challenge with a brand's name on it.",
         data: {
-          badge: "Pre-seed · live product",
+          badge: "Pre-seed · live product · revenue model shipped",
           ctaLabel: "See the live product",
           ctaHref: "#product",
         },
@@ -67,13 +67,31 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "explainer",
         anchor: "problem",
         navLabel: "Problem",
-        title: "Nobody can measure a Discord community.",
+        title: "Reaching gamers costs a fortune. Most of it misses.",
+        subtitle: "Three ways to buy a gamer's attention today. Every one makes a brand pay for the people who aren't gamers.",
         data: {
           steps: [
-            { icon: "users", label: "Huge audience", note: "Hundreds of millions of gamers organise themselves into Discord servers. That is where games are discussed, played and bought." },
-            { icon: "eye", label: "Invisible", note: "A server owner with 40,000 members has no way to prove what those members play — and what can't be described can't be sold." },
-            { icon: "chart", label: "Unsellable", note: "So brands buy Twitch and YouTube instead, renting attention they can't verify, because communities aren't purchasable." },
-            { icon: "gamepad", label: "Scattered gamer", note: "And members rebuild their identity from scratch in every game they play, with nothing carrying between them." },
+            { icon: "trophy", label: "Esports", note: "Six figures, one weekend, one city. You reach the fans who could afford a ticket and the stream viewers who muted your bumper." },
+            { icon: "monitor", label: "Social ads", note: "Meta and TikTok sell you the phone break between two matches. They scroll past on the way back to the lobby, and you paid for every impression that missed." },
+            { icon: "lock", label: "Discord, by hand", note: "The brands that know the insight end up DMing big servers, who charge premium because the brand came to them. No rate card, no targeting, no reporting." },
+            { icon: "chart", label: "No way to compare", note: "None of the three can tell a media buyer how many verified players of a named game they actually reached. So gaming budgets stay smaller than gaming audiences." },
+          ],
+        },
+      },
+      {
+        kind: "text",
+        anchor: "insight",
+        navLabel: "Insight",
+        title: "Gamers don't live where the money is being spent.",
+        body:
+          "A gamer might have a Facebook account. Might have TikTok. Might make it to an event if the ticket is affordable. But every single one of them has Discord — it is where the squad is, where the match gets organised, and where the argument about the last game happens. They are on Discord before they pick up their phone and back on Discord the second they put it down.\n\n"
+          + "Discord has no ads manager. No Business Suite, no targeting, no pixel, no self-serve buy. Unlike every other platform where an audience of this size gathers, there is no way to purchase attention at all. That is not a gap in a media plan — it is the entire gaming audience sitting behind a door with no handle.\n\n"
+          + "The absence is the opportunity. A brand cannot route around it, a competitor cannot buy their way past it, and the only route in today is a personal relationship with one server at a time. We built the structured version.",
+        data: {
+          bullets: [
+            "100% of gamers have Discord. 0 ways to buy ads on it.",
+            "Big servers already charge brands premium rates by hand — the demand is proven, the infrastructure isn't.",
+            "The unit that works isn't a banner. It's a competition the community would have wanted anyway.",
           ],
         },
       },
@@ -81,15 +99,15 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "explainer",
         anchor: "solution",
         navLabel: "Solution",
-        title: "Make the measurement the thing they want.",
+        title: "We built the handle.",
         subtitle: "One click to install. Nothing to configure. It never reads a message.",
         data: {
           loop: true,
           steps: [
             { icon: "rocket", label: "Install", note: "One click. The bot builds its own channel, posts a guide for everything and pins it. There is nothing to configure." },
             { icon: "link", label: "Members link", note: "A member links a game account to get a ranked profile. That link is the measurement — verified against the game's own API, so it can't be inflated." },
-            { icon: "trophy", label: "They compete", note: "Challenges with real, redeemable trophies. Stats are snapshotted the moment somebody joins, so only new play counts." },
-            { icon: "crown", label: "Server earns", note: "At 500 linked members the server unlocks a share of the ad revenue Cluster earns from it. The owner's incentive becomes recruiting for us." },
+            { icon: "trophy", label: "They compete", note: "A weekly challenge per game with real money on it. Stats are snapshotted the moment somebody joins, so only new play counts." },
+            { icon: "crown", label: "Both sides get paid", note: "Brands buy the challenge. The server that hosted it keeps a share. The owner's incentive becomes recruiting for us." },
           ],
         },
       },
@@ -183,9 +201,34 @@ export const SEED_DOCS: SeedDoc[] = [
         data: {
           steps: [
             { icon: "shield", label: "Verified audience", note: "This many verified players of this game, in communities of this size — described precisely, because every account was read from an official API." },
-            { icon: "send", label: "Ads & sponsorship", note: "Advertising against verified gaming audiences, and sponsored challenges: a brand's name on a competition the community actually enters." },
+            { icon: "trophy", label: "The challenge is the unit", note: "A sponsored weekly competition carrying a brand's name, sold per game per month. Entered on purpose rather than scrolled past, which is why it prices above a banner." },
             { icon: "crown", label: "Servers keep a share", note: "Not generosity — the acquisition channel. An owner who earns from us recruits for us, and their recruiting is more credible than any ad we could buy." },
             { icon: "zap", label: "Near-zero to serve", note: "The bot runs inside the same web application as the site — no gateway process, no always-on host — so a new server costs close to nothing." },
+          ],
+        },
+      },
+      {
+        kind: "pricing",
+        anchor: "pricing",
+        navLabel: "Rate card",
+        title: "What we charge, and what it costs us",
+        subtitle:
+          "Published at clustergg.com/pricing rather than quoted on request. Every figure below is read from the live rate card as this page loads.",
+      },
+      {
+        kind: "text",
+        anchor: "economics",
+        navLabel: "Unit economics",
+        title: "One sponsor at the top tier covers every prize we pay.",
+        body:
+          "The prize pools are the only real cost of goods in the model, and they are fixed: one weekly challenge per game, a guaranteed minimum pool on each, funded and paid by us. That number does not move when a second brand signs — the same competition carries the sponsor either way.\n\n"
+          + "Everything else is close to free to serve. The bot runs inside the same web application as the website, on the same deployment, with no gateway process and no always-on host; a card is rendered once and cached at a content-hashed URL that Discord's CDN then serves. The marginal cost of the ten-thousandth server is a database row.\n\n"
+          + "So the model has two levers and both compound: more games sold against the same fixed prize cost, and more servers making each game worth more.",
+        data: {
+          bullets: [
+            "Prize cost is fixed per month, not per sponsor.",
+            "A new server costs a row in a table and nothing per month.",
+            "Servers are paid out of revenue, so acquisition spend only happens when revenue does.",
           ],
         },
       },
@@ -193,8 +236,9 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "tiers",
         anchor: "ladder",
         navLabel: "Server ladder",
-        title: "What a server climbs toward",
-        subtitle: "Live from the product — these are the exact thresholds running in production.",
+        title: "The other side of the marketplace",
+        subtitle:
+          "Brands pay by the game. Servers get paid by the audience they built. Live from the product — these are the exact thresholds running in production.",
       },
       {
         kind: "ad",
@@ -238,13 +282,13 @@ export const SEED_DOCS: SeedDoc[] = [
               ],
             },
             {
-              name: "Prove the audience",
+              name: "Sell the challenge",
               status: "next",
-              summary: "Turn linked accounts into a sellable description.",
+              summary: "A published rate card, not a conversation.",
               detail:
-                "Once enough servers cross the threshold, the aggregate becomes something a brand can buy against: verified players of a named game, in communities of a known size, reachable in the place they already are. The first sponsored challenges are how we price it.",
+                "Once enough servers cross the threshold the aggregate becomes something a brand can buy against: verified players of a named game, in communities of a known size, reachable where they already are. The rate card is public so a media buyer can qualify us in one visit instead of three meetings, and the first sponsored challenges are the case studies for the next ten.",
               bullets: [
-                "Sponsored challenges as the first paid product",
+                "Public pricing, per game, per month",
                 "Audience reporting a media buyer recognises",
                 "Case studies from the servers that ran them",
               ],
@@ -289,6 +333,10 @@ export const SEED_DOCS: SeedDoc[] = [
         data: {
           qa: [
             {
+              q: "If the opportunity is this obvious, why is it still open?",
+              a: "Because it isn't one product, it's three that only work together: the game integrations that make an audience describable, the loyalty loop that makes it worth advertising to, and the revenue relationship that makes server owners want you there. Any one alone fails — a stats bot nobody monetises, an ad network with nothing verified behind it, or a rev-share deal with no product to attach it to. The work is in the combination, and it took us months.",
+            },
+            {
               q: "What stops Discord from building this?",
               a: "Discord builds infrastructure, not game-specific integrations — the work here is 24 separate API relationships and the normalisation between them, which is neither strategic for them nor cheap. More to the point, our value is the cross-game identity and the revenue relationship with server owners, and Discord has no interest in paying servers.",
             },
@@ -305,8 +353,12 @@ export const SEED_DOCS: SeedDoc[] = [
               a: "No. We do not request Discord's Message Content intent, so it is technically incapable of reading what anyone writes. It only sees the commands and buttons aimed at it. This matters to every server owner we talk to.",
             },
             {
+              q: "Why publish prices instead of quoting on request?",
+              a: "Because \"contact us for pricing\" costs us the brand who was ready to buy and only wanted to know whether we were a $600 or a $60,000 decision. Published pricing qualifies buyers before they take our time, and it makes the model legible to the server owners we're asking to trust it. The numbers are in the CMS, so sales can still negotiate.",
+            },
+            {
               q: "What are you raising, and for what?",
-              a: "Ask us directly — the terms are a conversation, not a slide. What the money does is straightforward: more game integrations, and the outbound effort to get the bot into the servers that should already have it.",
+              a: "Ask us directly — the terms are a conversation, not a slide. What the money does is straightforward: prize pools while the first sponsors ramp, more game integrations, and the outbound effort to get the bot into the servers that should already have it.",
             },
           ],
         },
@@ -326,9 +378,9 @@ export const SEED_DOCS: SeedDoc[] = [
     slug: "company-profile",
     kind: "profile",
     title: "ClusterGG for brands and publishers",
-    subtitle: "Reach gaming communities where they actually are — measured, verified and sponsorable",
+    subtitle: "The only structured way to advertise to gamers on Discord",
     summary:
-      "Our partnership profile: the audience we can describe, the activations we run inside Discord communities, and what a sponsored challenge actually looks like.",
+      "Our partnership profile: why reaching gamers costs what it does, the audience we can describe, what we charge, and what a sponsored challenge actually looks like.",
     accent: "#22d3ee",
     accent2: "#f59e0b",
     contactEmail: "partners@clustergg.com",
@@ -338,26 +390,27 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "hero",
         anchor: "top",
         navLabel: "Overview",
-        title: "Sponsor the community, not the impression.",
+        title: "Sponsor the competition, not the impression.",
         subtitle:
-          "Cluster runs inside Discord gaming communities and knows what their members play — because every stat is verified against the game's own API. That makes an audience you can buy against rather than hope for.",
+          "Every gamer is on Discord and there is no ads manager to reach them with. Cluster is the way in: placements across a network of gaming communities, and weekly challenges that carry your name into the servers where the players actually are.",
         data: {
           badge: "For brands, agencies and publishers",
-          ctaLabel: "See what an activation looks like",
-          ctaHref: "#activations",
+          ctaLabel: "See what it costs",
+          ctaHref: "#pricing",
         },
       },
       {
         kind: "explainer",
         anchor: "why",
         navLabel: "Why here",
-        title: "The room the audience is already in.",
+        title: "Three expensive ways to miss gamers. And one door with no handle.",
+        subtitle: "Esports sponsorship, social ads, or DMing big servers yourself. Each makes you pay for the people who aren't gamers.",
         data: {
           steps: [
-            { icon: "users", label: "They're on Discord", note: "Gaming communities don't gather on a platform you rent — they gather in servers they run themselves, and they stay for years." },
-            { icon: "shield", label: "Verified, not claimed", note: "Every account was read from the game's own API. There is no self-reporting anywhere in the product, which is what makes the audience describable at all." },
-            { icon: "target", label: "Bought by the game", note: "Not by a demographic guess: verified players of a named title, in communities of a known size." },
-            { icon: "flame", label: "Native, not an ad", note: "An activation is a competition members enter, not an impression they scroll past. It runs where they already are." },
+            { icon: "trophy", label: "Esports costs six figures", note: "One weekend, one city, and the reach is the fans who could afford a ticket plus the stream viewers who muted your bumper." },
+            { icon: "monitor", label: "Social sells you the break", note: "Meta and TikTok reach a gamer on their phone between two matches. They scroll past on the way back to the lobby — and you paid for every impression that missed." },
+            { icon: "lock", label: "Discord has no ads manager", note: "Where they actually spend their time, there is nothing to buy. No targeting, no pixel, no self-serve. Brands that know this end up negotiating with one server at a time." },
+            { icon: "shield", label: "So we built the buy", note: "Placements across every community running our bot, and sponsored challenges in the games you choose — with every player verified against that game's own API." },
           ],
         },
       },
@@ -382,12 +435,20 @@ export const SEED_DOCS: SeedDoc[] = [
         title: "What we can run for you.",
         data: {
           steps: [
-            { icon: "trophy", label: "Sponsored challenge", note: "Your name on a competition the community actually enters, scored from the game's own API and paid out in real trophies." },
-            { icon: "send", label: "In-server placement", note: "The live ad slot inside every opted-in community — the same rotation you can see running further down this page." },
+            { icon: "trophy", label: "Sponsored challenge", note: "Your name on the weekly competition for a game you choose — scored from the game's own API, with the prize pool funded and paid by us." },
+            { icon: "send", label: "Network placement", note: "Your creatives across clustergg.com and inside every opted-in community, swapped by you from the brand portal whenever you want." },
             { icon: "planet", label: "Game world takeover", note: "A game's whole planet in your colours: its leaderboards, its challenges, its landing page." },
-            { icon: "grid", label: "We build the server", note: "Channels, roles, guides and competitions, run for publishers who want the community without staffing it." },
+            { icon: "play", label: "Sunday broadcast", note: "Presenting sponsor of the live Profile of the Week final, on the winners card posted to every server, and named in every clip cut from it." },
           ],
         },
+      },
+      {
+        kind: "pricing",
+        anchor: "pricing",
+        navLabel: "Pricing",
+        title: "What it costs",
+        subtitle:
+          "Published, not quoted on request. Read live as this page loads, so what you see here is what we are charging today.",
       },
       {
         kind: "product",
@@ -511,8 +572,16 @@ export const SEED_DOCS: SeedDoc[] = [
               a: "Reach, entrants, completion and placement performance, broken down per community. Everything is counted directly rather than modelled.",
             },
             {
+              q: "Who pays the prize money?",
+              a: "We do. Every sponsored challenge carries a guaranteed minimum pool that Cluster funds and pays out to the winners. You are buying the competition and the name on it — not the administration, and not the risk of a prize going unpaid.",
+            },
+            {
+              q: "What does naming rights actually mean?",
+              a: "The weekly challenge for that game runs under your brand: on the card the bot posts into every server, on the leaderboard, on the challenge page, and in the winners announcement. It is the competition the community was going to enter anyway, carrying your name.",
+            },
+            {
               q: "What's the minimum?",
-              a: "There isn't a rate card yet — we're early enough that the first campaigns are priced as conversations. That cuts both ways and we'd rather say so.",
+              a: "One month, and the entry price is the placements-only tier. Annual is discounted because it helps us plan prize pools. Nothing is a lock-in and the full rate card is above.",
             },
           ],
         },
