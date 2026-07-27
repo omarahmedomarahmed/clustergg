@@ -3,8 +3,9 @@ import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import {
-  DEFAULT_LAYOUT, contentBox, plateBg, spotBox,
+  DEFAULT_LAYOUT, assetBox, contentBox, opacityOf, plateBg, spotBox, transformOf,
 } from "@/lib/cards/layout";
+import type { CardAsset } from "@/lib/cards/layout";
 import { layoutFor } from "@/lib/cards/layout-store";
 import type {
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
@@ -141,11 +142,22 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
       {l.bar ? (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
       ) : null}
+      {/* Admin-placed art BEHIND the content — planet globes, quest maps,
+          seasonal flourishes. Drawn before the mascot so the mascot still reads
+          as the foreground character. */}
+      {(l.assets ?? []).filter((a) => !a.front).map((a) => <Asset key={a.id} a={a} />)}
+
       {/* The astronaut, behind the content. */}
       {theme.astronautUrl && !l.mascot.hidden ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={theme.astronautUrl} alt="" width={mascot.width} height={mascot.height}
-          style={{ position: "absolute", left: mascot.left, top: mascot.top, width: mascot.width, height: mascot.height, objectFit: "contain", opacity: 0.85 }} />
+          style={{
+            position: "absolute", left: mascot.left, top: mascot.top,
+            width: mascot.width, height: mascot.height, objectFit: "contain",
+            // 0.85 is the house default; an explicit setting overrides it.
+            opacity: opacityOf(l.mascot.opacity) ?? 0.85,
+            ...styleOf({ ...l.mascot, opacity: undefined }),
+          }} />
       ) : null}
       {/* The content block. Its box is part of the layout, so moving the logo
           out of a corner can actually give the card that corner back. */}
@@ -156,7 +168,10 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
           wordmark only when no logo is configured, so a card is never
           unbranded. */}
       {!l.mark.hidden ? (
-        <div style={{ position: "absolute", left: mark.left, top: mark.top, width: mark.width, height: mark.height, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{
+          position: "absolute", left: mark.left, top: mark.top, width: mark.width, height: mark.height,
+          display: "flex", alignItems: "center", justifyContent: "center", ...styleOf(l.mark),
+        }}>
           {theme.markUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={theme.markUrl} alt="" width={mark.width} height={mark.height}
@@ -170,9 +185,57 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
           edge pinned to the spot so a stack of different heights still hangs
           from the same line. */}
       {corner && !l.badge.hidden ? (
-        <div style={{ position: "absolute", right: CARD_W - (badge.left + badge.width), top: badge.top, display: "flex", justifyContent: "flex-end" }}>{corner}</div>
+        <div style={{
+          position: "absolute", right: CARD_W - (badge.left + badge.width), top: badge.top,
+          display: "flex", justifyContent: "flex-end", ...styleOf(l.badge),
+        }}>{corner}</div>
       ) : null}
+
+      {/* Admin art ON TOP of everything — a watermark, a LIVE sticker, a
+          sponsor mark. Last, so it wins. */}
+      {(l.assets ?? []).filter((a) => a.front).map((a) => <Asset key={a.id} a={a} />)}
     </div>
+  );
+}
+
+/**
+ * Opacity and transform, as style keys that only exist when they are set.
+ *
+ * Satori is not React DOM: it walks the style object it is handed and parses
+ * every key it finds, so `{ transform: undefined }` is not "no transform" — it
+ * is a transform whose value is undefined, and the parser calls `.trim()` on
+ * it and takes down EVERY card on the platform. Spreading the result means an
+ * unset property is genuinely absent rather than present-and-undefined.
+ */
+function styleOf(o: { opacity?: number; flipX?: boolean; flipY?: boolean; rotate?: number }): React.CSSProperties {
+  const out: React.CSSProperties = {};
+  const op = opacityOf(o.opacity);
+  if (op !== undefined) out.opacity = op;
+  const tf = transformOf(o);
+  if (tf) out.transform = tf;
+  return out;
+}
+
+// One admin-placed image.
+//
+// Satori needs an explicit width/height on an absolutely positioned element —
+// it lays out through Yoga, which gives an unsized box zero size and silently
+// draws nothing.
+function Asset({ a }: { a: CardAsset }) {
+  const box = assetBox(a);
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={a.url}
+      alt=""
+      width={box.width}
+      height={box.height}
+      style={{
+        position: "absolute", left: box.left, top: box.top,
+        width: box.width, height: box.height, objectFit: "contain",
+        ...styleOf(a),
+      }}
+    />
   );
 }
 
@@ -856,6 +919,22 @@ function PlanetsBody(d: PlanetsCard) {
   );
 }
 
+// How big a guide's steps are drawn, by how many there are. Measured against
+// the 1200x630 canvas: `room` is the body character budget that fits the space
+// each layout leaves, and the two-column rows (5+) get shorter bodies because
+// they are half the width.
+const MAX_GUIDE_STEPS = 8;
+const GUIDE_SCALE: Record<number, { num: number; title: number; body: number; room: number; gap: number }> = {
+  1: { num: 42, title: 30, body: 22, room: 300, gap: 16 },
+  2: { num: 42, title: 28, body: 21, room: 260, gap: 16 },
+  3: { num: 42, title: 26, body: 19, room: 210, gap: 14 },
+  4: { num: 42, title: 26, body: 20, room: 116, gap: 13 },
+  5: { num: 34, title: 21, body: 16, room: 96, gap: 14 },
+  6: { num: 34, title: 21, body: 16, room: 96, gap: 14 },
+  7: { num: 28, title: 19, body: 15, room: 58, gap: 9 },
+  8: { num: 28, title: 19, body: 15, room: 58, gap: 9 },
+};
+
 function GuideBody(d: GuideCard) {
   const t = d.theme;
   return (
@@ -865,24 +944,40 @@ function GuideBody(d: GuideCard) {
     ) : undefined}>
       {d.badge ? <div style={{ display: "flex", marginBottom: 14 }}><Pill color={t.accent} bg={alpha(t.accent, 0.12)}>{d.badge}</Pill></div> : null}
       <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} />
-      {/* overflow:hidden keeps a long admin-written guide from ever pushing the
-          footer off the card — the steps clip instead of breaking the layout. */}
-      {/* Fewer steps means each one can say more. A quest guide listing every
-          scoring action needs the room; a four-step guide doesn't. */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 13, marginTop: 24, flex: 1, overflow: "hidden" }}>
-        {d.steps.slice(0, 4).map((s, i) => {
-          const room = d.steps.length <= 3 ? 210 : 116;
-          return (
-            <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 42, height: 42, borderRadius: 21, background: alpha(t.accent, 0.17), color: t.accent, fontSize: 23, fontWeight: 700 }}>{i + 1}</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
-                <div style={{ fontSize: 26, fontWeight: 700 }}>{clamp(s.title, 46)}</div>
-                <div style={{ fontSize: d.steps.length <= 3 ? 19 : 20, color: MUTED, lineHeight: 1.32 }}>{clamp(s.body, room)}</div>
+      {/* The steps FIT the card instead of being cut off at four.
+          `steps.slice(0, 4)` silently threw away everything past the fourth,
+          which is why the card called "Everything Cluster does" listed four of
+          the things Cluster does. Up to four run down one column; five to eight
+          run in two, with the type and the body budget scaled to match.
+          overflow:hidden stays as the backstop so a pathological guide clips
+          rather than pushing the footer off the canvas. */}
+      {(() => {
+        const steps = d.steps.slice(0, MAX_GUIDE_STEPS);
+        const two = steps.length > 4;
+        const g = GUIDE_SCALE[Math.min(steps.length, MAX_GUIDE_STEPS)] ?? GUIDE_SCALE[8];
+        return (
+          <div style={{
+            display: "flex", flexWrap: two ? "wrap" : "nowrap", flexDirection: two ? "row" : "column",
+            gap: g.gap, marginTop: two ? 18 : 24, flex: 1, overflow: "hidden", alignContent: "flex-start",
+          }}>
+            {steps.map((step, i) => (
+              <div key={i} style={{
+                display: "flex", alignItems: "flex-start", gap: 13,
+                // A plain percentage, NOT calc(): Satori rejects calc() outright
+                // ("Invalid value calc(50% - 10px) for setWidth") and 500s the
+                // whole card. 47% leaves room for the gap between columns.
+                width: two ? "47%" : "100%",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: g.num, height: g.num, borderRadius: g.num / 2, background: alpha(t.accent, 0.17), color: t.accent, fontSize: Math.round(g.num * 0.55), fontWeight: 700 }}>{i + 1}</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
+                  <div style={{ fontSize: g.title, fontWeight: 700 }}>{clamp(step.title, two ? 26 : 46)}</div>
+                  <div style={{ fontSize: g.body, color: MUTED, lineHeight: 1.3 }}>{clamp(step.body, g.room)}</div>
+                </div>
               </div>
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+        );
+      })()}
       {d.footer ? <div style={{ display: "flex", marginTop: 14, fontSize: 21, color: t.accent2, fontWeight: 700 }}>{d.footer}</div> : null}
     </Frame>
   );
@@ -927,11 +1022,15 @@ async function prepareCard(d: CardData): Promise<CardData> {
   // The whole image step gets one deadline. Past it the card is drawn with
   // whatever resolved — a person who tapped a button gets a card, not a spinner
   // that eventually times out in Discord's proxy.
-  const [body, brand, layout] = await Promise.all([
+  const [body, brand, rawLayout] = await Promise.all([
     withDeadline(prepareBody(d), d),
     withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
     withDeadline(layoutFor(d.kind), DEFAULT_LAYOUT),
   ]);
+  // Admin-placed art goes through the same resolver as everything else: Satori
+  // fetches remote images itself and one unreachable host takes down the whole
+  // card, so an asset that won't load is DROPPED rather than drawn as a hole.
+  const layout = await withDeadline(withAssets(rawLayout), { ...rawLayout, assets: [] });
   // Colours are normalised here, once, on the way in — so every card body can
   // use `theme.accent` directly and no unparseable value ever reaches Satori.
   return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout }) } as CardData;
@@ -949,6 +1048,17 @@ async function resolveBackground(theme: CardTheme): Promise<string | null> {
     if (out) return out;
   }
   return null;
+}
+
+async function withAssets(l: typeof DEFAULT_LAYOUT): Promise<typeof DEFAULT_LAYOUT> {
+  const list = l.assets ?? [];
+  if (!list.length) return l;
+  const urls = await Promise.all(
+    // Asked for at twice the drawn width for crispness — no point decoding a
+    // 4000px globe to paint it at 240 on a 1200px canvas.
+    list.map((a) => toEmbeddable(a.url, { maxWidth: Math.min(1600, Math.round(a.w * 2)) })),
+  );
+  return { ...l, assets: list.map((a, i) => ({ ...a, url: urls[i] ?? "" })).filter((a) => a.url) };
 }
 
 async function prepareBody(d: CardData): Promise<CardData> {

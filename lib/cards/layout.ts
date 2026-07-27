@@ -26,7 +26,7 @@ import type { CardKind } from "@/lib/cards/types";
 export const CANVAS_W = 1200;
 export const CANVAS_H = 630;
 
-/** An element that can be dragged and resized. */
+/** An element that can be dragged, resized, flipped and faded. */
 export type Spot = {
   /** Centre of the element, as a % of canvas width/height. */
   x: number;
@@ -34,10 +34,58 @@ export type Spot = {
   /** Rendered size in canvas pixels (width for images, the box for the badge). */
   size: number;
   hidden?: boolean;
+  /** Mirror horizontally / vertically. An astronaut can face the other way. */
+  flipX?: boolean;
+  flipY?: boolean;
+  /** Degrees, -180..180. */
+  rotate?: number;
+  /** 0-100. Lets art sit UNDER the text instead of competing with it. */
+  opacity?: number;
 };
 
 /** The block the card's own content is drawn into. Percentages, edges. */
 export type ContentBox = { x: number; y: number; w: number; h: number };
+
+/**
+ * One named piece of a card's content — a title, a row list, a stat strip.
+ *
+ * Each card kind declares its own parts (see `layout-guide.ts`), and this is
+ * what an admin turns off or resizes without touching code. `scale` multiplies
+ * the part's type size, so "make the standings bigger" is one number rather
+ * than a redesign.
+ */
+export type PartStyle = {
+  hidden?: boolean;
+  /** Type-size multiplier, 0.5–2. */
+  scale?: number;
+  /** 0-100. */
+  opacity?: number;
+};
+
+/**
+ * An arbitrary image an admin dropped onto a card.
+ *
+ * This is what makes the editor a real canvas rather than three draggable
+ * fixtures: any planet globe, quest map, trophy render or seasonal flourish can
+ * be placed on any card, at any size, in front of or behind the content.
+ */
+export type CardAsset = {
+  id: string;
+  url: string;
+  /** Centre, as a % of the canvas. */
+  x: number;
+  y: number;
+  /** Width in canvas pixels; height follows `ratio`. */
+  w: number;
+  /** height / width. 1 is square. */
+  ratio: number;
+  opacity: number;
+  flipX?: boolean;
+  flipY?: boolean;
+  rotate?: number;
+  /** Behind the card's content (default) or on top of it. */
+  front?: boolean;
+};
 
 export type CardLayout = {
   /** The astronaut mascot. */
@@ -59,6 +107,23 @@ export type CardLayout = {
   bar: boolean;
   /** The directional scrims that darken the left column and bottom strip. */
   scrim: boolean;
+  /** Per-part visibility and sizing, keyed by the kind's own region keys. */
+  parts: Record<string, PartStyle>;
+  /** Extra art placed on this card by an admin. */
+  assets: CardAsset[];
+  /**
+   * Where this card's background comes from, in order of preference.
+   *
+   * Each entry is a source id from `BG_SOURCES` — `challenge.cover`,
+   * `game.planetBg`, `gamer.background`, `card.bg` (the admin art for this card
+   * kind), or `none`. The first one that resolves to a real image wins, which
+   * is how "challenges use the challenge cover, planets use the planet globe"
+   * stops being hard-coded in the data loader and becomes a setting.
+   *
+   * Empty means "whatever the loader chose", i.e. the behaviour before this
+   * existed — so an unedited card is unchanged.
+   */
+  bgSources: string[];
 };
 
 // The house default — the geometry the renderer drew before any of this was
@@ -75,7 +140,29 @@ export const DEFAULT_LAYOUT: CardLayout = {
   glows: false,
   bar: true,
   scrim: true,
+  parts: {},
+  assets: [],
+  bgSources: [],
 };
+
+/**
+ * Every place a card can take its background art from.
+ *
+ * `resolve` runs in the data loader with whatever that card knows about, so a
+ * source that doesn't apply to a kind simply yields nothing and the next one is
+ * tried. Listed in the editor as a drag-ordered preference list.
+ */
+export const BG_SOURCES: { id: string; label: string; note: string }[] = [
+  { id: "entity.cover", label: "This thing's own cover", note: "The challenge's cover, the game's cover, the quest's card art — whatever the card is ABOUT." },
+  { id: "game.planetBg", label: "The game's planet art", note: "The globe/space art from the game's planet. The natural backdrop for anything game-shaped." },
+  { id: "game.cover", label: "The game's cover", note: "The game's key art from the catalogue." },
+  { id: "gamer.background", label: "The gamer's own art", note: "Their profile background, then their banner. Only on cards about a person." },
+  { id: "card.bg", label: "Admin art for this card type", note: "What's set in Admin → Card backgrounds for this kind." },
+  { id: "custom", label: "A fixed image", note: "One image you upload here, used on every card of this kind." },
+  { id: "none", label: "No art (flat)", note: "Solid colour. Fastest, and sometimes the most readable." },
+];
+
+export const BG_SOURCE_IDS = new Set(BG_SOURCES.map((s) => s.id));
 
 export const LAYOUT_KINDS: CardKind[] = [
   "profile", "game-stats", "challenge", "leaderboard",
@@ -101,7 +188,66 @@ function spot(v: unknown, fallback: Spot): Spot {
     // just silently eats the whole card, which looks like a broken renderer.
     size: num(o.size, fallback.size, 24, 620),
     hidden: o.hidden === true,
+    flipX: o.flipX === true,
+    flipY: o.flipY === true,
+    rotate: num(o.rotate, 0, -180, 180),
+    opacity: num(o.opacity, 100, 0, 100),
   };
+}
+
+function parts(v: unknown): Record<string, PartStyle> {
+  if (!v || typeof v !== "object") return {};
+  const out: Record<string, PartStyle> = {};
+  for (const [k, raw] of Object.entries(v as Record<string, unknown>)) {
+    // Keys are region ids from the card guide — short, known-shaped strings.
+    if (!/^[a-z0-9_-]{1,40}$/i.test(k)) continue;
+    const p = (raw ?? {}) as Partial<PartStyle>;
+    out[k] = {
+      hidden: p.hidden === true,
+      scale: num(p.scale, 1, 0.5, 2),
+      opacity: num(p.opacity, 100, 0, 100),
+    };
+  }
+  return out;
+}
+
+function assets(v: unknown): CardAsset[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .slice(0, 12) // A card is 1200x630; a dozen extra images is already a lot.
+    .map((raw, i): CardAsset | null => {
+      const a = (raw ?? {}) as Partial<CardAsset>;
+      const url = typeof a.url === "string" ? a.url.trim() : "";
+      // Only real image sources. An admin-supplied `javascript:` would go
+      // nowhere in Satori, but it would ship into the editor's DOM preview.
+      if (!url || !(/^https?:\/\//i.test(url) || url.startsWith("/") || url.startsWith("data:image/"))) return null;
+      return {
+        id: typeof a.id === "string" && a.id ? a.id.slice(0, 40) : `a${i}`,
+        url,
+        x: num(a.x, 50, -20, 120),
+        y: num(a.y, 50, -20, 120),
+        w: num(a.w, 240, 16, 1400),
+        ratio: num(a.ratio, 1, 0.05, 20),
+        opacity: num(a.opacity, 100, 0, 100),
+        flipX: a.flipX === true,
+        flipY: a.flipY === true,
+        rotate: num(a.rotate, 0, -180, 180),
+        front: a.front === true,
+      };
+    })
+    .filter((a): a is CardAsset => a !== null);
+}
+
+function bgSources(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of v) {
+    if (typeof s !== "string" || !BG_SOURCE_IDS.has(s) || seen.has(s)) continue;
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
 }
 
 /** Parse whatever is stored into a layout that is always safe to render. */
@@ -131,6 +277,44 @@ export function parseLayout(raw: string | null | undefined): CardLayout {
     glows: o.glows === true,
     bar: o.bar !== false,
     scrim: o.scrim !== false,
+    parts: parts(o.parts),
+    assets: assets(o.assets),
+    bgSources: bgSources(o.bgSources),
+  };
+}
+
+/** How a part should be drawn, with the house default when it's unset. */
+export function partOf(l: CardLayout, key: string): Required<PartStyle> {
+  const p = l.parts?.[key];
+  return {
+    hidden: p?.hidden === true,
+    scale: typeof p?.scale === "number" ? p.scale : 1,
+    opacity: typeof p?.opacity === "number" ? p.opacity : 100,
+  };
+}
+
+/** The CSS transform for a flipped/rotated element. Satori supports both. */
+export function transformOf(o: { flipX?: boolean; flipY?: boolean; rotate?: number }): string | undefined {
+  const parts: string[] = [];
+  if (o.rotate) parts.push(`rotate(${o.rotate}deg)`);
+  if (o.flipX || o.flipY) parts.push(`scale(${o.flipX ? -1 : 1}, ${o.flipY ? -1 : 1})`);
+  return parts.length ? parts.join(" ") : undefined;
+}
+
+/** 0-100 as a CSS opacity, or undefined when it's fully opaque. */
+export function opacityOf(v: number | undefined): number | undefined {
+  return typeof v === "number" && v < 100 ? Math.max(0, v) / 100 : undefined;
+}
+
+/** Absolute pixel box for a placed asset. */
+export function assetBox(a: CardAsset): { left: number; top: number; width: number; height: number } {
+  const width = a.w;
+  const height = a.w * a.ratio;
+  return {
+    left: (a.x / 100) * CANVAS_W - width / 2,
+    top: (a.y / 100) * CANVAS_H - height / 2,
+    width,
+    height,
   };
 }
 
