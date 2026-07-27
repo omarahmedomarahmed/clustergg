@@ -12,6 +12,7 @@ import Tabs from "@/components/Tabs";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import Icon from "@/components/Icon";
 import PortalKeyHandoff from "@/components/PortalKeyHandoff";
+import { optImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
 
@@ -149,7 +150,7 @@ export default async function BrandPortalPage({
   return (
     <div className="min-h-screen relative">
       {brand.portalBgUrl && (
-        <div className="fixed inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.92)), url(${brand.portalBgUrl})` }} />
+        <div className="fixed inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.92)), url(${optImg(brand.portalBgUrl, 1200)})` }} />
       )}
       <PortalHeader name={brand.name} logo={brand.logoUrl} cover={cover} subtitle={`${data.totals.total} campaign${data.totals.total === 1 ? "" : "s"} · ${data.totals.active} live`} />
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-8">

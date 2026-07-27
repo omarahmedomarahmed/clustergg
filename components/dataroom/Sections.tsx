@@ -5,6 +5,7 @@ import BotShowcase from "@/components/BotShowcase";
 import { Milestones, GtmStages, TeamGrid, Gallery, MetricTiles, Explainer, CardShowcase } from "@/components/dataroom/Interactive";
 import { ladder, metricValueFor, INVESTOR_AD_PLACEMENT, type LiveData, type Person, type Section } from "@/lib/dataroom";
 import type { BotStep } from "@/components/BotShowcase";
+import { optImg } from "@/lib/img";
 
 const nf = (n: number) => n.toLocaleString();
 
@@ -35,7 +36,7 @@ export function SectionBand({ section, doc, live, people, steps, installUrl, ind
           unreadable exactly where the artwork is interesting. */}
       {section.bgUrl && (
         <>
-          <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${section.bgUrl})` }} />
+          <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${optImg(section.bgUrl, 1200)})` }} />
           <div aria-hidden className="absolute inset-0" style={{ background: `rgba(4,5,26,${Math.max(0, Math.min(100, section.dim)) / 100})` }} />
         </>
       )}

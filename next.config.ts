@@ -32,6 +32,13 @@ const nextConfig: NextConfig = {
   },
   images: {
     remotePatterns: [{ protocol: "https", hostname: "**" }],
+    // Every Blob read counts against Fast Origin Transfer (10 GB on Hobby), and
+    // Next's default only caches an optimized image for 60 SECONDS — so a
+    // background on a busy page gets re-fetched from Blob and re-encoded every
+    // minute, forever. Uploaded art is effectively immutable (re-uploading
+    // mints a new URL), so it can be cached for a month. This is the single
+    // highest-leverage line in the file for the bill.
+    minimumCacheTTL: 2678400, // 31 days
   },
   experimental: {
     serverActions: { bodySizeLimit: "8mb" },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Icon from "@/components/Icon";
+import { optImg } from "@/lib/img";
 
 // ---- shapes mirrored from lib/providers/riot-lol-rich ----
 type Champ = { championId: number; name: string; iconUrl: string; splashUrl: string; level: number; points: number; lastPlayed: number | null; masteryTitle: string; tokensEarned?: number; chestGranted?: boolean };
@@ -62,7 +63,7 @@ export default function LolCard({
     const ch = view.champ;
     return (
       <div className="relative overflow-hidden rounded-xl" style={{ border: `1px solid ${c.accent}33` }}>
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.72), rgba(4,5,26,0.92)), url(${ch.splashUrl})` }} />
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.72), rgba(4,5,26,0.92)), url(${optImg(ch.splashUrl, 1200)})` }} />
         <div className="relative p-4">
           <button onClick={() => setView({ kind: "home" })} className="text-xs mb-3 inline-flex items-center gap-1" style={{ color: c.accent2 }}><Icon name="arrowLeft" size={12} /> Back</button>
           <div className="flex items-center gap-3">

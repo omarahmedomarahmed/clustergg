@@ -18,7 +18,7 @@ import Countdown from "@/components/Countdown";
 import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
 import { timeAgo } from "@/lib/utils";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 import { buildSkinnedPlanets } from "@/lib/planets";
 import { getQuestHeroData } from "@/lib/quest-hero";
 import { getPlanetExplore } from "@/lib/planet-explore";
@@ -149,7 +149,7 @@ export default async function PlanetPage({
         <div
           className="absolute inset-0 -z-10 bg-cover opacity-60"
           style={{
-            backgroundImage: `url(${cover})`,
+            backgroundImage: `url(${optImg(cover, 1200)})`,
             backgroundPosition: game ? `${game.coverAdjust.x}% ${game.coverAdjust.y}%` : "center",
           }}
         />
@@ -200,7 +200,7 @@ export default async function PlanetPage({
             >
               <div className="relative min-h-[7rem] flex flex-wrap items-center gap-4 p-5">
                 {cover ? (
-                  <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
+                  <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${optImg(cover, 1200)})` }} />
                 ) : (
                   <div className="absolute inset-0 bg-cover bg-center opacity-50" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
                 )}
@@ -236,7 +236,7 @@ export default async function PlanetPage({
                     const metricName = b.title.split("·")[1]?.trim() ?? b.title;
                     return (
                       <div key={b.id} className="group relative overflow-hidden rounded-2xl border border-white/10 hover:border-cyan-400/30 transition-colors" style={{ boxShadow: `0 0 0 1px ${pAccent}18` }}>
-                        {slimImg(game.coverUrl) && <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-35 transition-opacity" style={{ backgroundImage: `url(${slimImg(game.coverUrl)})` }} />}
+                        {slimImg(game.coverUrl) && <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-35 transition-opacity" style={{ backgroundImage: `url(${optImg(slimImg(game.coverUrl), 1200)})` }} />}
                         <div aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(180deg, rgba(4,5,26,0.66), rgba(4,5,26,0.92)), radial-gradient(120% 80% at 100% 0%, ${pAccent2}1f, transparent 60%)` }} />
                         <div aria-hidden className="absolute inset-x-0 top-0 h-0.5" style={{ background: `linear-gradient(90deg, ${pAccent}, ${pAccent2})` }} />
                         <div className="relative p-4">
@@ -271,7 +271,7 @@ export default async function PlanetPage({
                       <div key={ch.id} className="glass overflow-hidden">
                         <Link href={`${path}/challenges/${ch.id}`} className="block relative h-32 group overflow-hidden">
                           <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-                            style={{ backgroundImage: `url(${slimImg(ch.coverUrl, 400000) ?? cover})` }} />
+                            style={{ backgroundImage: `url(${optImg(slimImg(ch.coverUrl, 400000) ?? cover, 1200)})` }} />
                           <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/50 to-transparent" />
                           <span className={`absolute top-3 right-3 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest rounded-full px-2.5 py-1 border ${ch.status === "active" ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10" : "border-violet-400/40 text-muted bg-black/40"}`}>
                             {ch.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}

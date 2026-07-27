@@ -21,7 +21,7 @@ import { resolveTheme, themeToVars, bgLayerStyle } from "@/lib/theme";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
 import { timeAgo } from "@/lib/utils";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Home" };
@@ -197,7 +197,7 @@ export default async function FeedPage() {
                       className="group card-lift relative overflow-hidden rounded-2xl border border-violet-400/20 flex flex-col justify-end min-h-[150px] p-4">
                       {/* Cover art background */}
                       {cover ? (
-                        <div className="absolute inset-0 -z-10 bg-cover" style={{ backgroundImage: `url(${cover})`, backgroundPosition: `${c.coverAdjust?.x ?? 50}% ${c.coverAdjust?.y ?? 50}%` }} />
+                        <div className="absolute inset-0 -z-10 bg-cover" style={{ backgroundImage: `url(${optImg(cover, 1200)})`, backgroundPosition: `${c.coverAdjust?.x ?? 50}% ${c.coverAdjust?.y ?? 50}%` }} />
                       ) : (
                         <div className="absolute inset-0 -z-10" style={{ background: "radial-gradient(120% 120% at 0% 0%, #8b5cf633, transparent 60%), #0a0a1c" }} />
                       )}

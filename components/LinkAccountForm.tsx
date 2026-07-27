@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
 import BrandGlyph from "@/components/BrandGlyph";
 import MlbbLinkForm from "@/components/MlbbLinkForm";
+import { optImg } from "@/lib/img";
 
 export type ProviderInfo = {
   id: string;
@@ -70,7 +71,7 @@ export default function LinkAccountForm({
               className={`relative overflow-hidden rounded-xl border p-3 text-left transition-colors ${selected?.id === p.id ? "border-cyan-400/70" : "border-violet-400/20 hover:border-violet-400/50"}`}
             >
               {cover && (
-                <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${cover})` }} />
+                <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${optImg(cover, 1200)})` }} />
               )}
               <span aria-hidden className="absolute inset-0" style={{ background: cover ? "linear-gradient(180deg, rgba(10,10,28,0.55), rgba(10,10,28,0.8))" : "rgba(255,255,255,0.02)" }} />
               <span className="relative flex items-center gap-2.5">

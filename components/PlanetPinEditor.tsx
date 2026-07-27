@@ -3,6 +3,7 @@
 import { useActionState, useRef, useState } from "react";
 import { savePlanetPins, type ActionState } from "@/app/actions/admin";
 import Icon from "@/components/Icon";
+import { optImg } from "@/lib/img";
 
 export type EditablePin = { key: string; label: string; short: string; color: string; x: number; y: number; count: number };
 
@@ -52,7 +53,7 @@ export default function PlanetPinEditor({
         onPointerUp={() => (dragging.current = null)}
         onPointerLeave={() => (dragging.current = null)}
         className="relative mx-auto aspect-square w-full max-w-[440px] rounded-full overflow-hidden select-none touch-none"
-        style={bgUrl ? { backgroundImage: `url(${bgUrl})`, backgroundSize: "cover" } : undefined}
+        style={bgUrl ? { backgroundImage: `url(${optImg(bgUrl, 1200)})`, backgroundSize: "cover" } : undefined}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={imageUrl} alt="planet" className="absolute inset-0 h-full w-full rounded-full object-cover" draggable={false} />

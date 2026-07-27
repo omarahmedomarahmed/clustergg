@@ -5,7 +5,7 @@ import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import LeaderboardWidget from "@/components/LeaderboardWidget";
 import { getT } from "@/lib/i18n/t-server";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Leaderboards" };
@@ -75,7 +75,7 @@ export default async function LeaderboardsPage({ searchParams }: { searchParams:
       {/* Boards over the game's cover background */}
       <div className="relative rounded-3xl overflow-hidden border border-white/10 p-5 md:p-7">
         {cover ? (
-          <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
+          <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${optImg(cover, 1200)})` }} />
         ) : (
           <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-40" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
         )}

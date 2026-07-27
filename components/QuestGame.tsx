@@ -13,6 +13,7 @@ import { QUEST_ASTRONAUT } from "@/lib/quest-marker";
 import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from "@/lib/quest-path";
 import { DEFAULT_MISSIONS, missionDone, type QuestGamePayload, type QuestGameUi } from "@/lib/quest-game";
 import type { QuestView, QuestGamer } from "@/lib/quests";
+import { optImg } from "@/lib/img";
 
 // The playable space-game experience for a quest: a full-screen overlay where
 // the map art is the game world, the astronaut is your character that WALKS the
@@ -214,7 +215,7 @@ export default function QuestGame({
     const c = gu[k];
     if (!c?.bg) return null;
     const dim = (Math.max(0, Math.min(100, c.dim ?? 62)) / 100).toFixed(2);
-    return `linear-gradient(rgba(4,5,26,0.28), rgba(4,5,26,${dim})), url(${c.bg}) center/cover`;
+    return `linear-gradient(rgba(4,5,26,0.28), rgba(4,5,26,${dim})), url(${optImg(c.bg, 1200)}) center/cover`;
   };
   const guTitle = (k: keyof QuestGameUi, dflt: string): string => (gu[k]?.title ? tr(gu[k]!.title!) : dflt);
   const btnStyle = (k: keyof QuestGameUi) => {
@@ -229,7 +230,7 @@ export default function QuestGame({
   if (!mounted) return null;
 
   const sheet = "absolute inset-x-0 bottom-0 z-40 max-h-[72dvh] overflow-y-auto overscroll-contain rounded-t-3xl sm:inset-x-auto sm:right-4 sm:bottom-4 sm:w-[420px] sm:max-h-[70dvh] sm:rounded-2xl border border-white/15 backdrop-blur-xl shadow-2xl";
-  const defaultSheetBg = `linear-gradient(rgba(4,5,26,0.92), rgba(4,5,26,0.96))${quest.cardBgUrl ? `, url(${quest.cardBgUrl}) center/cover` : ""}`;
+  const defaultSheetBg = `linear-gradient(rgba(4,5,26,0.92), rgba(4,5,26,0.96))${quest.cardBgUrl ? `, url(${optImg(quest.cardBgUrl, 1200)}) center/cover` : ""}`;
   const panelBg = (k: keyof QuestGameUi) => ({
     background: guBg(k) || (k !== "milestone" ? art?.[k as "rules" | "log" | "guide" | "missions"] : undefined) || defaultSheetBg,
   });
@@ -263,7 +264,7 @@ export default function QuestGame({
       `}</style>
       {/* Space backdrop */}
       {quest.cardBgUrl
-        ? <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.55), rgba(4,5,26,0.8)), url(${quest.cardBgUrl})` }} />
+        ? <div aria-hidden className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.55), rgba(4,5,26,0.8)), url(${optImg(quest.cardBgUrl, 1200)})` }} />
         : <div aria-hidden className="absolute inset-0" style={{ background: `radial-gradient(1000px 560px at 25% 8%, ${quest.color}29, transparent 60%), radial-gradient(800px 480px at 90% 100%, ${quest.accent2}1f, transparent 60%)` }} />}
 
       {/* ===== HUD top bar ===== */}
@@ -333,7 +334,7 @@ export default function QuestGame({
                 <LoopVideo src={quest.mapVideoUrl} poster={quest.mapArtUrl ?? undefined}
                   className="absolute inset-0 h-full w-full object-cover" />
               ) : (
-                <div className="absolute inset-0" style={{ background: quest.mapArtUrl ? `url(${quest.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${quest.color}22, ${quest.accent2}18), #0a0a1c` }} />
+                <div className="absolute inset-0" style={{ background: quest.mapArtUrl ? `url(${optImg(quest.mapArtUrl, 1200)}) center/cover` : `linear-gradient(120deg, ${quest.color}22, ${quest.accent2}18), #0a0a1c` }} />
               )}
               <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.12), rgba(4,5,26,0.4))" }} />
 

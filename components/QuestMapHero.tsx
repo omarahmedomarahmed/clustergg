@@ -15,6 +15,7 @@ import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from 
 import QuestGame from "@/components/QuestGame";
 import { openMissions, type QuestGamePayload } from "@/lib/quest-game";
 import type { QuestView, QuestGamer } from "@/lib/quests";
+import { optImg } from "@/lib/img";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
 // tiers as clickable milestone pins, a "you are here" marker that travels the
@@ -129,7 +130,7 @@ export default function QuestMapHero({
       {/* Space backdrop (quest theme) */}
       <div className="absolute inset-0 -z-10" style={{ background: "#04051a" }} />
       {q.cardBgUrl ? (
-        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.45), rgba(4,5,26,0.78)), url(${q.cardBgUrl})` }} />
+        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.45), rgba(4,5,26,0.78)), url(${optImg(q.cardBgUrl, 1200)})` }} />
       ) : (
         <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 620px at 30% 10%, ${q.color}26, transparent 60%), radial-gradient(900px 500px at 90% 110%, ${q.accent2}1a, transparent 60%)` }} />
       )}
@@ -232,7 +233,7 @@ export default function QuestMapHero({
             <LoopVideo src={q.mapVideoUrl} poster={q.mapArtUrl ?? undefined}
               className="absolute inset-0 h-full w-full object-cover" />
           ) : (
-            <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${q.mapArtUrl}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
+            <div className="absolute inset-0" style={{ background: q.mapArtUrl ? `url(${optImg(q.mapArtUrl, 1200)}) center/cover` : `linear-gradient(120deg, ${q.color}22, ${q.accent2}18), #0a0a1c` }} />
           )}
           {/* readability veil */}
           <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.15), rgba(4,5,26,0.45))" }} />
@@ -318,7 +319,7 @@ export default function QuestMapHero({
           {howto && (
             <div className="absolute inset-0 z-30 flex items-center justify-center p-4" onClick={() => setHowto(false)}>
               <div onClick={(e) => e.stopPropagation()} className="max-w-lg w-full rounded-2xl border border-white/15 backdrop-blur-xl p-5 bg-cover bg-center shadow-2xl"
-                style={{ background: (q.mapArtUrl || q.cardBgUrl) ? `linear-gradient(rgba(4,5,26,0.88), rgba(4,5,26,0.94)), url(${q.mapArtUrl || q.cardBgUrl}) center/cover` : "rgba(4,5,26,0.94)" }}>
+                style={{ background: (q.mapArtUrl || q.cardBgUrl) ? `linear-gradient(rgba(4,5,26,0.88), rgba(4,5,26,0.94)), url(${optImg(q.mapArtUrl || q.cardBgUrl, 1200)}) center/cover` : "rgba(4,5,26,0.94)" }}>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="font-bold text-lg grad-text">{q.name} — How to play</h3>
                   <button onClick={() => setHowto(false)} className="text-muted hover:text-ink"><Icon name="x" size={16} /></button>
@@ -332,7 +333,7 @@ export default function QuestMapHero({
           {/* Milestone detail — overlay panel on click (over the quest art) */}
           {sel !== null && tiers[sel] && (
             <div className="absolute inset-x-3 bottom-3 z-20 rounded-2xl border border-white/15 backdrop-blur-xl p-4 text-left bg-cover bg-center"
-              style={{ background: (q.mapArtUrl || q.cardBgUrl) ? `linear-gradient(rgba(4,5,26,0.84), rgba(4,5,26,0.92)), url(${q.mapArtUrl || q.cardBgUrl}) center/cover` : "rgba(4,5,26,0.9)" }}>
+              style={{ background: (q.mapArtUrl || q.cardBgUrl) ? `linear-gradient(rgba(4,5,26,0.84), rgba(4,5,26,0.92)), url(${optImg(q.mapArtUrl || q.cardBgUrl, 1200)}) center/cover` : "rgba(4,5,26,0.9)" }}>
               <div className="flex items-center justify-between">
                 <div className="font-bold flex items-center gap-2" style={{ color: tiers[sel].color || q.color }}>
                   {tiers[sel].name}

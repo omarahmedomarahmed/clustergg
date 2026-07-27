@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import GameLogo from "@/components/GameLogo";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n/t-server";
@@ -134,7 +134,7 @@ export default async function ChallengePage({
       {/* Game-themed page backdrop — the whole page lives in this game's world */}
       {pageBg && (
         <div aria-hidden className="fixed inset-0 -z-10 bg-cover bg-center"
-          style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.86), rgba(4,5,26,0.95)), url(${pageBg})` }} />
+          style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.86), rgba(4,5,26,0.95)), url(${optImg(pageBg, 1200)})` }} />
       )}
       {/* ===== Glorified hero ===== */}
       <section className="relative">
@@ -156,7 +156,7 @@ export default async function ChallengePage({
             <div
               className="absolute inset-0 bg-cover"
               style={{
-                backgroundImage: `url(${coverUrl})`,
+                backgroundImage: `url(${optImg(coverUrl, 1200)})`,
                 backgroundPosition: `${challenge.coverAdjust.x}% ${challenge.coverAdjust.y}%`,
                 transform: `scale(${challenge.coverAdjust.zoom})`,
               }}

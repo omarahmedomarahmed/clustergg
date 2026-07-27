@@ -7,6 +7,7 @@ import {
   type CreativeSize, type TemplateId, type StudioEntity, type BrandAssets,
   type Creative, type CreativeItem, type TextItem,
 } from "@/lib/creative-templates";
+import { optImg } from "@/lib/img";
 
 const FONT = 'system-ui, "Segoe UI", Roboto, Arial, sans-serif';
 const KIND_LABEL: Record<StudioEntity["kind"], string> = { challenge: "Challenges", quest: "Quests", game: "Planets", leaderboard: "Leaderboards" };
@@ -164,7 +165,7 @@ export default function CreativeStudio({ entities, brand }: { entities: StudioEn
               onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}>
               {/* background */}
               <div className="absolute inset-0" style={{ background: "#04051a" }} />
-              {creative.bg && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${creative.bg})` }} />}
+              {creative.bg && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${optImg(creative.bg, 1200)})` }} />}
               <div className="absolute inset-0" style={{ background: `rgba(4,5,26,${creative.bg ? creative.bgTint : 0.9})` }} />
               <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, transparent 40%, rgba(4,5,26,0.85))" }} />
               {/* items */}

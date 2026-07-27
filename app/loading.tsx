@@ -3,6 +3,7 @@ import LoadingPhrases from "@/components/LoadingPhrases";
 import BrandHeader from "@/components/BrandHeader";
 import AdSlot from "@/components/AdSlot";
 import AppStoreBadges from "@/components/AppStoreBadges";
+import { optImg } from "@/lib/img";
 
 // Global navigation fallback — shown while a new (dynamic) route segment loads.
 // Fully admin-editable (Brand kit): orb color/size/logo, the gamified astronaut,
@@ -28,7 +29,7 @@ export default async function Loading() {
     <div className="fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-hidden">
       {/* Background — admin art or the default dark blur */}
       {bg ? (
-        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.72), rgba(4,5,26,0.86)), url(${bg})` }} />
+        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.72), rgba(4,5,26,0.86)), url(${optImg(bg, 1200)})` }} />
       ) : (
         <div className="absolute inset-0 -z-10 bg-[#04051a]/80 backdrop-blur-sm" />
       )}
