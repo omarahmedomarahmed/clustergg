@@ -2,34 +2,49 @@ import Link from "next/link";
 import { networkStats, publicServers } from "@/lib/network";
 import { tierFor } from "@/lib/server-portal";
 import { installUrl } from "@/lib/discord/config";
+import { getContent } from "@/lib/cms";
+import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
+import { buildPricing, money, PRICING_NUMBER_KEYS } from "@/lib/pricing";
+import ServerEarnCards from "@/components/ServerEarnCards";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Communities on Cluster",
-  description: "Every Discord community running ClusterBot — their size, their challenges, and how to join them.",
+  title: "Get paid for your Discord community",
+  description:
+    "Install ClusterBot free, link 500 gamers, and earn from the brands sponsoring the games your members play. Plus every community already running it.",
 };
 
-// The public directory of connected servers.
+// The server-owner page.
 //
-// It works in both directions on purpose. A gamer finds communities worth
-// joining (and the ones holding keys to challenges they've been watching); an
-// owner sees who else is here and where they'd rank. Both are reasons to come
-// back to a page that would otherwise be a static list.
+// It used to be a directory with a CTA on top. It is now the earning pitch with
+// a directory under it, because the two audiences it serves want different
+// things in that order: an owner deciding whether to install needs the deal
+// first, and a gamer looking for a community scrolls past a pitch happily.
 export default async function ServersDirectoryPage() {
-  const [stats, servers] = await Promise.all([networkStats(), publicServers()]);
+  const [stats, servers, content] = await Promise.all([
+    networkStats(),
+    publicServers(),
+    getContent([...PRICING_NUMBER_KEYS, ...cardBgCmsKeys]),
+  ]);
   const install = installUrl();
+  const cfg = buildPricing(content);
+  const bg = buildCardBgMap(content);
   const nf = (n: number) => n.toLocaleString();
 
   return (
     <div className="min-h-screen">
       <section className="relative border-b border-white/10">
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-violet-600/20 via-transparent to-cyan-500/10" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-br from-emerald-500/15 via-transparent to-cyan-500/10" />
         <div className="relative mx-auto max-w-6xl px-4 py-12 sm:py-16">
-          <h1 className="text-3xl sm:text-5xl font-black">Communities on Cluster</h1>
-          <p className="text-muted mt-3 max-w-2xl">
-            Every Discord server running ClusterBot. Join one to compete in its challenges — a server
-            challenge is public to watch, but the key to enter only goes to that server&apos;s members.
+          <h1 className="text-3xl sm:text-5xl font-black">
+            Your community built an audience.<br />
+            <span className="grad-text">Start getting paid for it.</span>
+          </h1>
+          <p className="text-muted mt-4 max-w-2xl leading-relaxed">
+            Cluster pays Discord servers out of what brands pay us. Install the bot free, run challenges with
+            real prize money, and keep {Math.round(cfg.serverSharePct)}% of the revenue your community
+            generates. Every server below did exactly that.
           </p>
           <div className="flex flex-wrap gap-6 mt-7">
             <Stat label="Servers" value={nf(stats.servers)} />
@@ -45,7 +60,32 @@ export default async function ServersDirectoryPage() {
         </div>
       </section>
 
+      {/* ===== THE LADDER ===== */}
+      <section className="relative py-16 border-b border-white/10" style={{ background: cardBgStyle(bg, "sec_servers") }}>
+        <div className="relative mx-auto max-w-6xl px-4">
+          <ServerEarnCards installUrl={install || undefined} />
+          <div className="mt-8 glass rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <Icon name="chart" size={20} className="text-cyan-300 shrink-0" />
+            <p className="text-sm text-muted leading-relaxed flex-1">
+              Brands pay {money(cfg.perGame, cfg.currency)} a month per game for {cfg.challengesPerGame} sponsored
+              challenges. Those challenges run in the servers whose members play that game — so what your community
+              earns depends on what your community plays.
+            </p>
+            <Link href="/pricing" className="ghost-btn pressable rounded-full px-5 py-2.5 text-sm shrink-0">
+              See what brands pay
+            </Link>
+          </div>
+        </div>
+      </section>
+
       <div className="mx-auto max-w-6xl px-4 py-10">
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold">Communities already running it</h2>
+          <p className="text-sm text-muted mt-1.5 max-w-2xl">
+            Join one to compete in its challenges — a server challenge is public to watch, but the key to enter
+            only goes to that server&apos;s members.
+          </p>
+        </div>
         {servers.length === 0 ? (
           <div className="glass p-10 text-center">
             <div className="font-semibold">No servers yet.</div>

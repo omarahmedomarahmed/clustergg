@@ -42,6 +42,12 @@ export type PricingConfig = {
   slotCount: number;
   slotSeconds: number;
   /**
+   * What a monetized server keeps of the revenue its community generates.
+   * Mirrors `discordGuilds.revenueSharePct` — the number the product actually
+   * pays on. A marketing page quoting a different split is a support ticket.
+   */
+  serverSharePct: number;
+  /**
    * Projection factor: placement views per reachable member per month. Used ONLY
    * for the forward-looking impression estimate, which is always labelled as a
    * projection. Everything else on the pricing page is a counted number.
@@ -65,6 +71,7 @@ export const PRICING_DEFAULTS: PricingConfig = {
   streamAddon: 400,
   slotCount: 2,
   slotSeconds: 5,
+  serverSharePct: 70,
   impressionsPerMember: 12,
   currency: "USD",
 };
@@ -297,7 +304,7 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     detail:
       "Link 500 gamers and your server turns on. Brands sponsoring the games your members actually play start paying into your server, and the bot handles every part of it.",
     perks: [
-      "A share of every placement served to your community",
+      "70% of the revenue your community generates",
       "Sponsored challenges land in your server automatically",
       "Owner portal with live earnings, per game",
       "Your server listed publicly with its own page",

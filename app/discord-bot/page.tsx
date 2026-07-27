@@ -5,7 +5,9 @@ import { getContent } from "@/lib/cms";
 import { installUrl, discordConfigured, CLUSTER_CHANNEL } from "@/lib/discord/config";
 import { networkStats, publicServers } from "@/lib/network";
 import { botShowcaseSteps } from "@/lib/bot-showcase";
-import { TIERS } from "@/lib/server-portal";
+import ServerEarnCards from "@/components/ServerEarnCards";
+import { buildPricing, money } from "@/lib/pricing";
+import { PRICING_NUMBER_KEYS } from "@/lib/pricing";
 import BotShowcase from "@/components/BotShowcase";
 import BrandGlyph from "@/components/BrandGlyph";
 import Icon from "@/components/Icon";
@@ -41,13 +43,14 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
   const ready = discordConfigured() && !!url;
 
   const [c, network, servers, steps] = await Promise.all([
-    getContent(["discord.hero.title", "discord.hero.subtitle", "discord.unlock.threshold"])
+    getContent(["discord.hero.title", "discord.hero.subtitle", "discord.unlock.threshold", ...PRICING_NUMBER_KEYS])
       .catch(() => ({} as Record<string, string>)),
     networkStats().catch(() => ({ servers: 0, reach: 0, linked: 0, challenges: 0, games: 0 })),
     publicServers(8).catch(() => []),
     botShowcaseSteps().catch(() => []),
   ]);
   const threshold = Number(c["discord.unlock.threshold"]) || 500;
+  const cfg = buildPricing(c);
   const installed = sp.installed;
   const nf = (n: number) => n.toLocaleString();
 
@@ -96,12 +99,12 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           </span>
           <h1 className="text-4xl sm:text-6xl font-black leading-[1.05] mt-5 max-w-3xl mx-auto">
             {c["discord.hero.title"] || (
-              <>Turn your Discord into a <span className="grad-text">competition</span>.</>
+              <>Turn your Discord into a competition. <span className="grad-text">Then get paid for it.</span></>
             )}
           </h1>
           <p className="text-muted max-w-2xl mx-auto mt-5 text-lg leading-relaxed">
             {c["discord.hero.subtitle"] ||
-              "Your members get ranked profiles and live stats from the games they already play, plus challenges with real trophies — without leaving your server. You get the audience numbers, and a share of what they earn."}
+              `Your members get ranked profiles and live stats from the games they already play, plus weekly challenges with real prize money — without leaving your server. Link ${threshold.toLocaleString()} gamers and brands start paying into your community. Free forever, and it never reads a message.`}
           </p>
 
           <div className="flex flex-wrap gap-3 justify-center mt-8">
@@ -173,33 +176,55 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
         </div>
       </section>
 
-      {/* ===== THE OWNER'S DEAL ===== */}
-      <section className="border-y border-white/10 bg-[#070826]/60 py-14">
+      {/* ===== THE OWNER'S DEAL =====
+          The reason to install, given the space it deserves. An owner is being
+          asked to put a bot in front of their community; "it's free and it's
+          nice" doesn't earn that. What earns it is a number they can reach and
+          a payment that follows. */}
+      <section className="border-y border-white/10 bg-[#070826]/60 py-16">
         <div className="mx-auto max-w-6xl px-4">
-          <div className="text-xs tracking-[0.2em] text-muted font-bold">FOR SERVER OWNERS</div>
-          <h2 className="text-2xl sm:text-4xl font-black mt-2">
-            Your community is the product. <span className="grad-text">Get paid for it.</span>
-          </h2>
-          <p className="text-muted max-w-2xl mt-4">
-            Run <code className="text-cyan-300">/cluster server</code> any time to see how many members have joined
-            Cluster and linked a game. At <strong className="text-ink">{threshold.toLocaleString()} linked gamers</strong>{" "}
-            your server unlocks a share of the ad revenue Cluster earns from your community — and you can run private
-            challenges locked to your members with an access key.
-          </p>
+          <ServerEarnCards installUrl={ready ? url ?? undefined : undefined} />
 
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-8">
-            {TIERS.map((t) => (
-              <div key={t.key} className="glass rounded-2xl p-5">
-                <Icon name={t.icon} size={26} className="text-cyan-300" />
-                <div className="font-bold mt-1.5">{t.name}</div>
-                <div className="text-xs text-cyan-300 mt-0.5">
-                  {t.threshold === 0 ? "From day one" : `${t.threshold.toLocaleString()}+ linked members`}
+          {/* Where the money comes from. An owner who doesn't understand the
+              source assumes it's venture money and doesn't believe it lasts. */}
+          <div className="mt-10 glass rounded-3xl p-6 md:p-8">
+            <div className="grid lg:grid-cols-[1.3fr_1fr] gap-8 items-center">
+              <div>
+                <div className="inline-flex items-center gap-2 text-xs text-cyan-200 bg-cyan-500/10 border border-cyan-400/30 rounded-full px-3 py-1.5">
+                  <Icon name="chart" size={12} /> Where the money comes from
                 </div>
-                <div className="text-xs font-semibold mt-2">{t.unlocks}</div>
-                <p className="text-xs text-muted mt-1 leading-snug">{t.detail}</p>
+                <h3 className="text-2xl font-bold mt-4">Brands pay us. We pay you.</h3>
+                <p className="text-muted mt-3 leading-relaxed">
+                  Brands buy sponsored challenges by the game — {money(cfg.perGame, cfg.currency)} a month each,
+                  covering {cfg.challengesPerGame} weekly competitions with their name on them. Those challenges run in
+                  the servers whose members actually play that game. If your community is a League server, League
+                  sponsorship money flows to you. You keep{" "}
+                  <strong className="text-ink">{Math.round(cfg.serverSharePct)}%</strong> of what your community
+                  generates, and we fund every prize pool ourselves.
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Link href="/pricing" className="ghost-btn pressable rounded-full px-5 py-2.5 text-sm">
+                    See what brands pay
+                  </Link>
+                  <Link href="/servers" className="ghost-btn pressable rounded-full px-5 py-2.5 text-sm">
+                    Servers already earning
+                  </Link>
+                </div>
               </div>
-            ))}
+              <div className="grid grid-cols-2 gap-3">
+                <MoneyFact value={`${Math.round(cfg.serverSharePct)}%`} label="of your community's revenue is yours" gold />
+                <MoneyFact value={threshold.toLocaleString()} label="linked gamers to switch it on" />
+                <MoneyFact value={String(cfg.games * cfg.challengesPerGame)} label="sponsored challenges a month across the network" />
+                <MoneyFact value={money(cfg.games * cfg.challengesPerGame * cfg.prizePool, cfg.currency)} label="of prize money we fund every month" />
+              </div>
+            </div>
           </div>
+
+          <p className="text-xs text-muted mt-6 max-w-3xl">
+            Run <code className="text-cyan-300">/cluster admin</code> in your server any time to see how many members
+            have joined Cluster and linked a game, how far you are from the next stage, and what you&apos;ve earned.
+            Private challenges locked to your members with an access key are available from day one.
+          </p>
         </div>
       </section>
 
@@ -291,6 +316,15 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           </a>
         )}
       </section>
+    </div>
+  );
+}
+
+function MoneyFact({ value, label, gold = false }: { value: string; label: string; gold?: boolean }) {
+  return (
+    <div className={`rounded-2xl border p-4 ${gold ? "bg-emerald-500/10 border-emerald-400/30" : "bg-black/25 border-white/10"}`}>
+      <div className={`text-2xl font-bold leading-none ${gold ? "text-emerald-300" : "grad-text"}`}>{value}</div>
+      <div className="text-[11px] uppercase tracking-wider text-muted mt-2 leading-snug">{label}</div>
     </div>
   );
 }

@@ -39,7 +39,7 @@ export type MetricKey =
   | "guilds" | "guildMembers" | "botCommands" | "challengeRequests"
   | "games" | "planets" | "planetRequests"
   | "challenges" | "quests" | "leaderboards" | "trophies" | "redeems"
-  | "brands" | "creatives" | "placements" | "adImpressions" | "adClicks"
+  | "brandEnquiries" | "brands" | "creatives" | "placements" | "adImpressions" | "adClicks"
   | "posts" | "images";
 
 export function accessOf(area: string | undefined): AdminAccess {
@@ -136,6 +136,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     area: "ads",
     blurb: "Offline sales, run through the platform.",
     items: [
+      { href: "/admin/brand-enquiries", label: "Enquiries", desc: "Brands who asked to buy, with the plan they configured.", metric: "brandEnquiries" },
       { href: "/admin/brands", label: "Brands", desc: "Advertisers and their portals.", metric: "brands" },
       { href: "/admin/creatives", label: "Creatives", desc: "The artwork that runs.", metric: "creatives" },
       { href: "/admin/placements", label: "Placements", desc: "Where creatives can appear.", metric: "placements" },

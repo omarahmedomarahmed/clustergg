@@ -127,6 +127,12 @@ export default async function Nav() {
     ...(hidePlanets ? [] : [{ href: "/planets", label: t("nav.allPlanets"), icon: "planet" }]),
     ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad", logoUrl: slimImg(g.logoUrl, 300000) as string | null })),
     ...(user ? [{ href: "/messages", label: t("nav.messages"), icon: "message" }] : []),
+    // The two commercial doors. On mobile the drawer is the only place they can
+    // live, and a brand reading the site on a phone has nowhere else to go.
+    ...(user ? [] : [
+      { href: "/pricing", label: "For brands", icon: "target" },
+      { href: "/servers", label: "Monetize your server", icon: "satellite" },
+    ]),
     // Admin-defined extra drawer links (Admin → Mobile chrome).
     ...drawerExtra,
   ];
@@ -188,6 +194,9 @@ export default async function Nav() {
               <Link href="/search" aria-label="Search" className="hidden sm:flex text-muted hover:text-ink transition-colors">
                 <Icon name="search" size={19} />
               </Link>
+              {/* The only nav link a brand needs. Guests only — a signed-in
+                  gamer is not the buyer and the nav has no room to spare. */}
+              <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline">For brands</Link>
               <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>
               <AddBotButton size="sm" className="hidden md:inline-flex" />
               <a href="/api/auth/discord?next=/onboarding" title="Sign in with Discord"
