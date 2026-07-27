@@ -1,6 +1,7 @@
 import { closeExpiredChallenges } from "@/lib/challenges";
 import { postAdsToGuilds } from "@/lib/discord/ads";
 import { postLeaderboardUpdates } from "@/lib/discord/leaderboard-feed";
+import { postWeekUpdate } from "@/lib/discord/week-feed";
 
 // Everything periodic, as named jobs.
 //
@@ -12,7 +13,7 @@ import { postLeaderboardUpdates } from "@/lib/discord/leaderboard-feed";
 // Each job must be safe to run repeatedly. Closing challenges is idempotent,
 // and ad posting has its own per-server interval.
 
-export type JobKey = "challenges" | "discord-ads" | "leaderboard-feed";
+export type JobKey = "challenges" | "discord-ads" | "leaderboard-feed" | "week-update";
 
 export type JobResult = { key: JobKey; ok: boolean; summary: string };
 
@@ -26,6 +27,11 @@ export const JOBS: { key: JobKey; label: string; description: string }[] = [
     key: "discord-ads",
     label: "Post Discord ads",
     description: "Posts one ad into each server that has unlocked revenue share and is opted in. Respects the per-server interval, so running it early is safe.",
+  },
+  {
+    key: "week-update",
+    label: "Post the Profile of the Week update",
+    description: "Posts the weekly vote standings — placements, days left and the way in — into every server running the bot. One post per server per day, so running it early or twice is safe.",
   },
   {
     key: "leaderboard-feed",
@@ -44,6 +50,17 @@ export async function runJob(key: JobKey): Promise<JobResult> {
       case "discord-ads": {
         const r = await postAdsToGuilds();
         return { key, ok: true, summary: `${r.posted} posted · ${r.skipped} skipped · ${r.considered} eligible server${r.considered === 1 ? "" : "s"}.` };
+      }
+      case "week-update": {
+        const r = await postWeekUpdate();
+        return {
+          key, ok: true,
+          summary: r.posted
+            ? `Posted into ${r.posted} server${r.posted === 1 ? "" : "s"} · ${r.skipped} already had today's.`
+            : r.considered
+              ? `Every one of the ${r.considered} server${r.considered === 1 ? "" : "s"} already had today's update.`
+              : "No server has the bot with announcements on yet.",
+        };
       }
       case "leaderboard-feed": {
         const r = await postLeaderboardUpdates();

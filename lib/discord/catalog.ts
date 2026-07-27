@@ -90,6 +90,9 @@ export async function openChoices(q: string, opts: { isManager?: boolean } = {})
   const list: Choice[] = [
     { name: "My profile card", value: "profile" },
     { name: "My Cluster Points", value: "cp" },
+    // High in the list on purpose: it's the one competition everybody is
+    // already in, and the daily post makes it the thing people come looking for.
+    { name: "Profile of the Week — the vote", value: "week" },
     { name: "Live challenges", value: "challenges:" },
     { name: "All games", value: "planets" },
     { name: "Share my profile publicly", value: "share" },

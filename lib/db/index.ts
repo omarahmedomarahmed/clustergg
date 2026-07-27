@@ -248,6 +248,19 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "dap_guild_idx" ON "discord_ad_posts" ("guild_id","created_at")`,
+  `CREATE TABLE IF NOT EXISTS "discord_week_posts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "post_key" text NOT NULL,
+    "week_key" text NOT NULL,
+    "kind" text NOT NULL DEFAULT 'update',
+    "channel_id" text,
+    "message_id" text,
+    "status" text NOT NULL DEFAULT 'posted',
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "dwp_guild_key_idx" ON "discord_week_posts" ("guild_id","post_key")`,
+  `CREATE INDEX IF NOT EXISTS "dwp_week_idx" ON "discord_week_posts" ("week_key")`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "guild_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "visibility" text NOT NULL DEFAULT 'public'`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "guild_id" text`,

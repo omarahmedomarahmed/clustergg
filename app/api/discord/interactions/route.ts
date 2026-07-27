@@ -14,7 +14,7 @@ import { shareMessage } from "@/lib/discord/share";
 import { joinChallengeFor, challengeGate, keyVisibleTo, setChallengeState } from "@/lib/challenges";
 import { submitChallengeRequest } from "@/lib/challenge-requests";
 import { linkGameAccountFor } from "@/lib/link-account";
-import { PROVIDERS } from "@/lib/providers/registry";
+import { PROVIDERS, linkableProvider } from "@/lib/providers/registry";
 import { logCommand } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { reportToHq } from "@/lib/discord/hq";
@@ -367,7 +367,22 @@ function componentPress(i: Interaction) {
   if (customId.startsWith("open-link|")) {
     const game = customId.slice("open-link|".length);
     const provider = providerForGame(game);
-    if (!provider) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    // A press we can't answer gets an ANSWER, not silence. `DeferredUpdateMessage`
+    // here meant the button visibly did nothing — indistinguishable from a dead
+    // bot, and the exact symptom VALORANT produced for months. The screens no
+    // longer render such a button; this is the backstop for old messages that
+    // still carry one, since a pinned card lives forever.
+    if (!provider) {
+      return json({
+        type: InteractionResponseType.ChannelMessageWithSource,
+        data: {
+          content: game
+            ? `**${game}** can't be linked yet — its stats API isn't open to us. Run \`/cluster link\` to pick a game we can connect, or link it on the site: ${siteUrl()}/profile?tab=accounts`
+            : `Run \`/cluster link\` to pick a game.`,
+          flags: MessageFlags.Ephemeral,
+        },
+      });
+    }
     return json(linkModal(game, provider));
   }
   // Same rule for the entry key on a server-gated challenge. No database work
@@ -576,10 +591,7 @@ function joinFailure(reason: string): string {
 // Which provider backs a game, so `/cluster link game:Chess` knows what to
 // create. Uses the same registry the website links through.
 function providerForGame(game: string): string | null {
-  // Identity-only providers (Discord, Epic) have no stats to sync, so they
-  // aren't linkable as a game account.
-  const p = PROVIDERS.find((x) => x.game.toLowerCase() === game.toLowerCase() && !x.identityOnly);
-  return p?.id ?? null;
+  return linkableProvider(game)?.id ?? null;
 }
 
 // ===== Share =====

@@ -1,6 +1,6 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { getProvider } from "@/lib/providers/registry";
+import { getProvider, PROVIDERS } from "@/lib/providers/registry";
 import { getUserQuests, getTotalCp } from "@/lib/quests";
 import { levelFromCp } from "@/lib/level";
 import { getContent } from "@/lib/cms";
@@ -278,19 +278,64 @@ export async function planetCard(game: string): Promise<CardData | null> {
   const [g] = await db.select().from(schema.games).where(eq(schema.games.name, game)).limit(1);
   if (!g) return null;
 
-  const [challenges, ranked, bg] = await Promise.all([
-    db.select({ id: schema.challenges.id }).from(schema.challenges)
-      .where(and(eq(schema.challenges.game, game), eq(schema.challenges.status, "active"))),
-    db.select({ id: schema.statCurrent.id }).from(schema.statCurrent).where(eq(schema.statCurrent.game, game)),
+  // A game is played through one or more providers (Chess is Chess.com AND
+  // Lichess), and a linked account records the provider, not the game.
+  const providerIds = PROVIDERS.filter((p) => p.game === g.name).map((p) => p.id);
+
+  const [live, accounts, boardRows, bg] = await Promise.all([
+    // The actual challenges, not a count of them — soonest deadline first,
+    // because the one closing tonight is the one worth entering now.
+    db.select({
+      id: schema.challenges.id, title: schema.challenges.title, endAt: schema.challenges.endAt,
+      prizes: schema.challenges.prizes, prizeDescription: schema.challenges.prizeDescription,
+    }).from(schema.challenges)
+      .where(and(eq(schema.challenges.game, game), eq(schema.challenges.status, "active")))
+      .orderBy(schema.challenges.endAt).limit(6),
+    // Distinct gamers. The old number counted rows in stat_current — one per
+    // metric per account — so a game tracking six metrics reported six times
+    // the players it had.
+    providerIds.length
+      ? db.selectDistinct({ userId: schema.linkedGameAccounts.userId })
+          .from(schema.linkedGameAccounts).where(inArray(schema.linkedGameAccounts.provider, providerIds))
+      : Promise.resolve([] as { userId: string }[]),
+    db.select().from(schema.leaderboards)
+      .where(and(eq(schema.leaderboards.game, game), eq(schema.leaderboards.isActive, true)))
+      .limit(4),
     cardBg("bot_planet"),
   ]);
 
-  // Top gamer on the game's primary board — the social proof on the card.
-  let topGamer: { name: string; value: string } | null = null;
-  try {
-    const [board] = await db.select().from(schema.leaderboards)
-      .where(and(eq(schema.leaderboards.game, game), eq(schema.leaderboards.isActive, true))).limit(1);
-    if (board) {
+  const entrants = await Promise.all(live.map(async (c) => {
+    try {
+      const rows = await db.select({ id: schema.challengeParticipants.id })
+        .from(schema.challengeParticipants).where(eq(schema.challengeParticipants.challengeId, c.id));
+      return rows.length;
+    } catch { return 0; }
+  }));
+
+  // What first place is worth, resolved in one query across every challenge on
+  // the card rather than one per challenge.
+  const firstTrophyIds = [...new Set(live.flatMap((c) => c.prizes?.first ?? []))];
+  let valueOf = new Map<string, number>();
+  if (firstTrophyIds.length) {
+    try {
+      const rows = await db.select({ id: schema.trophies.id, value: schema.trophies.value })
+        .from(schema.trophies).where(inArray(schema.trophies.id, firstTrophyIds));
+      valueOf = new Map(rows.map((r) => [r.id, Number(r.value)]));
+    } catch { /* a challenge with no priced prize just shows no prize */ }
+  }
+  const prizeOf = (c: (typeof live)[number]): string | null => {
+    if (c.prizeDescription?.trim()) return c.prizeDescription.trim();
+    const total = (c.prizes?.first ?? []).reduce((n, id) => n + (valueOf.get(id) ?? 0), 0);
+    return total > 0 ? `$${Math.round(total).toLocaleString()}` : null;
+  };
+
+  // Every board this game runs, each with whoever currently leads it. A board
+  // with no name on it is still worth listing — it's a board you could top.
+  const boards = await Promise.all(boardRows.map(async (board) => {
+    let leader: string | null = null;
+    let value: string | null = null;
+    let entries = 0;
+    try {
       const rows = await db.select({
         value: schema.statCurrent.metricValue, rankLabel: schema.statCurrent.rankLabel,
         name: schema.users.displayName,
@@ -298,20 +343,30 @@ export async function planetCard(game: string): Promise<CardData | null> {
         .innerJoin(schema.linkedGameAccounts, eq(schema.statCurrent.linkedAccountId, schema.linkedGameAccounts.id))
         .innerJoin(schema.users, eq(schema.linkedGameAccounts.userId, schema.users.id))
         .where(and(eq(schema.statCurrent.game, game), eq(schema.statCurrent.metricKey, board.metricKey)));
+      entries = rows.length;
       const sorted = [...rows].sort((a, b) => board.sortDir === "asc" ? a.value - b.value : b.value - a.value);
-      if (sorted[0]) topGamer = { name: sorted[0].name, value: sorted[0].rankLabel ?? String(Math.round(sorted[0].value * 100) / 100) };
-    }
-  } catch { /* a card without a top gamer is still a good card */ }
+      if (sorted[0]) {
+        leader = sorted[0].name;
+        value = sorted[0].rankLabel ?? String(Math.round(sorted[0].value * 100) / 100);
+      }
+    } catch { /* a board we can't read is still a board that exists */ }
+    return { title: board.title, leader, value, entries };
+  }));
 
   return {
     kind: "planet",
     game: g.name,
     logoUrl: g.logoUrl,
     description: g.description || null,
-    challenges: challenges.length,
-    ranked: ranked.length,
+    challenges: live.map((c, i) => ({
+      title: c.title,
+      endsAt: c.endAt.toISOString(),
+      participants: entrants[i],
+      prize: prizeOf(c),
+    })),
+    boards,
+    gamers: accounts.length,
     serverGamers: null,
-    topGamer,
     theme: {
       accent: g.accent || BRAND.accent,
       accent2: g.accent2 || BRAND.accent2,
@@ -450,5 +505,80 @@ export async function leaderboardCard(game: string, metricKey?: string | null): 
       avatarUrl: r.avatarUrl,
     })),
     theme: { ...BRAND, bgUrl: g[0]?.coverUrl || bg.bgUrl, bgFallbacks: [bg.bgUrl] },
+  };
+}
+
+// Profile of the Week, as a card the bot can post.
+//
+// `mode` decides which story it tells. During the week it's the race — the
+// standings and the clock. Once a week is called it's the result, and the
+// placements carry the trophy each of them was actually handed, because a
+// podium that doesn't show the prize is just a list of names.
+export async function weekCard(opts: { weekKey?: string; mode?: "race" | "result" } = {}): Promise<CardData | null> {
+  const { weekBoard, currentWeek } = await import("@/lib/profile-week");
+  const week = opts.weekKey ? undefined : await currentWeek();
+  const board = await weekBoard({ weekKey: opts.weekKey ?? week?.key, limit: 6 });
+  const bg = await cardBg("bot_week");
+
+  const called = !!board.result?.podium.length;
+  const mode = opts.mode ?? (called && board.week.phase === "announcement" ? "result" : "race");
+
+  const db = await getDb();
+  const running = board.entries.filter((e) => !e.disqualified);
+  const totalVotes = running.reduce((n, e) => n + e.weekVotes, 0);
+
+  // Avatars, so the card shows people rather than rows of text.
+  const names = mode === "result"
+    ? (board.result?.podium ?? []).map((p) => p.slug)
+    : running.slice(0, 4).map((e) => e.slug);
+  let avatars = new Map<string, string | null>();
+  if (names.length) {
+    try {
+      const rows = await db.select({ slug: schema.users.slug, avatarUrl: schema.users.avatarUrl })
+        .from(schema.users).where(inArray(schema.users.slug, names));
+      avatars = new Map(rows.map((r) => [r.slug, r.avatarUrl]));
+    } catch { /* a card without faces still reads */ }
+  }
+
+  const trophy = board.result?.trophy
+    ? { name: board.result.trophy.name, imageUrl: board.result.trophy.imageUrl, value: board.result.trophy.value }
+    : null;
+
+  const msLeft = board.week.votingEndsAt.getTime() - Date.now();
+  const daysLeft = board.week.phase === "voting" ? Math.max(0, Math.ceil(msLeft / 86400000)) : 0;
+
+  const entries = mode === "result"
+    ? (board.result?.podium ?? []).slice(0, 3).map((p, i) => ({
+        rank: i + 1,
+        name: p.displayName,
+        avatarUrl: avatars.get(p.slug) ?? null,
+        weekVotes: p.votes,
+        lifetimeVotes: running.find((e) => e.slug === p.slug)?.lifetimeVotes ?? 0,
+        trophyUrl: trophy?.imageUrl ?? null,
+      }))
+    : running.slice(0, 4).map((e, i) => ({
+        rank: i + 1,
+        name: e.displayName,
+        avatarUrl: avatars.get(e.slug) ?? null,
+        weekVotes: e.weekVotes,
+        lifetimeVotes: e.lifetimeVotes,
+      }));
+
+  return {
+    kind: "week",
+    mode,
+    weekKey: board.week.key,
+    title: mode === "result" ? "Profile of the Week" : "Profile of the Week",
+    subtitle: mode === "result"
+      ? "The votes are in — here's your podium"
+      : daysLeft > 0
+        ? `Voting closes in ${daysLeft} day${daysLeft === 1 ? "" : "s"} · every profile is entered`
+        : "Voting is closed — winners are being called",
+    daysLeft,
+    entries,
+    totalVotes,
+    contenders: running.filter((e) => e.weekVotes > 0).length,
+    trophy,
+    theme: { ...BRAND, accent: "#fbbf24", accent2: "#f472b6", bgUrl: bg.bgUrl },
   };
 }

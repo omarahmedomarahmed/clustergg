@@ -9,6 +9,7 @@ import {
   FREEZE_KEY, PODIUM_TROPHY_KEY, STREAM_LIVE_KEY, STREAM_URL_KEY,
   closeWeek, recordWeekAction, reopenWeek, setWeekStream,
 } from "@/lib/profile-week";
+import { announceWeekWinners, postWeekUpdate } from "@/lib/discord/week-feed";
 import { WEEK_TZ_KEY, weekAt } from "@/lib/week";
 
 // Running the competition.
@@ -132,9 +133,48 @@ export async function closeWeekNow(_prev: WeekAdminState, fd: FormData): Promise
       ? "Nobody has a vote this week — there's no podium to call."
       : "Couldn't close the week.");
   }
+
+  // Straight out to every server running the bot. Calling the week IS the
+  // announcement, so it shouldn't need a second button — and the post is keyed
+  // on the week, so calling it twice announces it once.
+  let told = 0;
+  try { told = (await announceWeekWinners(weekKey)).posted; }
+  catch { /* the result stands whether or not Discord was reachable */ }
+
   refresh();
   const names = res.podium.map((p, i) => `#${i + 1} ${p.displayName}`).join(" · ");
-  return { ok: `Called. ${names}${res.trophies ? ` — ${res.trophies} trophies awarded` : " — no podium trophy configured"}.` };
+  return {
+    ok: `Called. ${names}${res.trophies ? ` — ${res.trophies} trophies awarded` : " — no podium trophy configured"}`
+      + `${told ? ` · announced in ${told} server${told === 1 ? "" : "s"}` : ""}.`,
+  };
+}
+
+/** Re-post the winners, for a server that joined after the announcement went out. */
+export async function announceWeekAgain(_prev: WeekAdminState, fd: FormData): Promise<WeekAdminState> {
+  const me = await staff();
+  if (!me) return fail("Staff only.");
+  const weekKey = weekKeyOf(fd);
+  if (!weekKey) return fail("Missing week.");
+
+  const res = await announceWeekWinners(weekKey, { force: true });
+  if (!res.considered) return fail("No server has the bot with announcements on yet.");
+  if (!res.posted) return fail("Nothing was announced — has this week been called?");
+  return { ok: `Announced in ${res.posted} server${res.posted === 1 ? "" : "s"}.` };
+}
+
+/** Push today's standings to every server now, rather than waiting for the cron. */
+export async function postWeekUpdateNow(_prev: WeekAdminState, fd: FormData): Promise<WeekAdminState> {
+  const me = await staff();
+  if (!me) return fail("Staff only.");
+  // Forced, because a human pressing this means "send it now" — the once-a-day
+  // rule exists to stop the cron double-posting, not to overrule staff.
+  const res = await postWeekUpdate({ force: fd.get("force") === "1" });
+  if (!res.considered) return fail("No server has the bot with announcements on yet.");
+  return {
+    ok: res.posted
+      ? `Posted into ${res.posted} server${res.posted === 1 ? "" : "s"}.`
+      : "Every server already had today's update — tick Force to send it again.",
+  };
 }
 
 /** Undo a close, for when the wrong week gets called mid-stream. */

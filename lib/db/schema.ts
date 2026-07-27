@@ -829,6 +829,28 @@ export const discordAdPosts = pgTable("discord_ad_posts", {
   createdAt: now("created_at"),
 }, (t) => [index("dap_guild_idx").on(t.guildId, t.createdAt)]);
 
+// Profile of the Week posts the bot has already made into a server.
+//
+// The whole point of this row is the unique index. The daily post runs from a
+// cron that is allowed to fire twice, and a retry after a partial failure must
+// not repost into the servers that already got it — so "have I posted this
+// already" is a database constraint rather than a timing assumption.
+export const discordWeekPosts = pgTable("discord_week_posts", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  /** `update:<yyyy-mm-dd>` or `result:<weekKey>` — one post per key per guild. */
+  postKey: text("post_key").notNull(),
+  weekKey: text("week_key").notNull(),
+  kind: text("kind").notNull().default("update"), // update | result
+  channelId: text("channel_id"),
+  messageId: text("message_id"),
+  status: text("status").notNull().default("posted"), // posted | failed
+  createdAt: now("created_at"),
+}, (t) => [
+  uniqueIndex("dwp_guild_key_idx").on(t.guildId, t.postKey),
+  index("dwp_week_idx").on(t.weekKey),
+]);
+
 // ===== Rendered PNG cards =====
 // Every "glorified snapshot" the Discord bot attaches (and every OG image a
 // shared profile link produces) is a PNG rendered from live platform data.

@@ -8,7 +8,7 @@ import {
 import { layoutFor } from "@/lib/cards/layout-store";
 import type {
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
-  LeaderboardCard, ChallengeCard, PlanetCard, PlanetsCard, GuideCard,
+  LeaderboardCard, ChallengeCard, PlanetCard, PlanetsCard, GuideCard, WeekCard,
 } from "@/lib/cards/types";
 
 // Server-rendered "glorified" PNG cards, shared by the Discord bot and the web
@@ -648,27 +648,188 @@ function dayLabel(iso: string): string {
     : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
+// A game's hub: what you can enter, and where you'd stand.
+//
+// Two columns, because those are the two questions somebody opening a planet
+// actually has. Counters answered neither — "3 challenges" doesn't tell you
+// whether one ends tonight, and the old "gamers ranked" wasn't even a count of
+// gamers.
 function PlanetBody(d: PlanetCard) {
   const t = d.theme;
+  const challenges = d.challenges ?? [];
+  const boards = d.boards ?? [];
   return (
     <Frame theme={t} corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={86} height={86} style={{ width: 86, height: 86, borderRadius: 20, objectFit: "cover" }} />
     ) : undefined}>
-      <Title text={`${d.game} Planet`} sub={clamp(d.description, 96)} accent={t.accent} accent2={t.accent2} theme={t} />
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginTop: 36, flex: 1 }}>
-        {[
-          { k: "CHALLENGES LIVE", v: nf(d.challenges) },
-          { k: "GAMERS RANKED", v: nf(d.ranked) },
-          ...(d.serverGamers != null ? [{ k: "FROM THIS SERVER", v: nf(d.serverGamers) }] : []),
-        ].map((s, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, padding: "26px 28px", borderRadius: 22, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.10)" }}>
-            <div style={{ fontSize: 19, letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{s.k}</div>
-            <div style={{ fontSize: 52, fontWeight: 700, color: t.accent2 }}>{s.v}</div>
-          </div>
-        ))}
+      <Title
+        text={`${d.game} Planet`}
+        sub={`${nf(d.gamers)} gamer${d.gamers === 1 ? "" : "s"} here${d.serverGamers != null ? ` · ${nf(d.serverGamers)} from this server` : ""}`}
+        accent={t.accent} accent2={t.accent2} theme={t}
+      />
+
+      <div style={{ display: "flex", gap: 18, marginTop: 22, flex: 1 }}>
+        <Column label={`LIVE CHALLENGES · ${challenges.length}`} accent={t.accent}>
+          {challenges.length === 0 ? (
+            <Empty>Nothing running right now. The next one lands here first.</Empty>
+          ) : challenges.slice(0, 3).map((c, i) => {
+            const days = Math.max(0, Math.ceil((new Date(c.endsAt).getTime() - Date.now()) / 86400000));
+            return (
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "11px 16px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
+                <div style={{ fontSize: 24, fontWeight: 700 }}>{clamp(c.title, 30)}</div>
+                {/* One text node with its own separators rather than three flex
+                    children: Satori does not put the `gap` between adjacent
+                    inline-ish divs here, so they render welded together
+                    ("5d left2 in"). Explicit margins on the one coloured part. */}
+                <div style={{ display: "flex", fontSize: 19, color: MUTED }}>
+                  <div style={{ display: "flex", color: days <= 1 ? "#fda4af" : MUTED }}>
+                    {`${days === 0 ? "ends today" : `${days}d left`} · ${nf(c.participants)} in`}
+                  </div>
+                  {/* Clamped hard: `prizeDescription` is a free-text admin field
+                      and a sentence in it wraps the row onto three lines. */}
+                  {c.prize ? <div style={{ display: "flex", marginLeft: 10, color: "#fbbf24" }}>{clamp(c.prize, 18)}</div> : null}
+                </div>
+              </div>
+            );
+          })}
+        </Column>
+
+        <Column label={`LEADERBOARDS · ${boards.length}`} accent={t.accent2}>
+          {boards.length === 0 ? (
+            <Empty>No boards on this game yet.</Empty>
+          ) : boards.slice(0, 3).map((b, i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "11px 16px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
+              <div style={{ fontSize: 24, fontWeight: 700 }}>{clamp(b.title, 30)}</div>
+              <div style={{ display: "flex", gap: 10, fontSize: 19, color: MUTED }}>
+                {b.leader ? (
+                  <>
+                    <div style={{ display: "flex", color: "#fbbf24" }}>{`#1 ${clamp(b.leader, 16)}`}</div>
+                    {b.value ? <div style={{ display: "flex", color: t.accent2 }}>{b.value}</div> : null}
+                  </>
+                ) : (
+                  <div style={{ display: "flex" }}>unclaimed — link an account and take it</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </Column>
       </div>
-      {d.topGamer ? <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">{`TOP · ${d.topGamer.name} · ${d.topGamer.value}`}</Pill> : null}
+    </Frame>
+  );
+}
+
+// One labelled column of rows. Both halves of the planet card are this shape,
+// so they line up whatever each side happens to contain.
+function Column({ label, accent, children }: { label: string; accent: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+      <div style={{ fontSize: 17, letterSpacing: 2.5, fontWeight: 700, color: safeColor(accent, MUTED) }}>{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: "flex", fontSize: 21, color: MUTED, lineHeight: 1.3 }}>{children}</div>;
+}
+
+// Profile of the Week.
+//
+// `race` is the daily post and `result` is Sunday's. They deliberately share a
+// frame: a server that has watched the standings move all week should recognise
+// the card that ends it, with the podium in the same place the leaders were.
+function WeekBody(d: WeekCard) {
+  const t = d.theme;
+  const medal = ["#fbbf24", "#cbd5e1", "#d08a4a"];
+  const result = d.mode === "result";
+  const entries = d.entries ?? [];
+
+  return (
+    <Frame theme={t} corner={result && d.trophy?.imageUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={d.trophy.imageUrl} alt="" width={104} height={104} style={{ width: 104, height: 104, objectFit: "contain" }} />
+    ) : undefined}>
+      <Title text={d.title} sub={clamp(d.subtitle, 84)} accent={t.accent} accent2={t.accent2} theme={t} />
+
+      {entries.length === 0 ? (
+        <div style={{ display: "flex", marginTop: 40, fontSize: 27, color: MUTED, lineHeight: 1.3 }}>
+          Nobody has a vote yet this week. Customize your profile and you are one vote from the top.
+        </div>
+      ) : (
+        // Four rows in the race, three on the podium — that is what actually
+        // fits above the pills at this canvas size. Five overlapped them, and
+        // `overflow: hidden` means a future edit clips rather than collides.
+        <div style={{ display: "flex", flexDirection: "column", gap: result ? 12 : 9, marginTop: 20, flex: 1, overflow: "hidden" }}>
+          {entries.slice(0, result ? 3 : 4).map((e) => (
+            <div
+              key={e.rank}
+              style={{
+                display: "flex", alignItems: "center", gap: 16,
+                padding: result ? "14px 22px" : "9px 20px", borderRadius: 16,
+                background: e.rank === 1 ? alpha(medal[0], 0.14) : "rgba(0,0,0,0.44)",
+                border: `1px solid ${e.rank <= 3 ? alpha(medal[e.rank - 1] ?? MUTED, 0.5) : "rgba(255,255,255,0.08)"}`,
+              }}
+            >
+              <div style={{ fontSize: result ? 34 : 27, fontWeight: 700, width: 52, color: medal[e.rank - 1] ?? MUTED }}>{`#${e.rank}`}</div>
+              {e.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={e.avatarUrl} alt="" width={result ? 54 : 40} height={result ? 54 : 40}
+                  style={{ width: result ? 54 : 40, height: result ? 54 : 40, borderRadius: 27, objectFit: "cover", border: `3px solid ${medal[e.rank - 1] ?? "rgba(255,255,255,0.2)"}` }} />
+              ) : null}
+              {/* Two lines only on the podium. In the race a second line per row
+                  makes four rows taller than the canvas has room for, and the
+                  lifetime total reads perfectly well beside the week's. */}
+              {result ? (
+                <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+                  <div style={{ fontSize: 31, fontWeight: 700 }}>{clamp(e.name, 24)}</div>
+                  <div style={{ fontSize: 18, color: MUTED }}>{`${nf(e.lifetimeVotes)} lifetime votes`}</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "baseline", flex: 1 }}>
+                  <div style={{ display: "flex", fontSize: 26, fontWeight: 700 }}>{clamp(e.name, 22)}</div>
+                  <div style={{ display: "flex", marginLeft: 12, fontSize: 17, color: MUTED }}>{`${nf(e.lifetimeVotes)} lifetime`}</div>
+                </div>
+              )}
+              {/* The trophy each placement was handed, on the card that hands
+                  it to them. */}
+              {result && e.trophyUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={e.trophyUrl} alt="" width={46} height={46} style={{ width: 46, height: 46, objectFit: "contain" }} />
+              ) : null}
+              {/* Stacked on the podium, inline in the race. Stacking is what
+                  made a race row 88px tall, and four of those don't fit above
+                  the pills — the label costs a whole row's worth of height. */}
+              {result ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                  <div style={{ fontSize: 36, fontWeight: 700, color: medal[e.rank - 1] ?? t.accent2 }}>{nf(e.weekVotes)}</div>
+                  <div style={{ fontSize: 15, letterSpacing: 1.5, color: MUTED }}>VOTES</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", alignItems: "baseline" }}>
+                  <div style={{ display: "flex", fontSize: 29, fontWeight: 700, color: medal[e.rank - 1] ?? t.accent2 }}>{nf(e.weekVotes)}</div>
+                  <div style={{ display: "flex", marginLeft: 8, fontSize: 15, letterSpacing: 1.5, color: MUTED }}>VOTES</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 12, marginTop: 14 }}>
+        {result && d.trophy ? (
+          <Pill color="#fbbf24" bg="rgba(251,191,36,0.13)">
+            {`${clamp(d.trophy.name, 26)}${d.trophy.value > 0 ? ` · $${nf(d.trophy.value)}` : ""} to all three`}
+          </Pill>
+        ) : (
+          <>
+            <Pill color={t.accent} bg={alpha(t.accent, 0.13)}>
+              {d.daysLeft > 0 ? `${d.daysLeft} DAY${d.daysLeft === 1 ? "" : "S"} LEFT` : "VOTING CLOSED"}
+            </Pill>
+            <Pill>{`${nf(d.totalVotes)} votes cast · ${nf(d.contenders)} in the running`}</Pill>
+          </>
+        )}
+      </div>
     </Frame>
   );
 }
@@ -738,6 +899,7 @@ function body(d: CardData) {
     case "planet": return PlanetBody(d);
     case "planets": return PlanetsBody(d);
     case "guide": return GuideBody(d);
+    case "week": return WeekBody(d);
   }
 }
 
@@ -862,9 +1024,46 @@ async function prepareBody(d: CardData): Promise<CardData> {
       const [bgUrl, ...logos] = await Promise.all([bg, ...d.games.map((g) => toEmbeddable(g.logoUrl, ICON))]);
       return { ...d, games: d.games.map((g, i) => ({ ...g, logoUrl: logos[i] })), theme: { ...d.theme, bgUrl } };
     }
+    case "week": {
+      // The trophy art is fetched once and reused for every placement — all
+      // three win the same trophy, and decoding it three times is three times
+      // the work for the same bytes.
+      const [bgUrl, trophyUrl, ...avatars] = await Promise.all([
+        bg,
+        toEmbeddable(d.trophy?.imageUrl, { maxWidth: 240 }),
+        ...d.entries.map((e) => toEmbeddable(e.avatarUrl, ICON)),
+      ]);
+      return {
+        ...d,
+        // The trophy SURVIVES its art failing to load. Dropping the whole
+        // object when the image host is slow turned the podium card back into
+        // a race card — no prize named, no "awarded to all three" — which is
+        // the one thing Sunday's card exists to say. Only the picture is
+        // conditional; the name and the value are text.
+        trophy: d.trophy ? { ...d.trophy, imageUrl: trophyUrl ?? "" } : null,
+        entries: d.entries.map((e, i) => ({
+          ...e,
+          avatarUrl: avatars[i],
+          trophyUrl: e.trophyUrl ? trophyUrl : null,
+        })),
+        theme: { ...d.theme, bgUrl },
+      };
+    }
     default:
       return { ...d, theme: { ...d.theme, bgUrl: await bg } };
   }
+}
+
+/**
+ * The image-resolution step on its own.
+ *
+ * Exported so a test can assert what a card looks like AFTER its remote images
+ * have been fetched — which is where the interesting failures live. Text that
+ * silently disappears because an image host was slow is not visible in the
+ * card's data, only in what the renderer was actually handed.
+ */
+export function prepareCardForTest(d: CardData): Promise<CardData> {
+  return prepareCard(d);
 }
 
 // Render a card to an ImageResponse (streamable PNG response).

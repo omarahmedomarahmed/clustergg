@@ -121,9 +121,25 @@ export const CARD_GUIDES: CardGuide[] = [
   {
     kind: "planet",
     name: "Game planet",
-    summary: "A game's hub. The planet globe art is the natural background.",
+    summary: "A game's hub: its live challenges and its boards, side by side.",
     bgKey: "bot_planet",
-    regions: [...COMMON, TEXT_COLUMN],
+    regions: [
+      ...COMMON,
+      { key: "title", label: "Title", kind: "text", x: 4.6, y: 7, w: 55, h: 16, note: "Game name and how many gamers are on it." },
+      { key: "columns", label: "Challenges + leaderboards", kind: "text", x: 4.6, y: 27, w: 78, h: 63, note: "Two columns of rows on dark plates. Almost nothing shows through here." },
+    ],
+  },
+  {
+    kind: "week",
+    name: "Profile of the Week",
+    summary: "The weekly vote — standings during the week, the podium on Sunday.",
+    bgKey: "bot_week",
+    regions: [
+      ...COMMON,
+      { key: "title", label: "Title", kind: "text", x: 4.6, y: 7, w: 60, h: 16, note: "'Profile of the Week' and the countdown line." },
+      { key: "rows", label: "Placements", kind: "text", x: 4.6, y: 26, w: 78, h: 55, note: "Up to five ranked rows with avatars, or three big podium rows on Sunday." },
+      { key: "pills", label: "Days left / prize", kind: "text", x: 4.6, y: 83, w: 78, h: 10, note: "The countdown and vote totals, or the trophy the podium won." },
+    ],
   },
   {
     kind: "planets",
