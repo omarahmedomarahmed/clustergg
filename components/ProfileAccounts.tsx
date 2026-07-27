@@ -8,6 +8,7 @@ import BrandGlyph from "@/components/BrandGlyph";
 import LinkAccountForm, { type ProviderInfo } from "@/components/LinkAccountForm";
 import LolCard, { type LolSnapshot } from "@/components/LolCard";
 import { useTr } from "@/components/LocaleProvider";
+import { optImg } from "@/lib/img";
 
 export type AccountCard = {
   id: string;
@@ -133,7 +134,7 @@ function AccountRow({ account: a, colors: c, active, onToggle }: { account: Acco
   return (
     <div className="rounded-2xl overflow-hidden relative" style={{ border: `1px solid ${liveNow ? "rgba(244,63,94,0.5)" : mix(20)}` }}>
       {a.coverUrl ? (
-        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(3,4,15,${active ? "0.82" : "0.86"}), rgba(3,4,15,${active ? "0.9" : "0.92"})), url(${a.coverUrl})` }} />
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(3,4,15,${active ? "0.82" : "0.86"}), rgba(3,4,15,${active ? "0.9" : "0.92"})), url(${optImg(a.coverUrl, 1200)})` }} />
       ) : (
         <div className="absolute inset-0" style={{ background: mix(6) }} />
       )}

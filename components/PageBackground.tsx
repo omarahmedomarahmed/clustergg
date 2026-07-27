@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { pathToPageKey } from "@/lib/page-bg";
+import { optImg } from "@/lib/img";
 
 // Renders the admin-chosen background image for the current page (behind all
 // content, over the default nebula). Reads the whole page→url map from the
@@ -13,13 +14,18 @@ export default function PageBackground({ map }: { map: Record<string, string> })
   const url = key ? map[key] : "";
   if (!url) return null;
 
+  // Full-bleed, so it asks for a viewport-width variant rather than the
+  // original upload. This one image is on every page of the site, which makes
+  // it the single largest contributor to Blob egress if served raw.
+  const src = optImg(url, 1920, 65);
+
   return (
     <div
       aria-hidden
       className="fixed inset-0 pointer-events-none bg-cover bg-center bg-no-repeat"
       style={{
         zIndex: -1,
-        backgroundImage: `linear-gradient(rgba(4,5,26,0.62), rgba(4,5,26,0.86)), url(${url})`,
+        backgroundImage: `linear-gradient(rgba(4,5,26,0.62), rgba(4,5,26,0.86)), url(${src})`,
       }}
     />
   );

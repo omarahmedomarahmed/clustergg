@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import EntityImg from "@/components/EntityImg";
 import type { EntityLite, EntityDetail } from "@/lib/game-entities";
+import { optImg } from "@/lib/img";
 
 const KIND_LABEL: Record<string, string> = { champion: "Champions", hero: "Heroes", agent: "Agents", weapon: "Weapons", outfit: "Outfits", legend: "Legends", map: "Maps" };
 
@@ -81,7 +82,7 @@ function EntityModal({ game, lite, onClose }: { game: string; lite: EntityLite; 
         {/* Persistent cover pinned to the top while the body scrolls */}
         <div className="sticky top-0 z-10 h-44 sm:h-56 bg-[#04051a]" style={{ containerType: "size" }}>
           {/* Blurred fill + full (uncropped) art on top. */}
-          {headerImg && <div className="absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-45" style={{ backgroundImage: `url(${headerImg})` }} />}
+          {headerImg && <div className="absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-45" style={{ backgroundImage: `url(${optImg(headerImg, 1200)})` }} />}
           <EntityImg src={headerImg} name={lite.name} kind={lite.kind} className={`absolute inset-0 h-full w-full object-contain ${lite.kind === "weapon" ? "p-6" : "p-2"}`} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to top, #04051a, rgba(4,5,26,0.2) 60%, transparent)" }} />
           <button onClick={(e) => { e.stopPropagation(); onClose(); }} className="absolute top-2 right-2 rounded-full bg-black/50 p-1.5 text-white hover:bg-black/70"><Icon name="x" size={16} /></button>

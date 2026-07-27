@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listDocs, liveData } from "@/lib/dataroom";
 import Icon from "@/components/Icon";
+import { optImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -50,7 +51,7 @@ export default async function DataroomPage() {
               style={{ background: `linear-gradient(90deg, ${d.accent}, ${d.accent2})` }}
             />
             {d.coverUrl && (
-              <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${d.coverUrl})` }} />
+              <div aria-hidden className="absolute inset-0 bg-cover bg-center opacity-20" style={{ backgroundImage: `url(${optImg(d.coverUrl, 1200)})` }} />
             )}
             <div className="relative">
               <span className="text-[11px] uppercase tracking-widest" style={{ color: d.accent }}>

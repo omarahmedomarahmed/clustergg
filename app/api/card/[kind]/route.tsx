@@ -94,18 +94,41 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
     // Cache key = everything that identifies this card within its kind.
     const key = [slug, game, q.get("quest"), q.get("topic"), q.get("metric"), q.get("id"), q.get("week"), q.get("mode")].filter(Boolean).join("|") || "default";
     const hit = await getOrRenderCard(kind, key, data).catch(() => null);
-    if (hit) return NextResponse.redirect(hit.url, { status: 302, headers: { "x-card-cache": hit.cached ? "hit" : "miss" } });
+    if (hit) {
+      return NextResponse.redirect(hit.url, {
+        status: 302,
+        headers: {
+          "x-card-cache": hit.cached ? "hit" : "miss",
+          // Let the CDN answer the redirect. Discord re-fetches an embed image
+          // every time a message is scrolled past, and every one of those was
+          // a function invocation resolving the same card to the same Blob URL.
+          // Short TTL because the card's DATA can change (votes, standings);
+          // stale-while-revalidate means nobody ever waits for the refresh.
+          ...CARD_CACHE,
+        },
+      });
+    }
   }
 
   // A render can still fail on something outside our control (a font, a
   // pathological string). Discord shows a broken-image box for any non-image
   // response, so this endpoint must always answer with a picture.
   try {
-    return await renderCard(data);
+    const res = await renderCard(data);
+    // The rendered-inline path (no Blob configured) is the expensive one — it
+    // redraws the PNG per request — so it wants caching most of all.
+    for (const [k, v] of Object.entries(CARD_CACHE)) res.headers.set(k, v);
+    return res;
   } catch {
     return fallbackCard("This card couldn't be drawn just now.");
   }
 }
+
+// 5 minutes fresh at the CDN, a day of serving stale while it refreshes behind
+// the scenes. `fresh=1` (the admin preview) skips this path entirely.
+const CARD_CACHE = {
+  "cache-control": "public, max-age=0, s-maxage=300, stale-while-revalidate=86400",
+} as const;
 
 async function explain(data: CardData) {
   const src = data.theme.bgUrl ?? null;

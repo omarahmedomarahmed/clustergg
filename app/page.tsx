@@ -16,7 +16,7 @@ import { getUserQuests, getQuestTops } from "@/lib/quests";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { getT } from "@/lib/i18n/t-server";
 import { localizeQuest } from "@/lib/i18n/entities";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 import { timeAgo } from "@/lib/utils";
 import { networkStats, publicServers } from "@/lib/network";
 import { DiscordSection } from "@/components/DiscordSection";
@@ -165,7 +165,7 @@ export default async function LandingPage() {
         </section>
       ) : (
         <section className="relative">
-          <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-80" style={{ backgroundImage: `url(${c["hero.image"]})` }} />
+          <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-80" style={{ backgroundImage: `url(${optImg(c["hero.image"], 1200)})` }} />
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a]/30 via-[#04051a]/60 to-[#04051a]" />
           <div className="mx-auto max-w-6xl px-4 pt-24 pb-20 text-center">
             <div className="rise-in inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-xs text-cyan-200/90 mb-8">
@@ -224,7 +224,7 @@ export default async function LandingPage() {
       {/* ===== LIVE CHALLENGES — event hero cards ===== */}
       {activeChallenges.length > 0 && (
         <section className="relative py-20">
-          <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${c["banner.arena"]})` }} />
+          <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${optImg(c["banner.arena"], 1200)})` }} />
           <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a] via-transparent to-[#04051a]" />
           <div className="mx-auto max-w-6xl px-4">
             <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
@@ -251,7 +251,7 @@ export default async function LandingPage() {
                     <div className="h-40 relative overflow-hidden">
                       <div
                         className="event-cover absolute inset-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url(${challenge.coverUrl ?? c["banner.arena"]})` }}
+                        style={{ backgroundImage: `url(${optImg(challenge.coverUrl ?? c["banner.arena"], 1200)})` }}
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/40 to-transparent" />
                       <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-emerald-300">
@@ -321,7 +321,7 @@ export default async function LandingPage() {
                 <div className="h-28 relative overflow-hidden">
                   {cover ? (
                     <div className="absolute inset-0 bg-cover transition-transform duration-500 group-hover:scale-110"
-                      style={{ backgroundImage: `url(${cover})`, backgroundPosition: `${g.coverAdjust?.x ?? 50}% ${g.coverAdjust?.y ?? 50}%` }} />
+                      style={{ backgroundImage: `url(${optImg(cover, 1200)})`, backgroundPosition: `${g.coverAdjust?.x ?? 50}% ${g.coverAdjust?.y ?? 50}%` }} />
                   ) : (
                     <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
                   )}

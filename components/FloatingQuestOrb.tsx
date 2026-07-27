@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import CpIcon from "@/components/CpIcon";
+import { optImg } from "@/lib/img";
 
 export type OrbQuest = {
   key: string; name: string; color: string; accent2: string; icon: string;
@@ -43,7 +44,7 @@ export default function FloatingQuestOrb({ quests, icon, color = "#8b5cf6", size
                 className="relative block overflow-hidden rounded-xl border border-white/10 p-2.5 hover:border-white/25 transition-colors">
                 {/* Quest background art */}
                 {q.art
-                  ? <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${q.art})` }} />
+                  ? <span aria-hidden className="absolute inset-0 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${optImg(q.art, 1200)})` }} />
                   : <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${q.color}22, transparent)` }} />}
                 <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.82), rgba(4,5,26,0.6))" }} />
                 <div className="relative">

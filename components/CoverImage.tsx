@@ -1,6 +1,7 @@
 "use client";
 
 import EntityImg from "@/components/EntityImg";
+import { optImg } from "@/lib/img";
 
 // A card cover that shows the FULL image (never cropped): a blurred, zoomed copy
 // fills the whole area so there are no empty bars, and the real image sits on top
@@ -14,7 +15,7 @@ export default function CoverImage({
 }) {
   return (
     <div className={`relative overflow-hidden ${heightClass} ${rounded}`}>
-      {src && <div className="absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-45" style={{ backgroundImage: `url(${src})` }} />}
+      {src && <div className="absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-45" style={{ backgroundImage: `url(${optImg(src, 1200)})` }} />}
       <div className="absolute inset-0 bg-[#04051a]/20" />
       <EntityImg src={src} name={name} kind={kind} className={`relative h-full w-full object-contain ${padded ? "p-2" : ""}`} />
       {children}

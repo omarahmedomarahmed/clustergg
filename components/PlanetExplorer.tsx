@@ -13,7 +13,7 @@ import CoverImage from "@/components/CoverImage";
 import Countdown from "@/components/Countdown";
 import { ChallengeLog } from "@/components/ChallengeLog";
 import { useTr } from "@/components/LocaleProvider";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 import type { PlanetData } from "@/components/PlanetHero";
 import type { RegionStat } from "@/lib/regions";
 import type { PlanetExplore, ExploreBoard, ChampBoard, ExploreEntry } from "@/lib/planet-explore";
@@ -147,7 +147,7 @@ export default function PlanetExplorer({
               {challenges.map((c) => (
                 <button key={c.id} onClick={() => setSel({ kind: "challenge", id: c.id })} className="w-full text-left rounded-xl overflow-hidden relative border border-white/10 hover:border-cyan-400/40 transition">
                   <div className="h-14 relative">
-                    {c.coverUrl ? <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${slimImg(c.coverUrl, 300000)})` }} /> : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${p.accent}55, ${p.accent2}33)` }} />}
+                    {c.coverUrl ? <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${optImg(slimImg(c.coverUrl, 300000), 1200)})` }} /> : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${p.accent}55, ${p.accent2}33)` }} />}
                     <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,5,26,0.92), rgba(4,5,26,0.2))" }} />
                     <div className="absolute bottom-1.5 left-2.5 right-2.5">
                       <div className="text-[9px] uppercase tracking-widest text-emerald-300 flex items-center gap-1">{c.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />} {c.status === "active" ? tr("Live") : tr("Ended")}</div>
@@ -199,7 +199,7 @@ export default function PlanetExplorer({
       {/* Background art */}
       <div className="absolute inset-0 -z-10" style={{ background: "#04051a" }} />
       {p.bgUrl ? (
-        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.4), rgba(4,5,26,0.72)), url(${p.bgUrl})` }} />
+        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.4), rgba(4,5,26,0.72)), url(${optImg(p.bgUrl, 1200)})` }} />
       ) : (
         <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 620px at 50% 12%, ${p.accent}1f, transparent 60%), radial-gradient(900px 500px at 85% 110%, ${p.accent2}14, transparent 60%)` }} />
       )}
@@ -264,7 +264,7 @@ export default function PlanetExplorer({
               {sel && (
                 <div className="absolute inset-0 z-30 hidden md:flex items-center justify-center" onClick={() => setSel(null)}>
                   <div className="w-[min(100%,480px)] max-h-full overflow-y-auto rounded-2xl border border-white/15 backdrop-blur-xl shadow-2xl"
-                    style={{ background: middleBg ? `linear-gradient(rgba(4,5,26,0.9), rgba(4,5,26,0.95)), url(${middleBg}) center/cover` : "rgba(4,5,26,0.94)" }}
+                    style={{ background: middleBg ? `linear-gradient(rgba(4,5,26,0.9), rgba(4,5,26,0.95)), url(${optImg(middleBg, 1200)}) center/cover` : "rgba(4,5,26,0.94)" }}
                     onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
                       <span className="text-[11px] uppercase tracking-widest text-cyan-200">{tr("Details")}</span>
@@ -354,7 +354,7 @@ export default function PlanetExplorer({
         <div className="md:hidden fixed inset-0 z-[70] flex items-end" onClick={() => setSel(null)}>
           <div className="absolute inset-0 bg-black/65 backdrop-blur-sm" />
           <div className="relative w-full rounded-t-3xl border-t border-white/15 shadow-2xl flex flex-col rise-in transition-[height] duration-300"
-            style={{ height: sheetFull ? "96dvh" : "82dvh", background: middleBg ? `linear-gradient(rgba(4,5,26,0.94), rgba(4,5,26,0.97)), url(${middleBg}) center/cover` : "#05061c" }}
+            style={{ height: sheetFull ? "96dvh" : "82dvh", background: middleBg ? `linear-gradient(rgba(4,5,26,0.94), rgba(4,5,26,0.97)), url(${optImg(middleBg, 1200)}) center/cover` : "#05061c" }}
             onClick={(e) => e.stopPropagation()}>
             {/* Grab handle — tap or swipe up to enlarge, swipe down to shrink/close */}
             <div className="shrink-0 pt-2.5 pb-1.5 cursor-grab select-none" onClick={() => setSheetFull((v) => !v)}
@@ -428,7 +428,7 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
     if (!c) return <Empty onBack={onBack} />;
     return (
       <div className="relative -m-3">
-        <div className="absolute inset-0 bg-cover bg-center rounded-2xl" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.78), rgba(4,5,26,0.94)), url(${c.splashUrl})` }} />
+        <div className="absolute inset-0 bg-cover bg-center rounded-2xl" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.78), rgba(4,5,26,0.94)), url(${optImg(c.splashUrl, 1200)})` }} />
         <div className="relative p-3">
           <div className="flex items-center gap-2.5 mb-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -569,7 +569,7 @@ function ChampList({ boards, onOpen }: { boards: ChampBoard[]; onOpen: (id: numb
     <div className="grid grid-cols-2 gap-2">
       {boards.map((c) => (
         <button key={c.championId} onClick={() => onOpen(c.championId)} className="relative rounded-xl overflow-hidden border border-white/10 hover:border-cyan-400/50 transition text-left">
-          <div className="h-16 bg-cover bg-center" style={{ backgroundImage: `url(${c.splashUrl})` }} />
+          <div className="h-16 bg-cover bg-center" style={{ backgroundImage: `url(${optImg(c.splashUrl, 1200)})` }} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(4,5,26,0.92), transparent)" }} />
           <div className="absolute bottom-1 left-2 right-2 flex items-center gap-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -662,12 +662,12 @@ function EntityLoreCard({ game, kind, id, name, image }: { game: string | null; 
   return (
     <div className="relative -m-3 rounded-2xl overflow-hidden">
       {/* Faint splash filling the whole card background */}
-      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.94)), url(${splash})` }} />
+      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.94)), url(${optImg(splash, 1200)})` }} />
       {/* Persistent COVER pinned to the top while the body scrolls — shows the
           FULL art (contain) over a blurred fill so nothing is ever cropped. */}
       <div className="sticky top-0 z-10">
         <div className="relative h-40 sm:h-52 bg-[#04051a]" style={{ containerType: "size" }}>
-          {splash && <div className="absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-45" style={{ backgroundImage: `url(${splash})` }} />}
+          {splash && <div className="absolute inset-0 bg-cover bg-center scale-125 blur-2xl opacity-45" style={{ backgroundImage: `url(${optImg(splash, 1200)})` }} />}
           <EntityImg src={splash} name={name} kind={kind} className={`absolute inset-0 h-full w-full object-contain ${contain ? "p-3" : "p-1"}`} />
           <div className="absolute inset-0" style={{ background: "linear-gradient(to top, #04051a, rgba(4,5,26,0.15) 55%, transparent)" }} />
           <div className="absolute bottom-2 left-3 right-3">

@@ -5,7 +5,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
 import TopBannerAd from "@/components/TopBannerAd";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 import type { RegionStat } from "@/lib/regions";
 
 export type PlanetData = {
@@ -93,12 +93,12 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
       {/* Per-game themed space background art (falls back to gradient + cover). */}
       <div className="absolute inset-0 -z-10" style={{ background: "#04051a" }} />
       {p.bgUrl ? (
-        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.35), rgba(4,5,26,0.7)), url(${p.bgUrl})` }} />
+        <div className="absolute inset-0 -z-10 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(rgba(4,5,26,0.35), rgba(4,5,26,0.7)), url(${optImg(p.bgUrl, 1200)})` }} />
       ) : (
         <>
           <div className="absolute inset-0 -z-10" style={{ background: `radial-gradient(1200px 620px at 42% 20%, ${p.accent}1f, transparent 60%), radial-gradient(900px 500px at 85% 110%, ${p.accent2}14, transparent 60%)` }} />
           {slimImg(p.coverUrl, 400000) && (
-            <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-[0.12]" style={{ backgroundImage: `url(${slimImg(p.coverUrl, 400000)})` }} />
+            <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-[0.12]" style={{ backgroundImage: `url(${optImg(slimImg(p.coverUrl, 400000), 1200)})` }} />
           )}
           <div className="absolute inset-0 -z-10 opacity-30 bg-cover bg-center" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
         </>
@@ -179,7 +179,7 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
           {/* Overlay panel — appears ON the globe (over the planet art) */}
           {(region || expanded) && (
             <div className="absolute inset-x-3 bottom-3 z-30 rounded-2xl border border-white/15 backdrop-blur-xl p-4 text-left shadow-2xl bg-cover bg-center"
-              style={{ background: (p.bgUrl || p.coverUrl) ? `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.9)), url(${p.bgUrl || p.coverUrl}) center/cover` : "rgba(4,5,26,0.85)" }}>
+              style={{ background: (p.bgUrl || p.coverUrl) ? `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.9)), url(${optImg(p.bgUrl || p.coverUrl, 1200)}) center/cover` : "rgba(4,5,26,0.85)" }}>
               {panelContent}
             </div>
           )}
@@ -191,7 +191,7 @@ export default function PlanetHero({ planets, initialSlug, swap = false, heading
         <div className="mt-5 w-full max-w-md min-h-[132px]">
           {!(region || expanded) ? (
             <div className="rounded-2xl border border-violet-400/20 p-4 text-left bg-cover bg-center"
-              style={{ background: (p.bgUrl || p.coverUrl) ? `linear-gradient(rgba(4,5,26,0.8), rgba(4,5,26,0.9)), url(${p.bgUrl || p.coverUrl}) center/cover` : "rgba(10,10,28,0.5)" }}>
+              style={{ background: (p.bgUrl || p.coverUrl) ? `linear-gradient(rgba(4,5,26,0.8), rgba(4,5,26,0.9)), url(${optImg(p.bgUrl || p.coverUrl, 1200)}) center/cover` : "rgba(10,10,28,0.5)" }}>
               {panelContent}
             </div>
           ) : (

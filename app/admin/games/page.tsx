@@ -8,6 +8,7 @@ import CoverFramer from "@/components/CoverFramer";
 import GameMetricsEditor from "@/components/GameMetricsEditor";
 import SubmitButton from "@/components/SubmitButton";
 import Icon from "@/components/Icon";
+import { optImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Games" };
@@ -96,7 +97,7 @@ export default async function AdminGamesPage() {
               {g.coverUrl && (
                 <div className="mb-4 h-24 rounded-lg overflow-hidden border border-violet-400/15">
                   <div className="h-full w-full bg-cover" style={{
-                    backgroundImage: `url(${g.coverUrl})`,
+                    backgroundImage: `url(${optImg(g.coverUrl, 1200)})`,
                     backgroundPosition: `${g.coverAdjust.x}% ${g.coverAdjust.y}%`,
                     transform: `scale(${g.coverAdjust.zoom})`,
                   }} />

@@ -10,7 +10,7 @@ import { resolveGame } from "@/lib/game-logos";
 import { syncUserAccountsIfStale } from "@/lib/sync";
 import { getContent } from "@/lib/cms";
 import { gamerWeekVotes } from "@/lib/profile-week";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 import { hasVoted, recordProfileView } from "@/lib/identity";
 import { resolveTheme, themeToVars, bgLayerStyle, coverStyle, avatarClip, sectionArtStyle } from "@/lib/theme";
 import Avatar from "@/components/Avatar";
@@ -243,7 +243,7 @@ export default async function ProfilePage({ params }: Props) {
                   <Link key={p.id} href={href} className={`${cardCls} relative overflow-hidden !p-0 block hover:brightness-110 transition-[filter]`}>
                     <div className="h-24 relative overflow-hidden">
                       {cover ? (
-                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${cover})` }} />
+                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${optImg(cover, 1200)})` }} />
                       ) : (
                         <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${theme.accent}44, ${theme.accent2}33)` }} />
                       )}
@@ -291,7 +291,7 @@ export default async function ProfilePage({ params }: Props) {
                 return (
                   <Link key={s.id} href={`/planets/${s.slug}`} className="relative block h-20 overflow-hidden rounded-xl group" style={{ border: `1px solid color-mix(in srgb, ${theme.accent} 25%, transparent)` }}>
                     {cover ? (
-                      <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url(${cover})` }} />
+                      <div className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url(${optImg(cover, 1200)})` }} />
                     ) : (
                       <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${theme.accent}55, ${theme.accent2}33)` }} />
                     )}

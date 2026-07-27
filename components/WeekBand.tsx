@@ -6,6 +6,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import Avatar from "@/components/Avatar";
 import { voteFromBand, type WeekVoteState } from "@/app/actions/profile-week";
+import { optImg } from "@/lib/img";
 
 // Profile of the Week — an extension of the nav bar, on every page.
 //
@@ -16,11 +17,12 @@ import { voteFromBand, type WeekVoteState } from "@/app/actions/profile-week";
 //               position. This is the thing that makes the competition feel
 //               live rather than like a page you have to go and find.
 //
-//   Expanded  — the full board, rendered BELOW the header in normal flow. It
-//               pushes the page down and scrolls away with it, which is what
-//               lets you read the page while it's open. A tall sticky panel
-//               would eat the viewport permanently and there'd be no way to
-//               get past it.
+//   Expanded  — the full board, as a panel that DROPS from the nav and overlays
+//               the page, wherever you are in it. It does not push content
+//               down and does not insert itself at the top of the document:
+//               expanding it from halfway through a page used to move the
+//               board somewhere you couldn't see. The page keeps its scroll
+//               position and stays scrollable behind the panel.
 //
 // Expanded is the default, because the point of a weekly competition is that
 // people see it without looking for it. The choice is remembered per browser —
@@ -62,7 +64,6 @@ export type BandData = {
 };
 
 const STORE_KEY = "cluster.week.collapsed";
-export const SLOT_ID = "week-band-slot";
 const nf = (n: number) => n.toLocaleString();
 
 export default function WeekBand({ initial }: { initial: BandData }) {
@@ -71,18 +72,45 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   const [busy, setBusy] = useState(false);
   const [openSlug, setOpenSlug] = useState<string | null>(null);
   const [note, setNote] = useState<{ slug: string; text: string } | null>(null);
-  // The board is portalled OUT of the sticky header into a slot below it.
-  // Rendering it inside would make it part of the sticky element: a 500px panel
-  // pinned to the top of the viewport forever, with no way to scroll past it.
-  // In the slot it pushes the page down and scrolls away like any other block.
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  // Mounted-yet? The board is portalled to <body>, which doesn't exist during
+  // the server render.
+  const [mounted, setMounted] = useState(false);
 
   // Read the remembered choice after mount. Reading it during render would
   // make the server and the first client paint disagree.
   useEffect(() => {
+    setMounted(true);
     try { setOpen(window.localStorage.getItem(STORE_KEY) !== "1"); } catch { /* private mode */ }
-    setSlot(document.getElementById(SLOT_ID));
   }, []);
+
+  // Where the nav actually ends, published as a CSS variable.
+  //
+  // The panel hangs off the bottom of the header, and the header's height is
+  // not a constant: it grows on mobile, and the collapsed strip is part of it.
+  // Measuring beats guessing — a hard-coded offset leaves either a gap or an
+  // overlap on every viewport it wasn't written for. Re-measured on resize, and
+  // whenever the header itself changes size.
+  useEffect(() => {
+    const header = document.querySelector("header");
+    if (!header) return;
+    const apply = () => {
+      document.documentElement.style.setProperty("--nav-h", `${Math.round(header.getBoundingClientRect().height)}px`);
+    };
+    apply();
+    const ro = new ResizeObserver(apply);
+    ro.observe(header);
+    window.addEventListener("resize", apply);
+    return () => { ro.disconnect(); window.removeEventListener("resize", apply); };
+  }, []);
+
+  // Escape closes it, like every other overlay on the site.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") toggle(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   const toggle = () => {
     setOpen((v) => {
       const next = !v;
@@ -102,9 +130,16 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   // A quiet poll while it's open, so a board people are actively voting on
   // doesn't sit still. Paused when the tab is hidden — nobody is watching, and
   // it would just be traffic.
+  //
+  // Five minutes, not one. This band is on EVERY page, so the interval is
+  // multiplied by every open tab of the whole site: at 60s a single tab left
+  // open all day was 1,440 uncached function calls, and that is billed origin
+  // transfer for a leaderboard that moves a few times an hour. Voting already
+  // refreshes the board immediately on the way back, and the Refresh button is
+  // right there for anyone who wants it sooner.
   useEffect(() => {
     if (!open) return;
-    const id = setInterval(() => { if (!document.hidden) void refresh(); }, 60_000);
+    const id = setInterval(() => { if (!document.hidden) void refresh(); }, 300_000);
     return () => clearInterval(id);
   }, [open, refresh]);
 
@@ -154,9 +189,37 @@ export default function WeekBand({ initial }: { initial: BandData }) {
         </div>
       </div>
 
-      {/* ===== The board — portalled below the header, in flow ===== */}
-      {open && slot && createPortal(
-        <section className="relative border-b border-white/10 bg-gradient-to-b from-violet-600/10 via-transparent to-transparent">
+      {/* ===== The board — a panel that DROPS from the nav, over the page =====
+
+          Fixed to the top of the viewport, not inserted into the document. It
+          used to be portalled into a slot below the header, which meant opening
+          it pushed the whole page down and it only existed at the very top of
+          the document — so from halfway down an article you'd expand it and see
+          nothing move. Now it hangs off the nav wherever you are, overlays what
+          you were reading, and leaves the page's scroll position untouched.
+
+          Portalled to <body> because the nav uses `backdrop-blur`, and a
+          blurred ancestor becomes the containing block for `position: fixed` —
+          a fixed panel rendered inside the header is positioned against the
+          HEADER, not the viewport, and collapses to a sliver. */}
+      {open && mounted && createPortal(
+        <>
+          {/* Click-away, and a dimmer so the board reads as ON TOP of the page
+              rather than as part of it. Not a scroll lock: the brief was
+              explicitly that the page underneath stays scrollable. */}
+          <button
+            aria-hidden
+            tabIndex={-1}
+            onClick={toggle}
+            className="fixed inset-0 z-[60] cursor-default bg-[#04051a]/40"
+            style={{ top: "var(--nav-h, 96px)" }}
+          />
+          <section
+            className="fixed inset-x-0 z-[61] max-h-[calc(100dvh-var(--nav-h,96px))] overflow-y-auto overscroll-contain border-b border-white/10 bg-[#04051a]/95 backdrop-blur-xl shadow-2xl"
+            style={{ top: "var(--nav-h, 96px)" }}
+            role="region"
+            aria-label="Profile of the Week"
+          >
           <div className="mx-auto max-w-6xl px-4 py-6">
             <Header data={data} busy={busy} onRefresh={refresh} onCollapse={toggle} />
 
@@ -182,8 +245,9 @@ export default function WeekBand({ initial }: { initial: BandData }) {
               called on stream. Everyone with a Cluster profile is in it — there is nothing to enter.
             </p>
           </div>
-        </section>,
-        slot,
+          </section>
+        </>,
+        document.body,
       )}
 
       {/* Portalled to the body. The nav has `backdrop-blur`, which makes it a
@@ -516,7 +580,7 @@ function PodiumCard({ entry: e, place, data, onOpen, note, setNote, onVoted }: {
           so the entry has to look like the thing being judged. */}
       <div className={`group relative ${first ? "h-56 sm:h-64" : "h-44 sm:h-48"}`}>
         {art
-          ? <span aria-hidden className="absolute inset-0 bg-cover bg-center transition duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${art})` }} />
+          ? <span aria-hidden className="absolute inset-0 bg-cover bg-center transition duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${optImg(art, 1200)})` }} />
           : <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(150deg, ${e.accent}, ${e.accent2})`, opacity: 0.5 }} />}
         <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.30) 0%, rgba(4,5,26,0.72) 55%, rgba(4,5,26,0.97) 100%)" }} />
         {first && (
@@ -609,7 +673,7 @@ function EntryCard({ entry: e, data, onOpen, note, setNote, onVoted }: {
   return (
     <div className={`group relative overflow-hidden rounded-2xl border border-white/10 ${e.disqualified ? "opacity-55" : ""}`}>
       {art
-        ? <span aria-hidden className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${art})` }} />
+        ? <span aria-hidden className="absolute inset-0 bg-cover bg-center transition duration-500 group-hover:scale-105" style={{ backgroundImage: `url(${optImg(art, 1200)})` }} />
         : <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${e.accent}55, ${e.accent2}33)` }} />}
       <span aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.94), rgba(4,5,26,0.74))" }} />
 

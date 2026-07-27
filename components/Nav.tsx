@@ -13,13 +13,13 @@ import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
 import LocaleToggle from "@/components/LocaleToggle";
 import MobileHud from "@/components/MobileHud";
-import WeekBand, { SLOT_ID, type BandData } from "@/components/WeekBand";
+import WeekBand, { type BandData } from "@/components/WeekBand";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { weekBoard } from "@/lib/profile-week";
 import { parseDrawerLinks } from "@/lib/mobile-nav";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 
 export default async function Nav() {
   const user = await getCurrentUser();
@@ -134,7 +134,7 @@ export default async function Nav() {
   return (
     <>
     <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl bg-cover bg-center"
-      style={navBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${navBg})` } : undefined}>
+      style={navBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${optImg(navBg, 1200)})` } : undefined}>
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
         <Link href={user ? "/feed" : "/"} className="shrink-0" aria-label="Cluster home">
           <BrandHeader placement="nav" />
@@ -213,14 +213,12 @@ export default async function Nav() {
         />
       )}
 
-      {/* Profile of the Week. The strip stays in the sticky header; the board
-          it expands into renders below, in flow, so the page underneath still
-          scrolls instead of being pinned behind a full-height panel. */}
+      {/* Profile of the Week. The strip stays in the sticky header; expanding
+          it drops a panel OVER the page from the bottom of the nav, wherever
+          you happen to be scrolled — it no longer inserts itself at the top of
+          the document and shoves everything down. */}
       <WeekBand initial={bandData} />
     </header>
-    {/* Where the expanded board lands: outside the sticky header, so it pushes
-        the page down and scrolls away with it. */}
-    <div id={SLOT_ID} />
     </>
   );
 }

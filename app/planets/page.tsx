@@ -6,7 +6,7 @@ import { getT } from "@/lib/i18n/t-server";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
-import { slimImg } from "@/lib/img";
+import { slimImg, optImg } from "@/lib/img";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Planets" };
@@ -48,7 +48,7 @@ export default async function PlanetsDirectory() {
               <div className="h-28 relative overflow-hidden">
                 {slimImg(g?.coverUrl) ? (
                   <div className="absolute inset-0 bg-cover transition-transform duration-500 group-hover:scale-110"
-                    style={{ backgroundImage: `url(${slimImg(g!.coverUrl)})`, backgroundPosition: `${g!.coverAdjust.x}% ${g!.coverAdjust.y}%` }} />
+                    style={{ backgroundImage: `url(${optImg(slimImg(g!.coverUrl), 1200)})`, backgroundPosition: `${g!.coverAdjust.x}% ${g!.coverAdjust.y}%` }} />
                 ) : (
                   <div className="absolute inset-0 bg-cover" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
                 )}
