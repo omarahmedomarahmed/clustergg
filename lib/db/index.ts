@@ -367,6 +367,25 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "pvw_profile_idx" ON "profile_views" ("profile_user_id","created_at")`,
+  `CREATE TABLE IF NOT EXISTS "brand_enquiries" (
+    "id" text PRIMARY KEY NOT NULL,
+    "company" text NOT NULL,
+    "contact_name" text NOT NULL DEFAULT '',
+    "email" text NOT NULL,
+    "phone" text,
+    "website" text,
+    "message" text NOT NULL DEFAULT '',
+    "tier" text NOT NULL DEFAULT 'reach',
+    "games" integer NOT NULL DEFAULT 0,
+    "addon" boolean NOT NULL DEFAULT false,
+    "billing" text NOT NULL DEFAULT 'monthly',
+    "quoted_monthly" integer NOT NULL DEFAULT 0,
+    "status" text NOT NULL DEFAULT 'new',
+    "note" text,
+    "brand_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "benq_status_idx" ON "brand_enquiries" ("status","created_at")`,
 
   // ===== Data room: investor + partner documents =====
   `CREATE TABLE IF NOT EXISTS "dataroom_docs" (

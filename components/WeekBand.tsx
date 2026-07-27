@@ -68,7 +68,14 @@ const nf = (n: number) => n.toLocaleString();
 
 export default function WeekBand({ initial }: { initial: BandData }) {
   const [data, setData] = useState<BandData>(initial);
-  const [open, setOpen] = useState(true);
+  // Open for gamers, collapsed for visitors.
+  //
+  // The board is the engagement hook for someone who has a profile in it, and
+  // 700px of vote standings over the pitch for someone who doesn't. A guest is
+  // far more likely to be a brand or a server owner reading the argument, so
+  // they get the strip and a chevron; a signed-in gamer gets the board. Anyone
+  // who has actually chosen keeps their choice (below).
+  const [open, setOpen] = useState(initial.signedIn);
   const [busy, setBusy] = useState(false);
   const [openSlug, setOpenSlug] = useState<string | null>(null);
   const [note, setNote] = useState<{ slug: string; text: string } | null>(null);
@@ -80,7 +87,12 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   // make the server and the first client paint disagree.
   useEffect(() => {
     setMounted(true);
-    try { setOpen(window.localStorage.getItem(STORE_KEY) !== "1"); } catch { /* private mode */ }
+    try {
+      const stored = window.localStorage.getItem(STORE_KEY);
+      // Only an explicit stored choice overrides the signed-in default — an
+      // absent key means they've never touched it, not that they want it open.
+      if (stored === "1" || stored === "0") setOpen(stored === "0");
+    } catch { /* private mode */ }
   }, []);
 
   // Where the nav actually ends, published as a CSS variable.
