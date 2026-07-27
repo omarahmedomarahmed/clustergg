@@ -130,6 +130,30 @@ export const CARD_GUIDES: CardGuide[] = [
     ],
   },
   {
+    kind: "world",
+    name: "Game world / lore",
+    summary: "A champion, agent, weapon or map. The entity's own splash is the background.",
+    bgKey: "bot_world",
+    regions: [
+      ...COMMON,
+      { key: "title", label: "Name + kind", kind: "text", x: 4.6, y: 7, w: 55, h: 22, note: "The kind pill, the name, and the skin being shown." },
+      { key: "lore", label: "Lore", kind: "text", x: 4.6, y: 32, w: 52, h: 22, note: "A paragraph on a dark plate. Keep the LEFT half clear of character art." },
+      { key: "abilities", label: "Abilities", kind: "text", x: 4.6, y: 56, w: 52, h: 26, note: "Up to three rows. Character art usually lives on the right." },
+      { key: "pills", label: "Stats + skin count", kind: "text", x: 4.6, y: 85, w: 78, h: 9, note: "Bottom strip." },
+    ],
+  },
+  {
+    kind: "search",
+    name: "Search results",
+    summary: "The 'did you mean' card, shown only when a query matches more than one thing.",
+    bgKey: "bot_search",
+    regions: [
+      ...COMMON,
+      { key: "title", label: "The query", kind: "text", x: 4.6, y: 7, w: 60, h: 18, note: "What was typed, and how many things matched." },
+      { key: "rows", label: "Result rows", kind: "text", x: 4.6, y: 28, w: 78, h: 62, note: "Up to six rows with thumbnails." },
+    ],
+  },
+  {
     kind: "week",
     name: "Profile of the Week",
     summary: "The weekly vote — standings during the week, the podium on Sunday.",

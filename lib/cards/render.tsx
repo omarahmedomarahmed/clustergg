@@ -10,6 +10,7 @@ import { layoutFor } from "@/lib/cards/layout-store";
 import type {
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
   LeaderboardCard, ChallengeCard, PlanetCard, PlanetsCard, GuideCard, WeekCard,
+  WorldCard, SearchCard,
 } from "@/lib/cards/types";
 
 // Server-rendered "glorified" PNG cards, shared by the Discord bot and the web
@@ -983,6 +984,90 @@ function GuideBody(d: GuideCard) {
   );
 }
 
+// A game-world entity. The splash is the card; the lore sits on it.
+//
+// Text-over-art is the entire reason this is a PNG: Discord embeds cannot put
+// a word on an image. So the layout leans on the scrim and keeps the copy in
+// one column down the left, where the character art rarely is.
+function WorldBody(d: WorldCard) {
+  const t = d.theme;
+  return (
+    <Frame theme={t} corner={d.logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
+    ) : undefined}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+        <Pill color={t.accent} bg={alpha(t.accent, 0.14)}>{d.entityKind.toUpperCase()}</Pill>
+        {d.role ? <Pill>{clamp(d.role, 28)}</Pill> : null}
+      </div>
+
+      <Title
+        text={clamp(d.name, 28) ?? d.name}
+        sub={d.skinName ? `${d.skinName} · ${d.game}` : d.game}
+        accent={t.accent} accent2={t.accent2} theme={t}
+      />
+
+      {d.lore ? (
+        <Plate theme={t} style={{ marginTop: 18, maxWidth: 620 }}>
+          <div style={{ display: "flex", fontSize: 21, color: INK, lineHeight: 1.36 }}>{clamp(d.lore, 300)}</div>
+        </Plate>
+      ) : null}
+
+      {d.abilities.length ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 16, maxWidth: 620 }}>
+          {d.abilities.slice(0, 3).map((a, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "7px 14px", borderRadius: 12, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ display: "flex", fontSize: 19, fontWeight: 700, color: t.accent2 }}>{clamp(a.name, 22)}</div>
+              <div style={{ display: "flex", fontSize: 17, color: MUTED }}>{clamp(a.desc, 62)}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", gap: 10, marginTop: "auto" }}>
+        {d.meta.slice(0, 3).map((m, i) => (
+          <Pill key={i}>{`${m.label}: ${clamp(m.value, 18)}`}</Pill>
+        ))}
+        {d.skinCount > 0 ? (
+          <Pill color={t.accent} bg={alpha(t.accent, 0.13)}>
+            {`${d.skinCount} skin${d.skinCount === 1 ? "" : "s"} — tap below`}
+          </Pill>
+        ) : null}
+      </div>
+    </Frame>
+  );
+}
+
+// "Did you mean…". Only drawn when a query genuinely matched more than one
+// thing — one hit renders that hit, and none says so in words.
+function SearchBody(d: SearchCard) {
+  const t = d.theme;
+  return (
+    <Frame theme={t}>
+      <Title
+        text={`"${clamp(d.query, 24) ?? d.query}"`}
+        sub={`${d.results.length} matches — pick one below`}
+        accent={t.accent} accent2={t.accent2} theme={t}
+      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 22, flex: 1, overflow: "hidden" }}>
+        {d.results.slice(0, 6).map((r, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 18px", borderRadius: 14, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.08)" }}>
+            {r.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={r.imageUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: 10, objectFit: "cover" }} />
+            ) : null}
+            <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+              <div style={{ fontSize: 25, fontWeight: 700 }}>{clamp(r.label, 34)}</div>
+              <div style={{ fontSize: 17, color: MUTED }}>{clamp(r.sub, 52)}</div>
+            </div>
+            <Pill color={t.accent2} bg={alpha(t.accent2, 0.12, "#22d3ee")}>{r.kind.toUpperCase()}</Pill>
+          </div>
+        ))}
+      </div>
+    </Frame>
+  );
+}
+
 function body(d: CardData) {
   switch (d.kind) {
     case "profile": return ProfileBody(d);
@@ -995,6 +1080,8 @@ function body(d: CardData) {
     case "planets": return PlanetsBody(d);
     case "guide": return GuideBody(d);
     case "week": return WeekBody(d);
+    case "world": return WorldBody(d);
+    case "search": return SearchBody(d);
   }
 }
 
@@ -1123,6 +1210,14 @@ async function prepareBody(d: CardData): Promise<CardData> {
         matches: matches.map((m, i) => ({ ...m, iconUrl: rest[champs.length + i] })),
         theme: { ...d.theme, bgUrl },
       };
+    }
+    case "world": {
+      const [bgUrl, logoUrl] = await Promise.all([bg, toEmbeddable(d.logoUrl, ICON)]);
+      return { ...d, logoUrl, theme: { ...d.theme, bgUrl } };
+    }
+    case "search": {
+      const [bgUrl, ...imgs] = await Promise.all([bg, ...d.results.map((r) => toEmbeddable(r.imageUrl, ICON))]);
+      return { ...d, results: d.results.map((r, i) => ({ ...r, imageUrl: imgs[i] })), theme: { ...d.theme, bgUrl } };
     }
     case "quest":
     case "planet":

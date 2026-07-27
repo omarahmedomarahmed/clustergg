@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
-import { frame, navButton, backButton, rows, linkButton, actionId, button, type Frame, type Button } from "@/lib/discord/components";
-import { cardRef, embedColor } from "@/lib/discord/cards";
+import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, type Frame, type Button } from "@/lib/discord/components";
+import { cardRef, embedColor, liveCardUrl } from "@/lib/discord/cards";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
@@ -207,8 +207,7 @@ async function moreScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       navButton("Quests", frame("quests"), t, ButtonStyle.Secondary, "🗺"),
       navButton("Leaderboards", frame("leaderboard", ""), t, ButtonStyle.Secondary, "📊"),
       navButton("How it works", frame("guide", "getting-started"), t, ButtonStyle.Secondary, "📖"),
-      ctx.isManager ? navButton("My server", frame("server"), t, ButtonStyle.Secondary, "🛰") : null,
-      ctx.isManager ? navButton("Run a challenge", frame("admin", ""), t, ButtonStyle.Secondary, "🎯") : null,
+      ctx.isManager ? navButton("Server admin", frame("admin", ""), t, ButtonStyle.Secondary, "🛰") : null,
       navButton("Commands", frame("help"), t, ButtonStyle.Secondary, "❓"),
       ...tail(ctx, here, trail),
       linkButton("Open Cluster", siteUrl(), "🔗"),
@@ -714,6 +713,10 @@ async function hasJoined(userId: string, challengeId: string): Promise<boolean> 
 // is the revenue unlock, and the way they get there is a competition their
 // members actually want to enter. This is where they run one.
 async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  // `/cluster server` folds in here. It was a sibling command showing half the
+  // picture — growth without the tools to act on it — so it is now a view of
+  // the one admin command rather than a second thing to remember.
+  if (arg === "growth" || arg === "server") return serverScreen(ctx, trail);
   if (!ctx.guildId) {
     return notYet("Run this inside your server — it manages that server's challenges.", trail, [], ctx);
   }
@@ -722,7 +725,7 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
   // than on merely being in the server.
   if (!ctx.isManager) {
     return notYet("Only this server's admins and moderators can run challenges here.", trail, [
-      navButton("Server growth", frame("server"), trail, ButtonStyle.Secondary, "📈"),
+      navButton("Server growth", frame("admin", "growth"), trail, ButtonStyle.Secondary, "📈"),
     ], ctx);
   }
   const here = frame("admin", arg);
@@ -790,7 +793,7 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
       ...controls,
       button("DM me my portal key", actionId("portal-key", [], [here]), ButtonStyle.Secondary, "🔑"),
       ...live.slice(0, 2).map((c) => navButton(`View ${c.title}`.slice(0, 24), frame("challenge", c.id), [here], ButtonStyle.Secondary, "👁")),
-      navButton("Server growth", frame("server"), [here, ...trail], ButtonStyle.Secondary, "📈"),
+      navButton("Server growth", frame("admin", "growth"), [here, ...trail], ButtonStyle.Secondary, "📈"),
       ...tail(ctx, here, trail),
     ]),
   };
@@ -1132,6 +1135,89 @@ export async function weekScreen(ctx: ScreenCtx, trail: Frame[]): Promise<Screen
   };
 }
 
+// ===== Game world =====
+
+// A champion, agent, weapon or map — and its skins.
+//
+// The skins are the reason anyone opens this twice, so each one is a button
+// that re-renders THIS card with a different splash rather than opening a new
+// message. Discord's 100-char custom_id budget is the constraint: entity ids
+// are short, skin names are not, so a skin is addressed by its INDEX.
+export async function worldScreen(game: string, kind: string, id: string, skinIdx: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  if (!game || !id) return planetsScreen(ctx, trail);
+  const { skinsOf } = await import("@/lib/discord/resolve");
+  const skins = await skinsOf(game, kind, id);
+  const idx = Number(skinIdx);
+  const skin = Number.isFinite(idx) && idx >= 0 ? skins[idx]?.name ?? null : null;
+
+  const { url, data } = await cardRef("world", { game, entityKind: kind, id, skin: skin ?? "" });
+  if (!data || data.kind !== "world") return notYet(`Nothing in the ${game} world called that.`, trail, [], ctx);
+
+  const here = frame("world", game, kind, id, skinIdx);
+  const t = [here, ...trail];
+
+  // Four skins at a time — Discord allows 25 buttons and the tail needs room,
+  // so the rest are reachable by typing the skin name after the champion.
+  const shown = skins.slice(0, 4);
+  return {
+    embeds: [embed(url, {
+      title: skin ? `${data.name} — ${skin}` : data.name,
+      description: data.role ? `${data.role} · ${game}` : game,
+      color: data.theme.accent,
+      footer: skins.length > 4
+        ? `${skins.length} skins — type "/cluster show ${data.name} <skin>" for any of them`
+        : undefined,
+    })],
+    components: rows([
+      ...shown.map((sk, i) => button(
+        sk.name.slice(0, 24),
+        navId(frame("world", game, kind, id, String(i)), t.slice(1)),
+        i === idx ? ButtonStyle.Primary : ButtonStyle.Secondary,
+      )),
+      skin ? navButton("Base look", frame("world", game, kind, id), trail, ButtonStyle.Secondary) : null,
+      navButton(`${game} planet`.slice(0, 24), frame("planet", game), trail, ButtonStyle.Success, "🪐"),
+      ...tail(ctx, here, trail),
+      linkButton("Open the world", `${siteUrl()}/planets/${encodeURIComponent(game)}`, "🔗"),
+    ]),
+  };
+}
+
+// ===== Search =====
+
+// "Did you mean…", and nothing else.
+//
+// This screen only exists because a flat search sometimes has a real tie — two
+// gamers using the same handle on different games is the canonical case. Every
+// result is a button, so a tie costs one extra tap and never a retype.
+async function searchScreen(query: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const { search } = await import("@/lib/discord/resolve");
+  const { searchCard } = await import("@/lib/cards/data");
+  const hits = await search(query);
+  if (!hits.length) {
+    return notYet(
+      `Nothing on Cluster matches **${query.slice(0, 60)}**. Try a game, a gamer's name, a champion, or just \`/cluster\` for your own card.`,
+      trail, [], ctx,
+    );
+  }
+  const { getOrRenderCard } = await import("@/lib/cards/cache");
+  const data = await searchCard(query, hits.map((h) => ({ label: h.label, sub: h.sub, kind: h.kind, imageUrl: h.imageUrl })));
+  const hit = await getOrRenderCard("search", query.slice(0, 40) || "q", data).catch(() => null);
+  const url = hit?.url ?? liveCardUrl("search", { q: query });
+
+  const here = frame("search", query.slice(0, 40));
+  return {
+    embeds: [embed(url, {
+      title: `${hits.length} matches for "${query.slice(0, 40)}"`,
+      description: "More than one thing on Cluster answers to that. Pick the one you meant.",
+      color: "#8b5cf6",
+    })],
+    components: rows([
+      ...hits.slice(0, 8).map((h) => navButton(h.label.slice(0, 24), frame(h.screen, ...h.args), [here, ...trail], ButtonStyle.Primary)),
+      ...tail(ctx, here, trail),
+    ]),
+  };
+}
+
 // ===== Dispatch =====
 
 export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {
@@ -1154,6 +1240,8 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
     case "server": return serverScreen(ctx, trail);
     case "admin": return adminScreen(a, ctx, trail);
     case "week": return weekScreen(ctx, trail);
+    case "world": return worldScreen(a, f.args[1] ?? "", f.args[2] ?? "", f.args[3] ?? "", ctx, trail);
+    case "search": return searchScreen(a, ctx, trail);
     case "req-game": return requestGameScreen(ctx, trail);
     default: return homeScreen(ctx, trail);
   }
@@ -1172,49 +1260,66 @@ export async function screenForCommand(query: string): Promise<Frame> {
   const raw = (query ?? "").trim();
   if (!raw) return frame("home");
 
-  const at = raw.indexOf(":");
-  const kind = (at >= 0 ? raw.slice(0, at) : raw).toLowerCase();
-  const arg = at >= 0 ? raw.slice(at + 1).trim() : "";
+  // The five words that mean something on their own. Everything else — every
+  // gamer, game, champion, board and challenge — goes through one search.
+  const first = raw.split(/\s+/)[0].toLowerCase();
+  const rest = raw.slice(first.length).trim();
 
-  switch (kind) {
-    case "profile": return frame("show", "profile");
-    case "cp": return frame("show", "cp");
-    case "game": return frame("show", `game:${arg}`);
-    case "gamer": return frame("gamer", "discord", arg);
-    case "planet": return arg ? frame("planet", arg) : frame("planets");
-    case "planets": return frame("planets");
-    case "board":
-    case "leaderboard": return frame("leaderboard", arg);
-    case "challenge":
-    case "challenges": return frame("challenges", arg);
-    case "quest": return frame("quest", arg);
-    case "quests": return frame("quests");
+  switch (first) {
+    // `/cluster show <anything>`: the whole platform behind one word. The word
+    // itself is optional — `/cluster jett` and `/cluster show jett` are the
+    // same question — so this just strips it and searches what's left.
+    case "show":
+    case "search":
+    case "find":
+      return rest ? searchFrame(rest) : frame("home");
+
+    case "link":
+    case "connect":
+      return frame("link", rest);
+
+    // Voting IS the Profile of the Week screen. There is no second place to go.
     case "vote":
     case "votes":
-    case "week": return frame("week");
-    case "link": return frame("link", arg);
-    case "guide": return frame("guide", arg || "getting-started");
-    case "share": return frame("show", "profile");
-    case "help": return frame("help");
-    case "more": return frame("more");
-    // `/cluster server` folded into admin — the growth numbers and the tools to
-    // act on them were two commands describing one job.
-    case "server": return frame("server");
-    case "admin": return arg === "growth" ? frame("server") : frame("admin", arg);
-    default: break;
+    case "week":
+      return frame("week");
+
+    // One admin command. `/cluster server` used to be a sibling that showed
+    // half the picture; it is a button inside admin now.
+    case "admin":
+    case "server":
+    case "manage":
+      return frame("admin", first === "server" ? "growth" : rest);
+
+    // The bot's own manual. `guide` and `help` used to be different screens
+    // that both answered "how does this work" — they are one thing.
+    case "help":
+    case "guide":
+    case "commands":
+      return rest ? frame("guide", rest) : frame("help");
+
+    case "more":
+      return frame("more");
+    case "share":
+      return frame("show", "profile");
+    default:
+      break;
   }
 
-  // Free text. Match what exists before assuming it's a person.
-  const needle = raw.toLowerCase();
-  try {
-    const c = await catalog();
-    const game = c.games.find((g) => g.name.toLowerCase() === needle)
-      ?? c.games.find((g) => g.name.toLowerCase().includes(needle));
-    if (game) return frame("planet", game.value);
-    const quest = c.quests.find((q) => q.name.toLowerCase() === needle || q.value.toLowerCase() === needle)
-      ?? c.quests.find((q) => q.name.toLowerCase().includes(needle));
-    if (quest) return frame("quest", quest.value);
-  } catch { /* fall through to a name lookup */ }
+  // No leading verb: the whole thing is the search.
+  return searchFrame(raw);
+}
 
-  return frame("gamer", "discord", raw);
+// Run the flat search and turn its answer into a destination.
+//
+// One clear hit opens that thing. A genuine tie opens the picker. Nothing at
+// all still opens the picker, which is where the "nothing matches" message
+// lives — a dead end with an explanation beats a card about the wrong gamer.
+async function searchFrame(query: string): Promise<Frame> {
+  try {
+    const { resolveShow } = await import("@/lib/discord/resolve");
+    const r = await resolveShow(query);
+    if (r.type === "open") return frame(r.hit.screen, ...r.hit.args);
+  } catch { /* fall through to the picker, which explains itself */ }
+  return frame("search", query.slice(0, 60));
 }
