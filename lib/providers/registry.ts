@@ -286,6 +286,37 @@ export function getProvider(providerId: string): ProviderDef | undefined {
   return PROVIDERS.find((p) => p.id === providerId);
 }
 
+/**
+ * The provider that can actually LINK a game account, if any.
+ *
+ * One definition, because three places used to answer this separately and one
+ * of them disagreed: the bot offered a "Link my VALORANT account" button built
+ * from the games catalog, while the press handler resolved providers with the
+ * `identityOnly` filter — and VALORANT is identity-only, because VAL-* stats
+ * need Riot production approval. So the button existed and did nothing.
+ *
+ * Accepts a game name or a provider id, since callers have one or the other.
+ */
+export function linkableProvider(game: string): ProviderDef | null {
+  const q = (game ?? "").trim().toLowerCase();
+  if (!q) return null;
+  return PROVIDERS.find((p) => !p.identityOnly && (p.game.toLowerCase() === q || p.id.toLowerCase() === q)) ?? null;
+}
+
+/** Every game that can be linked, in registry order, deduped by game name. */
+export function linkableGames(): { game: string; provider: string }[] {
+  const seen = new Set<string>();
+  const out: { game: string; provider: string }[] = [];
+  for (const p of PROVIDERS) {
+    if (p.identityOnly) continue;
+    const key = p.game.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ game: p.game, provider: p.id });
+  }
+  return out;
+}
+
 export function isProviderLive(p: ProviderDef): boolean {
   if (p.legalFlag && p.phase === 3 && (p.id === "psn" || p.id === "activision")) return false;
   if (p.authType === "public") return true;

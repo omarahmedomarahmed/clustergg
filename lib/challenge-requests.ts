@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
-import { PROVIDERS, type ProviderDef } from "@/lib/providers/registry";
+import { PROVIDERS, linkableProvider, type ProviderDef } from "@/lib/providers/registry";
 
 // Server-owner challenge requests.
 //
@@ -89,8 +89,7 @@ function clampDays(d?: number): number {
 // Which provider backs a game name. Identity-only providers (Discord, Epic)
 // have no stats to sync, so they can't score a challenge.
 export function providerForGame(game: string): ProviderDef | null {
-  const q = game.trim().toLowerCase();
-  return PROVIDERS.find((p) => !p.identityOnly && (p.game.toLowerCase() === q || p.id.toLowerCase() === q)) ?? null;
+  return linkableProvider(game);
 }
 
 export type RequestableGame = { name: string; provider: string; logoUrl: string | null; metrics: string[] };

@@ -12,7 +12,7 @@ import { guildStats, attributeMember } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
-import { getProvider, PROVIDERS } from "@/lib/providers/registry";
+import { getProvider, linkableGames, linkableProvider, PROVIDERS } from "@/lib/providers/registry";
 
 // Every screen is "a PNG card + buttons underneath it".
 //
@@ -279,7 +279,9 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
         ? `No Cluster gamer with the Discord handle **${gamer}**.`
         : `No one on Cluster has linked **${gamer}** on **${game}** yet.`,
       trail,
-      [button("Connect yours", `open-link|${game}`, ButtonStyle.Success, "🎮")],
+      [linkableProvider(game)
+        ? button("Connect yours", `open-link|${game}`, ButtonStyle.Success, "🎮")
+        : navButton("Connect a game", frame("link", ""), trail, ButtonStyle.Success, "🎮")],
       ctx,
     );
   }
@@ -377,7 +379,9 @@ async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[]): Promise
         navButton("Challenges", frame("challenges", game), trail, ButtonStyle.Secondary, "🏆"),
         // Not linked? Then the one useful button is the one that fixes that,
         // and it opens the modal for THIS game rather than a generic picker.
-        linked ? null : button(`Link my ${game} account`.slice(0, 40), `open-link|${game}`, ButtonStyle.Success, "🔗"),
+        linked || !linkableProvider(game)
+          ? null
+          : button(`Link my ${game} account`.slice(0, 40), `open-link|${game}`, ButtonStyle.Success, "🔗"),
         ...tail(ctx, frame("show", target), trail),
       ]),
     };
@@ -481,7 +485,10 @@ async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
 // Discord button styles are a fixed palette of four, so "a different colour per
 // game" means spreading games across them deterministically — the same game is
 // always the same colour, everywhere in the bot.
-const BUTTON_PALETTE = [ButtonStyle.Primary, ButtonStyle.Success, ButtonStyle.Danger, ButtonStyle.Secondary];
+// Danger is deliberately NOT in here. In Discord red means destructive, so a
+// grid of game buttons with "League of Legends" and "PUBG" in red read as
+// warnings rather than as games — the picker looked broken.
+const BUTTON_PALETTE = [ButtonStyle.Primary, ButtonStyle.Success, ButtonStyle.Secondary];
 function gameStyle(name: string): number {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
@@ -852,9 +859,14 @@ export function linkModal(game: string, provider: string) {
   // generic "game ID and region" is how you get accounts that fail to verify,
   // so the modal uses the registry's real label and hint for that provider.
   const p = getProvider(provider);
-  const label = (p?.identifierLabel ?? "In-game name").slice(0, 45);
-  const hint = (p?.identifierHint ?? "Exactly as it appears in game").slice(0, 100);
   const regions = REGION_HINTS[provider];
+  // The registry's label is written for the WEBSITE, where the identifier is
+  // one field — so Mobile Legends' reads "Player ID + Server (Zone) ID". Here
+  // the zone gets a field of its own, and asking for it twice in one form is
+  // how you get people typing the same number into both boxes.
+  const raw = p?.identifierLabel ?? "In-game name";
+  const label = (regions && raw.includes("+") ? raw.split("+")[0].trim() : raw).slice(0, 45);
+  const hint = (p?.identifierHint ?? "Exactly as it appears in game").slice(0, 100);
 
   const components: unknown[] = [
     {
@@ -901,15 +913,54 @@ const REGION_HINTS: Record<string, { label: string; hint: string }> = {
   osu: { label: "Mode", hint: "osu, taiko, fruits, mania — optional" },
 };
 
+// Which games this picker may offer.
+//
+// Built from the games catalog INTERSECTED with the providers that can actually
+// link an account — not from the catalog alone. VALORANT is the case that broke
+// it: it's a live game with a planet and a leaderboard, but VAL-* stats need
+// Riot production approval, so its provider is identity-only and the modal has
+// nothing to open. The button existed, the press handler resolved no provider,
+// and Discord was answered with "do nothing" — a button that visibly does
+// nothing at all, which is worse than not offering the game.
+async function linkableFromCatalog(): Promise<{ name: string; value: string }[]> {
+  const c = await catalog();
+  const known = new Set(linkableGames().map((g) => g.game.toLowerCase()));
+  const fromCatalog = c.games.filter((g) => known.has(g.value.toLowerCase()));
+  // A platform with no games configured still has providers, so the picker is
+  // never empty just because the catalog is.
+  return fromCatalog.length
+    ? fromCatalog
+    : linkableGames().map((g) => ({ name: g.game, value: g.game }));
+}
+
 async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!ctx.gamer) return signInPrompt(ctx, trail);
-  const c = await catalog();
+  const linkable = await linkableFromCatalog();
+
+  // Asked for a game we can't link? Say which, say why, and offer the ones we
+  // can — rather than rendering a button that does nothing when pressed.
+  if (game && !linkableProvider(game)) {
+    const { url } = await cardRef("planets", {});
+    return {
+      embeds: [embed(url, {
+        title: `${game} can't be linked yet`,
+        description: `We track ${game} on the site, but its stats API isn't open to us yet, so there's no account to connect. Pick another game below — or link ${game} on the site and we'll switch it on the moment it opens up.`,
+        color: "#fbbf24",
+      })],
+      components: rows([
+        ...linkable.slice(0, 18).map((g) => button(g.name.slice(0, 24), `open-link|${g.value}`, gameStyle(g.value), "🎮")),
+        ...tail(ctx, frame("link", ""), trail),
+        linkButton("Link on the site instead", `${siteUrl()}/profile?tab=accounts`, "🌐"),
+      ]),
+    };
+  }
+
   if (!game) {
     // The picker is a real card — every game's logo, in one image — with a
     // coloured button per game underneath it. "Which games can I link?" should
     // be answered by looking, not by reading a list of names.
     const { url, data } = await cardRef("planets", {});
-    const games = c.games.slice(0, 20);
+    const games = linkable.slice(0, 20);
     return {
       embeds: [embed(url, {
         title: "Link a game account",
@@ -919,7 +970,7 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
       components: rows([
         // Straight to the modal for each game: one tap from here to typing a
         // name, rather than a screen in between that says the same thing.
-        ...games.map((g) => button(g.name.slice(0, 24), `open-link|${g.value}`, gameStyle(g.name), "🎮")),
+        ...games.map((g) => button(g.name.slice(0, 24), `open-link|${g.value}`, gameStyle(g.value), "🎮")),
         ...tail(ctx, frame("link", ""), trail),
         linkButton("Link on the site instead", `${siteUrl()}/profile?tab=accounts`, "🌐"),
       ]),
