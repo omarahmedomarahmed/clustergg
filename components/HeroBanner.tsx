@@ -43,15 +43,18 @@ export default function HeroBanner({
     <section className="mx-auto max-w-6xl px-4 pt-5">
       {/* ===== The banner ===== */}
       <div className="glass rounded-3xl px-4 py-3.5 sm:px-6 sm:py-4">
-        <div className="flex items-center gap-4 flex-wrap sm:flex-nowrap">
-          <div className="min-w-0 shrink-0">
+        <div className="flex items-center gap-3 sm:gap-4 flex-wrap sm:flex-nowrap">
+          <div className="min-w-0 flex-1 sm:flex-none sm:shrink-0">
             <div className="text-sm font-bold leading-tight">{label ?? "The Cluster galaxy"}</div>
             <div className="text-[11px] text-muted leading-tight mt-0.5 hidden sm:block">{note}</div>
           </div>
 
           {/* Logos: the whole point of the collapsed state. Clicking one opens
-              the explorer already showing that planet. */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5">
+              the explorer already showing that planet.
+              On a phone they take their own full-width row — squeezed between a
+              label and a button there was room for two of six games, which is a
+              picker that doesn't pick. */}
+          <div className="order-last sm:order-none w-full sm:w-auto flex items-center gap-1.5 sm:gap-2 sm:flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5">
             {planets.map((p) => {
               const active = open && p.slug === slug;
               return (

@@ -141,7 +141,10 @@ export default async function Nav() {
     <>
     <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl bg-cover bg-center"
       style={navBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${optImg(navBg, 1200)})` } : undefined}>
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4">
+      {/* A tighter gap on phones. Combined with hiding the install button below
+          `md` (see below), this is what stopped every page scrolling sideways by
+          ~40px on a 390px screen. */}
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 sm:gap-4 px-3 sm:px-4 min-w-0">
         <Link href={user ? "/feed" : "/"} className="shrink-0" aria-label="Cluster home">
           <BrandHeader placement="nav" />
         </Link>
@@ -176,7 +179,7 @@ export default async function Nav() {
         )}
         <div className="md:hidden flex-1" />
 
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <LocaleToggle current={locale} compact />
           {user ? (
             <>
@@ -187,7 +190,12 @@ export default async function Nav() {
                 slug={user.slug}
                 canAdmin={isStaff(user)}
               />
-              <AddBotButton size="sm" className="hidden lg:inline-flex" />
+              {/* Wrapped rather than given `hidden lg:inline-flex` directly:
+                  AddBotButton sets `inline-flex` itself, and which display wins
+                  depends on the order of the two utilities in the generated
+                  stylesheet, not on the class attribute. It lost — the install
+                  button was showing on phones and pushing the row off-screen. */}
+              <span className="hidden lg:inline-flex"><AddBotButton size="sm" /></span>
             </>
           ) : (
             <>
@@ -198,7 +206,7 @@ export default async function Nav() {
                   gamer is not the buyer and the nav has no room to spare. */}
               <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline">For brands</Link>
               <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>
-              <AddBotButton size="sm" className="hidden md:inline-flex" />
+              <span className="hidden md:inline-flex"><AddBotButton size="sm" /></span>
               <a href="/api/auth/discord?next=/onboarding" title="Sign in with Discord"
                 className="pressable inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white"
                 style={{ background: "#404eed", boxShadow: "0 6px 18px -8px #404eed" }}>
