@@ -3,11 +3,13 @@ import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import {
-  DEFAULT_LAYOUT, assetBox, contentBox, opacityOf, plateBg, spotBox, transformOf,
+  AD_LABEL_H, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, opacityOf, plateBg,
+  spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset } from "@/lib/cards/layout";
 import { layoutFor } from "@/lib/cards/layout-store";
 import type {
+  CardAdSlot,
   CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
   LeaderboardCard, ChallengeCard, PlanetCard, PlanetsCard, GuideCard, WeekCard,
   WorldCard, SearchCard,
@@ -109,6 +111,12 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
   const mark = spotBox(l.mark, 1);
   const badge = spotBox(l.badge, 1);
   const content = contentBox(l.content);
+  // The sponsor, and the badge pushed clear of it. `badgeTopFor` returns the
+  // badge's own top when there's no ad or no collision, so an unsold card and a
+  // hand-placed badge are both untouched.
+  const ad = theme.ad && !l.ad.hidden ? theme.ad : null;
+  const adB = adBox(l.ad);
+  const badgeTop = badgeTopFor(l, !!ad, 1);
   return (
     <div style={{ width: CARD_W, height: CARD_H, display: "flex", position: "relative", background: VOID, color: INK }}>
       {theme.bgUrl ? (
@@ -187,7 +195,7 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
           from the same line. */}
       {corner && !l.badge.hidden ? (
         <div style={{
-          position: "absolute", right: CARD_W - (badge.left + badge.width), top: badge.top,
+          position: "absolute", right: CARD_W - (badge.left + badge.width), top: badgeTop,
           display: "flex", justifyContent: "flex-end", ...styleOf(l.badge),
         }}>{corner}</div>
       ) : null}
@@ -195,6 +203,47 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
       {/* Admin art ON TOP of everything — a watermark, a LIVE sticker, a
           sponsor mark. Last, so it wins. */}
       {(l.assets ?? []).filter((a) => a.front).map((a) => <Asset key={a.id} a={a} />)}
+
+      {/* The sponsor, drawn after everything else.
+          This is inventory somebody paid for: a placed asset or a bright patch
+          of artwork covering it is a delivered impression the brand didn't get.
+          So it wins over every other layer, and only an admin hiding the slot
+          on this card kind takes it off. */}
+      {ad ? <AdSlot ad={ad} box={adB} opacity={l.ad.opacity} /> : null}
+    </div>
+  );
+}
+
+// The ad box: creative on top, the disclosure strip under it.
+//
+// The label is not decoration. A sponsored image dropped into artwork with no
+// marking is the kind of thing that gets a bot removed from servers and a
+// platform written about, so every card says who paid for the box.
+function AdSlot({ ad, box, opacity }: {
+  ad: CardAdSlot;
+  box: { left: number; top: number; width: number; height: number; imageHeight: number };
+  opacity?: number;
+}) {
+  const label = (ad.label || "Sponsored").toUpperCase();
+  const brand = (ad.brandName || "").toUpperCase();
+  return (
+    <div style={{
+      position: "absolute", left: box.left, top: box.top, width: box.width, height: box.height,
+      display: "flex", flexDirection: "column", overflow: "hidden",
+      borderRadius: 14, border: "1px solid rgba(255,255,255,0.18)", background: "rgba(4,5,26,0.82)",
+      ...styleOf({ opacity }),
+    }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={ad.imageUrl} alt="" width={box.width} height={box.imageHeight}
+        style={{ width: box.width, height: box.imageHeight, objectFit: "cover" }} />
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        width: box.width, height: AD_LABEL_H, paddingLeft: 9, paddingRight: 9,
+        fontSize: 11, letterSpacing: 0.8, color: MUTED,
+      }}>
+        <div style={{ display: "flex" }}>{label}</div>
+        <div style={{ display: "flex", color: INK, fontWeight: 700 }}>{brand.slice(0, 22)}</div>
+      </div>
     </div>
   );
 }
@@ -1105,14 +1154,27 @@ async function preparedBrand(): Promise<{ astronautUrl: string | null; markUrl: 
   } catch { return { astronautUrl: null, markUrl: null }; }
 }
 
+// The sponsor creative, as inline bytes.
+//
+// A brand uploads whatever their agency gave them — WebP, an SVG, a 4MB PNG —
+// and Satori decodes none of those. Resolved here like every other image, and
+// an ad whose art won't load is DROPPED: an empty labelled box would tell a
+// server there's an advertiser while showing them nothing.
+async function preparedAd(ad: CardAdSlot | null | undefined): Promise<CardAdSlot | null> {
+  if (!ad?.imageUrl) return null;
+  const imageUrl = await toEmbeddable(ad.imageUrl, { maxWidth: 720 });
+  return imageUrl ? { ...ad, imageUrl } : null;
+}
+
 async function prepareCard(d: CardData): Promise<CardData> {
   // The whole image step gets one deadline. Past it the card is drawn with
   // whatever resolved — a person who tapped a button gets a card, not a spinner
   // that eventually times out in Discord's proxy.
-  const [body, brand, rawLayout] = await Promise.all([
+  const [body, brand, rawLayout, ad] = await Promise.all([
     withDeadline(prepareBody(d), d),
     withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
     withDeadline(layoutFor(d.kind), DEFAULT_LAYOUT),
+    withDeadline(preparedAd(d.theme.ad), null),
   ]);
   // Admin-placed art goes through the same resolver as everything else: Satori
   // fetches remote images itself and one unreachable host takes down the whole
@@ -1120,7 +1182,7 @@ async function prepareCard(d: CardData): Promise<CardData> {
   const layout = await withDeadline(withAssets(rawLayout), { ...rawLayout, assets: [] });
   // Colours are normalised here, once, on the way in — so every card body can
   // use `theme.accent` directly and no unparseable value ever reaches Satori.
-  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout }) } as CardData;
+  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad }) } as CardData;
 }
 
 // The background, with fallbacks. Tried in order and stops at the first that
@@ -1295,7 +1357,10 @@ export async function renderCardBuffer(data: CardData): Promise<Buffer> {
     console.error("[cards] render failed, retrying plain:", (err as Error)?.message);
     const plain = {
       ...data,
-      theme: { ...data.theme, accent: FALLBACK_ACCENT, accent2: FALLBACK_ACCENT2, bgUrl: null, bgFallbacks: [] },
+      // The sponsor goes too. A brand's own artwork is untrusted input like any
+      // other, and if it is what took the render down, keeping it on the retry
+      // turns one missing ad into a card that never draws at all.
+      theme: { ...data.theme, accent: FALLBACK_ACCENT, accent2: FALLBACK_ACCENT2, bgUrl: null, bgFallbacks: [], ad: null },
     } as CardData;
     const res = await renderCard(plain);
     return Buffer.from(await res.arrayBuffer());

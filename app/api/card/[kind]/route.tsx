@@ -4,6 +4,7 @@ import { toEmbeddable } from "@/lib/cards/img";
 import { DEFAULT_LAYOUT } from "@/lib/cards/layout";
 import { previewFixtures } from "@/lib/cards/preview";
 import { getOrRenderCard } from "@/lib/cards/cache";
+import { withCardAd, PREVIEW_AD } from "@/lib/cards/ads";
 import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, weekCard, cardBg } from "@/lib/cards/data";
 import { guideCard, GUIDE_TOPICS } from "@/lib/cards/guides";
 import type { CardData } from "@/lib/cards/types";
@@ -84,6 +85,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
 
   if (!data) return fallbackCard("This card had no data — link a game account to fill it in.");
 
+  // The sponsor for this render, chosen before the cache is consulted so each
+  // brand's version of a card is stored separately. No impression is counted
+  // here: this route is also the OpenGraph image for shared links, and a
+  // crawler fetching a preview is not a gamer looking at a card. Impressions
+  // are counted where a card is actually served into a message.
+  const key = [slug, game, q.get("quest"), q.get("topic"), q.get("metric"), q.get("id"), q.get("week"), q.get("mode")].filter(Boolean).join("|") || "default";
+  const picked = await withCardAd(data, `${kind}|${key}`);
+  data = picked.data;
+  // The layout editor always has a box to drag, even before anything is sold.
+  if (!picked.ad && fx) data = { ...data, theme: { ...data.theme, ad: PREVIEW_AD } };
+
   // `?debug=1` answers "why doesn't my art show?" in a browser, without a
   // terminal and without guessing. It reports which source the background came
   // from and whether it actually resolved into bytes the renderer can draw —
@@ -91,9 +103,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
   if (q.get("debug") === "1") return NextResponse.json(await explain(data));
 
   if (!fresh) {
-    // Cache key = everything that identifies this card within its kind.
-    const key = [slug, game, q.get("quest"), q.get("topic"), q.get("metric"), q.get("id"), q.get("week"), q.get("mode")].filter(Boolean).join("|") || "default";
-    const hit = await getOrRenderCard(kind, key, data).catch(() => null);
+    // Cache key = everything that identifies this card within its kind, plus
+    // which creative is on it.
+    const hit = await getOrRenderCard(kind, picked.ad ? `${key}#${picked.ad.campaignCreativeId}` : key, data).catch(() => null);
     if (hit) {
       return NextResponse.redirect(hit.url, {
         status: 302,

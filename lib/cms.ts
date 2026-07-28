@@ -65,14 +65,14 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
 
   "brand.prize.title": "Real money, every week, in every game.",
   "brand.prize.body":
-    "Cluster funds and pays every prize pool. A sponsor buys the competition and the name on it — not the admin, not the payout, and not the risk of a prize going unpaid.",
+    "70% of what you pay for a challenge is the prize. It goes to three players as trophies carrying your brand, and Cluster runs the payout. You buy the competition and the name on it — not the admin, and not the risk of a prize going unpaid.",
 
   // ===== The Discord section: the server-owner pitch =====
   // The other side of the marketplace. Brands pay in; servers get paid out.
   "discord.badge": "ClusterBot for Discord",
   "discord.title": "Your community is an audience. Get paid like one.",
   "discord.subtitle":
-    "Install the bot and your members get ranked profiles, live stats from the games they already play, and challenges with real prize money — without leaving your server. Link 500 gamers and brands start paying into your community. Free, forever, and it never reads a message.",
+    "Install the bot and your members get ranked profiles, live stats from the games they already play, and challenges with real prize money — without leaving your server. Link 500 gamers and brands start sponsoring challenges here — with the prize money won by your members. Free, forever, and it never reads a message.",
   "discord.cta.primary": "Add ClusterBot to your server",
   "discord.cta.secondary": "See who's running it",
 
@@ -97,7 +97,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "section.badges.subtitle": "Earned from linked accounts, rank thresholds, community reputation and challenge placements. The criteria are code.",
   "section.partners.title": "Trusted by",
   "section.cta.title": "Two ways in, one network",
-  "section.cta.subtitle": "Brands buy the challenge. Servers get paid to run it. Gamers play for real money. Pick your side.",
+  "section.cta.subtitle": "Brands buy the challenge. Servers host it. Gamers win the money. Pick your side.",
   "section.cta.button": "Join the Cluster — it's free",
   "banner.arena": BANNER_ART.arena,
   "banner.games": BANNER_ART.games,

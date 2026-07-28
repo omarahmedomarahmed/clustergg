@@ -18,7 +18,7 @@ whatever it likes. We are the structured buy: placements across a network of
 gaming communities, and — the actual product — a **sponsored weekly challenge**
 per game, carrying the brand's name, entered by verified players of that game.
 
-Two sides. Brands pay in. Servers get paid out.
+Two sides. Brands pay in; 70% of it is won by gamers, inside the servers that hosted the challenge.
 
 ---
 
@@ -27,8 +27,14 @@ Two sides. Brands pay in. Servers get paid out.
 | Tier | Monthly | What it is |
 |---|---|---|
 | **Reach** | `pricing.reachBase` (default $600) | Every placement, the self-serve brand portal, full analytics. |
-| **Challenge** | `pricing.challengeBase` + `pricing.perGame` × games (default $500 + $1,000/game) | Everything in Reach at a reduced base, plus 4 sponsored challenges a month **per game** with naming rights. One game = $1,500. |
+| **Challenge** | `pricing.challengeBase` + per-game (default $500 + $1,000/game) | Everything in Reach at a reduced base, plus 4 sponsored challenges a month **per game** with naming rights. One game = $1,500. |
 | **Ultimate** | `pricing.ultimateBase` + all games (default $400 + $6,000 = **$6,400**) | Every game, every challenge, premium placement, Discord placement, the Sunday shout-out, and 2 × 5-second video slots. |
+
+The per-game rate is **derived, never stored**: `challengePrice × challengesPerGame`
+= $250 × 4 = $1,000. A brand buys challenges, one a week; the monthly rate for a
+game is simply how many of those that is. Storing it separately would create two
+numbers meaning the same thing that eventually disagree, and the one on the
+invoice would stop matching the one on the page.
 
 **Add-on, any plan:** `pricing.streamAddon` (default $400/month) — presenting
 sponsor of the Sunday Profile of the Week broadcast and every clip cut from it.
@@ -39,14 +45,26 @@ The tier is not chosen, it is *derived*: zero games is Reach, all games is
 Ultimate, anything between is Challenge. That is why the slider on `/pricing`
 can move a brand from $600 to $6,400 without them ever picking a plan name.
 
-## What it costs us
+## The unit
 
-One weekly challenge per game. `pricing.games` × `pricing.challengesPerGame` = 24
-a month at the defaults, each with a guaranteed minimum pool of
-`pricing.prizePool` ($175 — $100 / $50 / $25). That is **$4,200 a month** of
-prize money that Cluster funds and pays.
+Everything in the model reduces to one transaction: a sponsored weekly challenge.
 
-Two things about that number matter commercially:
+| | |
+|---|---|
+| We charge the brand | `pricing.challengePrice` — **$250** |
+| We pay out | `pricing.prizePool` — **$175** ($100 / $50 / $25) |
+| We keep | **$75** gross margin |
+| Share reaching players | **70%**, and it is arithmetic, not policy |
+
+The prize is paid as **three trophies carrying the sponsor's brand**, redeemed by
+the three gamers who placed. Nothing is withheld and nothing is shared with the
+server — every cent of the $175 reaches a player.
+
+Per game, per month: brand pays **$1,000**, players win **$700**, we keep **$300**.
+Across all six games at the defaults: **24 challenges**, **$6,000** of challenge
+revenue, **$4,200** paid to gamers.
+
+Two things about the cost side matter commercially:
 
 - **It is fixed, not per sponsor.** The same competition carries whoever is
   sponsoring it. A second brand does not add a second prize pool.
@@ -55,17 +73,22 @@ Two things about that number matter commercially:
   are rendered once and served from a content-hashed URL that Discord's CDN
   caches. The marginal cost of another server is a database row.
 
-## What a server earns
+## What a server gets
 
-Brands pay per game. The challenges run in the servers whose members play that
-game, and the server keeps `pricing.serverSharePct` (default 70%) of the revenue
-its community generates.
+**Servers are not paid a revenue share.** Say this precisely, because the wrong
+version of it is a promise we would have to break.
+
+What a server gets is brand-sponsored challenges running inside it, and the
+prize money on those challenges being won by *its own members*. A League server
+that crosses the threshold has League sponsorship money flowing to its players —
+up to **$700 a month per sponsored game**. The owner didn't earn a commission;
+their community earned real money, through their server, because of their bot.
 
 | Stage | Linked gamers | Unlocks |
 |---|---|---|
-| Monetized | 500 | Revenue share, sponsored challenges land automatically, owner portal |
-| Broadcaster | 1,000 | Paid to carry other communities' challenges, priority in its top game |
-| Sponsored | 5,000 | Direct brand sponsorship, keeps the whole fee, named on the broadcast |
+| Sponsored | 500 | Brand-sponsored challenges land here, prize money won by members, owner portal |
+| Broadcaster | 1,000 | Network-wide challenges carried here, priority in its top game |
+| Flagship | 5,000 | Brands request the community by name, exclusive challenges, named on the broadcast |
 
 **Linked, not members.** A 50,000-member server with no linked accounts earns
 nothing, and the pages say so plainly. The threshold is how we prove to a brand
@@ -81,7 +104,7 @@ Everything is a CMS key with the running value as its default, editable at
 
 | Thing | Where |
 |---|---|
-| The model, pure and shared | `lib/pricing.ts` — types, defaults, `quote()`, `money()`, the earn stages |
+| The model, pure and shared | `lib/pricing.ts` — types, defaults, `quote()`, `perGame()`, `marginPerChallenge()`, `prizeSharePct()`, the stage ladder |
 | Live inventory + audience | `lib/pricing-live.ts` — placement count, per-game verified gamers, reach |
 | The copy | `lib/cms.ts` → `CONTENT_DEFAULTS` (`brand.*` and `pricing.*`) |
 | The rate card page | `app/pricing/page.tsx` + `components/PricingPlans.tsx` |
@@ -119,7 +142,7 @@ decides whether the rest of the page is true.
 - Verified gamers per game — distinct linked accounts through that game's
   providers. (A gamer who linked two providers for one game can be counted
   twice, so it is a ceiling; never present it as unique reach.)
-- Challenges, prize pools, and what a server has earned.
+- Challenges, prize pools, and what a server's members have won.
 
 **Modelled, must be labelled:**
 

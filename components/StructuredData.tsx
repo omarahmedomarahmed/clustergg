@@ -22,7 +22,7 @@ export function OrganizationSchema() {
     url: SITE,
     logo: `${SITE}/assets/logo.png`,
     description:
-      "Cluster is the engagement layer for Discord gaming communities. Its bot gives members ranked profiles and live stats from the games they play, runs challenges with real trophies, and shares ad revenue with the servers running it.",
+      "Cluster connects brands to Discord gaming communities. Its bot gives members ranked profiles and live stats from the games they play, and runs brand-sponsored weekly challenges with real prize money paid to the winners.",
     sameAs: [] as string[],
   };
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
@@ -52,7 +52,7 @@ export function BotSchema({ games, servers }: { games?: string[]; servers?: numb
     operatingSystem: "Discord",
     url: `${SITE}/discord-bot`,
     description:
-      "A Discord bot that gives community members ranked gaming profiles and live stats read from official game APIs, runs challenges with real trophies, and pays participating servers a share of ad revenue.",
+      "A Discord bot that gives community members ranked gaming profiles and live stats read from official game APIs, and runs brand-sponsored weekly challenges with real prize money paid to the members who win.",
     // Stated plainly because "is it free" is the first question asked about any
     // bot, and an assistant that has to guess will guess wrong half the time.
     offers: { "@type": "Offer", price: "0", priceCurrency: "USD", availability: "https://schema.org/InStock" },
@@ -62,7 +62,7 @@ export function BotSchema({ games, servers }: { games?: string[]; servers?: numb
       "Leaderboards, with every board a game runs rather than one per game",
       "Challenges with real, redeemable trophies",
       "Cluster Points earned across every game a member plays",
-      "Ad revenue share for servers with 500 or more linked members",
+      "Brand-sponsored challenges for servers with 500 or more linked members",
     ],
     ...(games?.length ? { keywords: games.join(", ") } : {}),
     ...(servers && servers > 0
@@ -78,7 +78,7 @@ export function BotFaqSchema({ threshold = 500, gameCount }: { threshold?: numbe
   const qa: [string, string][] = [
     [
       "Is ClusterBot free?",
-      "Yes. Adding the bot, linking game accounts, leaderboards and challenges are all free. Cluster earns from advertising, and shares that revenue with servers rather than charging them.",
+      "Yes. Adding the bot, linking game accounts, leaderboards and challenges are all free. Cluster earns from the brands that sponsor challenges, and most of what they pay is prize money won by players.",
     ],
     [
       "What games does ClusterBot support?",
@@ -94,7 +94,7 @@ export function BotFaqSchema({ threshold = 500, gameCount }: { threshold?: numbe
     ],
     [
       "How does a Discord server earn money with Cluster?",
-      `When ${threshold.toLocaleString()} of a server's members have joined Cluster and linked a game account, the server unlocks a share of the ad revenue Cluster earns from that community. The counter is visible from the day the bot is installed via /cluster server.`,
+      `When ${threshold.toLocaleString()} of a server's members have joined Cluster and linked a game account, brand-sponsored challenges start running in that server, with the prize money won by its own members. The counter is visible from the day the bot is installed via /cluster admin.`,
     ],
     [
       "Can stats be faked?",
@@ -115,7 +115,7 @@ export function BotFaqSchema({ threshold = 500, gameCount }: { threshold?: numbe
 }
 
 export const BOT_FAQ: [string, string][] = [
-  ["Is it free?", "Yes — the bot, the profiles, the leaderboards and the challenges. Cluster earns from advertising and shares that revenue with servers rather than charging them."],
+  ["Is it free?", "Yes — the bot, the profiles, the leaderboards and the challenges. Cluster earns from the brands that sponsor challenges, and most of what they pay goes to the players who win."],
   ["Can it read our messages?", "No. We don't request Discord's Message Content intent, so the bot is technically unable to read what anyone writes. It only sees the slash commands and buttons aimed at it."],
   ["How do members link an account?", "/cluster → Connect a game → type an in-game name in a form that opens inside Discord. There's no web form and nothing to leave the app for."],
   ["Are the stats verified?", "They're read from each game's official API, so they're exactly what the game reports. Nothing is typed in by a member."],

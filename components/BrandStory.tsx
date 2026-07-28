@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
-import { pairs, money, type PricingConfig } from "@/lib/pricing";
+import { pairs, money, prizeSharePct, marginPerChallenge, type PricingConfig } from "@/lib/pricing";
 import { cardBgStyle, type CardBgMap } from "@/lib/card-bg";
 
 // The commercial argument, in sections.
@@ -83,7 +83,7 @@ export function InsightSection({ c, bg }: { c: Copy; bg?: CardBgMap }) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="glass rounded-3xl p-8 text-center">
-            <div className="text-6xl font-bold grad-text leading-none">{c["brand.insight.stat"]}</div>
+            <div className="text-6xl font-bold brand-text leading-none">{c["brand.insight.stat"]}</div>
             <div className="text-xs uppercase tracking-widest text-muted mt-4 leading-relaxed">{c["brand.insight.statLabel"]}</div>
           </div>
           <div className="glass rounded-3xl p-8 text-center border border-rose-400/25">
@@ -167,16 +167,43 @@ export function LoopSection({ c, bg }: { c: Copy; bg?: CardBgMap }) {
 export function PrizeSection({ c, cfg, bg }: { c: Copy; cfg: PricingConfig; bg?: CardBgMap }) {
   const perMonth = cfg.games * cfg.challengesPerGame;
   const total = perMonth * cfg.prizePool;
+  const share = prizeSharePct(cfg);
+  const keep = marginPerChallenge(cfg);
   return (
     <Band bg={bg} bgKey="sec_pricing" className="py-16">
       <div className="glass rounded-3xl p-8 md:p-10">
-        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-10 items-center">
+        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 items-center">
           <div>
             <div className="inline-flex items-center gap-2 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-full px-3 py-1.5">
-              <Icon name="trophy" size={12} /> Prize pool
+              <Icon name="trophy" size={12} /> Where your money goes
             </div>
             <h2 className="text-3xl md:text-4xl font-bold mt-4 leading-tight">{c["brand.prize.title"]}</h2>
             <p className="text-muted mt-3 leading-relaxed">{c["brand.prize.body"]}</p>
+
+            {/* The split, as a bar. A sentence claiming "70% goes to players"
+                is a claim; a bar that is visibly 70% long is the argument. */}
+            <div className="mt-7">
+              <div className="flex items-baseline justify-between text-xs mb-2">
+                <span className="text-muted">One sponsored challenge</span>
+                <span className="font-bold">{money(cfg.challengePrice, cfg.currency)}</span>
+              </div>
+              <div className="h-10 rounded-xl overflow-hidden flex border border-white/10">
+                <div
+                  className="bg-gradient-to-r from-amber-500 to-amber-400 grid place-items-center text-[#1a1200] text-xs font-bold"
+                  style={{ width: `${share}%` }}
+                >
+                  {money(cfg.prizePool, cfg.currency)} to players
+                </div>
+                <div className="flex-1 bg-white/10 grid place-items-center text-xs text-muted font-semibold">
+                  {money(keep, cfg.currency)}
+                </div>
+              </div>
+              <div className="flex justify-between text-[11px] text-muted mt-2">
+                <span><b className="text-amber-300">{share}%</b> prize money, paid as branded trophies</span>
+                <span>{100 - share}% runs the platform</span>
+              </div>
+            </div>
+
             <div className="mt-6 flex flex-wrap gap-3">
               <Podium place={1} amount={cfg.prize1} currency={cfg.currency} />
               <Podium place={2} amount={cfg.prize2} currency={cfg.currency} />
@@ -184,10 +211,10 @@ export function PrizeSection({ c, cfg, bg }: { c: Copy; cfg: PricingConfig; bg?:
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <Fact value={money(cfg.challengePrice, cfg.currency)} label="per sponsored weekly challenge" />
             <Fact value={String(cfg.challengesPerGame)} label="challenges per game, every month" />
-            <Fact value={String(cfg.games)} label="games running weekly" />
             <Fact value={String(perMonth)} label="challenges a month across the network" />
-            <Fact value={money(total, cfg.currency)} label="paid out to gamers every month" gold />
+            <Fact value={money(total, cfg.currency)} label="won by gamers every month" gold />
           </div>
         </div>
       </div>
@@ -207,7 +234,7 @@ function Podium({ place, amount, currency }: { place: number; amount: number; cu
 function Fact({ value, label, gold = false }: { value: string; label: string; gold?: boolean }) {
   return (
     <div className={`rounded-2xl border p-4 ${gold ? "bg-amber-500/10 border-amber-400/30" : "bg-black/25 border-white/10"}`}>
-      <div className={`text-2xl font-bold leading-none ${gold ? "text-amber-300" : "grad-text"}`}>{value}</div>
+      <div className={`text-2xl font-bold leading-none ${gold ? "text-amber-300" : "brand-text"}`}>{value}</div>
       <div className="text-[11px] uppercase tracking-wider text-muted mt-2 leading-snug">{label}</div>
     </div>
   );
@@ -224,11 +251,11 @@ export function BrandHero({ c, stats }: { c: Copy; stats?: { label: string; valu
       </div>
       <h1 className="text-4xl md:text-6xl font-bold leading-[1.05] tracking-tight max-w-4xl">
         {c["brand.hero.title"]}<br />
-        <span className="grad-text">{c["brand.hero.title2"]}</span>
+        <span className="brand-text">{c["brand.hero.title2"]}</span>
       </h1>
       <p className="mt-6 max-w-2xl text-lg text-muted leading-relaxed">{c["brand.hero.subtitle"]}</p>
       <div className="mt-8 flex flex-wrap gap-3">
-        <Link href="#plans" className="glow-btn pressable rounded-full px-7 py-3 font-semibold text-white">
+        <Link href="#plans" className="brand-btn pressable rounded-full px-7 py-3 font-semibold text-white">
           {c["brand.hero.cta.primary"]} <Icon name="arrowDown" size={15} className="ml-1" />
         </Link>
         <Link href="/dataroom/company-profile" className="ghost-btn pressable rounded-full px-6 py-3">
@@ -239,7 +266,7 @@ export function BrandHero({ c, stats }: { c: Copy; stats?: { label: string; valu
         <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {stats.map((s) => (
             <div key={s.label} className="glass rounded-2xl px-4 py-4">
-              <div className="text-2xl font-bold grad-text leading-none">{s.value}</div>
+              <div className="text-2xl font-bold brand-text leading-none">{s.value}</div>
               <div className="text-[11px] uppercase tracking-wider text-muted mt-2">{s.label}</div>
             </div>
           ))}

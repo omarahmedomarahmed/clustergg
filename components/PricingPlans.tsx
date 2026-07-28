@@ -5,7 +5,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
 import {
-  quote, money, projectedImpressions, lines,
+  quote, money, projectedImpressions, lines, perGame,
   type PricingConfig, type TierKey,
 } from "@/lib/pricing";
 
@@ -33,12 +33,21 @@ export default function PricingPlans({
   contactHref?: string;
   compact?: boolean;
 }) {
-  const [picked, setPicked] = useState(1);
+  // Which games, not how many.
+  //
+  // A slider answers "how many games" — a question no brand has. A brand knows
+  // which title their audience plays, and picking Valorant is a decision they
+  // can make; dragging to "3" is one they can't. Same maths, same price, but the
+  // control now matches the thought.
+  const max = Math.max(1, Math.min(cfg.games, games.length || cfg.games));
+  const [chosen, setChosen] = useState<string[]>(() => (games[0] ? [games[0].slug] : []));
   const [yearly, setYearly] = useState(false);
   const [addon, setAddon] = useState(false);
 
-  const max = Math.max(1, Math.min(cfg.games, games.length || cfg.games));
-  const n = Math.min(picked, max);
+  const n = Math.min(chosen.length, max);
+  const toggle = (slug: string) =>
+    setChosen((c) => (c.includes(slug) ? c.filter((s) => s !== slug) : c.length >= max ? c : [...c, slug]));
+  const setPicked = (want: number) => setChosen(games.slice(0, Math.max(0, Math.min(max, want))).map((g) => g.slug));
 
   const qReach = useMemo(() => quote(cfg, { games: 0, yearly, addon }), [cfg, yearly, addon]);
   const qPick = useMemo(() => quote(cfg, { games: n, yearly, addon }), [cfg, n, yearly, addon]);
@@ -75,11 +84,12 @@ export default function PricingPlans({
           contactHref={contactHref}
           icon="send"
           badge={`${placements.total} placements`}
+          addon={addon} setAddon={setAddon} cfg={cfg} copy={copy}
         />
 
         {/* ===== 2. CHALLENGE — the configurator ===== */}
         <div className={`glass rounded-3xl p-6 relative overflow-hidden ring-1 ${isUltimate ? "ring-amber-400/40" : "ring-violet-400/50"} lg:-mt-3 lg:mb-3`}>
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-500 via-cyan-400 to-amber-400" />
+          <div className="absolute inset-x-0 top-0 h-1 bg-violet-500" />
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-violet-200 bg-violet-500/15 border border-violet-400/30 rounded-full px-2.5 py-1">
@@ -96,44 +106,59 @@ export default function PricingPlans({
           {/* The slider */}
           <div className="mt-5">
             <div className="flex items-baseline justify-between text-xs mb-2">
-              <span className="text-muted">How many games do you want to own?</span>
-              <span className="font-bold text-cyan-300">{n} of {max}</span>
+              <span className="text-muted">Pick the games you want to own</span>
+              <span className="font-bold text-violet-300">{n} of {max} selected</span>
             </div>
-            <input
-              type="range" min={1} max={max} step={1} value={n}
-              onChange={(e) => setPicked(Number(e.target.value))}
-              aria-label="Games sponsored"
-              className={`w-full ${isUltimate ? "accent-amber-400" : "accent-violet-500"}`}
-            />
-            {/* Game logos: the ones you've bought are lit, the rest wait. */}
-            {games.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {games.slice(0, max).map((g, i) => {
-                  const on = i < n;
-                  return (
-                    <button
-                      key={g.slug} type="button" onClick={() => setPicked(i + 1)}
-                      title={`${g.name}${g.gamers ? ` · ${g.gamers.toLocaleString()} gamers` : ""}`}
-                      className={`rounded-xl p-1 transition-all ${on ? "ring-1 ring-cyan-400/60 bg-cyan-400/10" : "opacity-35 grayscale hover:opacity-70"}`}
-                    >
-                      <GameLogo logoUrl={g.logoUrl} name={g.name} size={30} rounded="rounded-lg" />
-                    </button>
-                  );
-                })}
-              </div>
+
+            {/* One row per game: logo, name, its real audience, a tick. */}
+            <div className="grid sm:grid-cols-2 gap-1.5">
+              {games.slice(0, max).map((g) => {
+                const on = chosen.includes(g.slug);
+                const full = !on && n >= max;
+                return (
+                  <button
+                    key={g.slug} type="button" onClick={() => toggle(g.slug)} disabled={full}
+                    aria-pressed={on}
+                    className={`flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left transition-all ${
+                      on ? "border-violet-400/60 bg-violet-500/15" : "border-white/10 bg-black/20 hover:border-violet-400/30"
+                    } ${full ? "opacity-40 cursor-not-allowed" : ""}`}
+                  >
+                    <span className={on ? "" : "opacity-60 grayscale"}>
+                      <GameLogo logoUrl={g.logoUrl} name={g.name} size={26} rounded="rounded-lg" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-xs font-semibold truncate">{g.name}</span>
+                      {g.gamers > 0 && <span className="block text-[10px] text-muted">{g.gamers.toLocaleString()} gamers</span>}
+                    </span>
+                    <span className={`h-4 w-4 rounded-[5px] border grid place-items-center shrink-0 ${
+                      on ? "bg-violet-400 border-violet-400" : "border-white/25"
+                    }`}>
+                      {on && <Icon name="check" size={11} className="text-[#12002e]" />}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {max > 1 && (
+              <button
+                type="button" onClick={() => setPicked(isUltimate ? 1 : max)}
+                className="mt-2 text-[11px] text-violet-300 hover:text-ink"
+              >
+                {isUltimate ? "Clear back to one game" : `Select all ${max} games →`}
+              </button>
             )}
           </div>
 
-          {/* What that buys — the numbers that move with the slider */}
+          {/* What that buys — the numbers that move as you pick */}
           <div className="mt-5 grid grid-cols-3 gap-2 text-center">
             <Stat n={qPick.challengesPerMonth} label="challenges / month" accent="text-cyan-300" />
-            <Stat n={money(qPick.prizeFunded, cfg.currency)} label="prizes we fund" accent="text-amber-300" />
+            <Stat n={money(qPick.prizeFunded, cfg.currency)} label="prize money to players" accent="text-amber-300" />
             <Stat n={selectedGamers > 0 ? selectedGamers.toLocaleString() : "—"} label="verified gamers" accent="text-violet-200" />
           </div>
 
           <div className="mt-4 rounded-xl bg-black/25 border border-white/10 p-3 text-xs text-muted leading-relaxed">
             <span className="text-ink font-semibold">{money(isUltimate ? cfg.ultimateBase : cfg.challengeBase, cfg.currency)}</span> base
-            {" + "}<span className="text-ink font-semibold">{money(cfg.perGame, cfg.currency)}</span> × {n} {n === 1 ? "game" : "games"}
+            {" + "}<span className="text-ink font-semibold">{money(perGame(cfg), cfg.currency)}</span> × {n} {n === 1 ? "game" : "games"}
             {addon && <> {" + "}<span className="text-ink font-semibold">{money(cfg.streamAddon, cfg.currency)}</span> broadcast</>}
             {isUltimate && (
               <div className="mt-1.5 text-amber-300 inline-flex items-center gap-1.5">
@@ -148,7 +173,7 @@ export default function PricingPlans({
 
           <AddonToggle on={addon} setOn={setAddon} cfg={cfg} copy={copy} />
 
-          <Link href={contactHref} className="glow-btn pressable mt-5 block rounded-full px-6 py-3 text-center font-semibold text-white">
+          <Link href={contactHref} className="brand-btn pressable mt-5 block rounded-full px-6 py-3 text-center font-semibold text-white">
             {cta} · {money(rate(qPick), cfg.currency)}/mo
           </Link>
         </div>
@@ -175,6 +200,7 @@ export default function PricingPlans({
               <span>{cfg.slotCount} × {cfg.slotSeconds}-second video slots in the network rotation.</span>
             </div>
           }
+          addon={addon} setAddon={setAddon} cfg={cfg} copy={copy}
         />
       </div>
 
@@ -220,7 +246,7 @@ function Price({ value, currency, yearly, yearlyTotal }: { value: number; curren
   return (
     <div className="mt-4">
       <div className="flex items-baseline gap-1.5">
-        <span className="text-4xl font-bold grad-text">{money(value, currency)}</span>
+        <span className="text-4xl font-bold brand-text">{money(value, currency)}</span>
         <span className="text-sm text-muted">/month</span>
       </div>
       <div className="text-[11px] text-muted mt-1 h-4">
@@ -232,10 +258,12 @@ function Price({ value, currency, yearly, yearlyTotal }: { value: number; curren
 
 function TierCard({
   tier, active, name, tagline, price, currency, yearly, yearlyTotal, features, cta, contactHref, icon, badge, onBadgeClick, extra,
+  addon, setAddon, cfg, copy,
 }: {
   tier: TierKey; active: boolean; name: string; tagline: string; price: number; currency: string;
   yearly: boolean; yearlyTotal: number; features: string[]; cta: string; contactHref: string;
   icon: string; badge?: string; onBadgeClick?: () => void; extra?: React.ReactNode;
+  addon: boolean; setAddon: (v: boolean) => void; cfg: PricingConfig; copy: Record<string, string>;
 }) {
   const gold = tier === "ultimate";
   return (
@@ -267,10 +295,15 @@ function TierCard({
       </ul>
       {extra}
 
+      {/* The add-on sells on every plan, so it is offered on every plan. It used
+          to live only inside the middle card, which meant a brand who wanted
+          placements plus the Sunday broadcast never saw that they could. */}
+      <AddonToggle on={addon} setOn={setAddon} cfg={cfg} copy={copy} />
+
       <Link
         href={contactHref}
-        className={`pressable mt-5 block rounded-full px-6 py-3 text-center font-semibold ${
-          gold ? "bg-gradient-to-r from-amber-500 to-orange-500 text-[#1a1200]" : "ghost-btn"
+        className={`pressable mt-4 block rounded-full px-6 py-3 text-center font-semibold ${
+          gold ? "bg-amber-500 text-[#1a1200]" : "ghost-btn"
         }`}
       >{cta}</Link>
     </div>
@@ -322,7 +355,7 @@ function InvCard({ icon, value, label, note }: { icon: string; value: string; la
   return (
     <div className="glass rounded-2xl p-4">
       <Icon name={icon} size={16} className="text-violet-300" />
-      <div className="text-2xl font-bold grad-text mt-1.5 leading-none">{value}</div>
+      <div className="text-2xl font-bold brand-text mt-1.5 leading-none">{value}</div>
       <div className="text-[11px] uppercase tracking-wider text-muted mt-1.5">{label}</div>
       <p className="text-[11px] text-muted/70 mt-2 leading-snug">{note}</p>
     </div>

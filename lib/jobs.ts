@@ -26,7 +26,7 @@ export const JOBS: { key: JobKey; label: string; description: string }[] = [
   {
     key: "discord-ads",
     label: "Post Discord ads",
-    description: "Posts one ad into each server that has unlocked revenue share and is opted in. Respects the per-server interval, so running it early is safe.",
+    description: "Posts one ad into each server that has crossed the unlock threshold and is opted in. Respects the per-server interval, so running it early is safe.",
   },
   {
     key: "week-update",

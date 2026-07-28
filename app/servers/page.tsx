@@ -4,7 +4,7 @@ import { tierFor } from "@/lib/server-portal";
 import { installUrl } from "@/lib/discord/config";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
-import { buildPricing, money, PRICING_NUMBER_KEYS } from "@/lib/pricing";
+import { buildPricing, money, perGame, prizeSharePct, PRICING_NUMBER_KEYS } from "@/lib/pricing";
 import ServerEarnCards from "@/components/ServerEarnCards";
 import Icon from "@/components/Icon";
 
@@ -42,9 +42,9 @@ export default async function ServersDirectoryPage() {
             <span className="grad-text">Start getting paid for it.</span>
           </h1>
           <p className="text-muted mt-4 max-w-2xl leading-relaxed">
-            Cluster pays Discord servers out of what brands pay us. Install the bot free, run challenges with
-            real prize money, and keep {Math.round(cfg.serverSharePct)}% of the revenue your community
-            generates. Every server below did exactly that.
+            Brands sponsor weekly challenges in the games your members already play, and{" "}
+            {prizeSharePct(cfg)}% of what they pay goes straight to the players who win — your players.
+            Installing is free. Every server below did exactly that.
           </p>
           <div className="flex flex-wrap gap-6 mt-7">
             <Stat label="Servers" value={nf(stats.servers)} />
@@ -67,9 +67,9 @@ export default async function ServersDirectoryPage() {
           <div className="mt-8 glass rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <Icon name="chart" size={20} className="text-cyan-300 shrink-0" />
             <p className="text-sm text-muted leading-relaxed flex-1">
-              Brands pay {money(cfg.perGame, cfg.currency)} a month per game for {cfg.challengesPerGame} sponsored
-              challenges. Those challenges run in the servers whose members play that game — so what your community
-              earns depends on what your community plays.
+              Brands pay {money(perGame(cfg), cfg.currency)} a month per game for {cfg.challengesPerGame} sponsored
+              challenges, and {money(cfg.prizePool, cfg.currency)} of every one is prize money. Those challenges run
+              where the players are — so what lands in your community depends on what your community plays.
             </p>
             <Link href="/pricing" className="ghost-btn pressable rounded-full px-5 py-2.5 text-sm shrink-0">
               See what brands pay

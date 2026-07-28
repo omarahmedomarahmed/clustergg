@@ -466,7 +466,7 @@ async function ensureProvisioned(db: DB) {
     // table scans — this is what keeps Neon data-transfer from ballooning.
     await runColumnMigrations(db);
     try {
-      const { runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, refreshStaleChallengeWindows, ensureBrandKeys, rehostImagesToBlob } = await import("./seed");
+      const { runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, ensureCardAdPlacement, refreshStaleChallengeWindows, ensureBrandKeys, rehostImagesToBlob } = await import("./seed");
       await runBootMaintenance(db);
       // Runs EVERY boot (not version-gated): converts any images still stored as
       // base64 data URLs to Blob. Cheap once done (SQL LIKE 'data:%' → 0 rows),
@@ -476,6 +476,7 @@ async function ensureProvisioned(db: DB) {
       // and Higgsfield/cloudfront art into our own Blob. Idempotent + cheap once done.
       await rehostImagesToBlob(db);
       await ensureTopBannerAd(db);
+      await ensureCardAdPlacement(db);
       await refreshStaleChallengeWindows(db);
       await ensureBrandKeys(db);
     } catch { /* non-fatal — ads/skins just won't backfill this boot */ }
@@ -492,13 +493,13 @@ async function ensureProvisioned(db: DB) {
     }
   }
   await runColumnMigrations(db);
-  const { seed, runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, refreshStaleChallengeWindows, ensureBrandKeys, rehostImagesToBlob } = await import("./seed");
+  const { seed, runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, ensureCardAdPlacement, refreshStaleChallengeWindows, ensureBrandKeys, rehostImagesToBlob } = await import("./seed");
   try {
     await seed(db, { demo: false });
   } catch (e) {
     if (!/duplicate key|already exists/i.test(String(e))) throw e;
   }
-  try { await runBootMaintenance(db); await migrateGameImagesToBlob(db); await rehostImagesToBlob(db); await ensureTopBannerAd(db); await refreshStaleChallengeWindows(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
+  try { await runBootMaintenance(db); await migrateGameImagesToBlob(db); await rehostImagesToBlob(db); await ensureTopBannerAd(db); await ensureCardAdPlacement(db); await refreshStaleChallengeWindows(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
 }
 
 async function createDb(): Promise<DB> {

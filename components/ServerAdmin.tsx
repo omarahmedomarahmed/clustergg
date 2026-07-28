@@ -104,7 +104,7 @@ export function DeliveryAdmin({ guildId, announcements, ads, unlocked, linked, t
           <input type="checkbox" name="ads" defaultChecked={ads} className="accent-violet-500 mt-0.5" />
           <span>
             Ad delivery
-            <span className="block text-[11px] text-muted">Only reaches servers that have also unlocked revenue share.</span>
+            <span className="block text-[11px] text-muted">Only reaches servers that have crossed the unlock threshold.</span>
           </span>
         </label>
         <button disabled={savingFlags} className="ghost-btn pressable rounded-full px-5 py-2 text-sm disabled:opacity-60">

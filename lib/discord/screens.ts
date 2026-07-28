@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
 import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, type Frame, type Button } from "@/lib/discord/components";
-import { cardRef, embedColor, liveCardUrl } from "@/lib/discord/cards";
+import { cardRef, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
@@ -47,6 +47,10 @@ export async function loadCtx(
   avatar?: string | null,
   isManager = false,
 ): Promise<ScreenCtx> {
+  // Every card rendered for the rest of this request belongs to this server —
+  // which is how a sponsor impression gets attributed to the community that
+  // produced it without passing a guild id through every screen.
+  setCardGuild(guildId);
   // Using the bot is the sign-up. Sending someone to the website before they
   // can even see their own card is the biggest drop-off in the funnel and buys
   // nothing — the interaction is signed and carries everything the OAuth
@@ -1018,7 +1022,7 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
     ? [
       `**${bar}** ${stats.pct}%`,
       "",
-      `**Ad revenue is unlocked.** ${stats.name} earns a ${stats.revenueSharePct}% share of what Cluster makes from your community.`,
+      `**Sponsored challenges are unlocked.** Brands running challenges in your community's games now post them here — and the prize money is won by your members.`,
       "",
       `**${stats.linked.toLocaleString()}** members have linked a game · **${stats.joined.toLocaleString()}** have a Cluster profile`,
     ]
@@ -1026,7 +1030,7 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       `**${bar}** ${stats.pct}%`,
       "",
       `**${stats.linked.toLocaleString()} / ${stats.threshold.toLocaleString()}** members have joined Cluster *and* linked a game account.`,
-      `**${stats.remaining.toLocaleString()} more** unlocks a ${stats.revenueSharePct}% share of the ad revenue Cluster earns from this community.`,
+      `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here, with real prize money paid to the members who win them.`,
       "",
       `${stats.joined.toLocaleString()} have a Cluster profile so far — linking a game is what counts.`,
     ];

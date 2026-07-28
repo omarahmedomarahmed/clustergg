@@ -150,7 +150,7 @@ export default async function AdminDiscordPage() {
                           />
                         </div>
                         <div className="text-[10px] text-muted mt-1">
-                          {g.unlocked ? `${g.revenueSharePct}% share earning` : `${g.remaining.toLocaleString()} more to unlock`}
+                          {g.unlocked ? "Sponsored challenges live" : `${g.remaining.toLocaleString()} more to unlock`}
                         </div>
                       </td>
                       <td className="px-3 py-2.5">

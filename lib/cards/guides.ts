@@ -84,7 +84,7 @@ export const GUIDE_TOPICS: Record<string, GuideTopic> = {
       { title: "Quests", body: "Cluster Points, Bronze to Platinum. /cluster quests" },
       { title: "Profile of the Week", body: "The platform votes. Sunday on stream. /cluster week" },
       { title: "Trophies", body: "Podiums pay real value. /cluster trophies" },
-      { title: "Your server", body: "Growth and revenue share. /cluster server" },
+      { title: "Your server", body: "Growth and sponsored challenges. /cluster admin" },
     ],
   },
   "commands": {

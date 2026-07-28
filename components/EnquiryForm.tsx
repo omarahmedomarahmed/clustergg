@@ -53,7 +53,7 @@ export default function EnquiryForm({
             </div>
           </div>
           <div className="text-right">
-            <div className="text-3xl font-bold grad-text leading-none">{money(rate, cfg.currency)}</div>
+            <div className="text-3xl font-bold brand-text leading-none">{money(rate, cfg.currency)}</div>
             <div className="text-[11px] text-muted mt-1">per month{yearly ? ", billed annually" : ""}</div>
           </div>
         </div>
@@ -122,7 +122,7 @@ export default function EnquiryForm({
         </div>
       )}
 
-      <button disabled={pending} className="glow-btn pressable mt-6 w-full rounded-full px-8 py-3.5 font-semibold text-white disabled:opacity-60">
+      <button disabled={pending} className="brand-btn pressable mt-6 w-full rounded-full px-8 py-3.5 font-semibold text-white disabled:opacity-60">
         {pending ? "Sending…" : "Send enquiry"}
       </button>
       <p className="text-[11px] text-muted mt-3 text-center">

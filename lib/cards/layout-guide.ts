@@ -62,11 +62,23 @@ export type CardGuide = {
   summary: string;
   regions: Region[];
   bgKey: string;   // the Card-backgrounds key that skins this card
+  /**
+   * What a gamer types (or presses) to make this card appear.
+   *
+   * Editing a layout without knowing which command produces it means guessing,
+   * saving, and going to Discord to check. Printing it next to the canvas turns
+   * that into a copy-paste.
+   */
+  command: string;
+  /** Which family it belongs to, for the picker's grouping. */
+  group: "gamer" | "game" | "competition" | "help";
 };
 
 export const CARD_GUIDES: CardGuide[] = [
   {
     kind: "profile",
+    command: "/cluster  ·  /cluster show <gamer>",
+    group: "gamer",
     name: "Gamer profile",
     summary:
       "A gamer's snapshot. Uses the gamer's OWN background if they set one in the profile builder, so platform art here is only the fallback.",
@@ -80,6 +92,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "game-stats",
+    command: "/cluster show <gamer> <game>",
+    group: "gamer",
     name: "Game account",
     summary: "One game's live stats: rank, headline metrics, mains and recent matches.",
     bgKey: "bot_game",
@@ -92,6 +106,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "challenge",
+    command: "/cluster show <challenge>",
+    group: "competition",
     name: "Challenge",
     summary: "The competition poster and scoreboard in one. The most content-dense card — treat its art as a backdrop only.",
     bgKey: "bot_challenge",
@@ -109,6 +125,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "leaderboard",
+    command: "/cluster show <game> leaderboard",
+    group: "competition",
     name: "Leaderboard",
     summary: "Top gamers for a game and metric. Rows fill most of the canvas.",
     bgKey: "bot_leaderboard",
@@ -120,6 +138,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "planet",
+    command: "/cluster show <game>",
+    group: "game",
     name: "Game planet",
     summary: "A game's hub: its live challenges and its boards, side by side.",
     bgKey: "bot_planet",
@@ -131,6 +151,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "world",
+    command: "/cluster show <champion | agent | weapon | map>",
+    group: "game",
     name: "Game world / lore",
     summary: "A champion, agent, weapon or map. The entity's own splash is the background.",
     bgKey: "bot_world",
@@ -144,6 +166,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "search",
+    command: "/cluster show <anything ambiguous>",
+    group: "help",
     name: "Search results",
     summary: "The 'did you mean' card, shown only when a query matches more than one thing.",
     bgKey: "bot_search",
@@ -155,6 +179,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "week",
+    command: "/cluster vote  ·  the Sunday announcement",
+    group: "competition",
     name: "Profile of the Week",
     summary: "The weekly vote — standings during the week, the podium on Sunday.",
     bgKey: "bot_week",
@@ -167,6 +193,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "planets",
+    command: "/cluster show planets  ·  every START HERE button",
+    group: "game",
     name: "All games",
     summary: "The game picker — every logo as a tile. What START HERE opens.",
     bgKey: "bot_planet",
@@ -177,6 +205,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "quest",
+    command: "/cluster show <quest>",
+    group: "gamer",
     name: "Quest progress",
     summary: "A gamer's progress through one quest's tiers.",
     bgKey: "bot_quest",
@@ -188,6 +218,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "cp-summary",
+    command: "/cluster show cp",
+    group: "gamer",
     name: "Cluster Points",
     summary: "Total CP and per-quest breakdown.",
     bgKey: "bot_quest",
@@ -195,6 +227,8 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "guide",
+    command: "/cluster guide  ·  pinned on install",
+    group: "help",
     name: "How-to guide",
     summary: "The pinned onboarding cards. Mostly text — art should be almost abstract.",
     bgKey: "bot_guide",

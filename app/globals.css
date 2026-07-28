@@ -41,20 +41,38 @@ html, body {
   box-shadow: 0 8px 40px -12px rgba(139,92,246,.35);
 }
 
-.grad-text {
-  background: linear-gradient(92deg, #a78bfa 0%, #22d3ee 55%, #e879f9 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
+/* ===== The two-colour system =====
+ *
+ * There used to be one gradient — violet to cyan to fuchsia — on every headline,
+ * every button and every big number, which meant nothing on the site could mean
+ * anything by being coloured. Now colour carries information:
+ *
+ *   BLUE   Discord, the bot, gamers. The product.
+ *   PURPLE brands, ads, pricing. The business.
+ *
+ * `.grad-text` keeps its name because thirty-nine files call it, but it is a
+ * flat blue now. `.brand-text` is its purple twin for commercial surfaces.
+ */
+.grad-text { color: #38bdf8; }
+.brand-text { color: #a78bfa; }
 
+/* The primary button. Blue by default — it is mostly a gamer or bot action. */
 .glow-btn {
-  background: linear-gradient(92deg, #7c3aed, #0891b2);
-  box-shadow: 0 0 24px -4px rgba(139,92,246,.55), inset 0 1px 0 rgba(255,255,255,.2);
-  transition: box-shadow .25s, transform .15s, filter .2s;
+  background: #2563eb;
+  box-shadow: 0 0 24px -6px rgba(56,189,248,.55), inset 0 1px 0 rgba(255,255,255,.2);
+  transition: box-shadow .25s, transform .15s, filter .2s, background .2s;
 }
-.glow-btn:hover { box-shadow: 0 0 42px -4px rgba(139,92,246,.8); filter: brightness(1.1); transform: translateY(-1px); }
+.glow-btn:hover { background: #1d4ed8; box-shadow: 0 0 42px -6px rgba(56,189,248,.8); filter: brightness(1.06); transform: translateY(-1px); }
 .glow-btn:active { transform: translateY(0); }
+
+/* Its purple twin, for anything a brand clicks: pricing, enquiry, the portal. */
+.brand-btn {
+  background: #7c3aed;
+  box-shadow: 0 0 24px -6px rgba(167,139,250,.6), inset 0 1px 0 rgba(255,255,255,.2);
+  transition: box-shadow .25s, transform .15s, filter .2s, background .2s;
+}
+.brand-btn:hover { background: #6d28d9; box-shadow: 0 0 42px -6px rgba(167,139,250,.85); filter: brightness(1.06); transform: translateY(-1px); }
+.brand-btn:active { transform: translateY(0); }
 
 .ghost-btn {
   border: 1px solid rgba(139,92,246,.4);
@@ -163,7 +181,7 @@ a, button, [role="button"], select, summary { cursor: pointer; }
 .nav-link:hover { color: #e8eaf6; }
 .nav-link::after {
   content: ""; position: absolute; left: 0; right: 100%; bottom: -4px; height: 2px;
-  background: linear-gradient(90deg, #8b5cf6, #22d3ee);
+  background: #38bdf8;
   transition: right .25s ease; border-radius: 2px;
 }
 .nav-link:hover::after { right: 0; }

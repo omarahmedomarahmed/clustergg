@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Icon from "@/components/Icon";
@@ -67,6 +68,16 @@ const STORE_KEY = "cluster.week.collapsed";
 const nf = (n: number) => n.toLocaleString();
 
 export default function WeekBand({ initial }: { initial: BandData }) {
+  // Never in the admin area.
+  //
+  // Staff are signed in, so the board opened by default and dropped a fixed
+  // panel over Mission Control that swallowed every click underneath it — the
+  // card studio was literally unusable. Admin is a workspace; nobody votes from
+  // it. Read here rather than passed down because the header is rendered once,
+  // in the root layout, by a server component that has no pathname.
+  const pathname = usePathname();
+  const inAdmin = pathname?.startsWith("/admin") ?? false;
+
   const [data, setData] = useState<BandData>(initial);
   // Open for gamers, collapsed for visitors.
   //
@@ -158,6 +169,9 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   const podium = data.entries.filter((e) => !e.disqualified).slice(0, 3);
   const announcing = data.week.phase === "announcement";
   const streaming = announcing && data.stream.live && !!data.stream.url;
+
+  // After every hook, so the hook order never changes between renders.
+  if (inAdmin) return null;
 
   return (
     <>
@@ -428,7 +442,7 @@ function embedUrl(raw: string): string | null {
 // result that reads as a status line makes winning feel like a database row.
 function Called({ result, me }: { result: NonNullable<BandData["result"]>; me: BandData["me"] }) {
   if (!result.podium.length) return null;
-  const order = result.podium.length >= 3 ? [1, 0, 2] : result.podium.map((_, i) => i);
+  const total = result.podium.length;
   const mine = me ? result.podium.findIndex((p) => p.slug === me.slug) : -1;
   const trophy = result.trophy;
 
@@ -460,16 +474,14 @@ function Called({ result, me }: { result: NonNullable<BandData["result"]>; me: B
       </div>
 
       <div className={`grid items-end gap-3 px-5 py-5 ${COLS[Math.min(result.podium.length, 3)] ?? COLS[3]}`}>
-        {order.map((pos) => {
-          const p = result.podium[pos];
-          if (!p) return null;
+        {result.podium.map((p, pos) => {
           const medal = MEDAL[pos] ?? "#94a3b8";
           const first = pos === 0;
           return (
             <Link
               key={p.userId}
               href={`/u/${p.slug}`}
-              className={`group relative flex flex-col items-center gap-2 rounded-2xl border px-4 text-center transition hover:-translate-y-0.5 ${first ? "py-7" : "py-5"}`}
+              className={`group relative flex flex-col items-center gap-2 rounded-2xl border px-4 text-center transition hover:-translate-y-0.5 ${first ? "py-7" : "py-5"} ${podiumOrder(pos, total)}`}
               style={{
                 borderColor: first ? medal : `${medal}55`,
                 background: `linear-gradient(180deg, ${medal}1f, rgba(4,5,26,0.5))`,
@@ -531,15 +543,11 @@ function Podium({ entries, data, onOpen, note, setNote, onVoted }: {
   setNote: (n: { slug: string; text: string } | null) => void;
   onVoted: () => void;
 }) {
-  const order = entries.length >= 3 ? [1, 0, 2] : entries.map((_, i) => i);
   return (
     <div className={`mb-5 grid items-end gap-3 ${COLS[Math.min(entries.length, 3)] ?? COLS[3]}`}>
-      {order.map((pos) => {
-        const e = entries[pos];
-        if (!e) return null;
-        return (
+      {entries.map((e, pos) => (
+        <div key={e.userId} className={podiumOrder(pos, entries.length)}>
           <PodiumCard
-            key={e.userId}
             entry={e}
             place={pos}
             data={data}
@@ -548,10 +556,26 @@ function Podium({ entries, data, onOpen, note, setNote, onVoted }: {
             setNote={setNote}
             onVoted={onVoted}
           />
-        );
-      })}
+        </div>
+      ))}
     </div>
   );
+}
+
+/**
+ * A podium reads 2nd–1st–3rd across, and 1st–2nd–3rd down.
+ *
+ * The winner used to be rendered second in the DOM so the middle column would
+ * hold them. That is right on a wide screen and wrong everywhere else: on a
+ * phone the grid collapses to one column and the runner-up appeared above the
+ * winner. It was also wrong for a screen reader, which reads the DOM.
+ *
+ * So the DOM stays in ranking order — correct on mobile and correct read aloud —
+ * and only the wide layout re-orders, with CSS, into a podium.
+ */
+function podiumOrder(pos: number, total: number): string {
+  if (total < 3) return "";
+  return pos === 0 ? "sm:order-2" : pos === 1 ? "sm:order-1" : "sm:order-3";
 }
 
 const PLACE_LABEL = ["Profile of the Week", "Second", "Third"];

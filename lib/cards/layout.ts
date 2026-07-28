@@ -94,6 +94,19 @@ export type CardLayout = {
   mark: Spot;
   /** Top-right furniture: game logo, level pill, or the challenge trophy stack. */
   badge: Spot;
+  /**
+   * The sponsor box.
+   *
+   * Every card the bot renders carries one, because the cards ARE the inventory:
+   * a brand cannot buy a banner inside Discord, and this is the only surface
+   * that reaches a server's members where they already are. `size` is the box
+   * WIDTH in canvas pixels; its height follows `AD_RATIO`, so the geometry can't
+   * drift from the creative a brand actually uploaded.
+   *
+   * Hide it per card kind (`hidden: true`) when a card shouldn't sell — a guide
+   * that ships in the install flow, say — and every other card keeps earning.
+   */
+  ad: Spot;
   content: ContentBox;
   /** Darkness (0-100) of the plate drawn behind text blocks. 0 turns it off. */
   plate: number;
@@ -129,11 +142,33 @@ export type CardLayout = {
 // The house default — the geometry the renderer drew before any of this was
 // editable, expressed in the new terms. Changing these changes every card that
 // has never been edited, which is the point: one place to retune the whole set.
+/**
+ * Height / width of a sponsor creative.
+ *
+ * 0.3125 is the 320x100 mobile-leaderboard ratio — the single most common
+ * banner a brand already owns, so the first campaign needs no new artwork. The
+ * `discord_card` placement is defined at 640x200 (the same ratio at 2x) so what
+ * a brand uploads lands in this box without a crop.
+ */
+export const AD_RATIO = 0.3125;
+
+/** The "Sponsored · Brand" strip drawn under the creative, in canvas pixels. */
+export const AD_LABEL_H = 22;
+
 export const DEFAULT_LAYOUT: CardLayout = {
   mascot: { x: 9, y: 84, size: 200 },
   mark: { x: 92.7, y: 87.6, size: 104 },
   badge: { x: 91, y: 11.5, size: 96 },
-  content: { x: 4.7, y: 7, w: 79.5, h: 84 },
+  // 79.5% before the sponsor box existed, which put the right edge of the text
+  // column 130px INSIDE it — a challenge title with six words ran under the
+  // creative. Satori has no float, so text cannot wrap around the box; the
+  // column has to stop short of it. This is the cost of the inventory, taken
+  // once, everywhere, instead of discovered per card in production.
+  content: { x: 4.7, y: 7, w: 68.5, h: 84 },
+  // Top-right, hard against the corner the eye lands on last — the corner a
+  // card's own furniture (game logo, level pill, trophy stack) used to own
+  // alone. The badge is pushed clear of it automatically; see `badgeTopFor`.
+  ad: { x: 85.4, y: 12.4, size: 296 },
   plate: 46,
   plateRadius: 22,
   dim: 62,
@@ -265,6 +300,7 @@ export function parseLayout(raw: string | null | undefined): CardLayout {
     mascot: spot(o.mascot, DEFAULT_LAYOUT.mascot),
     mark: spot(o.mark, DEFAULT_LAYOUT.mark),
     badge: spot(o.badge, DEFAULT_LAYOUT.badge),
+    ad: spot(o.ad, DEFAULT_LAYOUT.ad),
     content: {
       x: num(c.x, DEFAULT_LAYOUT.content.x, 0, 90),
       y: num(c.y, DEFAULT_LAYOUT.content.y, 0, 90),
@@ -330,6 +366,42 @@ export function spotBox(s: Spot, ratio = 1): { left: number; top: number; width:
     width,
     height,
   };
+}
+
+/**
+ * The whole sponsor unit: the creative plus the strip that names the brand.
+ *
+ * The spot positions the CREATIVE, so an admin dragging the box is dragging the
+ * picture rather than a container whose height depends on whether a label
+ * happens to fit.
+ */
+export function adBox(s: Spot): {
+  left: number; top: number; width: number; height: number; imageHeight: number; bottom: number;
+} {
+  const b = spotBox(s, AD_RATIO);
+  return { ...b, imageHeight: b.height, height: b.height + AD_LABEL_H, bottom: b.top + b.height + AD_LABEL_H };
+}
+
+/**
+ * Where the badge actually hangs once a sponsor box is on the card.
+ *
+ * The brief was "put the ad top-right and move the badge and trophy below it".
+ * Doing that by changing the badge's stored default would have moved it on
+ * every card whether or not an ad was ever served, leaving a hole at the top of
+ * an unsold card. So the shift is computed at render time and only when the two
+ * genuinely collide: an admin who drags the badge somewhere else keeps exactly
+ * where they put it, and a card with no ad is unchanged.
+ */
+export function badgeTopFor(l: CardLayout, hasAd: boolean, badgeRatio = 1): number {
+  const badge = spotBox(l.badge, badgeRatio);
+  if (!hasAd || l.ad.hidden || l.badge.hidden) return badge.top;
+  const ad = adBox(l.ad);
+  const overlapsX = badge.left < ad.left + ad.width && ad.left < badge.left + badge.width;
+  const overlapsY = badge.top < ad.bottom && ad.top < badge.top + badge.height;
+  if (!overlapsX || !overlapsY) return badge.top;
+  // Never push the badge off the bottom edge; a clipped trophy stack is worse
+  // than one that overlaps by a few pixels.
+  return Math.min(ad.bottom + 16, CANVAS_H - badge.height - 8);
 }
 
 export function contentBox(c: ContentBox): { left: number; top: number; width: number; height: number } {

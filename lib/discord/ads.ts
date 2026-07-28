@@ -8,7 +8,7 @@ import { adEligibleGuilds } from "@/lib/discord/guilds";
 import { linkButton, rows } from "@/lib/discord/components";
 import { embedColor } from "@/lib/discord/cards";
 
-// Ads the bot posts into servers that have unlocked revenue share.
+// Ads the bot posts into servers that have crossed the unlock threshold.
 //
 // Two rules keep this from feeling like spam, which is what would get the bot
 // removed from every server it's in:

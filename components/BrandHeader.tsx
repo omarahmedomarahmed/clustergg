@@ -27,7 +27,13 @@ export default async function BrandHeader({ placement = "nav" }: { placement?: "
   const word = mode === "mark"
     ? null
     : wordmark
-      ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={wordmark} alt="Cluster" style={{ height: wmHeight }} className={`w-auto object-contain ${placement === "nav" ? "max-w-[160px] sm:max-w-[260px]" : "max-w-[220px]"}`} />)
+      // On a phone the nav shows the letter-mark only.
+      //
+      // The wordmark is 160px of a 390px viewport, and with the locale toggle,
+      // the Discord button and the burger all needing room the row ran past the
+      // right edge — the burger visibly outside the page. The mark alone is
+      // still unmistakably the brand and gives the row 160px back.
+      ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={wordmark} alt="Cluster" style={{ height: wmHeight }} className={`w-auto object-contain ${placement === "nav" ? "hidden sm:block sm:max-w-[260px]" : "max-w-[220px]"}`} />)
       : <span className={`${placement === "nav" ? "hidden sm:inline text-2xl" : "text-lg"} font-bold tracking-wide grad-text`}>CLUSTER</span>;
 
   return (

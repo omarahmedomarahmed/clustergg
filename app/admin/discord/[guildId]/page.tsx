@@ -57,8 +57,8 @@ export default async function GuildDetailPage({ params }: { params: Promise<{ gu
           <Stat label="On Cluster" value={stats.joined.toLocaleString()} />
           <Stat label="Linked a game" value={stats.linked.toLocaleString()} accent />
           <Stat
-            label={stats.unlocked ? "Revenue share" : "To unlock"}
-            value={stats.unlocked ? `${stats.revenueSharePct}%` : `${stats.remaining.toLocaleString()} more`}
+            label={stats.unlocked ? "Sponsored challenges" : "To unlock"}
+            value={stats.unlocked ? "Unlocked" : `${stats.remaining.toLocaleString()} more`}
           />
         </div>
         <p className="text-xs text-muted mt-3">

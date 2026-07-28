@@ -120,13 +120,26 @@ export async function toEmbeddable(
 
   // Already inline. Still has to be a format Satori can read, so an inline
   // WebP gets converted exactly like a remote one.
+  //
+  // Not every data URL is base64. Our own house ad creatives are
+  // `data:image/svg+xml;utf8,<percent-encoded svg>` — reading those as base64
+  // produced bytes that were not an image, so every house creative silently
+  // resolved to nothing. The payload encoding is declared in the URL; read it
+  // rather than assume it.
   if (raw.startsWith("data:")) {
-    const type = raw.slice(5, raw.indexOf(";")).toLowerCase();
-    const b64 = raw.slice(raw.indexOf(",") + 1);
-    if (NATIVE.has(type)) return raw;
-    if (!CONVERTIBLE.has(type)) return null;
+    const comma = raw.indexOf(",");
+    if (comma < 0) return null;
+    const meta = raw.slice(5, comma);
+    const type = meta.split(";")[0].trim().toLowerCase();
+    const isBase64 = /;\s*base64/i.test(meta);
+    const payload = raw.slice(comma + 1);
+    if (NATIVE.has(type) && isBase64) return raw;
+    if (!NATIVE.has(type) && !CONVERTIBLE.has(type)) return null;
     try {
-      const out = await toNativeBytes(Buffer.from(b64, "base64"), type, maxWidth);
+      const bytes = isBase64
+        ? Buffer.from(payload, "base64")
+        : Buffer.from(decodeURIComponent(payload), "utf8");
+      const out = await toNativeBytes(bytes, type, maxWidth);
       return out ? `data:${out.type};base64,${out.data.toString("base64")}` : null;
     } catch { return null; }
   }

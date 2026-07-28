@@ -5,6 +5,7 @@ import { getContent } from "@/lib/cms";
 import { installUrl } from "@/lib/discord/config";
 import { networkStats } from "@/lib/network";
 import FloatingQuestOrb, { type OrbQuest } from "@/components/FloatingQuestOrb";
+import OrbRail from "@/components/OrbRail";
 import DiscordOrb from "@/components/DiscordOrb";
 
 // The floating rail, bottom-right.
@@ -67,7 +68,10 @@ export default async function FloatingOrbs() {
   const net = showDiscord ? await networkStats().catch(() => null) : null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 print:hidden">
+    // Positioning and the dismiss control live in OrbRail (a client component) —
+    // this one stays a server component so it can read the CMS and the network
+    // stats without shipping either to the browser.
+    <OrbRail>
       {showDiscord && (
         <DiscordOrb
           installUrl={install!}
@@ -86,6 +90,6 @@ export default async function FloatingOrbs() {
           size={questSize}
         />
       )}
-    </div>
+    </OrbRail>
   );
 }

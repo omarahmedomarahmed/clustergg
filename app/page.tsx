@@ -470,7 +470,7 @@ export default async function LandingPage() {
           />
           <DoorCard
             icon="satellite" tone="emerald" title="I run a Discord"
-            body="Install the bot free, link 500 gamers, and start earning from the brands sponsoring the games your members already play."
+            body="Install the bot free, link 500 gamers, and brands start sponsoring challenges in your server — with the prize money won by your members."
             href="/discord-bot" cta="Add ClusterBot"
           />
           <DoorCard

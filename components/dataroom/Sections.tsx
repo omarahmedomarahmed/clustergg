@@ -6,7 +6,7 @@ import { Milestones, GtmStages, TeamGrid, Gallery, MetricTiles, Explainer, CardS
 import { ladder, metricValueFor, INVESTOR_AD_PLACEMENT, type LiveData, type Person, type Section } from "@/lib/dataroom";
 import type { BotStep } from "@/components/BotShowcase";
 import { optImg } from "@/lib/img";
-import { money } from "@/lib/pricing";
+import { money, perGame, marginPerChallenge, prizeSharePct } from "@/lib/pricing";
 
 const nf = (n: number) => n.toLocaleString();
 
@@ -265,7 +265,7 @@ function Body({ section, doc, live, people, steps, installUrl }: {
       const { reach, entry, full } = live.quotes;
       const plans = [
         { name: "Reach", price: reach.monthly, note: "Every placement, the brand portal, full analytics.", detail: "Placements only" },
-        { name: "Challenge", price: entry.monthly, note: `${money(p.challengeBase, p.currency)} base + ${money(p.perGame, p.currency)} per game. ${p.challengesPerGame} sponsored challenges a month, per game, with naming rights.`, detail: "From one game" },
+        { name: "Challenge", price: entry.monthly, note: `${money(p.challengeBase, p.currency)} base + ${money(perGame(p), p.currency)} per game. ${p.challengesPerGame} sponsored challenges a month, per game, with naming rights.`, detail: "From one game" },
         { name: "Ultimate", price: full.monthly, note: `All ${p.games} games, ${full.challengesPerMonth} challenges a month, premium and Discord placement, the Sunday shout-out.`, detail: "The whole network" },
       ];
       return (
@@ -281,17 +281,18 @@ function Body({ section, doc, live, people, steps, installUrl }: {
               </div>
             ))}
           </div>
-          {/* The cost side, so the margin question is answered before it's asked. */}
+          {/* The unit, so the margin question is answered before it's asked. */}
           <div className="grid sm:grid-cols-4 gap-3 mt-4">
-            <PriceFact label="challenges a month" value={nf(p.games * p.challengesPerGame)} accent={accent2} />
-            <PriceFact label="minimum prize pool each" value={money(p.prizePool, p.currency)} accent={accent2} />
-            <PriceFact label="prize money we fund monthly" value={money(p.games * p.challengesPerGame * p.prizePool, p.currency)} accent={accent2} />
-            <PriceFact label="of it kept by the server that hosted it" value={`${Math.round(p.serverSharePct)}%`} accent={accent2} />
+            <PriceFact label="charged per sponsored challenge" value={money(p.challengePrice, p.currency)} accent={accent2} />
+            <PriceFact label="paid out to the three winners" value={money(p.prizePool, p.currency)} accent={accent2} />
+            <PriceFact label="gross margin per challenge" value={money(marginPerChallenge(p), p.currency)} accent={accent2} />
+            <PriceFact label={`of brand spend reaches players (${nf(p.games * p.challengesPerGame)} challenges a month)`} value={`${prizeSharePct(p)}%`} accent={accent2} />
           </div>
           <p className="text-xs text-muted mt-4 max-w-2xl leading-relaxed">
-            Annual is {Math.round(p.yearlyDiscountPct)}% off. The Sunday broadcast sponsorship is a
-            {" "}{money(p.streamAddon, p.currency)}/month add-on on any plan. Every figure here is read from the
-            live rate card, not written into this document.
+            Prizes are paid as three trophies carrying the sponsor&apos;s brand — {money(p.prize1, p.currency)},{" "}
+            {money(p.prize2, p.currency)} and {money(p.prize3, p.currency)}. Annual is {Math.round(p.yearlyDiscountPct)}% off,
+            and the Sunday broadcast sponsorship is a {money(p.streamAddon, p.currency)}/month add-on on any plan.
+            Every figure here is read from the live rate card, not written into this document.
           </p>
           <LiveNote takenAt={live.takenAt} />
         </>

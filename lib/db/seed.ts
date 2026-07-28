@@ -4,6 +4,7 @@ import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
 import { uid } from "@/lib/utils";
 import { BADGE_ART, TROPHY_ART, BANNER_ART } from "@/lib/assets";
+import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
 
 // Seeds platform defaults (badges, games, spaces, placements, leaderboards,
 // trophies) and the superadmin from env. Demo mode additionally seeds a demo
@@ -163,9 +164,13 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { key: "challenge_sidebar", pageScope: "Challenge detail rail", device: "desktop", width: 300, height: 600, mobileWidth: null, mobileHeight: null },
     { key: "messages_footer", pageScope: "Above message compose box", device: "both", width: 320, height: 50, mobileWidth: 320, mobileHeight: 50 },
     { key: "interstitial_video", pageScope: "Between page transitions", device: "both", width: 640, height: 360, mobileWidth: 320, mobileHeight: 180 },
-    // Posted by ClusterBot into servers that have unlocked revenue share.
+    // Posted by ClusterBot into servers that have crossed the unlock threshold.
     // Sized for a Discord embed image, which renders about 1200 wide.
     { key: "discord_bot_post", pageScope: "ClusterBot posts in Discord servers", device: "both", width: 1200, height: 400, mobileWidth: 600, mobileHeight: 200 },
+    // The box drawn into EVERY card the bot renders — a profile, a leaderboard,
+    // a challenge, a planet. 640x200 is the 320x100 mobile-leaderboard ratio at
+    // 2x, so a brand's existing banner fits without a redraw.
+    { key: CARD_AD_PLACEMENT, pageScope: "Inside every card ClusterBot renders", device: "both", width: 640, height: 200, mobileWidth: 640, mobileHeight: 200 },
   ];
   const placementIds: Record<string, string> = {};
   for (const p of placementDefs) {
@@ -924,6 +929,45 @@ export async function seedHouseAds(db: DB) {
 // into final placements and hands out the trophies.
 export async function refreshStaleChallengeWindows(_db: DB) {
   return;
+}
+
+/**
+ * The in-card ad placement, on databases seeded before it existed.
+ *
+ * Same shape as `ensureTopBannerAd`: create the placement if missing, and give
+ * it a house creative if the house campaign has nothing pointed at it — so the
+ * slot is visibly working from the first boot instead of being an empty
+ * rectangle nobody can tell is wired up.
+ */
+export async function ensureCardAdPlacement(db: DB) {
+  await db.insert(schema.adPlacements).values({
+    id: uid(), key: CARD_AD_PLACEMENT, pageScope: "Inside every card ClusterBot renders",
+    device: "both", width: 640, height: 200, mobileWidth: 640, mobileHeight: 200,
+  }).onConflictDoNothing();
+
+  const [placement] = await db.select().from(schema.adPlacements)
+    .where(eq(schema.adPlacements.key, CARD_AD_PLACEMENT)).limit(1);
+  if (!placement) return;
+
+  const [brand] = await db.select({ id: schema.brands.id }).from(schema.brands).where(eq(schema.brands.id, HOUSE_BRAND_ID)).limit(1);
+  if (!brand) return; // fresh DB: seedHouseAds covers every placement
+  const [camp] = await db.select({ id: schema.adCampaigns.id }).from(schema.adCampaigns).where(eq(schema.adCampaigns.brandId, HOUSE_BRAND_ID)).limit(1);
+  if (!camp) return;
+
+  const [link] = await db.select({ id: schema.adCampaignCreatives.id }).from(schema.adCampaignCreatives)
+    .where(and(eq(schema.adCampaignCreatives.campaignId, camp.id), eq(schema.adCampaignCreatives.placementId, placement.id))).limit(1);
+  if (link) return;
+
+  const t = HOUSE_TAGLINES[2];
+  const crId = uid();
+  await db.insert(schema.adCreatives).values({
+    id: crId, brandId: HOUSE_BRAND_ID, name: `Cluster · ${CARD_AD_PLACEMENT}`, type: "image",
+    fileUrl: svgAd(placement.width, placement.height, t.from, t.to, "CLUSTER", t.title),
+    clickUrl: t.click, width: placement.width, height: placement.height, status: "approved",
+  });
+  await db.insert(schema.adCampaignCreatives).values({
+    id: uid(), campaignId: camp.id, creativeId: crId, placementId: placement.id, weight: 1, priority: 0,
+  });
 }
 
 export async function ensureTopBannerAd(db: DB) {

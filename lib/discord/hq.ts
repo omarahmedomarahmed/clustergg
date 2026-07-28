@@ -502,7 +502,7 @@ function describe(e: HqEvent): { title: string; body: string; color: string } {
       };
     case "unlock":
       return {
-        title: "A server unlocked revenue share",
+        title: "A server unlocked sponsored challenges",
         body: `**${e.guildName}** crossed the threshold with ${e.linked.toLocaleString()} linked gamers.`,
         color: "#22d3ee",
       };
