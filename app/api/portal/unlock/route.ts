@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { getServerBySlugOrId } from "@/lib/server-portal";
 import { getBrandBySlugOrId } from "@/lib/brands";
-import { grantPortalSession, verifyPortalKey } from "@/lib/portal-auth";
+import { grantPortalSession, verifyPortalKey, clearThrottle, MAX_FAILURES } from "@/lib/portal-auth";
+import { lockState, recordAttempt } from "@/lib/portal-attempts";
 
 export const dynamic = "force-dynamic";
 
@@ -21,16 +22,16 @@ export const dynamic = "force-dynamic";
 
 type Kind = "server" | "brand";
 
-async function resolve(kind: Kind, slug: string): Promise<{ id: string; key: string | null; url: string } | null> {
+async function resolve(kind: Kind, slug: string): Promise<{ id: string; name: string; key: string | null; url: string } | null> {
   if (kind === "server") {
     const server = await getServerBySlugOrId(slug);
     if (!server) return null;
-    return { id: server.guildId, key: server.portalKey, url: `/servers/${server.slug ?? server.guildId}` };
+    return { id: server.guildId, name: server.name, key: server.portalKey, url: `/servers/${server.slug ?? server.guildId}` };
   }
   const db = await getDb();
   const brand = await getBrandBySlugOrId(db, slug);
   if (!brand) return null;
-  return { id: brand.id, key: brand.accessKey, url: `/brands/${brand.slug}` };
+  return { id: brand.id, name: brand.name, key: brand.accessKey, url: `/brands/${brand.slug}` };
 }
 
 async function unlock(req: NextRequest, kind: string, slug: string, key: string) {
@@ -43,14 +44,35 @@ async function unlock(req: NextRequest, kind: string, slug: string, key: string)
   if (!portal) return NextResponse.redirect(home);
 
   const dest = new URL(portal.url, req.nextUrl.origin);
-  const verdict = verifyPortalKey(kind, portal.id, portal.key, key);
-  if (verdict !== "ok") {
-    // Says which of the two it was: a throttled owner who mistyped once needs
-    // to know to wait, not to keep trying a key that is actually correct.
-    dest.searchParams.set("unlock", verdict);
+  const who = {
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+    userAgent: req.headers.get("user-agent"),
+  };
+
+  // Locked out? Answer before looking at the key at all. Checking it first
+  // would let an attacker keep testing keys and simply ignore the response.
+  const lock = await lockState(kind, portal.id);
+  if (lock.locked) {
+    await recordAttempt(kind, portal.id, portal.name, false, who);
+    dest.searchParams.set("unlock", "throttled");
+    dest.searchParams.set("mins", String(Math.max(1, Math.ceil(lock.retryInMs / 60000))));
     return NextResponse.redirect(dest);
   }
 
+  const verdict = verifyPortalKey(kind, portal.id, portal.key, key);
+  if (verdict !== "ok") {
+    await recordAttempt(kind, portal.id, portal.name, false, who);
+    // Says which of the two it was: a throttled owner who mistyped once needs
+    // to know to wait, not to keep trying a key that is actually correct. And
+    // it says how many tries are left, so a lockout is never a surprise.
+    dest.searchParams.set("unlock", verdict);
+    const left = Math.max(0, MAX_FAILURES - (lock.failures + 1));
+    if (verdict === "bad") dest.searchParams.set("left", String(left));
+    return NextResponse.redirect(dest);
+  }
+
+  await recordAttempt(kind, portal.id, portal.name, true, who);
+  clearThrottle(kind, portal.id);
   const res = NextResponse.redirect(dest);
   await grantPortalSession(kind, portal.id, res.cookies);
   return res;

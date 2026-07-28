@@ -17,6 +17,7 @@ import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { weekBoard } from "@/lib/profile-week";
 import { parseDrawerLinks } from "@/lib/mobile-nav";
 import { getContent } from "@/lib/cms";
+import { NAV_SETTING_KEY, navShows, parseNav } from "@/lib/site-chrome";
 import { getT } from "@/lib/i18n/t-server";
 import { slimImg, optImg } from "@/lib/img";
 
@@ -104,7 +105,13 @@ export default async function Nav() {
     signedIn: !!user,
     me: user ? { id: user.id, slug: user.slug } : null,
   };
-  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode", "mobile.drawer.extra"]);
+  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode", "mobile.drawer.extra", NAV_SETTING_KEY]);
+  // What this audience is allowed to see (Admin → Site chrome). Guests and
+  // members are configured separately, because the row a brand needs and the
+  // row a gamer needs are different rows.
+  const chrome = parseNav(brand[NAV_SETTING_KEY]);
+  const who = user ? "user" : "guest";
+  const show = (id: string) => navShows(chrome, id, who);
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
   const hidePlanets = brand["brand.nav.hidePlanets"] === "1";
@@ -151,7 +158,7 @@ export default async function Nav() {
 
         {/* Game planets — bigger, glorified logos. */}
         <nav className="hidden md:flex items-center gap-2.5 shrink-0">
-          {navGames.map((g) => (
+          {show("gameLogos") && navGames.map((g) => (
             <Link key={g.id} href={planetHref(g)} title={g.name}
               className="group shrink-0 relative rounded-xl transition-transform hover:scale-110">
               <span className="absolute -inset-1 rounded-xl bg-gradient-to-br from-violet-500/0 to-cyan-500/0 group-hover:from-violet-500/25 group-hover:to-cyan-500/25 blur-md transition-all" />
@@ -159,7 +166,7 @@ export default async function Nav() {
                 className="relative ring-1 ring-violet-400/25 group-hover:ring-cyan-400/60 shadow-lg" />
             </Link>
           ))}
-          {!hidePlanets && (
+          {!hidePlanets && show("allPlanets") && (
             <Link href="/planets" title="All planets"
               className="shrink-0 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 text-muted hover:text-cyan-300 hover:border-cyan-400/50 transition-colors">
               {planetsIcon
@@ -173,7 +180,7 @@ export default async function Nav() {
             Members only: a quest tracker means nothing to somebody who has no
             quests, and the space is better spent on the two doors a guest is
             actually here for. */}
-        {user && navQuests.length > 0 ? (
+        {user && show("questCard") && navQuests.length > 0 ? (
           <div className="hidden lg:flex flex-1 min-w-0 px-1 justify-center">
             <NavQuestCard quests={navQuests} totalCp={totalCp} />
           </div>
@@ -189,34 +196,50 @@ export default async function Nav() {
               off the edge. */}
           {user ? (
             <>
-              <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />
-              <UserMenu
-                displayName={user.displayName}
-                avatarUrl={user.avatarUrl}
-                slug={user.slug}
-                canAdmin={isStaff(user)}
-              />
+              {show("search") && (
+                <Link href="/search" title={t("common.findGamers")} className="text-muted hover:text-ink hidden sm:inline-flex">
+                  <Icon name="search" size={18} />
+                </Link>
+              )}
+              {show("brandsLink") && <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>}
+              {show("serversLink") && <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>}
+              {show("alerts") && <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />}
+              {show("profileMenu") && (
+                <UserMenu
+                  displayName={user.displayName}
+                  avatarUrl={user.avatarUrl}
+                  slug={user.slug}
+                  canAdmin={isStaff(user)}
+                />
+              )}
               {/* Wrapped rather than given `hidden lg:inline-flex` directly:
                   AddBotButton sets `inline-flex` itself, and which display wins
                   depends on the order of the two utilities in the generated
                   stylesheet, not on the class attribute. It lost — the install
                   button was showing on phones and pushing the row off-screen. */}
-              <span className="hidden lg:inline-flex"><AddBotButton size="sm" /></span>
+              {show("addBot") && <span className="hidden lg:inline-flex"><AddBotButton size="sm" /></span>}
             </>
           ) : (
             <>
               {/* The two doors a guest is here for. A guest is far more likely
                   to be a brand or a server owner than a gamer hunting for the
                   search box — and search is one tap away in the drawer. */}
-              <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>
-              <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>
-              <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>
-              <span className="hidden md:inline-flex"><AddBotButton size="sm" /></span>
+              {show("search") && (
+                <Link href="/search" title={t("common.findGamers")} className="text-muted hover:text-ink hidden sm:inline-flex">
+                  <Icon name="search" size={18} />
+                </Link>
+              )}
+              {show("brandsLink") && <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>}
+              {show("serversLink") && <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>}
+              {show("loginLink") && <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>}
+              {show("addBot") && <span className="hidden md:inline-flex"><AddBotButton size="sm" /></span>}
+              {show("discordSignIn") && (
               <a href="/api/auth/discord?next=/onboarding" title="Sign in with Discord"
                 className="pressable inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-semibold text-white"
                 style={{ background: "#404eed", boxShadow: "0 6px 18px -8px #404eed" }}>
                 <BrandGlyph provider="discord" size={16} /> <span className="hidden sm:inline">{t("nav.signIn")}</span> Discord
               </a>
+              )}
             </>
           )}
           <MobileMenu links={mobileLinks} loggedIn={!!user} profileSlug={user?.slug ?? null} wordmarkUrl={drawerWordmark} markUrl={drawerMark} />
@@ -224,7 +247,7 @@ export default async function Nav() {
       </div>
 
       {/* Native-mobile-game HUD strip (level bar + red-dot alerts), members only */}
-      {user && (
+      {user && show("mobileHud") && (
         <MobileHud
           displayName={user.displayName}
           avatarUrl={user.avatarUrl}
@@ -244,7 +267,7 @@ export default async function Nav() {
           default and covered Mission Control with a fixed panel that swallowed
           every click underneath it — the card studio was unusable. Admin is a
           workspace, not somewhere anyone votes. */}
-      <WeekBand initial={bandData} />
+      {show("weekBand") && <WeekBand initial={bandData} />}
     </header>
     </>
   );

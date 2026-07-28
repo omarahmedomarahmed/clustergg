@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { keysMatch } from "@/lib/portal-auth";
+import { keysMatch, hasPortalSession } from "@/lib/portal-auth";
 import { uploadDataUrlToBlob } from "@/lib/blob";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,13 @@ const MAX_DATAURL_BYTES = 8 * 1024 * 1024;
 
 // Key-gated creative upload for the unauthenticated brand portal. Validates the
 // brand's access key before storing the image, mirroring /api/upload.
+//
+// The key is not the only proof, and requiring it was a bug: a brand that
+// unlocked through the key FORM (or through a shared `?key=` link, which hands
+// off to the unlock route and comes back with a clean URL) holds a portal
+// session and no key — so every upload they attempted returned 401 while the
+// server actions on the same page accepted them. Both credentials are accepted
+// here, exactly as `requireBrand` accepts them in the actions.
 export async function POST(req: NextRequest) {
   let brandId = "", key = "", dataUrl = "";
   try {
@@ -22,8 +29,10 @@ export async function POST(req: NextRequest) {
   }
 
   const db = await getDb();
-  const [brand] = await db.select({ accessKey: schema.brands.accessKey }).from(schema.brands).where(eq(schema.brands.id, brandId)).limit(1);
-  if (!brand || !keysMatch(brand.accessKey, key)) {
+  const [brand] = await db.select({ id: schema.brands.id, accessKey: schema.brands.accessKey })
+    .from(schema.brands).where(eq(schema.brands.id, brandId)).limit(1);
+  const allowed = !!brand && (keysMatch(brand.accessKey, key) || await hasPortalSession("brand", brand.id));
+  if (!allowed) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

@@ -22,6 +22,8 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "sec_loop", label: "Story · The loyalty loop", note: "Behind the four-step loop that keeps gamers coming back." },
   { key: "sec_pricing", label: "Story · Pricing section", note: "Behind the brand pricing cards and the game slider." },
   { key: "sec_servers", label: "Story · Server earnings", note: "Behind the 500 / 1,000 / 5,000 earning stages." },
+  { key: "sec_ops", label: "Story · Where the money goes", note: "Behind the 'not a tournament organiser' cost split on the pricing page." },
+  { key: "sec_tech", label: "Story · How it's built", note: "Behind the engineering proof points brands and investors ask about." },
   { key: "sec_cta", label: "Story · Closing CTA", note: "Behind the final call to action at the bottom of the home page." },
   // Discord bot PNG cards — the art behind every card the bot posts.
   { key: "bot_welcome", label: "Bot · Welcome card", note: "Backdrop of the bot's welcome + fallback cards." },

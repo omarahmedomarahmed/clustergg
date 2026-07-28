@@ -2,11 +2,14 @@ import { notFound } from "next/navigation";
 import { hasPortalSession } from "@/lib/portal-auth";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness, getBrandInbox } from "@/lib/brands";
+import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness, getBrandInbox, getCardCampaign } from "@/lib/brands";
+import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
+import { networkStats } from "@/lib/network";
 import BrandMessageForm from "@/components/BrandMessageForm";
 import BrandAnalyticsPanel from "@/components/BrandAnalyticsPanel";
 import BrandAppearanceEditor from "@/components/BrandAppearanceEditor";
 import BrandCreativesTab from "@/components/BrandCreativesTab";
+import BrandCardCampaign from "@/components/BrandCardCampaign";
 import BrandChartBuilder from "@/components/BrandChartBuilder";
 import Tabs from "@/components/Tabs";
 import AnimatedNumber from "@/components/AnimatedNumber";
@@ -23,9 +26,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function BrandPortalPage({
   params, searchParams,
-}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; unlock?: string; campaign?: string; filter?: string }> }) {
+}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; unlock?: string; campaign?: string; filter?: string; left?: string; mins?: string }> }) {
   const { slug } = await params;
-  const { key = "", unlock = "", campaign: campaignId = "", filter = "all" } = await searchParams;
+  const { key = "", unlock = "", campaign: campaignId = "", filter = "all", left = "", mins = "" } = await searchParams;
   const db = await getDb();
   const brand = await getBrandBySlugOrId(db, slug);
   if (!brand) notFound();
@@ -61,8 +64,22 @@ export default async function BrandPortalPage({
               <input name="key" required placeholder="CLSTR-XXXX-XXXX-XXXX" className="input-cosmic flex-1 font-mono" />
               <button className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">Unlock</button>
             </form>
-            {unlock === "bad" && <p className="mt-2 text-xs text-rose-300">That key didn&apos;t match. Double-check it or reach out to your manager.</p>}
-            {unlock === "throttled" && <p className="mt-2 text-xs text-amber-300">Too many attempts. Wait a few minutes before trying again.</p>}
+            {unlock === "bad" && (
+              <p className="mt-2 text-xs text-rose-300">
+                That key didn&apos;t match. Double-check it or reach out to your manager.
+                {left !== "" && (
+                  <> {Number(left) > 0
+                    ? `${left} ${Number(left) === 1 ? "try" : "tries"} left before this portal locks.`
+                    : "That was the last try — this portal is now locked."}</>
+                )}
+              </p>
+            )}
+            {unlock === "throttled" && (
+              <p className="mt-2 text-xs text-amber-300">
+                Locked after too many wrong keys{mins ? ` — try again in about ${mins} minute${mins === "1" ? "" : "s"}` : ""}.
+                The attempt has been reported to our team; if it was you, email us and we&apos;ll lift it.
+              </p>
+            )}
           </div>
 
           <div className="glass p-6">
@@ -138,9 +155,11 @@ export default async function BrandPortalPage({
   }
 
   // ---- Overview: all campaigns + brand-wide intelligence ----
-  const [data, brandAnalytics] = await Promise.all([
+  const [data, brandAnalytics, cardCampaign, net] = await Promise.all([
     getBrandPortalData(db, brand.id),
     getBrandAnalytics(db, brand.id, { days: 90 }),
+    getCardCampaign(db, brand.id, CARD_AD_PLACEMENT),
+    networkStats().catch(() => null),
   ]);
   const shown = data.campaigns.filter((c) => filter === "all" || c.status === filter);
   const chip = (f: string, label: string) => (
@@ -156,13 +175,33 @@ export default async function BrandPortalPage({
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-8">
         {brand.about && <div className="glass p-5 text-sm text-muted">{brand.about}</div>}
 
+        {/* The card placement leads the portal. It is the only inventory a
+            brand cannot buy anywhere else, and uploading to it is the whole
+            launch — no account manager in the way. */}
+        <BrandCardCampaign
+          brandId={brand.id} keyStr={key} brandName={brand.name}
+          creatives={cardCampaign.creatives.map((c) => ({
+            campaignCreativeId: c.campaignCreativeId, fileUrl: c.fileUrl,
+            impressions: c.impressions, clicks: c.clicks,
+          }))}
+          live={cardCampaign.live}
+          status={cardCampaign.campaign?.status ?? null}
+          impressions={cardCampaign.impressions}
+          clicks={cardCampaign.clicks}
+          reach={{ servers: net?.servers ?? 0, gamers: net?.reach ?? 0 }}
+        />
+
         {/* Brand can restyle its own portal */}
         <BrandAppearanceEditor brandId={brand.id} keyStr={key} initial={{ logoUrl: brand.logoUrl ?? "", coverUrl: brand.coverUrl ?? "", portalBgUrl: brand.portalBgUrl ?? "" }} />
 
         {data.totals.total === 0 ? (
           <div className="glass p-6">
-            <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="rocket" size={18} className="text-cyan-300" /> Your first campaign isn&apos;t set up yet</h2>
-            <p className="text-sm text-muted mt-1">Message us below and we&apos;ll create your campaign — then you can upload creatives for every placement right here.</p>
+            <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="rocket" size={18} className="text-cyan-300" /> Want the website placements too?</h2>
+            <p className="text-sm text-muted mt-1">
+              Your Discord card campaign runs from the panel above — that part needs nobody. The banner
+              and rail placements across clustergg.com are sold per campaign; message us below and
+              we&apos;ll open one for you.
+            </p>
           </div>
         ) : (
           <>

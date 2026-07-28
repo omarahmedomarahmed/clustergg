@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Icon from "@/components/Icon";
+import LoopRing from "@/components/viz/LoopRing";
 import { useDetail } from "@/components/dataroom/DetailModal";
 import type { MilestoneLadder } from "@/lib/dataroom/types-client";
 import type { Person, SectionData } from "@/lib/dataroom/types";
@@ -287,65 +288,74 @@ export function MetricTiles({ metrics, accent }: {
 
 // ===== Graphic explainer =====
 //
-// A mechanic, drawn instead of described. Icons and one-word labels on a
-// connecting line, with the detail behind a click — so the section reads in two
-// seconds and still rewards someone who wants the argument. Labels are short by
-// contract: this section physically cannot become a paragraph, which is the
-// point of having it.
+// A mechanic, drawn instead of described.
+//
+// This used to be numbered boxes in a row with a gradient line running behind
+// them — the layout every deck in the category uses, which is exactly why it
+// carries no information: a reader's eye reports "process diagram" and moves
+// on. It is also the layout that was asked to be removed everywhere.
+//
+// What replaced it: each beat is a full-width band with the consequence stated
+// as the headline and a large ghosted numeral behind it. It reads as an
+// argument that accumulates rather than a flowchart, it holds real sentences,
+// and it works at 390px without becoming six tiny circles. A mechanic that
+// repeats renders as a ring instead, because that is what "it repeats" looks
+// like.
 export function Explainer({ steps, loop, accent, accent2 }: {
   steps: NonNullable<SectionData["steps"]>; loop?: boolean; accent: string; accent2: string;
 }) {
   const openDetail = useDetail();
   if (!steps.length) return null;
 
-  return (
-    <div className="relative">
-      {/* The connecting line, behind the nodes. */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-0 right-0 top-[38px] hidden h-0.5 md:block"
-        style={{ background: `linear-gradient(90deg, transparent, ${accent}, ${accent2}, ${loop ? accent : "transparent"})` }}
+  if (loop) {
+    return (
+      <LoopRing
+        accent={accent}
+        nodes={steps.map((s, i) => ({ key: `s${i}`, title: s.label, body: s.note ?? "" }))}
       />
-      <div className={`grid gap-4 sm:grid-cols-2 ${steps.length >= 5 ? "lg:grid-cols-5" : steps.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
-        {steps.map((s, i) => {
-          const c = i % 2 ? accent2 : accent;
-          const body = s.note ?? null;
-          return (
-            <button
-              key={i}
-              type="button"
-              disabled={!body}
-              onClick={() => body && openDetail({ title: s.label, subtitle: `Step ${i + 1}`, body, accent: c })}
-              className="group relative flex flex-col items-center text-center disabled:cursor-default"
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {steps.map((s, i) => {
+        const c = i % 2 ? accent2 : accent;
+        const body = s.note ?? null;
+        return (
+          <button
+            key={i}
+            type="button"
+            disabled={!body}
+            onClick={() => body && openDetail({ title: s.label, subtitle: `Step ${i + 1}`, body, accent: c })}
+            className="group relative flex w-full items-center gap-4 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-left transition enabled:hover:border-white/25 sm:gap-6 sm:p-5 disabled:cursor-default"
+          >
+            {/* The numeral is scenery, not a step counter: it sits behind the
+                content at low contrast so the eye lands on the sentence. */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -right-2 top-1/2 -translate-y-1/2 text-[86px] font-black leading-none opacity-[0.07] sm:text-[110px]"
+              style={{ color: c }}
             >
-              <span
-                className="relative grid h-[76px] w-[76px] place-items-center rounded-2xl border-2 transition group-enabled:group-hover:scale-105"
-                style={{ borderColor: c, background: `${c}1f`, boxShadow: `0 0 34px -12px ${c}` }}
-              >
-                <Icon name={s.icon} size={30} style={{ color: c }} />
-                <span
-                  className="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full text-[11px] font-black text-[#04051a]"
-                  style={{ background: c }}
-                >
-                  {i + 1}
-                </span>
+              {i + 1}
+            </span>
+            <span
+              className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl border-2 sm:h-16 sm:w-16"
+              style={{ borderColor: c, background: `${c}1f` }}
+            >
+              <Icon name={s.icon} size={26} style={{ color: c }} />
+            </span>
+            <span className="relative min-w-0 flex-1">
+              <span className="block text-base font-bold sm:text-lg">{s.label}</span>
+              {body && <span className="mt-1 block text-sm leading-snug text-muted line-clamp-2">{body}</span>}
+            </span>
+            {body && (
+              <span className="relative hidden shrink-0 items-center gap-1 text-[11px] text-muted transition group-hover:text-ink sm:inline-flex">
+                Detail <Icon name="arrowRight" size={11} />
               </span>
-              <span className="mt-3 text-sm font-bold">{s.label.slice(0, 22)}</span>
-              {body && (
-                <span className="mt-1 inline-flex items-center gap-1 text-[10px] text-muted group-hover:text-ink">
-                  Why <Icon name="arrowRight" size={9} />
-                </span>
-              )}
-              {/* The loop-back arrow, on the last node only. */}
-              {loop && i === steps.length - 1 && (
-                <span className="mt-2 inline-flex items-center gap-1 text-[10px] font-semibold" style={{ color: accent }}>
-                  <Icon name="arrowLeft" size={10} /> repeats
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -90,6 +90,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/cards", label: "Card backgrounds", desc: "The art behind every rendered card, including the bot's.", exact: true },
       { href: "/admin/cards/guide", label: "Card layouts", desc: "Drag the mascot, logo and badge on every rendered card, and set how dark the art goes." },
       { href: "/admin/brand-kit", label: "Logos & brand kit", desc: "Wordmark, mark, favicon, orbs and framing." },
+      { href: "/admin/chrome", label: "Nav & footer", desc: "Show or hide every top-bar item — guests and members separately — and every footer link." },
       { href: "/admin/mobile", label: "Mobile chrome", desc: "Bottom nav and side drawer on phones." },
       { href: "/admin/creative-studio", label: "Creative studio", desc: "Build social creatives from platform art." },
       { href: "/admin/partners", label: "Partners", desc: "The logos in the trusted-by strip." },

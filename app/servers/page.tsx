@@ -6,6 +6,7 @@ import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { buildPricing, money, perGame, prizeSharePct, PRICING_NUMBER_KEYS } from "@/lib/pricing";
 import ServerEarnCards from "@/components/ServerEarnCards";
+import EarnCurve from "@/components/viz/EarnCurve";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -64,6 +65,19 @@ export default async function ServersDirectoryPage() {
       <section className="relative py-16 border-b border-white/10" style={{ background: cardBgStyle(bg, "sec_servers") }}>
         <div className="relative mx-auto max-w-6xl px-4">
           <ServerEarnCards installUrl={install || undefined} />
+
+          {/* The number an owner actually wants: what connecting more of their
+              members is worth to those members, at the size the network is
+              today rather than at some future size we'd have to promise. */}
+          <div className="mt-8">
+            <EarnCurve
+              cfg={cfg}
+              networkGamers={stats.linked}
+              title="What your members are playing for"
+              subtitle="Every gamer who links an account puts your community into more of the weekly prize money. Nothing is paid to you as commission — it is won by your players."
+            />
+          </div>
+
           <div className="mt-8 glass rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <Icon name="chart" size={20} className="text-cyan-300 shrink-0" />
             <p className="text-sm text-muted leading-relaxed flex-1">

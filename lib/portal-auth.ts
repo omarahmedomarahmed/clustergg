@@ -23,15 +23,26 @@ import { cookies } from "next/headers";
 const COOKIE_PREFIX = "portal_";
 const MAX_AGE = 60 * 60 * 12; // 12 hours
 
-// Signing secret. Falls back to a per-process random value, which is safe (it
-// just means sessions don't survive a redeploy) but logs loudly enough to be
-// noticed, since the fallback also breaks sessions across instances.
-let ephemeral: string | null = null;
+// Signing secret. Falls back to a per-PROCESS random value, which is safe (it
+// just means sessions don't survive a redeploy).
+//
+// The fallback is cached on `globalThis`, not in a module variable, and that
+// is not a nicety. Next bundles server code per entry point and the same
+// module can end up instantiated more than once in one process — the route
+// handler that MINTS the session and the server action that CHECKS it were
+// landing in different bundles. With a module-local secret they each rolled
+// their own, so a portal page rendered unlocked (its bundle had signed the
+// cookie) while every action on that page threw "Invalid brand access key".
+// One process, one secret, whichever bundle asks.
+const SECRET_KEY = Symbol.for("cluster.portal.secret");
+type SecretHolder = { [SECRET_KEY]?: string };
+
 function secret(): string {
   const configured = process.env.PORTAL_SECRET || process.env.CRON_SECRET || process.env.BOT_API_SECRET;
   if (configured) return configured;
-  if (!ephemeral) ephemeral = randomBytes(32).toString("hex");
-  return ephemeral;
+  const holder = globalThis as SecretHolder;
+  if (!holder[SECRET_KEY]) holder[SECRET_KEY] = randomBytes(32).toString("hex");
+  return holder[SECRET_KEY]!;
 }
 
 // Constant-time string comparison that doesn't leak length either.
@@ -124,14 +135,25 @@ export function verifyPortalKey(
   return "ok";
 }
 
-// ===== Brute-force throttle =====
+// ===== Brute-force lockout =====
 //
-// Per-portal, in memory. This is a serverless environment so it isn't a global
-// guarantee — it's a speed bump that costs an attacker far more than it costs
-// a person who mistyped their key once.
+// Two layers, and the second one is the real one.
+//
+// In memory: a per-process speed bump. Free, instant, and worth nothing on its
+// own here — this is a serverless environment, so the map is empty on every
+// cold start and an attacker only has to be unlucky enough to hit a warm one.
+//
+// In the database: `portal_login_attempts`. Three misses inside the window and
+// the portal is locked for everyone until the window passes, which is the
+// behaviour that was asked for — and, more importantly, every attempt is a row
+// staff can read. A lockout nobody can see is a lockout nobody can act on.
 
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_FAILURES = 10;
+/** Wrong keys before a portal locks. */
+export const MAX_FAILURES = 3;
+/** How long the lock lasts, and the window failures are counted over. */
+export const LOCKOUT_MS = 15 * 60 * 1000;
+
+const WINDOW_MS = LOCKOUT_MS;
 const failures = new Map<string, { count: number; first: number }>();
 
 function throttleOk(bucket: string): boolean {
@@ -148,6 +170,11 @@ function noteFailure(bucket: string): void {
     return;
   }
   rec.count++;
+}
+
+/** Clear the in-memory counter for a portal — used after a correct key. */
+export function clearThrottle(kind: string, id: string): void {
+  failures.delete(`${kind}:${id}`);
 }
 
 // A fresh key: short enough to paste from a DM, long enough to be unguessable
