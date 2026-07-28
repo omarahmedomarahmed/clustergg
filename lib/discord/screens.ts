@@ -8,7 +8,7 @@ import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
 import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild } from "@/lib/challenges";
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
-import { guildStats, attributeMember } from "@/lib/discord/guilds";
+import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
@@ -733,10 +733,11 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
     ], ctx);
   }
   const here = frame("admin", arg);
-  const [mine, pending, portal] = await Promise.all([
+  const [mine, pending, portal, guild] = await Promise.all([
     challengesForGuild(ctx.guildId),
     listRequests({ guildId: ctx.guildId, status: "pending" }),
     ensurePortal(ctx.guildId),
+    getGuildRow(ctx.guildId),
   ]);
 
   const live = mine.filter((c) => c.status === "active" || c.status === "paused");
@@ -798,6 +799,25 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
       button("DM me my portal key", actionId("portal-key", [], [here]), ButtonStyle.Secondary, "🔑"),
       ...live.slice(0, 2).map((c) => navButton(`View ${c.title}`.slice(0, 24), frame("challenge", c.id), [here], ButtonStyle.Secondary, "👁")),
       navButton("Server growth", frame("admin", "growth"), [here, ...trail], ButtonStyle.Secondary, "📈"),
+      // The three switches that were only settable by us.
+      //
+      // Sponsored posts are the owner's revenue decision and the daily
+      // competition post is the one thing that appears in their channel
+      // uninvited — an owner who cannot turn either off ends up removing the
+      // bot instead. Both say what they currently are, because a toggle whose
+      // state you can't see is a toggle nobody trusts.
+      button(
+        guild?.adOptIn ? "Sponsored posts: on" : "Sponsored posts: off",
+        actionId("ad-optin", [guild?.adOptIn ? "0" : "1"], [here]),
+        guild?.adOptIn ? ButtonStyle.Success : ButtonStyle.Secondary, "💸",
+      ),
+      button(
+        guild?.announcementsEnabled === false ? "Daily post: off" : "Daily post: on",
+        actionId("announce", [guild?.announcementsEnabled === false ? "1" : "0"], [here]),
+        guild?.announcementsEnabled === false ? ButtonStyle.Secondary : ButtonStyle.Success, "📣",
+      ),
+      button("Post the guides again", actionId("repost-guides", [], [here]), ButtonStyle.Secondary, "📚"),
+      button("Use this channel", actionId("set-channel", [], [here]), ButtonStyle.Secondary, "📍"),
       ...tail(ctx, here, trail),
     ]),
   };
@@ -1264,6 +1284,18 @@ export async function screenForCommand(query: string): Promise<Frame> {
   const raw = (query ?? "").trim();
   if (!raw) return frame("home");
 
+  // A value picked from the autocomplete, resolved exactly.
+  //
+  // This existed only as a claim in a comment. Every `kind:arg` token the
+  // autocomplete produces — `planet:Chess`, `quest:conquest`, `gamer:hikaru` —
+  // fell through to the fuzzy text search, which then hunted for a string
+  // containing a colon and, finding nothing, opened the "did you mean" picker.
+  // So the menu listed the right destinations and picking one took you to a
+  // disambiguation card. It works because it was TYPED like a name often
+  // enough that nobody noticed the picked path was broken.
+  const picked = fromToken(raw);
+  if (picked) return picked;
+
   // The five words that mean something on their own. Everything else — every
   // gamer, game, champion, board and challenge — goes through one search.
   const first = raw.split(/\s+/)[0].toLowerCase();
@@ -1312,6 +1344,56 @@ export async function screenForCommand(query: string): Promise<Frame> {
 
   // No leading verb: the whole thing is the search.
   return searchFrame(raw);
+}
+
+/**
+ * The `kind:arg` grammar the autocomplete emits.
+ *
+ * Only ever produced by us — a person types names, not tokens — so an
+ * unrecognised prefix returns null and falls through to the search rather than
+ * erroring. `world:` carries three parts because an entity is only unique
+ * within a game and a kind.
+ */
+function fromToken(raw: string): Frame | null {
+  const at = raw.indexOf(":");
+  if (at <= 0) {
+    // The prefix-free values from the same list.
+    switch (raw.toLowerCase()) {
+      case "profile": return frame("show", "profile");
+      case "cp": return frame("show", "cp");
+      case "planets": return frame("planets");
+      case "week": return frame("week");
+      case "challenges": return frame("challenges");
+      case "admin": return frame("admin", "");
+      default: return null;
+    }
+  }
+  const kind = raw.slice(0, at).toLowerCase();
+  const arg = raw.slice(at + 1).trim();
+
+  switch (kind) {
+    case "planet": return arg ? frame("planet", arg) : frame("planets");
+    // The stats screen takes the `game:` prefix itself, so it is kept.
+    case "game": return frame("show", `game:${arg}`);
+    case "board":
+    case "leaderboard": return frame("leaderboard", arg);
+    case "quest": return arg ? frame("quest", arg) : frame("quests");
+    case "guide": return frame("guide", arg);
+    case "gamer": return frame("gamer", arg);
+    case "link": return frame("link", arg);
+    case "challenge": return frame("challenge", arg);
+    case "challenges": return frame("challenges", arg);
+    case "admin": return frame("admin", arg);
+    case "search": return frame("search", arg);
+    case "world": {
+      // world:<game>:<kind>:<id> — and an id may itself contain a colon, so
+      // only the first three separators are structural.
+      const [game = "", entityKind = "", ...rest] = arg.split(":");
+      const id = rest.join(":");
+      return game && entityKind && id ? frame("world", game, entityKind, id) : null;
+    }
+    default: return null;
+  }
 }
 
 // Run the flat search and turn its answer into a destination.

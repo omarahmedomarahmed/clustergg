@@ -75,6 +75,62 @@ export async function showChoices(q: string): Promise<Choice[]> {
   return match(list, q);
 }
 
+/**
+ * Champions, agents, legends, weapons and maps — every game world we carry.
+ *
+ * Typing one of these already WORKED: the flat resolver matches entity names
+ * across every game. What it didn't do was appear while you type, which means
+ * you had to already know the name to find it. Lore is the thing people browse
+ * rather than look up, so it belongs in the suggestions.
+ *
+ * Only searched at two characters or more. Twenty-four game catalogues scanned
+ * on every keystroke of an empty box is a lot of work to produce a list nobody
+ * asked for, and Discord's budget for the whole reply is about three seconds.
+ */
+export async function worldChoices(q: string, limit = 8): Promise<Choice[]> {
+  const needle = q.trim().toLowerCase();
+  if (needle.length < 2) return [];
+  try {
+    const { getCachedEntityList } = await import("@/lib/game-world-cache");
+    const c = await catalog();
+    const out: Choice[] = [];
+    for (const g of c.games) {
+      if (out.length >= limit) break;
+      let list: Awaited<ReturnType<typeof getCachedEntityList>> = [];
+      try { list = await getCachedEntityList(g.name); } catch { continue; }
+      for (const e of list) {
+        if (out.length >= limit) break;
+        if (!e.name.toLowerCase().includes(needle)) continue;
+        out.push({
+          name: `${e.name} — ${e.role ? `${e.role}, ` : ""}${g.name}`.slice(0, 100),
+          value: `world:${g.name}:${e.kind}:${e.id}`.slice(0, 100),
+        });
+      }
+    }
+    return out;
+  } catch { return []; }
+}
+
+/**
+ * Everything a server's staff can do, in the same box as everything else.
+ *
+ * These used to be two entries — run a challenge, see growth — while the bot
+ * could actually do six things. An action that exists but is only reachable by
+ * pressing a button on a screen you have to know to open is an action most
+ * owners never find.
+ */
+export function adminChoices(): Choice[] {
+  return [
+    { name: "Server admin — run a challenge", value: "admin" },
+    { name: "Server admin — our growth to the unlock", value: "admin:growth" },
+    { name: "Server admin — DM me my portal key", value: "admin:key" },
+    { name: "Server admin — sponsored posts switch", value: "admin:ads" },
+    { name: "Server admin — daily competition post switch", value: "admin:announce" },
+    { name: "Server admin — post the guides again", value: "admin:guides" },
+    { name: "Server admin — use this channel for Cluster", value: "admin:channel" },
+  ];
+}
+
 // The whole bot, in one autocomplete.
 //
 // `/cluster` now takes a single box, so this is the entire menu — everything a
@@ -101,14 +157,21 @@ export async function openChoices(q: string, opts: { isManager?: boolean } = {})
     ...c.games.map((g) => ({ name: `${g.name} — leaderboard`, value: `board:${g.value}` })),
     ...c.games.map((g) => ({ name: `${g.name} — link my account`, value: `link:${g.value}` })),
     ...c.quests.map((qq) => ({ name: `${qq.name} — my progress`, value: `quest:${qq.value}` })),
-    ...(opts.isManager
-      ? [
-        { name: "Server admin — run a challenge", value: "admin" },
-        { name: "Server admin — our growth", value: "admin:growth" },
-      ]
-      : []),
+    ...(opts.isManager ? adminChoices() : []),
     ...c.guides.map((g) => ({ name: `Guide — ${g.name}`, value: `guide:${g.value}` })),
     { name: "Everything this bot does", value: "help" },
   ];
-  return match(list, q);
+
+  // People and lore are looked up live rather than cached: they change by the
+  // minute and there are far too many to hold in a list. They go FIRST once
+  // there's a query, because somebody who typed three letters of a name is
+  // looking for that name, not for a menu item that happens to contain it.
+  const [gamers, world] = q.trim().length >= 2
+    ? await Promise.all([
+      import("@/lib/gamer-lookup").then((m) => m.gamerChoices(q, 6)).catch(() => []),
+      worldChoices(q, 6).catch(() => []),
+    ])
+    : [[], []];
+
+  return [...gamers, ...world, ...match(list, q)].slice(0, 25);
 }

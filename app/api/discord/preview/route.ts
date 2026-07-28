@@ -23,7 +23,14 @@ export async function GET(req: NextRequest) {
   const args = (q.get("args") || "").split(",").filter(Boolean);
   const discordId = q.get("discord_id") || "";
 
-  const ctx = await loadCtx(discordId, q.get("name") || "Preview", q.get("guild_id") || undefined);
+  // Staff previewing the owner-only screens need to be able to say they're a
+  // manager; without it, every admin screen previews as its permission notice.
+  // Safe to take from the caller: this endpoint already requires the bot
+  // secret, and it renders a payload rather than performing anything.
+  const ctx = await loadCtx(
+    discordId, q.get("name") || "Preview", q.get("guild_id") || undefined,
+    null, q.get("is_manager") === "1",
+  );
   const payload = await renderScreen(frame(screen, ...args), screen === "home" ? [] : [frame("home")], ctx);
   return NextResponse.json({ linked: !!ctx.gamer, screen, args, payload });
 }

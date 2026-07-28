@@ -15,12 +15,11 @@ import { joinChallengeFor, challengeGate, keyVisibleTo, setChallengeState } from
 import { submitChallengeRequest } from "@/lib/challenge-requests";
 import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS, linkableProvider } from "@/lib/providers/registry";
-import { logCommand } from "@/lib/discord/guilds";
+import { logCommand, upsertGuild, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { reportToHq } from "@/lib/discord/hq";
 import { dmUser } from "@/lib/discord/rest";
 import { castDiscordVote } from "@/lib/identity";
-import { gamerChoices } from "@/lib/gamer-lookup";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
@@ -303,16 +302,11 @@ async function autocomplete(i: Interaction) {
   let choices: { name: string; value: string }[] = [];
   try {
     // One box means one list: everything the bot can open, live from the
-    // database. Discord caps it at 25, so the destinations rank ahead of the
-    // people — a short query is far more likely to be "valorant" than a name.
+    // database — destinations, people and game lore. `openChoices` owns the
+    // ordering, including the people-and-lore-first rule once there's a query,
+    // so this stays a single call rather than two lists stapled together with
+    // different ideas about what matters.
     choices = await openChoices(query, { isManager: isGuildManager(i) });
-    if (choices.length < 25 && query.trim().length >= 2) {
-      const seen = new Set(choices.map((c) => c.value));
-      for (const g of await gamerChoices(query)) {
-        if (choices.length >= 25) break;
-        if (!seen.has(g.value)) choices.push(g);
-      }
-    }
   } catch { choices = []; }
   return { type: InteractionResponseType.AutocompleteResult, data: { choices } };
 }
@@ -541,6 +535,40 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
       }],
     });
     return;
+  }
+
+  // ===== Server settings, from the admin card =====
+  //
+  // Each of these was a column in the database that only we could change, which
+  // made "turn the daily post off" a support request. They are gated on
+  // Discord's own manager permission — the same gate the admin card itself is
+  // behind — because they change what appears in somebody's server.
+  const SETTINGS = new Set(["ad-optin", "announce", "repost-guides", "set-channel"]);
+  if (SETTINGS.has(target.screen)) {
+    if (!i.guild_id || !ctx.isManager) {
+      await editOriginal(i.token, {
+        embeds: [{ color: 0xf59e0b, description: "Only this server's admins and moderators can change that." }],
+      });
+      return;
+    }
+    const on = target.args[0] === "1";
+    try {
+      if (target.screen === "ad-optin") {
+        await upsertGuild(i.guild_id, { adOptIn: on });
+      } else if (target.screen === "announce") {
+        await upsertGuild(i.guild_id, { announcementsEnabled: on });
+      } else if (target.screen === "set-channel") {
+        // Wherever they pressed the button. An owner who wants Cluster in a
+        // different channel types the command there — no channel picker, no id
+        // to copy.
+        if (i.channel_id) await upsertGuild(i.guild_id, { channelId: i.channel_id });
+      } else if (target.screen === "repost-guides") {
+        const { postGuides } = await import("@/lib/discord/onboard");
+        const row = await getGuildRow(i.guild_id);
+        const channel = row?.channelId ?? i.channel_id ?? null;
+        if (channel) void postGuides(channel).catch(() => {});
+      }
+    } catch { /* the re-render below still shows the real current state */ }
   }
 
   // Voting from Discord is deliberate: requiring a sign-up before a server can
