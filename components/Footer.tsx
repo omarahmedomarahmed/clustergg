@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { getContent } from "@/lib/cms";
-import { getT } from "@/lib/i18n/t-server";
 import BrandHeader from "@/components/BrandHeader";
 import AddBotButton from "@/components/AddBotButton";
 import AppStoreBadges from "@/components/AppStoreBadges";
 import LocaleToggle from "@/components/LocaleToggle";
 import { getLocale } from "@/lib/i18n/server";
 import { optImg } from "@/lib/img";
+import { FOOTER_SETTING_KEY, parseFooter } from "@/lib/site-chrome";
 
 // Three audiences, three columns.
 //
@@ -15,9 +15,12 @@ import { optImg } from "@/lib/img";
 // money — a brand and a server owner — hunting for the page that was written
 // for them.
 export default async function Footer() {
-  const c = await getContent(["footer.tagline", "brand.footer.bg", "footer.brands.title", "footer.servers.title"]);
+  const c = await getContent(["footer.tagline", "brand.footer.bg", FOOTER_SETTING_KEY]);
   const footerBg = c["brand.footer.bg"];
-  const { t } = await getT();
+  // Columns and links come from Admin → Site chrome. Adding a link used to be a
+  // deploy, which is why the footer had exactly the links somebody happened to
+  // think of on the day it was written.
+  const columns = parseFooter(c[FOOTER_SETTING_KEY]);
   const locale = await getLocale();
   return (
     <footer className="relative z-10 mt-20 border-t border-violet-500/15 bg-cover bg-center"
@@ -33,40 +36,25 @@ export default async function Footer() {
               was one of the things pushing the burger past the edge. */}
           <div className="mt-5"><LocaleToggle current={locale} /></div>
         </div>
-        <div>
-          <div className="font-semibold mb-3 text-ink">{c["footer.brands.title"] || "For brands"}</div>
-          <ul className="space-y-2 text-muted">
-            <li><Link href="/pricing" className="hover:text-ink">Pricing</Link></li>
-            <li><Link href="/brands" className="hover:text-ink">Talk to us</Link></li>
-            <li><Link href="/dataroom/company-profile" className="hover:text-ink">Partner profile</Link></li>
-            <li><Link href="/pricing#plans" className="hover:text-ink">Sponsored challenges</Link></li>
-            <li><Link href="/dataroom" className="hover:text-ink">Investors &amp; partners</Link></li>
-          </ul>
-        </div>
-        <div>
-          <div className="font-semibold mb-3 text-ink">{c["footer.servers.title"] || "For server owners"}</div>
-          <ul className="space-y-2 text-muted">
-            <li><Link href="/discord-bot" className="hover:text-ink">Add the bot</Link></li>
-            <li><Link href="/servers" className="hover:text-ink">Monetize your server</Link></li>
-            <li><Link href="/servers" className="hover:text-ink">Connected servers</Link></li>
-            <li><Link href="/blog" className="hover:text-ink">Blog &amp; guides</Link></li>
-          </ul>
-        </div>
-        <div>
-          <div className="font-semibold mb-3 text-ink">{t("footer.product")}</div>
-          <ul className="space-y-2 text-muted">
-            <li><Link href="/planets" className="hover:text-ink">{t("nav.planets")}</Link></li>
-            <li><Link href="/leaderboards" className="hover:text-ink">{t("nav.leaderboards")}</Link></li>
-            <li><Link href="/search" className="hover:text-ink">{t("common.findGamers")}</Link></li>
-            <li><Link href="/signup" className="hover:text-ink">{t("nav.join")}</Link></li>
-          </ul>
-          <div className="font-semibold mb-3 mt-6 text-ink">{t("footer.legal")}</div>
-          <ul className="space-y-2 text-muted">
-            <li><Link href="/legal/privacy" className="hover:text-ink">{t("footer.privacy")}</Link></li>
-            <li><Link href="/legal/terms" className="hover:text-ink">{t("footer.terms")}</Link></li>
-            <li><Link href="/legal/cookies" className="hover:text-ink">{t("footer.cookies")}</Link></li>
-          </ul>
-        </div>
+        {columns.map((col) => (
+          <div key={col.title || col.links[0]?.href}>
+            {col.title && <div className="font-semibold mb-3 text-ink">{col.title}</div>}
+            <ul className="space-y-2 text-muted">
+              {col.links.map((l) => (
+                <li key={`${l.label}-${l.href}`}>
+                  {/* Internal links prefetch through the router; an admin can
+                      also point a link at another site, and that has to be a
+                      plain anchor or Next tries to route to it. */}
+                  {l.href.startsWith("/") ? (
+                    <Link href={l.href} className="hover:text-ink">{l.label}</Link>
+                  ) : (
+                    <a href={l.href} className="hover:text-ink" target="_blank" rel="noreferrer">{l.label}</a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
       </div>
       <div className="border-t border-violet-500/10 py-5 text-center text-xs text-muted/70">
         © {new Date().getFullYear()} Cluster · clustergg.com · Made among the stars
