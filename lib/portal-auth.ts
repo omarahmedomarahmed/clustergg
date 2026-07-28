@@ -135,14 +135,25 @@ export function verifyPortalKey(
   return "ok";
 }
 
-// ===== Brute-force throttle =====
+// ===== Brute-force lockout =====
 //
-// Per-portal, in memory. This is a serverless environment so it isn't a global
-// guarantee — it's a speed bump that costs an attacker far more than it costs
-// a person who mistyped their key once.
+// Two layers, and the second one is the real one.
+//
+// In memory: a per-process speed bump. Free, instant, and worth nothing on its
+// own here — this is a serverless environment, so the map is empty on every
+// cold start and an attacker only has to be unlucky enough to hit a warm one.
+//
+// In the database: `portal_login_attempts`. Three misses inside the window and
+// the portal is locked for everyone until the window passes, which is the
+// behaviour that was asked for — and, more importantly, every attempt is a row
+// staff can read. A lockout nobody can see is a lockout nobody can act on.
 
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_FAILURES = 10;
+/** Wrong keys before a portal locks. */
+export const MAX_FAILURES = 3;
+/** How long the lock lasts, and the window failures are counted over. */
+export const LOCKOUT_MS = 15 * 60 * 1000;
+
+const WINDOW_MS = LOCKOUT_MS;
 const failures = new Map<string, { count: number; first: number }>();
 
 function throttleOk(bucket: string): boolean {
@@ -159,6 +170,11 @@ function noteFailure(bucket: string): void {
     return;
   }
   rec.count++;
+}
+
+/** Clear the in-memory counter for a portal — used after a correct key. */
+export function clearThrottle(kind: string, id: string): void {
+  failures.delete(`${kind}:${id}`);
 }
 
 // A fresh key: short enough to paste from a DM, long enough to be unguessable

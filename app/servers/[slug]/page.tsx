@@ -28,10 +28,10 @@ export default async function ServerPortalPage({
   params, searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ key?: string; unlock?: string }>;
+  searchParams: Promise<{ key?: string; unlock?: string; left?: string; mins?: string }>;
 }) {
   const { slug } = await params;
-  const { key = "", unlock = "" } = await searchParams;
+  const { key = "", unlock = "", left = "", mins = "" } = await searchParams;
 
   const server = await getServerBySlugOrId(slug);
   if (!server) notFound();
@@ -56,7 +56,7 @@ export default async function ServerPortalPage({
 
   const base = `/servers/${server.slug ?? server.guildId}`;
 
-  if (!unlocked) return <PublicView server={server} data={data} base={base} unlock={unlock} />;
+  if (!unlocked) return <PublicView server={server} data={data} base={base} unlock={unlock} left={left} mins={mins} />;
 
   const [challenges, requests, board, feed] = await Promise.all([
     challengesForGuild(server.guildId),
@@ -203,11 +203,14 @@ export default async function ServerPortalPage({
 
 // ===== Locked / public =====
 
-async function PublicView({ server, data, base, unlock }: {
+async function PublicView({ server, data, base, unlock, left = "", mins = "" }: {
   server: Awaited<ReturnType<typeof getServerBySlugOrId>> & object;
   data: NonNullable<Awaited<ReturnType<typeof portalData>>>;
   base: string;
   unlock?: string;
+  /** Tries remaining, and minutes until a lock lifts — both from the unlock handler. */
+  left?: string;
+  mins?: string;
 }) {
   const challenges = await challengesForGuild(server.guildId);
   const live = challenges.filter((c) => c.status === "active");
@@ -277,11 +280,19 @@ async function PublicView({ server, data, base, unlock }: {
             <p className="text-xs text-rose-300 mt-2">
               That key didn&apos;t match. Check for a missing dash, or run <code className="text-cyan-300">/cluster admin</code> in
               your server and the bot will DM it again.
+              {/* Says how many tries remain, because a lockout that arrives
+                  without warning reads as the product being broken. */}
+              {left !== "" && (
+                <> {Number(left) > 0
+                  ? `${left} ${Number(left) === 1 ? "try" : "tries"} left before this portal locks.`
+                  : "That was the last try — this portal is now locked."}</>
+              )}
             </p>
           )}
           {unlock === "throttled" && (
             <p className="text-xs text-amber-300 mt-2">
-              Too many attempts. Wait a few minutes and try again — this protects your portal from being guessed at.
+              Locked after too many wrong keys{mins ? ` — try again in about ${mins} minute${mins === "1" ? "" : "s"}` : ""}.
+              The attempt has been reported to our team; if it was you, email us and we&apos;ll lift it.
             </p>
           )}
           {alreadyIn && <p className="text-xs text-emerald-300 mt-2">You&apos;re signed in to this portal.</p>}

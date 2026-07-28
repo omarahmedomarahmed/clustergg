@@ -990,6 +990,30 @@ export const dataroomViews = pgTable("dataroom_views", {
 // Use `publicUserColumns` as the projection for any user join that just needs
 // to link + show an avatar. It omits `bannerUrl` and `theme` entirely and keeps
 // `avatarUrl` (genuinely rendered). `PublicUser` is the resulting row type.
+// Every attempt to unlock a brand or server portal, successful or not.
+//
+// The in-memory throttle this replaces was a speed bump that reset on every
+// cold start and was invisible to staff — so a brand whose key was being ground
+// down produced no record anywhere. Rows here do three jobs: they lock a portal
+// after too many misses, they show staff exactly what happened and when, and
+// they are the only place a "somebody tried to get into your account" answer
+// can come from.
+//
+// The key itself is NEVER stored, not even hashed: a short shared secret in a
+// log is a short shared secret in a backup.
+export const portalLoginAttempts = pgTable("portal_login_attempts", {
+  id: id(),
+  /** "brand" | "server" */
+  kind: text("kind").notNull(),
+  portalId: text("portal_id").notNull(),
+  /** Denormalised so a deleted brand still has a readable history. */
+  portalName: text("portal_name"),
+  ok: boolean("ok").notNull().default(false),
+  hashedIp: text("hashed_ip"),
+  userAgent: text("user_agent"),
+  createdAt: now("created_at"),
+}, (t) => [index("pla_portal_idx").on(t.kind, t.portalId, t.createdAt)]);
+
 export const publicUserColumns = {
   id: users.id,
   displayName: users.displayName,

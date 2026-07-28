@@ -26,9 +26,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function BrandPortalPage({
   params, searchParams,
-}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; unlock?: string; campaign?: string; filter?: string }> }) {
+}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; unlock?: string; campaign?: string; filter?: string; left?: string; mins?: string }> }) {
   const { slug } = await params;
-  const { key = "", unlock = "", campaign: campaignId = "", filter = "all" } = await searchParams;
+  const { key = "", unlock = "", campaign: campaignId = "", filter = "all", left = "", mins = "" } = await searchParams;
   const db = await getDb();
   const brand = await getBrandBySlugOrId(db, slug);
   if (!brand) notFound();
@@ -64,8 +64,22 @@ export default async function BrandPortalPage({
               <input name="key" required placeholder="CLSTR-XXXX-XXXX-XXXX" className="input-cosmic flex-1 font-mono" />
               <button className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">Unlock</button>
             </form>
-            {unlock === "bad" && <p className="mt-2 text-xs text-rose-300">That key didn&apos;t match. Double-check it or reach out to your manager.</p>}
-            {unlock === "throttled" && <p className="mt-2 text-xs text-amber-300">Too many attempts. Wait a few minutes before trying again.</p>}
+            {unlock === "bad" && (
+              <p className="mt-2 text-xs text-rose-300">
+                That key didn&apos;t match. Double-check it or reach out to your manager.
+                {left !== "" && (
+                  <> {Number(left) > 0
+                    ? `${left} ${Number(left) === 1 ? "try" : "tries"} left before this portal locks.`
+                    : "That was the last try — this portal is now locked."}</>
+                )}
+              </p>
+            )}
+            {unlock === "throttled" && (
+              <p className="mt-2 text-xs text-amber-300">
+                Locked after too many wrong keys{mins ? ` — try again in about ${mins} minute${mins === "1" ? "" : "s"}` : ""}.
+                The attempt has been reported to our team; if it was you, email us and we&apos;ll lift it.
+              </p>
+            )}
           </div>
 
           <div className="glass p-6">

@@ -356,6 +356,17 @@ const COLUMN_MIGRATIONS = [
     "closed_at" timestamp with time zone,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS "portal_login_attempts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "kind" text NOT NULL,
+    "portal_id" text NOT NULL,
+    "portal_name" text,
+    "ok" boolean NOT NULL DEFAULT false,
+    "hashed_ip" text,
+    "user_agent" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "pla_portal_idx" ON "portal_login_attempts" ("kind","portal_id","created_at")`,
   `CREATE TABLE IF NOT EXISTS "profile_views" (
     "id" text PRIMARY KEY NOT NULL,
     "profile_user_id" text NOT NULL,
