@@ -2,6 +2,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { pairs, money, prizeSharePct, marginPerChallenge, type PricingConfig } from "@/lib/pricing";
 import { cardBgStyle, type CardBgMap } from "@/lib/card-bg";
+import LoopRing from "@/components/viz/LoopRing";
 
 // The commercial argument, in sections.
 //
@@ -127,32 +128,21 @@ export function SolutionSection({ c, bg }: { c: Copy; bg?: CardBgMap }) {
 // ===== 4. The loyalty loop =====
 
 export function LoopSection({ c, bg }: { c: Copy; bg?: CardBgMap }) {
-  const items = pairs(c["brand.loop.items"]);
-  const icons = ["link", "swords", "send", "rocket"];
+  // Drawn as a ring, not as numbered boxes with an arrow between them.
+  //
+  // The old layout was four cards in a row with a chevron in the gaps, which
+  // reads as a four-step process that ends — the opposite of the claim being
+  // made. A closed loop with the last node feeding the first says "this runs
+  // again next week" without a caption, and it is the layout that was asked
+  // for everywhere it appeared.
+  const items = pairs(c["brand.loop.items"]).map((p, i) => ({ key: `l${i}`, title: p.title, body: p.note }));
   return (
     <Band bg={bg} bgKey="sec_loop" className="py-20">
-      <div className="text-center max-w-2xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-bold">{c["brand.loop.title"]}</h2>
-        <p className="text-muted mt-3 leading-relaxed">{c["brand.loop.subtitle"]}</p>
-      </div>
-      <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-4 relative">
-        {items.map((it, i) => (
-          <div key={it.title} className="glass rounded-2xl p-5 relative">
-            <div className="flex items-center gap-3">
-              <span className="h-9 w-9 rounded-full bg-violet-500/20 border border-violet-400/40 grid place-items-center text-sm font-bold text-violet-200">
-                {i + 1}
-              </span>
-              <Icon name={icons[i] ?? "spark"} size={18} className="text-cyan-300" />
-            </div>
-            <div className="font-bold mt-3">{it.title}</div>
-            <p className="text-sm text-muted mt-1.5 leading-relaxed">{it.note}</p>
-            {/* The arrow that makes it read as a loop rather than four features. */}
-            {i < items.length - 1 && (
-              <Icon name="arrowRight" size={16} className="hidden lg:block absolute top-1/2 -right-3 -translate-y-1/2 text-violet-400/50" />
-            )}
-          </div>
-        ))}
-      </div>
+      <LoopRing
+        title={c["brand.loop.title"]}
+        subtitle={c["brand.loop.subtitle"]}
+        nodes={items}
+      />
     </Band>
   );
 }

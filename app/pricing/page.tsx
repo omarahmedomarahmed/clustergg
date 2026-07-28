@@ -3,6 +3,10 @@ import Icon from "@/components/Icon";
 import PricingPlans from "@/components/PricingPlans";
 import ServerEarnCards from "@/components/ServerEarnCards";
 import { BrandHero, ProblemSection, InsightSection, SolutionSection, LoopSection, PrizeSection } from "@/components/BrandStory";
+import PlacementMap from "@/components/viz/PlacementMap";
+import OpsSplit from "@/components/viz/OpsSplit";
+import CompareMatrix from "@/components/viz/CompareMatrix";
+import TechProofGrid from "@/components/viz/TechProofGrid";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { pricingLive } from "@/lib/pricing-live";
@@ -69,6 +73,30 @@ export default async function PricingPage() {
       <ProblemSection c={storyCopy} bg={bg} />
       <InsightSection c={storyCopy} bg={bg} />
       <SolutionSection c={storyCopy} bg={bg} />
+
+      {/* ===== What you are buying, drawn ===== */}
+      <section className="mx-auto max-w-6xl px-4 py-16">
+        <div className="mx-auto mb-8 max-w-2xl text-center">
+          <h2 className="text-3xl font-bold md:text-4xl">Where your brand appears</h2>
+          <p className="mt-3 leading-relaxed text-muted">
+            Two surfaces. One of them cannot be bought anywhere else, because it is inside a Discord
+            server rather than next to it.
+          </p>
+        </div>
+        <PlacementMap discordPlacements={live.discordPlacements} webPlacements={live.webPlacements} />
+      </section>
+
+      {/* ===== The no-operations argument ===== */}
+      <section className="border-y border-violet-500/15 py-20" style={{ background: cardBgStyle(bg, "sec_ops") }}>
+        <div className="mx-auto max-w-6xl px-4">
+          <OpsSplit
+            title="Not a tournament organiser"
+            subtitle={`We do not hire match admins, book venues or run production. Software reads each game's own API on a schedule, so ${money(cfg.prizePool, cfg.currency)} of every ${money(cfg.challengePrice, cfg.currency)} challenge reaches the players instead of the people running it.`}
+            spend={cfg.challengePrice}
+            currency={cfg.currency}
+          />
+        </div>
+      </section>
 
       {/* ===== THE PLANS ===== */}
       <section id="plans" className="relative py-20 scroll-mt-24" style={{ background: cardBgStyle(bg, "sec_pricing") }}>
@@ -156,6 +184,25 @@ export default async function PricingPage() {
       <section className="relative py-20 border-y border-violet-500/15" style={{ background: cardBgStyle(bg, "sec_servers") }}>
         <div className="relative mx-auto max-w-6xl px-4">
           <ServerEarnCards installUrl={install || undefined} compact />
+        </div>
+      </section>
+
+      {/* ===== What else the budget could buy ===== */}
+      <section className="mx-auto max-w-6xl px-4 py-20">
+        <CompareMatrix
+          title="What else you could do with the budget"
+          subtitle="Three other ways to reach the same gamers, and where each of them actually wins. The rows we lose are on the table too."
+        />
+      </section>
+
+      {/* ===== How it's built ===== */}
+      <section className="border-y border-sky-500/15 py-20" style={{ background: cardBgStyle(bg, "sec_tech") }}>
+        <div className="mx-auto max-w-6xl px-4">
+          <TechProofGrid
+            cfg={cfg}
+            title="Built as software, end to end"
+            subtitle="Nothing here is operated by hand. The same architecture serves one server and a thousand."
+          />
         </div>
       </section>
 
