@@ -422,6 +422,138 @@ function PerKind({ section, metricOptions }: {
         </div>
       );
 
+    // ===== The investor set =====
+
+    case "raise": {
+      const ask = d.ask ?? {};
+      return (
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Raising"><input name="askAmount" type="number" min={0} defaultValue={ask.amount ?? ""} placeholder="250000" className="input-cosmic w-full" /></Field>
+            <Field label="Instrument"><input name="askInstrument" defaultValue={ask.instrument ?? ""} placeholder="SAFE" className="input-cosmic w-full" /></Field>
+            <Field label="Currency"><input name="askCurrency" defaultValue={ask.currency ?? "USD"} className="input-cosmic w-full" /></Field>
+            <Field label="Valuation / cap"><input name="askValuation" type="number" min={0} defaultValue={ask.valuation ?? ""} className="input-cosmic w-full" /></Field>
+            <Field label="Equity offered %"><input name="askEquity" type="number" min={0} max={100} step={0.5} defaultValue={ask.equityPct ?? ""} className="input-cosmic w-full" /></Field>
+            <Field label="Runway (months)"><input name="askRunway" type="number" min={0} defaultValue={ask.runwayMonths ?? ""} className="input-cosmic w-full" /></Field>
+          </div>
+          <Rows
+            label="Use of funds"
+            name="useLabel"
+            hint="Percentages of the round. They're drawn as one bar, and the slide says so if they don't add to 100."
+            initial={(d.useOfFunds ?? []).map((x) => JSON.stringify(x))}
+            blank={JSON.stringify({ label: "", pct: 0 })}
+            render={(raw) => {
+              let x: { label?: string; pct?: number; note?: string } = {};
+              try { x = JSON.parse(raw); } catch { /* new row */ }
+              return (
+                <div className="grid gap-2 rounded-xl border border-white/10 p-3">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_6rem]">
+                    <input name="useLabel" defaultValue={x.label ?? ""} placeholder="Prize pools" className="input-cosmic w-full" />
+                    <input name="usePct" type="number" min={0} max={100} defaultValue={x.pct ?? 0} placeholder="%" className="input-cosmic w-full" />
+                  </div>
+                  <input name="useNote" defaultValue={x.note ?? ""} placeholder="What that money actually does (optional)" className="input-cosmic w-full" />
+                </div>
+              );
+            }}
+          />
+          <Rows
+            label="Cap table, after the round"
+            name="capHolder"
+            hint="Percentages only — a shape, not a share register."
+            initial={(d.capTable ?? []).map((x) => JSON.stringify(x))}
+            blank={JSON.stringify({ holder: "", pct: 0 })}
+            render={(raw) => {
+              let x: { holder?: string; pct?: number; note?: string } = {};
+              try { x = JSON.parse(raw); } catch { /* new row */ }
+              return (
+                <div className="grid gap-2 rounded-xl border border-white/10 p-3">
+                  <div className="grid gap-2 sm:grid-cols-[1fr_6rem]">
+                    <input name="capHolder" defaultValue={x.holder ?? ""} placeholder="Founders" className="input-cosmic w-full" />
+                    <input name="capPct" type="number" min={0} max={100} defaultValue={x.pct ?? 0} placeholder="%" className="input-cosmic w-full" />
+                  </div>
+                  <input name="capNote" defaultValue={x.note ?? ""} placeholder="Vesting, class, terms (optional)" className="input-cosmic w-full" />
+                </div>
+              );
+            }}
+          />
+        </div>
+      );
+    }
+
+    case "unit":
+      return (
+        <Rows
+          label="Units"
+          name="unitLabel"
+          hint="One row per unit of sale. The margin and its percentage are calculated — don't type them."
+          initial={(d.units ?? []).map((x) => JSON.stringify(x))}
+          blank={JSON.stringify({ label: "", revenue: 0, cost: 0 })}
+          render={(raw) => {
+            let x: { label?: string; revenue?: number; cost?: number; note?: string } = {};
+            try { x = JSON.parse(raw); } catch { /* new row */ }
+            return (
+              <div className="grid gap-2 rounded-xl border border-white/10 p-3">
+                <div className="grid gap-2 sm:grid-cols-[1fr_7rem_7rem]">
+                  <input name="unitLabel" defaultValue={x.label ?? ""} placeholder="One weekly challenge" className="input-cosmic w-full" />
+                  <input name="unitRevenue" type="number" min={0} defaultValue={x.revenue ?? 0} placeholder="Revenue" className="input-cosmic w-full" />
+                  <input name="unitCost" type="number" min={0} defaultValue={x.cost ?? 0} placeholder="Cost" className="input-cosmic w-full" />
+                </div>
+                <input name="unitNote" defaultValue={x.note ?? ""} placeholder="What the cost actually is (optional)" className="input-cosmic w-full" />
+              </div>
+            );
+          }}
+        />
+      );
+
+    case "saas":
+      return (
+        <Rows
+          label="Extra metrics"
+          name="saasLabel"
+          hint="MRR, ARR, paying brands, ARPA, impressions and clicks are read from the database and always shown. Add anything the database can't answer — pipeline, LOIs, retention."
+          initial={(d.saasNotes ?? []).map((x) => JSON.stringify(x))}
+          blank={JSON.stringify({ label: "", value: "" })}
+          render={(raw) => {
+            let x: { label?: string; value?: string; note?: string } = {};
+            try { x = JSON.parse(raw); } catch { /* new row */ }
+            return (
+              <div className="grid gap-2 rounded-xl border border-white/10 p-3">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <input name="saasLabel" defaultValue={x.label ?? ""} placeholder="Pipeline" className="input-cosmic w-full" />
+                  <input name="saasValue" defaultValue={x.value ?? ""} placeholder="$40,000" className="input-cosmic w-full" />
+                </div>
+                <input name="saasNote" defaultValue={x.note ?? ""} placeholder="How it's counted (optional)" className="input-cosmic w-full" />
+              </div>
+            );
+          }}
+        />
+      );
+
+    case "market":
+      return (
+        <Rows
+          label="Market figures"
+          name="marketLabel"
+          hint="Every figure carries where it came from. A number with no source is the one that ends the meeting."
+          initial={(d.market ?? []).map((x) => JSON.stringify(x))}
+          blank={JSON.stringify({ label: "", value: "" })}
+          render={(raw) => {
+            let x: { label?: string; value?: string; note?: string; source?: string } = {};
+            try { x = JSON.parse(raw); } catch { /* new row */ }
+            return (
+              <div className="grid gap-2 rounded-xl border border-white/10 p-3">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <input name="marketLabel" defaultValue={x.label ?? ""} placeholder="Today's sellable inventory" className="input-cosmic w-full" />
+                  <input name="marketValue" defaultValue={x.value ?? ""} placeholder="$6,400 / mo" className="input-cosmic w-full" />
+                </div>
+                <textarea name="marketNote" defaultValue={x.note ?? ""} rows={2} placeholder="The arithmetic behind it" className="input-cosmic w-full" />
+                <input name="marketSource" defaultValue={x.source ?? ""} placeholder="Source — a report, a page, or 'bottom-up from our rate card'" className="input-cosmic w-full" />
+              </div>
+            );
+          }}
+        />
+      );
+
     default:
       return null;
   }

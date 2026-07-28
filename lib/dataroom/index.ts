@@ -7,6 +7,7 @@ import { TIERS } from "@/lib/server-portal";
 import { buildPricing, quote, type PricingConfig, type Quote, PRICING_NUMBER_KEYS } from "@/lib/pricing";
 import { getContent } from "@/lib/cms";
 import { SEED_DOCS, SEED_PEOPLE } from "@/lib/dataroom/defaults";
+import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
 import type { Doc, Person, Section, SectionData, SectionKind } from "@/lib/dataroom/types";
 import type { MilestoneLadder } from "@/lib/dataroom/types-client";
 
@@ -45,6 +46,7 @@ export async function ensureSeeded(): Promise<void> {
           id: uid(), docId, kind: s.kind, anchor: s.anchor, navLabel: s.navLabel,
           title: s.title ?? null, subtitle: s.subtitle ?? null, body: s.body ?? null,
           data: (s.data ?? {}) as Record<string, unknown>, sortOrder: j,
+          isVisible: !s.hidden,
         }).onConflictDoNothing();
       }
     }
@@ -86,6 +88,7 @@ export async function reseedDoc(slug: string): Promise<{ ok: boolean; sections: 
         id: uid(), docId: doc.id, kind: sec.kind, anchor: sec.anchor, navLabel: sec.navLabel,
         title: sec.title ?? null, subtitle: sec.subtitle ?? null, body: sec.body ?? null,
         data: (sec.data ?? {}) as Record<string, unknown>, sortOrder: j,
+        isVisible: !sec.hidden,
       });
     }
     return { ok: true, sections: seed.sections.length };
@@ -138,6 +141,34 @@ export async function getPeople(docId: string): Promise<Person[]> {
 
 // ===== The live numbers =====
 
+/**
+ * Revenue as the database knows it.
+ *
+ * An investor's first question is "what is your MRR", and a deck that answers
+ * it with a typed-in number is a deck that is wrong within a month — or worse,
+ * one whose number nobody can trace. These come from the campaigns actually
+ * running: `budget` is the monthly contract value on a campaign, so MRR is the
+ * sum over active campaigns inside their date window, and everything else is
+ * arithmetic on that.
+ *
+ * Zero is a legitimate answer and is shown as one. Pre-revenue is a stage, not
+ * something to be hidden behind an adjective.
+ */
+export type CommercialStats = {
+  brands: number;
+  payingBrands: number;
+  activeCampaigns: number;
+  mrr: number;
+  arr: number;
+  /** Average revenue per paying brand, per month. */
+  arpa: number;
+  impressions30d: number;
+  clicks30d: number;
+  cardCampaigns: number;
+  /** Sellable inventory, split by where it lives. */
+  placements: { total: number; web: number; discord: number };
+};
+
 export type LiveData = {
   network: NetworkStats;
   servers: PublicServer[];
@@ -147,21 +178,93 @@ export type LiveData = {
   /** The live rate card, so a deck can never quote a price we stopped charging. */
   pricing: PricingConfig;
   quotes: { reach: Quote; entry: Quote; full: Quote };
+  commercial: CommercialStats;
   takenAt: string;
 };
+
+// Our own brand row, used for house promos. Never counted as a customer.
+const HOUSE_BRAND_ID = "house-cluster-brand";
+
+const NO_COMMERCIAL: CommercialStats = {
+  brands: 0, payingBrands: 0, activeCampaigns: 0, mrr: 0, arr: 0, arpa: 0,
+  impressions30d: 0, clicks30d: 0, cardCampaigns: 0,
+  placements: { total: 0, web: 0, discord: 0 },
+};
+
+async function commercialStats(): Promise<CommercialStats> {
+  try {
+    const db = await getDb();
+    const now = new Date();
+    const since = new Date(Date.now() - 30 * 86400_000);
+
+    const [brandRows, campaigns, imps, clicks, placements] = await Promise.all([
+      db.select({ id: schema.brands.id }).from(schema.brands).where(eq(schema.brands.status, "active")),
+      db.select({ brandId: schema.adCampaigns.brandId, budget: schema.adCampaigns.budget, id: schema.adCampaigns.id })
+        .from(schema.adCampaigns)
+        .where(and(
+          eq(schema.adCampaigns.status, "active"),
+          sql`${schema.adCampaigns.startDate} <= ${now}`,
+          sql`${schema.adCampaigns.endDate} >= ${now}`,
+        )),
+      db.select({ n: count() }).from(schema.adImpressions).where(gte(schema.adImpressions.createdAt, since)),
+      db.select({ n: count() }).from(schema.adClicks).where(gte(schema.adClicks.createdAt, since)),
+      db.select({ id: schema.adPlacements.id, key: schema.adPlacements.key }).from(schema.adPlacements),
+    ]);
+    const cardPlacement = placements.filter((p) => p.key === CARD_AD_PLACEMENT);
+
+    // The house brand advertises Cluster to its own users. Counting it as a
+    // customer would be counting our own marketing as revenue.
+    const paying = new Set(campaigns.filter((c) => c.brandId !== HOUSE_BRAND_ID && (c.budget ?? 0) > 0).map((c) => c.brandId));
+    const mrr = Math.round(campaigns
+      .filter((c) => c.brandId !== HOUSE_BRAND_ID)
+      .reduce((sum, c) => sum + (c.budget ?? 0), 0));
+
+    // Our own house promo runs on the card placement too, and counting it here
+    // would report an advertiser that is us.
+    const cardCampaigns = cardPlacement[0]
+      ? (await db.selectDistinct({ campaignId: schema.adCampaignCreatives.campaignId })
+          .from(schema.adCampaignCreatives)
+          .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id))
+          .where(and(
+            eq(schema.adCampaignCreatives.placementId, cardPlacement[0].id),
+            sql`${schema.adCampaigns.brandId} <> ${HOUSE_BRAND_ID}`,
+          ))).length
+      : 0;
+
+    return {
+      brands: brandRows.filter((b) => b.id !== HOUSE_BRAND_ID).length,
+      payingBrands: paying.size,
+      activeCampaigns: campaigns.filter((c) => c.brandId !== HOUSE_BRAND_ID).length,
+      mrr,
+      arr: mrr * 12,
+      arpa: paying.size ? Math.round(mrr / paying.size) : 0,
+      impressions30d: Number(imps[0]?.n ?? 0),
+      clicks30d: Number(clicks[0]?.n ?? 0),
+      cardCampaigns,
+      placements: {
+        total: placements.length,
+        web: placements.filter((p) => !p.key.startsWith("discord_")).length,
+        discord: placements.filter((p) => p.key.startsWith("discord_")).length,
+      },
+    };
+  } catch {
+    return NO_COMMERCIAL;
+  }
+}
 
 // One pass for a whole document, handed to every section that needs it, so a
 // page with four live sections makes one set of queries rather than four.
 export async function liveData(): Promise<LiveData> {
-  const [network, servers, metrics, priceContent] = await Promise.all([
+  const [network, servers, metrics, priceContent, commercial] = await Promise.all([
     networkStats().catch((): NetworkStats => ({ servers: 0, reach: 0, gamers: 0, linked: 0, challenges: 0, games: 0 })),
     publicServers(12).catch(() => []),
     loadMetrics().catch(() => ({} as Metrics)),
     getContent(PRICING_NUMBER_KEYS).catch(() => ({} as Record<string, string>)),
+    commercialStats(),
   ]);
   const pricing = buildPricing(priceContent);
   return {
-    network, servers, metrics, metricDefs: METRICS, tiers: TIERS, pricing,
+    network, servers, metrics, metricDefs: METRICS, tiers: TIERS, pricing, commercial,
     quotes: {
       reach: quote(pricing, { games: 0 }),
       entry: quote(pricing, { games: 1 }),

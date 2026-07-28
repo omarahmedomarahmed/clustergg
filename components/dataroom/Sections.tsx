@@ -3,6 +3,12 @@ import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
 import BotShowcase from "@/components/BotShowcase";
 import { Milestones, GtmStages, TeamGrid, Gallery, MetricTiles, Explainer, CardShowcase } from "@/components/dataroom/Interactive";
+import { RaiseSection, UnitSection, SaasSection, MarketSection } from "@/components/dataroom/Investor";
+import CompareMatrix from "@/components/viz/CompareMatrix";
+import OpsSplit from "@/components/viz/OpsSplit";
+import PlacementMap from "@/components/viz/PlacementMap";
+import TechProofGrid from "@/components/viz/TechProofGrid";
+import LoopRing from "@/components/viz/LoopRing";
 import { ladder, metricValueFor, INVESTOR_AD_PLACEMENT, type LiveData, type Person, type Section } from "@/lib/dataroom";
 import type { BotStep } from "@/components/BotShowcase";
 import { optImg } from "@/lib/img";
@@ -394,6 +400,84 @@ function Body({ section, doc, live, people, steps, installUrl }: {
               Live slot, real rotation, impressions counted the same way every placement on the network is.
             </p>
           </div>
+        </>
+      );
+
+    // ===== The investor set =====
+
+    case "raise":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <RaiseSection d={d} accent={accent} />
+        </>
+      );
+
+    case "unit":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <UnitSection d={d} accent={accent} />
+        </>
+      );
+
+    case "saas":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <SaasSection d={d} live={live.commercial} accent={accent} />
+          <LiveNote takenAt={live.takenAt} />
+        </>
+      );
+
+    case "market":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <MarketSection d={d} accent={accent} />
+        </>
+      );
+
+    case "compare":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <CompareMatrix />
+        </>
+      );
+
+    case "ops":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <OpsSplit spend={live.pricing.challengePrice} currency={live.pricing.currency} />
+        </>
+      );
+
+    case "placements":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <PlacementMap
+            discordPlacements={live.commercial.placements.discord}
+            webPlacements={live.commercial.placements.web}
+          />
+        </>
+      );
+
+    case "tech":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <TechProofGrid cfg={live.pricing} />
+        </>
+      );
+
+    case "loop":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <LoopRing accent={accent} />
         </>
       );
 

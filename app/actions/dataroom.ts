@@ -322,6 +322,64 @@ function readSectionData(kind: SectionKind, fd: FormData): SectionData {
     case "ad":
       d.placement = str(fd, "placement") || "investor-doc-ad-placement";
       break;
+
+    // ===== The investor set =====
+    case "raise": {
+      const num = (k: string) => {
+        const n = Number(str(fd, k).replace(/[^0-9.]/g, ""));
+        return Number.isFinite(n) && n > 0 ? n : undefined;
+      };
+      d.ask = {
+        amount: num("askAmount"),
+        instrument: str(fd, "askInstrument") || undefined,
+        valuation: num("askValuation"),
+        equityPct: num("askEquity"),
+        runwayMonths: num("askRunway"),
+        currency: str(fd, "askCurrency") || "USD",
+      };
+      const useLabels = fd.getAll("useLabel").map(String);
+      d.useOfFunds = useLabels.map((label, i) => ({
+        label: label.trim(),
+        pct: Number(fd.getAll("usePct")[i] ?? 0) || 0,
+        note: String(fd.getAll("useNote")[i] ?? "").trim() || undefined,
+      })).filter((x) => x.label);
+      const holders = fd.getAll("capHolder").map(String);
+      d.capTable = holders.map((holder, i) => ({
+        holder: holder.trim(),
+        pct: Number(fd.getAll("capPct")[i] ?? 0) || 0,
+        note: String(fd.getAll("capNote")[i] ?? "").trim() || undefined,
+      })).filter((x) => x.holder);
+      break;
+    }
+    case "unit": {
+      const labels = fd.getAll("unitLabel").map(String);
+      d.units = labels.map((label, i) => ({
+        label: label.trim(),
+        revenue: Number(fd.getAll("unitRevenue")[i] ?? 0) || 0,
+        cost: Number(fd.getAll("unitCost")[i] ?? 0) || 0,
+        note: String(fd.getAll("unitNote")[i] ?? "").trim() || undefined,
+      })).filter((x) => x.label);
+      break;
+    }
+    case "saas": {
+      const labels = fd.getAll("saasLabel").map(String);
+      d.saasNotes = labels.map((label, i) => ({
+        label: label.trim(),
+        value: String(fd.getAll("saasValue")[i] ?? "").trim(),
+        note: String(fd.getAll("saasNote")[i] ?? "").trim() || undefined,
+      })).filter((x) => x.label && x.value);
+      break;
+    }
+    case "market": {
+      const labels = fd.getAll("marketLabel").map(String);
+      d.market = labels.map((label, i) => ({
+        label: label.trim(),
+        value: String(fd.getAll("marketValue")[i] ?? "").trim(),
+        note: String(fd.getAll("marketNote")[i] ?? "").trim() || undefined,
+        source: String(fd.getAll("marketSource")[i] ?? "").trim() || undefined,
+      })).filter((x) => x.label && x.value);
+      break;
+    }
   }
   return d;
 }

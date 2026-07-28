@@ -19,6 +19,16 @@ export type SeedSection = {
   subtitle?: string;
   body?: string;
   data?: SectionData;
+  /**
+   * Ships built but switched off.
+   *
+   * For slides whose content is a decision rather than a fact — the raise, the
+   * cap table. Shipping those visible with plausible-looking defaults would put
+   * numbers in front of an investor that nobody chose. The slide is there, the
+   * layout is done, and a founder turns it on in Admin → Data room once the
+   * figures are theirs.
+   */
+  hidden?: boolean;
 };
 
 export type SeedDoc = {
@@ -216,9 +226,70 @@ export const SEED_DOCS: SeedDoc[] = [
           "Published at clustergg.com/pricing rather than quoted on request. Every figure below is read from the live rate card as this page loads.",
       },
       {
+        kind: "unit",
+        anchor: "unit",
+        navLabel: "Unit economics",
+        title: "One transaction, repeated",
+        subtitle:
+          "Every number here is the live rate card. Cost of goods is the prize — there is no third line, because there is no operations team between the money and the players.",
+        data: {
+          units: [
+            { label: "One weekly challenge", revenue: 250, cost: 175, note: "$175 is the prize, paid as three trophies carrying the sponsor's brand. The only cost of goods." },
+            { label: "One game, one month", revenue: 1000, cost: 700, note: "Four challenges. The prize cost is fixed per month — a second sponsor does not double it." },
+            { label: "Six games, one month", revenue: 6000, cost: 4200, note: "The full catalogue as sold today, before placement revenue and before the add-on." },
+          ],
+        },
+      },
+      {
+        kind: "ops",
+        anchor: "ops",
+        navLabel: "No operations",
+        title: "Not a tournament organiser",
+        subtitle:
+          "The comparison that explains the margin: a produced event spends most of a sponsorship on the people producing it. We employ no match admins, book no venues and run no production — the competition is scored by reading each game's own API on a schedule.",
+      },
+      {
+        kind: "compare",
+        anchor: "compare",
+        navLabel: "Competition",
+        title: "What a brand is really choosing between",
+        subtitle:
+          "Giveaway bots, tournament platforms and esports agencies, capability by capability — including the rows where they beat us.",
+      },
+      {
+        kind: "market",
+        anchor: "market",
+        navLabel: "Market",
+        title: "Sized from our own rate card, not a report",
+        subtitle:
+          "Top-down market numbers are unfalsifiable and everybody's deck has them. This is bottom-up: what the catalogue can be sold for, with the arithmetic in the open.",
+        data: {
+          market: [
+            {
+              label: "Today's sellable inventory",
+              value: "$6,400 / mo",
+              note: "Six games at $1,000 a month plus the $400 ultimate base — one brand taking the whole network. The rate card is published, so this is checkable.",
+              source: "clustergg.com/pricing · the live rate card this page reads from",
+            },
+            {
+              label: "The catalogue we already run",
+              value: "24 games",
+              note: "Integrations built and syncing. Selling the same weekly challenge across all of them is $24,000 a month of game inventory at today's price, with no new engineering.",
+              source: "lib/providers/registry.ts · the integrations in production",
+            },
+            {
+              label: "Then it stops being per-game",
+              value: "Placements",
+              note: "Ad inventory scales with reach rather than catalogue: every card the bot renders carries a sponsor box, so inventory grows with servers installed and gamers connected, not with games added.",
+              source: "Bottom-up from installs — no third-party market estimate is doing work here.",
+            },
+          ],
+        },
+      },
+      {
         kind: "text",
         anchor: "economics",
-        navLabel: "Unit economics",
+        navLabel: "Why it compounds",
         title: "The whole model is one $250 transaction, repeated.",
         body:
           "A brand buys a game's weekly challenge for $250. $175 of that is the prize, paid as three trophies carrying their brand and redeemed by the three gamers who placed. We keep $75. That is 70% of gross revenue reaching players by construction, not by policy — and it is the entire cost of goods.\n\n"
@@ -310,6 +381,38 @@ export const SEED_DOCS: SeedDoc[] = [
         },
       },
       {
+        kind: "saas",
+        anchor: "saas",
+        navLabel: "SaaS metrics",
+        title: "Revenue, as the database has it",
+        subtitle:
+          "Read from the campaigns actually running as this page loads. Nothing on this slide was typed into a deck, which also means it cannot be flattering by accident.",
+      },
+      {
+        kind: "tech",
+        anchor: "tech",
+        navLabel: "Engineering",
+        title: "What we actually built",
+        subtitle:
+          "The parts a technical diligence call asks about, each with a number that can be checked against the running product.",
+      },
+      {
+        kind: "loop",
+        anchor: "loop",
+        navLabel: "The weekly loop",
+        title: "How the network grows itself",
+        subtitle:
+          "Profile of the Week is the distribution engine, not a feature. Every gamer on the platform is entered, and winning means asking people who have never heard of us to come and vote.",
+      },
+      {
+        kind: "placements",
+        anchor: "surfaces",
+        navLabel: "Ad surfaces",
+        title: "Where a sponsor actually appears",
+        subtitle:
+          "The Discord card is inventory nobody else can sell: it is inside a server rather than next to it, and it is rendered by us on every interaction.",
+      },
+      {
         kind: "metrics",
         anchor: "numbers",
         navLabel: "Numbers",
@@ -317,6 +420,40 @@ export const SEED_DOCS: SeedDoc[] = [
         subtitle: "The same numbers our own team runs on, with the definition of each one attached.",
         data: {
           metricKeys: ["guilds", "guildMembers", "users", "linkedAccounts", "botCommands", "challenges", "leaderboards", "games"],
+        },
+      },
+      {
+        kind: "raise",
+        anchor: "raise",
+        navLabel: "The raise",
+        // Off until a founder confirms the terms. Every other slide in this
+        // deck is either a fact about the product or a number read from the
+        // database; this one is a decision, and shipping a plausible-looking
+        // cap table nobody chose is worse than shipping no slide.
+        hidden: true,
+        title: "What we're raising, and what it buys",
+        subtitle:
+          "Pre-seed, on a SAFE. The platform is built and running; this round buys the prize pools and the outbound effort that turn it into revenue.",
+        data: {
+          ask: {
+            amount: 250000,
+            instrument: "SAFE",
+            valuation: 2500000,
+            equityPct: 10,
+            runwayMonths: 18,
+            currency: "USD",
+          },
+          useOfFunds: [
+            { label: "Prize pools", pct: 35, note: "Funding challenges while the first sponsors ramp — the cost of goods, paid before the revenue arrives" },
+            { label: "Sales & partnerships", pct: 30, note: "Getting the bot into the servers that should already have it, and the first brands onto the card placement" },
+            { label: "Engineering", pct: 25, note: "More game integrations, and the analytics brands ask for before they renew" },
+            { label: "Infrastructure & legal", pct: 10, note: "Hosting, APIs, prize payout compliance" },
+          ],
+          capTable: [
+            { holder: "Founders", pct: 80, note: "Fully vesting, 4 years" },
+            { holder: "This round", pct: 10, note: "SAFE, converting at the cap" },
+            { holder: "Option pool", pct: 10, note: "Reserved for the first engineering and sales hires" },
+          ],
         },
       },
       {
@@ -359,7 +496,7 @@ export const SEED_DOCS: SeedDoc[] = [
             },
             {
               q: "What are you raising, and for what?",
-              a: "Ask us directly — the terms are a conversation, not a slide. What the money does is straightforward: prize pools while the first sponsors ramp, more game integrations, and the outbound effort to get the bot into the servers that should already have it.",
+              a: "The terms are on the raise slide, with the use of funds and the cap table beside them. In short: prize pools while the first sponsors ramp, more game integrations, and the outbound effort to get the bot into the servers that should already have it.",
             },
           ],
         },

@@ -26,6 +26,18 @@ export type SectionKind =
   | "pricing"     // the live brand rate card
   | "faq"         // questions with answers
   | "ad"          // the investor-doc ad placement, live
+  // The investor set. Added because a deck that can't answer "how much are you
+  // raising, at what, who owns it, and what are the unit economics" isn't a
+  // deck — it's a product tour.
+  | "raise"       // the ask, the instrument, use of funds, the cap table
+  | "unit"        // unit economics, per challenge and per game
+  | "saas"        // MRR / ARR / brands / ARPA, live from the database
+  | "market"      // market sizing, with the source next to every number
+  | "compare"     // the competitor matrix
+  | "ops"         // where a sponsorship dollar goes, vs a produced event
+  | "placements"  // the ad surfaces, drawn
+  | "tech"        // the engineering proof points
+  | "loop"        // the weekly viral loop, as a ring
   | "contact";    // how to reach us
 
 export const SECTION_KINDS: { kind: SectionKind; label: string; blurb: string; live?: boolean }[] = [
@@ -46,6 +58,15 @@ export const SECTION_KINDS: { kind: SectionKind; label: string; blurb: string; l
   { kind: "pricing", label: "Brand rate card", blurb: "What brands actually pay, read live from Admin → Site content. A deck can't quote a stale price.", live: true },
   { kind: "faq", label: "FAQ", blurb: "Questions with answers, collapsed until asked." },
   { kind: "ad", label: "Ad placement", blurb: "The live investor-doc ad slot — shows a partner exactly what they'd buy.", live: true },
+  { kind: "raise", label: "The raise", blurb: "Amount, instrument, valuation, equity, use of funds and the cap table — as charts, not a paragraph." },
+  { kind: "unit", label: "Unit economics", blurb: "What one challenge and one game-month cost and earn, with the margin drawn." },
+  { kind: "saas", label: "SaaS metrics", blurb: "MRR, ARR, paying brands, ARPA — read live from the campaigns actually running.", live: true },
+  { kind: "market", label: "Market size", blurb: "TAM / SAM / SOM with the source stated beside each number." },
+  { kind: "compare", label: "Competitor matrix", blurb: "Us against giveaway bots, tournament platforms and agencies, capability by capability." },
+  { kind: "ops", label: "Where the money goes", blurb: "The cost split against a produced tournament — the no-operations argument." },
+  { kind: "placements", label: "Ad surfaces", blurb: "The Discord card and the website slots, drawn at their real geometry." },
+  { kind: "tech", label: "Engineering", blurb: "The renderer, the verified-stats pipeline, the ad rotation — with numbers." },
+  { kind: "loop", label: "The weekly loop", blurb: "Profile of the Week drawn as a ring: how the network grows itself." },
   { kind: "contact", label: "Contact", blurb: "Email, a note, and a button." },
 ];
 
@@ -100,6 +121,29 @@ export type SectionData = {
 
   // ad
   placement?: string;
+
+  // raise — the ask, and who owns what after it. Percentages, not share
+  // counts: a cap table in a public-ish document is a shape, not a register.
+  ask?: {
+    amount?: number;
+    instrument?: string;      // "SAFE", "Priced equity round", …
+    valuation?: number;       // pre-money, or the cap on a SAFE
+    equityPct?: number;       // what the round buys
+    runwayMonths?: number;
+    currency?: string;
+  };
+  useOfFunds?: { label: string; pct: number; note?: string }[];
+  capTable?: { holder: string; pct: number; note?: string }[];
+
+  // unit — one line per unit of sale.
+  units?: { label: string; revenue: number; cost: number; note?: string }[];
+
+  // saas — hand-entered metrics shown NEXT TO the live ones, never instead of
+  // them. Anything the database can answer is read from the database.
+  saasNotes?: { label: string; value: string; note?: string }[];
+
+  // market — every number carries where it came from, or it isn't shown.
+  market?: { label: string; value: string; note?: string; source?: string }[];
 
   // any renderer: an optional link out
   linkLabel?: string;
