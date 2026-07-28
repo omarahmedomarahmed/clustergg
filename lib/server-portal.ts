@@ -37,29 +37,33 @@ export const TIERS: Tier[] = [
   },
   {
     key: "monetized",
-    name: "Monetized Server",
+    name: "Sponsored Server",
     threshold: 500,
     icon: "diamond",
-    unlocks: "Ad revenue share",
-    detail: "You earn a share of what Cluster makes from ads shown to your community.",
+    unlocks: "Brand-sponsored challenges, with real prize money",
+    detail:
+      "Brands sponsoring the games your members play start running their weekly challenges here — and every "
+      + "dollar of the prize money is won by your members.",
   },
   {
     key: "broadcaster",
     name: "Broadcaster",
     threshold: 1000,
     icon: "satellite",
-    unlocks: "Carry other servers' challenges",
-    detail: "Public challenges and other servers' competitions can run in your server — and you're paid to carry them.",
+    unlocks: "Carry the whole network's challenges",
+    detail:
+      "Challenges from across the network run in your server, so more of your members are playing for real "
+      + "prizes in more games at once.",
   },
   {
     key: "sponsored",
-    name: "Sponsored Server",
+    name: "Flagship Server",
     threshold: 5000,
     icon: "crown",
-    unlocks: "Brand-sponsored challenges, 100% of the fee",
+    unlocks: "Brands ask for your community by name",
     detail:
-      "Brands sponsor challenges directly in your server and you keep the whole fee. "
-      + "Smaller servers now carry YOUR challenges instead of the other way round.",
+      "Brands buy challenges in your server specifically, and smaller servers carry yours instead of the "
+      + "other way round.",
   },
 ];
 

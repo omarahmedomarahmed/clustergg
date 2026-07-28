@@ -6,7 +6,7 @@ import { BrandHero, ProblemSection, InsightSection, SolutionSection, LoopSection
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { pricingLive } from "@/lib/pricing-live";
-import { money, lines, pairs, quote } from "@/lib/pricing";
+import { money, lines, pairs, quote, perGame } from "@/lib/pricing";
 import { installUrl } from "@/lib/discord/config";
 
 export const dynamic = "force-dynamic";
@@ -131,7 +131,7 @@ export default async function PricingPage() {
           <div className="text-center max-w-2xl mx-auto mb-8">
             <h2 className="text-3xl md:text-4xl font-bold">The games you can own</h2>
             <p className="text-muted mt-3 leading-relaxed">
-              One weekly challenge per game, {cfg.challengesPerGame} a month each, {money(cfg.perGame, cfg.currency)} per game per month.
+              One weekly challenge per game, {cfg.challengesPerGame} a month each, {money(perGame(cfg), cfg.currency)} per game per month.
               Gamer counts are linked, verified accounts — read from each game&apos;s own API, never self-reported.
             </p>
           </div>

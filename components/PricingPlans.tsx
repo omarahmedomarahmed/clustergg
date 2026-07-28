@@ -5,7 +5,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
 import {
-  quote, money, projectedImpressions, lines,
+  quote, money, projectedImpressions, lines, perGame,
   type PricingConfig, type TierKey,
 } from "@/lib/pricing";
 
@@ -133,7 +133,7 @@ export default function PricingPlans({
 
           <div className="mt-4 rounded-xl bg-black/25 border border-white/10 p-3 text-xs text-muted leading-relaxed">
             <span className="text-ink font-semibold">{money(isUltimate ? cfg.ultimateBase : cfg.challengeBase, cfg.currency)}</span> base
-            {" + "}<span className="text-ink font-semibold">{money(cfg.perGame, cfg.currency)}</span> × {n} {n === 1 ? "game" : "games"}
+            {" + "}<span className="text-ink font-semibold">{money(perGame(cfg), cfg.currency)}</span> × {n} {n === 1 ? "game" : "games"}
             {addon && <> {" + "}<span className="text-ink font-semibold">{money(cfg.streamAddon, cfg.currency)}</span> broadcast</>}
             {isUltimate && (
               <div className="mt-1.5 text-amber-300 inline-flex items-center gap-1.5">

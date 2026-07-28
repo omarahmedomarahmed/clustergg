@@ -710,7 +710,7 @@ export const profileViews = pgTable("profile_views", {
 // ===== Discord servers =====
 // A server that has installed ClusterBot. This is the unit the whole growth
 // loop is measured in: an owner installs, watches their members join Cluster,
-// and unlocks ad revenue share once enough of them have linked a game.
+// and unlocks brand-sponsored challenges once enough of them have linked a game.
 export const discordGuilds = pgTable("discord_guilds", {
   guildId: text("guild_id").primaryKey(),
   name: text("name").notNull().default(""),

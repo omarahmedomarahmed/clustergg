@@ -163,7 +163,7 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { key: "challenge_sidebar", pageScope: "Challenge detail rail", device: "desktop", width: 300, height: 600, mobileWidth: null, mobileHeight: null },
     { key: "messages_footer", pageScope: "Above message compose box", device: "both", width: 320, height: 50, mobileWidth: 320, mobileHeight: 50 },
     { key: "interstitial_video", pageScope: "Between page transitions", device: "both", width: 640, height: 360, mobileWidth: 320, mobileHeight: 180 },
-    // Posted by ClusterBot into servers that have unlocked revenue share.
+    // Posted by ClusterBot into servers that have crossed the unlock threshold.
     // Sized for a Discord embed image, which renders about 1200 wide.
     { key: "discord_bot_post", pageScope: "ClusterBot posts in Discord servers", device: "both", width: 1200, height: 400, mobileWidth: 600, mobileHeight: 200 },
   ];

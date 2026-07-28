@@ -150,7 +150,7 @@ export const POSTS: BlogPost[] = [
         head: ["Linked members", "What unlocks"],
         rows: [
           ["From day one", "Private challenges for your community, and a public server page with your logo and invite"],
-          ["500", "A share of the ad revenue Cluster earns from your community"],
+          ["500", "Brand-sponsored challenges run in your server, with the prize money won by your members"],
           ["1,000", "You can carry other servers' challenges, and are paid to"],
           ["5,000", "Brands sponsor challenges directly in your server and you keep the whole fee"],
         ],
@@ -162,7 +162,7 @@ export const POSTS: BlogPost[] = [
       { kind: "p", text: "If your server is under a few thousand members, chase engagement rather than revenue. Every model above pays proportionally to how alive the community is, and none of them fix a quiet server." },
       { kind: "p", text: "Above that, run two in parallel: something passive that pays without ongoing work, and one direct sponsorship attempt per quarter. The passive one funds the effort of the direct one." },
 
-      { kind: "cta", text: "Cluster's revenue share starts at 500 linked members, and the counter is visible from day one.", href: "/discord-bot", label: "See how the tiers work" },
+      { kind: "cta", text: "Cluster's sponsored challenges start at 500 linked members, and the counter is visible from day one.", href: "/discord-bot", label: "See how the tiers work" },
     ],
   },
 

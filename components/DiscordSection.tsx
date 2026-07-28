@@ -87,7 +87,7 @@ export function DiscordSection({ stats, servers, copy, steps, installUrl }: {
           <Step
             n={3}
             title="You get paid"
-            body="Hit 500 linked members and your server earns a share of the ad revenue Cluster makes from your community."
+            body="Hit 500 linked members and brands start sponsoring challenges in your server — with the prize money won by your own members."
           />
         </div>
 

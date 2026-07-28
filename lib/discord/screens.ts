@@ -1018,7 +1018,7 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
     ? [
       `**${bar}** ${stats.pct}%`,
       "",
-      `**Ad revenue is unlocked.** ${stats.name} earns a ${stats.revenueSharePct}% share of what Cluster makes from your community.`,
+      `**Sponsored challenges are unlocked.** Brands running challenges in your community's games now post them here — and the prize money is won by your members.`,
       "",
       `**${stats.linked.toLocaleString()}** members have linked a game · **${stats.joined.toLocaleString()}** have a Cluster profile`,
     ]
@@ -1026,7 +1026,7 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       `**${bar}** ${stats.pct}%`,
       "",
       `**${stats.linked.toLocaleString()} / ${stats.threshold.toLocaleString()}** members have joined Cluster *and* linked a game account.`,
-      `**${stats.remaining.toLocaleString()} more** unlocks a ${stats.revenueSharePct}% share of the ad revenue Cluster earns from this community.`,
+      `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here, with real prize money paid to the members who win them.`,
       "",
       `${stats.joined.toLocaleString()} have a Cluster profile so far — linking a game is what counts.`,
     ];

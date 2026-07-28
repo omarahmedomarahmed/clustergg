@@ -6,7 +6,7 @@ import { installUrl, discordConfigured, CLUSTER_CHANNEL } from "@/lib/discord/co
 import { networkStats, publicServers } from "@/lib/network";
 import { botShowcaseSteps } from "@/lib/bot-showcase";
 import ServerEarnCards from "@/components/ServerEarnCards";
-import { buildPricing, money } from "@/lib/pricing";
+import { buildPricing, money, perGame, prizeSharePct } from "@/lib/pricing";
 import { PRICING_NUMBER_KEYS } from "@/lib/pricing";
 import BotShowcase from "@/components/BotShowcase";
 import BrandGlyph from "@/components/BrandGlyph";
@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "ClusterBot for Discord — ranked profiles, live game stats and challenges",
   description:
-    "Add ClusterBot to your Discord server. Members get ranked profiles and live stats from League, Valorant, Apex, CS2, Fortnite and more, plus challenges with real trophies — all inside Discord. Hit 500 linked members and your server earns a share of the ad revenue.",
+    "Add ClusterBot to your Discord server. Members get ranked profiles and live stats from League, Valorant, Apex, CS2, Fortnite and more, plus challenges with real trophies — all inside Discord. Hit 500 linked members and brands start sponsoring weekly challenges there, with the prize money won by your members.",
   alternates: { canonical: "/discord-bot" },
   openGraph: {
     title: "ClusterBot for Discord",
@@ -104,7 +104,7 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           </h1>
           <p className="text-muted max-w-2xl mx-auto mt-5 text-lg leading-relaxed">
             {c["discord.hero.subtitle"] ||
-              `Your members get ranked profiles and live stats from the games they already play, plus weekly challenges with real prize money — without leaving your server. Link ${threshold.toLocaleString()} gamers and brands start paying into your community. Free forever, and it never reads a message.`}
+              `Your members get ranked profiles and live stats from the games they already play, plus weekly challenges with real prize money — without leaving your server. Link ${threshold.toLocaleString()} gamers and brands start sponsoring challenges here — with the prize money won by your members. Free forever, and it never reads a message.`}
           </p>
 
           <div className="flex flex-wrap gap-3 justify-center mt-8">
@@ -193,14 +193,14 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
                 <div className="inline-flex items-center gap-2 text-xs text-cyan-200 bg-cyan-500/10 border border-cyan-400/30 rounded-full px-3 py-1.5">
                   <Icon name="chart" size={12} /> Where the money comes from
                 </div>
-                <h3 className="text-2xl font-bold mt-4">Brands pay us. We pay you.</h3>
+                <h3 className="text-2xl font-bold mt-4">Brands pay us. Your members get paid.</h3>
                 <p className="text-muted mt-3 leading-relaxed">
-                  Brands buy sponsored challenges by the game — {money(cfg.perGame, cfg.currency)} a month each,
-                  covering {cfg.challengesPerGame} weekly competitions with their name on them. Those challenges run in
-                  the servers whose members actually play that game. If your community is a League server, League
-                  sponsorship money flows to you. You keep{" "}
-                  <strong className="text-ink">{Math.round(cfg.serverSharePct)}%</strong> of what your community
-                  generates, and we fund every prize pool ourselves.
+                  A brand buys a game&apos;s weekly challenge — {money(cfg.challengePrice, cfg.currency)} each,{" "}
+                  {money(perGame(cfg), cfg.currency)} a month for all {cfg.challengesPerGame}. Of every one of those,{" "}
+                  <strong className="text-ink">{money(cfg.prizePool, cfg.currency)}</strong> is prize money —{" "}
+                  {prizeSharePct(cfg)}% of what the brand pays, handed to the three gamers who win as trophies carrying
+                  that brand&apos;s name. The challenges run where the players are, so if yours is a League server,
+                  League sponsorship money is won by your members. We take the difference and run the whole thing.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href="/pricing" className="ghost-btn pressable rounded-full px-5 py-2.5 text-sm">
@@ -212,10 +212,10 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <MoneyFact value={`${Math.round(cfg.serverSharePct)}%`} label="of your community's revenue is yours" gold />
+                <MoneyFact value={money(perGame(cfg) * (cfg.prizePool / Math.max(1, cfg.challengePrice)), cfg.currency)} label="prize money per sponsored game, every month" gold />
                 <MoneyFact value={threshold.toLocaleString()} label="linked gamers to switch it on" />
                 <MoneyFact value={String(cfg.games * cfg.challengesPerGame)} label="sponsored challenges a month across the network" />
-                <MoneyFact value={money(cfg.games * cfg.challengesPerGame * cfg.prizePool, cfg.currency)} label="of prize money we fund every month" />
+                <MoneyFact value={money(cfg.games * cfg.challengesPerGame * cfg.prizePool, cfg.currency)} label="won by gamers every month, network-wide" />
               </div>
             </div>
           </div>

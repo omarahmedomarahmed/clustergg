@@ -21,7 +21,17 @@ export type PricingConfig = {
   games: number;
   /** Sponsored challenges per game, per month. One a week. */
   challengesPerGame: number;
-  /** Guaranteed minimum prize pool per challenge, and its split. */
+  /** What a brand pays for one sponsored weekly challenge. */
+  challengePrice: number;
+  /**
+   * What that challenge pays out, and its split. Every cent of it reaches a
+   * gamer, as three trophies carrying the sponsor's brand.
+   *
+   * `challengePrice - prizePool` is the gross margin on a challenge. It is the
+   * only place the two numbers meet, which is deliberate: the prize is a
+   * commitment to the players and the price is a commitment to the brand, and
+   * neither should move because someone edited the other.
+   */
   prizePool: number;
   prize1: number;
   prize2: number;
@@ -32,8 +42,6 @@ export type PricingConfig = {
   challengeBase: number;
   /** Monthly base when every game is sponsored. */
   ultimateBase: number;
-  /** Per game, per month — buys `challengesPerGame` challenges and the naming rights. */
-  perGame: number;
   /** Paid annually, this much comes off. */
   yearlyDiscountPct: number;
   /** The Sunday broadcast sponsorship, addable to any plan. */
@@ -41,12 +49,6 @@ export type PricingConfig = {
   /** Video slots included at the top tier. */
   slotCount: number;
   slotSeconds: number;
-  /**
-   * What a monetized server keeps of the revenue its community generates.
-   * Mirrors `discordGuilds.revenueSharePct` — the number the product actually
-   * pays on. A marketing page quoting a different split is a support ticket.
-   */
-  serverSharePct: number;
   /**
    * Projection factor: placement views per reachable member per month. Used ONLY
    * for the forward-looking impression estimate, which is always labelled as a
@@ -59,6 +61,7 @@ export type PricingConfig = {
 export const PRICING_DEFAULTS: PricingConfig = {
   games: 6,
   challengesPerGame: 4,
+  challengePrice: 250,
   prizePool: 175,
   prize1: 100,
   prize2: 50,
@@ -66,12 +69,10 @@ export const PRICING_DEFAULTS: PricingConfig = {
   reachBase: 600,
   challengeBase: 500,
   ultimateBase: 400,
-  perGame: 1000,
   yearlyDiscountPct: 20,
   streamAddon: 400,
   slotCount: 2,
   slotSeconds: 5,
-  serverSharePct: 70,
   impressionsPerMember: 12,
   currency: "USD",
 };
@@ -179,6 +180,35 @@ export const PRICING_NUMBER_DEFAULTS: Record<string, string> = Object.fromEntrie
 );
 
 // ===== The maths =====
+//
+// The per-game rate is DERIVED, never stored. A brand buys challenges, one a
+// week; the monthly rate for a game is simply how many of them that is. Storing
+// it separately would create two numbers that mean the same thing and eventually
+// disagree, and the one a brand sees on an invoice would stop matching the one
+// on the page.
+
+/** What a brand pays per game, per month. */
+export function perGame(cfg: PricingConfig): number {
+  return cfg.challengePrice * cfg.challengesPerGame;
+}
+
+/** What we keep on one challenge, after the prize. */
+export function marginPerChallenge(cfg: PricingConfig): number {
+  return Math.max(0, cfg.challengePrice - cfg.prizePool);
+}
+
+/**
+ * The share of challenge revenue that reaches gamers.
+ *
+ * Not a policy we chose to publish — an arithmetic consequence of charging
+ * `challengePrice` and paying out `prizePool`. It is stated everywhere as
+ * "70% of what a brand pays goes to the players", and it stays true by
+ * construction rather than by someone remembering to update it.
+ */
+export function prizeSharePct(cfg: PricingConfig): number {
+  if (cfg.challengePrice <= 0) return 0;
+  return Math.round((cfg.prizePool / cfg.challengePrice) * 100);
+}
 
 export type Quote = {
   tier: TierKey;
@@ -210,7 +240,7 @@ export function quote(
   const games = Math.max(0, Math.min(cfg.games, Math.round(opts.games ?? 0)));
   const tier: TierKey = games <= 0 ? "reach" : games >= cfg.games ? "ultimate" : "challenge";
   const base = tier === "reach" ? cfg.reachBase : tier === "ultimate" ? cfg.ultimateBase : cfg.challengeBase;
-  const gamesCost = games * cfg.perGame;
+  const gamesCost = games * perGame(cfg);
   const addonCost = opts.addon ? cfg.streamAddon : 0;
   const monthly = base + gamesCost + addonCost;
   const yearlyTotal = round2(monthly * 12 * (1 - cfg.yearlyDiscountPct / 100));
@@ -297,16 +327,16 @@ export type EarnStage = {
 export const EARN_STAGES_DEFAULT: EarnStage[] = [
   {
     key: "monetized",
-    name: "Monetized",
+    name: "Sponsored",
     threshold: 500,
     icon: "diamond",
-    headline: "Your community starts paying you back",
+    headline: "Brand-sponsored challenges start landing in your server",
     detail:
-      "Link 500 gamers and your server turns on. Brands sponsoring the games your members actually play start paying into your server, and the bot handles every part of it.",
+      "Link 500 gamers and your server switches on. Brands sponsoring the games your members already play start running their weekly challenges here — and every dollar of the prize money is won by your members.",
     perks: [
-      "70% of the revenue your community generates",
-      "Sponsored challenges land in your server automatically",
-      "Owner portal with live earnings, per game",
+      "Sponsored weekly challenges in your community's games",
+      "Prize money paid straight to your members who win",
+      "Owner portal: who linked, who entered, what they won",
       "Your server listed publicly with its own page",
     ],
   },
@@ -315,28 +345,28 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     name: "Broadcaster",
     threshold: 1000,
     icon: "satellite",
-    headline: "Get paid to carry other communities' competitions",
+    headline: "More games, more weeks, more money into your community",
     detail:
-      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, and you are paid to carry each one.",
+      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, so more of your members are playing for real prizes in more games at once.",
     perks: [
-      "Everything in Monetized",
-      "Carry network-wide challenges for a fee",
+      "Everything in Sponsored",
+      "Network-wide challenges carried in your server",
       "Priority on sponsored challenges in your top game",
       "Featured in the public server directory",
     ],
   },
   {
     key: "sponsored",
-    name: "Sponsored",
+    name: "Flagship",
     threshold: 5000,
     icon: "crown",
-    headline: "Brands sponsor you directly, and you keep the fee",
+    headline: "Brands buy your community by name",
     detail:
-      "At 5,000 linked gamers you are an audience in your own right. Brands buy challenges in your server specifically, and smaller servers carry yours instead of the other way round.",
+      "At 5,000 linked gamers you are an audience in your own right. Brands ask for challenges in your server specifically, and smaller servers carry yours instead of the other way round.",
     perks: [
       "Everything in Broadcaster",
-      "Direct brand sponsorship of your challenges",
-      "You keep the whole sponsorship fee",
+      "Brands request your community by name",
+      "Exclusive challenges only your members can enter",
       "Named on the Sunday broadcast",
     ],
   },

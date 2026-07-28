@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
-import { pairs, money, type PricingConfig } from "@/lib/pricing";
+import { pairs, money, prizeSharePct, marginPerChallenge, type PricingConfig } from "@/lib/pricing";
 import { cardBgStyle, type CardBgMap } from "@/lib/card-bg";
 
 // The commercial argument, in sections.
@@ -167,16 +167,43 @@ export function LoopSection({ c, bg }: { c: Copy; bg?: CardBgMap }) {
 export function PrizeSection({ c, cfg, bg }: { c: Copy; cfg: PricingConfig; bg?: CardBgMap }) {
   const perMonth = cfg.games * cfg.challengesPerGame;
   const total = perMonth * cfg.prizePool;
+  const share = prizeSharePct(cfg);
+  const keep = marginPerChallenge(cfg);
   return (
     <Band bg={bg} bgKey="sec_pricing" className="py-16">
       <div className="glass rounded-3xl p-8 md:p-10">
-        <div className="grid lg:grid-cols-[1.2fr_1fr] gap-10 items-center">
+        <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 items-center">
           <div>
             <div className="inline-flex items-center gap-2 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-full px-3 py-1.5">
-              <Icon name="trophy" size={12} /> Prize pool
+              <Icon name="trophy" size={12} /> Where your money goes
             </div>
             <h2 className="text-3xl md:text-4xl font-bold mt-4 leading-tight">{c["brand.prize.title"]}</h2>
             <p className="text-muted mt-3 leading-relaxed">{c["brand.prize.body"]}</p>
+
+            {/* The split, as a bar. A sentence claiming "70% goes to players"
+                is a claim; a bar that is visibly 70% long is the argument. */}
+            <div className="mt-7">
+              <div className="flex items-baseline justify-between text-xs mb-2">
+                <span className="text-muted">One sponsored challenge</span>
+                <span className="font-bold">{money(cfg.challengePrice, cfg.currency)}</span>
+              </div>
+              <div className="h-10 rounded-xl overflow-hidden flex border border-white/10">
+                <div
+                  className="bg-gradient-to-r from-amber-500 to-amber-400 grid place-items-center text-[#1a1200] text-xs font-bold"
+                  style={{ width: `${share}%` }}
+                >
+                  {money(cfg.prizePool, cfg.currency)} to players
+                </div>
+                <div className="flex-1 bg-white/10 grid place-items-center text-xs text-muted font-semibold">
+                  {money(keep, cfg.currency)}
+                </div>
+              </div>
+              <div className="flex justify-between text-[11px] text-muted mt-2">
+                <span><b className="text-amber-300">{share}%</b> prize money, paid as branded trophies</span>
+                <span>{100 - share}% runs the platform</span>
+              </div>
+            </div>
+
             <div className="mt-6 flex flex-wrap gap-3">
               <Podium place={1} amount={cfg.prize1} currency={cfg.currency} />
               <Podium place={2} amount={cfg.prize2} currency={cfg.currency} />
@@ -184,10 +211,10 @@ export function PrizeSection({ c, cfg, bg }: { c: Copy; cfg: PricingConfig; bg?:
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
+            <Fact value={money(cfg.challengePrice, cfg.currency)} label="per sponsored weekly challenge" />
             <Fact value={String(cfg.challengesPerGame)} label="challenges per game, every month" />
-            <Fact value={String(cfg.games)} label="games running weekly" />
             <Fact value={String(perMonth)} label="challenges a month across the network" />
-            <Fact value={money(total, cfg.currency)} label="paid out to gamers every month" gold />
+            <Fact value={money(total, cfg.currency)} label="won by gamers every month" gold />
           </div>
         </div>
       </div>

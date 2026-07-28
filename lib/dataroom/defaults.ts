@@ -107,7 +107,7 @@ export const SEED_DOCS: SeedDoc[] = [
             { icon: "rocket", label: "Install", note: "One click. The bot builds its own channel, posts a guide for everything and pins it. There is nothing to configure." },
             { icon: "link", label: "Members link", note: "A member links a game account to get a ranked profile. That link is the measurement — verified against the game's own API, so it can't be inflated." },
             { icon: "trophy", label: "They compete", note: "A weekly challenge per game with real money on it. Stats are snapshotted the moment somebody joins, so only new play counts." },
-            { icon: "crown", label: "Both sides get paid", note: "Brands buy the challenge. The server that hosted it keeps a share. The owner's incentive becomes recruiting for us." },
+            { icon: "crown", label: "The money lands", note: "The brand pays for the challenge; 70% of it is won by players, inside the server that hosted it. The owner's incentive becomes recruiting for us." },
           ],
         },
       },
@@ -202,7 +202,7 @@ export const SEED_DOCS: SeedDoc[] = [
           steps: [
             { icon: "shield", label: "Verified audience", note: "This many verified players of this game, in communities of this size — described precisely, because every account was read from an official API." },
             { icon: "trophy", label: "The challenge is the unit", note: "A sponsored weekly competition carrying a brand's name, sold per game per month. Entered on purpose rather than scrolled past, which is why it prices above a banner." },
-            { icon: "crown", label: "Servers keep a share", note: "Not generosity — the acquisition channel. An owner who earns from us recruits for us, and their recruiting is more credible than any ad we could buy." },
+            { icon: "crown", label: "Players keep most of it", note: "70% of every sponsorship is prize money won inside the server that ran it. Not generosity — the acquisition channel. An owner whose members win money recruits for us, and that is more credible than any ad we could buy." },
             { icon: "zap", label: "Near-zero to serve", note: "The bot runs inside the same web application as the site — no gateway process, no always-on host — so a new server costs close to nothing." },
           ],
         },
@@ -219,16 +219,17 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "text",
         anchor: "economics",
         navLabel: "Unit economics",
-        title: "One sponsor at the top tier covers every prize we pay.",
+        title: "The whole model is one $250 transaction, repeated.",
         body:
-          "The prize pools are the only real cost of goods in the model, and they are fixed: one weekly challenge per game, a guaranteed minimum pool on each, funded and paid by us. That number does not move when a second brand signs — the same competition carries the sponsor either way.\n\n"
+          "A brand buys a game's weekly challenge for $250. $175 of that is the prize, paid as three trophies carrying their brand and redeemed by the three gamers who placed. We keep $75. That is 70% of gross revenue reaching players by construction, not by policy — and it is the entire cost of goods.\n\n"
+          + "The prize does not move when a second brand signs, because the same competition carries whoever is sponsoring it. Per game per month that is $1,000 in, $700 out, $300 kept; across six games, $6,000 in and $4,200 won by gamers.\n\n"
           + "Everything else is close to free to serve. The bot runs inside the same web application as the website, on the same deployment, with no gateway process and no always-on host; a card is rendered once and cached at a content-hashed URL that Discord's CDN then serves. The marginal cost of the ten-thousandth server is a database row.\n\n"
           + "So the model has two levers and both compound: more games sold against the same fixed prize cost, and more servers making each game worth more.",
         data: {
           bullets: [
+            "$250 charged, $175 paid to players, $75 kept — per challenge, every week.",
             "Prize cost is fixed per month, not per sponsor.",
             "A new server costs a row in a table and nothing per month.",
-            "Servers are paid out of revenue, so acquisition spend only happens when revenue does.",
           ],
         },
       },
@@ -274,7 +275,7 @@ export const SEED_DOCS: SeedDoc[] = [
               status: "current",
               summary: "Get the bot into communities that already compete.",
               detail:
-                "We target servers that already run tournaments and argue about rank, because they need what we built rather than having to be convinced they do. Each install gives the owner a portal showing their growth toward revenue share — which is the argument for the next server, made by someone who isn't us.",
+                "We target servers that already run tournaments and argue about rank, because they need what we built rather than having to be convinced they do. Each install gives the owner a portal showing their growth toward sponsored challenges — which is the argument for the next server, made by someone who isn't us.",
               bullets: [
                 "Direct outreach to competitive gaming servers",
                 "The owner's portal as the retention and referral surface",

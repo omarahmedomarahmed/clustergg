@@ -203,13 +203,13 @@ export async function checkUnlock(guildId: string): Promise<boolean> {
     await dmUser(row.ownerDiscordId, {
       embeds: [{
         image: { url: unlockCard },
-        title: "Your server just unlocked ad revenue",
+        title: "Your server just unlocked sponsored challenges",
         description: [
           `**${stats.linked.toLocaleString()} of your members** have joined Cluster and linked a game account.`,
           "",
-          `That crosses the ${stats.threshold.toLocaleString()} threshold, so **${row.name || "your server"}** is now earning a ${stats.revenueSharePct}% share of the ad revenue Cluster makes from your community.`,
+          `That crosses the ${stats.threshold.toLocaleString()} threshold, so brand-sponsored challenges now run in **${row.name || "your server"}** — and every dollar of prize money on them is won by your members.`,
           "",
-          "Nothing else to do — it's active from now on. Run `/cluster server` any time to see where you stand.",
+          "Nothing else to do — it's active from now on. Run `/cluster admin` any time to see where you stand.",
         ].join("\n"),
         color: embedColor("#34d399"),
       }],
