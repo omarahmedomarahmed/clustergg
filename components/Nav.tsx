@@ -11,7 +11,6 @@ import AddBotButton from "@/components/AddBotButton";
 import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
-import LocaleToggle from "@/components/LocaleToggle";
 import MobileHud from "@/components/MobileHud";
 import WeekBand, { type BandData } from "@/components/WeekBand";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
@@ -117,7 +116,7 @@ export default async function Nav() {
   // Only pass a real uploaded mark — the built-in placeholder path doesn't exist
   // as a file, so leaving it null lets the drawer show the gradient CLUSTER text.
   const drawerMark = brand["brand.logo"] && brand["brand.logo"] !== "/assets/logo.png" ? brand["brand.logo"] : null;
-  const { locale, t } = await getT(user?.locale ?? null);
+  const { t } = await getT(user?.locale ?? null);
 
   // Nav is game-first: the only things in the bar are the game planets. Feed and
   // "all planets" live in the mobile drawer for reachability.
@@ -131,7 +130,8 @@ export default async function Nav() {
     // live, and a brand reading the site on a phone has nowhere else to go.
     ...(user ? [] : [
       { href: "/pricing", label: "For brands", icon: "target" },
-      { href: "/servers", label: "Monetize your server", icon: "satellite" },
+      { href: "/discord-bot", label: "For Discord servers", icon: "satellite" },
+      { href: "/search", label: t("common.findGamers"), icon: "search" },
     ]),
     // Admin-defined extra drawer links (Admin → Mobile chrome).
     ...drawerExtra,
@@ -169,8 +169,11 @@ export default async function Nav() {
           )}
         </nav>
 
-        {/* One quest card (with a dropdown to switch) fills the nav space (lg+) */}
-        {navQuests.length > 0 ? (
+        {/* One quest card (with a dropdown to switch) fills the nav space (lg+).
+            Members only: a quest tracker means nothing to somebody who has no
+            quests, and the space is better spent on the two doors a guest is
+            actually here for. */}
+        {user && navQuests.length > 0 ? (
           <div className="hidden lg:flex flex-1 min-w-0 px-1 justify-center">
             <NavQuestCard quests={navQuests} totalCp={totalCp} />
           </div>
@@ -180,7 +183,10 @@ export default async function Nav() {
         <div className="md:hidden flex-1" />
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          <LocaleToggle current={locale} compact />
+          {/* The language switch lives in the footer now. It was taking a slot in
+              the busiest row on the site for a control almost nobody touches
+              twice, and on a phone it was one of the things pushing the burger
+              off the edge. */}
           {user ? (
             <>
               <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />
@@ -199,12 +205,11 @@ export default async function Nav() {
             </>
           ) : (
             <>
-              <Link href="/search" aria-label="Search" className="hidden sm:flex text-muted hover:text-ink transition-colors">
-                <Icon name="search" size={19} />
-              </Link>
-              {/* The only nav link a brand needs. Guests only — a signed-in
-                  gamer is not the buyer and the nav has no room to spare. */}
-              <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline">For brands</Link>
+              {/* The two doors a guest is here for. A guest is far more likely
+                  to be a brand or a server owner than a gamer hunting for the
+                  search box — and search is one tap away in the drawer. */}
+              <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>
+              <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>
               <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>
               <span className="hidden md:inline-flex"><AddBotButton size="sm" /></span>
               <a href="/api/auth/discord?next=/onboarding" title="Sign in with Discord"

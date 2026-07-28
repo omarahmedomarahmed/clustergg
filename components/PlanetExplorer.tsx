@@ -136,7 +136,7 @@ export default function PlanetExplorer({
       }
       case "entities":
         if (!game) return null;
-        return <EntityRail key={m.id} game={game} entityKind={m.entityKind ?? "all"} limit={m.limit ?? 10}
+        return <EntityRail key={m.id} game={game} entityKind={m.entityKind ?? "all"} limit={m.limit ?? 18}
           onOpen={(e) => setSel({ kind: "entity", entityKind: e.kind, id: e.id, name: e.name, image: e.image })}
           onExpand={(k) => setSel({ kind: "directory", entityKind: k })} />;
       case "challenges":
@@ -406,8 +406,12 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
         {g.challengeId
           ? <ChallengeLog challengeId={g.challengeId} slug={g.slug} title={g.challengeTitle} />
           : g.provider === "riot-lol" && g.accountId
+            // League has a bespoke card (mastery, live game, match history) that
+            // no generic view could match. Every other game gets its real synced
+            // stats rather than a note telling it to look elsewhere.
             ? <LolCard accountId={g.accountId} colors={COL} statNumbers={[]} />
-            : <div className="text-xs text-muted">{tr("Open the full profile for this gamer's complete stats.")}</div>}
+            : game ? <GamerStats slug={g.slug} game={game} />
+              : <div className="text-xs text-muted">{tr("Open the full profile for this gamer's complete stats.")}</div>}
       </div>
     );
   }
@@ -628,7 +632,12 @@ function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: strin
               {roles.map((r) => <MiniChip key={r} on={role === r} onClick={() => setRole(r)}>{r}</MiniChip>)}
             </div>
           )}
-          <div className="grid grid-cols-3 gap-1.5 max-h-[210px] overflow-y-auto pr-0.5 overscroll-contain">
+          {/* Six rows of three, not two.
+              210px showed about three rows of a roster that runs to 160+
+              champions, so the rail read as a teaser for the directory rather
+              than as the game's world. It scrolls either way — this just makes
+              the default view worth looking at. */}
+          <div className="grid grid-cols-3 gap-1.5 max-h-[440px] overflow-y-auto pr-0.5 overscroll-contain">
             {shown.map((e) => (
               <button key={`${e.kind}-${e.id}`} onClick={() => onOpen(e)} title={e.name} style={{ containerType: "size" }} className="relative rounded-lg overflow-hidden border border-white/10 hover:border-cyan-400/50 transition aspect-square">
                 <EntityImg src={e.image} name={e.name} kind={e.kind} className={`h-full w-full ${entityImgCls(e.kind)}`} />
@@ -750,4 +759,68 @@ function winCondition(format: string, conditions: { metric: string; op: string; 
   if (!conditions || conditions.length === 0) return base;
   const parts = conditions.map((c) => `${OP_LABEL[c.op] ?? c.op} ${Number(c.value).toLocaleString()} ${c.metric.replace(/_/g, " ")}`);
   return `${base} Scoring: ${parts.join(", ")}.`;
+}
+
+// One gamer's real stats for whichever game's planet you're standing on.
+//
+// Fetched on open rather than shipped with the planet: a planet can carry
+// hundreds of gamers and nobody looks at more than a handful, so loading every
+// gamer's metrics up front would be paying for data almost none of which gets
+// read.
+function GamerStats({ slug, game }: { slug: string; game: string }) {
+  const [data, setData] = useState<{
+    accounts: {
+      id: string; provider: string; inGameName: string; region: string | null;
+      verified: boolean; syncedAt: string | null;
+      stats: { key: string; label: string; display: string; rank: string | null }[];
+    }[];
+  } | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let live = true;
+    setData(null); setFailed(false);
+    fetch(`/api/planet/gamer?slug=${encodeURIComponent(slug)}&game=${encodeURIComponent(game)}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad status"))))
+      .then((j) => { if (live) setData(j); })
+      .catch(() => { if (live) setFailed(true); });
+    return () => { live = false; };
+  }, [slug, game]);
+
+  if (failed) return <div className="text-xs text-muted">Couldn&apos;t load these stats. The full profile has them.</div>;
+  if (!data) return <div className="text-xs text-muted">Loading stats…</div>;
+  if (!data.accounts.length) {
+    return <div className="text-xs text-muted">No {game} account linked yet.</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {data.accounts.map((a) => (
+        <div key={a.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-sm">{a.inGameName}</span>
+            {a.region && <span className="text-[10px] uppercase tracking-wider text-muted border border-white/15 rounded px-1.5 py-0.5">{a.region}</span>}
+            {a.verified && (
+              <span className="text-[10px] text-emerald-300 inline-flex items-center gap-1">
+                <Icon name="check" size={10} /> verified
+              </span>
+            )}
+          </div>
+          {a.stats.length === 0 ? (
+            <p className="text-xs text-muted mt-2">Linked, but nothing has synced yet.</p>
+          ) : (
+            <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+              {a.stats.slice(0, 10).map((st) => (
+                <div key={st.key} className="rounded-lg bg-white/[0.04] px-2.5 py-1.5">
+                  <div className="text-sm font-bold text-cyan-300 leading-none">{st.display}</div>
+                  <div className="text-[10px] text-muted mt-1 leading-tight truncate" title={st.label}>{st.label}</div>
+                  {st.rank && <div className="text-[10px] text-amber-300 truncate">{st.rank}</div>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
 }

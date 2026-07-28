@@ -5,6 +5,7 @@ import { getContent } from "@/lib/cms";
 import { installUrl } from "@/lib/discord/config";
 import { networkStats } from "@/lib/network";
 import FloatingQuestOrb, { type OrbQuest } from "@/components/FloatingQuestOrb";
+import OrbRail from "@/components/OrbRail";
 import DiscordOrb from "@/components/DiscordOrb";
 
 // The floating rail, bottom-right.
@@ -67,15 +68,10 @@ export default async function FloatingOrbs() {
   const net = showDiscord ? await networkStats().catch(() => null) : null;
 
   return (
-    // Above the mobile bottom nav, not on top of it.
-    //
-    // `bottom-4` put a 72px orb directly over the tab bar on a phone, covering
-    // "You" and half of "Ranks" — the two tabs a gamer uses most. The bar is
-    // ~64px plus the home-indicator inset, so below `md` the rail is lifted
-    // clear of it and drops back down on desktop where no bar exists.
-    <div
-      className="fixed right-4 z-40 flex flex-col items-end gap-3 print:hidden bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-4"
-    >
+    // Positioning and the dismiss control live in OrbRail (a client component) —
+    // this one stays a server component so it can read the CMS and the network
+    // stats without shipping either to the browser.
+    <OrbRail>
       {showDiscord && (
         <DiscordOrb
           installUrl={install!}
@@ -94,6 +90,6 @@ export default async function FloatingOrbs() {
           size={questSize}
         />
       )}
-    </div>
+    </OrbRail>
   );
 }

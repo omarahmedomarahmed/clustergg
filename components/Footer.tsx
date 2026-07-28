@@ -4,6 +4,8 @@ import { getT } from "@/lib/i18n/t-server";
 import BrandHeader from "@/components/BrandHeader";
 import AddBotButton from "@/components/AddBotButton";
 import AppStoreBadges from "@/components/AppStoreBadges";
+import LocaleToggle from "@/components/LocaleToggle";
+import { getLocale } from "@/lib/i18n/server";
 import { optImg } from "@/lib/img";
 
 // Three audiences, three columns.
@@ -16,6 +18,7 @@ export default async function Footer() {
   const c = await getContent(["footer.tagline", "brand.footer.bg", "footer.brands.title", "footer.servers.title"]);
   const footerBg = c["brand.footer.bg"];
   const { t } = await getT();
+  const locale = await getLocale();
   return (
     <footer className="relative z-10 mt-20 border-t border-violet-500/15 bg-cover bg-center"
       style={footerBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.86), rgba(4,5,26,0.92)), url(${optImg(footerBg, 1200)})` } : undefined}>
@@ -25,6 +28,10 @@ export default async function Footer() {
           <p className="text-muted leading-relaxed">{c["footer.tagline"]}</p>
           <div className="mt-4"><AddBotButton label="Add ClusterBot to your server" /></div>
           <div className="mt-4"><AppStoreBadges className="items-start" /></div>
+          {/* Moved out of the nav. It was occupying a slot in the busiest row on
+              the site for a control almost nobody uses twice, and on a phone it
+              was one of the things pushing the burger past the edge. */}
+          <div className="mt-5"><LocaleToggle current={locale} /></div>
         </div>
         <div>
           <div className="font-semibold mb-3 text-ink">{c["footer.brands.title"] || "For brands"}</div>
