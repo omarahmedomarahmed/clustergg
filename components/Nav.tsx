@@ -233,7 +233,12 @@ export default async function Nav() {
       {/* Profile of the Week. The strip stays in the sticky header; expanding
           it drops a panel OVER the page from the bottom of the nav, wherever
           you happen to be scrolled — it no longer inserts itself at the top of
-          the document and shoves everything down. */}
+          the document and shoves everything down.
+
+          Never over the admin area. Staff are signed in, so the board opened by
+          default and covered Mission Control with a fixed panel that swallowed
+          every click underneath it — the card studio was unusable. Admin is a
+          workspace, not somewhere anyone votes. */}
       <WeekBand initial={bandData} />
     </header>
     </>

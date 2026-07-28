@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Icon from "@/components/Icon";
@@ -67,6 +68,16 @@ const STORE_KEY = "cluster.week.collapsed";
 const nf = (n: number) => n.toLocaleString();
 
 export default function WeekBand({ initial }: { initial: BandData }) {
+  // Never in the admin area.
+  //
+  // Staff are signed in, so the board opened by default and dropped a fixed
+  // panel over Mission Control that swallowed every click underneath it — the
+  // card studio was literally unusable. Admin is a workspace; nobody votes from
+  // it. Read here rather than passed down because the header is rendered once,
+  // in the root layout, by a server component that has no pathname.
+  const pathname = usePathname();
+  const inAdmin = pathname?.startsWith("/admin") ?? false;
+
   const [data, setData] = useState<BandData>(initial);
   // Open for gamers, collapsed for visitors.
   //
@@ -158,6 +169,9 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   const podium = data.entries.filter((e) => !e.disqualified).slice(0, 3);
   const announcing = data.week.phase === "announcement";
   const streaming = announcing && data.stream.live && !!data.stream.url;
+
+  // After every hook, so the hook order never changes between renders.
+  if (inAdmin) return null;
 
   return (
     <>

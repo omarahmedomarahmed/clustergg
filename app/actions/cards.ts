@@ -27,6 +27,17 @@ function readLayout(fd: FormData): CardLayout {
   };
   const on = (k: string) => fd.get(k) === "on" || fd.get(k) === "true";
   const d = DEFAULT_LAYOUT;
+  // Placed images, per-part visibility and the background-source order travel as
+  // one JSON field rather than a form input each: they are lists of unknown
+  // length, and `parseLayout` below validates and clamps every one of them (URL
+  // schemes, part-key shape, sizes) exactly as it does for a stored layout. A
+  // missing or malformed blob falls back to the defaults instead of wiping what
+  // the admin had — losing placed art to a stray character is not recoverable.
+  const json = (k: string, fallback: unknown) => {
+    const raw = fd.get(k);
+    if (typeof raw !== "string" || !raw) return fallback;
+    try { return JSON.parse(raw); } catch { return fallback; }
+  };
   // Round-tripped through the parser so the same clamps that protect the
   // renderer also protect what gets stored — one definition of "valid".
   return parseLayout(JSON.stringify({
@@ -40,6 +51,9 @@ function readLayout(fd: FormData): CardLayout {
     glows: on("glows"),
     bar: on("bar"),
     scrim: on("scrim"),
+    assets: json("assets", d.assets),
+    parts: json("parts", d.parts),
+    bgSources: json("bgSources", d.bgSources),
   }));
 }
 
