@@ -8,6 +8,23 @@ export type CardKind =
   | "leaderboard" | "challenge" | "planet" | "planets" | "guide" | "week"
   | "world" | "search";
 
+/**
+ * The sponsor shown on this render of this card.
+ *
+ * Picked per card, per rotation window — not per campaign — so two cards posted
+ * in the same server a second apart carry two different brands. That is the
+ * whole product: the inventory is every card the bot draws, and a brand's reach
+ * is the number of times a gamer pressed a button anywhere on the network.
+ */
+export type CardAdSlot = {
+  imageUrl: string;
+  brandName: string;
+  /** The campaign-creative that was served; what an impression is counted against. */
+  campaignCreativeId?: string | null;
+  /** Overrides the "SPONSORED" label — a house promo says "FROM CLUSTER". */
+  label?: string | null;
+};
+
 export type CardTheme = {
   accent: string;   // primary brand/game/quest colour
   accent2: string;  // secondary
@@ -21,6 +38,10 @@ export type CardTheme = {
   astronautUrl?: string | null;
   markUrl?: string | null;
   layout?: CardLayout;
+  // The sponsor for this render. Attached before the card is hashed for the
+  // cache, so each brand's version of a card is stored and reused separately
+  // rather than one of them silently overwriting the other.
+  ad?: CardAdSlot | null;
 };
 
 export type ProfileCard = {

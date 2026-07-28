@@ -5,7 +5,7 @@ import Icon from "@/components/Icon";
 import { saveCardLayout, resetCardLayout, type CardActionState } from "@/app/actions/cards";
 import ImageUpload from "@/components/ImageUpload";
 import {
-  DEFAULT_LAYOUT, BG_SOURCES, assetBox,
+  DEFAULT_LAYOUT, BG_SOURCES, AD_RATIO, assetBox, badgeTopFor,
   type CardLayout, type CardAsset, type ContentBox, type Spot,
 } from "@/lib/cards/layout";
 import type { LibraryGroup } from "@/lib/cards/asset-library";
@@ -29,7 +29,7 @@ export type EditorArt = {
 };
 
 // `asset:<id>` is a handle too — one pointer path for everything on the canvas.
-type Handle = "mascot" | "mark" | "badge" | "content" | `asset:${string}`;
+type Handle = "mascot" | "mark" | "badge" | "ad" | "content" | `asset:${string}`;
 
 const ASPECT = 1200 / 630;
 
@@ -96,7 +96,7 @@ export default function CardLayoutEditor({ kind, name, initial, art, previewUrl,
     setSel(null);
   };
 
-  const setSpot = (key: "mascot" | "mark" | "badge", patch: Partial<Spot>) =>
+  const setSpot = (key: "mascot" | "mark" | "badge" | "ad", patch: Partial<Spot>) =>
     setL((cur) => ({ ...cur, [key]: { ...cur[key], ...patch } }));
   const setContent = (patch: Partial<ContentBox>) =>
     setL((cur) => ({ ...cur, content: { ...cur.content, ...patch } }));
@@ -198,10 +198,25 @@ export default function CardLayoutEditor({ kind, name, initial, art, previewUrl,
               <Grab
                 label="Badge"
                 spot={l.badge}
+                // Shown where the renderer will actually draw it: with an ad
+                // box in the corner the badge is pushed below it, and an editor
+                // that ignored that would be lying about the card.
+                centerY={((badgeTopFor(l, true, 1) + l.badge.size / 2) / 630) * 100}
                 active={drag === "badge"}
                 onGrab={() => setDrag("badge")}
                 img={null}
                 tint="rgba(251,191,36,0.35)"
+              />
+            )}
+            {!l.ad.hidden && (
+              <Grab
+                label="Sponsor"
+                spot={l.ad}
+                ratio={AD_RATIO}
+                active={drag === "ad"}
+                onGrab={() => setDrag("ad")}
+                img={null}
+                tint="rgba(167,139,250,0.42)"
               />
             )}
             {!l.mark.hidden && (
@@ -233,6 +248,13 @@ export default function CardLayoutEditor({ kind, name, initial, art, previewUrl,
           <SpotFields label="Mascot" prefix="mascot" spot={l.mascot} onChange={(p) => setSpot("mascot", p)} />
           <SpotFields label="Logo" prefix="mark" spot={l.mark} onChange={(p) => setSpot("mark", p)} />
           <SpotFields label="Top-right badge" prefix="badge" spot={l.badge} onChange={(p) => setSpot("badge", p)} />
+          <SpotFields
+            label="Sponsor box"
+            prefix="ad"
+            spot={l.ad}
+            onChange={(p) => setSpot("ad", p)}
+            hint="A brand's creative, drawn on every render of this card. Size is the box WIDTH — the height follows the 640×200 creative. Hiding it takes this card kind out of the ad rotation."
+          />
 
           <fieldset className="rounded-xl border border-white/10 p-3">
             <legend className="px-1.5 text-[11px] uppercase tracking-widest text-muted">Content box</legend>
@@ -436,13 +458,18 @@ const round = (n: number) => Math.round(n * 10) / 10;
 
 // ===== Canvas pieces =====
 
-function Grab({ label, spot, active, onGrab, img, tint }: {
+function Grab({ label, spot, active, onGrab, img, tint, ratio = 1, centerY }: {
   label: string; spot: Spot; active: boolean; onGrab: () => void; img: string | null; tint: string;
+  /** height / width of this element's art. The ad box is a banner, not a square. */
+  ratio?: number;
+  /** Overrides the spot's own Y — used for the badge, which the renderer pushes
+   *  below the ad box. The editor has to show where it ACTUALLY lands. */
+  centerY?: number;
 }) {
   // Size is in canvas pixels; the canvas is 1200 wide however many CSS pixels
   // it occupies, so a percentage width keeps the handle to scale.
   const w = (spot.size / 1200) * 100;
-  const h = (spot.size / 630) * 100;
+  const h = ((spot.size * ratio) / 630) * 100;
   return (
     <div
       onPointerDown={(e) => { e.preventDefault(); onGrab(); }}
@@ -451,7 +478,7 @@ function Grab({ label, spot, active, onGrab, img, tint }: {
         active ? "border-cyan-300" : "border-white/45 hover:border-white/80"
       }`}
       style={{
-        left: `${spot.x}%`, top: `${spot.y}%`, width: `${w}%`, height: `${h}%`,
+        left: `${spot.x}%`, top: `${centerY ?? spot.y}%`, width: `${w}%`, height: `${h}%`,
         transform: "translate(-50%, -50%)",
         background: img ? "transparent" : tint,
       }}
@@ -487,12 +514,13 @@ function Box({ label, x, y, w, h, active, onGrab }: {
 
 // ===== Form pieces =====
 
-function SpotFields({ label, prefix, spot, onChange }: {
-  label: string; prefix: string; spot: Spot; onChange: (patch: Partial<Spot>) => void;
+function SpotFields({ label, prefix, spot, onChange, hint }: {
+  label: string; prefix: string; spot: Spot; onChange: (patch: Partial<Spot>) => void; hint?: string;
 }) {
   return (
     <fieldset className="rounded-xl border border-white/10 p-3">
       <legend className="px-1.5 text-[11px] uppercase tracking-widest text-muted">{label}</legend>
+      {hint && <p className="mb-2 text-[10px] leading-snug text-muted">{hint}</p>}
       <div className="grid grid-cols-3 gap-2">
         <Num name={`${prefix}.x`} label="X %" value={spot.x} onChange={(v) => onChange({ x: v })} />
         <Num name={`${prefix}.y`} label="Y %" value={spot.y} onChange={(v) => onChange({ y: v })} />

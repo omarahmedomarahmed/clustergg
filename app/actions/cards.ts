@@ -44,6 +44,7 @@ function readLayout(fd: FormData): CardLayout {
     mascot: { x: n("mascot.x", d.mascot.x), y: n("mascot.y", d.mascot.y), size: n("mascot.size", d.mascot.size), hidden: on("mascot.hidden") },
     mark: { x: n("mark.x", d.mark.x), y: n("mark.y", d.mark.y), size: n("mark.size", d.mark.size), hidden: on("mark.hidden") },
     badge: { x: n("badge.x", d.badge.x), y: n("badge.y", d.badge.y), size: n("badge.size", d.badge.size), hidden: on("badge.hidden") },
+    ad: { x: n("ad.x", d.ad.x), y: n("ad.y", d.ad.y), size: n("ad.size", d.ad.size), hidden: on("ad.hidden") },
     content: { x: n("content.x", d.content.x), y: n("content.y", d.content.y), w: n("content.w", d.content.w), h: n("content.h", d.content.h) },
     plate: n("plate", d.plate),
     plateRadius: n("plateRadius", d.plateRadius),

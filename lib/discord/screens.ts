@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
 import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, type Frame, type Button } from "@/lib/discord/components";
-import { cardRef, embedColor, liveCardUrl } from "@/lib/discord/cards";
+import { cardRef, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
@@ -47,6 +47,10 @@ export async function loadCtx(
   avatar?: string | null,
   isManager = false,
 ): Promise<ScreenCtx> {
+  // Every card rendered for the rest of this request belongs to this server —
+  // which is how a sponsor impression gets attributed to the community that
+  // produced it without passing a guild id through every screen.
+  setCardGuild(guildId);
   // Using the bot is the sign-up. Sending someone to the website before they
   // can even see their own card is the biggest drop-off in the funnel and buys
   // nothing — the interaction is signed and carries everything the OAuth
