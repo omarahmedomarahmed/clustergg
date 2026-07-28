@@ -67,7 +67,15 @@ export default async function FloatingOrbs() {
   const net = showDiscord ? await networkStats().catch(() => null) : null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 flex flex-col items-end gap-3 print:hidden">
+    // Above the mobile bottom nav, not on top of it.
+    //
+    // `bottom-4` put a 72px orb directly over the tab bar on a phone, covering
+    // "You" and half of "Ranks" — the two tabs a gamer uses most. The bar is
+    // ~64px plus the home-indicator inset, so below `md` the rail is lifted
+    // clear of it and drops back down on desktop where no bar exists.
+    <div
+      className="fixed right-4 z-40 flex flex-col items-end gap-3 print:hidden bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-4"
+    >
       {showDiscord && (
         <DiscordOrb
           installUrl={install!}

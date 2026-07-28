@@ -112,7 +112,7 @@ export default async function PricingPage() {
             <div className="text-center rounded-3xl bg-black/30 border border-white/10 p-8">
               <div className="text-5xl font-bold text-amber-300 leading-none">{money(cfg.streamAddon, cfg.currency)}</div>
               <div className="text-xs uppercase tracking-widest text-muted mt-3">per month</div>
-              <Link href="/brands" className="pressable mt-6 block rounded-full px-6 py-3 font-semibold bg-gradient-to-r from-amber-500 to-orange-500 text-[#1a1200]">
+              <Link href="/brands" className="pressable mt-6 block rounded-full px-6 py-3 font-semibold bg-amber-500 text-[#1a1200]">
                 Add it to a plan
               </Link>
             </div>
@@ -181,14 +181,14 @@ export default async function PricingPage() {
       <section className="mx-auto max-w-4xl px-4 pb-24">
         <div className="glass rounded-3xl p-10 md:p-12 text-center glow-sweep">
           <h2 className="text-3xl md:text-4xl font-bold">
-            Start at <span className="grad-text">{money(cfg.reachBase, cfg.currency)}</span>. Own a game from <span className="grad-text">{money(entry.monthly, cfg.currency)}</span>.
+            Start at <span className="brand-text">{money(cfg.reachBase, cfg.currency)}</span>. Own a game from <span className="brand-text">{money(entry.monthly, cfg.currency)}</span>.
           </h2>
           <p className="text-muted mt-4 max-w-xl mx-auto leading-relaxed">
             Take the whole network for {money(full.monthly, cfg.currency)} a month — {nf(full.challengesPerMonth)} challenges,
             every placement, and your name on every competition we run.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link href="/brands" className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white">
+            <Link href="/brands" className="brand-btn pressable rounded-full px-8 py-3.5 font-semibold text-white">
               {copy["pricing.cta.primary"]}
             </Link>
             <Link href="/dataroom/company-profile" className="ghost-btn pressable rounded-full px-6 py-3.5">

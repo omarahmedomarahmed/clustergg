@@ -83,7 +83,7 @@ export function InsightSection({ c, bg }: { c: Copy; bg?: CardBgMap }) {
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div className="glass rounded-3xl p-8 text-center">
-            <div className="text-6xl font-bold grad-text leading-none">{c["brand.insight.stat"]}</div>
+            <div className="text-6xl font-bold brand-text leading-none">{c["brand.insight.stat"]}</div>
             <div className="text-xs uppercase tracking-widest text-muted mt-4 leading-relaxed">{c["brand.insight.statLabel"]}</div>
           </div>
           <div className="glass rounded-3xl p-8 text-center border border-rose-400/25">
@@ -234,7 +234,7 @@ function Podium({ place, amount, currency }: { place: number; amount: number; cu
 function Fact({ value, label, gold = false }: { value: string; label: string; gold?: boolean }) {
   return (
     <div className={`rounded-2xl border p-4 ${gold ? "bg-amber-500/10 border-amber-400/30" : "bg-black/25 border-white/10"}`}>
-      <div className={`text-2xl font-bold leading-none ${gold ? "text-amber-300" : "grad-text"}`}>{value}</div>
+      <div className={`text-2xl font-bold leading-none ${gold ? "text-amber-300" : "brand-text"}`}>{value}</div>
       <div className="text-[11px] uppercase tracking-wider text-muted mt-2 leading-snug">{label}</div>
     </div>
   );
@@ -251,11 +251,11 @@ export function BrandHero({ c, stats }: { c: Copy; stats?: { label: string; valu
       </div>
       <h1 className="text-4xl md:text-6xl font-bold leading-[1.05] tracking-tight max-w-4xl">
         {c["brand.hero.title"]}<br />
-        <span className="grad-text">{c["brand.hero.title2"]}</span>
+        <span className="brand-text">{c["brand.hero.title2"]}</span>
       </h1>
       <p className="mt-6 max-w-2xl text-lg text-muted leading-relaxed">{c["brand.hero.subtitle"]}</p>
       <div className="mt-8 flex flex-wrap gap-3">
-        <Link href="#plans" className="glow-btn pressable rounded-full px-7 py-3 font-semibold text-white">
+        <Link href="#plans" className="brand-btn pressable rounded-full px-7 py-3 font-semibold text-white">
           {c["brand.hero.cta.primary"]} <Icon name="arrowDown" size={15} className="ml-1" />
         </Link>
         <Link href="/dataroom/company-profile" className="ghost-btn pressable rounded-full px-6 py-3">
@@ -266,7 +266,7 @@ export function BrandHero({ c, stats }: { c: Copy; stats?: { label: string; valu
         <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {stats.map((s) => (
             <div key={s.label} className="glass rounded-2xl px-4 py-4">
-              <div className="text-2xl font-bold grad-text leading-none">{s.value}</div>
+              <div className="text-2xl font-bold brand-text leading-none">{s.value}</div>
               <div className="text-[11px] uppercase tracking-wider text-muted mt-2">{s.label}</div>
             </div>
           ))}

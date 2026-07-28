@@ -31,7 +31,7 @@ export default function ServerEarnCards({
   return (
     <div>
       <div className="text-center max-w-2xl mx-auto">
-        <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-xs text-emerald-200/90 mb-5">
+        <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-1.5 text-xs text-sky-200/90 mb-5">
           <Icon name="satellite" size={12} /> For Discord server owners
         </div>
         <h2 className="text-3xl md:text-4xl font-bold leading-tight">{title}</h2>
@@ -41,9 +41,9 @@ export default function ServerEarnCards({
       {/* Step zero — free, and the only thing standing between an owner and
           stage one. Kept visually lighter than the stages so it reads as the
           starting line rather than a fourth tier. */}
-      <div className="mt-8 glass rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 border border-emerald-400/20">
-        <div className="h-11 w-11 rounded-xl bg-emerald-500/15 border border-emerald-400/30 grid place-items-center shrink-0">
-          <Icon name="rocket" size={20} className="text-emerald-300" />
+      <div className="mt-8 glass rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4 border border-sky-400/20">
+        <div className="h-11 w-11 rounded-xl bg-sky-500/15 border border-sky-400/30 grid place-items-center shrink-0">
+          <Icon name="rocket" size={20} className="text-sky-300" />
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-bold">Free to join. Always.</div>
@@ -62,13 +62,11 @@ export default function ServerEarnCards({
           <div
             key={s.key}
             className={`glass rounded-3xl p-6 flex flex-col relative overflow-hidden ${
-              i === 1 ? "ring-1 ring-emerald-400/40 lg:-mt-3 lg:mb-3" : ""
+              i === 1 ? "ring-1 ring-sky-400/40 lg:-mt-3 lg:mb-3" : ""
             }`}
           >
             <div className={`absolute inset-x-0 top-0 h-1 ${
-              i === 0 ? "bg-gradient-to-r from-cyan-500/70 to-emerald-400/70"
-                : i === 1 ? "bg-gradient-to-r from-emerald-400 to-teal-300"
-                : "bg-gradient-to-r from-amber-400 to-orange-400"
+              i === 0 ? "bg-sky-500/70" : i === 1 ? "bg-sky-400" : "bg-amber-400"
             }`} />
 
             <div className="flex items-start justify-between gap-3">
@@ -78,7 +76,7 @@ export default function ServerEarnCards({
                 </div>
                 <h3 className="text-2xl font-bold mt-3">{s.name}</h3>
               </div>
-              <Icon name={s.icon} size={26} className={i === 2 ? "text-amber-300 shrink-0 mt-1" : "text-emerald-300 shrink-0 mt-1"} />
+              <Icon name={s.icon} size={26} className={i === 2 ? "text-amber-300 shrink-0 mt-1" : "text-sky-300 shrink-0 mt-1"} />
             </div>
 
             <div className="mt-4">
@@ -95,7 +93,7 @@ export default function ServerEarnCards({
             <ul className="mt-4 space-y-2 flex-1">
               {s.perks.map((p) => (
                 <li key={p} className="flex items-start gap-2 text-sm">
-                  <Icon name="check" size={14} className={`mt-1 shrink-0 ${i === 2 ? "text-amber-300" : "text-emerald-300"}`} />
+                  <Icon name="check" size={14} className={`mt-1 shrink-0 ${i === 2 ? "text-amber-300" : "text-sky-300"}`} />
                   <span className="text-muted leading-snug">{p}</span>
                 </li>
               ))}
@@ -104,7 +102,7 @@ export default function ServerEarnCards({
             <Link
               href="/servers"
               className={`pressable mt-5 block rounded-full px-6 py-3 text-center font-semibold text-sm ${
-                i === 1 ? "bg-gradient-to-r from-emerald-500 to-teal-400 text-[#032018]" : "ghost-btn"
+                i === 1 ? "bg-sky-500 text-[#001427]" : "ghost-btn"
               }`}
             >
               {i === 0 ? "See who's earning" : "See the ladder"}
