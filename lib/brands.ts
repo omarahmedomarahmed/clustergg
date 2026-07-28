@@ -10,6 +10,104 @@ export function newAccessKey(): string {
   return `CLSTR-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
 }
 
+// ===== The card campaign =====
+//
+// Every other placement is a rectangle on a web page a brand has to be told
+// about. This one is different, and it is the reason a brand signs: the
+// creative is drawn INTO the cards ClusterBot renders inside Discord servers,
+// which is somewhere no ad network can reach.
+//
+// So it gets its own read model and its own upload flow. Uploading one image
+// here is the whole launch — no campaign to be "set up" by an account manager
+// first, no placement matrix to fill in — and a brand can keep adding
+// creatives, which rotate between them.
+
+export type CardCreative = {
+  campaignCreativeId: string;
+  creativeId: string;
+  fileUrl: string;
+  clickUrl: string | null;
+  createdAt: Date;
+  impressions: number;
+  clicks: number;
+};
+
+export type CardCampaign = {
+  placement: { id: string; width: number; height: number } | null;
+  campaign: { id: string; name: string; status: string; startDate: Date; endDate: Date } | null;
+  creatives: CardCreative[];
+  impressions: number;
+  clicks: number;
+  /** Is this brand's creative actually being served right now? */
+  live: boolean;
+};
+
+export async function getCardCampaign(db: DB, brandId: string, placementKey: string): Promise<CardCampaign> {
+  const empty: CardCampaign = { placement: null, campaign: null, creatives: [], impressions: 0, clicks: 0, live: false };
+  const [placement] = await db.select().from(schema.adPlacements)
+    .where(eq(schema.adPlacements.key, placementKey)).limit(1);
+  if (!placement) return empty;
+
+  // Any campaign of this brand that has creatives on the card placement. A
+  // brand normally has one, but reading them all means a second campaign
+  // created by staff doesn't hide the creatives a brand uploaded themselves.
+  const rows = await db.select({
+    ccId: schema.adCampaignCreatives.id,
+    creativeId: schema.adCreatives.id,
+    fileUrl: schema.adCreatives.fileUrl,
+    clickUrl: schema.adCreatives.clickUrl,
+    createdAt: schema.adCreatives.createdAt,
+    campaignId: schema.adCampaigns.id,
+    campaignName: schema.adCampaigns.name,
+    status: schema.adCampaigns.status,
+    startDate: schema.adCampaigns.startDate,
+    endDate: schema.adCampaigns.endDate,
+  })
+    .from(schema.adCampaignCreatives)
+    .innerJoin(schema.adCreatives, eq(schema.adCampaignCreatives.creativeId, schema.adCreatives.id))
+    .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id))
+    .where(and(
+      eq(schema.adCampaignCreatives.placementId, placement.id),
+      eq(schema.adCampaigns.brandId, brandId),
+    ))
+    .orderBy(desc(schema.adCreatives.createdAt));
+
+  const base = { id: placement.id, width: placement.width, height: placement.height };
+  if (!rows.length) return { ...empty, placement: base };
+
+  const ccIds = rows.map((r) => r.ccId);
+  const [imps, clicks] = await Promise.all([
+    db.select({ ccId: schema.adImpressions.campaignCreativeId, n: sql<number>`count(*)::int` })
+      .from(schema.adImpressions).where(inArray(schema.adImpressions.campaignCreativeId, ccIds))
+      .groupBy(schema.adImpressions.campaignCreativeId),
+    db.select({ ccId: schema.adClicks.campaignCreativeId, n: sql<number>`count(*)::int` })
+      .from(schema.adClicks).where(inArray(schema.adClicks.campaignCreativeId, ccIds))
+      .groupBy(schema.adClicks.campaignCreativeId),
+  ]);
+  const impBy = new Map(imps.map((r) => [r.ccId, Number(r.n)]));
+  const clickBy = new Map(clicks.map((r) => [r.ccId, Number(r.n)]));
+
+  const now = Date.now();
+  const first = rows[0];
+  return {
+    placement: base,
+    campaign: {
+      id: first.campaignId, name: first.campaignName, status: first.status,
+      startDate: first.startDate, endDate: first.endDate,
+    },
+    creatives: rows.map((r) => ({
+      campaignCreativeId: r.ccId, creativeId: r.creativeId, fileUrl: r.fileUrl,
+      clickUrl: r.clickUrl, createdAt: r.createdAt,
+      impressions: impBy.get(r.ccId) ?? 0, clicks: clickBy.get(r.ccId) ?? 0,
+    })),
+    impressions: [...impBy.values()].reduce((a, b) => a + b, 0),
+    clicks: [...clickBy.values()].reduce((a, b) => a + b, 0),
+    // What the rotation engine actually requires — stated here so the portal
+    // can say "live" or "not live" for the same reasons `serveAds` does.
+    live: rows.some((r) => r.status === "active" && r.startDate.getTime() <= now && r.endDate.getTime() >= now),
+  };
+}
+
 export type PlacementSlot = {
   placementId: string; key: string; pageScope: string; width: number; height: number;
   creativeId: string | null; creativeType: string | null; fileUrl: string | null; clickUrl: string | null;
