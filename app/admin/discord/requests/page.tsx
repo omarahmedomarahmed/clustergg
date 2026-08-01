@@ -18,9 +18,14 @@ export default async function ChallengeRequestsPage() {
   await requireAdmin();
   const requests = await listRequests();
 
-  const guildIds = [...new Set(requests.map((r) => r.guildId))];
+  // A brand's paid slot arrives with no guild — it was bought for the whole
+  // network — so the guild lookups have to skip the empty id rather than query
+  // for it and come back with nothing.
+  const guildIds = [...new Set(requests.map((r) => r.guildId).filter((g) => !!g))];
+  const brandIds = [...new Set(requests.map((r) => r.brandId).filter((b): b is string => !!b))];
+  const campaignIds = [...new Set(requests.map((r) => r.campaignId).filter((c): c is string => !!c))];
   const db = await getDb();
-  const [guilds, requesters] = await Promise.all([
+  const [guilds, requesters, brandRows, campaignRows] = await Promise.all([
     guildIds.length
       ? db.select({ guildId: schema.discordGuilds.guildId, name: schema.discordGuilds.name, iconUrl: schema.discordGuilds.iconUrl })
         .from(schema.discordGuilds).where(inArray(schema.discordGuilds.guildId, guildIds))
@@ -31,12 +36,22 @@ export default async function ChallengeRequestsPage() {
       return db.select({ id: schema.users.id, displayName: schema.users.displayName })
         .from(schema.users).where(inArray(schema.users.id, ids));
     })(),
+    brandIds.length
+      ? db.select({ id: schema.brands.id, name: schema.brands.name, logoUrl: schema.brands.logoUrl })
+        .from(schema.brands).where(inArray(schema.brands.id, brandIds))
+      : Promise.resolve([]),
+    campaignIds.length
+      ? db.select({ id: schema.sponsoredCampaigns.id, slots: schema.sponsoredCampaigns.slots, total: schema.sponsoredCampaigns.total })
+        .from(schema.sponsoredCampaigns).where(inArray(schema.sponsoredCampaigns.id, campaignIds))
+      : Promise.resolve([]),
   ]);
 
   const stats = await Promise.all(guildIds.map((g) => guildStats(g)));
   const byGuild = new Map(guilds.map((g) => [g.guildId, g]));
   const linkedByGuild = new Map(stats.filter((s) => !!s).map((s) => [s!.guildId, s!.linked]));
   const byUser = new Map(requesters.map((u) => [u.id, u.displayName]));
+  const byBrand = new Map(brandRows.map((b) => [b.id, b]));
+  const byCampaign = new Map(campaignRows.map((c) => [c.id, c]));
 
   const pending = requests.filter((r) => r.status === "pending");
   const reviewed = requests.filter((r) => r.status !== "pending");
@@ -48,9 +63,11 @@ export default async function ChallengeRequestsPage() {
         <Link href="/admin/discord" className="text-sm text-cyan-300 hover:underline">← Discord bot</Link>
       </div>
       <p className="text-muted text-sm mb-8">
-        A server owner builds a challenge for their community in Discord and submits it here. Approving
-        creates the challenge, mints the entry key, and posts it into their server with the key attached —
-        so approval is the only step between a request and their members competing.
+        Two things land here. A <b className="text-ink">server owner</b> builds a challenge for their own
+        community: approving mints the entry key and posts it into their server, private to them. A{" "}
+        <b className="text-ink">brand</b> has already paid for a month of four — approving one launches it
+        publicly across the network, and the next week opens when it ends. Either way, approval is the only
+        step between the request and people competing.
       </p>
 
       {pending.length === 0 && reviewed.length === 0 ? (
@@ -68,8 +85,9 @@ export default async function ChallengeRequestsPage() {
             {pending.map((r) => (
               <RequestCard
                 key={r.id}
-                req={serialize(r, byUser)}
+                req={serialize(r, byUser, byCampaign)}
                 server={serverOf(r.guildId, byGuild, linkedByGuild)}
+                brand={brandOf(r, byBrand, byCampaign)}
               />
             ))}
           </div>
@@ -83,8 +101,9 @@ export default async function ChallengeRequestsPage() {
             {reviewed.map((r) => (
               <RequestCard
                 key={r.id}
-                req={serialize(r, byUser)}
+                req={serialize(r, byUser, byCampaign)}
                 server={serverOf(r.guildId, byGuild, linkedByGuild)}
+                brand={brandOf(r, byBrand, byCampaign)}
               />
             ))}
           </div>
@@ -96,7 +115,9 @@ export default async function ChallengeRequestsPage() {
 
 type Req = Awaited<ReturnType<typeof listRequests>>[number];
 
-function serialize(r: Req, byUser: Map<string, string>) {
+type Campaign = { id: string; slots: number; total: number };
+
+function serialize(r: Req, byUser: Map<string, string>, byCampaign: Map<string, Campaign>) {
   return {
     id: r.id,
     title: r.title,
@@ -109,6 +130,29 @@ function serialize(r: Req, byUser: Map<string, string>) {
     challengeId: r.challengeId,
     createdAt: r.createdAt.toISOString(),
     requestedBy: (r.requestedByUserId && byUser.get(r.requestedByUserId)) ?? null,
+    slotIndex: r.slotIndex,
+    slots: (r.campaignId ? byCampaign.get(r.campaignId)?.slots : null) ?? null,
+  };
+}
+
+// The brand behind a paid slot, or null when a server owner asked.
+//
+// Staff read these two the same way at a glance and then act on them
+// completely differently — one is already paid for and goes out to the
+// network, the other is a favour for one community — so the card needs to
+// know which it is before it renders anything.
+function brandOf(
+  r: Req,
+  byBrand: Map<string, { name: string; logoUrl: string | null }>,
+  byCampaign: Map<string, Campaign>,
+) {
+  if (!r.brandId) return null;
+  const b = byBrand.get(r.brandId);
+  if (!b) return null;
+  return {
+    name: b.name,
+    logoUrl: b.logoUrl,
+    total: (r.campaignId ? byCampaign.get(r.campaignId)?.total : null) ?? 0,
   };
 }
 

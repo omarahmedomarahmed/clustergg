@@ -264,6 +264,22 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "guild_id" text`,
   `ALTER TABLE "ad_creatives" ADD COLUMN IF NOT EXISTS "cta_label" text`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "community" jsonb NOT NULL DEFAULT '{}'::jsonb`,
+  `CREATE TABLE IF NOT EXISTS "sponsored_campaigns" (
+    "id" text PRIMARY KEY NOT NULL,
+    "brand_id" text NOT NULL,
+    "game" text NOT NULL,
+    "slots" integer DEFAULT 4 NOT NULL,
+    "price_per_challenge" double precision DEFAULT 250 NOT NULL,
+    "total" double precision DEFAULT 1000 NOT NULL,
+    "status" text DEFAULT 'submitted' NOT NULL,
+    "start_at" timestamp with time zone NOT NULL,
+    "cover_url" text,
+    "slot_state" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "targeting" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "spc_brand_idx" ON "sponsored_campaigns" ("brand_id","created_at")`,
+  `CREATE INDEX IF NOT EXISTS "spc_game_idx" ON "sponsored_campaigns" ("game","status")`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "sponsor_brand_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "sponsor_campaign_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "sponsor_price" double precision NOT NULL DEFAULT 0`,
@@ -313,6 +329,13 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "creq_guild_idx" ON "challenge_requests" ("guild_id","created_at")`,
   `CREATE INDEX IF NOT EXISTS "creq_status_idx" ON "challenge_requests" ("status")`,
+  // A brand's bought slot arrives in the same queue as a server owner's ask.
+  // These must come AFTER the CREATE above: on a fresh database an ALTER
+  // placed earlier in the array runs against a table that doesn't exist yet
+  // and takes the whole boot down with it.
+  `ALTER TABLE "challenge_requests" ADD COLUMN IF NOT EXISTS "brand_id" text`,
+  `ALTER TABLE "challenge_requests" ADD COLUMN IF NOT EXISTS "campaign_id" text`,
+  `ALTER TABLE "challenge_requests" ADD COLUMN IF NOT EXISTS "slot_index" integer`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "vote_count" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_views" integer NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS "profile_votes" (

@@ -1,15 +1,17 @@
 import { notFound } from "next/navigation";
 import { hasPortalSession } from "@/lib/portal-auth";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness, getBrandInbox, getCardCampaign } from "@/lib/brands";
 import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
 import { networkStats } from "@/lib/network";
+import { brandCampaigns, campaignQuote, networkReach, nextMonday, slotWindows } from "@/lib/sponsored-campaigns";
 import BrandMessageForm from "@/components/BrandMessageForm";
 import BrandAnalyticsPanel from "@/components/BrandAnalyticsPanel";
 import BrandAppearanceEditor from "@/components/BrandAppearanceEditor";
 import BrandCreativesTab from "@/components/BrandCreativesTab";
 import BrandCardCampaign from "@/components/BrandCardCampaign";
+import CampaignBuilder from "@/components/CampaignBuilder";
 import BrandChartBuilder from "@/components/BrandChartBuilder";
 import Tabs from "@/components/Tabs";
 import AnimatedNumber from "@/components/AnimatedNumber";
@@ -155,12 +157,43 @@ export default async function BrandPortalPage({
   }
 
   // ---- Overview: all campaigns + brand-wide intelligence ----
-  const [data, brandAnalytics, cardCampaign, net] = await Promise.all([
+  const [data, brandAnalytics, cardCampaign, net, reach, sponsored] = await Promise.all([
     getBrandPortalData(db, brand.id),
     getBrandAnalytics(db, brand.id, { days: 90 }),
     getCardCampaign(db, brand.id, CARD_AD_PLACEMENT),
     networkStats().catch(() => null),
+    networkReach(),
+    brandCampaigns(brand.id),
   ]);
+
+  // What the builder needs: every game with its own audience, plus which ones
+  // are already taken — by anybody this week, or by THIS brand for the month.
+  const gameLogos = new Map(
+    (await db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl }).from(schema.games))
+      .map((g) => [g.name, g.logoUrl]),
+  );
+  const mineByGame = new Set(
+    sponsored.filter((c) => c.status === "submitted" || c.status === "running").map((c) => c.game),
+  );
+  const busyGames = new Set(
+    (await db.select({ game: schema.challenges.game })
+      .from(schema.challenges)
+      .where(and(eq(schema.challenges.status, "active"), sql`${schema.challenges.sponsorPrice} > 0`)))
+      .map((c) => c.game),
+  );
+  const builderGames = reach.byGame.map((g) => ({
+    game: g.game,
+    logoUrl: gameLogos.get(g.game) ?? null,
+    servers: g.servers,
+    unlockedServers: g.unlockedServers,
+    gamers: g.gamers,
+    verifiedPlayers: g.verifiedPlayers,
+    regions: g.regions,
+    busy: busyGames.has(g.game),
+    owned: mineByGame.has(g.game),
+  }));
+  const buyQuote = campaignQuote();
+  const buyWeeks = slotWindows(nextMonday());
   const shown = data.campaigns.filter((c) => filter === "all" || c.status === filter);
   const chip = (f: string, label: string) => (
     <a href={`${base}&filter=${f}`} className={`rounded-full border px-3 py-1 text-xs transition ${filter === f ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-200" : "border-white/12 text-muted hover:border-white/25"}`}>{label}</a>
@@ -175,9 +208,22 @@ export default async function BrandPortalPage({
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-8">
         {brand.about && <div className="glass p-5 text-sm text-muted">{brand.about}</div>}
 
-        {/* The card placement leads the portal. It is the only inventory a
-            brand cannot buy anywhere else, and uploading to it is the whole
-            launch — no account manager in the way. */}
+        {/* The media buy leads the portal.
+            A brand opens this page to buy reach, and the single biggest thing
+            they can buy is a month of sponsored challenges on a game. It goes
+            above the card placement because it IS the product — the card is the
+            always-on layer underneath it. */}
+        <CampaignBuilder
+          brandId={brand.id} keyStr={key}
+          games={builderGames}
+          quote={buyQuote}
+          network={{ servers: reach.servers, unlockedServers: reach.unlockedServers, gamers: reach.gamers }}
+          weeks={buyWeeks.map((w) => ({ startAt: w.startAt.toISOString(), endAt: w.endAt.toISOString() }))}
+        />
+
+        {/* The card placement: the only inventory a brand cannot buy anywhere
+            else, and uploading to it is the whole launch — no account manager
+            in the way. */}
         <BrandCardCampaign
           brandId={brand.id} keyStr={key} brandName={brand.name}
           creatives={cardCampaign.creatives.map((c) => ({

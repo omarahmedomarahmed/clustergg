@@ -833,9 +833,77 @@ export const serverEvents = pgTable("server_events", {
 // to enter. They build it here — game, dates, trophies, prize value — and staff
 // approve it. Approval is what creates the real `challenges` row, generates the
 // access key, and announces it to their server.
+/**
+ * A brand buying a month of sponsored challenges on one game.
+ *
+ * This is the media buy. A brand picks a game, sees who it reaches, and buys
+ * four weekly challenges — one month, one payment, no subscription. Every
+ * challenge is $250: $175 of prize money and a $75 platform fee. Four of them
+ * on one game is $1,000, and four is the minimum, because one challenge is a
+ * post and four is a campaign.
+ *
+ * The four are NOT created at once. Only the first becomes a live challenge;
+ * the next opens when it ends. A game runs one sponsored challenge at a time —
+ * two competing on the same game in the same week split the field and make both
+ * look empty. A brand can buy a second game in parallel, and that game runs its
+ * own one-at-a-time queue.
+ */
+export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
+  id: id(),
+  brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  game: text("game").notNull(),
+  /** How many weekly challenges were bought. Four is the floor. */
+  slots: integer("slots").notNull().default(4),
+  /** What one challenge cost, and the total. Frozen at purchase. */
+  pricePerChallenge: doublePrecision("price_per_challenge").notNull().default(250),
+  total: doublePrecision("total").notNull().default(1000),
+  /** draft | submitted | running | completed | cancelled */
+  status: text("status").notNull().default("submitted"),
+  /** Monday of the first week. Every slot is seven days from here. */
+  startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
+  /** One cover for all four, unless a slot overrides it. */
+  coverUrl: text("cover_url"),
+  /**
+   * Per-slot state: the cover, the request, the challenge it became.
+   *
+   * Held as one document rather than a table because a slot has no identity
+   * outside its campaign — you never query "all slot 3s" — and because the
+   * brand edits the upcoming one as a whole.
+   */
+  slotState: jsonb("slot_state").$type<{
+    index: number;
+    startAt: string;
+    endAt: string;
+    coverUrl?: string | null;
+    requestId?: string | null;
+    challengeId?: string | null;
+    status: "waiting" | "requested" | "live" | "done";
+  }[]>().notNull().default([]),
+  /**
+   * Who the brand asked for.
+   *
+   * `regions` and `games` come from what server owners told us about their
+   * communities; `guildIds` is a hand-picked list when a brand wants specific
+   * servers. Empty means the whole network, which is the default and usually
+   * the right answer — a challenge nobody can enter is worth nothing.
+   */
+  targeting: jsonb("targeting").$type<{ regions?: string[]; countries?: string[]; guildIds?: string[] }>()
+    .notNull().default({}),
+  createdAt: now("created_at"),
+}, (t) => [index("spc_brand_idx").on(t.brandId, t.createdAt), index("spc_game_idx").on(t.game, t.status)]);
+
 export const challengeRequests = pgTable("challenge_requests", {
   id: id(),
+  // A request comes from one of two places, and admin has to be able to tell
+  // them apart at a glance: a server owner asking to run something for their
+  // community, or a BRAND who has paid for a slot in a campaign. Both land in
+  // the same queue because both end in the same thing — a challenge with our
+  // name on it — but they are reviewed with different questions in mind.
   guildId: text("guild_id").notNull(),
+  brandId: text("brand_id"),
+  campaignId: text("campaign_id"),
+  /** Which of the campaign's four weeks this request is for. */
+  slotIndex: integer("slot_index"),
   requestedByDiscordId: text("requested_by_discord_id"),
   requestedByUserId: text("requested_by_user_id"),
   game: text("game").notNull(),

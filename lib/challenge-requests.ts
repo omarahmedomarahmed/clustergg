@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { PRICING_DEFAULTS } from "@/lib/pricing";
 import { uid } from "@/lib/utils";
 import { PROVIDERS, linkableProvider, type ProviderDef } from "@/lib/providers/registry";
 
@@ -195,6 +196,18 @@ export async function approveRequest(
     const accessKey = newAccessKey();
     const challengeId = uid();
 
+    // A brand's challenge and a server's challenge are shaped differently, and
+    // the difference is who it is FOR.
+    //
+    // A server owner's is private to their community — that exclusivity is the
+    // thing they're getting. A brand paid to reach the network, so theirs is
+    // public by default and runs everywhere: gating a sponsored challenge to
+    // one server would sell a brand a fraction of what they bought. Staff can
+    // still narrow it to chosen servers afterwards, which is a different and
+    // deliberate decision.
+    const sponsored = !!req.brandId;
+    const price = sponsored ? PRICING_DEFAULTS.challengePrice : 0;
+
     await db.insert(schema.challenges).values({
       id: challengeId,
       spaceId: space.id,
@@ -207,10 +220,10 @@ export async function approveRequest(
       pointsEngine: req.metric ? { [req.metric]: 1 } : {},
       // Private to the server that asked for it, and gated by the key we're
       // about to send them. Everyone else can watch.
-      visibility: "private",
-      guildId: req.guildId,
-      guildIds: [req.guildId],
-      accessKey,
+      visibility: sponsored ? "public" : "private",
+      guildId: req.guildId || null,
+      guildIds: req.guildId ? [req.guildId] : [],
+      accessKey: sponsored ? null : accessKey,
       announceHype: true,
       startAt, endAt,
       status: "active",
@@ -219,8 +232,18 @@ export async function approveRequest(
       trophyId: podium?.first?.[0] ?? null,
       prizeDescription: req.prizeDescription
         ?? (req.prizeValue > 0 ? `${req.prizeValue} ${req.prizeCurrency} prize pool` : null),
+      sponsorBrandId: req.brandId,
+      sponsorCampaignId: req.campaignId,
+      sponsorPrice: price,
       createdBy: reviewerId,
     });
+
+    // Tie the challenge back to the week of the campaign that bought it, so the
+    // brand's portal can show "week 2 of 4, live" rather than a loose list.
+    if (req.campaignId && req.slotIndex != null) {
+      const { bindSlotChallenge } = await import("@/lib/sponsored-campaigns");
+      await bindSlotChallenge(req.campaignId, req.slotIndex, challengeId);
+    }
 
     await db.update(schema.challengeRequests).set({
       status: "approved",
