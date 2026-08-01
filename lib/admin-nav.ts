@@ -143,6 +143,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/placements", label: "Placements", desc: "Where creatives can appear.", metric: "placements" },
       { href: "/admin/ads/schedule", label: "Ad schedule", desc: "What runs when." },
       { href: "/admin/ads/analytics", label: "Ad analytics", desc: "Impressions, clicks and earnings by campaign.", metric: "adImpressions" },
+      { href: "/admin/brands/testimonials", label: "Testimonials", desc: "What players said, for the brands' end-of-month reports." },
     ],
   },
   {

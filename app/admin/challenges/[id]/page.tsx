@@ -34,6 +34,12 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
       .from(schema.discordGuilds).where(eq(schema.discordGuilds.status, "active")),
   ]);
 
+  // Sponsors, so a branded trophy in the podium picker says whose logo is on it.
+  const brandNames = new Map(
+    (await db.select({ id: schema.brands.id, name: schema.brands.name }).from(schema.brands))
+      .map((b) => [b.id, b.name]),
+  );
+
   const builderProviders = PROVIDERS
     .filter((p) => !p.identityOnly && p.capabilities.length > 0)
     .map((p) => ({ id: p.id, name: p.name, game: p.game, live: isProviderLive(p), authType: p.authType, docsUrl: p.docsUrl, capabilities: p.capabilities.map((c) => ({ key: c.key, label: c.label, unit: c.unit, higherIsBetter: c.higherIsBetter })) }));
@@ -51,6 +57,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     gateQuestId: challenge.gateQuestId, gateMinBadges: challenge.gateMinBadges ?? 0,
     visibility: challenge.visibility ?? "public", guildId: challenge.guildId, guildIds: challenge.guildIds ?? [],
     accessKey: challenge.accessKey, announceHype: challenge.announceHype ?? false,
+    sponsorBrandId: challenge.sponsorBrandId,
   };
 
   return (
@@ -115,7 +122,11 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             challenge={editData}
             providers={builderProviders}
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
-            trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
+            trophies={trophies.map((t) => ({
+              id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl,
+              brandId: t.brandId, brandName: t.brandId ? (brandNames.get(t.brandId) ?? "sponsor") : null,
+              value: Number(t.value ?? 0),
+            }))}
             quests={quests}
             guilds={guilds.map((g) => ({ guildId: g.guildId, name: g.name }))}
           />

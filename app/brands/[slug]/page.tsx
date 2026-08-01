@@ -6,6 +6,10 @@ import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignR
 import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
 import { networkStats } from "@/lib/network";
 import { brandCampaigns, campaignQuote, networkReach, nextMonday, slotWindows } from "@/lib/sponsored-campaigns";
+import { brandChallengeReports, campaignReport, brandTestimonials, brandTier, challengeServers } from "@/lib/brand-report";
+import { pricingConfig } from "@/lib/pricing-live";
+import BrandCampaignReports from "@/components/BrandCampaignReports";
+import BrandTierStrip from "@/components/BrandTierStrip";
 import BrandMessageForm from "@/components/BrandMessageForm";
 import BrandAnalyticsPanel from "@/components/BrandAnalyticsPanel";
 import BrandAppearanceEditor from "@/components/BrandAppearanceEditor";
@@ -194,6 +198,29 @@ export default async function BrandPortalPage({
   }));
   const buyQuote = campaignQuote();
   const buyWeeks = slotWindows(nextMonday());
+
+  // ---- What the money did: the reporting half of the buy ----
+  //
+  // Built here rather than in the component so every number crosses to the
+  // client already counted. The per-challenge reports are fetched ONCE for the
+  // brand and shared across campaigns — a portal that queried per week would
+  // issue a query per week of every month they've ever bought.
+  const cfg = await pricingConfig();
+  const challengeReports = await brandChallengeReports(brand.id, cfg);
+  const campaignViews = await Promise.all(sponsored.map((c) => campaignReport(c, challengeReports, cfg)));
+  const testimonials = await brandTestimonials(brand.id);
+  // The servers each week landed in — the drill-down under "servers reached".
+  // Only for weeks that actually ran, so an unstarted month costs no queries.
+  const ranIds = [...new Set(
+    campaignViews.flatMap((r) => r.weeks.map((w) => w.report?.challengeId).filter((x): x is string => !!x)),
+  )];
+  const serversByChallenge = new Map(
+    await Promise.all(ranIds.map(async (id) => [id, await challengeServers(id)] as const)),
+  );
+  const tier = brandTier(
+    sponsored.filter((c) => c.status === "submitted" || c.status === "running").map((c) => c.game),
+    cfg,
+  );
   const shown = data.campaigns.filter((c) => filter === "all" || c.status === filter);
   const chip = (f: string, label: string) => (
     <a href={`${base}&filter=${f}`} className={`rounded-full border px-3 py-1 text-xs transition ${filter === f ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-200" : "border-white/12 text-muted hover:border-white/25"}`}>{label}</a>
@@ -207,6 +234,52 @@ export default async function BrandPortalPage({
       <PortalHeader name={brand.name} logo={brand.logoUrl} cover={cover} subtitle={`${data.totals.total} campaign${data.totals.total === 1 ? "" : "s"} · ${data.totals.active} live`} />
       <div className="mx-auto max-w-5xl px-4 py-8 space-y-8">
         {brand.about && <div className="glass p-5 text-sm text-muted">{brand.about}</div>}
+
+        {/* Where they stand, before anything they can buy. A brand opening
+            their own dashboard should see their position on it first. */}
+        <BrandTierStrip
+          tier={tier}
+          spend={campaignViews.reduce((a, c) => a + c.totals.spend, 0)}
+          reached={campaignViews.reduce((a, c) => a + c.totals.members, 0)}
+          entrants={campaignViews.reduce((a, c) => a + c.totals.entrants, 0)}
+          pastGames={new Set(sponsored.map((c) => c.game)).size}
+          currency={cfg.currency}
+        />
+
+        {/* What the last month did, before what the next one costs. */}
+        <BrandCampaignReports
+          brandId={brand.id} keyStr={key}
+          campaigns={campaignViews.map((r) => ({
+            id: r.campaign.id,
+            game: r.campaign.game,
+            status: r.campaign.status,
+            startAt: r.campaign.startAt.toISOString(),
+            slots: r.campaign.slots,
+            total: r.campaign.total,
+            weeks: r.weeks.map((w) => ({
+              index: w.index, startAt: w.startAt, endAt: w.endAt,
+              coverUrl: w.coverUrl, status: w.status, challengeId: w.challengeId,
+              report: w.report ? {
+                title: w.report.title, game: w.report.game, status: w.report.status,
+                servers: w.report.reach.servers, members: w.report.reach.members, linked: w.report.reach.linked,
+                entrants: w.report.entrants, clicks: w.report.clicks,
+                ecpm: w.report.ecpm, costPerEntrant: w.report.costPerEntrant,
+                mediaValue: w.report.mediaValue, roas: w.report.roas, spend: w.report.spend,
+                standings: w.report.standings,
+                servers_list: (serversByChallenge.get(w.report.challengeId) ?? [])
+                  .map((s) => ({ name: s.name || "A Discord server", members: s.members, linked: s.linked })),
+              } : null,
+            })),
+            totals: r.totals,
+            benchmark: r.benchmark,
+            complete: r.complete,
+            // A quote belongs to the month it came from; ones staff recorded
+            // without a campaign are shown on the brand's latest.
+            testimonials: testimonials
+              .filter((t) => !t.campaignId || t.campaignId === r.campaign.id)
+              .map((t) => ({ name: t.name, quote: t.quote, slug: t.slug, avatarUrl: t.avatarUrl })),
+          }))}
+        />
 
         {/* The media buy leads the portal.
             A brand opens this page to buy reach, and the single biggest thing

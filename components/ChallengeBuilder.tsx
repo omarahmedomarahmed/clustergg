@@ -16,7 +16,13 @@ export type BuilderProvider = {
   capabilities: { key: string; label: string; unit?: string; higherIsBetter?: boolean }[];
 };
 export type BuilderSpace = { id: string; name: string; game: string | null };
-export type BuilderTrophy = { id: string; name: string; tier: string; imageUrl: string };
+export type BuilderTrophy = {
+  id: string; name: string; tier: string; imageUrl: string;
+  /** Whose logo is on it. A branded trophy belongs to one sponsor's challenges. */
+  brandId?: string | null;
+  brandName?: string | null;
+  value?: number;
+};
 export type BuilderQuest = { id: string; name: string; logoUrl: string | null };
 // An existing challenge to edit (all fields pre-filled). Omitted when creating.
 export type BuilderGuild = { guildId: string; name: string };
@@ -31,6 +37,8 @@ export type ChallengeEdit = {
   prizes?: { first?: string[]; second?: string[]; third?: string[] } | null;
   gateQuestId: string | null; gateMinBadges: number;
   visibility: string; guildId: string | null; guildIds?: string[]; accessKey: string | null; announceHype: boolean;
+  /** Set when a brand paid for this one — it changes which trophies belong on it. */
+  sponsorBrandId?: string | null;
 };
 
 // Points recommendation: reward the primary "win-like" metric heavily, add a
@@ -68,6 +76,16 @@ export default function ChallengeBuilder({
   providers, spaces, trophies, quests = [], guilds = [], challenge,
 }: { providers: BuilderProvider[]; spaces: BuilderSpace[]; trophies: BuilderTrophy[]; quests?: BuilderQuest[]; guilds?: BuilderGuild[]; challenge?: ChallengeEdit }) {
   const editing = !!challenge;
+
+  // Which trophies belong on THIS challenge's podium.
+  //
+  // A branded trophy carries a sponsor's logo and the winner keeps it on their
+  // profile permanently, so another brand's trophy must never be selectable
+  // here. A sponsored challenge is offered its own brand's set plus the general
+  // catalogue; an unsponsored one is offered the general catalogue only.
+  const sponsorId = challenge?.sponsorBrandId ?? null;
+  const podiumTrophies = trophies.filter((t) => !t.brandId || t.brandId === sponsorId);
+
   const [providerId, setProviderId] = useState(challenge?.provider ?? providers[0]?.id ?? "");
   const [cadence, setCadence] = useState(challenge?.cadence ?? "weekly");
   const [format, setFormat] = useState(challenge?.format ?? "top3");
@@ -358,7 +376,11 @@ export default function ChallengeBuilder({
               <label key={name} className="block text-xs text-muted">
                 {label}
                 <select name={name} multiple defaultValue={dflt} size={4} className="input-cosmic mt-1 w-full !py-1 text-xs">
-                  {trophies.map((t) => <option key={t.id} value={t.id}>{t.name} ({t.tier})</option>)}
+                  {podiumTrophies.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} ({t.tier}){t.value ? ` — $${t.value}` : ""}{t.brandName ? ` · ${t.brandName}` : ""}
+                    </option>
+                  ))}
                 </select>
               </label>
             ))}

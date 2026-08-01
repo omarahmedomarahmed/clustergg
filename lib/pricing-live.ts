@@ -34,6 +34,19 @@ export type PricingLive = {
   games: SponsorGame[];
 };
 
+/**
+ * The pricing config as staff have edited it.
+ *
+ * The cheap half of `pricingLive` for the many callers that need the numbers
+ * but not the inventory — a report, a bill, a quote. Falls back to the defaults
+ * rather than throwing, because a page that can't reach the CMS should still
+ * price a challenge at $250 instead of at nothing.
+ */
+export async function pricingConfig(): Promise<PricingConfig> {
+  try { return buildPricing(await getContent(PRICING_CMS_KEYS)); }
+  catch { return buildPricing({}); }
+}
+
 export async function pricingLive(): Promise<PricingLive> {
   const copy = await getContent(PRICING_CMS_KEYS);
   const cfg = buildPricing(copy);

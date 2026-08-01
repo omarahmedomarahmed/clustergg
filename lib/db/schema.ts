@@ -527,6 +527,17 @@ export const trophies = pgTable("trophies", {
   tier: text("tier").notNull().default("gold"), // gold | silver | bronze | legendary
   game: text("game"),
   value: doublePrecision("value").notNull().default(0), // admin-assigned $ value (shown on prizes, redeemable)
+  /**
+   * The brand whose logo is on it.
+   *
+   * A branded trophy is the thing a sponsored challenge actually leaves behind:
+   * the winner keeps it on their profile with the sponsor's mark on it, long
+   * after the week is over. Set means "made for this brand" — it is offered
+   * first when staff build that brand's challenge and never mixed into the
+   * general catalogue, because awarding one brand's trophy in another's
+   * competition would put the wrong logo on somebody's profile forever.
+   */
+  brandId: text("brand_id").references(() => brands.id, { onDelete: "set null" }),
 });
 
 // A trophy AWARDED to a gamer (challenge podium win). Lives on their profile
@@ -891,6 +902,57 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
     .notNull().default({}),
   createdAt: now("created_at"),
 }, (t) => [index("spc_brand_idx").on(t.brandId, t.createdAt), index("spc_game_idx").on(t.game, t.status)]);
+
+/**
+ * What a player said about a sponsored challenge, in their own words.
+ *
+ * The end-of-month report a brand receives ends with testimonials, and the only
+ * kind worth printing is a real one. So these are entered by a human — staff
+ * collect a quote from a winner and attribute it — rather than generated from
+ * anything. A month with no quotes shows no quotes.
+ */
+export const brandTestimonials = pgTable("brand_testimonials", {
+  id: id(),
+  brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  campaignId: text("campaign_id"),
+  challengeId: text("challenge_id"),
+  /** The gamer, when they're on the platform — their avatar and profile link. */
+  userId: text("user_id"),
+  /** Who said it, as printed. Falls back to the user's display name. */
+  name: text("name").notNull().default(""),
+  quote: text("quote").notNull(),
+  /** draft | published — only published quotes reach the brand's report. */
+  status: text("status").notNull().default("published"),
+  createdAt: now("created_at"),
+}, (t) => [index("btm_brand_idx").on(t.brandId, t.createdAt)]);
+
+/**
+ * Where a challenge announcement actually landed, and how many people were there.
+ *
+ * A brand asks "how many people saw it", and the only honest answer is a count
+ * taken at the moment we posted: which servers received the message and how
+ * many members each had. Recomputing it later from today's server sizes would
+ * quietly rewrite history every time a server grew — so the number is frozen
+ * per delivery, once, and never recalculated.
+ *
+ * One row per (challenge, server). The unique index is what makes a retrying
+ * cron or a second announcement idempotent rather than double-counted.
+ */
+export const challengeDeliveries = pgTable("challenge_deliveries", {
+  id: id(),
+  challengeId: text("challenge_id").notNull(),
+  guildId: text("guild_id").notNull(),
+  /** Server members at the moment of delivery — the reach of this one post. */
+  members: integer("members").notNull().default(0),
+  /** Of those, the ones who had linked a game account and could actually enter. */
+  linked: integer("linked").notNull().default(0),
+  /** launch | ending | result — the same challenge is announced more than once. */
+  kind: text("kind").notNull().default("launch"),
+  createdAt: now("created_at"),
+}, (t) => [
+  uniqueIndex("cdel_once_idx").on(t.challengeId, t.guildId, t.kind),
+  index("cdel_challenge_idx").on(t.challengeId),
+]);
 
 export const challengeRequests = pgTable("challenge_requests", {
   id: id(),

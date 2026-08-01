@@ -42,7 +42,10 @@ export default async function AdminChallengesPage() {
           <ChallengeBuilder
             providers={builderProviders}
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
-            trophies={trophies.map((t) => ({ id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl }))}
+            trophies={trophies.map((t) => ({
+              id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl,
+              brandId: t.brandId, value: Number(t.value ?? 0),
+            }))}
             quests={quests}
           />
         </div>

@@ -336,6 +336,30 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenge_requests" ADD COLUMN IF NOT EXISTS "brand_id" text`,
   `ALTER TABLE "challenge_requests" ADD COLUMN IF NOT EXISTS "campaign_id" text`,
   `ALTER TABLE "challenge_requests" ADD COLUMN IF NOT EXISTS "slot_index" integer`,
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "brand_id" text`,
+  `CREATE TABLE IF NOT EXISTS "challenge_deliveries" (
+    "id" text PRIMARY KEY NOT NULL,
+    "challenge_id" text NOT NULL,
+    "guild_id" text NOT NULL,
+    "members" integer DEFAULT 0 NOT NULL,
+    "linked" integer DEFAULT 0 NOT NULL,
+    "kind" text DEFAULT 'launch' NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "cdel_once_idx" ON "challenge_deliveries" ("challenge_id","guild_id","kind")`,
+  `CREATE INDEX IF NOT EXISTS "cdel_challenge_idx" ON "challenge_deliveries" ("challenge_id")`,
+  `CREATE TABLE IF NOT EXISTS "brand_testimonials" (
+    "id" text PRIMARY KEY NOT NULL,
+    "brand_id" text NOT NULL,
+    "campaign_id" text,
+    "challenge_id" text,
+    "user_id" text,
+    "name" text DEFAULT '' NOT NULL,
+    "quote" text NOT NULL,
+    "status" text DEFAULT 'published' NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "btm_brand_idx" ON "brand_testimonials" ("brand_id","created_at")`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "vote_count" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_views" integer NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS "profile_votes" (
