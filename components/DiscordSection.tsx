@@ -31,12 +31,15 @@ export function DiscordSection({ stats, servers, copy, steps, installUrl }: {
           <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/40 bg-violet-500/10 px-4 py-1.5 text-xs uppercase tracking-widest text-violet-200">
             <Icon name="link" size={13} /> {copy["discord.badge"] || "ClusterBot for Discord"}
           </span>
+          {/* No literal fallbacks beside these two. Both keys have CMS
+              defaults, so a fallback string here is a second copy of the
+              pitch that nobody remembers to update — which is exactly how
+              this section kept the old positioning last time. */}
           <h2 className="text-3xl sm:text-5xl font-black mt-5 leading-tight">
-            {copy["discord.title"] || "Turn your Discord into a competition."}
+            {copy["discord.title"]}
           </h2>
           <p className="text-muted mt-4 text-base sm:text-lg">
-            {copy["discord.subtitle"]
-              || "Add the bot and your members get ranked profiles, live stats from the games they already play, and challenges with real trophies — without leaving your server. You get the audience numbers, and a share of what they earn."}
+            {copy["discord.subtitle"]}
           </p>
           <div className="flex flex-wrap justify-center gap-3 mt-7">
             <AddBotButton size="lg" label={copy["discord.cta.primary"] || "Add ClusterBot to your server"} />

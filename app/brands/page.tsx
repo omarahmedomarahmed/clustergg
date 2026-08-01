@@ -6,9 +6,9 @@ import { money, quote } from "@/lib/pricing";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Talk to us — advertise to gamers on Discord",
+  title: "Talk to us — buy media inside Discord",
   description:
-    "Tell us the audience you want to reach and we'll tell you honestly whether we have it. Sponsored challenges and placements across Discord gaming communities.",
+    "Tell us the audience you want to reach and we'll tell you honestly whether we have it. Sponsored challenges and placements across Discord gaming communities, on a published rate card.",
 };
 
 // Where every pricing CTA lands.

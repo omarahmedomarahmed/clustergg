@@ -149,8 +149,10 @@ export function ReseedDoc({ doc }: { doc: Doc }) {
       <input type="hidden" name="id" value={doc.id} />
       <p className="text-xs text-cyan-100">
         Replaces every section in this document with the version we ship — the visual one, with the
-        graphic explainers and the live product cards. <b>Your own sections and text are deleted.</b>{" "}
-        The document&apos;s title, colours and contact details are untouched. Type <b>{doc.slug}</b> to confirm.
+        graphic explainers and the live product cards. <b>Your own sections and text are deleted</b>,
+        and the title, subtitle and summary are rewritten to the shipped ones, because a restored deck
+        under an old cover line is half a deck. Colours, access key and contact details are untouched.
+        Type <b>{doc.slug}</b> to confirm.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <input name="confirm" placeholder={doc.slug} className="input-cosmic w-48 font-mono text-sm" />

@@ -71,8 +71,12 @@ export async function ensureSeeded(): Promise<void> {
 // explicit, per-document, admin-pressed action: it says what it will destroy
 // before it does it, and it never runs on its own.
 //
-// The document's own identity (slug, title, accent, contact) is left alone.
-// Only the sections are replaced, because they are what a redesign changes.
+// The document's ROUTING and STYLE are left alone — slug, accent, access key,
+// published state, contact address. Its title, subtitle and summary are not:
+// those are copy, they appear above the first slide and on the index, and a
+// repositioning that reframes every section but leaves the old one-liner on
+// the cover has repositioned nothing. So a reseed replaces the words and keeps
+// the identity.
 export async function reseedDoc(slug: string): Promise<{ ok: boolean; sections: number }> {
   const seed = SEED_DOCS.find((d) => d.slug === slug);
   if (!seed) return { ok: false, sections: 0 };
@@ -81,6 +85,10 @@ export async function reseedDoc(slug: string): Promise<{ ok: boolean; sections: 
     const [doc] = await db.select({ id: schema.dataroomDocs.id })
       .from(schema.dataroomDocs).where(eq(schema.dataroomDocs.slug, slug)).limit(1);
     if (!doc) return { ok: false, sections: 0 };
+
+    await db.update(schema.dataroomDocs)
+      .set({ title: seed.title, subtitle: seed.subtitle, summary: seed.summary })
+      .where(eq(schema.dataroomDocs.id, doc.id));
 
     await db.delete(schema.dataroomSections).where(eq(schema.dataroomSections.docId, doc.id));
     for (const [j, sec] of seed.sections.entries()) {
