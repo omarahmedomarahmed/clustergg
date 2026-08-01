@@ -134,6 +134,9 @@ async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: 
         "Run `/cluster admin` and request a challenge for your community. You pick the game, the length, the prize and the trophies; we review it, then post it here with an entry key only your server has. Your members link a game to enter — which is exactly the number that unlocks brand-sponsored challenges here.",
         "",
         "The challenge itself is public on Cluster: everyone can see your standings, your trophies and your server — but only people with your key can enter. That puts your community in front of our whole audience.",
+        "",
+        "**One thing worth twenty seconds, now**",
+        "Tell us what your community plays and where its members are. Brands buy sponsored challenges by game and by region, so a described server gets matched to a sponsor and an undescribed one waits. Tap **Describe your community** below — every question is optional and you can change any of it later.",
         ...(portal ? [
           "",
           "**Your server portal**",
@@ -144,7 +147,11 @@ async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: 
       color: embedColor("#8b5cf6"),
     }],
     components: rows([
-      navButton("Request a challenge", frame("admin", ""), [frame("home")], ButtonStyle.Primary, "🏆"),
+      // First button, ahead of everything else. This is the moment an owner is
+      // most willing to answer questions about their server — they just chose
+      // to install us — and the answers are what makes the server sellable.
+      navButton("Describe your community", frame("setup", guildId), [frame("admin", "")], ButtonStyle.Primary, "🧭"),
+      navButton("Request a challenge", frame("admin", ""), [frame("home")], ButtonStyle.Success, "🏆"),
       ...(portal ? [linkButton("Open your portal", `${siteUrl()}/servers/${portal.slug}?key=${encodeURIComponent(portal.key)}`, "🛰")] : []),
       navButton("Your growth so far", frame("server"), [frame("home")], ButtonStyle.Secondary, "📈"),
       linkButton("Server owner guide", `${siteUrl()}/discord-bot`, "📖"),

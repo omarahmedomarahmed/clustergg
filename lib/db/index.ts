@@ -263,6 +263,7 @@ const COLUMN_MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS "dwp_week_idx" ON "discord_week_posts" ("week_key")`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "guild_id" text`,
   `ALTER TABLE "ad_creatives" ADD COLUMN IF NOT EXISTS "cta_label" text`,
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "community" jsonb NOT NULL DEFAULT '{}'::jsonb`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "sponsor_brand_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "sponsor_campaign_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "sponsor_price" double precision NOT NULL DEFAULT 0`,

@@ -134,3 +134,55 @@ export function rows(buttons: (Button | null)[]): { type: 1; components: Button[
   for (let i = 0; i < list.length; i += 5) out.push({ type: ComponentType.ActionRow, components: list.slice(i, i + 5) });
   return out;
 }
+
+// ===== Select menus =====
+//
+// A button per option stops working the moment there are more than twenty-five
+// of them, and "which games does your community play" is a list that grows every
+// time we connect another game. A select menu is the right primitive: one row,
+// any number of options, and multi-select without inventing a toggle protocol
+// out of buttons that each rewrite the message.
+//
+// The `custom_id` grammar is the same as everything else — the handler reads
+// `i.data.values` for what was picked.
+
+export type SelectOption = { label: string; value: string; description?: string; default?: boolean };
+
+export type Select = {
+  type: 3;
+  custom_id: string;
+  placeholder?: string;
+  min_values: number;
+  max_values: number;
+  options: SelectOption[];
+};
+
+export function select(customId: string, options: SelectOption[], opts: {
+  placeholder?: string;
+  /** 0 lets an owner clear their answer, which is a real thing to want. */
+  min?: number;
+  max?: number;
+} = {}): Select | null {
+  // Discord rejects a select with no options — and rejects the WHOLE message
+  // with it. An empty catalogue must drop the menu, not the screen.
+  const list = options.slice(0, 25);
+  if (!list.length) return null;
+  return {
+    type: ComponentType.StringSelect,
+    custom_id: customId.slice(0, MAX_CUSTOM_ID),
+    ...(opts.placeholder ? { placeholder: opts.placeholder.slice(0, 150) } : {}),
+    min_values: Math.max(0, opts.min ?? 0),
+    max_values: Math.max(1, Math.min(list.length, opts.max ?? 1)),
+    options: list.map((o) => ({
+      label: o.label.slice(0, 100),
+      value: o.value.slice(0, 100),
+      ...(o.description ? { description: o.description.slice(0, 100) } : {}),
+      ...(o.default ? { default: true } : {}),
+    })),
+  };
+}
+
+/** A select occupies a whole action row — it can never share one with a button. */
+export function selectRow(s: Select | null): { type: 1; components: Select[] } | null {
+  return s ? { type: ComponentType.ActionRow, components: [s] } : null;
+}

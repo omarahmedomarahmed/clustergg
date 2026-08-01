@@ -761,6 +761,20 @@ export const discordGuilds = pgTable("discord_guilds", {
   // a Cluster account needs to see their own numbers.
   slug: text("slug"),
   portalKey: text("portal_key"),
+  /**
+   * What this community actually is — answered by its own owner.
+   *
+   * This is inventory description. A brand buying Discord has to be able to ask
+   * for "PUBG players in MENA" and get an answer, and the only person who
+   * reliably knows what a server plays and where it lives is the person running
+   * it. Everything else we hold is derived (linked accounts, challenge entries)
+   * and lags reality by weeks; this is asked once, at install, in about twenty
+   * seconds, and can be corrected any time.
+   *
+   * Shape and validation live in `lib/discord/community.ts` — this column is
+   * deliberately loose so a new question doesn't need a migration.
+   */
+  community: jsonb("community").$type<Record<string, unknown>>().notNull().default({}),
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
   installedAt: now("installed_at"),
   removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),

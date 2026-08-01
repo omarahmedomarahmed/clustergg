@@ -7,7 +7,7 @@ import {
 } from "@/lib/discord/types";
 import { parseId, frame, rows, button, navButton, linkButton, actionId, type Frame } from "@/lib/discord/components";
 import { openChoices } from "@/lib/discord/catalog";
-import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal } from "@/lib/discord/screens";
+import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal, aboutModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
@@ -114,6 +114,7 @@ function modalSubmit(i: Interaction) {
   if (kind === "key") return keySubmit(i, who, arg, (fields.get("key") ?? "").trim());
   if (kind === "link") return linkSubmit(i, who, arg, fields);
   if (kind === "req") return requestSubmit(i, who, arg, fields);
+  if (kind === "about") return aboutSubmit(i, arg, (fields.get("about") ?? "").trim());
   return json({ type: InteractionResponseType.DeferredUpdateMessage });
 }
 
@@ -387,6 +388,38 @@ function componentPress(i: Interaction) {
     if (!id) return json({ type: InteractionResponseType.DeferredUpdateMessage });
     return json(keyModal(id));
   }
+  // The community profile's select menus.
+  //
+  // A select answers with `data.values` rather than a custom_id, so it can't go
+  // through the nav grammar — but it must still re-render the screen so the
+  // owner sees their answer stick. Manager-gated on the way in: this describes
+  // the server to advertisers, and any member could otherwise rewrite it.
+  if (customId.startsWith("set|")) {
+    const [, field, guildId] = customId.split("|");
+    const values = i.data?.values ?? [];
+    if (!field || !guildId) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    after(async () => {
+      // Checked here rather than inline because the DM case needs a database
+      // read: in a DM there is no member and no permissions, so the only proof
+      // of authority is being the account we recorded as the server's owner.
+      if (!(await maySetup(i, guildId))) return;
+      try {
+        const { saveCommunity } = await import("@/lib/discord/community");
+        await saveCommunity(guildId, { [field]: values });
+      } catch { /* the re-render below still shows the truth */ }
+      await rerender(i, frame("setup", guildId), [frame("admin", "")]);
+    });
+    return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  }
+  // The one free-text box in that profile. A modal has to be the immediate
+  // answer to a fresh interaction, so no database work happens here.
+  if (customId.startsWith("open-about|")) {
+    const guildId = customId.slice("open-about|".length);
+    if (!guildId) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    // Authority is re-checked on submit, where there is time for a database
+    // read. Opening the box is harmless; saving what's in it is not.
+    return json(aboutModal(guildId));
+  }
   // A server owner filling in their challenge request.
   if (customId.startsWith("open-req|")) {
     const game = customId.slice("open-req|".length);
@@ -439,6 +472,75 @@ function componentPress(i: Interaction) {
 
 // Render a screen into the message that was clicked. Used by the few buttons
 // that don't carry a nav trail in their custom_id.
+// The community description, saved and shown back.
+function aboutSubmit(i: Interaction, guildId: string, about: string) {
+  after(async () => {
+    if (!(await maySetup(i, guildId))) {
+      await editOriginal(i.token, { content: "Only this server's admins can change that." });
+      return;
+    }
+    try {
+      const { saveCommunity } = await import("@/lib/discord/community");
+      await saveCommunity(guildId, { about });
+    } catch { /* fall through to the re-render, which shows what stuck */ }
+    await rerender(i, frame("setup", guildId), [frame("admin", "")], {
+      content: about ? "Saved — that's what a sponsor will read." : "Cleared.",
+      ephemeral: true,
+    });
+  });
+  return json({
+    type: InteractionResponseType.DeferredChannelMessageWithSource,
+    data: { flags: MessageFlags.Ephemeral },
+  });
+}
+
+/**
+ * May this person describe this server?
+ *
+ * Two ways to qualify, because the profile is reachable from two places: a
+ * manager pressing inside the server itself, or the Discord account recorded as
+ * the server's owner pressing in their DM — which is where the install message
+ * went, and the only identity a DM interaction carries.
+ */
+async function maySetup(i: Interaction, guildId: string): Promise<boolean> {
+  if (i.guild_id === guildId && isGuildManager(i)) return true;
+  const who = actor(i);
+  if (!who) return false;
+  try {
+    const { getGuildRow } = await import("@/lib/discord/guilds");
+    const row = await getGuildRow(guildId);
+    return !!row?.ownerDiscordId && row.ownerDiscordId === who.id;
+  } catch { return false; }
+}
+
+/**
+ * Draw a screen again into the interaction that is already open.
+ *
+ * Used by anything that CHANGES state and then wants the same screen back —
+ * a select menu, a modal submit. `navigate` can't be reused because it starts
+ * its own deferral; by the time these run, the deferral has already happened.
+ */
+async function rerender(
+  i: Interaction,
+  target: Frame,
+  trail: Frame[],
+  opts: { content?: string; ephemeral?: boolean } = {},
+) {
+  const who = actor(i);
+  if (!who) return;
+  try {
+    const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
+    const payload = await renderScreen(target, trail, ctx);
+    await editOriginal(i.token, {
+      content: opts.content ?? payload.content ?? "",
+      embeds: payload.embeds ?? [],
+      components: payload.components ?? [],
+    });
+  } catch {
+    await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
+  }
+}
+
 function navigate(i: Interaction, target: Frame, trail: Frame[]) {
   const who = actor(i);
   if (!who) return json({ type: InteractionResponseType.DeferredUpdateMessage });
