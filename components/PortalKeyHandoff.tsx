@@ -36,7 +36,7 @@ export default function PortalKeyHandoff({ kind, slug, portalKey }: {
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="key" value={portalKey} />
-        <button className="grad-btn pressable rounded-full px-6 py-2.5 text-sm font-bold">Continue</button>
+        <button className="glow-btn pressable rounded-full px-6 py-2.5 text-sm font-bold">Continue</button>
       </form>
     </div>
   );

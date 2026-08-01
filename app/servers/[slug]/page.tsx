@@ -3,7 +3,12 @@ import Link from "next/link";
 import { getServerBySlugOrId, portalData, serverBoard, serverCommandFeed, TIERS } from "@/lib/server-portal";
 import { hasPortalSession } from "@/lib/portal-auth";
 import { challengesForGuild } from "@/lib/challenges";
-import { listRequests } from "@/lib/challenge-requests";
+import { listRequests, requestableGames } from "@/lib/challenge-requests";
+import { threadFor, markRead } from "@/lib/server-messages";
+import { getCommunity } from "@/lib/discord/community";
+import { canAct } from "@/lib/discord/config";
+import ServerMessages from "@/components/ServerMessages";
+import ServerChallengeRequest from "@/components/ServerChallengeRequest";
 import Tabs from "@/components/Tabs";
 import Icon from "@/components/Icon";
 import PortalKeyHandoff from "@/components/PortalKeyHandoff";
@@ -58,12 +63,22 @@ export default async function ServerPortalPage({
 
   if (!unlocked) return <PublicView server={server} data={data} base={base} unlock={unlock} left={left} mins={mins} />;
 
-  const [challenges, requests, board, feed] = await Promise.all([
+  const [challenges, requests, board, feed, thread, games, community] = await Promise.all([
     challengesForGuild(server.guildId),
     listRequests({ guildId: server.guildId }),
     serverBoard(),
     serverCommandFeed(server.guildId),
+    threadFor(server.guildId),
+    requestableGames(),
+    getCommunity(server.guildId),
   ]);
+
+  // Counted BEFORE marking read, so a reply that arrived since their last visit
+  // still announces itself on the tab they're about to open.
+  const unreadFromUs = thread.filter((m) => m.sender === "admin" && !m.readByOwner).length;
+  // Opening the dashboard IS reading the thread — an unread badge that survives
+  // the owner looking straight at the messages is a badge nobody trusts again.
+  await markRead(server.guildId, "owner");
 
   const pending = requests.filter((r) => r.status === "pending");
 
@@ -135,13 +150,11 @@ export default async function ServerPortalPage({
             key: "challenges", label: `Challenges (${challenges.length})`, icon: "trophy",
             node: (
               <div className="space-y-4">
-                <div className="glass p-6">
-                  <h2 className="font-bold mb-1">Run a challenge for your community</h2>
-                  <p className="text-sm text-muted">
-                    Build it in Discord with <code className="text-cyan-300">/cluster admin</code> → Request a challenge.
-                    We review it, then post it in your server with an entry key only your members have.
-                  </p>
-                </div>
+                <ServerChallengeRequest
+                  guildId={server.guildId} keyStr=""
+                  games={games.map((g) => ({ name: g.name, logoUrl: g.logoUrl }))}
+                  pending={pending.length}
+                />
                 {challenges.length === 0
                   ? <p className="text-sm text-muted">Nothing running yet.</p>
                   : challenges.map((c) => (
@@ -164,7 +177,8 @@ export default async function ServerPortalPage({
               <div className="space-y-3">
                 {requests.length === 0 ? (
                   <p className="text-sm text-muted">
-                    No requests yet. Start one in Discord with <code className="text-cyan-300">/cluster admin</code>.
+                    No requests yet. Start one on the Challenges tab, or in Discord with{" "}
+                    <code className="text-cyan-300">/cluster admin</code> — either way it lands in the same queue.
                   </p>
                 ) : requests.map((r) => (
                   <div key={r.id} className="glass p-5 flex items-start justify-between gap-4 flex-wrap">
@@ -185,6 +199,22 @@ export default async function ServerPortalPage({
                   </div>
                 ))}
               </div>
+            ),
+          },
+          {
+            key: "messages",
+            label: unreadFromUs ? `Messages (${unreadFromUs})` : "Messages",
+            icon: "messages",
+            node: (
+              <ServerMessages
+                guildId={server.guildId} keyStr=""
+                botLive={canAct()}
+                messages={thread.map((m) => ({
+                  id: m.id, sender: m.sender, body: m.body,
+                  createdAt: m.createdAt.toISOString(), source: m.source,
+                  delivered: !!m.deliveredAt, deliveryError: m.deliveryError,
+                }))}
+              />
             ),
           },
           {
@@ -275,7 +305,7 @@ async function PublicView({ server, data, base, unlock, left = "", mins = "" }: 
             {server.inviteUrl && (
               <a
                 href={server.inviteUrl} target="_blank" rel="noreferrer"
-                className="grad-btn pressable rounded-full px-6 py-2.5 font-bold inline-block mt-4"
+                className="glow-btn pressable rounded-full px-6 py-2.5 font-bold inline-block mt-4"
               >
                 Join {server.name} for the key
               </a>
@@ -299,7 +329,7 @@ async function PublicView({ server, data, base, unlock, left = "", mins = "" }: 
               placeholder="Portal key"
               className="input-cosmic w-full sm:w-72 uppercase tracking-widest"
             />
-            <button className="grad-btn pressable rounded-full px-6 py-2.5 font-bold">Unlock</button>
+            <button className="glow-btn pressable rounded-full px-6 py-2.5 font-bold">Unlock</button>
           </form>
           {unlock === "bad" && (
             <p className="text-xs text-rose-300 mt-2">

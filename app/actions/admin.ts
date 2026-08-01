@@ -978,6 +978,9 @@ export async function saveTrophy(formData: FormData) {
     game: String(formData.get("game") ?? "").trim() || null,
     // Admin-assigned $ value — shown on challenge prizes and redeemable.
     value: Math.max(0, Number(formData.get("value")) || 0),
+    // A branded trophy carries a sponsor's logo, so it is only ever offered in
+    // that sponsor's own challenges. Blank means the general catalogue.
+    brandId: String(formData.get("brandId") ?? "").trim() || null,
   };
   if (!values.name || !values.imageUrl) return;
   if (trophyId) {

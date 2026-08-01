@@ -99,7 +99,7 @@ export default async function ProfileAnalyticsPage() {
           {tr("Every 25 profile views earns Cluster Points on the Orbit quest, and so does every vote. Share your profile link, and add Cluster to a server so people can pull up your card without leaving Discord.")}
         </p>
         <div className="flex flex-wrap gap-3 mt-4">
-          <Link href="/profile" className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold">
+          <Link href="/profile" className="glow-btn pressable rounded-full px-5 py-2 text-sm font-bold">
             {tr("Customize your profile")}
           </Link>
           <Link href="/discord-bot" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">

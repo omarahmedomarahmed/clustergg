@@ -527,6 +527,17 @@ export const trophies = pgTable("trophies", {
   tier: text("tier").notNull().default("gold"), // gold | silver | bronze | legendary
   game: text("game"),
   value: doublePrecision("value").notNull().default(0), // admin-assigned $ value (shown on prizes, redeemable)
+  /**
+   * The brand whose logo is on it.
+   *
+   * A branded trophy is the thing a sponsored challenge actually leaves behind:
+   * the winner keeps it on their profile with the sponsor's mark on it, long
+   * after the week is over. Set means "made for this brand" — it is offered
+   * first when staff build that brand's challenge and never mixed into the
+   * general catalogue, because awarding one brand's trophy in another's
+   * competition would put the wrong logo on somebody's profile forever.
+   */
+  brandId: text("brand_id").references(() => brands.id, { onDelete: "set null" }),
 });
 
 // A trophy AWARDED to a gamer (challenge podium win). Lives on their profile
@@ -833,9 +844,161 @@ export const serverEvents = pgTable("server_events", {
 // to enter. They build it here — game, dates, trophies, prize value — and staff
 // approve it. Approval is what creates the real `challenges` row, generates the
 // access key, and announces it to their server.
-export const challengeRequests = pgTable("challenge_requests", {
+/**
+ * A brand buying a month of sponsored challenges on one game.
+ *
+ * This is the media buy. A brand picks a game, sees who it reaches, and buys
+ * four weekly challenges — one month, one payment, no subscription. Every
+ * challenge is $250: $175 of prize money and a $75 platform fee. Four of them
+ * on one game is $1,000, and four is the minimum, because one challenge is a
+ * post and four is a campaign.
+ *
+ * The four are NOT created at once. Only the first becomes a live challenge;
+ * the next opens when it ends. A game runs one sponsored challenge at a time —
+ * two competing on the same game in the same week split the field and make both
+ * look empty. A brand can buy a second game in parallel, and that game runs its
+ * own one-at-a-time queue.
+ */
+export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
+  id: id(),
+  brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  game: text("game").notNull(),
+  /** How many weekly challenges were bought. Four is the floor. */
+  slots: integer("slots").notNull().default(4),
+  /** What one challenge cost, and the total. Frozen at purchase. */
+  pricePerChallenge: doublePrecision("price_per_challenge").notNull().default(250),
+  total: doublePrecision("total").notNull().default(1000),
+  /** draft | submitted | running | completed | cancelled */
+  status: text("status").notNull().default("submitted"),
+  /** Monday of the first week. Every slot is seven days from here. */
+  startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
+  /** One cover for all four, unless a slot overrides it. */
+  coverUrl: text("cover_url"),
+  /**
+   * Per-slot state: the cover, the request, the challenge it became.
+   *
+   * Held as one document rather than a table because a slot has no identity
+   * outside its campaign — you never query "all slot 3s" — and because the
+   * brand edits the upcoming one as a whole.
+   */
+  slotState: jsonb("slot_state").$type<{
+    index: number;
+    startAt: string;
+    endAt: string;
+    coverUrl?: string | null;
+    requestId?: string | null;
+    challengeId?: string | null;
+    status: "waiting" | "requested" | "live" | "done";
+  }[]>().notNull().default([]),
+  /**
+   * Who the brand asked for.
+   *
+   * `regions` and `games` come from what server owners told us about their
+   * communities; `guildIds` is a hand-picked list when a brand wants specific
+   * servers. Empty means the whole network, which is the default and usually
+   * the right answer — a challenge nobody can enter is worth nothing.
+   */
+  targeting: jsonb("targeting").$type<{ regions?: string[]; countries?: string[]; guildIds?: string[] }>()
+    .notNull().default({}),
+  createdAt: now("created_at"),
+}, (t) => [index("spc_brand_idx").on(t.brandId, t.createdAt), index("spc_game_idx").on(t.game, t.status)]);
+
+/**
+ * The conversation between a server owner and Cluster.
+ *
+ * One thread per server, written to from three places and read from two: the
+ * owner types in Discord or on their portal, staff reply from the admin
+ * console, and the reply is delivered as a DM from the bot. To the owner it is
+ * one conversation with the bot they installed; to staff it is a support inbox
+ * with a thread per server. Modelled on `brandMessages` for exactly that
+ * reason — the shape is proven and the two are read the same way.
+ *
+ * `deliveredAt` is what separates this from a comment log: a staff reply that
+ * never reached Discord is a reply the owner never got, and the console has to
+ * be able to say which.
+ */
+export const serverMessages = pgTable("server_messages", {
   id: id(),
   guildId: text("guild_id").notNull(),
+  /** owner | admin */
+  sender: text("sender").notNull(),
+  body: text("body").notNull(),
+  /** The Discord user who wrote it, or who a staff reply was sent to. */
+  discordUserId: text("discord_user_id"),
+  /** Where it came from: discord | portal | admin. */
+  source: text("source").notNull().default("portal"),
+  /** Set when the bot actually delivered a staff reply as a DM. */
+  deliveredAt: timestamp("delivered_at", { withTimezone: true, mode: "date" }),
+  /** Why delivery failed, when it did — usually the owner's DMs are closed. */
+  deliveryError: text("delivery_error"),
+  readByAdmin: boolean("read_by_admin").notNull().default(false),
+  readByOwner: boolean("read_by_owner").notNull().default(false),
+  createdAt: now("created_at"),
+}, (t) => [index("srv_msg_idx").on(t.guildId, t.createdAt)]);
+
+/**
+ * What a player said about a sponsored challenge, in their own words.
+ *
+ * The end-of-month report a brand receives ends with testimonials, and the only
+ * kind worth printing is a real one. So these are entered by a human — staff
+ * collect a quote from a winner and attribute it — rather than generated from
+ * anything. A month with no quotes shows no quotes.
+ */
+export const brandTestimonials = pgTable("brand_testimonials", {
+  id: id(),
+  brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  campaignId: text("campaign_id"),
+  challengeId: text("challenge_id"),
+  /** The gamer, when they're on the platform — their avatar and profile link. */
+  userId: text("user_id"),
+  /** Who said it, as printed. Falls back to the user's display name. */
+  name: text("name").notNull().default(""),
+  quote: text("quote").notNull(),
+  /** draft | published — only published quotes reach the brand's report. */
+  status: text("status").notNull().default("published"),
+  createdAt: now("created_at"),
+}, (t) => [index("btm_brand_idx").on(t.brandId, t.createdAt)]);
+
+/**
+ * Where a challenge announcement actually landed, and how many people were there.
+ *
+ * A brand asks "how many people saw it", and the only honest answer is a count
+ * taken at the moment we posted: which servers received the message and how
+ * many members each had. Recomputing it later from today's server sizes would
+ * quietly rewrite history every time a server grew — so the number is frozen
+ * per delivery, once, and never recalculated.
+ *
+ * One row per (challenge, server). The unique index is what makes a retrying
+ * cron or a second announcement idempotent rather than double-counted.
+ */
+export const challengeDeliveries = pgTable("challenge_deliveries", {
+  id: id(),
+  challengeId: text("challenge_id").notNull(),
+  guildId: text("guild_id").notNull(),
+  /** Server members at the moment of delivery — the reach of this one post. */
+  members: integer("members").notNull().default(0),
+  /** Of those, the ones who had linked a game account and could actually enter. */
+  linked: integer("linked").notNull().default(0),
+  /** launch | ending | result — the same challenge is announced more than once. */
+  kind: text("kind").notNull().default("launch"),
+  createdAt: now("created_at"),
+}, (t) => [
+  uniqueIndex("cdel_once_idx").on(t.challengeId, t.guildId, t.kind),
+  index("cdel_challenge_idx").on(t.challengeId),
+]);
+
+export const challengeRequests = pgTable("challenge_requests", {
+  id: id(),
+  // A request comes from one of two places, and admin has to be able to tell
+  // them apart at a glance: a server owner asking to run something for their
+  // community, or a BRAND who has paid for a slot in a campaign. Both land in
+  // the same queue because both end in the same thing — a challenge with our
+  // name on it — but they are reviewed with different questions in mind.
+  guildId: text("guild_id").notNull(),
+  brandId: text("brand_id"),
+  campaignId: text("campaign_id"),
+  /** Which of the campaign's four weeks this request is for. */
+  slotIndex: integer("slot_index"),
   requestedByDiscordId: text("requested_by_discord_id"),
   requestedByUserId: text("requested_by_user_id"),
   game: text("game").notNull(),

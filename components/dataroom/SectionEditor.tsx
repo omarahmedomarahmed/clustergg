@@ -142,7 +142,7 @@ export function SectionEditor({ section, metricOptions }: {
             </label>
 
             <div className="flex flex-wrap items-center gap-3">
-              <button disabled={busy} className="grad-btn pressable rounded-full px-6 py-2.5 font-bold text-sm disabled:opacity-60">
+              <button disabled={busy} className="glow-btn pressable rounded-full px-6 py-2.5 font-bold text-sm disabled:opacity-60">
                 {busy ? "Saving…" : "Save section"}
               </button>
               {!confirming ? (

@@ -42,6 +42,14 @@ type Scope = {
    * the link is minted per recipient rather than once for the payload.
    */
   sponsor?: PickedAd | null;
+  /**
+   * Record this fan-out against a challenge.
+   *
+   * Set on the posts that constitute a challenge's audience, so a brand's
+   * reach comes from where messages actually landed rather than from a count
+   * of servers taken afterwards.
+   */
+  ledger?: { challengeId: string; kind: "launch" | "ending" | "result" };
 };
 
 const asList = (v: Scope["only"]): string[] =>
@@ -72,9 +80,20 @@ async function announce(payload: Record<string, unknown>, scope: Scope = {}): Pr
   const list = await targets(scope);
   // Sequential on purpose: a burst of parallel posts is the fastest way to get
   // rate-limited across every server at once.
+  const landed: string[] = [];
   for (const t of list) {
-    try { await postMessage(t.channelId, withSponsorRow(payload, scope.sponsor, t.guildId)); }
-    catch { /* never break the caller */ }
+    try {
+      await postMessage(t.channelId, withSponsorRow(payload, scope.sponsor, t.guildId));
+      if (t.guildId) landed.push(t.guildId);
+    } catch { /* never break the caller */ }
+  }
+
+  // Write down where it actually landed. Only servers we posted to without
+  // throwing are counted — a brand's reach number must never include a server
+  // that never received the message.
+  if (scope.ledger && landed.length) {
+    const { recordDeliveries } = await import("@/lib/challenge-delivery");
+    void recordDeliveries(scope.ledger.challengeId, landed, scope.ledger.kind).catch(() => {});
   }
 }
 
@@ -180,16 +199,17 @@ export async function announceChallengeLaunched(challengeId: string): Promise<vo
         `Entry key: **\`${ch.accessKey}\`** — tap Join now, or enter it on the site.`,
       ].join("\n"),
       embeds, components,
-    }, { only: holders, sponsor: card.ad });
+    }, { only: holders, sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
 
     await announce({
       content: `**${ch.title}** is live on **${ch.game}** — a server challenge. Anyone can follow the standings; entering needs a key from the server running it.`,
       embeds, components,
-    }, { except: holders, sponsor: card.ad });
+    }, { except: holders, sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
     return;
   }
 
-  await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components }, { sponsor: card.ad });
+  await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components },
+    { sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
 
   // And into HQ's feed for that game, so our own server carries every game's
   // news in its own channel rather than one undifferentiated stream.
@@ -226,7 +246,7 @@ export async function announceChallengeEnded(challengeId: string): Promise<void>
       footer: { text: "Trophies are in the winners' trophy cases and can be redeemed for real value." },
     }],
     components: rows([linkButton("Final standings", url, "🏆")]),
-  }, { sponsor: card.ad });
+  }, { sponsor: card.ad, ledger: { challengeId, kind: "result" } });
 }
 
 // A gamer reached a new quest tier.

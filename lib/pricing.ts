@@ -55,6 +55,31 @@ export type PricingConfig = {
    * projection. Everything else on the pricing page is a counted number.
    */
   impressionsPerMember: number;
+  /**
+   * What the market charges for the same delivery, used ONLY to value what a
+   * campaign returned.
+   *
+   * ROAS is a ratio, and a ratio needs a price on the numerator. These two are
+   * that price: the CPM and CPC a brand would pay for gaming inventory
+   * elsewhere. They are stored rather than hard-coded, and they are shown to
+   * the brand next to every number derived from them, because a return figure
+   * whose benchmark is hidden is a number no media buyer should accept — and
+   * one they can argue with is one they can trust.
+   */
+  benchmarkCpm: number;
+  benchmarkCpc: number;
+  /**
+   * What an engaged participant costs elsewhere.
+   *
+   * A sponsored challenge does not only deliver views. Someone who ENTERS has
+   * linked an account, played a week under the brand's name and appeared on its
+   * leaderboard — an engagement a brand would otherwise buy at gaming
+   * cost-per-engagement rates, which run in dollars rather than cents. Pricing
+   * an entrant at an impression's rate would understate a challenge as badly as
+   * counting the prize money would overstate it, so the three are priced
+   * separately and all three are printed next to the result.
+   */
+  benchmarkCpe: number;
   currency: string;
 };
 
@@ -74,6 +99,9 @@ export const PRICING_DEFAULTS: PricingConfig = {
   slotCount: 2,
   slotSeconds: 5,
   impressionsPerMember: 12,
+  benchmarkCpm: 8,
+  benchmarkCpc: 0.6,
+  benchmarkCpe: 3.5,
   currency: "USD",
 };
 

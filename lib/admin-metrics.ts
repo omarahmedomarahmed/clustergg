@@ -32,6 +32,7 @@ export const METRICS: MetricDef[] = [
   { key: "guildMembers", label: "Reach", definition: "Combined member count of every server running the bot — the audience the bot can address.", group: "discord", href: "/admin/discord", goodWhenUp: true },
   { key: "botCommands", label: "Bot interactions", definition: "Every logged slash command and button press, across all servers.", group: "discord", href: "/admin/discord/analytics", goodWhenUp: true },
   { key: "challengeRequests", label: "Challenge requests waiting", definition: "Server owners who asked to run a challenge and are waiting on our review.", group: "discord", href: "/admin/discord/requests" },
+  { key: "serverMessages", label: "Servers waiting on a reply", definition: "Server owners who wrote to us and haven't been answered. Counted per server, not per message — one owner asking three things is one conversation.", group: "discord", href: "/admin/discord/messages" },
 
   { key: "games", label: "Games", definition: "Active games in the catalog.", group: "content", href: "/admin/games" },
   { key: "planets", label: "Planets", definition: "Active planets — one per game.", group: "content", href: "/admin/spaces" },
@@ -80,6 +81,13 @@ export async function loadMetrics(since?: Date): Promise<Metrics> {
         ? db.select({ c: count() }).from(schema.discordCommandLogs).where(gte(schema.discordCommandLogs.createdAt, since))
         : db.select({ c: count() }).from(schema.discordCommandLogs)),
       one("challengeRequests", () => db.select({ c: count() }).from(schema.challengeRequests).where(eq(schema.challengeRequests.status, "pending"))),
+      // Per SERVER rather than per message: three questions from one owner is
+      // one conversation to answer, and a badge that counts messages makes a
+      // chatty owner look like a backlog.
+      one("serverMessages", () => db
+        .select({ c: sql<number>`count(distinct ${schema.serverMessages.guildId})` })
+        .from(schema.serverMessages)
+        .where(sql`${schema.serverMessages.sender} = 'owner' and ${schema.serverMessages.readByAdmin} = false`)),
 
       one("games", () => db.select({ c: count() }).from(schema.games).where(eq(schema.games.isActive, true))),
       one("planets", () => db.select({ c: count() }).from(schema.spaces).where(eq(schema.spaces.isActive, true))),

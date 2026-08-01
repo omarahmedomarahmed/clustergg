@@ -12,13 +12,17 @@ import {
 // mints the entry key, and posts it into their server. So it shows exactly what
 // will go live — the editable name and length — rather than being a bare yes.
 
-export function RequestCard({ req, server }: {
+export function RequestCard({ req, server, brand }: {
   req: {
     id: string; title: string; game: string; description: string; days: number;
     prizeValue: number; prizeCurrency: string; status: string; challengeId: string | null;
     createdAt: string; requestedBy: string | null;
+    /** Week n of a bought campaign, when this came from a brand. */
+    slotIndex: number | null; slots: number | null;
   };
   server: { name: string; iconUrl: string | null; linked: number } | null;
+  /** Set when a BRAND paid for this slot rather than a server asking for it. */
+  brand: { name: string; logoUrl: string | null; total: number } | null;
 }) {
   const [approveState, approve, approving] = useActionState<RequestActionState, FormData>(approveChallengeRequest, null);
   const [rejectState, reject, rejecting] = useActionState<RequestActionState, FormData>(rejectChallengeRequest, null);
@@ -28,21 +32,37 @@ export function RequestCard({ req, server }: {
   return (
     <div className={`glass p-6 border ${pending ? "border-amber-400/30" : "border-white/10"}`}>
       <div className="flex items-start gap-4 flex-wrap">
-        {server?.iconUrl && (
+        {/* Whose request this is, at a glance. A brand's and a server's land in
+            the same queue because both end in a challenge with our name on it,
+            but they are reviewed with different questions — so the two are
+            never rendered the same way. */}
+        {(brand?.logoUrl ?? server?.iconUrl) && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={server.iconUrl} alt="" className="h-12 w-12 rounded-xl object-cover shrink-0" />
+          <img src={(brand?.logoUrl ?? server?.iconUrl) as string} alt="" className="h-12 w-12 rounded-xl object-cover shrink-0" />
         )}
         <div className="min-w-0 flex-1">
+          {brand && (
+            <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-violet-400/45 bg-violet-500/15 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-widest text-violet-200">
+              Paid · {brand.name}
+            </div>
+          )}
           <div className="font-bold text-lg">{req.title}</div>
           <div className="text-xs text-muted">
-            {req.game} · {req.days} days · requested by {req.requestedBy ?? "a server admin"}
-            {server ? ` · ${server.name} (${server.linked.toLocaleString()} linked)` : ""}
+            {brand
+              ? `${req.game} · ${req.days} days · week ${(req.slotIndex ?? 0) + 1} of ${req.slots ?? 4} · $${brand.total.toLocaleString()} campaign`
+              : `${req.game} · ${req.days} days · requested by ${req.requestedBy ?? "a server admin"}${server ? ` · ${server.name} (${server.linked.toLocaleString()} linked)` : ""}`}
           </div>
           {req.description && <p className="text-sm text-muted mt-2">{req.description}</p>}
           {req.prizeValue > 0 && (
             <div className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-200">
-              {req.prizeValue.toLocaleString()} {req.prizeCurrency} prize pool — their money
+              {req.prizeValue.toLocaleString()} {req.prizeCurrency} prize pool — {brand ? "already paid for" : "their money"}
             </div>
+          )}
+          {brand && (
+            <p className="mt-2 text-[11px] leading-snug text-violet-200/80">
+              Approving this posts it publicly to every eligible server. To keep it to chosen servers
+              instead, approve it and then set its audience on the challenge itself.
+            </p>
           )}
         </div>
         <StatusChip status={req.status} />
@@ -62,9 +82,12 @@ export function RequestCard({ req, server }: {
             </label>
             <button
               disabled={approving}
-              className="grad-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-60"
+              className="glow-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-60"
             >
-              {approving ? "Approving…" : "Approve & send key"}
+              {/* A brand's challenge is public and has no entry key to send —
+                  promising one on the button would be a lie about what the
+                  click does. */}
+              {approving ? "Approving…" : brand ? "Approve & launch" : "Approve & send key"}
             </button>
           </form>
           <form action={reject} className="flex items-end gap-2">

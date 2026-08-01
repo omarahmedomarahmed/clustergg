@@ -31,7 +31,7 @@ export function RegisterCommands({ ready }: { ready: boolean }) {
           <span className="block text-xs text-muted mb-1">Server (guild) ID — optional</span>
           <input name="guildId" placeholder="e.g. 1123581321345589" className="input-cosmic w-full" />
         </label>
-        <button disabled={!ready || pending} className="grad-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-50">
+        <button disabled={!ready || pending} className="glow-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-50">
           {pending ? "Registering…" : "Register /cluster"}
         </button>
       </div>
@@ -128,7 +128,7 @@ export function Broadcast({ ready }: { ready: boolean }) {
         name="guildIds" placeholder="Server IDs, comma separated — blank means all servers"
         className="input-cosmic w-full mb-3"
       />
-      <button disabled={!ready || pending} className="grad-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-50">
+      <button disabled={!ready || pending} className="glow-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-50">
         {pending ? "Sending…" : "Send broadcast"}
       </button>
       <Result state={state} />

@@ -76,7 +76,7 @@ export function WeekSettings({ timezone, frozen, trophyId, trophies }: {
       </div>
 
       <div className="mt-4 flex items-center gap-3">
-        <button disabled={pending} className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
+        <button disabled={pending} className="glow-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
           {pending ? "Saving…" : "Save settings"}
         </button>
         <Note state={state} />
@@ -125,7 +125,7 @@ export function WeekStream({ weekKey, url, live, closed, podium, announcedAt }: 
           <input type="checkbox" name="live" defaultChecked={live} className="h-4 w-4 accent-rose-400" />
           We&apos;re live now
         </label>
-        <button disabled={savingStream} className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
+        <button disabled={savingStream} className="glow-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
           {savingStream ? "Saving…" : "Save stream"}
         </button>
         <Note state={stream} />
@@ -192,7 +192,7 @@ export function WeekBroadcast({ guilds }: { guilds: number }) {
         somebody in the competition — link an account, make your profile yours. The daily cron sends it; this sends it now.
       </p>
       <form action={action} className="mt-4 flex flex-wrap items-center gap-3">
-        <button disabled={pending} className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
+        <button disabled={pending} className="glow-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
           {pending ? "Posting…" : "Post the update now"}
         </button>
         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted">

@@ -221,3 +221,57 @@ export async function portalSendMessage(brandId: string, key: string, formData: 
   revalidatePath(`/brands/${brand.slug}`);
   return { ok: true };
 }
+
+// ===== The media buy: a month of sponsored challenges on one game =====
+//
+// This is the product the whole platform exists to sell, and it is one action:
+// a brand picks a game and four weekly challenges appear in the review queue
+// with their money behind them. No proposal, no insertion order, no account
+// manager. Cluster's whole claim is that Discord advertising can be bought like
+// advertising, and an "enquiry form" here would falsify that claim on the page
+// that makes it.
+
+export async function portalBuyCampaign(brandId: string, key: string, formData: FormData) {
+  const { brand } = await requireBrand(brandId, key);
+  const game = String(formData.get("game") ?? "").trim();
+  const coverUrl = String(formData.get("coverUrl") ?? "").trim() || null;
+
+  // Four covers or one — a brand that made a different creative per week gets
+  // to use them, and one that didn't is not made to.
+  let slotCovers: (string | null)[] = [];
+  try {
+    const raw = JSON.parse(String(formData.get("slotCovers") ?? "[]"));
+    if (Array.isArray(raw)) slotCovers = raw.map((v) => (typeof v === "string" && v.trim() ? v.trim() : null));
+  } catch { slotCovers = []; }
+
+  let targeting: { regions?: string[]; countries?: string[]; guildIds?: string[] } = {};
+  try {
+    const raw = JSON.parse(String(formData.get("targeting") ?? "{}"));
+    if (raw && typeof raw === "object") targeting = raw as typeof targeting;
+  } catch { targeting = {}; }
+
+  const { buyCampaign } = await import("@/lib/sponsored-campaigns");
+  const res = await buyCampaign({ brandId, game, coverUrl, slotCovers, targeting });
+  if (!res.ok) return { error: res.message };
+
+  revalidatePath(`/brands/${brand.slug}`);
+  return { ok: true, campaignId: res.campaignId };
+}
+
+/** Change the cover on a week that hasn't gone live yet. */
+export async function portalSetSlotCover(brandId: string, key: string, campaignId: string, index: number, coverUrl: string | null) {
+  const { db, brand } = await requireBrand(brandId, key);
+  // Scoped to this brand's own campaign — an id from somewhere else must not be
+  // able to restyle another brand's week.
+  const [own] = await db.select({ id: schema.sponsoredCampaigns.id })
+    .from(schema.sponsoredCampaigns)
+    .where(and(eq(schema.sponsoredCampaigns.id, campaignId), eq(schema.sponsoredCampaigns.brandId, brandId)))
+    .limit(1);
+  if (!own) return { error: "Unknown campaign." };
+
+  const { setSlotCover } = await import("@/lib/sponsored-campaigns");
+  const ok = await setSlotCover(campaignId, index, coverUrl);
+  if (!ok) return { error: "That week is already live — message us and we'll change it." };
+  revalidatePath(`/brands/${brand.slug}`);
+  return { ok: true };
+}

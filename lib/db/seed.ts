@@ -237,7 +237,7 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   const lyraChess = await mkAccount(lyra, "chesscom", "magnuscarlsen", "magnuscarlsen");
   await mkAccount(lyra, "lichess", "drnykterstein", "DrNykterstein");
   const orionDota = await mkAccount(orion, "opendota", "105248644", "Miracle-");
-  await mkAccount(orion, "chesscom", "gothamchess", "gothamchess");
+  const orionChess = await mkAccount(orion, "chesscom", "gothamchess", "gothamchess");
   const vegaDota = await mkAccount(vega, "opendota", "86745912", "Arteezy");
   await mkAccount(vega, "speedruncom", "kjp4y75j", "Niftski");
   await mkAccount(atlas, "roblox", "156", "builderman");
@@ -425,6 +425,101 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   for (const cc of ccRows) {
     await db.insert(schema.adCampaignCreatives).values({ id: uid(), ...cc });
   }
+
+  // ---- A finished month of sponsored challenges, with its delivery ledger ----
+  //
+  // The brand portal's whole purpose is showing what a media buy did, so a demo
+  // where it shows nothing demonstrates the opposite of the product. This seeds
+  // one complete campaign the way a real one arrives: four weekly challenges on
+  // one game, each announced into servers of known size, each with entrants and
+  // a podium — and the reach written into the delivery ledger at post time,
+  // exactly as `announce` writes it in production.
+  const demoGuilds = [
+    { guildId: "demo-guild-nebula-1", name: "Chess Legion", memberCount: 4200 },
+    { guildId: "demo-guild-nebula-2", name: "Endgame HQ", memberCount: 1850 },
+    { guildId: "demo-guild-nebula-3", name: "Blitz Club MENA", memberCount: 930 },
+  ];
+  for (const g of demoGuilds) {
+    await db.insert(schema.discordGuilds).values({
+      ...g, status: "active", announcementsEnabled: true,
+      channelId: `demo-channel-${g.guildId}`,
+      community: { games: ["Chess"], regions: ["mena", "eu"], vibes: ["competitive"], about: "", answeredAt: new Date().toISOString() },
+    }).onConflictDoNothing();
+  }
+  for (const [i, u] of [nova, lyra, orion, vega, atlas].entries()) {
+    await db.insert(schema.discordGuildMembers).values({
+      guildId: demoGuilds[i % demoGuilds.length].guildId, userId: u,
+      firstLinkedAt: new Date(Date.now() - 30 * 86400000),
+    }).onConflictDoNothing();
+  }
+
+  const sponsoredCampaignId = uid();
+  const monthStart = new Date(Date.now() - 28 * 86400000);
+  const week = (n: number) => new Date(monthStart.getTime() + n * 7 * 86400000);
+  const sponsoredIds: string[] = [];
+  for (let i = 0; i < 4; i++) {
+    const id = uid();
+    sponsoredIds.push(id);
+    await db.insert(schema.challenges).values({
+      id, spaceId: spaceIds["chess"], game: "Chess", provider: "chesscom",
+      title: `NebulaTech Chess Challenge — week ${i + 1}`,
+      description: `Week ${i + 1} of 4, sponsored by NebulaTech. Most wins on Chess.com takes the pool.`,
+      format: "top3", cadence: "weekly",
+      rules: { conditions: [] }, pointsEngine: { wins: 10 },
+      startAt: week(i), endAt: week(i + 1),
+      status: "completed", visibility: "public",
+      heroType: "image", coverUrl: BANNER_ART.arena, trophyId: trophyIds[0],
+      prizeDescription: "USD 175 prize pool — 100 / 50 / 25",
+      sponsorBrandId: brand1, sponsorCampaignId: sponsoredCampaignId, sponsorPrice: 250,
+      createdBy: admin,
+    });
+
+    // Where it landed, frozen at post time — the same rows `recordDeliveries`
+    // writes when the bot fans an announcement out.
+    for (const g of demoGuilds) {
+      await db.insert(schema.challengeDeliveries).values({
+        id: uid(), challengeId: id, guildId: g.guildId,
+        members: g.memberCount, linked: 2, kind: "launch",
+      }).onConflictDoNothing();
+    }
+
+    // Who competed, and who won. A challenge is scored through a linked
+    // account, so the field is the demo gamers who actually have one on this
+    // game — the same constraint a real entrant meets. It grows week on week,
+    // which is what a campaign that is working looks like.
+    const field: [string, string][] = [[nova, novaChess], [lyra, lyraChess], [orion, orionChess]];
+    for (const [place, [userId, accountId]] of field.slice(0, Math.min(field.length, 2 + i)).entries()) {
+      await db.insert(schema.challengeParticipants).values({
+        id: uid(), challengeId: id, userId, linkedAccountId: accountId,
+        currentPoints: 500 - place * 60 - i * 10,
+        finalPlacement: place < 3 ? place + 1 : null,
+        status: "active",
+      }).onConflictDoNothing();
+    }
+  }
+
+  await db.insert(schema.sponsoredCampaigns).values({
+    id: sponsoredCampaignId, brandId: brand1, game: "Chess",
+    slots: 4, pricePerChallenge: 250, total: 1000, status: "completed",
+    startAt: monthStart, coverUrl: BANNER_ART.arena,
+    slotState: sponsoredIds.map((id, i) => ({
+      index: i,
+      startAt: week(i).toISOString(),
+      endAt: week(i + 1).toISOString(),
+      coverUrl: BANNER_ART.arena,
+      requestId: null,
+      challengeId: id,
+      status: "done" as const,
+    })),
+    targeting: { regions: ["mena", "eu"] },
+  });
+
+  // The report's last page: what a player said, recorded by staff.
+  await db.insert(schema.brandTestimonials).values({
+    id: uid(), brandId: brand1, campaignId: sponsoredCampaignId, userId: nova,
+    name: "", quote: "I played more chess that week than the whole month before it. Won the second one and the trophy's still on my profile.",
+    status: "published",
+  });
 
   await db.insert(schema.spaceRequests).values({
     id: uid(), requestedBy: atlas, proposedName: "Rocket League",

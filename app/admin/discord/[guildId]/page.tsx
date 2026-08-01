@@ -4,6 +4,8 @@ import { requireAdmin } from "@/lib/auth";
 import { guildDetail } from "@/lib/discord/guilds";
 import { challengesForGuild } from "@/lib/challenges";
 import { listRequests } from "@/lib/challenge-requests";
+import { threadFor, markRead } from "@/lib/server-messages";
+import ServerThread from "@/components/ServerThread";
 import { BotUsage } from "@/components/DiscordAnalytics";
 import { ChallengeControls } from "@/components/ChallengeRequestReview";
 import { PortalAdmin, DeliveryAdmin } from "@/components/ServerAdmin";
@@ -22,10 +24,14 @@ export default async function GuildDetailPage({ params }: { params: Promise<{ gu
   const detail = await guildDetail(guildId, 30);
   if (!detail) notFound();
 
-  const [challenges, requests] = await Promise.all([
+  const [challenges, requests, thread] = await Promise.all([
     challengesForGuild(guildId),
     listRequests({ guildId }),
+    threadFor(guildId),
   ]);
+  // Opening the server IS reading its thread — the inbox badge has to clear
+  // when staff actually look at it, not when they remember to press something.
+  await markRead(guildId, "admin");
   const { stats, row, members, challengeJoins, adPosts, adImpressions, commands } = detail;
 
   return (
@@ -43,6 +49,16 @@ export default async function GuildDetailPage({ params }: { params: Promise<{ gu
         </div>
         <Link href="/admin/discord" className="text-sm text-cyan-300 hover:underline">← All servers</Link>
       </div>
+
+      <ServerThread
+        guildId={guildId}
+        ownerKnown={!!row?.ownerDiscordId}
+        messages={thread.map((m) => ({
+          id: m.id, sender: m.sender, body: m.body,
+          createdAt: m.createdAt.toISOString(), source: m.source,
+          delivered: !!m.deliveredAt, deliveryError: m.deliveryError,
+        }))}
+      />
 
       <section className="glass p-6 mb-6">
         <h2 className="font-bold mb-4">Growth toward revenue</h2>
@@ -79,7 +95,8 @@ export default async function GuildDetailPage({ params }: { params: Promise<{ gu
         </p>
         {challenges.length === 0 ? (
           <p className="text-sm text-muted">
-            None yet. This server can request one with <code className="text-cyan-300">/cluster admin</code>.
+            None yet. This server can request one from their dashboard, or with{" "}
+            <code className="text-cyan-300">/cluster admin</code>.
           </p>
         ) : (
           <div className="space-y-4">

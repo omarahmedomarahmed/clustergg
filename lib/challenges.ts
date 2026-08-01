@@ -292,6 +292,20 @@ export async function closeChallenge(challengeId: string): Promise<CloseResult> 
   }
 
   void announceChallengeEnded(challengeId).catch(() => {});
+
+  // The one-at-a-time rule, made real.
+  //
+  // A brand bought four weeks; only the first ever exists as a live challenge.
+  // This is the moment the next one is allowed to: the week that just finished
+  // is marked done and week two enters the review queue. Fire-and-forget, like
+  // the announcement — a campaign that fails to advance is a support ticket,
+  // while a close that fails is a competition with no winners.
+  if (c.sponsorCampaignId) {
+    void import("@/lib/sponsored-campaigns")
+      .then((m) => m.advanceCampaign(challengeId))
+      .catch(() => {});
+  }
+
   return { ok: true, winners: Math.min(3, standings.length) };
 }
 

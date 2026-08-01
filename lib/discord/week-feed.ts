@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { canAct, siteUrl } from "@/lib/discord/config";
@@ -10,6 +10,7 @@ import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
 import { currentWeek, weekBoard, weekTimezone } from "@/lib/profile-week";
 import { weekFromKey } from "@/lib/week";
+import { challengeStandings } from "@/lib/challenges";
 
 // Profile of the Week, in every server, every day.
 //
@@ -171,9 +172,19 @@ export async function announceWeekWinners(weekKey: string, opts: { force?: boole
   const lines = podium.slice(0, 3).map((p, i) =>
     `${medals[i]} **${p.displayName}** — ${p.votes.toLocaleString()} vote${p.votes === 1 ? "" : "s"}`);
 
+  // Sunday is also where the week's sponsored challenges get their moment.
+  //
+  // A brand buys four weeks and the show features each one in turn — that is
+  // part of what the month costs, so it happens here rather than depending on
+  // anyone remembering. Named plainly, with the podium, because a sponsor
+  // mentioned without a result is an ad and a sponsor mentioned with one is
+  // news.
+  const sponsored = await sponsoredThisWeek();
+
   const content = [
     `👑 **Profile of the Week — ${weekKey}**`,
     lines.join("\n"),
+    sponsored,
     trophy
       ? `Each of them has been handed the **${trophy.name}**${trophy.value > 0 ? ` (worth $${Math.round(trophy.value).toLocaleString()})` : ""} — it's in their trophy case now, and it can be redeemed for real value.`
       : "Their placements are on their profiles.",
@@ -182,7 +193,7 @@ export async function announceWeekWinners(weekKey: string, opts: { force?: boole
     week
       ? `Voting reopens <t:${Math.floor(week.endsAt.getTime() / 1000)}:R> and everyone starts at zero. Link a game, make your profile yours, and you're in.`
       : "Voting reopens Monday and everyone starts at zero. Link a game, make your profile yours, and you're in.",
-  ].join("\n\n");
+  ].filter(Boolean).join("\n\n");
 
   const stream = board.stream.url;
 
@@ -210,4 +221,43 @@ export async function announceWeekWinners(weekKey: string, opts: { force?: boole
   }
 
   return out;
+}
+
+/**
+ * The sponsored challenges that ran this week, for the Sunday show.
+ *
+ * A brand's month is four weeks and each one is featured in turn — the feature
+ * is part of what they bought, so it is generated from the challenges that
+ * actually ran rather than from a list somebody maintains. Returns an empty
+ * string when nothing was sponsored, so the post simply doesn't mention it.
+ */
+async function sponsoredThisWeek(): Promise<string> {
+  try {
+    const db = await getDb();
+    const since = new Date(Date.now() - 8 * 86400000);
+    const rows = await db.select({
+      id: schema.challenges.id,
+      title: schema.challenges.title,
+      game: schema.challenges.game,
+      brand: schema.brands.name,
+    }).from(schema.challenges)
+      .innerJoin(schema.brands, eq(schema.challenges.sponsorBrandId, schema.brands.id))
+      .where(and(
+        sql`${schema.challenges.sponsorPrice} > 0`,
+        sql`${schema.challenges.endAt} >= ${since}`,
+        sql`${schema.challenges.startAt} <= now()`,
+      ))
+      .limit(3);
+    if (!rows.length) return "";
+
+    const parts: string[] = [];
+    for (const c of rows) {
+      const top = await challengeStandings(c.id, 1);
+      const leader = top[0];
+      parts.push(leader
+        ? `**${c.title}** — sponsored by ${c.brand}. ${leader.displayName} leads on ${c.game} with ${leader.points.toLocaleString()} points.`
+        : `**${c.title}** — sponsored by ${c.brand}, running on ${c.game} right now.`);
+    }
+    return [`🏆 **This week's sponsored challenges**`, parts.join("\n")].join("\n");
+  } catch { return ""; }
 }
