@@ -177,7 +177,13 @@ export function DocShell({ docId, sections, accent, children }: {
         )}
       </div>
 
-      {children}
+      {/* Space for the rail.
+          The rail is `fixed`, so it takes no room in the flow — without this
+          the document centres itself under it and the section labels are drawn
+          straight through the slide. It looked fine at the width it was built
+          at and overlapped at every narrower desktop, which is the failure
+          mode a fixed element always has. */}
+      <div className="lg:pl-44">{children}</div>
     </div>
   );
 }

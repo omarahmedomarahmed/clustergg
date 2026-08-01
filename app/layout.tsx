@@ -47,12 +47,20 @@ export async function generateMetadata(): Promise<Metadata> {
   }
   return {
     metadataBase: new URL(appUrl),
-    title: { default: "Cluster — Every game. One identity.", template: "%s · Cluster" },
+    // The default title and description are what a search result, a shared
+    // link and a page with no metadata of its own all show, so they carry the
+    // positioning rather than a feature list. Both audiences are in it on
+    // purpose: a brand has to see what we sell, and a gamer has to see what
+    // they get, because the same URL serves both.
+    title: {
+      default: "Cluster — the media-buying platform for Discord gaming communities",
+      template: "%s · Cluster",
+    },
     description:
-      "Link every game account you own — Chess.com, Lichess, Dota 2, Steam, Riot, Fortnite and more — into one shareable gamer profile. Compete in challenges, earn cosmic badges, climb real leaderboards.",
+      "Brands reach gamers where they really are. Cluster turns Discord gaming communities into a media channel: sponsored weekly challenges gamers enter for the chance to win, placements inside every server running the bot, and real analytics. Server owners earn from the audience they built; gamers link every game they play into one profile and compete for real prize money.",
     openGraph: {
-      title: "Cluster — Every game. One identity.",
-      description: "One cosmic profile for every game you play. Real stats, real leaderboards, real challenges.",
+      title: "Cluster — the media-buying platform for Discord gaming communities",
+      description: "Brands reach gamers where they really are. Server owners earn. Gamers play, win, and share.",
       url: appUrl,
       siteName: "Cluster",
       images: [{ url: "/assets/og.png", width: 1200, height: 675 }],

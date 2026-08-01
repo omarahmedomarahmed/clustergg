@@ -44,11 +44,12 @@ export default function DiscordOrb({ installUrl, servers, reach, color = "#5865f
             <BrandGlyph provider="discord" size={15} /> ClusterBot
           </div>
           <p className="text-sm font-semibold mt-2 leading-snug">
-            Turn your Discord into a competition.
+            Your community is media. Get paid like it.
           </p>
           <p className="text-xs text-muted mt-1.5 leading-relaxed">
             Your members get ranked profiles and live stats from the games they already play, plus challenges
-            with real trophies — without leaving your server.
+            with real prize money — without leaving your server. Brands sponsor the challenges; you take a
+            share of the platform fee.
           </p>
 
           {(servers ?? 0) > 0 && (

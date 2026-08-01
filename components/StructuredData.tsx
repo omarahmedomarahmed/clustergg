@@ -22,7 +22,7 @@ export function OrganizationSchema() {
     url: SITE,
     logo: `${SITE}/assets/logo.png`,
     description:
-      "Cluster connects brands to Discord gaming communities. Its bot gives members ranked profiles and live stats from the games they play, and runs brand-sponsored weekly challenges with real prize money paid to the winners.",
+      "Cluster is the media-buying and monetization platform for Discord gaming communities. Brands buy sponsored weekly challenges and in-bot ad placements with real analytics; server owners earn a share of the platform fee on every challenge that runs in their community; and gamers get ranked profiles, live stats from the games they play, and real prize money for winning.",
     sameAs: [] as string[],
   };
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;

@@ -333,6 +333,7 @@ function readSectionData(kind: SectionKind, fd: FormData): SectionData {
         amount: num("askAmount"),
         instrument: str(fd, "askInstrument") || undefined,
         valuation: num("askValuation"),
+        postMoney: num("askPostMoney"),
         equityPct: num("askEquity"),
         runwayMonths: num("askRunway"),
         currency: str(fd, "askCurrency") || "USD",

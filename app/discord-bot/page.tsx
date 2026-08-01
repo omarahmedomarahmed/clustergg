@@ -97,14 +97,16 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           <span className="inline-flex items-center gap-2 rounded-full border border-violet-400/40 bg-violet-500/10 px-4 py-1.5 text-xs uppercase tracking-widest text-violet-200">
             <BrandGlyph provider="discord" size={14} /> Free · installs in one click
           </span>
+          {/* The copy is the CMS's, with no fallback string beside it.
+              These keys previously had no default, so the page rendered the
+              JSX literal instead — and stayed on the old positioning through
+              a site-wide rewrite that had touched every other surface. A
+              second copy of a sentence is a second copy to forget. */}
           <h1 className="text-4xl sm:text-6xl font-black leading-[1.05] mt-5 max-w-3xl mx-auto">
-            {c["discord.hero.title"] || (
-              <>Turn your Discord into a competition. <span className="grad-text">Then get paid for it.</span></>
-            )}
+            {c["discord.hero.title"]}
           </h1>
           <p className="text-muted max-w-2xl mx-auto mt-5 text-lg leading-relaxed">
-            {c["discord.hero.subtitle"] ||
-              `Your members get ranked profiles and live stats from the games they already play, plus weekly challenges with real prize money — without leaving your server. Link ${threshold.toLocaleString()} gamers and brands start sponsoring challenges here — with the prize money won by your members. Free forever, and it never reads a message.`}
+            {(c["discord.hero.subtitle"] ?? "").replace("{threshold}", threshold.toLocaleString())}
           </p>
 
           <div className="flex flex-wrap gap-3 justify-center mt-8">

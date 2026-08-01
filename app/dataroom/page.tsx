@@ -6,7 +6,7 @@ import { optImg } from "@/lib/img";
 export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Data room",
-  description: "ClusterGG's investor and partner documents, with live traction.",
+  description: "Cluster's investor and sales documents — the media-buying and monetization platform for Discord gaming communities, with live traction.",
   robots: { index: false, follow: false },
 };
 

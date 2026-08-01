@@ -16,8 +16,8 @@ import { EARN_STAGES_DEFAULT, type EarnStage } from "@/lib/pricing";
 
 export default function ServerEarnCards({
   stages = EARN_STAGES_DEFAULT,
-  title = "Your community is already worth something. Let it get paid.",
-  subtitle = "Brands sponsor weekly challenges in the games your members already play, and the prize money is won by your members. Installing is free, and every stage below unlocks on one number: how many of them link a game account.",
+  title = "Your community is media. Get paid like it.",
+  subtitle = "You bring the audience; Cluster brings the monetization layer. Brands sponsor weekly challenges in the games your members already play, your members win the prize money, and you take a share of the platform fee on every one. Installing is free, and every stage below unlocks on one number: how many of them link a game account.",
   installUrl,
   compact = false,
 }: {

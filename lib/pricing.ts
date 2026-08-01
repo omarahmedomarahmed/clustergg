@@ -114,20 +114,20 @@ export const PRICING_NUMBER_KEYS = Object.keys(PRICING_DEFAULTS)
 // loading-screen phrases use, so an admin edits a list in a textarea rather
 // than learning a syntax.
 export const PRICING_COPY_DEFAULTS: Record<string, string> = {
-  "pricing.eyebrow": "For brands",
-  "pricing.title": "Reach gamers where they actually are.",
+  "pricing.eyebrow": "B2B SaaS · gaming marketing",
+  "pricing.title": "Buy media inside Discord.",
   "pricing.subtitle":
-    "Every gamer has Discord. Discord has no ads manager. Cluster is the only structured way to buy that attention — placements across the network, and sponsored challenges the community actually enters.",
+    "Discord is where gamers actually live, and it has no ads manager. Cluster is the media-buying layer over it: placements across every community running the bot, and sponsored challenges gamers enter for the chance to win. Structured, measurable, and bought in a month.",
   "pricing.note":
-    "All prices in USD, per month, billed monthly unless you choose annual. No setup fee, no minimum term, cancel before the next cycle.",
+    "All prices in USD, per month, billed monthly unless you choose annual. No setup fees, no administration fees, no minimum term — cancel before the next cycle.",
 
   "pricing.tier.reach.name": "Reach",
-  "pricing.tier.reach.tagline": "Be everywhere gamers already look.",
+  "pricing.tier.reach.tagline": "Show up where gamers already are.",
   "pricing.tier.reach.features":
     "Your creatives in every placement across clustergg.com\nPlacements inside every opted-in Discord server\nImpressions and clicks counted per placement and per community\nSelf-serve brand portal — upload and swap creatives yourself, any time\nFull analytics dashboard, filterable and downloadable\nNo lead time, no ticket, no account manager in the way",
 
   "pricing.tier.challenge.name": "Challenge",
-  "pricing.tier.challenge.tagline": "Put your name on the competition.",
+  "pricing.tier.challenge.tagline": "Sponsor the gameplay, not the content.",
   "pricing.tier.challenge.features":
     "Everything in Reach, with the base rate reduced\nFour sponsored community challenges a month, per game\nNaming rights — that game's weekly challenge carries your brand\nCluster funds and pays every prize pool\nEntrants are verified players of that game, read from its official API\nPer-challenge reporting: entrants, completion, reach, standings",
 
@@ -143,8 +143,8 @@ export const PRICING_COPY_DEFAULTS: Record<string, string> = {
 
   // "Question | answer" per line.
   "pricing.faq":
-    "What am I actually buying? | Placements across clustergg.com and inside every opted-in Discord server, and — from the Challenge tier up — sponsored weekly competitions carrying your brand name in the games you choose.\n"
-    + "Who pays the prize money? | We do. Every challenge has a guaranteed minimum pool that Cluster funds and pays out. You buy the competition and the name on it, not the admin or the payout risk.\n"
+    "What am I actually buying? | Structured gamer attention on Discord: placements across clustergg.com and inside every opted-in server, and — from the Challenge tier up — sponsored weekly competitions carrying your brand in the games you choose. Not vague awareness, and not a banner next to the audience.\n"
+    + "Who pays the prize money? | We do. Every challenge has a guaranteed minimum pool that Cluster funds and pays out. You're buying the competition and the name on it — no setup fee, no administration fee, no payout risk.\n"
     + "How do you know these are real gamers? | Every account is linked and verified against the game's own official API — rank, matches, wins. Nothing on Cluster is self-reported, which is the whole reason the audience can be described at all.\n"
     + "Can I change my creative myself? | Yes. Every plan includes the brand portal: upload, swap and pause creatives whenever you want, and watch impressions and clicks per placement and per community. No ticket, no lead time.\n"
     + "Is the impression figure guaranteed? | No, and we won't pretend otherwise. Reach and placement counts are measured; the forward-looking impression number is a projection with its formula printed next to it. What is contractual is the placements and the challenges.\n"

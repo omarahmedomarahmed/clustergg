@@ -1,26 +1,40 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser, isAdmin, isStaff } from "@/lib/auth";
-import { areaAllowed, getStaffGrants } from "@/lib/permissions";
 import { AdminRail, AdminMobileNav } from "@/components/AdminNav";
-import { navFor, accessOf } from "@/lib/admin-nav";
+import { navFor, navForSystems, accessOf } from "@/lib/admin-nav";
+import { areaAllowed, getStaffGrants } from "@/lib/permissions";
+import { currentAccess } from "@/lib/departments";
+import { pathAllowedFor, systemBy } from "@/lib/systems";
 import { countPendingRequests } from "@/lib/challenge-requests";
 
-// The chrome only. Which pages exist, what they do and who may open them all
-// live in lib/admin-nav.ts, shared with the command centre.
+// The chrome only. Which pages exist and what they do live in lib/admin-nav.ts;
+// who may open them lives in lib/systems.ts and a person's department.
+//
+// The rail is built from the SAME predicate the page guards use, so it can
+// never offer a link that would then 403. A console listing doors you can't
+// open is worse than one listing fewer.
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (!isStaff(user)) redirect("/feed");
   const admin = isAdmin(user);
+
+  const access = await currentAccess();
+  const systems = access?.systems ?? [];
+  const department = access?.department ?? null;
+
+  // Admins keep the whole map, still filtered by the legacy area grants so the
+  // "admin only" pages stay admin only. Staff get exactly their department's
+  // systems and nothing else.
   const grants = admin ? [] : await getStaffGrants();
+  const nav = admin
+    ? navFor(true, grants, areaAllowed)
+    : navForSystems(systems, pathAllowedFor);
 
-  // The rail and the command centre read the SAME map (lib/admin-nav.ts), so a
-  // page can't exist in one and not the other.
-  const nav = navFor(admin, grants, areaAllowed);
-
-  // Counts that belong in the nav: a queue nobody can see from the rail is a
-  // queue nobody works.
-  const pendingRequests = admin ? await countPendingRequests() : 0;
+  const pendingRequests = admin || systems.includes("challenges")
+    ? await countPendingRequests()
+    : 0;
 
   const groups = nav.map((g) => ({
     section: g.section,
@@ -34,11 +48,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     })),
   }));
 
-  // Staff see what they have, not a list of locked doors. Admins see the same
-  // rail with each item marked, so delegating is a visible decision.
   const staffNote = admin
     ? undefined
-    : `You have staff access${grants.length > 0 ? `, plus ${grants.join(", ")} granted by an admin` : ""}. Anything admin-only is hidden rather than shown locked — ask an admin on /admin/roles.`;
+    : department
+      ? `${department.name} — you run ${department.systems.map((s) => systemBy(s)?.name ?? s).join(", ") || "nothing yet"}. Everything outside your systems is hidden rather than locked.`
+      : undefined;
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6 lg:py-8 lg:flex lg:gap-8">
@@ -47,7 +61,31 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <aside className="hidden lg:block w-56 shrink-0">
         <AdminRail groups={groups} staffNote={staffNote} />
       </aside>
-      <div className="min-w-0 flex-1">{children}</div>
+      <div className="min-w-0 flex-1">
+        {/* A staff member nobody has placed yet. Not an error — somebody has to
+            decide what they run before they can run it — so it says exactly
+            that instead of showing an admin that looks broken. */}
+        {!admin && !department ? <NoDepartment name={user.displayName} /> : children}
+      </div>
+    </div>
+  );
+}
+
+function NoDepartment({ name }: { name: string }) {
+  return (
+    <div className="glass max-w-2xl p-8">
+      <h1 className="text-2xl font-bold">Welcome, {name}.</h1>
+      <p className="mt-2 text-muted">
+        You have a staff account but you&apos;re not in a department yet, so there&apos;s nothing here to
+        run. Cluster is organised into systems — the bot, challenges, trophies and payout, billing, and so
+        on — and each one is owned by a department. When someone puts you in one, this console fills with
+        that system&apos;s pages, its numbers, and a brief explaining what the job actually is.
+      </p>
+      <p className="mt-3 text-sm text-muted">
+        Ask a super admin to place you. In the meantime you can{" "}
+        <Link href="/admin/systems" className="text-cyan-300 hover:underline">read what each system does</Link>{" "}
+        — that page is open to everyone on staff.
+      </p>
     </div>
   );
 }

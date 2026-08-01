@@ -24,6 +24,13 @@ export const users = pgTable("users", {
   locale: text("locale").notNull().default("en"), // "en" | "ar" — the gamer's chosen site language
   title: text("title"), // flex title shown under the name (e.g. "Blitz Grandmaster")
   role: text("role").notNull().default("user"), // user | admin | superadmin | brand
+  /**
+   * Which department a staff member works in, and therefore what they can open.
+   *
+   * Null for everybody who isn't staff, and for staff nobody has placed yet —
+   * who correctly see an empty console until someone does.
+   */
+  departmentId: text("department_id"),
   status: text("status").notNull().default("active"), // active | suspended | banned
   isVerified: boolean("is_verified").notNull().default(false),
   primarySignupProvider: text("primary_signup_provider"),
@@ -902,6 +909,28 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
     .notNull().default({}),
   createdAt: now("created_at"),
 }, (t) => [index("spc_brand_idx").on(t.brandId, t.createdAt), index("spc_game_idx").on(t.game, t.status)]);
+
+/**
+ * A department: a team, and the systems it runs.
+ *
+ * Staff do not hold permissions; departments do. A person is put in a
+ * department and inherits whatever that department runs, which means access is
+ * changed by moving somebody rather than by editing a checklist per head — the
+ * difference between an org chart and a spreadsheet of exceptions.
+ *
+ * A staff member in no department sees nothing. That is the intended state for
+ * a new hire on their first morning, not an error: somebody decides what they
+ * run before they can run it.
+ */
+export const departments = pgTable("departments", {
+  id: id(),
+  name: text("name").notNull(),
+  /** What this team is responsible for, in the manager's own words. */
+  purpose: text("purpose").notNull().default(""),
+  /** System keys from lib/systems.ts. */
+  systems: jsonb("systems").$type<string[]>().notNull().default([]),
+  createdAt: now("created_at"),
+});
 
 /**
  * The conversation between a server owner and Cluster.

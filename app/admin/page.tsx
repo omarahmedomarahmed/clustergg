@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { areaAllowed, getStaffGrants } from "@/lib/permissions";
-import { navFor, accessOf, ACCESS_LABEL, type AdminLink, type AdminAccess } from "@/lib/admin-nav";
+import { navFor, navForSystems, accessOf, ACCESS_LABEL, type AdminLink, type AdminAccess } from "@/lib/admin-nav";
+import { currentAccess } from "@/lib/departments";
+import { pathAllowedFor, systemBy } from "@/lib/systems";
 import { loadMetrics, attentionOf, type Metrics } from "@/lib/admin-metrics";
 import Icon from "@/components/Icon";
 
@@ -23,8 +25,15 @@ export default async function AdminCommandCentre() {
   const admin = isAdmin(user!);
   const grants = admin ? [] : await getStaffGrants();
   const metrics = await loadMetrics();
-  const groups = navFor(admin, grants, areaAllowed);
+  // Filtered by the SAME predicate as the rail and the page guards. The body
+  // used to list every console while the rail hid most of them — a dashboard
+  // offering doors that 404 is worse than one offering fewer.
+  const access = await currentAccess();
+  const groups = admin
+    ? navFor(true, grants, areaAllowed)
+    : navForSystems(access?.systems ?? [], pathAllowedFor);
   const attention = attentionOf(metrics);
+  const mine = (access?.systems ?? []).map((k) => systemBy(k)?.name ?? k).filter(Boolean);
 
   return (
     <div>
@@ -34,9 +43,11 @@ export default async function AdminCommandCentre() {
         </div>
         <h1 className="text-2xl sm:text-3xl font-black mt-1">Command centre</h1>
         <p className="text-muted text-sm mt-1 max-w-2xl">
-          Every console on one page. {admin
-            ? "You can open everything here. Each card says whether staff can too."
-            : "Areas an admin hasn't granted you are hidden rather than shown locked."}
+          {admin
+            ? "Every console on one page. You can open everything here; each card says whether staff can too."
+            : mine.length > 0
+              ? `Your systems: ${mine.join(", ")}. Everything outside them is hidden rather than shown locked — ask a super admin if you need more.`
+              : "You're not in a department yet, so there's nothing here to run. Ask a super admin to place you."}
         </p>
       </div>
 

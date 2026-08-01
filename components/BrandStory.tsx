@@ -96,6 +96,7 @@ export function InsightSection({ c, bg }: { c: Copy; bg?: CardBgMap }) {
             <p className="text-sm text-muted leading-relaxed">
               They pick up their phone between two matches and might see you on TikTok.
               They were on Discord before that, and they&apos;re back on Discord after.
+              Discord is home.
             </p>
           </div>
         </div>
