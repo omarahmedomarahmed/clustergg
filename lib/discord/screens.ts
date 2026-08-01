@@ -2,7 +2,8 @@ import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
 import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, type Frame, type Button } from "@/lib/discord/components";
-import { cardRef, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
+import { cardRef, currentCardGuild, currentSponsor, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
+import { withSponsorRow } from "@/lib/discord/sponsor";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
@@ -1244,7 +1245,24 @@ async function searchScreen(query: string, ctx: ScreenCtx, trail: Frame[]): Prom
 
 // ===== Dispatch =====
 
+/**
+ * Every reply the bot sends, with the sponsor's button under it.
+ *
+ * A card carries a brand's creative in its top-right corner, and a Discord
+ * image is not clickable — so without this the brand gets an impression and no
+ * possible click, forever. This is the click: one link button, drawn last,
+ * under whatever the screen itself put there.
+ *
+ * It goes here rather than in each screen because the answer to "which screens
+ * carry advertising" is all of them. Twenty-one screens all remembering to add
+ * it is twenty-one chances to drop a brand's only clickable surface.
+ */
 export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {
+  const payload = await renderScreenBody(f, trail, ctx);
+  return withSponsorRow(payload, currentSponsor(), currentCardGuild());
+}
+
+async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {
   const [a = ""] = f.args;
   switch (f.screen) {
     case "home": return homeScreen(ctx, trail);

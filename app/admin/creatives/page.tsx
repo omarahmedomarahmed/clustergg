@@ -63,6 +63,10 @@ export default async function AdminCreativesPage() {
             <ImageUpload name="fileUrl" label="Creative file" aspect="16/9" maxDim={1600} scope="creative" hint="Image is optimized on upload. Video: use “paste a link”." />
           </div>
           <input name="clickUrl" placeholder="Click-through URL" className="input-cosmic sm:col-span-2" />
+          {/* Only the Discord card placement draws a button, but every creative
+              can carry the words for one — which creative ends up on cards is
+              decided later, in the campaign. */}
+          <input name="ctaLabel" maxLength={48} placeholder="Discord button tagline — shows as “Sponsored: Brand — this”" className="input-cosmic sm:col-span-2" />
           <div className="flex gap-2">
             <input name="width" type="number" placeholder="W px" className="input-cosmic" />
             <input name="height" type="number" placeholder="H px" className="input-cosmic" />

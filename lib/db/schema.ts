@@ -368,6 +368,18 @@ export const adCreatives = pgTable("ad_creatives", {
   type: text("type").notNull().default("image"), // image | video
   fileUrl: text("file_url").notNull(),
   clickUrl: text("click_url"),
+  /**
+   * The brand's own words on the Discord button under this creative.
+   *
+   * Every card the bot posts carries a link button for its sponsor — that is
+   * the only clickable surface a Discord ad has, because an image in a message
+   * is not a link. The button reads "Sponsored: <brand> — <this>", so a brand
+   * writes the half that is theirs and the disclosure half is not negotiable.
+   *
+   * Per CREATIVE, not per campaign: a brand running three creatives is running
+   * three messages, and the button is part of the message.
+   */
+  ctaLabel: text("cta_label"),
   width: integer("width"),
   height: integer("height"),
   durationSeconds: integer("duration_seconds"),
@@ -423,6 +435,10 @@ export const adClicks = pgTable("ad_clicks", {
   id: id(),
   campaignCreativeId: text("campaign_creative_id").notNull().references(() => adCampaignCreatives.id, { onDelete: "cascade" }),
   impressionId: text("impression_id"),
+  /** The Discord server the click came from, when it came from one. */
+  guildId: text("guild_id"),
+  /** `web` or `discord` — the same two funnels the impressions have. */
+  source: text("source"),
   createdAt: now("created_at"),
 });
 

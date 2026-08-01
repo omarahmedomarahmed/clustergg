@@ -678,6 +678,8 @@ export async function saveCreative(formData: FormData) {
     type,
     fileUrl: String(formData.get("fileUrl") ?? "").trim(),
     clickUrl: String(formData.get("clickUrl") ?? "").trim() || null,
+    // The words on the Discord button under a card carrying this creative.
+    ctaLabel: String(formData.get("ctaLabel") ?? "").trim().slice(0, 48) || null,
     width: Number(formData.get("width")) || null,
     height: Number(formData.get("height")) || null,
     durationSeconds: type === "video" ? Math.min(durationRaw ?? 5, 5) : null,

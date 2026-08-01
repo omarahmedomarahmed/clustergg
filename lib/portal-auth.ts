@@ -45,6 +45,25 @@ function secret(): string {
   return holder[SECRET_KEY]!;
 }
 
+/**
+ * A short signature over an arbitrary payload, using the same process secret.
+ *
+ * For links we mint and later have to trust — an ad click-through carrying a
+ * campaign-creative id, say. Anyone can read the id in the URL; what this stops
+ * is somebody writing their OWN url with a competitor's id in it and running up
+ * that brand's click count.
+ */
+export function signPayload(payload: string, bytes = 16): string {
+  return createHmac("sha256", secret()).update(payload).digest("hex").slice(0, bytes * 2);
+}
+
+export function verifyPayload(payload: string, signature: string | null | undefined): boolean {
+  if (!signature) return false;
+  const expected = Buffer.from(signPayload(payload, signature.length / 2 || 16));
+  const given = Buffer.from(signature);
+  return expected.length === given.length && timingSafeEqual(expected, given);
+}
+
 // Constant-time string comparison that doesn't leak length either.
 export function keysMatch(expected: string | null | undefined, given: string | null | undefined): boolean {
   if (!expected || !given) return false;

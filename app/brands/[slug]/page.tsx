@@ -182,6 +182,7 @@ export default async function BrandPortalPage({
           brandId={brand.id} keyStr={key} brandName={brand.name}
           creatives={cardCampaign.creatives.map((c) => ({
             campaignCreativeId: c.campaignCreativeId, fileUrl: c.fileUrl,
+            ctaLabel: c.ctaLabel, clickUrl: c.clickUrl,
             impressions: c.impressions, clicks: c.clicks,
           }))}
           live={cardCampaign.live}

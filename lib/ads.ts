@@ -14,6 +14,8 @@ export type ServedCreative = {
   type: string;
   fileUrl: string;
   clickUrl: string | null;
+  /** The brand's own words on the Discord button under this creative. */
+  ctaLabel: string | null;
   brandName: string;
   durationSeconds: number | null;
 };
@@ -47,6 +49,7 @@ export async function serveAds(db: DB, placementKey: string, device: string): Pr
     weight: schema.adCampaignCreatives.weight,
     type: schema.adCreatives.type,
     clickUrl: schema.adCreatives.clickUrl,
+    ctaLabel: schema.adCreatives.ctaLabel,
     durationSeconds: schema.adCreatives.durationSeconds,
     brandName: schema.brands.name,
     targetDevice: schema.adCampaigns.targetDevice,
@@ -90,6 +93,7 @@ export async function serveAds(db: DB, placementKey: string, device: string): Pr
       type: r.type,
       fileUrl: fileById.get(r.creativeId) ?? "",
       clickUrl: r.clickUrl,
+      ctaLabel: r.ctaLabel,
       brandName: r.brandName,
       durationSeconds: r.durationSeconds,
     })),

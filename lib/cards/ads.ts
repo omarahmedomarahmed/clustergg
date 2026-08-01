@@ -28,7 +28,43 @@ import type { CardAdSlot, CardData } from "@/lib/cards/types";
 
 export const CARD_AD_PLACEMENT = "discord_card";
 
-export type PickedAd = CardAdSlot & { campaignCreativeId: string };
+export type PickedAd = CardAdSlot & {
+  campaignCreativeId: string;
+  /** Where the button under the card sends people. Null means no button. */
+  clickUrl: string | null;
+  /** The brand's half of the button label. */
+  ctaLabel: string | null;
+};
+
+/**
+ * What Cluster's own promo says when it is the sponsor on a card.
+ *
+ * The house creative fills unsold inventory, and unsold inventory is still the
+ * best place we have to tell a server owner that their server can earn. Stored
+ * as the fallback rather than as a house-brand special case, so an admin can
+ * change the wording by giving the house creative its own `ctaLabel`.
+ */
+export const HOUSE_CTA = "monetize your Discord server";
+
+/**
+ * The Discord button under a sponsored card.
+ *
+ * An image in a Discord message is not a link — there is no click on a card, no
+ * matter how good the creative is. A link button underneath it is the only
+ * clickable surface Discord gives us, so every card the bot posts carries one
+ * for whoever paid for that card.
+ *
+ * The label is not fully the brand's: it always opens with "Sponsored:" and the
+ * brand's name, because a button in a community's own server that reads like a
+ * recommendation from that server is exactly the thing that gets a bot removed.
+ * Brands write the tagline after it.
+ */
+export function sponsorButtonLabel(ad: { brandName: string; ctaLabel?: string | null }): string {
+  const tagline = (ad.ctaLabel || HOUSE_CTA).trim();
+  // Discord hard-caps a button label at 80 characters and rejects the whole
+  // message — every button in it — if one is longer.
+  return `Sponsored: ${ad.brandName} — ${tagline}`.slice(0, 80);
+}
 
 // Stable per-card seed: the same card asks for the same slot in a window, and
 // two different cards asked for at the same instant land on different brands.
@@ -78,6 +114,8 @@ export async function pickCardAd(seed: string, at = Date.now()): Promise<PickedA
       campaignCreativeId: c.campaignCreativeId,
       imageUrl: c.fileUrl,
       brandName: c.brandName,
+      clickUrl: c.clickUrl,
+      ctaLabel: c.ctaLabel,
     };
   } catch {
     // No ad is always a valid card. Never let the ad system cost a render.

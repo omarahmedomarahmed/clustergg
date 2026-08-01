@@ -6,6 +6,8 @@ import { postMessage } from "@/lib/discord/rest";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
+import { type PickedAd } from "@/lib/cards/ads";
+import { withSponsorRow } from "@/lib/discord/sponsor";
 import { challengeUrl, challengeStandings } from "@/lib/challenges";
 import { reportToHq } from "@/lib/discord/hq";
 
@@ -29,35 +31,50 @@ function defaultChannel(): string | null {
 // Where should this announcement go? A server-gated challenge needs both sides
 // of this: the message carrying the entry key goes ONLY to the server that owns
 // it, and the "this exists, come watch" message goes to everyone EXCEPT them.
-type Scope = { only?: string[] | string | null; except?: string[] | string | null };
+type Scope = {
+  only?: string[] | string | null;
+  except?: string[] | string | null;
+  /**
+   * The sponsor on the card in this announcement, from `cardRef(...).ad`.
+   *
+   * An announcement is one card fanned out to every server, and the click
+   * button under it has to be attributed to the server it was pressed in — so
+   * the link is minted per recipient rather than once for the payload.
+   */
+  sponsor?: PickedAd | null;
+};
 
 const asList = (v: Scope["only"]): string[] =>
   v == null ? [] : Array.isArray(v) ? v.filter(Boolean) : [v];
 
-async function targets(scope: Scope = {}): Promise<string[]> {
+type Target = { channelId: string; guildId: string | null };
+
+async function targets(scope: Scope = {}): Promise<Target[]> {
   const only = asList(scope.only);
   const except = new Set(asList(scope.except));
-  const out: string[] = [];
+  const out: Target[] = [];
   const fallback = defaultChannel();
-  if (fallback && !only.length) out.push(fallback);
+  if (fallback && !only.length) out.push({ channelId: fallback, guildId: null });
   try {
     const guilds = await announcingGuilds();
     for (const g of guilds) {
       if (only.length && !only.includes(g.guildId)) continue;
       if (except.has(g.guildId)) continue;
-      if (g.channelId) out.push(g.channelId);
+      if (g.channelId) out.push({ channelId: g.channelId, guildId: g.guildId });
     }
   } catch { /* fall back to whatever we already have */ }
-  return [...new Set(out)];
+  const seen = new Set<string>();
+  return out.filter((t) => (seen.has(t.channelId) ? false : (seen.add(t.channelId), true)));
 }
 
 async function announce(payload: Record<string, unknown>, scope: Scope = {}): Promise<void> {
   if (!canAct()) return;
-  const channels = await targets(scope);
+  const list = await targets(scope);
   // Sequential on purpose: a burst of parallel posts is the fastest way to get
   // rate-limited across every server at once.
-  for (const channel of channels) {
-    try { await postMessage(channel, payload); } catch { /* never break the caller */ }
+  for (const t of list) {
+    try { await postMessage(t.channelId, withSponsorRow(payload, scope.sponsor, t.guildId)); }
+    catch { /* never break the caller */ }
   }
 }
 
@@ -119,7 +136,7 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
       navButton("START HERE", frame("planets"), [frame("home")], ButtonStyle.Primary, "🚀"),
       linkButton("See standings", url, "📊"),
     ]),
-  });
+  }, { sponsor: card.ad });
 }
 
 // A new challenge is live.
@@ -163,16 +180,16 @@ export async function announceChallengeLaunched(challengeId: string): Promise<vo
         `Entry key: **\`${ch.accessKey}\`** — tap Join now, or enter it on the site.`,
       ].join("\n"),
       embeds, components,
-    }, { only: holders });
+    }, { only: holders, sponsor: card.ad });
 
     await announce({
       content: `**${ch.title}** is live on **${ch.game}** — a server challenge. Anyone can follow the standings; entering needs a key from the server running it.`,
       embeds, components,
-    }, { except: holders });
+    }, { except: holders, sponsor: card.ad });
     return;
   }
 
-  await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components });
+  await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components }, { sponsor: card.ad });
 
   // And into HQ's feed for that game, so our own server carries every game's
   // news in its own channel rather than one undifferentiated stream.
@@ -209,7 +226,7 @@ export async function announceChallengeEnded(challengeId: string): Promise<void>
       footer: { text: "Trophies are in the winners' trophy cases and can be redeemed for real value." },
     }],
     components: rows([linkButton("Final standings", url, "🏆")]),
-  });
+  }, { sponsor: card.ad });
 }
 
 // A gamer reached a new quest tier.
@@ -225,7 +242,7 @@ export async function announceQuestTier(userId: string, questKey: string, tierNa
       navButton("My progress", frame("show", `quest:${questKey}`), [frame("home")], ButtonStyle.Primary, "🗺"),
       linkButton("Play the quest map", `${siteUrl()}/quests/${questKey}`, "🎮"),
     ]),
-  });
+  }, { sponsor: card.ad });
 }
 
 // A new game account was linked — a good moment to nudge profile customization,
@@ -242,5 +259,5 @@ export async function announceAccountLinked(userId: string, game: string): Promi
       linkButton("Customize your profile", `${siteUrl()}/profile`, "✨"),
       navButton("Link yours", frame("link"), [frame("home")], ButtonStyle.Primary, "🔗"),
     ]),
-  });
+  }, { sponsor: card.ad });
 }

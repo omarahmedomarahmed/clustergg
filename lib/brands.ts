@@ -27,6 +27,8 @@ export type CardCreative = {
   creativeId: string;
   fileUrl: string;
   clickUrl: string | null;
+  /** The brand's own words on this creative's Discord button. */
+  ctaLabel: string | null;
   createdAt: Date;
   impressions: number;
   clicks: number;
@@ -56,6 +58,7 @@ export async function getCardCampaign(db: DB, brandId: string, placementKey: str
     creativeId: schema.adCreatives.id,
     fileUrl: schema.adCreatives.fileUrl,
     clickUrl: schema.adCreatives.clickUrl,
+    ctaLabel: schema.adCreatives.ctaLabel,
     createdAt: schema.adCreatives.createdAt,
     campaignId: schema.adCampaigns.id,
     campaignName: schema.adCampaigns.name,
@@ -97,7 +100,7 @@ export async function getCardCampaign(db: DB, brandId: string, placementKey: str
     },
     creatives: rows.map((r) => ({
       campaignCreativeId: r.ccId, creativeId: r.creativeId, fileUrl: r.fileUrl,
-      clickUrl: r.clickUrl, createdAt: r.createdAt,
+      clickUrl: r.clickUrl, ctaLabel: r.ctaLabel, createdAt: r.createdAt,
       impressions: impBy.get(r.ccId) ?? 0, clicks: clickBy.get(r.ccId) ?? 0,
     })),
     impressions: [...impBy.values()].reduce((a, b) => a + b, 0),
