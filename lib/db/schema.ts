@@ -290,6 +290,19 @@ export const challenges = pgTable("challenges", {
   trophyId: text("trophy_id"),
   prizes: jsonb("prizes").$type<{ first?: string[]; second?: string[]; third?: string[] }>(), // multi-trophy podium prizes per place
   prizeDescription: text("prize_description"),
+  // ===== Sponsorship =====
+  //
+  // A sponsored challenge is one a brand bought. It is the unit of the whole
+  // business — the brand's money enters here, 70% of it leaves as prize money
+  // to gamers, and the rest is split between the servers that carried it and
+  // Cluster. None of that arithmetic can be done without knowing which brand
+  // paid and how much, so it is recorded on the challenge itself rather than
+  // inferred from a campaign later.
+  sponsorBrandId: text("sponsor_brand_id"),
+  /** The ad campaign this challenge was bought under, when there is one. */
+  sponsorCampaignId: text("sponsor_campaign_id"),
+  /** What the brand paid for THIS challenge. Zero for anything unsponsored. */
+  sponsorPrice: doublePrecision("sponsor_price").notNull().default(0),
   createdBy: text("created_by"),
   createdAt: now("created_at"),
 });

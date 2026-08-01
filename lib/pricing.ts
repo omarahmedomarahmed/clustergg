@@ -318,6 +318,12 @@ export type EarnStage = {
   name: string;
   /** Linked gamers required. Linked — not members. */
   threshold: number;
+  /**
+   * The owner's share of a sponsored challenge at this stage, as a % of what
+   * the brand paid. The single number an owner is climbing this ladder for, so
+   * it belongs on the card rather than in a footnote.
+   */
+  ownerPct: number;
   icon: string;
   headline: string;
   detail: string;
@@ -329,12 +335,14 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     key: "monetized",
     name: "Sponsored",
     threshold: 500,
+    ownerPct: 5,
     icon: "diamond",
     headline: "Brand-sponsored challenges start landing in your server",
     detail:
-      "Link 500 gamers and your server switches on. Brands sponsoring the games your members already play start running their weekly challenges here — and every dollar of the prize money is won by your members.",
+      "Link 500 gamers and your server switches on. Brands sponsoring the games your members already play start running their weekly challenges here — every dollar of the prize money is won by your members, and 5% of what the brand paid is yours.",
     perks: [
       "Sponsored weekly challenges in your community's games",
+      "5% of every sponsored challenge, paid to you",
       "Prize money paid straight to your members who win",
       "Owner portal: who linked, who entered, what they won",
       "Your server listed publicly with its own page",
@@ -344,12 +352,14 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     key: "broadcaster",
     name: "Broadcaster",
     threshold: 1000,
+    ownerPct: 10,
     icon: "satellite",
     headline: "More games, more weeks, more money into your community",
     detail:
-      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, so more of your members are playing for real prizes in more games at once.",
+      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, so more of your members are playing for real prizes in more games at once — and your share doubles.",
     perks: [
       "Everything in Sponsored",
+      "Your share doubles to 10% of every sponsored challenge",
       "Network-wide challenges carried in your server",
       "Priority on sponsored challenges in your top game",
       "Featured in the public server directory",
@@ -359,12 +369,14 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     key: "sponsored",
     name: "Flagship",
     threshold: 5000,
+    ownerPct: 25,
     icon: "crown",
     headline: "Brands buy your community by name",
     detail:
-      "At 5,000 linked gamers you are an audience in your own right. Brands ask for challenges in your server specifically, and smaller servers carry yours instead of the other way round.",
+      "At 5,000 linked gamers you are an audience in your own right. Brands ask for challenges in your server specifically, smaller servers carry yours instead of the other way round, and you keep 25 of the 30 points Cluster charges — we keep 5.",
     perks: [
       "Everything in Broadcaster",
+      "25% of every sponsored challenge — Cluster keeps 5%",
       "Brands request your community by name",
       "Exclusive challenges only your members can enter",
       "Named on the Sunday broadcast",

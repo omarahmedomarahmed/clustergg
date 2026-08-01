@@ -6,7 +6,7 @@ import Icon from "@/components/Icon";
 // never round-trip through the client.
 
 export function TierLadder({ tiers, linked, current }: {
-  tiers: { key: string; name: string; threshold: number; icon: string; unlocks: string; detail: string }[];
+  tiers: { key: string; name: string; threshold: number; icon: string; unlocks: string; detail: string; ownerPct: number }[];
   linked: number;
   current: string;
 }) {
@@ -43,9 +43,21 @@ export function TierLadder({ tiers, linked, current }: {
                     </span>
                   )}
                 </div>
-                <span className="text-xs text-muted">
-                  {t.threshold === 0 ? "from day one" : `${t.threshold.toLocaleString()} linked gamers`}
-                </span>
+                <div className="flex items-center gap-2">
+                  {/* The rung's cash value, stated on the rung. A ladder whose
+                      steps say what they unlock but not what they PAY is the
+                      one thing an owner is actually climbing it for. */}
+                  {t.ownerPct > 0 && (
+                    <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold tracking-wide ${
+                      earned ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200" : "border-white/15 text-muted"
+                    }`}>
+                      {t.ownerPct}% of every sponsored challenge
+                    </span>
+                  )}
+                  <span className="text-xs text-muted">
+                    {t.threshold === 0 ? "from day one" : `${t.threshold.toLocaleString()} linked gamers`}
+                  </span>
+                </div>
               </div>
               <div className="text-sm font-semibold mt-2">{t.unlocks}</div>
               <p className="text-xs text-muted mt-1">{t.detail}</p>
@@ -221,6 +233,128 @@ export function ServerBoard({ rows, highlight }: {
         </tbody>
       </table>
       {rows.length === 0 && <div className="p-6 text-sm text-muted">No servers yet.</div>}
+    </div>
+  );
+}
+
+// ===== Earnings =====
+//
+// The one panel an owner opens to answer "what am I making?".
+//
+// Every row shows its own working — what the brand paid, how many of the
+// entrants came from here, the tier percentage, and the product of the three.
+// A total an owner cannot reconstruct from the challenge in front of them is a
+// total they will email us about, and rightly.
+
+export type EarningRowView = {
+  challengeId: string;
+  title: string;
+  game: string;
+  brandName: string | null;
+  endsAt: string;
+  ended: boolean;
+  entrants: number;
+  totalEntrants: number;
+  price: number;
+  serverShare: number;
+  ownerPct: number;
+  owner: number;
+  membersWon: number;
+};
+
+export function EarningsPanel({ ownerPct, clusterPct, nextPct, nextAt, linked, earned, pending, membersWon, rows }: {
+  ownerPct: number;
+  clusterPct: number;
+  nextPct: number | null;
+  nextAt: number | null;
+  linked: number;
+  earned: number;
+  pending: number;
+  membersWon: number;
+  rows: EarningRowView[];
+}) {
+  const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+  return (
+    <div className="space-y-6">
+      <div className="glass p-6">
+        <h2 className="font-bold mb-1">What you earn</h2>
+        <p className="text-sm text-muted">
+          A brand pays for a sponsored challenge. <b className="text-ink">70%</b> of it becomes prize money your
+          members play for. The remaining 30% is split between you and Cluster — and the more gamers you bring,
+          the more of it is yours.
+        </p>
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Money label="Your share" value={`${ownerPct}%`} accent />
+          <Money label="Cluster keeps" value={`${clusterPct}%`} />
+          <Money label="Earned" value={usd(earned)} accent />
+          <Money label="Still running" value={usd(pending)} />
+        </div>
+        {nextPct != null && nextAt != null && (
+          <p className="mt-3 text-xs text-amber-200">
+            {(nextAt - linked).toLocaleString()} more linked gamers takes your share from {ownerPct}% to {nextPct}%.
+          </p>
+        )}
+        <p className="mt-3 text-[11px] leading-snug text-muted">
+          A challenge runs in more than one server, so its fee is divided by where the entrants came from: your
+          share of a challenge is your share of its players. Every row below shows that division.
+          Your members have also won <b className="text-ink">{usd(membersWon)}</b> in prize money, which is
+          theirs, not yours.
+        </p>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className="glass p-6 text-sm text-muted">
+          No sponsored challenges have run here yet. They start once your server is unlocked and a brand buys
+          the games your members play.
+        </div>
+      ) : (
+        <div className="glass overflow-x-auto">
+          <table className="w-full text-sm min-w-[720px]">
+            <thead className="text-[11px] uppercase tracking-widest text-muted">
+              <tr>
+                <th className="px-4 py-3 text-left">Challenge</th>
+                <th className="px-4 py-3 text-left">Brand</th>
+                <th className="px-4 py-3 text-right">Brand paid</th>
+                <th className="px-4 py-3 text-right">Your players</th>
+                <th className="px-4 py-3 text-right">Your share</th>
+                <th className="px-4 py-3 text-right">You earned</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.challengeId} className="border-t border-white/5">
+                  <td className="px-4 py-3">
+                    <div className="font-semibold">{r.title}</div>
+                    <div className="text-[11px] text-muted">
+                      {r.game} · {r.ended ? "finished" : "running"} {new Date(r.endsAt).toLocaleDateString()}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-muted">{r.brandName ?? "—"}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{usd(r.price)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">
+                    {r.entrants.toLocaleString()}<span className="text-muted"> / {r.totalEntrants.toLocaleString()}</span>
+                  </td>
+                  <td className="px-4 py-3 text-right tabular-nums text-muted">
+                    {r.ownerPct}% × {Math.round(r.serverShare * 100)}%
+                  </td>
+                  <td className={`px-4 py-3 text-right font-bold tabular-nums ${r.ended ? "text-emerald-300" : "text-amber-200"}`}>
+                    {usd(r.owner)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Money({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-xl border px-3 py-2.5 ${accent ? "border-emerald-400/30 bg-emerald-500/[0.06]" : "border-white/10 bg-black/20"}`}>
+      <div className="text-[10px] uppercase tracking-widest text-muted">{label}</div>
+      <div className={`text-lg font-bold tabular-nums ${accent ? "text-emerald-300" : ""}`}>{value}</div>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesFo
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
+import { clusterPctFor, nextEarnTier, ownerPctFor } from "@/lib/server-earnings";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
 import { getProvider, linkableGames, linkableProvider, PROVIDERS } from "@/lib/providers/registry";
@@ -1039,19 +1040,33 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   const filled = Math.round((stats.pct / 100) * 20);
   const bar = `${"█".repeat(filled)}${"░".repeat(20 - filled)}`;
 
+  // The pay rate, in the same message as the counter. An owner asked to recruit
+  // gamers should be able to see, without leaving Discord, what the next
+  // hundred of them are worth.
+  const pct = ownerPctFor(stats.linked);
+  const next = nextEarnTier(stats.linked);
+  const rate = pct > 0
+    ? `You keep **${pct}%** of every sponsored challenge that runs here.`
+    : "";
+  const upgrade = next
+    ? `**${(next.threshold - stats.linked).toLocaleString()} more** takes your share to **${next.ownerPct}%**.`
+    : `You are at the top rate — **${pct}%** of every sponsored challenge, and Cluster keeps ${clusterPctFor(stats.linked)}%.`;
+
   const lines = stats.unlocked
     ? [
       `**${bar}** ${stats.pct}%`,
       "",
-      `**Sponsored challenges are unlocked.** Brands running challenges in your community's games now post them here — and the prize money is won by your members.`,
+      "**Sponsored challenges are unlocked.** Brands running challenges in your community's games now post them here — and the prize money is won by your members.",
+      rate,
+      upgrade,
       "",
       `**${stats.linked.toLocaleString()}** members have linked a game · **${stats.joined.toLocaleString()}** have a Cluster profile`,
-    ]
+    ].filter(Boolean)
     : [
       `**${bar}** ${stats.pct}%`,
       "",
       `**${stats.linked.toLocaleString()} / ${stats.threshold.toLocaleString()}** members have joined Cluster *and* linked a game account.`,
-      `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here, with real prize money paid to the members who win them.`,
+      `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here — real prize money for the members who win them, and **${next?.ownerPct ?? 5}% of what the brand paid** for you.`,
       "",
       `${stats.joined.toLocaleString()} have a Cluster profile so far — linking a game is what counts.`,
     ];

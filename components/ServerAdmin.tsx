@@ -119,7 +119,7 @@ export function DeliveryAdmin({ guildId, announcements, ads, unlocked, linked, t
         <div className="text-xs uppercase tracking-widest text-muted">Revenue share</div>
         <p className="text-[11px] text-muted">
           {unlocked
-            ? "Unlocked. This server earns a share of the ad revenue its community generates."
+            ? "Unlocked. Sponsored challenges run here, and the owner earns a share of every one."
             : `${linked.toLocaleString()} of ${threshold.toLocaleString()} members have linked a game. It unlocks automatically at ${threshold.toLocaleString()}.`}
         </p>
         <label className="flex items-start gap-2 text-sm">

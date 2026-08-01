@@ -85,6 +85,13 @@ export default function ServerEarnCards({
                 <span className="text-sm text-muted">linked gamers</span>
               </div>
               <div className="text-[11px] text-muted mt-1">not members — gamers who linked a game account</div>
+              {/* The pay rate, next to the price of admission. These two
+                  numbers together ARE the offer; separating them turns a deal
+                  into a slogan. */}
+              <div className="mt-3 inline-flex items-baseline gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1">
+                <span className="text-lg font-bold text-emerald-300 tabular-nums">{s.ownerPct}%</span>
+                <span className="text-[11px] text-emerald-100/80">of every sponsored challenge</span>
+              </div>
             </div>
 
             <div className="mt-4 text-sm font-semibold text-ink">{s.headline}</div>

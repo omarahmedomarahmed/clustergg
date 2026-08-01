@@ -74,7 +74,7 @@ export default async function ServersDirectoryPage() {
               cfg={cfg}
               networkGamers={stats.linked}
               title="What your members are playing for"
-              subtitle="Every gamer who links an account puts your community into more of the weekly prize money. Nothing is paid to you as commission — it is won by your players."
+              subtitle="Every gamer who links an account puts your community into more of the weekly prize money — that part is won by your players. Your own share of what the brand paid rises separately, in steps, on the ladder above."
             />
           </div>
 
