@@ -36,6 +36,7 @@ export default async function CardStudioPage() {
     bgKey: g.bgKey,
     brief: artBrief(g, layouts[g.kind]),
     regions: g.regions.map((r) => ({ key: r.key, label: r.label, note: r.note, kind: r.kind })),
+    parts: g.parts,
     layout: layouts[g.kind],
     art: {
       bgUrl: backgrounds[i].bgUrl,

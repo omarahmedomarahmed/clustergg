@@ -1,13 +1,16 @@
 import { earnCurve } from "@/lib/positioning";
 import { money, type PricingConfig } from "@/lib/pricing";
 
-// What a server's community earns as more of it connects.
+// What a server's community plays for as more of it connects.
 //
-// Server owners are not paid a commission — the prize money goes to the gamers
-// who win it. So the honest number to show an owner is how much of the monthly
-// prize pool their own members are positioned to win, which rises with how many
-// of them are connected. Stated as an expectation with the arithmetic on the
-// page, because a curve with no formula under it is a promise.
+// This curve is about the PRIZE money — the 70% that gamers win, not the
+// owner's own share of the platform fee. The two are separate and are shown
+// separately: an owner's cut rises in steps at 500 / 1,000 / 5,000 linked
+// gamers (see `lib/server-earnings.ts` and the ladder), while this rises
+// smoothly with connection because it is the members' share of a pool.
+//
+// Stated as an expectation with the arithmetic on the page, because a curve
+// with no formula under it is a promise.
 //
 // Drawn as an SVG area chart with no charting library: it is eight numbers, and
 // a dependency for eight numbers is a dependency that will one day break a

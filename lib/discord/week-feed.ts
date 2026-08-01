@@ -5,6 +5,7 @@ import { canAct, siteUrl } from "@/lib/discord/config";
 import { announcingGuilds } from "@/lib/discord/guilds";
 import { postMessage } from "@/lib/discord/rest";
 import { cardRef, embedColor } from "@/lib/discord/cards";
+import { withSponsorRow } from "@/lib/discord/sponsor";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
 import { currentWeek, weekBoard, weekTimezone } from "@/lib/profile-week";
@@ -88,7 +89,7 @@ export async function postWeekUpdate(opts: { guildIds?: string[]; force?: boolea
 
   // One render for the whole run: every server sees the same standings, which
   // is also the only honest thing to show — it is one competition.
-  const { url, data } = await cardRef("week", { mode: "race" });
+  const { url, data, ad } = await cardRef("week", { mode: "race" });
   const accent = data && "theme" in data ? data.theme.accent : "#fbbf24";
 
   const top = board.entries.filter((e) => !e.disqualified).slice(0, 3);
@@ -119,7 +120,10 @@ export async function postWeekUpdate(opts: { guildIds?: string[]; force?: boolea
     if (!g.channelId) { out.skipped++; continue; }
     if (!opts.force && await alreadyPosted(g.guildId, postKey)) { out.skipped++; continue; }
 
-    const res = await postMessage(g.channelId, {
+    // The sponsor row is minted per SERVER, not once for the run: the daily
+    // post is the bot's widest reach, and a click from it has to be
+    // attributable to the community it came from.
+    const res = await postMessage(g.channelId, withSponsorRow({
       content,
       embeds: [{ color: embedColor(accent), image: { url } }],
       components: rows([
@@ -128,7 +132,7 @@ export async function postWeekUpdate(opts: { guildIds?: string[]; force?: boolea
         linkButton("Customize your profile", `${siteUrl()}/profile`, "✨"),
         navButton("The competition", frame("week"), [frame("home")], ButtonStyle.Secondary, "👑"),
       ]),
-    });
+    }, ad, g.guildId));
 
     await record(g.guildId, postKey, week.key, "update", g.channelId, res.ok ? res.data.id : null, res.ok);
     if (res.ok) out.posted++; else out.skipped++;
@@ -159,7 +163,7 @@ export async function announceWeekWinners(weekKey: string, opts: { force?: boole
   if (!guilds.length) return out;
 
   const postKey = `result:${weekKey}`;
-  const { url, data } = await cardRef("week", { week: weekKey, mode: "result" });
+  const { url, data, ad } = await cardRef("week", { week: weekKey, mode: "result" });
   const accent = data && "theme" in data ? data.theme.accent : "#fbbf24";
   const trophy = board.result?.trophy ?? null;
 
@@ -186,7 +190,7 @@ export async function announceWeekWinners(weekKey: string, opts: { force?: boole
     if (!g.channelId) { out.skipped++; continue; }
     if (!opts.force && await alreadyPosted(g.guildId, postKey)) { out.skipped++; continue; }
 
-    const res = await postMessage(g.channelId, {
+    const res = await postMessage(g.channelId, withSponsorRow({
       content,
       embeds: [{
         color: embedColor(accent),
@@ -199,7 +203,7 @@ export async function announceWeekWinners(weekKey: string, opts: { force?: boole
         linkButton("Customize your profile", `${siteUrl()}/profile`, "✨"),
         navButton("Next week's board", frame("week"), [frame("home")], ButtonStyle.Success, "👑"),
       ]),
-    });
+    }, ad, g.guildId));
 
     await record(g.guildId, postKey, weekKey, "result", g.channelId, res.ok ? res.data.id : null, res.ok);
     if (res.ok) out.posted++; else out.skipped++;

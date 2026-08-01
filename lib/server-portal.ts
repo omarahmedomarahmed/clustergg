@@ -1,8 +1,10 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid, slugify } from "@/lib/utils";
 import { newPortalKey } from "@/lib/portal-auth";
 import { guildStats, type GuildStats } from "@/lib/discord/guilds";
+import { challengeEarning, clusterPctFor, nextEarnTier, ownerPctFor } from "@/lib/server-earnings";
+import { PRICING_DEFAULTS } from "@/lib/pricing";
 
 // The server-owner portal.
 //
@@ -24,6 +26,12 @@ export type Tier = {
   icon: string;
   unlocks: string;
   detail: string;
+  /**
+   * The owner's share of a sponsored challenge at this tier, as a % of what the
+   * brand paid. Read from `lib/server-earnings.ts` so the ladder, the portal
+   * and the payout arithmetic can never quote three different numbers.
+   */
+  ownerPct: number;
 };
 
 export const TIERS: Tier[] = [
@@ -34,6 +42,7 @@ export const TIERS: Tier[] = [
     icon: "spark",
     unlocks: "Private challenges for your community",
     detail: "Request challenges, run them for your members, and appear on Cluster with your own logo and invite.",
+    ownerPct: ownerPctFor(0),
   },
   {
     key: "monetized",
@@ -42,8 +51,9 @@ export const TIERS: Tier[] = [
     icon: "diamond",
     unlocks: "Brand-sponsored challenges, with real prize money",
     detail:
-      "Brands sponsoring the games your members play start running their weekly challenges here — and every "
-      + "dollar of the prize money is won by your members.",
+      "Brands sponsoring the games your members play start running their weekly challenges here. Every dollar "
+      + "of the prize money is won by your members, and 5% of what the brand paid is yours.",
+    ownerPct: ownerPctFor(500),
   },
   {
     key: "broadcaster",
@@ -53,7 +63,8 @@ export const TIERS: Tier[] = [
     unlocks: "Carry the whole network's challenges",
     detail:
       "Challenges from across the network run in your server, so more of your members are playing for real "
-      + "prizes in more games at once.",
+      + "prizes in more games at once — and your share of every sponsored challenge doubles to 10%.",
+    ownerPct: ownerPctFor(1000),
   },
   {
     key: "sponsored",
@@ -63,7 +74,8 @@ export const TIERS: Tier[] = [
     unlocks: "Brands ask for your community by name",
     detail:
       "Brands buy challenges in your server specifically, and smaller servers carry yours instead of the "
-      + "other way round.",
+      + "other way round. You keep 25% of every sponsored challenge; Cluster keeps 5%.",
+    ownerPct: ownerPctFor(5000),
   },
 ];
 
@@ -191,6 +203,153 @@ export async function serverFunnel(guildId: string, days = 30): Promise<{ totals
   } catch { return { totals: empty, byChallenge: [] }; }
 }
 
+// ===== Earnings =====
+
+export type EarningRow = {
+  challengeId: string;
+  title: string;
+  game: string;
+  brandName: string | null;
+  endsAt: Date;
+  ended: boolean;
+  /** Entrants from THIS server, and from everywhere. */
+  entrants: number;
+  totalEntrants: number;
+  /** How many servers carried this challenge, for the no-entrants split. */
+  serversCarrying: number;
+  /** What the brand paid, what the pool was, and what this server earned. */
+  price: number;
+  prizePool: number;
+  serverShare: number;
+  ownerPct: number;
+  owner: number;
+  /** Prize money this server's own members took home. */
+  membersWon: number;
+};
+
+export type Earnings = {
+  ownerPct: number;
+  clusterPct: number;
+  nextPct: number | null;
+  nextAt: number | null;
+  /** Paid so far, and still running. */
+  earned: number;
+  pending: number;
+  membersWon: number;
+  rows: EarningRow[];
+};
+
+/**
+ * What this server has earned from sponsored challenges, challenge by challenge.
+ *
+ * An owner should be able to reconstruct every figure here from the challenge
+ * itself: the brand paid X, our members were N of M entrants, our tier is P%,
+ * so we earned X × P% × N/M. That is why each row carries its own working
+ * rather than a total somebody has to take on trust.
+ */
+export async function serverEarnings(guildId: string, linked: number): Promise<Earnings> {
+  const ownerPct = ownerPctFor(linked);
+  const next = nextEarnTier(linked);
+  const empty: Earnings = {
+    ownerPct, clusterPct: clusterPctFor(linked),
+    nextPct: next?.ownerPct ?? null, nextAt: next?.threshold ?? null,
+    earned: 0, pending: 0, membersWon: 0, rows: [],
+  };
+  try {
+    const db = await getDb();
+
+    // Everyone this server brought to Cluster. A challenge's entrants "from
+    // here" are the ones who are members of this server.
+    const members = await db.select({ userId: schema.discordGuildMembers.userId })
+      .from(schema.discordGuildMembers)
+      .where(eq(schema.discordGuildMembers.guildId, guildId));
+    const mine = new Set(members.map((m) => m.userId));
+    if (!mine.size) return empty;
+
+    // Sponsored challenges only — an unsponsored community challenge has no
+    // brand money in it and therefore nothing to share.
+    const challenges = await db.select({
+      id: schema.challenges.id,
+      title: schema.challenges.title,
+      game: schema.challenges.game,
+      endAt: schema.challenges.endAt,
+      status: schema.challenges.status,
+      price: schema.challenges.sponsorPrice,
+      brandId: schema.challenges.sponsorBrandId,
+      guildId: schema.challenges.guildId,
+      guildIds: schema.challenges.guildIds,
+    })
+      .from(schema.challenges)
+      .where(sql`${schema.challenges.sponsorPrice} > 0`)
+      .orderBy(desc(schema.challenges.endAt))
+      .limit(60);
+    if (!challenges.length) return empty;
+
+    const ids = challenges.map((c) => c.id);
+    const parts = await db.select({
+      challengeId: schema.challengeParticipants.challengeId,
+      userId: schema.challengeParticipants.userId,
+      placement: schema.challengeParticipants.finalPlacement,
+    }).from(schema.challengeParticipants).where(inArray(schema.challengeParticipants.challengeId, ids));
+
+    const brandIds = [...new Set(challenges.map((c) => c.brandId).filter((b): b is string => !!b))];
+    const brandRows = brandIds.length
+      ? await db.select({ id: schema.brands.id, name: schema.brands.name })
+          .from(schema.brands).where(inArray(schema.brands.id, brandIds))
+      : [];
+    const brandName = new Map(brandRows.map((b) => [b.id, b.name]));
+
+    const cfg = PRICING_DEFAULTS;
+    const prizeByPlace = [cfg.prize1, cfg.prize2, cfg.prize3];
+    const rows: EarningRow[] = [];
+    for (const c of challenges) {
+      const entries = parts.filter((p) => p.challengeId === c.id);
+      const ours = entries.filter((p) => mine.has(p.userId));
+      // Not carried here, and nobody from here entered: not this server's row.
+      const carried = [c.guildId, ...(c.guildIds ?? [])].filter(Boolean);
+      if (!ours.length && !carried.includes(guildId)) continue;
+
+      const earning = challengeEarning({
+        linked,
+        entrants: ours.length,
+        totalEntrants: entries.length,
+        serversCarrying: carried.length || 1,
+        membersWon: ours.reduce((sum, p) => sum + (p.placement && p.placement <= 3 ? prizeByPlace[p.placement - 1] ?? 0 : 0), 0),
+        cfg: { ...cfg, challengePrice: c.price || cfg.challengePrice },
+      });
+      rows.push({
+        challengeId: c.id,
+        title: c.title,
+        game: c.game,
+        brandName: c.brandId ? brandName.get(c.brandId) ?? null : null,
+        endsAt: c.endAt,
+        ended: c.status === "completed" || c.endAt.getTime() < Date.now(),
+        entrants: ours.length,
+        totalEntrants: entries.length,
+        serversCarrying: carried.length || 1,
+        price: earning.price,
+        prizePool: earning.prizePool,
+        serverShare: earning.serverShare,
+        ownerPct: earning.ownerPct,
+        owner: earning.owner,
+        membersWon: earning.membersWon,
+      });
+    }
+
+    return {
+      ...empty,
+      rows,
+      // Only a finished challenge has been earned. A running one is pending,
+      // because its entrant split — and therefore the share — is still moving.
+      earned: round2(rows.filter((r) => r.ended).reduce((s, r) => s + r.owner, 0)),
+      pending: round2(rows.filter((r) => !r.ended).reduce((s, r) => s + r.owner, 0)),
+      membersWon: round2(rows.reduce((s, r) => s + r.membersWon, 0)),
+    };
+  } catch { return empty; }
+}
+
+function round2(n: number): number { return Math.round(n * 100) / 100; }
+
 // ===== The board =====
 
 export type BoardRow = {
@@ -243,6 +402,8 @@ export type PortalData = {
   tier: ReturnType<typeof tierFor>;
   badges: ReturnType<typeof badgesFor>;
   funnel: Awaited<ReturnType<typeof serverFunnel>>;
+  /** What sponsored challenges have paid this server, challenge by challenge. */
+  earnings: Earnings;
   rank: number;
   totalServers: number;
 };
@@ -250,7 +411,7 @@ export type PortalData = {
 export async function portalData(server: PortalServer): Promise<PortalData | null> {
   const stats = await guildStats(server.guildId);
   if (!stats) return null;
-  const [funnel, board, challenges] = await Promise.all([
+  const [funnel, board, challenges, earnings] = await Promise.all([
     serverFunnel(server.guildId),
     serverBoard(),
     (async () => {
@@ -261,6 +422,7 @@ export async function portalData(server: PortalServer): Promise<PortalData | nul
         return rows.length;
       } catch { return 0; }
     })(),
+    serverEarnings(server.guildId, stats.linked),
   ]);
   const me = board.find((b) => b.guildId === server.guildId);
   return {
@@ -268,6 +430,7 @@ export async function portalData(server: PortalServer): Promise<PortalData | nul
     stats,
     tier: tierFor(stats.linked),
     badges: badgesFor(stats.linked, challenges),
+    earnings,
     funnel,
     rank: me?.rank ?? board.length + 1,
     totalServers: board.length,

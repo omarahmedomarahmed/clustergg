@@ -616,7 +616,13 @@ export async function worldCard(game: string, kind: string, id: string, skin?: s
     skinName: picked?.name ?? null,
     skinCount: e.skins.length,
     meta: e.meta.slice(0, 4),
-    abilities: e.abilities.slice(0, 4).map((a) => ({ name: a.name, desc: a.desc })),
+    // `a.icon` used to be dropped here — the cache hosts every ability icon and
+    // the card then rendered the abilities as plain text.
+    abilities: e.abilities.slice(0, 4).map((a) => ({ name: a.name, desc: a.desc, iconUrl: a.icon })),
+    // The same image the background uses, carried separately so the renderer
+    // can draw it undimmed in the splash panel. Falls back exactly as the
+    // background does, so the panel is never empty while the backdrop has art.
+    artUrl: art || e.splash || e.image || null,
     logoUrl: g?.logoUrl ?? null,
     theme: {
       accent: g?.accent || BRAND.accent,

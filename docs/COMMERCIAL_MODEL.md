@@ -53,12 +53,32 @@ Everything in the model reduces to one transaction: a sponsored weekly challenge
 |---|---|
 | We charge the brand | `pricing.challengePrice` — **$250** |
 | We pay out | `pricing.prizePool` — **$175** ($100 / $50 / $25) |
-| We keep | **$75** gross margin |
+| Platform fee | **$75** — the 30% that is not prize money |
 | Share reaching players | **70%**, and it is arithmetic, not policy |
 
 The prize is paid as **three trophies carrying the sponsor's brand**, redeemed by
-the three gamers who placed. Nothing is withheld and nothing is shared with the
-server — every cent of the $175 reaches a player.
+the three gamers who placed. Nothing is withheld from it: every cent of the $175
+reaches a player.
+
+The **$75 platform fee is what gets split with the server**, and how much depends
+on how many gamers that server brought:
+
+| Linked gamers | Owner keeps | Cluster keeps |
+|---|---|---|
+| under 500 | 0% | 30% |
+| 500 | **5%** | 25% |
+| 1,000 | **10%** | 20% |
+| 5,000 | **25%** | 5% |
+
+Percentages are **of what the brand paid**, not of the fee — 25% of $250 is
+$62.50, and the 25 + 5 adds back to the 30 points we charge.
+
+**A challenge runs in more than one server, so the fee is apportioned.** A
+server's share of a challenge is its share of that challenge's entrants: supply
+the whole field and earn the full percentage, supply a tenth of it and earn a
+tenth. Forty servers each taking 25% of one $250 challenge would be 1000% of a
+number we collected once, so the apportionment is not optional — and it is shown
+on every row of the owner's earnings table, with its working.
 
 Per game, per month: brand pays **$1,000**, players win **$700**, we keep **$300**.
 Across all six games at the defaults: **24 challenges**, **$6,000** of challenge
@@ -75,20 +95,24 @@ Two things about the cost side matter commercially:
 
 ## What a server gets
 
-**Servers are not paid a revenue share.** Say this precisely, because the wrong
-version of it is a promise we would have to break.
+Two things, and they are separate — say it precisely, because owners conflate
+them and then feel misled.
 
-What a server gets is brand-sponsored challenges running inside it, and the
-prize money on those challenges being won by *its own members*. A League server
-that crosses the threshold has League sponsorship money flowing to its players —
-up to **$700 a month per sponsored game**. The owner didn't earn a commission;
-their community earned real money, through their server, because of their bot.
+**One: their members win the prize money.** A League server that crosses the
+threshold has League sponsorship money flowing to its players — up to **$700 a
+month per sponsored game**. That is the community's money, not the owner's.
 
-| Stage | Linked gamers | Unlocks |
-|---|---|---|
-| Sponsored | 500 | Brand-sponsored challenges land here, prize money won by members, owner portal |
-| Broadcaster | 1,000 | Network-wide challenges carried here, priority in its top game |
-| Flagship | 5,000 | Brands request the community by name, exclusive challenges, named on the broadcast |
+**Two: the owner earns a share of the platform fee.** 5% of every sponsored
+challenge at 500 linked gamers, 10% at 1,000, 25% at 5,000 — apportioned by how
+much of the challenge's field came from their server. This is the owner's own
+revenue, and it is why recruiting gamers to Cluster is worth their time rather
+than only their goodwill.
+
+| Stage | Linked gamers | Owner's share | Unlocks |
+|---|---|---|---|
+| Sponsored | 500 | 5% | Brand-sponsored challenges land here, prize money won by members, owner portal |
+| Broadcaster | 1,000 | 10% | Network-wide challenges carried here, priority in its top game |
+| Flagship | 5,000 | 25% | Brands request the community by name, exclusive challenges, named on the broadcast |
 
 **Linked, not members.** A 50,000-member server with no linked accounts earns
 nothing, and the pages say so plainly. The threshold is how we prove to a brand
@@ -105,6 +129,8 @@ Everything is a CMS key with the running value as its default, editable at
 | Thing | Where |
 |---|---|
 | The model, pure and shared | `lib/pricing.ts` — types, defaults, `quote()`, `perGame()`, `marginPerChallenge()`, `prizeSharePct()`, the stage ladder |
+| The owner's revenue share | `lib/server-earnings.ts` — `EARN_TIERS`, `ownerPctFor()`, `clusterPctFor()`, `challengeEarning()` |
+| What one server has earned | `serverEarnings()` in `lib/server-portal.ts`, rendered by the portal's Earnings tab |
 | Live inventory + audience | `lib/pricing-live.ts` — placement count, per-game verified gamers, reach |
 | The copy | `lib/cms.ts` → `CONTENT_DEFAULTS` (`brand.*` and `pricing.*`) |
 | The rate card page | `app/pricing/page.tsx` + `components/PricingPlans.tsx` |

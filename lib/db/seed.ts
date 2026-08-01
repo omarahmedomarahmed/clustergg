@@ -4,7 +4,7 @@ import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
 import { uid } from "@/lib/utils";
 import { BADGE_ART, TROPHY_ART, BANNER_ART } from "@/lib/assets";
-import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
+import { CARD_AD_PLACEMENT, HOUSE_CTA } from "@/lib/cards/ads";
 
 // Seeds platform defaults (badges, games, spaces, placements, leaderboards,
 // trophies) and the superadmin from env. Demo mode additionally seeds a demo
@@ -898,10 +898,16 @@ export async function seedHouseAds(db: DB) {
     const t = HOUSE_TAGLINES[i % HOUSE_TAGLINES.length];
     i++;
     const crId = uid();
+    const card = p.key === CARD_AD_PLACEMENT;
     await db.insert(schema.adCreatives).values({
       id: crId, brandId: HOUSE_BRAND_ID, name: `Cluster · ${p.key}`, type: "image",
       fileUrl: svgAd(p.width, p.height, t.from, t.to, "CLUSTER", t.title),
-      clickUrl: t.click, width: p.width, height: p.height, status: "approved",
+      // The Discord card placement is the only one with a button under it, and
+      // the house version of that button sells the thing an unsold slot is
+      // evidence of: a server that isn't earning yet.
+      clickUrl: card ? "/pricing" : t.click,
+      ctaLabel: card ? HOUSE_CTA : null,
+      width: p.width, height: p.height, status: "approved",
     });
     await db.insert(schema.adCampaignCreatives).values({
       id: uid(), campaignId: campId, creativeId: crId, placementId: p.id, weight: 1, priority: 0,
@@ -963,7 +969,11 @@ export async function ensureCardAdPlacement(db: DB) {
   await db.insert(schema.adCreatives).values({
     id: crId, brandId: HOUSE_BRAND_ID, name: `Cluster · ${CARD_AD_PLACEMENT}`, type: "image",
     fileUrl: svgAd(placement.width, placement.height, t.from, t.to, "CLUSTER", t.title),
-    clickUrl: t.click, width: placement.width, height: placement.height, status: "approved",
+    // Unsold card inventory is still the best place we have to tell a server
+    // owner their community can earn — so the house button sells the thing the
+    // empty slot is evidence of.
+    clickUrl: "/pricing", ctaLabel: HOUSE_CTA,
+    width: placement.width, height: placement.height, status: "approved",
   });
   await db.insert(schema.adCampaignCreatives).values({
     id: uid(), campaignId: camp.id, creativeId: crId, placementId: placement.id, weight: 1, priority: 0,

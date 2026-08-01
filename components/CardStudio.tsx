@@ -6,6 +6,7 @@ import Icon from "@/components/Icon";
 import CardLayoutEditor, { type EditorArt } from "@/components/CardLayoutEditor";
 import type { LibraryGroup } from "@/lib/cards/asset-library";
 import type { CardLayout } from "@/lib/cards/layout";
+import type { CardPart } from "@/lib/cards/layout-guide";
 
 // The card studio.
 //
@@ -28,6 +29,8 @@ export type StudioCard = {
   bgKey: string;
   brief: string;
   regions: { key: string; label: string; note: string; kind: string }[];
+  /** The content sections of this card, offered as per-section controls. */
+  parts: CardPart[];
   layout: CardLayout;
   art: EditorArt;
   previewUrl: string;
@@ -100,6 +103,7 @@ export default function CardStudio({ cards, library }: { cards: StudioCard[]; li
           name={card.name}
           initial={card.layout}
           art={card.art}
+          parts={card.parts}
           previewUrl={card.previewUrl}
           library={library}
         />

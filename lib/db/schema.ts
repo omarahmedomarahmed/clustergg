@@ -290,6 +290,19 @@ export const challenges = pgTable("challenges", {
   trophyId: text("trophy_id"),
   prizes: jsonb("prizes").$type<{ first?: string[]; second?: string[]; third?: string[] }>(), // multi-trophy podium prizes per place
   prizeDescription: text("prize_description"),
+  // ===== Sponsorship =====
+  //
+  // A sponsored challenge is one a brand bought. It is the unit of the whole
+  // business — the brand's money enters here, 70% of it leaves as prize money
+  // to gamers, and the rest is split between the servers that carried it and
+  // Cluster. None of that arithmetic can be done without knowing which brand
+  // paid and how much, so it is recorded on the challenge itself rather than
+  // inferred from a campaign later.
+  sponsorBrandId: text("sponsor_brand_id"),
+  /** The ad campaign this challenge was bought under, when there is one. */
+  sponsorCampaignId: text("sponsor_campaign_id"),
+  /** What the brand paid for THIS challenge. Zero for anything unsponsored. */
+  sponsorPrice: doublePrecision("sponsor_price").notNull().default(0),
   createdBy: text("created_by"),
   createdAt: now("created_at"),
 });
@@ -368,6 +381,18 @@ export const adCreatives = pgTable("ad_creatives", {
   type: text("type").notNull().default("image"), // image | video
   fileUrl: text("file_url").notNull(),
   clickUrl: text("click_url"),
+  /**
+   * The brand's own words on the Discord button under this creative.
+   *
+   * Every card the bot posts carries a link button for its sponsor — that is
+   * the only clickable surface a Discord ad has, because an image in a message
+   * is not a link. The button reads "Sponsored: <brand> — <this>", so a brand
+   * writes the half that is theirs and the disclosure half is not negotiable.
+   *
+   * Per CREATIVE, not per campaign: a brand running three creatives is running
+   * three messages, and the button is part of the message.
+   */
+  ctaLabel: text("cta_label"),
   width: integer("width"),
   height: integer("height"),
   durationSeconds: integer("duration_seconds"),
@@ -423,6 +448,10 @@ export const adClicks = pgTable("ad_clicks", {
   id: id(),
   campaignCreativeId: text("campaign_creative_id").notNull().references(() => adCampaignCreatives.id, { onDelete: "cascade" }),
   impressionId: text("impression_id"),
+  /** The Discord server the click came from, when it came from one. */
+  guildId: text("guild_id"),
+  /** `web` or `discord` — the same two funnels the impressions have. */
+  source: text("source"),
   createdAt: now("created_at"),
 });
 
@@ -732,6 +761,20 @@ export const discordGuilds = pgTable("discord_guilds", {
   // a Cluster account needs to see their own numbers.
   slug: text("slug"),
   portalKey: text("portal_key"),
+  /**
+   * What this community actually is — answered by its own owner.
+   *
+   * This is inventory description. A brand buying Discord has to be able to ask
+   * for "PUBG players in MENA" and get an answer, and the only person who
+   * reliably knows what a server plays and where it lives is the person running
+   * it. Everything else we hold is derived (linked accounts, challenge entries)
+   * and lags reality by weeks; this is asked once, at install, in about twenty
+   * seconds, and can be corrected any time.
+   *
+   * Shape and validation live in `lib/discord/community.ts` — this column is
+   * deliberately loose so a new question doesn't need a migration.
+   */
+  community: jsonb("community").$type<Record<string, unknown>>().notNull().default({}),
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
   installedAt: now("installed_at"),
   removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),

@@ -18,6 +18,9 @@ import {
 export type CardCreativeView = {
   campaignCreativeId: string;
   fileUrl: string;
+  /** The button under this creative, and where it goes. Per creative. */
+  ctaLabel: string | null;
+  clickUrl: string | null;
   impressions: number;
   clicks: number;
 };
@@ -37,12 +40,23 @@ export default function BrandCardCampaign({
   reach: { servers: number; gamers: number };
 }) {
   const [clickUrl, setClickUrl] = useState("");
+  const [ctaLabel, setCtaLabel] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const hero = creatives[0]?.fileUrl ?? null;
 
+  // Exactly what Discord will render, composed the same way the bot composes
+  // it. A brand should never have to publish something to find out how it reads
+  // in somebody else's server.
+  const buttonPreview = `Sponsored: ${brandName} — ${ctaLabel.trim() || "your tagline here"}`.slice(0, 80);
+  const ready = /^https?:\/\/\S+$/i.test(clickUrl.trim()) && ctaLabel.trim().length > 0;
+
   const upload = async (file: File) => {
+    if (!ready) {
+      setMsg("Add the button text and the link first — a card without them can't be clicked.");
+      return;
+    }
     setBusy(true); setMsg(null);
     try {
       // 1280 wide: twice the 640 the box is drawn at, so it stays sharp on a
@@ -58,6 +72,7 @@ export default function BrandCardCampaign({
         const fd = new FormData();
         fd.set("fileUrl", json.url);
         fd.set("clickUrl", clickUrl);
+        fd.set("ctaLabel", ctaLabel);
         const r = await portalLaunchCardCreative(brandId, keyStr, fd);
         setMsg(r?.error ?? (creatives.length ? "Added to the rotation." : "You're live. The next card the bot draws can carry it."));
       });
@@ -138,20 +153,44 @@ export default function BrandCardCampaign({
           </p>
         </div>
 
-        {/* Upload = launch. */}
+        {/* Upload = launch, and the button is part of the creative. */}
         <div className="space-y-3">
-          <label className={`flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-violet-400/40 bg-violet-500/[0.06] py-5 text-center text-sm font-semibold cursor-pointer transition hover:border-violet-300/70 ${working ? "pointer-events-none opacity-60" : ""}`}>
-            <Icon name="plus" size={16} />
-            {busy ? "Uploading…" : pending ? "Saving…" : creatives.length ? "Add another creative" : "Upload your creative — go live"}
-            <span className="text-[10px] font-normal text-muted">PNG or JPG · 640×200</span>
-            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
-          </label>
+          {/* The two fields come FIRST, before the upload, because they are not
+              optional: a Discord image cannot be clicked, so the button under
+              the card is the only click this placement has. */}
+          <div className="space-y-2 rounded-xl border border-white/12 bg-black/25 p-3">
+            <div className="text-[10px] uppercase tracking-widest text-muted">The button under your card</div>
+            <input
+              value={ctaLabel} onChange={(e) => setCtaLabel(e.target.value.slice(0, 48))}
+              placeholder="Your tagline — e.g. 20% off for gamers"
+              className="w-full rounded-lg border border-white/12 bg-black/30 px-2.5 py-2 text-xs outline-none focus:border-violet-400/50"
+            />
+            <input
+              value={clickUrl} onChange={(e) => setClickUrl(e.target.value)}
+              placeholder="https://your-landing-page.com"
+              className="w-full rounded-lg border border-white/12 bg-black/30 px-2.5 py-2 text-xs outline-none focus:border-violet-400/50"
+            />
+            {/* Rendered like the real thing: Discord's blurple link button. */}
+            <div className="rounded-md bg-[#5865F2] px-3 py-2 text-center text-[11px] font-semibold text-white truncate">
+              {buttonPreview}
+            </div>
+            <p className="text-[10px] leading-snug text-muted">
+              Every card carries this. &ldquo;Sponsored:&rdquo; and your name are always shown — the rest is yours.
+              We count every press against this exact creative and tell you which server it came from.
+            </p>
+          </div>
 
-          <input
-            value={clickUrl} onChange={(e) => setClickUrl(e.target.value)}
-            placeholder="Click-through URL (optional)"
-            className="w-full rounded-lg border border-white/12 bg-black/25 px-2.5 py-2 text-xs outline-none focus:border-violet-400/50"
-          />
+          <label className={`flex flex-col items-center justify-center gap-1 rounded-xl border border-dashed py-5 text-center text-sm font-semibold transition ${
+            ready
+              ? "border-violet-400/40 bg-violet-500/[0.06] cursor-pointer hover:border-violet-300/70"
+              : "border-white/12 bg-black/20 cursor-not-allowed text-muted"
+          } ${working ? "pointer-events-none opacity-60" : ""}`}>
+            <Icon name="plus" size={16} />
+            {busy ? "Uploading…" : pending ? "Saving…" : !ready ? "Add the button text and link first" : creatives.length ? "Add another creative" : "Upload your creative — go live"}
+            <span className="text-[10px] font-normal text-muted">PNG or JPG · 640×200</span>
+            <input type="file" accept="image/*" className="hidden" disabled={!ready}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); }} />
+          </label>
 
           <div className="grid grid-cols-2 gap-2">
             <Stat label="Impressions" value={n(impressions)} />
@@ -181,6 +220,14 @@ export default function BrandCardCampaign({
               <div key={c.campaignCreativeId} className="overflow-hidden rounded-xl border border-white/10 bg-black/25">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={c.fileUrl} alt="" className="w-full object-cover" style={{ aspectRatio: "640 / 200" }} />
+                {/* Each creative has its OWN button and destination — a brand
+                    running three creatives is running three messages. */}
+                <div className="border-t border-white/8 px-2 py-1.5">
+                  <div className="truncate rounded bg-[#5865F2] px-2 py-1 text-[10px] font-semibold text-white">
+                    {`Sponsored: ${brandName} — ${c.ctaLabel || "no tagline"}`}
+                  </div>
+                  {c.clickUrl && <div className="mt-1 truncate text-[10px] text-muted">→ {c.clickUrl}</div>}
+                </div>
                 <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[11px]">
                   <span className="text-muted">{n(c.impressions)} impressions · {n(c.clicks)} clicks</span>
                   <button

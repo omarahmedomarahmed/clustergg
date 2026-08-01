@@ -60,6 +60,14 @@ export type PartStyle = {
   scale?: number;
   /** 0-100. */
   opacity?: number;
+  /**
+   * Replace this section's own words.
+   *
+   * Only the section's fixed copy — a heading, a label, a caption. The live
+   * data underneath is never overridable, because a leaderboard whose standings
+   * can be typed in by hand is not a leaderboard.
+   */
+  text?: string;
 };
 
 /**
@@ -157,18 +165,28 @@ export const AD_LABEL_H = 22;
 
 export const DEFAULT_LAYOUT: CardLayout = {
   mascot: { x: 9, y: 84, size: 200 },
-  mark: { x: 92.7, y: 87.6, size: 104 },
+  // Bottom-right at 250, on every card, without exception.
+  //
+  // It was 104px and it read as a favicon somebody forgot to remove. These
+  // cards get screenshotted, cropped and reposted, and the only thing that
+  // travels with them is this mark — so it is drawn at a size that survives
+  // being seen at thumbnail scale in somebody else's feed.
+  mark: { x: 87.5, y: 77.5, size: 250 },
   badge: { x: 91, y: 11.5, size: 96 },
-  // 79.5% before the sponsor box existed, which put the right edge of the text
-  // column 130px INSIDE it — a challenge title with six words ran under the
-  // creative. Satori has no float, so text cannot wrap around the box; the
-  // column has to stop short of it. This is the cost of the inventory, taken
-  // once, everywhere, instead of discovered per card in production.
-  content: { x: 4.7, y: 7, w: 68.5, h: 84 },
-  // Top-right, hard against the corner the eye lands on last — the corner a
-  // card's own furniture (game logo, level pill, trophy stack) used to own
-  // alone. The badge is pushed clear of it automatically; see `badgeTopFor`.
-  ad: { x: 85.4, y: 12.4, size: 296 },
+  // The text column stops short of the sponsor box AND of the logo.
+  //
+  // Satori has no float, so text cannot wrap around either of them — the
+  // column has to end before the right-hand furniture starts. 758px of the
+  // 1200 belongs to content; the 420 to its right belongs to the brand at the
+  // top, the logo at the bottom, and (on a world card) the splash between.
+  // This is the cost of carrying inventory on every card, taken once, in one
+  // place, instead of discovered per card in production.
+  content: { x: 4.7, y: 7, w: 58.5, h: 84 },
+  // Top-right corner at 400 wide — the biggest unit that still leaves a
+  // readable text column, and the same coordinates on every card so a brand's
+  // creative lands in the same place whatever the bot was asked for. The badge
+  // is pushed clear of it automatically; see `badgeTopFor`.
+  ad: { x: 81.7, y: 12.8, size: 400 },
   plate: 46,
   plateRadius: 22,
   dim: 62,
@@ -237,10 +255,14 @@ function parts(v: unknown): Record<string, PartStyle> {
     // Keys are region ids from the card guide — short, known-shaped strings.
     if (!/^[a-z0-9_-]{1,40}$/i.test(k)) continue;
     const p = (raw ?? {}) as Partial<PartStyle>;
+    const text = typeof p.text === "string" ? p.text.trim().slice(0, 160) : "";
     out[k] = {
       hidden: p.hidden === true,
       scale: num(p.scale, 1, 0.5, 2),
       opacity: num(p.opacity, 100, 0, 100),
+      // Plain text only, and only ever drawn as a string by Satori — but it
+      // also reaches the editor's DOM preview, so the tag characters go.
+      ...(text ? { text: text.replace(/[<>]/g, "") } : {}),
     };
   }
   return out;
@@ -319,13 +341,37 @@ export function parseLayout(raw: string | null | undefined): CardLayout {
   };
 }
 
+/**
+ * How one named section of a card should be drawn.
+ *
+ * `f` is the whole reason `scale` is usable: every font size inside a section
+ * goes through it, so "make the standings bigger" is one slider rather than a
+ * redesign. `say` is the text override — hand it the section's built-in words
+ * and it returns those words unless an admin replaced them.
+ */
+export type PartDraw = {
+  hidden: boolean;
+  scale: number;
+  opacity: number;
+  text?: string;
+  /** A font size in canvas pixels, scaled by this section's setting. */
+  f: (px: number) => number;
+  /** This section's fixed copy, or the admin's replacement for it. */
+  say: (built: string) => string;
+};
+
 /** How a part should be drawn, with the house default when it's unset. */
-export function partOf(l: CardLayout, key: string): Required<PartStyle> {
+export function partOf(l: CardLayout, key: string): PartDraw {
   const p = l.parts?.[key];
+  const scale = typeof p?.scale === "number" ? p.scale : 1;
+  const text = typeof p?.text === "string" && p.text ? p.text : undefined;
   return {
     hidden: p?.hidden === true,
-    scale: typeof p?.scale === "number" ? p.scale : 1,
+    scale,
     opacity: typeof p?.opacity === "number" ? p.opacity : 100,
+    text,
+    f: (px: number) => Math.max(8, Math.round(px * scale)),
+    say: (built: string) => text ?? built,
   };
 }
 

@@ -1,8 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
-import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, type Frame, type Button } from "@/lib/discord/components";
-import { cardRef, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
+import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, select, selectRow, type Frame, type Button } from "@/lib/discord/components";
+import { cardRef, currentCardGuild, currentSponsor, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
+import { withSponsorRow } from "@/lib/discord/sponsor";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
@@ -10,6 +11,8 @@ import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesFo
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
+import { clusterPctFor, nextEarnTier, ownerPctFor } from "@/lib/server-earnings";
+import { REGIONS, VIBES, completeness, getCommunity, regionLabel, vibeLabel } from "@/lib/discord/community";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
 import { getProvider, linkableGames, linkableProvider, PROVIDERS } from "@/lib/providers/registry";
@@ -816,6 +819,7 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
         actionId("announce", [guild?.announcementsEnabled === false ? "1" : "0"], [here]),
         guild?.announcementsEnabled === false ? ButtonStyle.Secondary : ButtonStyle.Success, "📣",
       ),
+      navButton("Describe your community", frame("setup", ctx.guildId), [here, ...trail], ButtonStyle.Primary, "🧭"),
       button("Post the guides again", actionId("repost-guides", [], [here]), ButtonStyle.Secondary, "📚"),
       button("Use this channel", actionId("set-channel", [], [here]), ButtonStyle.Secondary, "📍"),
       ...tail(ctx, here, trail),
@@ -861,6 +865,30 @@ export function requestModal(game: string) {
         textRow("days", "How many days should it run?", 1, true, "7", 3),
         textRow("prize", "Prize money you're putting up", 1, false, "e.g. 100 — leave blank for trophies only", 8),
         textRow("currency", "Currency", 1, false, "USD", 8),
+      ],
+    },
+  };
+}
+
+/**
+ * The one free-text question in the community profile.
+ *
+ * Menus can capture games and regions; they cannot capture "we're the biggest
+ * Arabic-speaking Valorant server and we run scrims every Friday". That
+ * sentence is what makes a sponsor pick this server over an identical one, so
+ * there is exactly one box for it and nothing else.
+ */
+export function aboutModal(guildId: string) {
+  return {
+    type: InteractionResponseType.Modal,
+    data: {
+      custom_id: `about|${guildId}`.slice(0, 100),
+      title: "Describe your community",
+      components: [
+        textRow(
+          "about", "In your own words", 2, false,
+          "Who plays here, what they play, and what makes this server different", 400,
+        ),
       ],
     },
   };
@@ -1021,6 +1049,95 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
   };
 }
 
+// ===== The community profile: twenty seconds that make a server sellable =====
+//
+// A brand buying Discord asks for "PUBG players in MENA". Nothing we derive
+// answers that on a server's first day — linked accounts take weeks and say
+// nothing about where anyone is. The owner knows now, so this asks them, with
+// select menus rather than a wall of buttons because the games list grows every
+// time we connect another one.
+//
+// Every question is skippable and every answer is changeable. And the screen
+// says WHY we are asking, because a form with no stated purpose gets answered
+// carelessly or not at all.
+
+async function communityScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  // Reachable from two places, and only one of them is inside a server.
+  //
+  // The install DM offers this button, and a DM has no guild and no member —
+  // `isManager` is meaningless there. So the frame carries the guild id, and
+  // access is granted to a manager of that guild OR to the Discord account we
+  // recorded as its owner, which is the account the DM went to in the first
+  // place. Anything else gets nothing: this describes a server to advertisers.
+  const guildId = arg || ctx.guildId || "";
+  if (!guildId) {
+    return notYet("Run this inside your server — it describes that server to brands.", trail, [], ctx);
+  }
+  const row = await getGuildRow(guildId);
+  const allowed = (ctx.isManager && ctx.guildId === guildId)
+    || (!!row?.ownerDiscordId && row.ownerDiscordId === ctx.discordId);
+  if (!allowed) {
+    return notYet("Only this server's admins can describe the community.", trail, [], ctx);
+  }
+  const here = frame("setup", guildId);
+  const [profile, cat, portal] = await Promise.all([
+    getCommunity(guildId),
+    catalog(),
+    ensurePortal(guildId),
+  ]);
+  const done = completeness(profile);
+
+  const said = (label: string, values: string[]) =>
+    values.length ? `**${label}:** ${values.join(", ")}` : `**${label}:** —`;
+
+  const lines = [
+    "Brands buy challenges by game and by region. The faster we can describe your community, the sooner a sponsor picks it.",
+    "",
+    said("Games", profile.games),
+    said("Where your members are", profile.regions.map(regionLabel)),
+    said("What kind of community", profile.vibes.map(vibeLabel)),
+    profile.about ? `**In your words:** ${profile.about}` : "**In your words:** —",
+    "",
+    done === 100
+      ? "That is everything. You can change any of it whenever your community does."
+      : `**${done}% described.** Every answer is optional — anything you skip just means we match you to fewer sponsors.`,
+  ];
+
+  const { url } = await cardRef("guide", { topic: "everything" });
+  return {
+    embeds: [embed(url, {
+      title: "Describe your community",
+      description: lines.join("\n"),
+      color: done === 100 ? "#34d399" : "#8b5cf6",
+      footer: "Only your server's admins can see or change this. It is shown to brands as audience, never as your members' data.",
+    })],
+    components: [
+      // Three menus, each its own row — a select can never share a row with
+      // anything. Ordered by how much a brand cares: game first, then region.
+      selectRow(select(
+        `set|games|${guildId}`,
+        cat.games.map((g) => ({ label: g.name, value: g.value, default: profile.games.includes(g.value) })),
+        { placeholder: "Which games does your community play?", max: 8 },
+      )),
+      selectRow(select(
+        `set|regions|${guildId}`,
+        REGIONS.map((r) => ({ label: r.label, value: r.key, default: profile.regions.includes(r.key) })),
+        { placeholder: "Where are most of your members?", max: 4 },
+      )),
+      selectRow(select(
+        `set|vibes|${guildId}`,
+        VIBES.map((v) => ({ label: v.label, value: v.key, default: profile.vibes.includes(v.key) })),
+        { placeholder: "What kind of community is it?", max: 4 },
+      )),
+      ...rows([
+        button("Say it in your own words", `open-about|${guildId}`, ButtonStyle.Secondary, "✍"),
+        portal ? linkButton("Your server portal", `${siteUrl()}/servers/${portal.slug}`, "🛰") : null,
+        ...tail(ctx, here, trail),
+      ]),
+    ].filter(Boolean),
+  };
+}
+
 // ===== Server growth (the owner's reason to recruit for us) =====
 
 async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
@@ -1038,19 +1155,33 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   const filled = Math.round((stats.pct / 100) * 20);
   const bar = `${"█".repeat(filled)}${"░".repeat(20 - filled)}`;
 
+  // The pay rate, in the same message as the counter. An owner asked to recruit
+  // gamers should be able to see, without leaving Discord, what the next
+  // hundred of them are worth.
+  const pct = ownerPctFor(stats.linked);
+  const next = nextEarnTier(stats.linked);
+  const rate = pct > 0
+    ? `You keep **${pct}%** of every sponsored challenge that runs here.`
+    : "";
+  const upgrade = next
+    ? `**${(next.threshold - stats.linked).toLocaleString()} more** takes your share to **${next.ownerPct}%**.`
+    : `You are at the top rate — **${pct}%** of every sponsored challenge, and Cluster keeps ${clusterPctFor(stats.linked)}%.`;
+
   const lines = stats.unlocked
     ? [
       `**${bar}** ${stats.pct}%`,
       "",
-      `**Sponsored challenges are unlocked.** Brands running challenges in your community's games now post them here — and the prize money is won by your members.`,
+      "**Sponsored challenges are unlocked.** Brands running challenges in your community's games now post them here — and the prize money is won by your members.",
+      rate,
+      upgrade,
       "",
       `**${stats.linked.toLocaleString()}** members have linked a game · **${stats.joined.toLocaleString()}** have a Cluster profile`,
-    ]
+    ].filter(Boolean)
     : [
       `**${bar}** ${stats.pct}%`,
       "",
       `**${stats.linked.toLocaleString()} / ${stats.threshold.toLocaleString()}** members have joined Cluster *and* linked a game account.`,
-      `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here, with real prize money paid to the members who win them.`,
+      `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here — real prize money for the members who win them, and **${next?.ownerPct ?? 5}% of what the brand paid** for you.`,
       "",
       `${stats.joined.toLocaleString()} have a Cluster profile so far — linking a game is what counts.`,
     ];
@@ -1244,7 +1375,24 @@ async function searchScreen(query: string, ctx: ScreenCtx, trail: Frame[]): Prom
 
 // ===== Dispatch =====
 
+/**
+ * Every reply the bot sends, with the sponsor's button under it.
+ *
+ * A card carries a brand's creative in its top-right corner, and a Discord
+ * image is not clickable — so without this the brand gets an impression and no
+ * possible click, forever. This is the click: one link button, drawn last,
+ * under whatever the screen itself put there.
+ *
+ * It goes here rather than in each screen because the answer to "which screens
+ * carry advertising" is all of them. Twenty-one screens all remembering to add
+ * it is twenty-one chances to drop a brand's only clickable surface.
+ */
 export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {
+  const payload = await renderScreenBody(f, trail, ctx);
+  return withSponsorRow(payload, currentSponsor(), currentCardGuild());
+}
+
+async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {
   const [a = ""] = f.args;
   switch (f.screen) {
     case "home": return homeScreen(ctx, trail);
@@ -1263,6 +1411,7 @@ export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Pr
     case "link": return linkScreen(a, ctx, trail);
     case "server": return serverScreen(ctx, trail);
     case "admin": return adminScreen(a, ctx, trail);
+    case "setup": return communityScreen(a, ctx, trail);
     case "week": return weekScreen(ctx, trail);
     case "world": return worldScreen(a, f.args[1] ?? "", f.args[2] ?? "", f.args[3] ?? "", ctx, trail);
     case "search": return searchScreen(a, ctx, trail);

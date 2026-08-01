@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { keysMatch, hasPortalSession } from "@/lib/portal-auth";
 import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
+import { safeTarget } from "@/lib/cards/ad-click";
 
 // The brand portal is unauthenticated but gated by the brand's access key. Every
 // action re-validates the key against the brand before doing anything.
@@ -80,8 +81,19 @@ async function cardPlacement(db: Awaited<ReturnType<typeof getDb>>) {
 export async function portalLaunchCardCreative(brandId: string, key: string, formData: FormData) {
   const { db, brand } = await requireBrand(brandId, key);
   const fileUrl = String(formData.get("fileUrl") ?? "").trim();
-  const clickUrl = String(formData.get("clickUrl") ?? "").trim() || null;
+  // Three things, not one, and all three are required to launch on Discord.
+  //
+  // A card carries the creative; the BUTTON under it carries the click, because
+  // a Discord image is not a link. Launching with art and no destination buys a
+  // brand impressions they can never attribute to anything — which is exactly
+  // the complaint every gaming sponsorship already has. So the destination and
+  // the button's words are part of the creative, per creative, and a campaign
+  // does not go live without them.
+  const clickUrl = safeTarget(String(formData.get("clickUrl") ?? "").trim());
+  const ctaLabel = String(formData.get("ctaLabel") ?? "").trim().slice(0, 48);
   if (!fileUrl) return { error: "Upload a creative first." };
+  if (!clickUrl) return { error: "Add the link the button should open — a full https:// address." };
+  if (!ctaLabel) return { error: "Add the button text. It shows as “Sponsored: your brand — your words”." };
 
   const placement = await cardPlacement(db);
   if (!placement) return { error: "The Discord card placement isn't available yet. Message us and we'll sort it." };
@@ -119,7 +131,7 @@ export async function portalLaunchCardCreative(brandId: string, key: string, for
   const creativeId = uid();
   await db.insert(schema.adCreatives).values({
     id: creativeId, brandId, name: `${brand.name} · card ${new Date().toISOString().slice(0, 10)}`,
-    type: "image", fileUrl, clickUrl: clickUrl ?? brand.contactEmail ?? null,
+    type: "image", fileUrl, clickUrl, ctaLabel,
     width: placement.width, height: placement.height, status: "approved",
   });
   await db.insert(schema.adCampaignCreatives).values({

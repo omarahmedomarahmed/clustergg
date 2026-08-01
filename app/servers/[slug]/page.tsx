@@ -7,7 +7,7 @@ import { listRequests } from "@/lib/challenge-requests";
 import Tabs from "@/components/Tabs";
 import Icon from "@/components/Icon";
 import PortalKeyHandoff from "@/components/PortalKeyHandoff";
-import { ServerBoard, TierLadder, FunnelPanel, ChallengeRow, CommandFeed } from "@/components/ServerPortal";
+import { ServerBoard, TierLadder, FunnelPanel, ChallengeRow, CommandFeed, EarningsPanel } from "@/components/ServerPortal";
 
 export const dynamic = "force-dynamic";
 
@@ -104,6 +104,31 @@ export default async function ServerPortalPage({
                   </div>
                 </div>
               </div>
+            ),
+          },
+          {
+            // Second tab, not last: an owner opens this portal to find out what
+            // their community is worth, and the answer should not be three
+            // clicks in.
+            key: "earnings", label: "Earnings", icon: "diamond",
+            node: (
+              <EarningsPanel
+                ownerPct={data.earnings.ownerPct}
+                clusterPct={data.earnings.clusterPct}
+                nextPct={data.earnings.nextPct}
+                nextAt={data.earnings.nextAt}
+                linked={data.stats.linked}
+                earned={data.earnings.earned}
+                pending={data.earnings.pending}
+                membersWon={data.earnings.membersWon}
+                rows={data.earnings.rows.map((r) => ({
+                  challengeId: r.challengeId, title: r.title, game: r.game,
+                  brandName: r.brandName, endsAt: r.endsAt.toISOString(), ended: r.ended,
+                  entrants: r.entrants, totalEntrants: r.totalEntrants,
+                  price: r.price, serverShare: r.serverShare, ownerPct: r.ownerPct,
+                  owner: r.owner, membersWon: r.membersWon,
+                }))}
+              />
             ),
           },
           {
