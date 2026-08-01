@@ -99,7 +99,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
                 const { endChallengeNow } = await import("@/app/actions/admin");
                 await endChallengeNow(id);
               }}>
-                <button className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold">
+                <button className="glow-btn pressable rounded-full px-5 py-2 text-sm font-bold">
                   End now &amp; award trophies
                 </button>
               </form>

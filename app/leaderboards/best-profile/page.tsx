@@ -80,7 +80,7 @@ export default async function BestProfilePage() {
         <p className="text-sm text-muted">
           {tr("Customize your profile until it's unmistakably yours, then share it. Every signed-in gamer can vote once, and so can anyone in a Discord server where Cluster is installed. Votes earn you Cluster Points on the Orbit quest.")}
         </p>
-        <Link href="/profile" className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold inline-block mt-4">
+        <Link href="/profile" className="glow-btn pressable rounded-full px-5 py-2 text-sm font-bold inline-block mt-4">
           {tr("Customize your profile")}
         </Link>
       </div>

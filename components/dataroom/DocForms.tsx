@@ -63,7 +63,7 @@ export function DocSettings({ doc }: { doc?: Doc }) {
       </label>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button disabled={busy} className="grad-btn pressable rounded-full px-6 py-2.5 font-bold text-sm disabled:opacity-60">
+        <button disabled={busy} className="glow-btn pressable rounded-full px-6 py-2.5 font-bold text-sm disabled:opacity-60">
           {busy ? "Saving…" : doc ? "Save document" : "Create document"}
         </button>
         {state?.ok && <span className="text-sm text-emerald-300">{state.ok}</span>}
@@ -265,7 +265,7 @@ export function PersonEditor({ person, docs }: { person?: Person; docs: Doc[] })
             </label>
 
             <div className="flex flex-wrap items-center gap-3">
-              <button disabled={busy} className="grad-btn pressable rounded-full px-6 py-2.5 font-bold text-sm disabled:opacity-60">
+              <button disabled={busy} className="glow-btn pressable rounded-full px-6 py-2.5 font-bold text-sm disabled:opacity-60">
                 {busy ? "Saving…" : person ? "Save" : "Add person"}
               </button>
               {state?.ok && <span className="text-sm text-emerald-300">{state.ok}</span>}

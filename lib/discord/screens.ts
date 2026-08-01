@@ -793,6 +793,9 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
     })],
     components: rows([
       button("Request a challenge", `nav-req|${ctx.guildId}`, ButtonStyle.Primary, "🏆"),
+      // The support channel, where an owner already is. Everything else here
+      // is a switch; this is the one that reaches a person.
+      button("Message Cluster", `open-msg|${ctx.guildId}`, ButtonStyle.Secondary, "💬"),
       // Discord is a good remote control and a poor dashboard. Everything with
       // depth — per-member progress, the traffic we send you, editing — is on
       // the site, so every owner screen points there rather than trying to
@@ -888,6 +891,33 @@ export function aboutModal(guildId: string) {
         textRow(
           "about", "In your own words", 2, false,
           "Who plays here, what they play, and what makes this server different", 400,
+        ),
+      ],
+    },
+  };
+}
+
+/**
+ * Writing to Cluster, from inside Discord.
+ *
+ * This is a modal and not a DM listener because it has to be: we do not request
+ * the Message Content intent, so the bot cannot read the text of a message sent
+ * to it. Asking for that intent would mean Discord verification and the ability
+ * to read every message in every server we're in — an enormous permission to
+ * hold for a support inbox. A modal hands us exactly the text the owner meant
+ * to send us and nothing else, which is the right amount of access.
+ */
+export function contactModal(guildId: string) {
+  return {
+    type: InteractionResponseType.Modal,
+    data: {
+      custom_id: `msg|${guildId}`.slice(0, 100),
+      title: "Message Cluster",
+      components: [
+        textRow(
+          "body", "What's on your mind?", 2, true,
+          "A challenge you want run, a problem with the bot, a brand you want here",
+          1000,
         ),
       ],
     },

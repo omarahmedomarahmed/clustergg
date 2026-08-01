@@ -305,7 +305,7 @@ export default function CampaignBuilder({
             </div>
             <button
               type="button" onClick={buy} disabled={working}
-              className="grad-btn pressable mt-4 w-full rounded-full px-6 py-3 font-bold disabled:opacity-60"
+              className="brand-btn pressable mt-4 w-full rounded-full px-6 py-3 font-bold disabled:opacity-60"
             >
               {pending ? "Sending…" : `Buy ${quote.slots} challenges on ${picked.game}`}
             </button>

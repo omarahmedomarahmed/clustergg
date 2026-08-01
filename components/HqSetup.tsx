@@ -50,7 +50,7 @@ export function HqBuildButton({ toCreate, alreadySetUp, blocked }: {
       )}
       <button
         disabled={busy || blocked || (toCreate === 0 && !alreadySetUp)}
-        className="grad-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-60"
+        className="glow-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-60"
       >
         {busy ? "Building…"
           : blocked ? "Can't build yet"

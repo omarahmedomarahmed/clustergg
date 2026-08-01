@@ -36,7 +36,7 @@ export type AdminGroup = {
 
 export type MetricKey =
   | "users" | "linkedAccounts" | "syncErrors"
-  | "guilds" | "guildMembers" | "botCommands" | "challengeRequests"
+  | "guilds" | "guildMembers" | "botCommands" | "challengeRequests" | "serverMessages"
   | "games" | "planets" | "planetRequests"
   | "challenges" | "quests" | "leaderboards" | "trophies" | "redeems"
   | "brandEnquiries" | "brands" | "creatives" | "placements" | "adImpressions" | "adClicks"
@@ -74,6 +74,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/discord", label: "Servers & bot status", desc: "Every connected server, its growth, and whether the bot is configured.", exact: true, metric: "guilds" },
       { href: "/admin/discord/analytics", label: "Bot analytics", desc: "Commands, screens, funnel and latency across every server.", metric: "botCommands" },
       { href: "/admin/discord/requests", label: "Challenge requests", desc: "Server owners asking to run a challenge. Approve or reject.", metric: "challengeRequests", queue: true },
+      { href: "/admin/discord/messages", label: "Server messages", desc: "What owners are asking us, and your replies.", metric: "serverMessages" },
       { href: "/admin/discord/broadcast", label: "Broadcast & ads", desc: "Post to every server at once, or push an ad creative.", area: "ads" },
       { href: "/admin/discord/hq", label: "HQ server", desc: "Build our own Discord: channels, categories, roles, pinned starters.", area: "settings" },
     ],

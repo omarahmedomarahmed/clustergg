@@ -83,7 +83,7 @@ export default async function AdminDiscordPage() {
           <>
             <Link href="/admin/discord/analytics" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">Bot analytics</Link>
             {install && (
-              <a href={install} target="_blank" rel="noreferrer" className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold">
+              <a href={install} target="_blank" rel="noreferrer" className="glow-btn pressable rounded-full px-5 py-2 text-sm font-bold">
                 Add to a server
               </a>
             )}

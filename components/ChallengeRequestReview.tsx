@@ -82,7 +82,7 @@ export function RequestCard({ req, server, brand }: {
             </label>
             <button
               disabled={approving}
-              className="grad-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-60"
+              className="glow-btn pressable rounded-full px-6 py-2.5 font-bold disabled:opacity-60"
             >
               {/* A brand's challenge is public and has no entry key to send —
                   promising one on the button would be a lie about what the

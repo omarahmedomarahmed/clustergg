@@ -360,6 +360,20 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "btm_brand_idx" ON "brand_testimonials" ("brand_id","created_at")`,
+  `CREATE TABLE IF NOT EXISTS "server_messages" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "sender" text NOT NULL,
+    "body" text NOT NULL,
+    "discord_user_id" text,
+    "source" text DEFAULT 'portal' NOT NULL,
+    "delivered_at" timestamp with time zone,
+    "delivery_error" text,
+    "read_by_admin" boolean DEFAULT false NOT NULL,
+    "read_by_owner" boolean DEFAULT false NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "srv_msg_idx" ON "server_messages" ("guild_id","created_at")`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "vote_count" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_views" integer NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS "profile_votes" (

@@ -904,6 +904,39 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
 }, (t) => [index("spc_brand_idx").on(t.brandId, t.createdAt), index("spc_game_idx").on(t.game, t.status)]);
 
 /**
+ * The conversation between a server owner and Cluster.
+ *
+ * One thread per server, written to from three places and read from two: the
+ * owner types in Discord or on their portal, staff reply from the admin
+ * console, and the reply is delivered as a DM from the bot. To the owner it is
+ * one conversation with the bot they installed; to staff it is a support inbox
+ * with a thread per server. Modelled on `brandMessages` for exactly that
+ * reason — the shape is proven and the two are read the same way.
+ *
+ * `deliveredAt` is what separates this from a comment log: a staff reply that
+ * never reached Discord is a reply the owner never got, and the console has to
+ * be able to say which.
+ */
+export const serverMessages = pgTable("server_messages", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  /** owner | admin */
+  sender: text("sender").notNull(),
+  body: text("body").notNull(),
+  /** The Discord user who wrote it, or who a staff reply was sent to. */
+  discordUserId: text("discord_user_id"),
+  /** Where it came from: discord | portal | admin. */
+  source: text("source").notNull().default("portal"),
+  /** Set when the bot actually delivered a staff reply as a DM. */
+  deliveredAt: timestamp("delivered_at", { withTimezone: true, mode: "date" }),
+  /** Why delivery failed, when it did — usually the owner's DMs are closed. */
+  deliveryError: text("delivery_error"),
+  readByAdmin: boolean("read_by_admin").notNull().default(false),
+  readByOwner: boolean("read_by_owner").notNull().default(false),
+  createdAt: now("created_at"),
+}, (t) => [index("srv_msg_idx").on(t.guildId, t.createdAt)]);
+
+/**
  * What a player said about a sponsored challenge, in their own words.
  *
  * The end-of-month report a brand receives ends with testimonials, and the only

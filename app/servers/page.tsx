@@ -54,7 +54,7 @@ export default async function ServersDirectoryPage() {
             <Stat label="Live challenges" value={nf(stats.challenges)} />
           </div>
           {install && (
-            <a href={install} target="_blank" rel="noreferrer" className="grad-btn pressable rounded-full px-6 py-3 font-bold inline-block mt-8">
+            <a href={install} target="_blank" rel="noreferrer" className="glow-btn pressable rounded-full px-6 py-3 font-bold inline-block mt-8">
               Add ClusterBot to your server
             </a>
           )}
@@ -145,7 +145,7 @@ export default async function ServersDirectoryPage() {
                       <a
                         href={`/api/servers/invite?g=${encodeURIComponent(s.guildId)}`}
                         target="_blank" rel="noreferrer"
-                        className="grad-btn pressable rounded-full px-4 py-2 text-xs font-bold inline-flex items-center gap-1.5"
+                        className="glow-btn pressable rounded-full px-4 py-2 text-xs font-bold inline-flex items-center gap-1.5"
                       >
                         <Icon name="link" size={12} /> Join
                       </a>

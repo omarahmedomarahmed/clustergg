@@ -7,7 +7,7 @@ import {
 } from "@/lib/discord/types";
 import { parseId, frame, rows, button, navButton, linkButton, actionId, type Frame } from "@/lib/discord/components";
 import { openChoices } from "@/lib/discord/catalog";
-import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal, aboutModal } from "@/lib/discord/screens";
+import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal, aboutModal, contactModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
@@ -115,6 +115,7 @@ function modalSubmit(i: Interaction) {
   if (kind === "link") return linkSubmit(i, who, arg, fields);
   if (kind === "req") return requestSubmit(i, who, arg, fields);
   if (kind === "about") return aboutSubmit(i, arg, (fields.get("about") ?? "").trim());
+  if (kind === "msg") return contactSubmit(i, who, arg, (fields.get("body") ?? "").trim());
   return json({ type: InteractionResponseType.DeferredUpdateMessage });
 }
 
@@ -420,6 +421,13 @@ function componentPress(i: Interaction) {
     // read. Opening the box is harmless; saving what's in it is not.
     return json(aboutModal(guildId));
   }
+  // An owner writing to us. A modal has to be the immediate answer to a fresh
+  // interaction, so authority is re-checked on submit where there is time.
+  if (customId.startsWith("open-msg|")) {
+    const guildId = customId.slice("open-msg|".length);
+    if (!guildId) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    return json(contactModal(guildId));
+  }
   // A server owner filling in their challenge request.
   if (customId.startsWith("open-req|")) {
     const game = customId.slice("open-req|".length);
@@ -473,6 +481,34 @@ function componentPress(i: Interaction) {
 // Render a screen into the message that was clicked. Used by the few buttons
 // that don't carry a nav trail in their custom_id.
 // The community description, saved and shown back.
+/**
+ * An owner writing to us from inside Discord.
+ *
+ * Gated on the same permission as every other owner action: a server member who
+ * can't manage the server can't open a support thread in its name, because
+ * staff answering it would be answering the wrong person about somebody else's
+ * community.
+ */
+function contactSubmit(i: Interaction, who: Who, guildId: string, body: string) {
+  after(async () => {
+    if (!(await maySetup(i, guildId))) {
+      await editOriginal(i.token, { content: "Only this server's admins can message us on its behalf." });
+      return;
+    }
+    const { ownerSend } = await import("@/lib/server-messages");
+    const res = await ownerSend({ guildId, body, discordUserId: who.id, source: "discord" });
+    await editOriginal(i.token, {
+      content: res.ok
+        ? "Sent. We answer here in your DMs and on your server dashboard — usually the same day."
+        : "Couldn't send that. Try again, or write from your dashboard.",
+    });
+  });
+  return json({
+    type: InteractionResponseType.DeferredChannelMessageWithSource,
+    data: { flags: MessageFlags.Ephemeral },
+  });
+}
+
 function aboutSubmit(i: Interaction, guildId: string, about: string) {
   after(async () => {
     if (!(await maySetup(i, guildId))) {

@@ -501,7 +501,7 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
           </fieldset>
 
           <div className="flex flex-wrap gap-2">
-            <button disabled={saving} className="grad-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
+            <button disabled={saving} className="glow-btn pressable rounded-full px-5 py-2 text-sm font-bold disabled:opacity-60">
               {saving ? "Saving…" : "Save layout"}
             </button>
           </div>
