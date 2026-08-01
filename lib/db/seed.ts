@@ -201,6 +201,23 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     bio: "Cluster platform operations. Keeping the galaxy spinning.", country: "US",
     role: "superadmin", password: "cluster-admin",
   });
+  // One employee, in one department, running one system.
+  //
+  // The console is built to be handed to staff, and a workspace with no staff
+  // in it demonstrates the opposite of that. This is the shape it's designed
+  // for at this size: one person per department, each owning a system whole.
+  const opsStaff = await mkUser({
+    slug: "prize-ops", displayName: "Prize Ops", email: "ops@clustergg.com",
+    bio: "Trophies and payouts.", country: "EG", role: "staff", password: "cluster-demo",
+  });
+  const opsDept = uid();
+  await db.insert(schema.departments).values({
+    id: opsDept, name: "Prize Operations",
+    purpose: "Every winner gets what they were promised, and can turn it into money.",
+    systems: ["trophies"],
+  });
+  await db.update(schema.users).set({ departmentId: opsDept }).where(eq(schema.users.id, opsStaff));
+
   const nova = await mkUser({ slug: "nova", displayName: "Nova", email: "nova@demo.gg", bio: "Chess addict orbiting 2000 elo. Blitz or nothing.", country: "US" });
   const orion = await mkUser({ slug: "orion", displayName: "Orion", email: "orion@demo.gg", bio: "Dota 2 mid player. Immortal dreams, Archon reality.", country: "DE" });
   const vega = await mkUser({ slug: "vega", displayName: "Vega", email: "vega@demo.gg", bio: "Speedrunner. Frames are a social construct.", country: "JP" });

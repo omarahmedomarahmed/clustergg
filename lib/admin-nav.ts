@@ -61,6 +61,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     blurb: "Where everything is, and what needs you today.",
     items: [
       { href: "/admin", label: "Command centre", desc: "Every console, every live number, in one place.", exact: true },
+      { href: "/admin/systems", label: "The systems", desc: "What Cluster is made of, what each part is for, and who runs it.", exact: true },
       { href: "/admin/analytics", label: "Product analytics", desc: "Every metric we track, filterable, with a one-page report per metric.", metric: "users" },
       { href: "/admin/dataroom", label: "Data room", desc: "The investor deck and partner profile — every section editable, every number live.", area: "settings" },
       { href: "/admin/audit-log", label: "Audit log", desc: "Every admin and staff action, with who and when.", area: "audit" },
@@ -130,6 +131,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/users", label: "Users", desc: "Every gamer: profile, roles, trophies, ban and impersonate.", metric: "users" },
       { href: "/admin/linked-accounts", label: "Linked accounts", desc: "Every synced game account and its sync health.", metric: "linkedAccounts" },
       { href: "/admin/roles", label: "Roles & staff access", desc: "Promote staff and grant them admin areas.", area: "roles" },
+      { href: "/admin/departments", label: "Departments", desc: "Who runs which system. Move a person, not a checklist.", area: "roles" },
     ],
   },
   {
@@ -138,6 +140,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     area: "ads",
     blurb: "Offline sales, run through the platform.",
     items: [
+      { href: "/admin/billing", label: "Billing & revenue", desc: "What came in, what we owe gamers and servers, and what's left." },
       { href: "/admin/brand-enquiries", label: "Enquiries", desc: "Brands who asked to buy, with the plan they configured.", metric: "brandEnquiries" },
       { href: "/admin/brands", label: "Brands", desc: "Advertisers and their portals.", metric: "brands" },
       { href: "/admin/creatives", label: "Creatives", desc: "The artwork that runs.", metric: "creatives" },
@@ -167,5 +170,21 @@ export function navFor(
   return ADMIN_NAV
     .filter((g) => allowed(isAdminUser, g.area, grants))
     .map((g) => ({ ...g, items: g.items.filter((i) => allowed(isAdminUser, i.area, grants)) }))
+    .filter((g) => g.items.length > 0);
+}
+
+/**
+ * The rail as one department sees it.
+ *
+ * Filtered by the same function the page guard uses, so the rail cannot show a
+ * link that would 403 — a console that offers you doors you can't open is worse
+ * than one that offers you fewer.
+ */
+export function navForSystems(
+  systems: string[],
+  allowedPath: (systems: string[], path: string) => boolean,
+): AdminGroup[] {
+  return ADMIN_NAV
+    .map((g) => ({ ...g, items: g.items.filter((i) => allowedPath(systems, i.href)) }))
     .filter((g) => g.items.length > 0);
 }

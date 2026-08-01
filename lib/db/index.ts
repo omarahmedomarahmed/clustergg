@@ -374,6 +374,14 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "srv_msg_idx" ON "server_messages" ("guild_id","created_at")`,
+  `CREATE TABLE IF NOT EXISTS "departments" (
+    "id" text PRIMARY KEY NOT NULL,
+    "name" text NOT NULL,
+    "purpose" text DEFAULT '' NOT NULL,
+    "systems" jsonb DEFAULT '[]'::jsonb NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "department_id" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "vote_count" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_views" integer NOT NULL DEFAULT 0`,
   `CREATE TABLE IF NOT EXISTS "profile_votes" (
