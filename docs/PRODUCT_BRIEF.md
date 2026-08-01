@@ -1,6 +1,6 @@
 # Cluster — Technical Product Brief
 
-**Brand:** Cluster · **Domain:** clustergg.com · **Tagline:** _Every game. One identity._
+**Brand:** Cluster · **Domain:** clustergg.com · **Tagline:** _The media-buying and monetization platform for Discord gaming communities._
 
 This brief is the source content for a product-overview slide deck: what Cluster
 is, how it's built, the page/feature map, and where screenshots go.
@@ -9,18 +9,35 @@ is, how it's built, the page/feature map, and where screenshots go.
 
 ## 1. One-liner
 
-Cluster is a **cosmic, game-styled identity layer for gamers**: link every game
-account you own into one shareable profile, then compete in challenges, climb
+Cluster is a **B2B SaaS platform for gaming marketing**: brands buy media inside
+Discord in a structured way, server owners monetize their communities, and gamers
+earn through sponsored play. The unit of sale is not an impression — it is a
+weekly challenge carrying a brand's name, entered by verified players of a named
+game, with 70% of what the brand pays won by those players.
+
+The gamer-facing product is what makes that audience worth buying: link every
+game account you own into one shareable profile, compete in challenges, climb
 real API-verified leaderboards, and progress through galaxy-spanning **Quests**
 that turn everything you do into **Cluster Points (CP)**.
 
 ## 2. The problem
 
-A gamer's identity is fragmented across a dozen platforms (Riot, Steam, Chess.com,
-Epic, Xbox, PlayStation, mobile). There's no single, credible, shareable place
-that proves _"this is who I am across every game I play."_ Communities (Discord
-servers) have the audience but no native way to surface stats, run cross-game
-competitions, or monetize.
+**For brands.** Gamers live on Discord — they may open TikTok, they may go to a
+weekend event, but before and after that they are on Discord. Reaching them costs
+a fortune anyway: a tournament sponsorship is six figures for one or two days,
+and then the clips go to Meta and TikTok, so the brand pays twice — once for the
+event, again for the attention. Neither purchase lands on Discord, because
+Discord has no ads manager: no Business Suite, no targeting, no pixel, no
+self-serve buy. The largest gaming audience there is sits behind a door with no
+handle.
+
+**For server owners.** They have the audience and no native way to surface
+stats, run cross-game competitions, or get paid for any of it — short of
+negotiating sponsorships by hand.
+
+**For gamers.** Their identity is fragmented across a dozen platforms (Riot,
+Steam, Chess.com, Epic, Xbox, PlayStation, mobile), with no single credible,
+shareable place that proves _"this is who I am across every game I play."_
 
 ## 3. The product
 

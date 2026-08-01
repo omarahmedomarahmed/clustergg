@@ -1,10 +1,12 @@
 # Cluster (ClusterGG.com)
 
-**One cosmic identity for every game a person plays.**
+**The media-buying and monetization platform for Discord gaming communities.**
 
-Cluster is a gamer platform where players connect their game accounts (PC / console / mobile) and Discord, get a public, fully-customizable cosmic profile at `clustergg.com/u/<name>`, compete in live **Challenges** built on real game data, chart progress through **Quests** that pay out **Cluster Points (CP)**, and climb per-game **Leaderboards** on interactive **Planet** globes. It is monetized by banner/video ad **placements** sold to brands through a self-serve brand portal and an admin back office.
+Cluster is a B2B SaaS platform for gaming marketing. Brands reach gamers where they really are — inside Discord — by sponsoring the weekly challenge for a game rather than buying an impression next to it. Server owners earn a share of the platform fee on every challenge that runs in their community. Gamers link every game account they own (PC / console / mobile) into one public, fully-customizable profile at `clustergg.com/u/<name>`, enter live **Challenges** scored from real game APIs, chart progress through **Quests** that pay out **Cluster Points (CP)**, and climb per-game **Leaderboards** on interactive **Planet** globes.
 
-This repository is the entire product: a single Next.js app that serves the public site, the gamer app, the admin "Mission Control" CMS, the brand portal, and the JSON/OAuth/cron APIs.
+The three sides are the product, and none of them works alone: a stats bot nobody monetizes, an ad network with nothing verified behind it, or a revenue-share deal with no product to attach it to. Revenue comes from sponsored challenges, in-bot and on-site ad **placements**, media-buying packages and campaign analytics, sold through a self-serve brand portal and an admin back office.
+
+This repository is the entire product: a single Next.js app that serves the public site, the gamer app, the Discord bot, the admin "Mission Control" CMS, the brand and server-owner portals, and the JSON/OAuth/cron APIs.
 
 ---
 

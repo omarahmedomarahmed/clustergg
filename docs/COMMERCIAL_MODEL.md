@@ -11,14 +11,21 @@ number here you change it everywhere — including in front of an investor.
 
 ## The one-paragraph version
 
-Every gamer is on Discord. Discord has no ads manager. Brands that want gaming
-audiences either sponsor an esports event, burn money on Meta and TikTok reaching
-people on a phone break, or personally negotiate with a big server that charges
-whatever it likes. We are the structured buy: placements across a network of
-gaming communities, and — the actual product — a **sponsored weekly challenge**
+Gamers live on Discord. Discord has no ads manager. Brands that want gaming
+audiences sponsor an esports event for one or two days, then pay again to promote
+the clips on Meta and TikTok — or personally negotiate with a big server that
+charges whatever it likes. We are the structured buy: placements across a network
+of gaming communities, and — the actual product — a **sponsored weekly challenge**
 per game, carrying the brand's name, entered by verified players of that game.
 
-Two sides. Brands pay in; 70% of it is won by gamers, inside the servers that hosted the challenge.
+Sponsoring a challenge is not ad spend. It is putting a brand inside a gamer's
+home and paying them to play.
+
+**Three sides.** Brands spend. Gamers engage — 70% of what a brand pays is won by
+them, inside the servers that hosted the challenge. Server owners earn a share of
+the platform fee on every challenge that runs in their community. Cluster takes
+what is left, and there is no operations line under it: no setup fees, no
+administration fees, no staff, no operations. That is the whole margin story.
 
 ---
 
