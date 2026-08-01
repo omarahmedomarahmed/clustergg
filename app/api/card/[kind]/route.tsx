@@ -5,7 +5,8 @@ import { DEFAULT_LAYOUT } from "@/lib/cards/layout";
 import { previewFixtures } from "@/lib/cards/preview";
 import { getOrRenderCard } from "@/lib/cards/cache";
 import { withCardAd, PREVIEW_AD } from "@/lib/cards/ads";
-import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, weekCard, cardBg } from "@/lib/cards/data";
+import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, weekCard, worldCard, searchCard, cardBg } from "@/lib/cards/data";
+import type { PreviewFixtures } from "@/lib/cards/preview";
 import { guideCard, GUIDE_TOPICS } from "@/lib/cards/guides";
 import type { CardData } from "@/lib/cards/types";
 
@@ -76,6 +77,21 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
           mode: q.get("mode") === "result" ? "result" : q.get("mode") === "race" ? "race" : undefined,
         });
         break;
+      // The two kinds the studio could edit but never see. `world` and `search`
+      // are in LAYOUT_KINDS — an admin could drag their furniture and change
+      // their sections — and this route had no case for either, so the preview
+      // underneath the editor was the "no data" fallback for both. Editing a
+      // card you cannot look at is not editing.
+      case "world": {
+        const w = q.get("entity")
+          ? { game: game ?? "", kind: q.get("entityKind") ?? "champion", id: q.get("entity")! }
+          : fx?.world;
+        if (w?.game && w.id) data = await worldCard(w.game, w.kind, w.id, q.get("skin"));
+        break;
+      }
+      case "search":
+        data = await searchCard(q.get("q") ?? "nova", await searchPreviewRows(fx));
+        break;
       default:
         return NextResponse.json({ error: "unknown card kind" }, { status: 404 });
     }
@@ -141,6 +157,20 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
 const CARD_CACHE = {
   "cache-control": "public, max-age=0, s-maxage=300, stale-while-revalidate=86400",
 } as const;
+
+// The "did you mean" card, previewed against things that actually exist.
+//
+// In production this card is built from a live ambiguous query, so its rows are
+// whatever matched. For the studio that isn't reachable — there's no query — so
+// the preview shows the real fixtures the platform already resolved: a gamer, a
+// game, a champion. Three rows of true things beats six rows of lorem.
+async function searchPreviewRows(fx: PreviewFixtures | null) {
+  return [
+    fx?.slug ? { label: fx.slug, sub: `clustergg.com/u/${fx.slug}`, kind: "gamer" } : null,
+    fx?.game ? { label: fx.game, sub: "Game planet — challenges and boards", kind: "game" } : null,
+    fx?.world ? { label: fx.world.id, sub: `${fx.world.kind} · ${fx.world.game}`, kind: fx.world.kind } : null,
+  ].filter((r): r is { label: string; sub: string; kind: string } => r !== null);
+}
 
 async function explain(data: CardData) {
   const src = data.theme.bgUrl ?? null;

@@ -6,9 +6,10 @@ import { saveCardLayout, resetCardLayout, type CardActionState } from "@/app/act
 import ImageUpload from "@/components/ImageUpload";
 import {
   DEFAULT_LAYOUT, BG_SOURCES, AD_RATIO, assetBox, badgeTopFor,
-  type CardLayout, type CardAsset, type ContentBox, type Spot,
+  type CardLayout, type CardAsset, type ContentBox, type PartStyle, type Spot,
 } from "@/lib/cards/layout";
 import type { LibraryGroup } from "@/lib/cards/asset-library";
+import type { CardPart } from "@/lib/cards/layout-guide";
 
 // Drag the furniture on a rendered card.
 //
@@ -33,11 +34,13 @@ type Handle = "mascot" | "mark" | "badge" | "ad" | "content" | `asset:${string}`
 
 const ASPECT = 1200 / 630;
 
-export default function CardLayoutEditor({ kind, name, initial, art, previewUrl, library = [] }: {
+export default function CardLayoutEditor({ kind, name, initial, art, parts = [], previewUrl, library = [] }: {
   kind: string;
   name: string;
   initial: CardLayout;
   art: EditorArt;
+  /** The content sections this card kind draws, from its guide. */
+  parts?: CardPart[];
   /** Live render of this card kind, re-fetched after a save. */
   previewUrl: string;
   /** Platform images offered in the "place an image" picker. */
@@ -95,6 +98,17 @@ export default function CardLayoutEditor({ kind, name, initial, art, previewUrl,
     setL((c) => ({ ...c, assets: (c.assets ?? []).filter((a) => a.id !== id) }));
     setSel(null);
   };
+
+  // ===== Content sections =====
+  //
+  // The furniture was always draggable and the CONTENT never was — "the trophy
+  // case is in the way" had no answer short of a deploy. Each section a card
+  // draws is now a row here: turn it off, fade it, resize its type, and where
+  // the section has fixed copy of its own, rewrite it.
+  const [openPart, setOpenPart] = useState<string | null>(null);
+  const partOf = (key: string): PartStyle => l.parts?.[key] ?? {};
+  const patchPart = (key: string, patch: Partial<PartStyle>) =>
+    setL((c) => ({ ...c, parts: { ...(c.parts ?? {}), [key]: { ...(c.parts?.[key] ?? {}), ...patch } } }));
 
   const setSpot = (key: "mascot" | "mark" | "badge" | "ad", patch: Partial<Spot>) =>
     setL((cur) => ({ ...cur, [key]: { ...cur[key], ...patch } }));
@@ -255,6 +269,72 @@ export default function CardLayoutEditor({ kind, name, initial, art, previewUrl,
             onChange={(p) => setSpot("ad", p)}
             hint="A brand's creative, drawn on every render of this card. Size is the box WIDTH — the height follows the 640×200 creative. Hiding it takes this card kind out of the ad rotation."
           />
+
+          {/* ===== What this card actually says ===== */}
+          {parts.length > 0 && (
+            <fieldset className="rounded-xl border border-white/10 p-3 space-y-1.5">
+              <legend className="px-1.5 text-[11px] uppercase tracking-widest text-muted">
+                Sections on this card
+              </legend>
+              <p className="text-[11px] text-muted leading-snug pb-1">
+                Every block this card draws, in the order it draws them. Turn one off and the space
+                goes to what&apos;s below it. Sections with their own wording can be rewritten —
+                the live numbers underneath never can.
+              </p>
+              {parts.map((sec) => {
+                const st = partOf(sec.key);
+                const open = openPart === sec.key;
+                const edited = st.hidden || (st.scale ?? 1) !== 1 || (st.opacity ?? 100) !== 100 || !!st.text;
+                return (
+                  <div key={sec.key} className={`rounded-lg border ${open ? "border-cyan-400/50 bg-black/30" : "border-white/10"}`}>
+                    <div className="flex items-center gap-2 px-2.5 py-2">
+                      <input
+                        type="checkbox" checked={!st.hidden} className="accent-cyan-500 shrink-0"
+                        title={st.hidden ? "Hidden — tick to draw it" : "Drawn — untick to hide it"}
+                        onChange={(e) => patchPart(sec.key, { hidden: !e.target.checked })}
+                      />
+                      <button
+                        type="button" onClick={() => setOpenPart(open ? null : sec.key)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <span className={`text-xs font-semibold ${st.hidden ? "text-muted line-through" : "text-ink"}`}>
+                          {sec.label}
+                        </span>
+                        {edited && <span className="ml-1.5 text-[9px] uppercase tracking-wider text-cyan-300">edited</span>}
+                      </button>
+                      <Icon name={open ? "minus" : "edit"} size={12} />
+                    </div>
+                    {open && (
+                      <div className="border-t border-white/10 px-2.5 py-2.5 space-y-2.5">
+                        <p className="text-[10px] leading-snug text-muted">{sec.note}</p>
+                        <Slider
+                          name="" label="Text size" value={Math.round((st.scale ?? 1) * 100)} min={50} max={200} suffix="%"
+                          onChange={(v) => patchPart(sec.key, { scale: v / 100 })}
+                        />
+                        <Slider
+                          name="" label="Opacity" value={Math.round(st.opacity ?? 100)} min={10} max={100} suffix="%"
+                          onChange={(v) => patchPart(sec.key, { opacity: v })}
+                        />
+                        {sec.text !== undefined && (
+                          <label className="block">
+                            <span className="mb-1 block text-[10px] text-muted">Its wording</span>
+                            <input
+                              type="text" value={st.text ?? "" } placeholder={sec.text} maxLength={160}
+                              onChange={(e) => patchPart(sec.key, { text: e.target.value })}
+                              className="input-cosmic w-full px-2 py-1 text-xs"
+                            />
+                            <span className="mt-1 block text-[10px] text-muted">
+                              Empty keeps “{sec.text}”.
+                            </span>
+                          </label>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </fieldset>
+          )}
 
           <fieldset className="rounded-xl border border-white/10 p-3">
             <legend className="px-1.5 text-[11px] uppercase tracking-widest text-muted">Content box</legend>

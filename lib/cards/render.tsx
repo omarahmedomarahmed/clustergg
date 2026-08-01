@@ -3,10 +3,10 @@ import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import {
-  AD_LABEL_H, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, opacityOf, plateBg,
-  spotBox, transformOf,
+  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, opacityOf,
+  partOf, plateBg, spotBox, transformOf,
 } from "@/lib/cards/layout";
-import type { CardAsset } from "@/lib/cards/layout";
+import type { CardAsset, PartDraw } from "@/lib/cards/layout";
 import { layoutFor } from "@/lib/cards/layout-store";
 import type {
   CardAdSlot,
@@ -105,7 +105,20 @@ function safeTheme(theme: CardTheme): CardTheme {
 // Every position here comes from the card's LAYOUT (Admin → Card layouts), not
 // from constants. The defaults reproduce the geometry this frame used to
 // hard-code, so an unedited card is pixel-identical to what it drew before.
-function Frame({ theme, children, corner }: { theme: CardTheme; children: React.ReactNode; corner?: React.ReactNode }) {
+function Frame({ theme, children, corner, side }: {
+  theme: CardTheme;
+  children: React.ReactNode;
+  corner?: React.ReactNode;
+  /**
+   * The right-hand column, between the sponsor and the logo.
+   *
+   * Content is clipped to the content box, so a card that wants to put a
+   * picture beside its text — the world card's splash — cannot do it from
+   * inside `children`. This is that column: it is handed the exact rectangle
+   * the layout leaves free, so it can never overlap the text or the ad.
+   */
+  side?: (box: { left: number; top: number; width: number; height: number }) => React.ReactNode;
+}) {
   const l = theme.layout ?? DEFAULT_LAYOUT;
   const mascot = spotBox(l.mascot, 1);
   const mark = spotBox(l.mark, 1);
@@ -117,6 +130,22 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
   const ad = theme.ad && !l.ad.hidden ? theme.ad : null;
   const adB = adBox(l.ad);
   const badgeTop = badgeTopFor(l, !!ad, 1);
+  // The free rectangle to the right of the content: starts where the text
+  // column ends, stops at the canvas edge, and begins under whichever of the
+  // sponsor box and the badge hangs lowest. Computed from the LIVE layout, so
+  // an admin who drags the ad somewhere else moves this with it.
+  const sideTop = Math.max(
+    content.top,
+    ad && !l.ad.hidden ? adB.bottom + 14 : 0,
+    corner && !l.badge.hidden ? badgeTop + badge.height + 14 : 0,
+  );
+  const sideLeft = content.left + content.width + 16;
+  const sideBox = {
+    left: sideLeft,
+    top: sideTop,
+    width: Math.max(0, CANVAS_W - 20 - sideLeft),
+    height: Math.max(0, CARD_H - 18 - sideTop),
+  };
   return (
     <div style={{ width: CARD_W, height: CARD_H, display: "flex", position: "relative", background: VOID, color: INK }}>
       {theme.bgUrl ? (
@@ -173,6 +202,9 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
       <div style={{ position: "absolute", left: content.left, top: content.top, width: content.width, height: content.height, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {children}
       </div>
+      {/* The right-hand column. Drawn before the logo on purpose: the logo is
+          the one thing that is never covered. */}
+      {side && sideBox.width > 60 && sideBox.height > 60 ? side(sideBox) : null}
       {/* The real logo mark, drawn on top of everything. Falls back to the
           wordmark only when no logo is configured, so a card is never
           unbranded. */}
@@ -186,7 +218,11 @@ function Frame({ theme, children, corner }: { theme: CardTheme; children: React.
             <img src={theme.markUrl} alt="" width={mark.width} height={mark.height}
               style={{ width: mark.width, height: mark.height, borderRadius: Math.round(mark.width * 0.23), objectFit: "contain" }} />
           ) : (
-            <div style={{ width: mark.width, height: mark.width, borderRadius: Math.round(mark.width * 0.17), display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: Math.round(mark.width * 0.55), fontWeight: 700, color: "#fff" }}>C</div>
+            // Drawn at 62% of the spot, not filling it. The mark is 250px now,
+            // and a deployment that hasn't uploaded a logo yet should get a
+            // wordmark-sized placeholder, not a 250px solid tile painted over
+            // the corner of every card it renders.
+            <div style={{ width: Math.round(mark.width * 0.62), height: Math.round(mark.width * 0.62), borderRadius: Math.round(mark.width * 0.14), display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: Math.round(mark.width * 0.34), fontWeight: 700, color: "#fff" }}>C</div>
           )}
         </div>
       ) : null}
@@ -266,6 +302,61 @@ function styleOf(o: { opacity?: number; flipX?: boolean; flipY?: boolean; rotate
   return out;
 }
 
+// ===== Sections =====
+//
+// Every block a card draws is NAMED, and the name is what an admin edits.
+//
+// Before this, the layout editor could move the furniture and resize the
+// content box, and that was all — "the card is too busy" had exactly one
+// answer, which was to make the whole block smaller. The sections declared in
+// `layout-guide.ts` are the real grain of a card: the trophy case, the recent
+// matches, the standings, the abilities. Each one can be turned off, faded,
+// scaled, and — where the section has fixed copy of its own — reworded.
+//
+// Live data is deliberately NOT rewordable. A heading over a leaderboard can
+// say whatever a server wants it to say; the leaderboard cannot.
+
+/** This card's setting for one named section. */
+function part(t: CardTheme, key: string): PartDraw {
+  return partOf(t.layout ?? DEFAULT_LAYOUT, key);
+}
+
+/**
+ * One named section, drawn or not.
+ *
+ * Returning `null` when hidden is the whole trick: the section leaves the flex
+ * column entirely rather than collapsing to a zero-height box that still eats
+ * its margin, so hiding the trophy case genuinely gives that space to whatever
+ * is underneath it.
+ */
+function Section({ p, style, children }: {
+  p: PartDraw; style?: React.CSSProperties; children: React.ReactNode;
+}) {
+  if (p.hidden) return null;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", ...style, ...styleOf({ opacity: p.opacity }) }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * A section heading — the one line of a data block an admin can rewrite.
+ *
+ * `flexShrink: 0` is load-bearing. When a card's content is a few pixels taller
+ * than its box, Yoga compresses every child that will compress, and a heading
+ * squeezed to half its line height renders ON TOP of the first row beneath it.
+ * A heading that refuses to shrink pushes the overflow to the bottom, where
+ * `overflow: hidden` clips it cleanly instead.
+ */
+function Head({ p, children, color = MUTED }: { p: PartDraw; children: string; color?: string }) {
+  return (
+    <div style={{ display: "flex", flexShrink: 0, fontSize: p.f(17), letterSpacing: 3, color, fontWeight: 700 }}>
+      {p.say(children)}
+    </div>
+  );
+}
+
 // One admin-placed image.
 //
 // Satori needs an explicit width/height on an absolutely positioned element —
@@ -326,9 +417,15 @@ function Plate({ theme, children, style }: {
   );
 }
 
-function Pill({ children, color = MUTED, bg = "rgba(255,255,255,0.07)" }: { children: React.ReactNode; color?: string; bg?: string }) {
+function Pill({ children, color = MUTED, bg = "rgba(255,255,255,0.07)", size = 21 }: {
+  children: React.ReactNode; color?: string; bg?: string; size?: number;
+}) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 16px", borderRadius: 999, background: bg, color: safeColor(color, MUTED), fontSize: 21, fontWeight: 700 }}>
+    <div style={{
+      display: "flex", alignItems: "center", gap: 8,
+      padding: `${Math.round(size / 3)}px ${Math.round(size * 0.76)}px`, borderRadius: 999,
+      background: bg, color: safeColor(color, MUTED), fontSize: size, fontWeight: 700,
+    }}>
       {children}
     </div>
   );
@@ -355,14 +452,25 @@ function Bar({ pct, accent: a1, accent2: a2, h = 16 }: { pct: number; accent: st
   );
 }
 
-function Title({ text, sub, accent: a1, accent2: a2, theme }: {
+function Title({ text, sub, accent: a1, accent2: a2, theme, p, size = 52 }: {
   text: string; sub?: string | null; accent: string; accent2: string; theme: CardTheme;
+  /** The `title` section's setting, when the card has one. */
+  p?: PartDraw;
+  /**
+   * Headline size. 52 is the house default — the text column lost 120px to the
+   * sponsor box and the logo, and a two-word title at the old 58 wrapped to
+   * three lines. Dense cards pass something smaller: on a challenge card every
+   * line the title takes is a line the standings don't get.
+   */
+  size?: number;
 }) {
   const [accent, accent2] = [safeColor(a1), safeColor(a2, FALLBACK_ACCENT2)];
+  const f = p?.f ?? ((n: number) => n);
+  if (p?.hidden) return null;
   return (
-    <Plate theme={theme} style={{ gap: 6 }}>
-      <div style={{ fontSize: 58, fontWeight: 700, lineHeight: 1.05, color: INK }}>{text}</div>
-      {sub ? <div style={{ fontSize: 26, color: MUTED }}>{sub}</div> : null}
+    <Plate theme={theme} style={{ gap: 6, ...styleOf({ opacity: p?.opacity }) }}>
+      <div style={{ fontSize: f(size), fontWeight: 700, lineHeight: 1.05, color: INK }}>{text}</div>
+      {sub ? <div style={{ fontSize: f(Math.round(size * 0.46)), color: MUTED }}>{sub}</div> : null}
       <div style={{ display: "flex", width: 132, height: 6, borderRadius: 999, marginTop: 8, background: `linear-gradient(90deg, ${accent}, ${accent2})` }} />
     </Plate>
   );
@@ -385,106 +493,115 @@ function clamp(s: string | null | undefined, max: number): string | undefined {
 
 function ProfileBody(d: ProfileCard) {
   const t = d.theme;
-  const l = t.layout ?? DEFAULT_LAYOUT;
-  const trophies = (d.trophies ?? []).slice(0, 5);
-  const challenges = (d.challenges ?? []).slice(0, 3);
+  const [pIdentity, pStats, pTrophies, pChallenges, pAccounts] =
+    ["identity", "stats", "trophies", "challenges", "accounts"].map((k) => part(t, k));
+  const trophies = pTrophies.hidden ? [] : (d.trophies ?? []).slice(0, 5);
+  const challenges = pChallenges.hidden ? [] : (d.challenges ?? []).slice(0, 3);
   // With a trophy shelf and live challenges below it, six account tiles no
   // longer fit. Four keeps every row full-width and readable, and the profile
   // link on the card is there for the rest.
   const accounts = d.accounts.slice(0, trophies.length || challenges.length ? 4 : 6);
   return (
     <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
-      <Plate theme={t} style={{ gap: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 28 }}>
-          <Avatar url={d.avatarUrl} ring={t.accent} />
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <div style={{ fontSize: 56, fontWeight: 700, lineHeight: 1.05 }}>{d.displayName}</div>
-            <div style={{ fontSize: 25, color: MUTED }}>{`clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`}</div>
+      <Section p={pIdentity}>
+        <Plate theme={t} style={{ gap: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
+            <Avatar url={d.avatarUrl} ring={t.accent} size={pIdentity.f(104)} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ fontSize: pIdentity.f(52), fontWeight: 700, lineHeight: 1.05 }}>{clamp(d.displayName, 18)}</div>
+              <div style={{ fontSize: pIdentity.f(23), color: MUTED }}>{`clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`}</div>
+            </div>
           </div>
-        </div>
-      </Plate>
+        </Plate>
+      </Section>
 
-      <div style={{ display: "flex", gap: 14, marginTop: 22 }}>
-        <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{`${nf(d.totalCp)} CP`}</Pill>
-        <Pill>{`${nf(d.views)} views`}</Pill>
-        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">
+      <Section p={pStats} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 22 }}>
+        <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(21)}>{`${nf(d.totalCp)} CP`}</Pill>
+        <Pill size={pStats.f(21)}>{`${nf(d.views)} views`}</Pill>
+        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pStats.f(21)}>
           <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#fbbf24" }} />
           {`${nf(d.votes)} votes`}
         </Pill>
-        {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)">{d.award}</Pill> : null}
-      </div>
+        {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)" size={pStats.f(21)}>{clamp(d.award, 22)}</Pill> : null}
+      </Section>
 
       {/* The trophy shelf. A profile card without it is a stat sheet; the
           trophies are the part somebody actually screenshots. Won pieces are
           drawn at full opacity with their real art — there is no placeholder,
           because an empty shelf says the honest thing. */}
       {trophies.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 7, marginTop: 20 }}>
-          <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>
+        <Section p={pTrophies} style={{ gap: 7, marginTop: 20 }}>
+          <Head p={pTrophies}>
             {`TROPHY CASE${d.trophyCount && d.trophyCount > trophies.length ? ` · ${nf(d.trophyCount)}` : ""}`}
-          </div>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 14 }}>
+          </Head>
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
             {trophies.map((tr, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, width: 92 }}>
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, width: pTrophies.f(84) }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={tr.imageUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, objectFit: "contain" }} />
-                <div style={{ fontSize: 15, color: MUTED }}>{clamp(tr.name, 13)}</div>
+                <img src={tr.imageUrl} alt="" width={pTrophies.f(66)} height={pTrophies.f(66)}
+                  style={{ width: pTrophies.f(66), height: pTrophies.f(66), objectFit: "contain" }} />
+                <div style={{ fontSize: pTrophies.f(15), color: MUTED }}>{clamp(tr.name, 12)}</div>
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       ) : null}
 
       {/* What they're competing in right now — the one thing on this card that
           another gamer can act on. */}
       {challenges.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 18 }}>
-          <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>IN THE ARENA</div>
+        <Section p={pChallenges} style={{ gap: 6, marginTop: 18 }}>
+          <Head p={pChallenges}>IN THE ARENA</Head>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {challenges.map((c, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 16px", borderRadius: 14, background: "rgba(0,0,0,0.48)", border: `1px solid ${c.live ? alpha(t.accent2, 0.45, FALLBACK_ACCENT2) : "rgba(255,255,255,0.10)"}` }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 14, background: "rgba(0,0,0,0.48)", border: `1px solid ${c.live ? alpha(t.accent2, 0.45, FALLBACK_ACCENT2) : "rgba(255,255,255,0.10)"}` }}>
                 {c.live ? <div style={{ display: "flex", width: 10, height: 10, borderRadius: 5, background: "#34d399" }} /> : null}
-                <div style={{ fontSize: 20, fontWeight: 700 }}>{clamp(c.title, 26)}</div>
-                <div style={{ fontSize: 18, color: MUTED }}>{c.place ? `#${c.place}` : `${nf(c.points)} pts`}</div>
+                <div style={{ fontSize: pChallenges.f(19), fontWeight: 700 }}>{clamp(c.title, 22)}</div>
+                <div style={{ fontSize: pChallenges.f(17), color: MUTED }}>{c.place ? `#${c.place}` : `${nf(c.points)} pts`}</div>
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       ) : null}
 
-      <div style={{ display: "flex", flexDirection: "column", marginTop: 20, gap: 10, flex: 1 }}>
-        <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>LINKED ACCOUNTS</div>
+      <Section p={pAccounts} style={{ marginTop: 20, gap: 10, flex: 1 }}>
+        <Head p={pAccounts}>LINKED ACCOUNTS</Head>
         {accounts.length === 0 ? (
-          <div style={{ fontSize: 26, color: MUTED }}>No games linked yet — link one to unlock quests.</div>
+          <div style={{ display: "flex", fontSize: pAccounts.f(24), color: MUTED }}>No games linked yet — link one to unlock quests.</div>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
             {accounts.map((a, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 18px", borderRadius: 18, background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.10)", width: 340 }}>
+              // A percentage, not a pixel width: the text column is narrower
+              // now that the sponsor and the logo own the right-hand side, and
+              // a hard 340 tipped two tiles per row into one.
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderRadius: 18, background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.10)", width: "48%" }}>
                 {a.logoUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.logoUrl} alt="" width={44} height={44} style={{ width: 44, height: 44, borderRadius: 10, objectFit: "cover" }} />
-                ) : <div style={{ width: 44, height: 44, borderRadius: 10, display: "flex", background: alpha(t.accent, 0.2) }} />}
+                  <img src={a.logoUrl} alt="" width={42} height={42} style={{ width: 42, height: 42, borderRadius: 10, objectFit: "cover" }} />
+                ) : <div style={{ width: 42, height: 42, borderRadius: 10, display: "flex", background: alpha(t.accent, 0.2) }} />}
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div style={{ fontSize: 23, fontWeight: 700 }}>{clamp(a.tag, 20)}</div>
-                  <div style={{ fontSize: 18, color: MUTED }}>{a.headline || a.game}</div>
+                  <div style={{ fontSize: pAccounts.f(22), fontWeight: 700 }}>{clamp(a.tag, 16)}</div>
+                  <div style={{ fontSize: pAccounts.f(17), color: MUTED }}>{clamp(a.headline || a.game, 22)}</div>
                 </div>
               </div>
             ))}
           </div>
         )}
-      </div>
+      </Section>
     </Frame>
   );
 }
 
 function GameStatsBody(d: GameStatsCard) {
   const t = d.theme;
-  const champs = d.champions ?? [];
-  const matches = d.matches ?? [];
+  const [pId, pLive, pStats, pChamps, pMatches, pRank, pEmpty] =
+    ["identity", "live", "stats", "champions", "matches", "rank", "empty"].map((k) => part(t, k));
+  const champs = pChamps.hidden ? [] : (d.champions ?? []);
+  const matches = pMatches.hidden ? [] : (d.matches ?? []);
   const hasRich = champs.length > 0 || matches.length > 0;
   // With champions and match history there's no room for six stat tiles, so the
   // stats compress into a single row and the game content gets the space.
-  const statCount = hasRich ? 3 : 6;
+  const statCount = hasRich ? 2 : 6;
 
   return (
     <Frame theme={t} corner={d.logoUrl ? (
@@ -492,84 +609,90 @@ function GameStatsBody(d: GameStatsCard) {
       <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
     ) : undefined}>
       {/* Identity first: the in-game name people searched for, and the human behind it. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-        <Avatar url={d.gameAvatarUrl || d.avatarUrl} size={84} ring={t.accent} />
+      <Section p={pId} style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
+        <Avatar url={d.gameAvatarUrl || d.avatarUrl} size={pId.f(78)} ring={t.accent} />
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div style={{ fontSize: 46, fontWeight: 700, lineHeight: 1.05 }}>{clamp(d.tag, 24)}</div>
-          <div style={{ fontSize: 23, color: MUTED }}>
-            {`${d.game}${d.region ? ` · ${d.region}` : ""} · ${d.displayName}${d.slug ? ` (clustergg.com/u/${d.slug})` : ""}`}
+          <div style={{ fontSize: pId.f(42), fontWeight: 700, lineHeight: 1.05 }}>{clamp(d.tag, 20)}</div>
+          <div style={{ fontSize: pId.f(21), color: MUTED }}>
+            {clamp(`${d.game}${d.region ? ` · ${d.region}` : ""} · ${d.displayName}`, 48)}
           </div>
         </div>
-      </div>
+      </Section>
 
       {d.live?.champion ? (
-        <div style={{ display: "flex", marginTop: 14 }}>
-          <Pill color="#34d399" bg="rgba(52,211,153,0.14)">
+        <Section p={pLive} style={{ flexDirection: "row", marginTop: 14 }}>
+          <Pill color="#34d399" bg="rgba(52,211,153,0.14)" size={pLive.f(21)}>
             <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#34d399" }} />
-            {`IN GAME · ${d.live.champion}`}
+            {pLive.say("IN GAME")}
+            {` · ${clamp(d.live.champion, 18)}`}
           </Pill>
-        </div>
+        </Section>
       ) : null}
 
       {d.stats.length === 0 && !hasRich ? (
-        <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: MUTED }}>
-          Stats sync shortly after linking — check back in a few minutes.
-        </div>
+        <Section p={pEmpty} style={{ marginTop: 40 }}>
+          <div style={{ display: "flex", fontSize: pEmpty.f(24), color: MUTED, lineHeight: 1.3 }}>
+            {pEmpty.say("Stats sync shortly after linking — check back in a few minutes.")}
+          </div>
+        </Section>
       ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 12, marginTop: 22 }}>
+        <Section p={pStats} style={{ flexDirection: "row", flexWrap: "wrap", alignContent: "flex-start", gap: 12, marginTop: 20 }}>
           {d.stats.slice(0, statCount).map((s, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 4, width: hasRich ? 352 : 336, padding: "14px 20px", borderRadius: 18, background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.10)" }}>
-              <div style={{ fontSize: 17, letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{clamp(s.label.toUpperCase(), 22)}</div>
-              <div style={{ fontSize: 34, fontWeight: 700, color: t.accent2 }}>{s.value}</div>
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 4, width: "48%", padding: "12px 18px", borderRadius: 18, background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.10)" }}>
+              <div style={{ fontSize: pStats.f(16), letterSpacing: 2, color: MUTED, fontWeight: 700 }}>{clamp(s.label.toUpperCase(), 20)}</div>
+              <div style={{ fontSize: pStats.f(32), fontWeight: 700, color: t.accent2 }}>{clamp(s.value, 18)}</div>
             </div>
           ))}
-        </div>
+        </Section>
       )}
 
       {champs.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 20 }}>
-          <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>MOST PLAYED</div>
-          <div style={{ display: "flex", gap: 12 }}>
+        <Section p={pChamps} style={{ gap: 8, marginTop: 18 }}>
+          <Head p={pChamps}>MOST PLAYED</Head>
+          <div style={{ display: "flex", gap: 10 }}>
             {champs.slice(0, 5).map((c, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: 122 }}>
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, width: pChamps.f(106) }}>
                 {c.iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={c.iconUrl} alt="" width={64} height={64} style={{ width: 64, height: 64, borderRadius: 32, objectFit: "cover", border: `3px solid ${alpha(t.accent, 0.53)}` }} />
+                  <img src={c.iconUrl} alt="" width={pChamps.f(58)} height={pChamps.f(58)}
+                    style={{ width: pChamps.f(58), height: pChamps.f(58), borderRadius: pChamps.f(29), objectFit: "cover", border: `3px solid ${alpha(t.accent, 0.53)}` }} />
                 ) : (
-                  <div style={{ display: "flex", width: 64, height: 64, borderRadius: 32, background: alpha(t.accent, 0.2), border: `3px solid ${alpha(t.accent, 0.53)}` }} />
+                  <div style={{ display: "flex", width: pChamps.f(58), height: pChamps.f(58), borderRadius: pChamps.f(29), background: alpha(t.accent, 0.2), border: `3px solid ${alpha(t.accent, 0.53)}` }} />
                 )}
-                <div style={{ fontSize: 17, fontWeight: 700 }}>{clamp(c.name, 12)}</div>
-                {c.points ? <div style={{ fontSize: 14, color: MUTED }}>{`${Math.round(c.points / 1000)}k`}</div> : null}
+                <div style={{ fontSize: pChamps.f(16), fontWeight: 700 }}>{clamp(c.name, 11)}</div>
+                {c.points ? <div style={{ fontSize: pChamps.f(14), color: MUTED }}>{`${Math.round(c.points / 1000)}k`}</div> : null}
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       ) : null}
 
       {matches.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 18, flex: 1 }}>
-          <div style={{ fontSize: 17, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>RECENT MATCHES</div>
+        <Section p={pMatches} style={{ gap: 8, marginTop: 16, flex: 1 }}>
+          <Head p={pMatches}>RECENT MATCHES</Head>
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {matches.slice(0, 4).map((m, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "7px 16px", borderRadius: 12, background: m.win ? "rgba(52,211,153,0.14)" : "rgba(239,68,68,0.12)", border: `1px solid ${m.win ? "rgba(52,211,153,0.35)" : "rgba(239,68,68,0.3)"}` }}>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 14px", borderRadius: 12, background: m.win ? "rgba(52,211,153,0.14)" : "rgba(239,68,68,0.12)", border: `1px solid ${m.win ? "rgba(52,211,153,0.35)" : "rgba(239,68,68,0.3)"}` }}>
                 {m.iconUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={m.iconUrl} alt="" width={34} height={34} style={{ width: 34, height: 34, borderRadius: 17, objectFit: "cover" }} />
+                  <img src={m.iconUrl} alt="" width={30} height={30} style={{ width: 30, height: 30, borderRadius: 15, objectFit: "cover" }} />
                 ) : null}
-                <div style={{ fontSize: 20, fontWeight: 700, width: 62, color: m.win ? "#34d399" : "#f87171" }}>{m.win ? "WIN" : "LOSS"}</div>
-                <div style={{ fontSize: 20, fontWeight: 700, flex: 1 }}>{clamp(m.champion, 18)}</div>
-                <div style={{ fontSize: 20, color: INK }}>{m.kda}</div>
-                <div style={{ fontSize: 17, color: MUTED, width: 110 }}>{clamp(m.queue ?? m.when ?? "", 14)}</div>
+                <div style={{ fontSize: pMatches.f(18), fontWeight: 700, width: pMatches.f(56), color: m.win ? "#34d399" : "#f87171" }}>{m.win ? "WIN" : "LOSS"}</div>
+                <div style={{ fontSize: pMatches.f(18), fontWeight: 700, flex: 1 }}>{clamp(m.champion, 14)}</div>
+                <div style={{ fontSize: pMatches.f(18), color: INK }}>{m.kda}</div>
+                <div style={{ fontSize: pMatches.f(15), color: MUTED, width: pMatches.f(92) }}>{clamp(m.queue ?? m.when ?? "", 12)}</div>
               </div>
             ))}
           </div>
-        </div>
+        </Section>
       ) : null}
 
       {d.rank ? (
-        <div style={{ display: "flex", marginTop: 12 }}>
-          <Pill color={t.accent} bg="rgba(255,255,255,0.08)">{`#${d.rank.place} of ${nf(d.rank.total)} · ${d.rank.board}`}</Pill>
-        </div>
+        <Section p={pRank} style={{ flexDirection: "row", marginTop: 12 }}>
+          <Pill color={t.accent} bg="rgba(255,255,255,0.08)" size={pRank.f(20)}>
+            {clamp(`#${d.rank.place} of ${nf(d.rank.total)} · ${d.rank.board}`, 42)}
+          </Pill>
+        </Section>
       ) : null}
     </Frame>
   );
@@ -584,79 +707,95 @@ function QuestBody(d: QuestCard) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain" }} />
     ) : undefined}>
-      <Title text={d.questName} sub={d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline} accent={t.accent} accent2={t.accent2} theme={t} />
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 16, marginTop: 30 }}>
-        <div style={{ fontSize: 74, fontWeight: 700, color: t.accent2, lineHeight: 1 }}>{nf(d.cp)}</div>
-        <div style={{ fontSize: 27, color: MUTED, paddingBottom: 10 }}>
-          {`CP${next > 0 ? ` / ${nf(next)} → ${d.nextTier ?? ""}` : " · max tier"}`}
-        </div>
-      </div>
-      <div style={{ display: "flex", marginTop: 18 }}><Bar pct={pct} accent={t.accent} accent2={t.accent2} h={18} /></div>
+      <Title text={d.questName} sub={d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+      {(() => {
+        const p = part(t, "progress");
+        return (
+          <Section p={p} style={{ marginTop: 30 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
+              <div style={{ fontSize: p.f(70), fontWeight: 700, color: t.accent2, lineHeight: 1 }}>{nf(d.cp)}</div>
+              <div style={{ fontSize: p.f(25), color: MUTED, paddingBottom: 10 }}>
+                {`${p.say("CP")}${next > 0 ? ` / ${nf(next)} → ${d.nextTier ?? ""}` : " · max tier"}`}
+              </div>
+            </div>
+            <div style={{ display: "flex", marginTop: 18 }}><Bar pct={pct} accent={t.accent} accent2={t.accent2} h={18} /></div>
+          </Section>
+        );
+      })()}
       {/* alignItems keeps the tier chips sized to their content instead of
           stretching to fill the remaining card height. */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginTop: 34, flex: 1 }}>
-        {d.tiers.slice(0, 5).map((tier, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, padding: "18px 10px", borderRadius: 20, background: tier.earned ? alpha(t.accent, 0.12) : "rgba(0,0,0,0.42)", border: `1px solid ${tier.earned ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.10)"}` }}>
-            <div style={{ display: "flex", width: 22, height: 22, borderRadius: 11, background: tier.earned ? t.accent : "transparent", border: `3px solid ${tier.earned ? t.accent : "rgba(255,255,255,0.32)"}` }} />
-            <div style={{ fontSize: 21, fontWeight: 700, color: tier.earned ? t.accent : MUTED }}>{tier.name}</div>
-            <div style={{ fontSize: 18, color: MUTED }}>{`${nf(tier.threshold)} CP`}</div>
-          </div>
-        ))}
-      </div>
+      {(() => {
+        const p = part(t, "tiers");
+        return (
+          <Section p={p} style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, marginTop: 32, flex: 1 }}>
+            {d.tiers.slice(0, 5).map((tier, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, padding: "16px 8px", borderRadius: 20, background: tier.earned ? alpha(t.accent, 0.12) : "rgba(0,0,0,0.42)", border: `1px solid ${tier.earned ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.10)"}` }}>
+                <div style={{ display: "flex", width: 20, height: 20, borderRadius: 10, background: tier.earned ? t.accent : "transparent", border: `3px solid ${tier.earned ? t.accent : "rgba(255,255,255,0.32)"}` }} />
+                <div style={{ fontSize: p.f(19), fontWeight: 700, color: tier.earned ? t.accent : MUTED }}>{clamp(tier.name, 10)}</div>
+                <div style={{ fontSize: p.f(16), color: MUTED }}>{`${nf(tier.threshold)} CP`}</div>
+              </div>
+            ))}
+          </Section>
+        );
+      })()}
     </Frame>
   );
 }
 
 function CpSummaryBody(d: CpSummaryCard) {
   const t = d.theme;
+  const p = part(t, "quests");
   return (
     <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
-      <Title text={`${d.displayName}'s quests`} sub={`${nf(d.totalCp)} total Cluster Points`} accent={t.accent} accent2={t.accent2} theme={t} />
-      <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: 30, flex: 1 }}>
+      <Title text={`${clamp(d.displayName, 16)}'s quests`} sub={`${nf(d.totalCp)} total Cluster Points`} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+      <Section p={p} style={{ gap: 16, marginTop: 30, flex: 1 }}>
         {d.quests.slice(0, 4).map((q, i) => {
           const pct = q.target > 0 ? (q.cp / q.target) * 100 : 100;
           return (
             <div key={i} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <div style={{ fontSize: 26, fontWeight: 700, color: q.accent }}>{q.name}</div>
-                <div style={{ fontSize: 23, color: MUTED }}>{`${nf(q.cp)} / ${nf(q.target)} CP · ${q.tier}`}</div>
+                <div style={{ fontSize: p.f(24), fontWeight: 700, color: q.accent }}>{clamp(q.name, 20)}</div>
+                <div style={{ fontSize: p.f(20), color: MUTED }}>{`${nf(q.cp)} / ${nf(q.target)} · ${clamp(q.tier, 12)}`}</div>
               </div>
               <Bar pct={pct} accent={q.accent} accent2={t.accent2} h={14} />
             </div>
           );
         })}
-      </div>
+      </Section>
     </Frame>
   );
 }
 
 function LeaderboardBody(d: LeaderboardCard) {
   const t = d.theme;
+  const [pRows, pEmpty] = ["rows", "empty"].map((k) => part(t, k));
   const medal = ["#fbbf24", "#cbd5e1", "#b45309"];
   return (
     <Frame theme={t} corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
     ) : undefined}>
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} />
+      <Title text={clamp(d.title, 26) ?? d.title} sub={clamp(d.subtitle, 42)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
       {d.rows.length === 0 ? (
-        <div style={{ display: "flex", marginTop: 40, fontSize: 26, color: MUTED }}>
-          No one has posted a score yet — link an account and you top this board.
-        </div>
+        <Section p={pEmpty} style={{ marginTop: 40 }}>
+          <div style={{ display: "flex", fontSize: pEmpty.f(24), color: MUTED, lineHeight: 1.3 }}>
+            {pEmpty.say("No one has posted a score yet — link an account and you top this board.")}
+          </div>
+        </Section>
       ) : (
-      <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 24, flex: 1 }}>
+      <Section p={pRows} style={{ gap: 8, marginTop: 22, flex: 1 }}>
         {d.rows.slice(0, 8).map((r) => (
-          <div key={r.rank} style={{ display: "flex", alignItems: "center", gap: 16, padding: "10px 20px", borderRadius: 14, background: r.you ? alpha(t.accent, 0.15) : "rgba(0,0,0,0.42)", border: `1px solid ${r.you ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.08)"}` }}>
-            <div style={{ fontSize: 27, fontWeight: 700, width: 52, color: medal[r.rank - 1] ?? MUTED }}>{`#${r.rank}`}</div>
+          <div key={r.rank} style={{ display: "flex", alignItems: "center", gap: 14, padding: "8px 16px", borderRadius: 14, background: r.you ? alpha(t.accent, 0.15) : "rgba(0,0,0,0.42)", border: `1px solid ${r.you ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.08)"}` }}>
+            <div style={{ fontSize: pRows.f(24), fontWeight: 700, width: pRows.f(46), color: medal[r.rank - 1] ?? MUTED }}>{`#${r.rank}`}</div>
             {r.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={r.avatarUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: 19, objectFit: "cover" }} />
+              <img src={r.avatarUrl} alt="" width={34} height={34} style={{ width: 34, height: 34, borderRadius: 17, objectFit: "cover" }} />
             ) : null}
-            <div style={{ fontSize: 27, fontWeight: 700, flex: 1 }}>{`${clamp(r.name, 26)}${r.you ? " · you" : ""}`}</div>
-            <div style={{ fontSize: 27, fontWeight: 700, color: t.accent2 }}>{r.value}</div>
+            <div style={{ fontSize: pRows.f(24), fontWeight: 700, flex: 1 }}>{`${clamp(r.name, 20)}${r.you ? " · you" : ""}`}</div>
+            <div style={{ fontSize: pRows.f(24), fontWeight: 700, color: t.accent2 }}>{clamp(r.value, 12)}</div>
           </div>
         ))}
-      </div>
+      </Section>
       )}
     </Frame>
   );
@@ -664,84 +803,99 @@ function LeaderboardBody(d: LeaderboardCard) {
 
 function ChallengeBody(d: ChallengeCard) {
   const t = d.theme;
+  const [pStatus, pMeta, pTime, pStand, pTro, pEmpty] =
+    ["status", "meta", "timeline", "standings", "trophies", "empty"].map((k) => part(t, k));
   const ends = new Date(d.endsAt);
   const days = Math.max(0, Math.ceil((ends.getTime() - Date.now()) / 86400000));
+  const trophies = pTro.hidden ? [] : d.trophies.slice(0, 3);
   return (
     <Frame theme={t} corner={(
-      // Trophies live top-RIGHT, stacked under the game logo. They used to sit
-      // at the bottom of the content row, which is where the mascot stands —
-      // the prize is the reason to enter and can't be the thing that collides.
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+      // Trophies live top-RIGHT, in a ROW under the game logo.
+      //
+      // They used to stack vertically, which was fine when the logo sat at
+      // 104px in the far corner — with the mark at 250 a three-high stack ran
+      // straight into it. A row is the same three prizes in a third of the
+      // height, and the prize is the reason to enter, so it cannot be the thing
+      // that gets covered.
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
         {d.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={d.logoUrl} alt="" width={64} height={64} style={{ width: 64, height: 64, borderRadius: 16, objectFit: "cover" }} />
+          <img src={d.logoUrl} alt="" width={58} height={58} style={{ width: 58, height: 58, borderRadius: 14, objectFit: "cover" }} />
         ) : null}
-        {d.trophies.slice(0, 3).map((tr, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ display: "flex", fontSize: 18, fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
-              {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
-            </div>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={tr.imageUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
+        {trophies.length ? (
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
+            {trophies.map((tr, i) => (
+              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(88) }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={tr.imageUrl} alt="" width={pTro.f(68)} height={pTro.f(68)}
+                  style={{ width: pTro.f(68), height: pTro.f(68), objectFit: "contain" }} />
+                <div style={{ display: "flex", fontSize: pTro.f(16), fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
+                  {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
+                </div>
+              </div>
+            ))}
           </div>
-        ))}
+        ) : null}
       </div>
     )}>
-      <div style={{ display: "flex", gap: 12 }}>
-        <Pill color="#34d399" bg="rgba(52,211,153,0.14)">
+      <Section p={pStatus} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        <Pill color="#34d399" bg="rgba(52,211,153,0.14)" size={pStatus.f(20)}>
           <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#34d399" }} />
-          LIVE
+          {pStatus.say("LIVE")}
         </Pill>
         {d.isPrivate ? (
-          <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)">
+          <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)" size={pStatus.f(20)}>
             <div style={{ display: "flex", width: 12, height: 12, borderRadius: 3, background: "#fbbf24" }} />
-            {clamp(d.serverName ? `${d.serverName.toUpperCase()} · KEY TO JOIN` : "KEY TO JOIN", 30)}
+            {clamp(d.serverName ? `${d.serverName.toUpperCase()} · KEY TO JOIN` : "KEY TO JOIN", 26)}
           </Pill>
         ) : null}
-        <Pill>{d.game}</Pill>
+        <Pill size={pStatus.f(20)}>{clamp(d.game, 18)}</Pill>
+      </Section>
+      {/* 42, and clamped to fit one line of it. This is the densest card on the
+          platform — pills, title, meta, timeline and four standings rows in
+          529px — and a title that wraps costs a standings row. */}
+      <div style={{ display: "flex", marginTop: 14 }}>
+        <Title text={clamp(d.title, 28) ?? ""} sub={clamp(d.description, 68)} size={42} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
       </div>
-      <div style={{ display: "flex", marginTop: 18 }}>
-        <Title text={clamp(d.title, 44) ?? ""} sub={clamp(d.description, 92)} accent={t.accent} accent2={t.accent2} theme={t} />
-      </div>
-      <div style={{ display: "flex", gap: 14, marginTop: 22 }}>
-        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)">{d.ended ? "FINISHED" : `${days}d left`}</Pill>
-        <Pill>{`${nf(d.participants)} joined`}</Pill>
-        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)">{clamp(d.prize, 26)}</Pill> : null}
-      </div>
+      <Section p={pMeta} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 20 }}>
+        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pMeta.f(20)}>{d.ended ? "FINISHED" : `${days}d left`}</Pill>
+        <Pill size={pMeta.f(20)}>{`${nf(d.participants)} joined`}</Pill>
+        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pMeta.f(20)}>{clamp(d.prize, 20)}</Pill> : null}
+      </Section>
 
       {/* Timeline: the whole window, not just "5d left". People want to know if
           they're early enough to still matter. */}
       {d.startsAt ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 5, marginTop: 16 }}>
+        <Section p={pTime} style={{ gap: 5, marginTop: 16 }}>
           <Bar pct={windowPct(d.startsAt, d.endsAt)} accent={t.accent} accent2={t.accent2} h={10} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 16, color: MUTED }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: pTime.f(16), color: MUTED }}>
             <div style={{ display: "flex" }}>{dayLabel(d.startsAt)}</div>
             <div style={{ display: "flex" }}>{dayLabel(d.endsAt)}</div>
           </div>
-        </div>
+        </Section>
       ) : null}
 
-      <div style={{ display: "flex", gap: 22, marginTop: 18, flex: 1 }}>
-        {/* Standings — full width now that the trophies moved to the corner. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-          <div style={{ fontSize: 16, letterSpacing: 3, color: MUTED, fontWeight: 700 }}>
-            {d.ended ? "FINAL STANDINGS" : "STANDINGS"}
+      {/* overflow:hidden, not because anything should overflow — because when
+          something does, Yoga's answer is to COMPRESS the children, and a
+          compressed heading renders on top of the first row instead of above
+          it. Clipping the fourth row is a card that reads; overlapping text is
+          a card that looks broken. */}
+      <Section p={pStand} style={{ gap: 6, marginTop: 14, flex: 1, overflow: "hidden" }}>
+        <Head p={pStand}>{d.ended ? "FINAL STANDINGS" : "STANDINGS"}</Head>
+        {(d.standings ?? []).length === 0 ? (
+          <div style={{ display: "flex", fontSize: pEmpty.f(20), color: MUTED }}>
+            {pEmpty.say("No one has scored yet — first mover takes the lead.")}
           </div>
-          {(d.standings ?? []).length === 0 ? (
-            <div style={{ display: "flex", fontSize: 21, color: MUTED }}>No one has scored yet — first mover takes the lead.</div>
-          ) : (
-            (d.standings ?? []).slice(0, 4).map((s) => (
-              <div key={s.place} style={{ display: "flex", alignItems: "center", gap: 12, padding: "6px 14px", borderRadius: 12, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                <div style={{ fontSize: 20, fontWeight: 700, width: 40, color: ["#fbbf24", "#cbd5e1", "#b45309"][s.place - 1] ?? MUTED }}>{`#${s.place}`}</div>
-                <div style={{ fontSize: 21, fontWeight: 700, flex: 1 }}>{clamp(s.name, 20)}</div>
-                <div style={{ fontSize: 21, fontWeight: 700, color: t.accent2 }}>{`${nf(s.points)} pts`}</div>
-              </div>
-            ))
-          )}
-        </div>
-
-
-      </div>
+        ) : (
+          (d.standings ?? []).slice(0, 4).map((s) => (
+            <div key={s.place} style={{ display: "flex", alignItems: "center", flexShrink: 0, gap: 12, padding: "6px 14px", borderRadius: 12, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ fontSize: pStand.f(19), fontWeight: 700, width: pStand.f(38), color: ["#fbbf24", "#cbd5e1", "#b45309"][s.place - 1] ?? MUTED }}>{`#${s.place}`}</div>
+              <div style={{ fontSize: pStand.f(20), fontWeight: 700, flex: 1 }}>{clamp(s.name, 18)}</div>
+              <div style={{ fontSize: pStand.f(20), fontWeight: 700, color: t.accent2 }}>{`${nf(s.points)} pts`}</div>
+            </div>
+          ))
+        )}
+      </Section>
     </Frame>
   );
 }
@@ -769,59 +923,60 @@ function dayLabel(iso: string): string {
 // gamers.
 function PlanetBody(d: PlanetCard) {
   const t = d.theme;
+  const [pCh, pBo] = ["challenges", "boards"].map((k) => part(t, k));
   const challenges = d.challenges ?? [];
   const boards = d.boards ?? [];
   return (
     <Frame theme={t} corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={86} height={86} style={{ width: 86, height: 86, borderRadius: 20, objectFit: "cover" }} />
+      <img src={d.logoUrl} alt="" width={80} height={80} style={{ width: 80, height: 80, borderRadius: 20, objectFit: "cover" }} />
     ) : undefined}>
       <Title
-        text={`${d.game} Planet`}
+        text={`${clamp(d.game, 18)} Planet`}
         sub={`${nf(d.gamers)} gamer${d.gamers === 1 ? "" : "s"} here${d.serverGamers != null ? ` · ${nf(d.serverGamers)} from this server` : ""}`}
-        accent={t.accent} accent2={t.accent2} theme={t}
+        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
       />
 
-      <div style={{ display: "flex", gap: 18, marginTop: 22, flex: 1 }}>
-        <Column label={`LIVE CHALLENGES · ${challenges.length}`} accent={t.accent}>
+      <div style={{ display: "flex", gap: 14, marginTop: 22, flex: 1 }}>
+        <Column p={pCh} label={`${pCh.say("LIVE CHALLENGES")} · ${challenges.length}`} accent={t.accent}>
           {challenges.length === 0 ? (
-            <Empty>Nothing running right now. The next one lands here first.</Empty>
+            <Empty p={pCh}>Nothing running right now. The next one lands here first.</Empty>
           ) : challenges.slice(0, 3).map((c, i) => {
             const days = Math.max(0, Math.ceil((new Date(c.endsAt).getTime() - Date.now()) / 86400000));
             return (
-              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "11px 16px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
-                <div style={{ fontSize: 24, fontWeight: 700 }}>{clamp(c.title, 30)}</div>
+              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 14px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
+                <div style={{ fontSize: pCh.f(22), fontWeight: 700 }}>{clamp(c.title, 22)}</div>
                 {/* One text node with its own separators rather than three flex
                     children: Satori does not put the `gap` between adjacent
                     inline-ish divs here, so they render welded together
                     ("5d left2 in"). Explicit margins on the one coloured part. */}
-                <div style={{ display: "flex", fontSize: 19, color: MUTED }}>
+                <div style={{ display: "flex", fontSize: pCh.f(17), color: MUTED }}>
                   <div style={{ display: "flex", color: days <= 1 ? "#fda4af" : MUTED }}>
                     {`${days === 0 ? "ends today" : `${days}d left`} · ${nf(c.participants)} in`}
                   </div>
                   {/* Clamped hard: `prizeDescription` is a free-text admin field
                       and a sentence in it wraps the row onto three lines. */}
-                  {c.prize ? <div style={{ display: "flex", marginLeft: 10, color: "#fbbf24" }}>{clamp(c.prize, 18)}</div> : null}
+                  {c.prize ? <div style={{ display: "flex", marginLeft: 8, color: "#fbbf24" }}>{clamp(c.prize, 12)}</div> : null}
                 </div>
               </div>
             );
           })}
         </Column>
 
-        <Column label={`LEADERBOARDS · ${boards.length}`} accent={t.accent2}>
+        <Column p={pBo} label={`${pBo.say("LEADERBOARDS")} · ${boards.length}`} accent={t.accent2}>
           {boards.length === 0 ? (
-            <Empty>No boards on this game yet.</Empty>
+            <Empty p={pBo}>No boards on this game yet.</Empty>
           ) : boards.slice(0, 3).map((b, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "11px 16px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
-              <div style={{ fontSize: 24, fontWeight: 700 }}>{clamp(b.title, 30)}</div>
-              <div style={{ display: "flex", gap: 10, fontSize: 19, color: MUTED }}>
+            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 14px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
+              <div style={{ fontSize: pBo.f(22), fontWeight: 700 }}>{clamp(b.title, 22)}</div>
+              <div style={{ display: "flex", gap: 10, fontSize: pBo.f(17), color: MUTED }}>
                 {b.leader ? (
                   <>
-                    <div style={{ display: "flex", color: "#fbbf24" }}>{`#1 ${clamp(b.leader, 16)}`}</div>
-                    {b.value ? <div style={{ display: "flex", color: t.accent2 }}>{b.value}</div> : null}
+                    <div style={{ display: "flex", color: "#fbbf24" }}>{`#1 ${clamp(b.leader, 13)}`}</div>
+                    {b.value ? <div style={{ display: "flex", color: t.accent2 }}>{clamp(b.value, 10)}</div> : null}
                   </>
                 ) : (
-                  <div style={{ display: "flex" }}>unclaimed — link an account and take it</div>
+                  <div style={{ display: "flex" }}>unclaimed — take it</div>
                 )}
               </div>
             </div>
@@ -834,17 +989,20 @@ function PlanetBody(d: PlanetCard) {
 
 // One labelled column of rows. Both halves of the planet card are this shape,
 // so they line up whatever each side happens to contain.
-function Column({ label, accent, children }: { label: string; accent: string; children: React.ReactNode }) {
+function Column({ label, accent, children, p }: {
+  label: string; accent: string; children: React.ReactNode; p: PartDraw;
+}) {
+  if (p.hidden) return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-      <div style={{ fontSize: 17, letterSpacing: 2.5, fontWeight: 700, color: safeColor(accent, MUTED) }}>{label}</div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, flex: 1, ...styleOf({ opacity: p.opacity }) }}>
+      <div style={{ fontSize: p.f(16), letterSpacing: 2.5, fontWeight: 700, color: safeColor(accent, MUTED) }}>{label}</div>
       {children}
     </div>
   );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: "flex", fontSize: 21, color: MUTED, lineHeight: 1.3 }}>{children}</div>;
+function Empty({ children, p }: { children: React.ReactNode; p?: PartDraw }) {
+  return <div style={{ display: "flex", fontSize: p?.f(19) ?? 19, color: MUTED, lineHeight: 1.3 }}>{children}</div>;
 }
 
 // Profile of the Week.
@@ -854,6 +1012,7 @@ function Empty({ children }: { children: React.ReactNode }) {
 // the card that ends it, with the podium in the same place the leaders were.
 function WeekBody(d: WeekCard) {
   const t = d.theme;
+  const [pRows, pPills, pEmpty] = ["rows", "pills", "empty"].map((k) => part(t, k));
   const medal = ["#fbbf24", "#cbd5e1", "#d08a4a"];
   const result = d.mode === "result";
   const entries = d.entries ?? [];
@@ -861,19 +1020,21 @@ function WeekBody(d: WeekCard) {
   return (
     <Frame theme={t} corner={result && d.trophy?.imageUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.trophy.imageUrl} alt="" width={104} height={104} style={{ width: 104, height: 104, objectFit: "contain" }} />
+      <img src={d.trophy.imageUrl} alt="" width={96} height={96} style={{ width: 96, height: 96, objectFit: "contain" }} />
     ) : undefined}>
-      <Title text={d.title} sub={clamp(d.subtitle, 84)} accent={t.accent} accent2={t.accent2} theme={t} />
+      <Title text={d.title} sub={clamp(d.subtitle, 64)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
 
       {entries.length === 0 ? (
-        <div style={{ display: "flex", marginTop: 40, fontSize: 27, color: MUTED, lineHeight: 1.3 }}>
-          Nobody has a vote yet this week. Customize your profile and you are one vote from the top.
-        </div>
+        <Section p={pEmpty} style={{ marginTop: 40 }}>
+          <div style={{ display: "flex", fontSize: pEmpty.f(25), color: MUTED, lineHeight: 1.3 }}>
+            {pEmpty.say("Nobody has a vote yet this week. Customize your profile and you are one vote from the top.")}
+          </div>
+        </Section>
       ) : (
         // Four rows in the race, three on the podium — that is what actually
         // fits above the pills at this canvas size. Five overlapped them, and
         // `overflow: hidden` means a future edit clips rather than collides.
-        <div style={{ display: "flex", flexDirection: "column", gap: result ? 12 : 9, marginTop: 20, flex: 1, overflow: "hidden" }}>
+        <Section p={pRows} style={{ gap: result ? 12 : 9, marginTop: 20, flex: 1, overflow: "hidden" }}>
           {entries.slice(0, result ? 3 : 4).map((e) => (
             <div
               key={e.rank}
@@ -884,24 +1045,24 @@ function WeekBody(d: WeekCard) {
                 border: `1px solid ${e.rank <= 3 ? alpha(medal[e.rank - 1] ?? MUTED, 0.5) : "rgba(255,255,255,0.08)"}`,
               }}
             >
-              <div style={{ fontSize: result ? 34 : 27, fontWeight: 700, width: 52, color: medal[e.rank - 1] ?? MUTED }}>{`#${e.rank}`}</div>
+              <div style={{ fontSize: pRows.f(result ? 32 : 25), fontWeight: 700, width: pRows.f(48), color: medal[e.rank - 1] ?? MUTED }}>{`#${e.rank}`}</div>
               {e.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={e.avatarUrl} alt="" width={result ? 54 : 40} height={result ? 54 : 40}
-                  style={{ width: result ? 54 : 40, height: result ? 54 : 40, borderRadius: 27, objectFit: "cover", border: `3px solid ${medal[e.rank - 1] ?? "rgba(255,255,255,0.2)"}` }} />
+                <img src={e.avatarUrl} alt="" width={result ? 50 : 38} height={result ? 50 : 38}
+                  style={{ width: result ? 50 : 38, height: result ? 50 : 38, borderRadius: 25, objectFit: "cover", border: `3px solid ${medal[e.rank - 1] ?? "rgba(255,255,255,0.2)"}` }} />
               ) : null}
               {/* Two lines only on the podium. In the race a second line per row
                   makes four rows taller than the canvas has room for, and the
                   lifetime total reads perfectly well beside the week's. */}
               {result ? (
                 <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-                  <div style={{ fontSize: 31, fontWeight: 700 }}>{clamp(e.name, 24)}</div>
-                  <div style={{ fontSize: 18, color: MUTED }}>{`${nf(e.lifetimeVotes)} lifetime votes`}</div>
+                  <div style={{ fontSize: pRows.f(28), fontWeight: 700 }}>{clamp(e.name, 18)}</div>
+                  <div style={{ fontSize: pRows.f(17), color: MUTED }}>{`${nf(e.lifetimeVotes)} lifetime votes`}</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "baseline", flex: 1 }}>
-                  <div style={{ display: "flex", fontSize: 26, fontWeight: 700 }}>{clamp(e.name, 22)}</div>
-                  <div style={{ display: "flex", marginLeft: 12, fontSize: 17, color: MUTED }}>{`${nf(e.lifetimeVotes)} lifetime`}</div>
+                  <div style={{ display: "flex", fontSize: pRows.f(24), fontWeight: 700 }}>{clamp(e.name, 16)}</div>
+                  <div style={{ display: "flex", marginLeft: 10, fontSize: pRows.f(16), color: MUTED }}>{`${nf(e.lifetimeVotes)} lifetime`}</div>
                 </div>
               )}
               {/* The trophy each placement was handed, on the card that hands
@@ -915,56 +1076,58 @@ function WeekBody(d: WeekCard) {
                   the pills — the label costs a whole row's worth of height. */}
               {result ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
-                  <div style={{ fontSize: 36, fontWeight: 700, color: medal[e.rank - 1] ?? t.accent2 }}>{nf(e.weekVotes)}</div>
-                  <div style={{ fontSize: 15, letterSpacing: 1.5, color: MUTED }}>VOTES</div>
+                  <div style={{ fontSize: pRows.f(34), fontWeight: 700, color: medal[e.rank - 1] ?? t.accent2 }}>{nf(e.weekVotes)}</div>
+                  <div style={{ fontSize: pRows.f(14), letterSpacing: 1.5, color: MUTED }}>VOTES</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "baseline" }}>
-                  <div style={{ display: "flex", fontSize: 29, fontWeight: 700, color: medal[e.rank - 1] ?? t.accent2 }}>{nf(e.weekVotes)}</div>
-                  <div style={{ display: "flex", marginLeft: 8, fontSize: 15, letterSpacing: 1.5, color: MUTED }}>VOTES</div>
+                  <div style={{ display: "flex", fontSize: pRows.f(27), fontWeight: 700, color: medal[e.rank - 1] ?? t.accent2 }}>{nf(e.weekVotes)}</div>
+                  <div style={{ display: "flex", marginLeft: 8, fontSize: pRows.f(14), letterSpacing: 1.5, color: MUTED }}>VOTES</div>
                 </div>
               )}
             </div>
           ))}
-        </div>
+        </Section>
       )}
 
-      <div style={{ display: "flex", gap: 12, marginTop: 14 }}>
+      <Section p={pPills} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
         {result && d.trophy ? (
-          <Pill color="#fbbf24" bg="rgba(251,191,36,0.13)">
-            {`${clamp(d.trophy.name, 26)}${d.trophy.value > 0 ? ` · $${nf(d.trophy.value)}` : ""} to all three`}
+          <Pill color="#fbbf24" bg="rgba(251,191,36,0.13)" size={pPills.f(20)}>
+            {`${clamp(d.trophy.name, 20)}${d.trophy.value > 0 ? ` · $${nf(d.trophy.value)}` : ""} to all three`}
           </Pill>
         ) : (
           <>
-            <Pill color={t.accent} bg={alpha(t.accent, 0.13)}>
+            <Pill color={t.accent} bg={alpha(t.accent, 0.13)} size={pPills.f(20)}>
               {d.daysLeft > 0 ? `${d.daysLeft} DAY${d.daysLeft === 1 ? "" : "S"} LEFT` : "VOTING CLOSED"}
             </Pill>
-            <Pill>{`${nf(d.totalVotes)} votes cast · ${nf(d.contenders)} in the running`}</Pill>
+            <Pill size={pPills.f(20)}>{`${nf(d.totalVotes)} votes · ${nf(d.contenders)} in the running`}</Pill>
           </>
         )}
-      </div>
+      </Section>
     </Frame>
   );
 }
 
 function PlanetsBody(d: PlanetsCard) {
   const t = d.theme;
+  const p = part(t, "tiles");
   return (
     <Frame theme={t}>
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} />
-      <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 14, marginTop: 26, flex: 1 }}>
+      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+      <Section p={p} style={{ flexDirection: "row", flexWrap: "wrap", alignContent: "flex-start", gap: 12, marginTop: 24, flex: 1 }}>
         {d.games.slice(0, 12).map((g, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, width: 168, height: 132, borderRadius: 20, background: "rgba(0,0,0,0.45)", border: `1px solid ${g.accent ? alpha(g.accent, 0.4) : "rgba(255,255,255,0.10)"}` }}>
+          // 4 tiles per row of the narrower text column: 4×158 + 3×12 = 668.
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, width: p.f(158), height: p.f(122), borderRadius: 20, background: "rgba(0,0,0,0.45)", border: `1px solid ${g.accent ? alpha(g.accent, 0.4) : "rgba(255,255,255,0.10)"}` }}>
             {g.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={g.logoUrl} alt="" width={56} height={56} style={{ width: 56, height: 56, borderRadius: 14, objectFit: "cover" }} />
+              <img src={g.logoUrl} alt="" width={p.f(52)} height={p.f(52)} style={{ width: p.f(52), height: p.f(52), borderRadius: 14, objectFit: "cover" }} />
             ) : (
-              <div style={{ display: "flex", width: 56, height: 56, borderRadius: 14, background: alpha(g.accent ?? t.accent, 0.27) }} />
+              <div style={{ display: "flex", width: p.f(52), height: p.f(52), borderRadius: 14, background: alpha(g.accent ?? t.accent, 0.27) }} />
             )}
-            <div style={{ fontSize: 19, fontWeight: 700, color: g.accent ?? INK }}>{clamp(g.name, 15)}</div>
+            <div style={{ fontSize: p.f(18), fontWeight: 700, color: g.accent ?? INK }}>{clamp(g.name, 14)}</div>
           </div>
         ))}
-      </div>
+      </Section>
     </Frame>
   );
 }
@@ -992,8 +1155,12 @@ function GuideBody(d: GuideCard) {
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
     ) : undefined}>
-      {d.badge ? <div style={{ display: "flex", marginBottom: 14 }}><Pill color={t.accent} bg={alpha(t.accent, 0.12)}>{d.badge}</Pill></div> : null}
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} />
+      {d.badge ? (
+        <Section p={part(t, "status")} style={{ flexDirection: "row", marginBottom: 14 }}>
+          <Pill color={t.accent} bg={alpha(t.accent, 0.12)}>{part(t, "status").say(d.badge)}</Pill>
+        </Section>
+      ) : null}
+      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
       {/* The steps FIT the card instead of being cut off at four.
           `steps.slice(0, 4)` silently threw away everything past the fourth,
           which is why the card called "Everything Cluster does" listed four of
@@ -1002,88 +1169,185 @@ function GuideBody(d: GuideCard) {
           overflow:hidden stays as the backstop so a pathological guide clips
           rather than pushing the footer off the canvas. */}
       {(() => {
+        const p = part(t, "steps");
         const steps = d.steps.slice(0, MAX_GUIDE_STEPS);
         const two = steps.length > 4;
         const g = GUIDE_SCALE[Math.min(steps.length, MAX_GUIDE_STEPS)] ?? GUIDE_SCALE[8];
         return (
-          <div style={{
-            display: "flex", flexWrap: two ? "wrap" : "nowrap", flexDirection: two ? "row" : "column",
+          <Section p={p} style={{
+            flexWrap: two ? "wrap" : "nowrap", flexDirection: two ? "row" : "column",
             gap: g.gap, marginTop: two ? 18 : 24, flex: 1, overflow: "hidden", alignContent: "flex-start",
           }}>
             {steps.map((step, i) => (
               <div key={i} style={{
-                display: "flex", alignItems: "flex-start", gap: 13,
+                display: "flex", alignItems: "flex-start", gap: 12,
                 // A plain percentage, NOT calc(): Satori rejects calc() outright
                 // ("Invalid value calc(50% - 10px) for setWidth") and 500s the
                 // whole card. 47% leaves room for the gap between columns.
                 width: two ? "47%" : "100%",
               }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: g.num, height: g.num, borderRadius: g.num / 2, background: alpha(t.accent, 0.17), color: t.accent, fontSize: Math.round(g.num * 0.55), fontWeight: 700 }}>{i + 1}</div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: p.f(g.num), height: p.f(g.num), borderRadius: p.f(g.num) / 2, background: alpha(t.accent, 0.17), color: t.accent, fontSize: Math.round(p.f(g.num) * 0.55), fontWeight: 700 }}>{i + 1}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 2, flex: 1 }}>
-                  <div style={{ fontSize: g.title, fontWeight: 700 }}>{clamp(step.title, two ? 26 : 46)}</div>
-                  <div style={{ fontSize: g.body, color: MUTED, lineHeight: 1.3 }}>{clamp(step.body, g.room)}</div>
+                  <div style={{ fontSize: p.f(g.title), fontWeight: 700 }}>{clamp(step.title, two ? 22 : 38)}</div>
+                  <div style={{ fontSize: p.f(g.body), color: MUTED, lineHeight: 1.3 }}>{clamp(step.body, Math.round(g.room * 0.82))}</div>
                 </div>
               </div>
             ))}
-          </div>
+          </Section>
         );
       })()}
-      {d.footer ? <div style={{ display: "flex", marginTop: 14, fontSize: 21, color: t.accent2, fontWeight: 700 }}>{d.footer}</div> : null}
+      {d.footer ? (
+        <Section p={part(t, "footer")} style={{ marginTop: 14 }}>
+          <div style={{ display: "flex", fontSize: part(t, "footer").f(20), color: t.accent2, fontWeight: 700 }}>
+            {part(t, "footer").say(d.footer)}
+          </div>
+        </Section>
+      ) : null}
     </Frame>
   );
 }
 
-// A game-world entity. The splash is the card; the lore sits on it.
+// A game-world entity. The splash is the card AND a picture on the card.
 //
 // Text-over-art is the entire reason this is a PNG: Discord embeds cannot put
-// a word on an image. So the layout leans on the scrim and keeps the copy in
-// one column down the left, where the character art rarely is.
+// a word on an image. But a splash used only as a darkened backdrop is a splash
+// nobody actually sees — it is 62% veiled, scrimmed twice, and covered in copy.
+// So the same art is drawn a second time, undimmed, in a framed panel down the
+// right: the atmosphere behind the words, and the character in front of them.
+//
+// The abilities show their icons. The icons were already fetched and hosted by
+// the world cache and then thrown away by the data loader, which meant the one
+// thing a player recognises at a glance — the Q/W/E/R squares they have looked
+// at ten thousand times — was rendered as a line of text.
 function WorldBody(d: WorldCard) {
   const t = d.theme;
+  const [pStatus, pLore, pAb, pArt, pMeta] =
+    ["status", "lore", "abilities", "art", "meta"].map((k) => part(t, k));
+  // Four abilities, not three: every one of these games ships a passive and
+  // three actives, and cutting the last one off cut the ultimate.
+  const abilities = pAb.hidden ? [] : d.abilities.slice(0, 4);
+  const art = pArt.hidden ? null : d.artUrl;
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
-    ) : undefined}>
-      <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
-        <Pill color={t.accent} bg={alpha(t.accent, 0.14)}>{d.entityKind.toUpperCase()}</Pill>
-        {d.role ? <Pill>{clamp(d.role, 28)}</Pill> : null}
-      </div>
+    <Frame
+      theme={t}
+      // No corner badge on this card: the game logo belongs on the splash panel,
+      // where it reads as a caption rather than as a third thing competing for
+      // the same corner as the sponsor.
+      side={art ? (box) => <SplashPanel url={art} logoUrl={d.logoUrl} caption={d.skinName ?? d.name} box={box} accent={t.accent} p={pArt} /> : undefined}
+      corner={!art && d.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
+      ) : undefined}
+    >
+      <Section p={pStatus} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+        <Pill color={t.accent} bg={alpha(t.accent, 0.14)} size={pStatus.f(19)}>{pStatus.say(d.entityKind.toUpperCase())}</Pill>
+        {d.role ? <Pill size={pStatus.f(19)}>{clamp(d.role, 22)}</Pill> : null}
+      </Section>
 
       <Title
-        text={clamp(d.name, 28) ?? d.name}
-        sub={d.skinName ? `${d.skinName} · ${d.game}` : d.game}
-        accent={t.accent} accent2={t.accent2} theme={t}
+        text={clamp(d.name, 22) ?? d.name}
+        sub={d.skinName ? `${clamp(d.skinName, 24)} · ${d.game}` : d.game}
+        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
       />
 
       {d.lore ? (
-        <Plate theme={t} style={{ marginTop: 18, maxWidth: 620 }}>
-          <div style={{ display: "flex", fontSize: 21, color: INK, lineHeight: 1.36 }}>{clamp(d.lore, 300)}</div>
-        </Plate>
+        <Section p={pLore} style={{ marginTop: 16 }}>
+          <Plate theme={t}>
+            <div style={{ display: "flex", fontSize: pLore.f(19), color: INK, lineHeight: 1.34 }}>{clamp(d.lore, abilities.length ? 190 : 380)}</div>
+          </Plate>
+        </Section>
       ) : null}
 
-      {d.abilities.length ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 16, maxWidth: 620 }}>
-          {d.abilities.slice(0, 3).map((a, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "7px 14px", borderRadius: 12, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div style={{ display: "flex", fontSize: 19, fontWeight: 700, color: t.accent2 }}>{clamp(a.name, 22)}</div>
-              <div style={{ display: "flex", fontSize: 17, color: MUTED }}>{clamp(a.desc, 62)}</div>
+      {abilities.length ? (
+        <Section p={pAb} style={{ gap: 6, marginTop: 14 }}>
+          {abilities.map((a, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px", borderRadius: 12, background: "rgba(0,0,0,0.52)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              {a.iconUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={a.iconUrl} alt="" width={pAb.f(38)} height={pAb.f(38)}
+                  style={{ width: pAb.f(38), height: pAb.f(38), borderRadius: 9, objectFit: "cover", border: `2px solid ${alpha(t.accent2, 0.55, FALLBACK_ACCENT2)}` }} />
+              ) : (
+                // A slot, not a gap. A row that loses its icon must not shunt
+                // its text left while the rows above and below keep theirs.
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: pAb.f(38), height: pAb.f(38), borderRadius: 9, background: alpha(t.accent2, 0.18, FALLBACK_ACCENT2), border: `2px solid ${alpha(t.accent2, 0.4, FALLBACK_ACCENT2)}`, fontSize: pAb.f(17), fontWeight: 700, color: t.accent2 }}>
+                  {["P", "Q", "E", "R"][i] ?? "•"}
+                </div>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+                {/* 36, not 26: these games prefix the slot into the name
+                    ("Ultimate · Dimensional Rift"), and a tight clamp ate the
+                    half that says what the ability IS. */}
+                <div style={{ display: "flex", fontSize: pAb.f(17), fontWeight: 700, color: t.accent2 }}>{clamp(a.name, 36)}</div>
+                <div style={{ display: "flex", fontSize: pAb.f(15), color: MUTED }}>{clamp(a.desc, 56)}</div>
+              </div>
             </div>
           ))}
-        </div>
+        </Section>
       ) : null}
 
-      <div style={{ display: "flex", gap: 10, marginTop: "auto" }}>
-        {d.meta.slice(0, 3).map((m, i) => (
-          <Pill key={i}>{`${m.label}: ${clamp(m.value, 18)}`}</Pill>
+      <Section p={pMeta} style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: "auto" }}>
+        {d.meta.slice(0, 2).map((m, i) => (
+          <Pill key={i} size={pMeta.f(18)}>{`${m.label}: ${clamp(m.value, 14)}`}</Pill>
         ))}
         {d.skinCount > 0 ? (
-          <Pill color={t.accent} bg={alpha(t.accent, 0.13)}>
-            {`${d.skinCount} skin${d.skinCount === 1 ? "" : "s"} — tap below`}
+          <Pill color={t.accent} bg={alpha(t.accent, 0.13)} size={pMeta.f(18)}>
+            {`${d.skinCount} skin${d.skinCount === 1 ? "" : "s"} below`}
           </Pill>
         ) : null}
-      </div>
+      </Section>
     </Frame>
+  );
+}
+
+/**
+ * The splash, drawn again as a picture.
+ *
+ * Deliberately NOT dimmed: the whole point is that this is the one place on the
+ * card where the artwork is at full strength. The gradient along the bottom is
+ * there because the Cluster mark is drawn over this panel's bottom-right corner
+ * — a 250px logo needs something behind it that isn't a champion's face.
+ */
+function SplashPanel({ url, logoUrl, caption, box, accent, p }: {
+  url: string;
+  logoUrl?: string | null;
+  caption: string;
+  box: { left: number; top: number; width: number; height: number };
+  accent: string;
+  p: PartDraw;
+}) {
+  return (
+    <div style={{
+      position: "absolute", left: box.left, top: box.top, width: box.width, height: box.height,
+      display: "flex", overflow: "hidden", borderRadius: 20,
+      border: `1px solid ${alpha(accent, 0.4)}`, background: "rgba(4,5,26,0.7)",
+      ...styleOf({ opacity: p.opacity }),
+    }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" width={box.width} height={box.height}
+        style={{ position: "absolute", left: 0, top: 0, width: box.width, height: box.height, objectFit: "cover" }} />
+      {/* Starts at 45% and lands almost black: the Cluster mark is drawn over
+          this panel's bottom-right corner, and a 250px logo on top of a
+          champion's face is a smudge. This is what it lands on instead. */}
+      <div style={{
+        position: "absolute", left: 0, top: Math.round(box.height * 0.45), width: box.width, height: box.height - Math.round(box.height * 0.45),
+        display: "flex", background: "linear-gradient(180deg, rgba(4,5,26,0) 0%, rgba(4,5,26,0.92) 100%)",
+      }} />
+      {/* The game's mark, bottom-LEFT of the panel — the Cluster logo owns the
+          bottom-right of the card and the two must not stack. */}
+      {logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logoUrl} alt="" width={40} height={40}
+          style={{ position: "absolute", left: 14, top: box.height - 54, width: 40, height: 40, borderRadius: 10, objectFit: "cover" }} />
+      ) : null}
+      {/* Held to the LEFT 46% of the panel. The logo covers the right of it,
+          and a caption that runs underneath a logo is a caption nobody reads. */}
+      <div style={{
+        position: "absolute", left: logoUrl ? 62 : 14, top: box.height - 42, width: Math.round(box.width * 0.46), height: 22,
+        display: "flex", alignItems: "center", fontSize: p.f(15), fontWeight: 700, color: INK,
+      }}>
+        {clamp(p.say(caption), 14)}
+      </div>
+    </div>
   );
 }
 
@@ -1091,28 +1355,29 @@ function WorldBody(d: WorldCard) {
 // thing — one hit renders that hit, and none says so in words.
 function SearchBody(d: SearchCard) {
   const t = d.theme;
+  const p = part(t, "rows");
   return (
     <Frame theme={t}>
       <Title
-        text={`"${clamp(d.query, 24) ?? d.query}"`}
+        text={`"${clamp(d.query, 20) ?? d.query}"`}
         sub={`${d.results.length} matches — pick one below`}
-        accent={t.accent} accent2={t.accent2} theme={t}
+        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
       />
-      <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 22, flex: 1, overflow: "hidden" }}>
+      <Section p={p} style={{ gap: 8, marginTop: 20, flex: 1, overflow: "hidden" }}>
         {d.results.slice(0, 6).map((r, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 18px", borderRadius: 14, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.08)" }}>
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderRadius: 14, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.08)" }}>
             {r.imageUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={r.imageUrl} alt="" width={38} height={38} style={{ width: 38, height: 38, borderRadius: 10, objectFit: "cover" }} />
+              <img src={r.imageUrl} alt="" width={34} height={34} style={{ width: 34, height: 34, borderRadius: 10, objectFit: "cover" }} />
             ) : null}
             <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-              <div style={{ fontSize: 25, fontWeight: 700 }}>{clamp(r.label, 34)}</div>
-              <div style={{ fontSize: 17, color: MUTED }}>{clamp(r.sub, 52)}</div>
+              <div style={{ fontSize: p.f(23), fontWeight: 700 }}>{clamp(r.label, 26)}</div>
+              <div style={{ fontSize: p.f(16), color: MUTED }}>{clamp(r.sub, 40)}</div>
             </div>
-            <Pill color={t.accent2} bg={alpha(t.accent2, 0.12, "#22d3ee")}>{r.kind.toUpperCase()}</Pill>
+            <Pill color={t.accent2} bg={alpha(t.accent2, 0.12, "#22d3ee")} size={p.f(18)}>{r.kind.toUpperCase()}</Pill>
           </div>
         ))}
-      </div>
+      </Section>
     </Frame>
   );
 }
@@ -1274,8 +1539,22 @@ async function prepareBody(d: CardData): Promise<CardData> {
       };
     }
     case "world": {
-      const [bgUrl, logoUrl] = await Promise.all([bg, toEmbeddable(d.logoUrl, ICON)]);
-      return { ...d, logoUrl, theme: { ...d.theme, bgUrl } };
+      const abilities = d.abilities.slice(0, 4);
+      const [bgUrl, logoUrl, artUrl, ...icons] = await Promise.all([
+        bg,
+        toEmbeddable(d.logoUrl, ICON),
+        // The splash a second time, at panel resolution rather than card
+        // resolution — the panel is ~410px wide, and decoding a 1215px champion
+        // splash twice at full size is the single most expensive thing this
+        // card could do.
+        toEmbeddable(d.artUrl, { maxWidth: 900 }),
+        ...abilities.map((a) => toEmbeddable(a.iconUrl, { maxWidth: 96 })),
+      ]);
+      return {
+        ...d, logoUrl, artUrl,
+        abilities: abilities.map((a, i) => ({ ...a, iconUrl: icons[i] })),
+        theme: { ...d.theme, bgUrl },
+      };
     }
     case "search": {
       const [bgUrl, ...imgs] = await Promise.all([bg, ...d.results.map((r) => toEmbeddable(r.imageUrl, ICON))]);

@@ -38,22 +38,51 @@ const COMMON: Region[] = [
   },
   {
     key: "logo", label: "Cluster logo", kind: "brand",
-    x: 79.5, y: 78, w: 19.5, h: 21,
-    note: "The logo is drawn last and nothing may cover it. Leave this corner clear — it is the one place art must not compete.",
+    x: 77, y: 57.6, w: 21, h: 39.7,
+    note: "250px, bottom-right, on every card without exception. Drawn last and nothing may cover it — this is the one corner art must not compete with.",
   },
   {
-    key: "corner", label: "Top-right badge", kind: "brand",
-    x: 66, y: 5, w: 31, h: 18,
-    note: "Game logo, level pill, or (on a challenge) the trophy stack. Keep the top-right quiet.",
+    key: "ad", label: "Sponsor box", kind: "brand",
+    x: 65, y: 2.9, w: 33.4, h: 23.4,
+    note: "400px wide, top-right, on every card. This is inventory somebody paid for: it is drawn over everything, so art here is never seen.",
+  },
+  {
+    key: "corner", label: "Badge under the sponsor", kind: "brand",
+    x: 66, y: 28, w: 31, h: 18,
+    note: "Game logo, level pill, or (on a challenge) the trophy row. Pushed below the sponsor box automatically.",
   },
 ];
 
 // The left column, where nearly every card puts its headline and stats. Held
 // dark by the scrim, so art here reads as texture rather than subject.
+//
+// It ends at 63% now, not 79%: the right-hand 420px belongs to the sponsor at
+// the top and the logo at the bottom, and Satori has no float, so text cannot
+// wrap around either of them.
 const TEXT_COLUMN: Region = {
   key: "text", label: "Text column", kind: "text",
-  x: 4.6, y: 7, w: 60, h: 62,
+  x: 4.6, y: 7, w: 58.5, h: 62,
   note: "Headline, subtitle and stat pills. The scrim darkens this hardest — put atmosphere here, never a face or a logo.",
+};
+
+/**
+ * One editable section of a card's CONTENT — not of its artwork.
+ *
+ * `regions` above describe where art must stay out of the way. These describe
+ * the things the renderer actually draws inside the content box, so an admin
+ * can turn one off, resize it, or change the words it says without a deploy.
+ *
+ * `text` is the copy the renderer ships with. Only sections that HAVE fixed
+ * copy carry it: a standings block's words are the standings, and a heading
+ * that can be typed over a leaderboard is not a leaderboard. The editor offers
+ * a text box only where this is set, and shows this as the placeholder.
+ */
+export type CardPart = {
+  key: string;
+  label: string;
+  note: string;
+  /** The built-in wording, when this section has any. */
+  text?: string;
 };
 
 export type CardGuide = {
@@ -61,6 +90,8 @@ export type CardGuide = {
   name: string;
   summary: string;
   regions: Region[];
+  /** The content sections of this card, in the order they are drawn. */
+  parts: CardPart[];
   bgKey: string;   // the Card-backgrounds key that skins this card
   /**
    * What a gamer types (or presses) to make this card appear.
@@ -89,6 +120,13 @@ export const CARD_GUIDES: CardGuide[] = [
       { key: "stats", label: "CP / views / votes", kind: "text", x: 4.6, y: 26, w: 50, h: 9, note: "Three pills in a row." },
       { key: "accounts", label: "Linked accounts", kind: "text", x: 4.6, y: 38, w: 62, h: 26, note: "Up to six game cards, two per row." },
     ],
+    parts: [
+      { key: "identity", label: "Avatar + name", note: "The round avatar, the display name and the profile link." },
+      { key: "stats", label: "CP / views / votes", note: "The pill row under the name." },
+      { key: "trophies", label: "Trophy case", note: "Up to five won trophies with their names.", text: "TROPHY CASE" },
+      { key: "challenges", label: "In the arena", note: "The competitions this gamer is in right now.", text: "IN THE ARENA" },
+      { key: "accounts", label: "Linked accounts", note: "Their connected game accounts.", text: "LINKED ACCOUNTS" },
+    ],
   },
   {
     kind: "game-stats",
@@ -102,6 +140,15 @@ export const CARD_GUIDES: CardGuide[] = [
       TEXT_COLUMN,
       { key: "champs", label: "Champions / mains", kind: "text", x: 4.6, y: 45, w: 44, h: 22, note: "Icons with names — busy area, keep art plain." },
       { key: "matches", label: "Recent matches", kind: "text", x: 50, y: 45, w: 30, h: 22, note: "Win/loss rows." },
+    ],
+    parts: [
+      { key: "identity", label: "In-game name + avatar", note: "The tag people searched for, and the human behind it." },
+      { key: "live", label: "In-game pill", note: "Only drawn while they are actually in a match." },
+      { key: "stats", label: "Stat tiles", note: "The headline numbers this game reports." },
+      { key: "champions", label: "Most played", note: "Champion / legend / operator icons.", text: "MOST PLAYED" },
+      { key: "matches", label: "Recent matches", note: "The last four results.", text: "RECENT MATCHES" },
+      { key: "rank", label: "Board placing", note: "Where this account sits on the game's leaderboard." },
+      { key: "empty", label: "Nothing-synced message", note: "Shown when the account has no stats yet.", text: "Stats sync shortly after linking — check back in a few minutes." },
     ],
   },
   {
@@ -122,6 +169,15 @@ export const CARD_GUIDES: CardGuide[] = [
       { key: "timeline", label: "Timeline bar", kind: "text", x: 4.6, y: 47, w: 78, h: 7, note: "Start → end progress bar with dates." },
       { key: "standings", label: "Standings", kind: "text", x: 4.6, y: 58, w: 78, h: 32, note: "Up to four ranked rows on dark plates." },
     ],
+    parts: [
+      { key: "status", label: "LIVE / key / game pills", note: "The row above the title.", text: "LIVE" },
+      { key: "title", label: "Title + description", note: "What the challenge is called and what it asks for." },
+      { key: "meta", label: "Days left / joined / prize", note: "The pill row under the title." },
+      { key: "timeline", label: "Timeline bar", note: "Start → end, so somebody can tell if they're early enough to matter." },
+      { key: "standings", label: "Standings", note: "The top four right now.", text: "STANDINGS" },
+      { key: "trophies", label: "Trophy stack", note: "The prizes, top-right under the sponsor." },
+      { key: "empty", label: "No-scores message", note: "Shown before anybody has scored.", text: "No one has scored yet — first mover takes the lead." },
+    ],
   },
   {
     kind: "leaderboard",
@@ -134,6 +190,11 @@ export const CARD_GUIDES: CardGuide[] = [
       ...COMMON,
       { key: "title", label: "Title", kind: "text", x: 4.6, y: 7, w: 55, h: 16, note: "Board name and subtitle." },
       { key: "rows", label: "Ranked rows", kind: "text", x: 4.6, y: 26, w: 78, h: 64, note: "Eight rows with avatars. Almost nothing shows through here." },
+    ],
+    parts: [
+      { key: "title", label: "Board name", note: "The board and what it measures." },
+      { key: "rows", label: "Ranked rows", note: "The top eight." },
+      { key: "empty", label: "Empty-board message", note: "Shown when nobody has posted a score.", text: "No one has posted a score yet — link an account and you top this board." },
     ],
   },
   {
@@ -148,20 +209,35 @@ export const CARD_GUIDES: CardGuide[] = [
       { key: "title", label: "Title", kind: "text", x: 4.6, y: 7, w: 55, h: 16, note: "Game name and how many gamers are on it." },
       { key: "columns", label: "Challenges + leaderboards", kind: "text", x: 4.6, y: 27, w: 78, h: 63, note: "Two columns of rows on dark plates. Almost nothing shows through here." },
     ],
+    parts: [
+      { key: "title", label: "Game name + gamer count", note: "How many gamers are on this planet, and how many from this server." },
+      { key: "challenges", label: "Live challenges column", note: "What you can enter right now.", text: "LIVE CHALLENGES" },
+      { key: "boards", label: "Leaderboards column", note: "Where you'd stand.", text: "LEADERBOARDS" },
+    ],
   },
   {
     kind: "world",
     command: "/cluster show <champion | agent | weapon | map>",
     group: "game",
     name: "Game world / lore",
-    summary: "A champion, agent, weapon or map. The entity's own splash is the background.",
+    summary:
+      "A champion, agent, weapon or map. The entity's own splash is BOTH the background and a framed panel down the right, so the art is seen rather than just veiled.",
     bgKey: "bot_world",
     regions: [
       ...COMMON,
       { key: "title", label: "Name + kind", kind: "text", x: 4.6, y: 7, w: 55, h: 22, note: "The kind pill, the name, and the skin being shown." },
-      { key: "lore", label: "Lore", kind: "text", x: 4.6, y: 32, w: 52, h: 22, note: "A paragraph on a dark plate. Keep the LEFT half clear of character art." },
-      { key: "abilities", label: "Abilities", kind: "text", x: 4.6, y: 56, w: 52, h: 26, note: "Up to three rows. Character art usually lives on the right." },
-      { key: "pills", label: "Stats + skin count", kind: "text", x: 4.6, y: 85, w: 78, h: 9, note: "Bottom strip." },
+      { key: "lore", label: "Lore", kind: "text", x: 4.6, y: 32, w: 52, h: 16, note: "A paragraph on a dark plate. Keep the LEFT half clear of character art." },
+      { key: "abilities", label: "Abilities", kind: "text", x: 4.6, y: 48, w: 59, h: 34, note: "Up to four rows, each with the ability's own icon." },
+      { key: "splash", label: "Splash panel", kind: "art", x: 64.5, y: 28, w: 34, h: 68, note: "The entity's splash, undimmed, between the sponsor box and the logo. Drawn by the renderer — nothing you put here shows." },
+      { key: "pills", label: "Stats + skin count", kind: "text", x: 4.6, y: 85, w: 59, h: 9, note: "Bottom strip." },
+    ],
+    parts: [
+      { key: "status", label: "Kind + role pills", note: "CHAMPION / AGENT / WEAPON, and the role." },
+      { key: "title", label: "Name + skin", note: "The entity's name and which skin is being shown." },
+      { key: "lore", label: "Lore", note: "A paragraph of the entity's story." },
+      { key: "abilities", label: "Abilities", note: "Ability icon, name and what it does — up to four.", text: "ABILITIES" },
+      { key: "art", label: "Splash panel", note: "The same splash as the background, drawn again as a framed portrait down the right side." },
+      { key: "meta", label: "Stats + skin count", note: "The bottom pill strip." },
     ],
   },
   {
@@ -175,6 +251,10 @@ export const CARD_GUIDES: CardGuide[] = [
       ...COMMON,
       { key: "title", label: "The query", kind: "text", x: 4.6, y: 7, w: 60, h: 18, note: "What was typed, and how many things matched." },
       { key: "rows", label: "Result rows", kind: "text", x: 4.6, y: 28, w: 78, h: 62, note: "Up to six rows with thumbnails." },
+    ],
+    parts: [
+      { key: "title", label: "The query", note: "What was typed, and how many things matched." },
+      { key: "rows", label: "Result rows", note: "Up to six matches with thumbnails." },
     ],
   },
   {
@@ -190,6 +270,12 @@ export const CARD_GUIDES: CardGuide[] = [
       { key: "rows", label: "Placements", kind: "text", x: 4.6, y: 26, w: 78, h: 55, note: "Up to five ranked rows with avatars, or three big podium rows on Sunday." },
       { key: "pills", label: "Days left / prize", kind: "text", x: 4.6, y: 83, w: 78, h: 10, note: "The countdown and vote totals, or the trophy the podium won." },
     ],
+    parts: [
+      { key: "title", label: "Title + countdown line", note: "'Profile of the Week' and where the week is up to." },
+      { key: "rows", label: "Placements", note: "The race during the week, the podium on Sunday." },
+      { key: "pills", label: "Days left / prize", note: "The bottom strip." },
+      { key: "empty", label: "No-votes message", note: "Shown at the start of a week before anybody has a vote.", text: "Nobody has a vote yet this week. Customize your profile and you are one vote from the top." },
+    ],
   },
   {
     kind: "planets",
@@ -201,6 +287,10 @@ export const CARD_GUIDES: CardGuide[] = [
     regions: [
       ...COMMON,
       { key: "tiles", label: "Game logo grid", kind: "art", x: 4.6, y: 30, w: 78, h: 55, note: "Rows of game logos. Keep the middle band clear." },
+    ],
+    parts: [
+      { key: "title", label: "Title", note: "The card's headline and subtitle." },
+      { key: "tiles", label: "Game logo grid", note: "Every game as a tile." },
     ],
   },
   {
@@ -215,6 +305,11 @@ export const CARD_GUIDES: CardGuide[] = [
       TEXT_COLUMN,
       { key: "tiers", label: "Tier ladder", kind: "text", x: 4.6, y: 50, w: 78, h: 38, note: "Progress bar and tier chips." },
     ],
+    parts: [
+      { key: "title", label: "Quest name", note: "The quest and whose progress this is." },
+      { key: "progress", label: "CP + progress bar", note: "How far to the next tier." },
+      { key: "tiers", label: "Tier ladder", note: "Up to five tier chips." },
+    ],
   },
   {
     kind: "cp-summary",
@@ -224,6 +319,10 @@ export const CARD_GUIDES: CardGuide[] = [
     summary: "Total CP and per-quest breakdown.",
     bgKey: "bot_quest",
     regions: [...COMMON, TEXT_COLUMN],
+    parts: [
+      { key: "title", label: "Title", note: "Whose quests these are, and their total." },
+      { key: "quests", label: "Quest bars", note: "Up to four quests with their progress." },
+    ],
   },
   {
     kind: "guide",
@@ -236,11 +335,22 @@ export const CARD_GUIDES: CardGuide[] = [
       ...COMMON,
       { key: "steps", label: "Numbered steps", kind: "text", x: 4.6, y: 30, w: 78, h: 55, note: "Two to four steps. The busiest text area of any card." },
     ],
+    parts: [
+      { key: "status", label: "Badge pill", note: "The small pill above the title." },
+      { key: "title", label: "Title", note: "The guide's headline and subtitle." },
+      { key: "steps", label: "Numbered steps", note: "Up to eight numbered steps." },
+      { key: "footer", label: "Footer line", note: "The closing line under the steps." },
+    ],
   },
 ];
 
 export function guideFor(kind: string): CardGuide | null {
   return CARD_GUIDES.find((g) => g.kind === kind) ?? null;
+}
+
+/** The editable content sections of one card kind. */
+export function partsFor(kind: string): CardPart[] {
+  return guideFor(kind)?.parts ?? [];
 }
 
 // A short brief staff can hand to an artist (or paste into an image prompt)

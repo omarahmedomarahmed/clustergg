@@ -226,7 +226,23 @@ export type WorldCard = {
   /** How many skins exist, so the card can say what the buttons are for. */
   skinCount: number;
   meta: { label: string; value: string }[];
-  abilities: { name: string; desc: string }[];
+  /**
+   * The ability icons are the point.
+   *
+   * These are the squares a player has stared at for a thousand hours; the name
+   * is what they'd call it, but the icon is what they RECOGNISE. The world
+   * cache already fetches and re-hosts them — this carries them the last step,
+   * to the card.
+   */
+  abilities: { name: string; desc: string; iconUrl?: string | null }[];
+  /**
+   * The chosen splash, drawn as a picture as well as as the backdrop.
+   *
+   * Same image as `theme.bgUrl` on purpose: the background is 62% veiled and
+   * double-scrimmed so the copy stays readable, which means the artwork itself
+   * is never actually seen. This is the undimmed copy, in a panel.
+   */
+  artUrl?: string | null;
   logoUrl?: string | null;
   theme: CardTheme;
 };
