@@ -426,20 +426,20 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "raise",
         anchor: "raise",
         navLabel: "The raise",
-        // Off until a founder confirms the terms. Every other slide in this
-        // deck is either a fact about the product or a number read from the
-        // database; this one is a decision, and shipping a plausible-looking
-        // cap table nobody chose is worse than shipping no slide.
-        hidden: true,
+        // Live: the terms are decided. This slide stayed hidden while they
+        // weren't, because every other slide here is either a fact about the
+        // product or a number read from the database, and a plausible-looking
+        // cap table nobody chose is worse than no slide.
         title: "What we're raising, and what it buys",
         subtitle:
-          "Pre-seed, on a SAFE. The platform is built and running; this round buys the prize pools and the outbound effort that turn it into revenue.",
+          "$100,000 for 20%, at $500,000 post-money. The platform is built and running — this round buys the prize pools and the outbound effort that turn it into revenue.",
         data: {
           ask: {
-            amount: 250000,
-            instrument: "SAFE",
-            valuation: 2500000,
-            equityPct: 10,
+            amount: 100000,
+            instrument: "Priced equity round",
+            valuation: 400000,
+            postMoney: 500000,
+            equityPct: 20,
             runwayMonths: 18,
             currency: "USD",
           },
@@ -450,8 +450,8 @@ export const SEED_DOCS: SeedDoc[] = [
             { label: "Infrastructure & legal", pct: 10, note: "Hosting, APIs, prize payout compliance" },
           ],
           capTable: [
-            { holder: "Founders", pct: 80, note: "Fully vesting, 4 years" },
-            { holder: "This round", pct: 10, note: "SAFE, converting at the cap" },
+            { holder: "Founders", pct: 70, note: "Fully vesting, 4 years" },
+            { holder: "This round", pct: 20, note: "$100,000 at $500,000 post-money" },
             { holder: "Option pool", pct: 10, note: "Reserved for the first engineering and sales hires" },
           ],
         },
@@ -496,7 +496,7 @@ export const SEED_DOCS: SeedDoc[] = [
             },
             {
               q: "What are you raising, and for what?",
-              a: "The terms are on the raise slide, with the use of funds and the cap table beside them. In short: prize pools while the first sponsors ramp, more game integrations, and the outbound effort to get the bot into the servers that should already have it.",
+              a: "$100,000 for 20%, at $500,000 post-money. The terms are on the raise slide with the use of funds and the cap table beside them. In short: prize pools while the first sponsors ramp, more game integrations, and the outbound effort to get the bot into the servers that should already have it.",
             },
           ],
         },

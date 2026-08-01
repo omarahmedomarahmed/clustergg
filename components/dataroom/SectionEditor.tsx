@@ -432,7 +432,8 @@ function PerKind({ section, metricOptions }: {
             <Field label="Raising"><input name="askAmount" type="number" min={0} defaultValue={ask.amount ?? ""} placeholder="250000" className="input-cosmic w-full" /></Field>
             <Field label="Instrument"><input name="askInstrument" defaultValue={ask.instrument ?? ""} placeholder="SAFE" className="input-cosmic w-full" /></Field>
             <Field label="Currency"><input name="askCurrency" defaultValue={ask.currency ?? "USD"} className="input-cosmic w-full" /></Field>
-            <Field label="Valuation / cap"><input name="askValuation" type="number" min={0} defaultValue={ask.valuation ?? ""} className="input-cosmic w-full" /></Field>
+            <Field label="Pre-money / cap"><input name="askValuation" type="number" min={0} defaultValue={ask.valuation ?? ""} className="input-cosmic w-full" /></Field>
+            <Field label="Post-money (if quoted that way)"><input name="askPostMoney" type="number" min={0} defaultValue={ask.postMoney ?? ""} className="input-cosmic w-full" /></Field>
             <Field label="Equity offered %"><input name="askEquity" type="number" min={0} max={100} step={0.5} defaultValue={ask.equityPct ?? ""} className="input-cosmic w-full" /></Field>
             <Field label="Runway (months)"><input name="askRunway" type="number" min={0} defaultValue={ask.runwayMonths ?? ""} className="input-cosmic w-full" /></Field>
           </div>

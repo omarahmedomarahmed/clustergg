@@ -128,6 +128,15 @@ export type SectionData = {
     amount?: number;
     instrument?: string;      // "SAFE", "Priced equity round", …
     valuation?: number;       // pre-money, or the cap on a SAFE
+    /**
+     * Post-money, when the round is quoted that way.
+     *
+     * Kept separate from `valuation` rather than folded into it because the
+     * two are different numbers and an investor reads the difference: a round
+     * quoted post-money already includes the cheque. Showing one under the
+     * other's label is the kind of error that ends a conversation.
+     */
+    postMoney?: number;
     equityPct?: number;       // what the round buys
     runwayMonths?: number;
     currency?: string;

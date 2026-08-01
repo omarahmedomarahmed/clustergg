@@ -27,9 +27,21 @@ export function RaiseSection({ d, accent }: { d: SectionData; accent: string }) 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Fact label="Raising" value={ask.amount ? money(ask.amount, cur) : "—"} accent={accent} big />
         <Fact label="Instrument" value={ask.instrument ?? "—"} />
-        <Fact label={ask.instrument?.toLowerCase().includes("safe") ? "Valuation cap" : "Pre-money"} value={ask.valuation ? money(ask.valuation, cur) : "—"} />
+        {/* Post-money when the round is quoted that way, pre-money otherwise.
+            An investor reads the difference — a post-money number already
+            includes the cheque — so the label always matches the figure. */}
+        <Fact
+          label={ask.postMoney ? "Post-money" : ask.instrument?.toLowerCase().includes("safe") ? "Valuation cap" : "Pre-money"}
+          value={ask.postMoney ? money(ask.postMoney, cur) : ask.valuation ? money(ask.valuation, cur) : "—"}
+        />
         <Fact label="Equity offered" value={ask.equityPct ? `${ask.equityPct}%` : "—"} />
       </div>
+      {ask.postMoney && ask.amount ? (
+        <p className="-mt-4 text-xs text-muted">
+          {money(ask.postMoney - ask.amount, cur)} pre-money. {money(ask.amount, cur)} in at{" "}
+          {money(ask.postMoney, cur)} post is {ask.equityPct}% of the company.
+        </p>
+      ) : null}
       {ask.runwayMonths ? (
         <p className="text-sm text-muted">
           <b className="text-ink">{ask.runwayMonths} months</b> of runway at the plan below.
