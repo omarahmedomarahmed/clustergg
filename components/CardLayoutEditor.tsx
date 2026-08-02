@@ -2,7 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/Icon";
-import { saveCardLayout, resetCardLayout, type CardActionState } from "@/app/actions/cards";
+import { saveCardLayout, resetCardLayout, applyFurnitureEverywhere, type CardActionState } from "@/app/actions/cards";
 import ImageUpload from "@/components/ImageUpload";
 import {
   DEFAULT_LAYOUT, BG_SOURCES, AD_RATIO, assetBox, badgeTopFor, partBoxes,
@@ -66,6 +66,14 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
       const res = await saveCardLayout(prev, fd);
       // The PNG behind this editor is cached by URL; a new query string is the
       // only thing that makes the browser fetch the freshly rendered one.
+      if (res?.ok) setNonce((n) => n + 1);
+      return res;
+    },
+    undefined,
+  );
+  const [applyState, applyAll, applying] = useActionState<CardActionState, FormData>(
+    async (prev, fd) => {
+      const res = await applyFurnitureEverywhere(prev, fd);
       if (res?.ok) setNonce((n) => n + 1);
       return res;
     },
@@ -389,6 +397,43 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
             onChange={(p) => setSpot("ad", p)}
             hint="A brand's creative, drawn on every render of this card. Size is the box WIDTH — the height follows the 640×200 creative. Hiding it takes this card kind out of the ad rotation."
           />
+
+          {/* One press, every card.
+              These four are the only elements common to all twelve kinds, and
+              they are exactly the ones that must not drift: a logo in a
+              different corner on each card is not branding, and a sponsor box
+              that moves between cards is inventory a brand cannot recognise.
+              Setting them meant opening twelve editors and repeating the same
+              four positions, which nobody did. */}
+          <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/5 p-3">
+            <button
+              // MUST be a submit button. `formAction` is only honoured on a
+              // submit; with type="button" the browser never submits, so the
+              // action never ran and the press did nothing at all.
+              type="submit"
+              formAction={applyAll}
+              disabled={applying}
+              onClick={(e) => {
+                // `formAction` submits the whole form, which is what carries the
+                // CURRENT unsaved numbers — applying what was last saved would
+                // make the button do something other than what the canvas shows.
+                if (!confirm("Copy the mascot, logo, badge and sponsor box — position, size, opacity and visibility — onto all 12 card kinds?\n\nNothing else about the other cards is touched.")) {
+                  e.preventDefault();
+                }
+              }}
+              className="ghost-btn pressable inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold disabled:opacity-60"
+            >
+              <Icon name="layers" size={12} />
+              {applying ? "Applying…" : "Apply these four to every card"}
+            </button>
+            <p className="mt-2 text-[11px] leading-snug text-muted">
+              Copies position, size, opacity and show/hide for the mascot, the logo, the top-right badge
+              and the sponsor box. Everything else on the other cards — their content boxes, their
+              sections, their placed art — is left exactly as it is.
+            </p>
+            {applyState?.ok && <p className="mt-2 text-[11px] text-emerald-300">{applyState.ok}</p>}
+            {applyState?.error && <p className="mt-2 text-[11px] text-amber-300">{applyState.error}</p>}
+          </div>
 
           {/* ===== What this card actually says ===== */}
           {parts.length > 0 && (
