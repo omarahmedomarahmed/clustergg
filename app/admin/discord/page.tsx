@@ -12,6 +12,9 @@ import { AdminHeader, AdminSection, AdminSettings, EmptyState } from "@/componen
 import { JOBS } from "@/lib/jobs";
 import FoundingOffers from "@/components/FoundingOffers";
 import { offers } from "@/lib/offers";
+import BotListsPanel from "@/components/BotListsPanel";
+import { BOT_LIST_CMS_KEYS, BOT_LISTS } from "@/lib/botlists";
+import { getContent } from "@/lib/cms";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -34,8 +37,12 @@ export default async function AdminDiscordPage() {
   const ready = discordConfigured();
   const install = installUrl();
 
-  const [guilds, pending, hq, offerState] = await Promise.all([
+  const [guilds, pending, hq, offerState, listValues] = await Promise.all([
     listGuilds(), countPendingRequests(), hqStatus(), offers(),
+    getContent([
+      ...BOT_LIST_CMS_KEYS,
+      ...BOT_LISTS.filter((l) => l.votes).map((l) => `botlist.${l.id}.webhook`),
+    ]).catch(() => ({} as Record<string, string>)),
   ]);
 
   const checks: { label: string; ok: boolean; detail: string }[] = [
@@ -169,6 +176,17 @@ export default async function AdminDiscordPage() {
             </table>
           </div>
         )}
+      </AdminSection>
+
+      {/* How anybody finds the bot in the first place.
+          Discord has no app store: the lists ARE discovery, and their ranking
+          is votes. Placed next to the offers because it is the same job —
+          getting the bot in front of servers that don't know it exists. */}
+      <AdminSection
+        title="Bot lists — where servers find us"
+        hint="Every list ranks by votes, and a vote can be cast every twelve hours. This is the checklist for getting listed, the tokens once we are, and the webhook that pays a voter in CP."
+      >
+        <BotListsPanel values={listValues} siteOrigin={liveOrigin} />
       </AdminSection>
 
       {/* The founding offers, and the servers still owed one. Placed above

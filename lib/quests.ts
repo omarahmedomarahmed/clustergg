@@ -14,7 +14,8 @@ export type QuestActionKey =
   | "follower_gained" | "message_new" | "profile_views_25"
   | "connect_account" | "stat_levelup"
   | "ad_impression" | "ad_click"
-  | "profile_vote_received" | "best_profile_award";
+  | "profile_vote_received" | "best_profile_award"
+  | "botlist_vote";
 
 export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string; defaultWeight: number; defaultCap?: number }[] = [
   { key: "join_challenge",   label: "Join a challenge",        group: "conquest",  defaultWeight: 15, defaultCap: 5 },
@@ -33,6 +34,14 @@ export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string
   // which is exactly what this quest measures.
   { key: "profile_vote_received", label: "Someone votes for your profile", group: "orbit", defaultWeight: 15 },
   { key: "best_profile_award",    label: "Place in Best Profile",          group: "orbit", defaultWeight: 250 },
+  // Voting for Cluster on a bot list.
+  //
+  // This is the one action here that grows the PLATFORM rather than the gamer's
+  // standing in it — bot-list ranking is votes, and every list that matters lets
+  // a person vote every twelve hours. Rewarding it in CP puts the ask inside a
+  // currency they already care about instead of inventing a parallel one, and
+  // the twice-a-day cap is the vote cooldown rather than a number we picked.
+  { key: "botlist_vote",     label: "Vote for Cluster on a bot list", group: "signal", defaultWeight: 50, defaultCap: 2 },
   { key: "connect_account",  label: "Connect a game account",  group: "ascension", defaultWeight: 120 },
   { key: "stat_levelup",     label: "A tracked stat rises",    group: "ascension", defaultWeight: 25, defaultCap: 20 },
   { key: "ad_impression",    label: "See an ad (impression)",  group: "signal",    defaultWeight: 1, defaultCap: 60 },

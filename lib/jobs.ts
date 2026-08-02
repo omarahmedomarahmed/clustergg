@@ -2,6 +2,7 @@ import { closeExpiredChallenges } from "@/lib/challenges";
 import { postAdsToGuilds } from "@/lib/discord/ads";
 import { postLeaderboardUpdates } from "@/lib/discord/leaderboard-feed";
 import { postWeekUpdate } from "@/lib/discord/week-feed";
+import { postBotListStats } from "@/lib/botlist-post";
 
 // Everything periodic, as named jobs.
 //
@@ -13,7 +14,7 @@ import { postWeekUpdate } from "@/lib/discord/week-feed";
 // Each job must be safe to run repeatedly. Closing challenges is idempotent,
 // and ad posting has its own per-server interval.
 
-export type JobKey = "challenges" | "discord-ads" | "leaderboard-feed" | "week-update";
+export type JobKey = "challenges" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats";
 
 export type JobResult = { key: JobKey; ok: boolean; summary: string };
 
@@ -32,6 +33,11 @@ export const JOBS: { key: JobKey; label: string; description: string }[] = [
     key: "week-update",
     label: "Post the Profile of the Week update",
     description: "Posts the weekly vote standings — placements, days left and the way in — into every server running the bot. One post per server per day, so running it early or twice is safe.",
+  },
+  {
+    key: "botlist-stats",
+    label: "Post our server count to the bot lists",
+    description: "Tells every bot list we hold a key for how many servers the bot is in. Server count is a ranking signal on all of them, and a stale one argues against installing us. Lists with no key are skipped, not failed.",
   },
   {
     key: "leaderboard-feed",
@@ -60,6 +66,15 @@ export async function runJob(key: JobKey): Promise<JobResult> {
             : r.considered
               ? `Every one of the ${r.considered} server${r.considered === 1 ? "" : "s"} already had today's update.`
               : "No server has the bot with announcements on yet.",
+        };
+      }
+      case "botlist-stats": {
+        const r = await postBotListStats();
+        return {
+          key, ok: r.failed === 0,
+          summary: `${r.guilds} server${r.guilds === 1 ? "" : "s"} → ${r.posted} list${r.posted === 1 ? "" : "s"} updated`
+            + (r.failed ? `, ${r.failed} failed: ${r.results.filter((x) => !x.ok && !x.skipped).map((x) => `${x.name} (${x.detail})`).join("; ").slice(0, 200)}` : "")
+            + (r.skipped ? `, ${r.skipped} not set up yet` : "") + ".",
         };
       }
       case "leaderboard-feed": {
