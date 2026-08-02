@@ -106,7 +106,39 @@ function safeTheme(theme: CardTheme): CardTheme {
 // Every position here comes from the card's LAYOUT (Admin → Card layouts), not
 // from constants. The defaults reproduce the geometry this frame used to
 // hard-code, so an unedited card is pixel-identical to what it drew before.
-function Frame({ theme, children, corner, side }: {
+/**
+ * What the badge shows, once the admin has had a say.
+ *
+ * The card body proposes (a level pill, a game logo, a trophy row) and the
+ * layout disposes. "auto" keeps the body's proposal, which is why setting this
+ * changes nothing until somebody chooses — and why a choice that the card has
+ * no data for shows nothing rather than something wrong.
+ */
+function badgeContent(
+  theme: CardTheme,
+  proposed: React.ReactNode,
+): React.ReactNode {
+  const show = theme.layout?.badgeShow ?? "auto";
+  if (show === "auto") return proposed;
+  if (show === "none") return undefined;
+  const b = theme.badge ?? {};
+  if (show === "game" && b.gameLogoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={b.gameLogoUrl} alt="" width={72} height={72}
+      style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />;
+  }
+  if (show === "level" && typeof b.level === "number") {
+    return <Pill color={theme.accent2} bg="rgba(0,0,0,0.45)">{`LV ${b.level}`}</Pill>;
+  }
+  if (show === "trophy" && b.trophyUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={b.trophyUrl} alt="" width={72} height={72}
+      style={{ width: 72, height: 72, objectFit: "contain" }} />;
+  }
+  return undefined;
+}
+
+function Frame({ theme, children, corner: proposedCorner, side }: {
   theme: CardTheme;
   children: React.ReactNode;
   corner?: React.ReactNode;
@@ -120,6 +152,7 @@ function Frame({ theme, children, corner, side }: {
    */
   side?: (box: { left: number; top: number; width: number; height: number }) => React.ReactNode;
 }) {
+  const corner = badgeContent(theme, proposedCorner);
   const l = theme.layout ?? DEFAULT_LAYOUT;
   const mascot = spotBox(l.mascot, 1);
   const mark = spotBox(l.mark, 1);
@@ -1472,9 +1505,22 @@ async function prepareCard(d: CardData): Promise<CardData> {
   // fetches remote images itself and one unreachable host takes down the whole
   // card, so an asset that won't load is DROPPED rather than drawn as a hole.
   const layout = await withDeadline(withAssets(rawLayout, d), { ...rawLayout, assets: [] });
+  // What the badge COULD show on this card, gathered once. An admin can
+  // override what the corner draws per card kind, and the override needs these
+  // to hand — dug out of the union here rather than inside the renderer, so
+  // "the game's logo" means the same thing on every kind that has one.
+  const any = body as Record<string, unknown>;
+  const firstTrophy = Array.isArray(any.trophies) && any.trophies.length
+    ? (any.trophies[0] as { imageUrl?: string }).imageUrl ?? null
+    : (any.trophy as { imageUrl?: string } | undefined)?.imageUrl ?? null;
+  const badge = {
+    gameLogoUrl: typeof any.logoUrl === "string" ? any.logoUrl : null,
+    level: typeof any.level === "number" ? any.level : null,
+    trophyUrl: firstTrophy,
+  };
   // Colours are normalised here, once, on the way in — so every card body can
   // use `theme.accent` directly and no unparseable value ever reaches Satori.
-  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad }) } as CardData;
+  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad, badge }) } as CardData;
 }
 
 // The background, with fallbacks. Tried in order and stops at the first that

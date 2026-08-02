@@ -126,7 +126,12 @@ export const CARD_GUIDES: CardGuide[] = [
       ...COMMON,
       { key: "avatar", label: "Avatar + name", kind: "text", x: 4.6, y: 7, w: 55, h: 20, note: "Round avatar, display name, slug and title." },
       { key: "stats", label: "CP / views / votes", kind: "text", x: 4.6, y: 26, w: 50, h: 9, note: "Three pills in a row." },
-      { key: "accounts", label: "Linked accounts", kind: "text", x: 4.6, y: 38, w: 62, h: 26, note: "Up to six game cards, two per row." },
+      // Starts at 56, not 38: the trophy case and the arena rows are drawn
+      // between the stat pills and the accounts, and an accounts region at 38
+      // left the two of them three percent of the card to share — so the editor
+      // drew both as slivers on top of it. This is where accounts actually
+      // lands once the two sections above it have their space.
+      { key: "accounts", label: "Linked accounts", kind: "text", x: 4.6, y: 56, w: 62, h: 26, note: "Up to six game cards, two per row, below the trophy case and the arena rows." },
     ],
     parts: [
       { key: "identity", label: "Avatar + name", note: "The round avatar, the display name and the profile link." },
@@ -174,7 +179,10 @@ export const CARD_GUIDES: CardGuide[] = [
         note: "Game logo with up to three trophies stacked beneath it, right-aligned. Keep the whole right edge clear down to the halfway line.",
       },
       TEXT_COLUMN,
-      { key: "timeline", label: "Timeline bar", kind: "text", x: 4.6, y: 47, w: 78, h: 7, note: "Start → end progress bar with dates." },
+      // Stops before the trophy column rather than running under it: at w:78
+      // this region and the trophies region claimed the same rectangle, which
+      // is a guide describing a card that cannot be drawn.
+      { key: "timeline", label: "Timeline bar", kind: "text", x: 4.6, y: 47, w: 56, h: 7, note: "Start → end progress bar with dates. Stops short of the trophy column beside it." },
       { key: "standings", label: "Standings", kind: "text", x: 4.6, y: 58, w: 78, h: 32, note: "Up to four ranked rows on dark plates." },
     ],
     parts: [
@@ -233,7 +241,12 @@ export const CARD_GUIDES: CardGuide[] = [
     bgKey: "bot_world",
     regions: [
       ...COMMON,
-      { key: "title", label: "Name + kind", kind: "text", x: 4.6, y: 7, w: 55, h: 22, note: "The kind pill, the name, and the skin being shown." },
+      // Starts at 13, not 7: the kind/role pills are drawn ABOVE the name, and a
+      // title region that began at the very top of the content box left them
+      // nowhere to go — so the editor drew them in a one-percent sliver on top
+      // of the name. The region is the name and skin; the pills have the band
+      // above it.
+      { key: "title", label: "Name + skin", kind: "text", x: 4.6, y: 13, w: 55, h: 16, note: "The entity's name and the skin being shown. The kind and role pills sit in the band above this." },
       { key: "lore", label: "Lore", kind: "text", x: 4.6, y: 32, w: 52, h: 16, note: "A paragraph on a dark plate. Keep the LEFT half clear of character art." },
       { key: "abilities", label: "Abilities", kind: "text", x: 4.6, y: 48, w: 59, h: 34, note: "Up to four rows, each with the ability's own icon." },
       { key: "splash", label: "Splash panel", kind: "art", x: 64.5, y: 28, w: 34, h: 68, note: "The entity's splash, undimmed, between the sponsor box and the logo. Drawn by the renderer — nothing you put here shows." },
