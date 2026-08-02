@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { cardMeta } from "@/lib/og";
 
 // Leaderboards are now part of each game's planet.
 export default async function GameLeaderboardRedirect({

@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { cardMeta } from "@/lib/og";
 import { notFound } from "next/navigation";
 import { and, eq, inArray } from "drizzle-orm";
 import GameLogo from "@/components/GameLogo";
@@ -18,6 +20,24 @@ import { recordServerEvent } from "@/lib/server-portal";
 import { getQuestCompletions } from "@/lib/quests";
 
 export const dynamic = "force-dynamic";
+
+// A challenge link previews the challenge: its prize pool, its podium and how
+// long is left. This is the single most-shared kind of Cluster link — it is
+// what a server owner pastes to get their members to enter.
+export async function generateMetadata(
+  { params }: { params: Promise<{ challengeId: string }> },
+): Promise<Metadata> {
+  const { challengeId } = await params;
+  const db = await getDb();
+  const [ch] = await db.select({ title: schema.challenges.title, game: schema.challenges.game, description: schema.challenges.description })
+    .from(schema.challenges).where(eq(schema.challenges.id, challengeId)).limit(1);
+  if (!ch) return {};
+  return {
+    title: ch.title,
+    description: ch.description || `A ${ch.game} challenge on Cluster. Enter, play, win real prizes.`,
+    ...cardMeta("challenge", { id: challengeId }, `${ch.title} — a ${ch.game} challenge on Cluster`),
+  };
+}
 
 function streamEmbed(url: string): string | null {
   try {

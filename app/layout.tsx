@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from "next";
 import { EMBED_HEADER } from "@/middleware";
 import { Space_Grotesk, Cairo } from "next/font/google";
 import "./globals.css";
+import { SITE_CARD } from "@/lib/og";
 import { getLocale } from "@/lib/i18n/server";
 import { getUiOverrides } from "@/lib/i18n/t-server";
 import { dirOf } from "@/lib/i18n/locale";
@@ -65,10 +66,14 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Brands reach gamers where they really are. Server owners earn. Gamers play, win, and share.",
       url: appUrl,
       siteName: "Cluster",
-      images: [{ url: "/assets/og.png", width: 1200, height: 675 }],
+      // The platform, drawn from live data — not a logo, and not a file that
+      // has to be re-exported every time the product changes. `/assets/og.png`
+      // used to be here and does not exist in this repository at all, so every
+      // link that didn't override it previewed a 404.
+      images: [{ url: SITE_CARD, width: 1200, height: 630, alt: "Cluster — every game, one identity" }],
       type: "website",
     },
-    twitter: { card: "summary_large_image", images: ["/assets/og.png"] },
+    twitter: { card: "summary_large_image", images: [SITE_CARD] },
     icons: { icon },
   };
 }
