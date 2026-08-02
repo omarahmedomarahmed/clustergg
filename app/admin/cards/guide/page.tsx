@@ -6,6 +6,7 @@ import { cardBg } from "@/lib/cards/data";
 import { previewUrlFor, previewSamples, type CardSample } from "@/lib/cards/preview";
 import { assetLibrary } from "@/lib/cards/asset-library";
 import CardStudio, { type StudioCard } from "@/components/CardStudio";
+import { buttonCopy } from "@/lib/discord/button-store";
 import { AdminHeader, AdminSection } from "@/components/AdminPage";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,9 @@ export const metadata = { title: "Admin · Card studio" };
 // — a layout applies to a card KIND, which is what makes it worth setting once.
 export default async function CardStudioPage() {
   await requireStaff();
-  const [layouts, brand, library] = await Promise.all([allLayouts(), brandCardArt(), assetLibrary()]);
+  const [layouts, brand, library, buttons] = await Promise.all([
+    allLayouts(), brandCardArt(), assetLibrary(), buttonCopy(),
+  ]);
   const backgrounds = await Promise.all(CARD_GUIDES.map((g) => cardBg(g.bgKey)));
   // Several real cards per kind, so a layout can be checked against the range of
   // art it will actually land on rather than against one lucky fixture.
@@ -90,7 +93,7 @@ export default async function CardStudioPage() {
         </ul>
       </AdminSection>
 
-      <CardStudio cards={cards} library={library} />
+      <CardStudio cards={cards} library={library} buttonCopy={buttons} />
     </div>
   );
 }

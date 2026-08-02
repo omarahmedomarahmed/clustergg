@@ -1,7 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
-import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, select, selectRow, type Frame, type Button } from "@/lib/discord/components";
+import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, select, selectRow, withButtonCopy, type Frame, type Button } from "@/lib/discord/components";
+import { buttonCopy } from "@/lib/discord/button-store";
 import { cardRef, currentCardGuild, currentSponsor, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
 import { withSponsorRow } from "@/lib/discord/sponsor";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
@@ -1419,7 +1420,11 @@ async function searchScreen(query: string, ctx: ScreenCtx, trail: Frame[]): Prom
  */
 export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {
   const payload = await renderScreenBody(f, trail, ctx);
-  return withSponsorRow(payload, currentSponsor(), currentCardGuild());
+  const sponsored = withSponsorRow(payload, currentSponsor(), currentCardGuild());
+  // The admin's wording, last: after the screen and after the sponsor, so it
+  // reaches every button the message will actually carry. One choke point
+  // rather than a rename in twenty-one screens.
+  return { ...sponsored, components: withButtonCopy(sponsored.components, await buttonCopy()) };
 }
 
 async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {

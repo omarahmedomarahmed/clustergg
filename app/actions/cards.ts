@@ -149,6 +149,49 @@ export async function applyFurnitureEverywhere(_prev: CardActionState, fd: FormD
   };
 }
 
+/**
+ * The wording on the buttons under the cards.
+ *
+ * The buttons ARE the navigation inside Discord, and their labels were literals
+ * in twenty-one screens — so softening "Connect a game" was a deploy, and
+ * taking a button off for a week was impossible. They are shared copy rather
+ * than per-card copy: the same button appears under a dozen cards, and letting
+ * it say four different things in four places is how one bot starts feeling
+ * like four.
+ *
+ * No card cache to clear — buttons are message components, not pixels.
+ */
+export async function saveBotButtons(_prev: CardActionState, fd: FormData): Promise<CardActionState> {
+  await requireStaff();
+  const { BOT_BUTTONS, BUTTON_COPY_KEY, parseButtonCopy } = await import("@/lib/discord/buttons");
+  const { forgetButtonCopy } = await import("@/lib/discord/button-store");
+
+  const draft: Record<string, { label?: string; emoji?: string; hidden?: boolean }> = {};
+  for (const b of BOT_BUTTONS) {
+    const label = String(fd.get(`btn.${b.key}.label`) ?? "").trim();
+    const emoji = String(fd.get(`btn.${b.key}.emoji`) ?? "").trim();
+    const hidden = fd.get(`btn.${b.key}.hidden`) === "on";
+    // Only what differs from the default is stored, so a later change to a
+    // default reaches every server that never overrode it.
+    draft[b.key] = {
+      ...(label && label !== b.label ? { label } : {}),
+      ...(emoji && emoji !== (b.emoji ?? "") ? { emoji } : {}),
+      ...(hidden ? { hidden: true } : {}),
+    };
+  }
+  const copy = parseButtonCopy(JSON.stringify(draft));
+  await setContent(BUTTON_COPY_KEY, JSON.stringify(copy));
+  forgetButtonCopy();
+
+  revalidatePath("/admin/cards/guide");
+  const n = Object.keys(copy).length;
+  return {
+    ok: n
+      ? `Saved. ${n} button${n === 1 ? "" : "s"} changed from the default — live on the next press.`
+      : "Saved. Every button is back to its default wording.",
+  };
+}
+
 // Back to the house geometry. Stored as the explicit default rather than an
 // empty value so "reset" and "never touched" read the same way everywhere.
 export async function resetCardLayout(_prev: CardActionState, fd: FormData): Promise<CardActionState> {
