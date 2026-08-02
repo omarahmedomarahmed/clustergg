@@ -23,6 +23,20 @@ html, body {
   min-height: 100%;
 }
 
+/* ---------- Everything at 90% ----------
+ *
+ * `zoom` rather than a root font-size. Half of this UI is sized in px — game
+ * logos, the globe, card art, the Discord card previews — so shrinking the root
+ * font would shrink the words and leave the pictures where they were, which is
+ * a different design rather than a smaller one.
+ *
+ * Modern browsers treat `zoom` as part of the used-value computation, so fixed
+ * positioning, 100vw and 100dvh all scale with it and the sticky nav still spans
+ * the window. Print is excluded: a deck printed at 90% is just small.
+ */
+html { zoom: 0.9; }
+@media print { html { zoom: 1; } }
+
 ::selection { background: rgba(139, 92, 246, 0.45); }
 
 * { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,.35) transparent; }

@@ -281,7 +281,7 @@ export async function saveSpace(formData: FormData) {
     }).onConflictDoNothing();
     await audit(admin.id, "space.create", "space", values.name);
   }
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
   revalidatePath("/planets");
 }
 
@@ -296,7 +296,7 @@ export async function deleteSpace(spaceId: string) {
   await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, spaceId));
   await db.delete(schema.spaces).where(eq(schema.spaces.id, spaceId));
   await audit(admin.id, "space.delete", "space", spaceId);
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
   revalidatePath("/planets");
 }
 
@@ -317,7 +317,7 @@ export async function ensurePlanetsForGames() {
     }).onConflictDoNothing();
   }
   await audit(admin.id, "planets.ensure_for_games", "space");
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
   revalidatePath("/planets");
 }
 
@@ -335,7 +335,7 @@ export async function deleteLegacyPlanets() {
     await db.delete(schema.spaces).where(eq(schema.spaces.id, s.id));
   }
   await audit(admin.id, "planets.delete_legacy", "space");
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
   revalidatePath("/planets");
 }
 
@@ -369,7 +369,7 @@ export async function adminDeletePost(postId: string) {
   const db = await getDb();
   await db.update(schema.posts).set({ deletedAt: new Date() }).where(eq(schema.posts.id, postId));
   await audit(admin.id, "post.delete", "post", postId);
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
 }
 
 export async function togglePinPost(postId: string, pin: boolean, path: string) {
@@ -509,6 +509,25 @@ export async function saveChallenge(
     })(),
     status: String(formData.get("status") ?? "draft"),
     prizeDescription: String(formData.get("prizeDescription") ?? "").trim() || null,
+    // ===== Sponsorship =====
+    //
+    // The builder could not set these, so every challenge it created was
+    // unsponsored — which meant it never appeared on a brand's report, never
+    // reached billing, and never paid the server it ran in. The columns existed;
+    // only the form didn't write them.
+    //
+    // Price is only meaningful with a brand attached: a price with no sponsor
+    // would put money into billing that nobody owes.
+    ...(() => {
+      const brandId = String(formData.get("sponsorBrandId") ?? "").trim() || null;
+      const campaignId = String(formData.get("sponsorCampaignId") ?? "").trim() || null;
+      const price = Math.max(0, Number(formData.get("sponsorPrice")) || 0);
+      return {
+        sponsorBrandId: brandId,
+        sponsorCampaignId: brandId ? campaignId : null,
+        sponsorPrice: brandId ? price : 0,
+      };
+    })(),
   };
 
   // Say which field is missing. This used to be `return;` — the form posted,

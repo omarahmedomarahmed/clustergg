@@ -14,6 +14,18 @@
 // This file is PURE — no database, no server imports — so the department editor
 // can render the same catalogue in the browser that the access guard enforces
 // on the server. One definition, two readers, no way for them to disagree.
+//
+// WHICH PAGES A SYSTEM OWNS IS NOT DECLARED HERE ANY MORE.
+//
+// It used to be, as a list of path prefixes per system, parallel to the list of
+// pages in lib/admin-nav.ts. Two lists of the same pages is two lists that can
+// disagree, and they did — `/admin/discord/broadcast` sat in the Discord
+// section while the ad desk owned it, expressed as a prefix in one file and an
+// `except` in the other. The owner is now written beside the page in the nav,
+// once, and read back here. A page that appears in the console has an owner by
+// construction; a page nobody claimed is admin-only, which is the safe default.
+
+import { ownersOfPath, pagesOfSystem } from "@/lib/admin-nav";
 
 export type SystemKey =
   | "ad"
@@ -32,10 +44,6 @@ export type SystemDef = {
   icon: string;
   /** One line: what this system is FOR. Not what it edits. */
   outcome: string;
-  /** The pages this department can open. Prefix match, most specific wins. */
-  pages: string[];
-  /** Pages inside this system's prefixes that belong to somebody else. */
-  except?: string[];
   /** The operating manual for whoever runs it. */
   brief: {
     /** "You are the …" — their job in one sentence. */
@@ -57,7 +65,6 @@ export const SYSTEMS: SystemDef[] = [
     name: "Ad system",
     icon: "zap",
     outcome: "Every creative a brand paid for is running, in the right place, and counted.",
-    pages: ["/admin/creatives", "/admin/placements", "/admin/ads", "/admin/discord/broadcast"],
     brief: {
       role: "You are the ad operator. Nothing a brand bought reaches a gamer without passing through you.",
       doing: [
@@ -85,8 +92,6 @@ export const SYSTEMS: SystemDef[] = [
     name: "Bot system",
     icon: "link",
     outcome: "The bot is installed, healthy, and talking to every server that has it.",
-    pages: ["/admin/discord"],
-    except: ["/admin/discord/broadcast", "/admin/discord/requests"],
     brief: {
       role: "You are the operator of our distribution. The bot is how Cluster reaches anybody at all.",
       doing: [
@@ -114,7 +119,6 @@ export const SYSTEMS: SystemDef[] = [
     name: "Game planet system",
     icon: "planet",
     outcome: "Every game we carry has a world worth visiting and stats worth trusting.",
-    pages: ["/admin/games", "/admin/game-worlds", "/admin/spaces", "/admin/connect"],
     brief: {
       role: "You are the curator of the games. A planet is a game's home on Cluster, and you build it.",
       doing: [
@@ -142,7 +146,6 @@ export const SYSTEMS: SystemDef[] = [
     name: "Quest system",
     icon: "spark",
     outcome: "A gamer who joins has something to do in their first ten minutes, and a reason to come back.",
-    pages: ["/admin/quests"],
     brief: {
       role: "You run the progression. Quests are the reason somebody who lost their first challenge opens Cluster again.",
       doing: [
@@ -164,7 +167,6 @@ export const SYSTEMS: SystemDef[] = [
     name: "Challenge system",
     icon: "trophy",
     outcome: "Every week, in every game we sell, there is a competition running that people entered.",
-    pages: ["/admin/challenges", "/admin/leaderboards", "/admin/discord/requests", "/admin/profile-week"],
     brief: {
       role: "You are the competition director. What you approve runs under Cluster's name in front of everyone.",
       doing: [
@@ -194,11 +196,6 @@ export const SYSTEMS: SystemDef[] = [
     name: "Platform content & self-branding",
     icon: "type",
     outcome: "Every word and image Cluster shows about itself is current and says the same thing.",
-    pages: [
-      "/admin/content", "/admin/language", "/admin/translations", "/admin/backgrounds",
-      "/admin/cards", "/admin/brand-kit", "/admin/chrome", "/admin/mobile",
-      "/admin/creative-studio", "/admin/partners", "/admin/dataroom", "/admin/brands/testimonials",
-    ],
     brief: {
       role: "You own how Cluster reads and looks. Every headline, every card background, every button label.",
       doing: [
@@ -226,7 +223,6 @@ export const SYSTEMS: SystemDef[] = [
     // `ADMIN_ONLY`: this system's staff work on profiles and sync health, and
     // neither job requires the ability to read every member's email and every
     // account they play under. Listing them here would grant exactly that.
-    pages: [],
     brief: {
       role: "You look after the gamers themselves: their profiles, their linked accounts, their standing.",
       doing: [
@@ -249,7 +245,6 @@ export const SYSTEMS: SystemDef[] = [
     name: "Trophies & payout",
     icon: "medal",
     outcome: "Every winner gets what they were promised, and can turn it into money.",
-    pages: ["/admin/trophies", "/admin/redeems"],
     brief: {
       role: "You are the one who pays people. A gamer's trust in Cluster is decided entirely by whether this works.",
       doing: [
@@ -276,8 +271,6 @@ export const SYSTEMS: SystemDef[] = [
     name: "Billing & revenue",
     icon: "diamond",
     outcome: "Money in matches what we sold, money out matches what we owe.",
-    pages: ["/admin/billing", "/admin/brands", "/admin/brand-enquiries"],
-    except: ["/admin/brands/testimonials"],
     brief: {
       role: "You are the books. Brand subscriptions in, campaign bills in, prize money and server earnings out.",
       doing: [
@@ -318,17 +311,13 @@ export function systemBy(key: string): SystemDef | null {
  * it lives under `/admin/brands`.
  */
 export function systemForPath(path: string): SystemDef | null {
-  let best: SystemDef | null = null;
-  let bestLen = -1;
-  for (const s of SYSTEMS) {
-    if (s.except?.some((e) => path === e || path.startsWith(`${e}/`))) continue;
-    for (const p of s.pages) {
-      if ((path === p || path.startsWith(`${p}/`)) && p.length > bestLen) {
-        best = s; bestLen = p.length;
-      }
-    }
-  }
-  return best;
+  const owners = ownersOfPath(path);
+  return owners.length ? (SYSTEMS.find((x) => x.key === owners[0]) ?? null) : null;
+}
+
+/** Every page a desk owns, read from the console's own map. */
+export function pagesFor(key: SystemKey): { href: string; label: string }[] {
+  return pagesOfSystem(key).map((i) => ({ href: i.href, label: i.label }));
 }
 
 /**
@@ -366,14 +355,19 @@ export const ALWAYS_OPEN = [...ALWAYS_OPEN_EXACT, ...ALWAYS_OPEN_UNDER];
  */
 export const ADMIN_ONLY = ["/admin/users", "/admin/linked-accounts"];
 
+
 export function pathAllowedFor(systems: string[], path: string): boolean {
   if (ADMIN_ONLY.some((p) => path === p || path.startsWith(`${p}/`))) return false;
   if (ALWAYS_OPEN_EXACT.includes(path)) return true;
   if (ALWAYS_OPEN_UNDER.some((p) => path === p || path.startsWith(`${p}/`))) return true;
-  const owner = systemForPath(path);
-  // A page no system claims is admin-only. New pages are invisible to staff
-  // until someone deliberately files them, which is the safe default: the
-  // alternative is a page appearing in a department nobody assigned it to.
-  if (!owner) return false;
-  return systems.includes(owner.key);
+  // Any owning desk is enough. A page can legitimately have two — the unified
+  // inbox carries server-owner threads and brand threads in one queue — and
+  // that is now expressed where the page is declared rather than as a special
+  // case here.
+  const owners = ownersOfPath(path);
+  // A page no desk claims is admin-only. New pages are invisible to staff until
+  // someone deliberately files them, which is the safe default: the alternative
+  // is a page appearing in a department nobody assigned it to.
+  if (owners.length === 0) return false;
+  return owners.some((k) => systems.includes(k));
 }

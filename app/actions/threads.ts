@@ -32,8 +32,11 @@ export type ThreadRefreshResult =
  * are not allowed to reload.
  */
 const ADMIN_PATHS: Record<ThreadKind, string[]> = {
-  server: ["/admin/discord/messages"],
-  brand: ["/admin/brands", "/admin/ads"],
+  // The unified inbox, plus the guild page where a server thread is actually
+  // read and answered. Either is enough — a desk that can open the conversation
+  // can reload it.
+  server: ["/admin/messages", "/admin/discord"],
+  brand: ["/admin/messages", "/admin/brands", "/admin/ads"],
 };
 
 export async function refreshThread(

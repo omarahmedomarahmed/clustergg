@@ -1,40 +1,44 @@
 "use client";
 
-import { useState } from "react";
 import PlanetExplorer from "@/components/PlanetExplorer";
 import { type PlanetData } from "@/components/PlanetHero";
-import QuestMapHero from "@/components/QuestMapHero";
-import HeroModeToggle from "@/components/HeroModeToggle";
-import type { QuestHeroData } from "@/lib/quest-hero";
 import type { PlanetExplore } from "@/lib/planet-explore";
 
-// The interactive hero used on the homepage AND every planet page. Defaults to
-// the planet globe explorer (leaderboards left, challenges + players right,
-// click-anything-opens-in-the-middle); a toggle rendered INSIDE the hero swaps
-// to the primary quest's treasure map in place. `swap` controls whether planet
-// logos navigate (planet pages) or switch in place (home). `explore` is the
-// server-rendered explorer data for the initial planet (planet page); when null
-// the explorer lazy-loads it from the API (home/feed).
+// The interactive hero used on the homepage AND every planet page: the game's
+// planet globe, with leaderboards left, challenges and players right, and
+// anything clicked opening in the middle.
+//
+// It used to carry a toggle that swapped the whole hero for the primary quest's
+// treasure map. That's gone. A hero has one job — say what this place is — and
+// a control that replaces it with a different subject makes the first thing a
+// visitor sees depend on a button they haven't pressed yet. Quests still have
+// their own pages and their own map; they are no longer an alternate hero.
+//
+// `swap` controls whether the game buttons NAVIGATE to that planet's page
+// (planet pages, where you're already on one) or change this hero in place
+// (home and feed, where leaving is the wrong response to picking a game).
+// `explore` is server-rendered data for the initial planet; when null the
+// explorer lazy-loads it from the API.
 export default function HeroStage({
-  planets, initialSlug, heading, quest, swap = true, explore = null, compact = false,
+  planets, initialSlug, heading, swap = true, explore = null, compact = false, onPlanetChange,
 }: {
   planets: PlanetData[];
   initialSlug: string;
   heading?: string;
-  quest: QuestHeroData | null;
   swap?: boolean;
   explore?: PlanetExplore | null;
   compact?: boolean;
+  onPlanetChange?: (slug: string) => void;
 }) {
-  const [mode, setMode] = useState<"planet" | "quest">("planet");
-
-  const planetThumb = planets[0]?.imageUrl ?? null;
-  const questThumb = quest?.quest.mapArtUrl || quest?.quest.cardBgUrl || null;
-  const toggle = quest
-    ? <HeroModeToggle mode={mode} setMode={setMode} planetThumb={planetThumb} questThumb={questThumb} />
-    : null;
-
-  return mode === "planet" || !quest
-    ? <PlanetExplorer planets={planets} initialSlug={initialSlug} initial={explore} swap={swap} heading={heading} toggle={toggle} compact={compact} />
-    : <QuestMapHero quest={quest.quest} tierHolders={quest.tierHolders} tabs={quest.tabs} toggle={toggle} variants={quest.variants} totalCp={quest.totalCp} />;
+  return (
+    <PlanetExplorer
+      planets={planets}
+      initialSlug={initialSlug}
+      initial={explore}
+      swap={swap}
+      heading={heading}
+      compact={compact}
+      onPlanetChange={onPlanetChange}
+    />
+  );
 }

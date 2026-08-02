@@ -1,7 +1,10 @@
 import Link from "next/link";
-import { asc } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { saveGame, deleteGame } from "@/app/actions/admin";
+import {
+  saveGame, deleteGame, saveSpace, deleteSpace, ensurePlanetsForGames, deleteLegacyPlanets,
+  adminDeletePost, togglePinPost,
+} from "@/app/actions/admin";
 import GameLogo from "@/components/GameLogo";
 import ImageUpload from "@/components/ImageUpload";
 import CoverFramer from "@/components/CoverFramer";
@@ -9,13 +12,28 @@ import GameMetricsEditor from "@/components/GameMetricsEditor";
 import SubmitButton from "@/components/SubmitButton";
 import Icon from "@/components/Icon";
 import { optImg } from "@/lib/img";
+import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin · Games" };
+export const metadata = { title: "Admin · Games & planets" };
+
+// A game and its planet are one thing, edited in one place.
+//
+// They used to be two pages. The Games catalog edited the planet's art, theme
+// and hero layout; the Planets page edited the planet's name, description and
+// visibility — and neither could edit the other, so changing "League of
+// Legends" meant knowing which half of it lived where. Worse, the Planets page
+// linked BACK to Games for the globe art, which is a page telling you it isn't
+// the right page.
+//
+// So: one row per game, holding both. The planet panel sits inside the game it
+// belongs to, and a game with no planet yet says so and offers to make one.
+// Legacy planets — rows from before a planet meant a game — get their own
+// section at the bottom, because they are a cleanup job and not a game.
 
 function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
   return (
-    <form action={saveGame} className="grid sm:grid-cols-2 gap-3">
+    <form action={saveGame} className="grid gap-3 sm:grid-cols-2">
       {game && <input type="hidden" name="gameId" value={game.id} />}
       <input name="name" required defaultValue={game?.name} placeholder="Game name" className="input-cosmic" />
       <input name="sortOrder" type="number" defaultValue={game?.sortOrder ?? 0} placeholder="Sort order" className="input-cosmic" />
@@ -28,8 +46,7 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
           hint="Drag the image to reposition and use the zoom slider — the frame is exactly how it appears on the planet header." />
       </div>
       <GameMetricsEditor initial={game?.customMetrics ?? []} />
-      {/* Per-planet theme + layout */}
-      <div className="sm:col-span-2 grid sm:grid-cols-3 gap-3 rounded-xl border border-violet-400/15 bg-black/20 p-3">
+      <div className="grid gap-3 rounded-xl border border-violet-400/15 bg-black/20 p-3 sm:col-span-2 sm:grid-cols-3">
         <label className="text-xs text-muted">Accent color
           <input type="color" name="accent" defaultValue={game?.accent ?? "#8b5cf6"} className="mt-1 h-9 w-full cursor-pointer rounded-lg border border-violet-400/25 bg-transparent p-0.5" />
         </label>
@@ -44,7 +61,7 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
           </select>
         </label>
       </div>
-      <div className="flex gap-4 sm:col-span-2 items-center flex-wrap pt-1">
+      <div className="flex flex-wrap items-center gap-4 pt-1 sm:col-span-2">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="showInNav" defaultChecked={game?.showInNav ?? false} className="accent-cyan-500" /> Show logo in nav
         </label>
@@ -54,7 +71,39 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
       </div>
       <div className="sm:col-span-2">
         <SubmitButton className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">
-          {game ? "Save" : "Add game"}
+          {game ? "Save game" : "Add game"}
+        </SubmitButton>
+      </div>
+    </form>
+  );
+}
+
+function PlanetForm({ planet, gameName, games }: {
+  planet?: typeof schema.spaces.$inferSelect;
+  /** Pre-selected when the form sits inside the game it belongs to. */
+  gameName?: string;
+  games: { name: string }[];
+}) {
+  return (
+    <form action={saveSpace} className="grid gap-3 sm:grid-cols-2">
+      {planet && <input type="hidden" name="spaceId" value={planet.id} />}
+      <input name="name" required defaultValue={planet?.name ?? gameName} placeholder="Planet name" className="input-cosmic" />
+      {gameName
+        // Inside a game, the game is not a choice — it is which row you're in.
+        ? <input type="hidden" name="game" value={gameName} />
+        : (
+          <select name="game" defaultValue={planet?.game ?? ""} className="input-cosmic">
+            <option value="">— pick a game —</option>
+            {games.map((g) => <option key={g.name} value={g.name}>{g.name}</option>)}
+          </select>
+        )}
+      <input name="description" defaultValue={planet?.description} placeholder="Description" className={`input-cosmic ${gameName ? "sm:col-span-1" : "sm:col-span-2"}`} />
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="isActive" defaultChecked={planet?.isActive ?? true} className="accent-violet-500" /> Visible
+      </label>
+      <div className="sm:col-span-2">
+        <SubmitButton className="ghost-btn pressable rounded-full px-5 py-2 text-sm font-semibold">
+          {planet ? "Save planet" : "Create planet"}
         </SubmitButton>
       </div>
     </form>
@@ -63,57 +112,186 @@ function GameForm({ game }: { game?: typeof schema.games.$inferSelect }) {
 
 export default async function AdminGamesPage() {
   const db = await getDb();
-  const games = await db.select().from(schema.games).orderBy(asc(schema.games.sortOrder));
+  const [games, planets, recentPosts] = await Promise.all([
+    db.select().from(schema.games).orderBy(asc(schema.games.sortOrder)),
+    db.select().from(schema.spaces).orderBy(asc(schema.spaces.name)),
+    db.select({ post: schema.posts, author: schema.users, space: schema.spaces })
+      .from(schema.posts)
+      .innerJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
+      .innerJoin(schema.spaces, eq(schema.posts.spaceId, schema.spaces.id))
+      .where(sql`${schema.posts.deletedAt} IS NULL`)
+      .orderBy(desc(schema.posts.createdAt)).limit(20),
+  ]);
+
+  const planetFor = new Map(planets.filter((p) => p.game).map((p) => [p.game as string, p]));
+  const legacy = planets.filter((p) => !p.game);
+  const missing = games.filter((g) => !planetFor.has(g.name));
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold mb-2">Games catalog</h1>
-      <p className="text-sm text-muted mb-6">
-        Logos, covers and framing shown across the site (homepage, planets, leaderboards).
-        Upload images straight from your device — they&apos;re optimized automatically.
-      </p>
+    <div className="space-y-10">
+      <div>
+        <h1 className="mb-1 text-2xl font-bold">Games &amp; planets</h1>
+        <p className="mb-5 max-w-2xl text-sm text-muted">
+          A game and its planet are the same thing, so they are edited in the same place. Open a game to
+          set its art, theme and hero layout, and the planet it appears as underneath.
+        </p>
 
-      <details className="glass p-6 mb-6 group">
-        <summary className="font-bold cursor-pointer list-none flex items-center gap-2">
-          <Icon name="spark" size={16} className="text-cyan-300" /> Add a new game
-          <span className="ml-auto text-xs text-muted group-open:hidden">Open form</span>
-        </summary>
-        <div className="mt-4 border-t border-violet-400/15 pt-4"><GameForm /></div>
-      </details>
+        <div className="mb-5 flex flex-wrap gap-2">
+          {missing.length > 0 && (
+            <form action={ensurePlanetsForGames}>
+              <SubmitButton className="ghost-btn pressable inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm">
+                <Icon name="planet" size={14} /> Create the {missing.length} missing planet{missing.length === 1 ? "" : "s"}
+              </SubmitButton>
+            </form>
+          )}
+          <Link href="/admin/spaces/requests" className="ghost-btn pressable inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm">
+            <Icon name="inbox" size={14} /> Games gamers have asked for
+          </Link>
+        </div>
 
-      <div className="text-xs uppercase tracking-widest text-muted mb-3">{games.length} games</div>
-      <div className="space-y-4">
-        {games.map((g) => (
-          <details key={g.id} className="glass overflow-hidden">
-            <summary className="flex items-center gap-4 p-4 cursor-pointer list-none">
-              <GameLogo logoUrl={g.logoUrl} name={g.name} size={44} />
-              <div className="min-w-0 flex-1">
-                <div className="font-bold">{g.name} {!g.isActive && <span className="text-xs text-rose-300">(hidden)</span>}</div>
-                <div className="text-xs text-muted truncate">{g.description}</div>
-              </div>
-              <span className="text-xs text-cyan-300">Edit</span>
-            </summary>
-            <div className="border-t border-violet-400/15 p-5">
-              {g.coverUrl && (
-                <div className="mb-4 h-24 rounded-lg overflow-hidden border border-violet-400/15">
-                  <div className="h-full w-full bg-cover" style={{
-                    backgroundImage: `url(${optImg(g.coverUrl, 1200)})`,
-                    backgroundPosition: `${g.coverAdjust.x}% ${g.coverAdjust.y}%`,
-                    transform: `scale(${g.coverAdjust.zoom})`,
-                  }} />
+        <details className="glass group mb-6 p-6">
+          <summary className="flex cursor-pointer list-none items-center gap-2 font-bold">
+            <Icon name="spark" size={16} className="text-cyan-300" /> Add a new game
+            <span className="ml-auto text-xs text-muted group-open:hidden">Open form</span>
+          </summary>
+          <div className="mt-4 border-t border-violet-400/15 pt-4"><GameForm /></div>
+        </details>
+
+        <div className="mb-3 text-xs uppercase tracking-widest text-muted">
+          {games.length} games · {planets.length - legacy.length} planets
+        </div>
+        <div className="space-y-4">
+          {games.map((g) => {
+            const planet = planetFor.get(g.name);
+            return (
+              <details key={g.id} className="glass overflow-hidden">
+                <summary className="flex cursor-pointer list-none items-center gap-4 p-4">
+                  <GameLogo logoUrl={g.logoUrl} name={g.name} size={44} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold">
+                      {g.name} {!g.isActive && <span className="text-xs text-rose-300">(hidden)</span>}
+                    </div>
+                    <div className="truncate text-xs text-muted">
+                      {planet
+                        ? <>planet <b className="text-ink/80">{planet.name}</b> · {planet.memberCount} members{planet.isActive ? "" : " · hidden"}</>
+                        : <span className="text-amber-300">no planet yet</span>}
+                      {g.description ? ` · ${g.description}` : ""}
+                    </div>
+                  </div>
+                  <span className="text-xs text-cyan-300">Edit</span>
+                </summary>
+                <div className="space-y-5 border-t border-violet-400/15 p-5">
+                  {g.coverUrl && (
+                    <div className="h-24 overflow-hidden rounded-lg border border-violet-400/15">
+                      <div className="h-full w-full bg-cover" style={{
+                        backgroundImage: `url(${optImg(g.coverUrl, 1200)})`,
+                        backgroundPosition: `${g.coverAdjust.x}% ${g.coverAdjust.y}%`,
+                        transform: `scale(${g.coverAdjust.zoom})`,
+                      }} />
+                    </div>
+                  )}
+                  <GameForm game={g} />
+
+                  {/* The planet, inside the game it is. */}
+                  <div className="rounded-xl border border-cyan-400/20 bg-cyan-500/5 p-4">
+                    <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest text-cyan-200">
+                      <Icon name="planet" size={13} /> Its planet
+                    </div>
+                    {planet ? (
+                      <>
+                        <PlanetForm planet={planet} gameName={g.name} games={games} />
+                        <div className="mt-3 flex flex-wrap items-center gap-4">
+                          <Link href={`/planets/${planet.slug}`} className="text-xs text-cyan-300 hover:underline">View it →</Link>
+                          <Link href={`/admin/games/${g.id}/planet`} className="text-xs text-cyan-300 hover:underline">Globe art &amp; region pins →</Link>
+                          <form action={deleteSpace.bind(null, planet.id)}>
+                            <button className="text-xs text-rose-300 hover:underline">Delete planet</button>
+                          </form>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="mb-3 text-xs text-muted">
+                          This game has no planet, so it has no page, no leaderboards and nowhere for a
+                          challenge to live. Creating one takes the game&apos;s name and art.
+                        </p>
+                        <PlanetForm gameName={g.name} games={games} />
+                      </>
+                    )}
+                  </div>
+
+                  <form action={deleteGame.bind(null, g.id)}>
+                    <button className="text-xs text-rose-300 hover:underline">Delete game</button>
+                  </form>
                 </div>
-              )}
-              <GameForm game={g} />
-              <div className="mt-3 flex items-center gap-4">
-                <Link href={`/admin/games/${g.id}/planet`} className="text-xs text-cyan-300 hover:underline">Planet globe art &amp; region pins →</Link>
-                <form action={deleteGame.bind(null, g.id)}>
-                  <button className="text-xs text-rose-300 hover:underline">Delete game</button>
+              </details>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Rows from before a planet meant a game. A cleanup job, not a game. */}
+      {legacy.length > 0 && (
+        <section>
+          <h2 className="mb-1 text-xl font-bold">Planets with no game ({legacy.length})</h2>
+          <p className="mb-4 max-w-2xl text-sm text-muted">
+            Left over from when a planet could be anything. They have no stats behind them and nothing
+            syncs into them — attach each to a game, or delete it.
+          </p>
+          <form action={deleteLegacyPlanets} className="mb-4">
+            <SubmitButton className="pressable inline-flex items-center gap-1.5 rounded-full border border-rose-400/40 px-4 py-2 text-sm text-rose-300">
+              <Icon name="x" size={14} /> Delete all {legacy.length}
+            </SubmitButton>
+          </form>
+          <div className="space-y-3">
+            {legacy.map((s) => (
+              <details key={s.id} className="glass overflow-hidden border !border-rose-400/30">
+                <summary className="flex cursor-pointer list-none items-center gap-3 p-4">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-rose-400/30">
+                    <Icon name="planet" size={16} className="text-rose-300" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-bold">{s.name}</div>
+                    <div className="truncate text-xs text-muted">{s.memberCount} members · {s.postCount} posts</div>
+                  </div>
+                  <span className="text-xs text-cyan-300">Fix</span>
+                </summary>
+                <div className="space-y-3 border-t border-violet-400/15 p-5">
+                  <PlanetForm planet={s} games={games} />
+                  <form action={deleteSpace.bind(null, s.id)}>
+                    <button className="text-xs text-rose-300 hover:underline">Delete planet</button>
+                  </form>
+                </div>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <h2 className="mb-4 text-xl font-bold">Moderation queue — recent posts</h2>
+        <div className="space-y-2">
+          {recentPosts.length === 0 && <div className="glass p-5 text-sm text-muted">Nothing posted yet.</div>}
+          {recentPosts.map(({ post, author, space }) => (
+            <div key={post.id} className="glass flex flex-wrap items-start gap-3 p-4">
+              <div className="min-w-0 flex-1">
+                <div className="mb-1 text-xs text-muted">
+                  {author.displayName} in {space.name} · {timeAgo(post.createdAt)}
+                  {post.isPinned && <span className="text-amber-300"> · pinned</span>}
+                </div>
+                <p className="line-clamp-2 text-sm">{post.body}</p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <form action={togglePinPost.bind(null, post.id, !post.isPinned, "/admin/games")}>
+                  <button className="ghost-btn rounded-full px-3 py-1 text-xs">{post.isPinned ? "Unpin" : "Pin"}</button>
+                </form>
+                <form action={adminDeletePost.bind(null, post.id)}>
+                  <button className="rounded-full border border-rose-400/40 px-3 py-1 text-xs text-rose-300">Delete</button>
                 </form>
               </div>
             </div>
-          </details>
-        ))}
-      </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

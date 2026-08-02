@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireStaff } from "@/lib/auth";
 import { currentAccess } from "@/lib/departments";
 import { systemBy, SYSTEMS } from "@/lib/systems";
-import { ADMIN_NAV } from "@/lib/admin-nav";
+import { ADMIN_NAV, pagesOfSystem } from "@/lib/admin-nav";
 import { loadMetrics } from "@/lib/admin-metrics";
 import Icon from "@/components/Icon";
 
@@ -31,11 +31,10 @@ export default async function SystemPage({ params }: { params: Promise<{ key: st
   const access = await currentAccess();
   const mine = !!access?.isAdmin || (access?.systems ?? []).includes(system.key);
 
-  // The pages this system owns, resolved through the same map the rail uses so
-  // a page can never appear here under a name it doesn't have there.
-  const links = ADMIN_NAV.flatMap((g) => g.items)
-    .filter((i) => system.pages.some((p) => i.href === p || i.href.startsWith(`${p}/`)))
-    .filter((i) => !system.except?.some((e) => i.href === e || i.href.startsWith(`${e}/`)));
+  // The pages this desk owns, read from the console's own map — the same
+  // declaration the rail renders and the guard enforces, so a page can never
+  // appear here under a name it doesn't have there, or at all if it doesn't.
+  const links = pagesOfSystem(system.key);
 
   const metrics = await loadMetrics().catch(() => ({} as Record<string, number>));
   const numbers = links

@@ -43,7 +43,7 @@ type Sel =
 // hero (switch planets, lazy-loading each). Modules with no data are hidden, so
 // the same layout fits every game.
 export default function PlanetExplorer({
-  planets, initialSlug, initial, swap = false, heading, toggle, compact = false,
+  planets, initialSlug, initial, swap = false, heading, toggle, compact = false, onPlanetChange,
 }: {
   planets: PlanetData[];
   initialSlug: string;
@@ -52,6 +52,9 @@ export default function PlanetExplorer({
   heading?: string;
   toggle?: React.ReactNode;
   compact?: boolean;   // feed teaser: single-column so a narrow container looks right
+  /** Fired when the reader picks a game here, so a game band outside the hero
+   *  can follow along instead of drifting out of sync with what's on screen. */
+  onPlanetChange?: (slug: string) => void;
 }) {
   const tr = useTr();
   const start = Math.max(0, planets.findIndex((x) => x.slug === initialSlug));
@@ -91,8 +94,22 @@ export default function PlanetExplorer({
   const pickPlanet = (i: number) => {
     setIdx(i); setSel(null);
     const slug = planets[i]?.slug;
-    if (swap && slug && slug !== data?.slug) load(slug);
+    if (!slug) return;
+    onPlanetChange?.(slug);
+    if (swap && slug !== data?.slug) load(slug);
   };
+
+  // The parent can drive the selection too — the hero's collapsed game band is
+  // the same control as the row of games above the globe, and pressing either
+  // has to move both. Guarded on the index so the callback above can't bounce
+  // back into a loop.
+  useEffect(() => {
+    const i = planets.findIndex((x) => x.slug === initialSlug);
+    if (i < 0 || i === idx) return;
+    setIdx(i); setSel(null);
+    if (swap && initialSlug !== data?.slug) load(initialSlug);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [initialSlug]);
   const refresh = () => data && load(data.slug);
 
   function onMove(e: React.MouseEvent) {
@@ -592,9 +609,9 @@ function MiniChip({ on, onClick, children }: { on: boolean; onClick: () => void;
   return <button onClick={onClick} className={`rounded-full px-2 py-0.5 text-[10px] font-semibold border transition ${on ? "border-cyan-400/50 bg-cyan-500/10 text-cyan-200" : "border-white/12 text-muted hover:text-ink"}`}>{children}</button>;
 }
 
-function RailGroup({ icon, title, accent, children }: { icon: string; title: string; accent?: string; children: React.ReactNode }) {
+function RailGroup({ icon, title, accent, testId, children }: { icon: string; title: string; accent?: string; testId?: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div data-rail={testId}>
       <div className={`text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5 ${accent ?? "text-cyan-200"}`}><Icon name={icon} size={13} /> {title}</div>
       {children}
     </div>
@@ -609,25 +626,56 @@ const entityImgCls = (k: string) => k === "weapon" ? "object-contain p-1 bg-blac
 // Click a tile → lore card in the middle; "See all" → full directory in middle.
 function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: string; entityKind: string; limit: number; onOpen: (e: EntityLite) => void; onExpand: (k: string) => void }) {
   const tr = useTr();
-  const [list, setList] = useState<EntityLite[] | null>(null);
+  const [all, setAll] = useState<EntityLite[] | null>(null);
   const [q, setQ] = useState("");
   const [role, setRole] = useState("all");
+  const [kind, setKind] = useState("all");
   useEffect(() => {
     let alive = true;
     fetch(`/api/planet/entities?game=${encodeURIComponent(game)}`, { cache: "force-cache" })
-      .then((r) => r.json()).then((j) => { if (alive) setList((j.entities ?? []).filter((e: EntityLite) => entityKind === "all" || e.kind === entityKind)); })
-      .catch(() => alive && setList([]));
+      .then((r) => r.json()).then((j) => { if (alive) setAll(j.entities ?? []); })
+      .catch(() => alive && setAll([]));
     return () => { alive = false; };
-  }, [game, entityKind]);
+  }, [game]);
+  // Reset the filters when the game changes, or a chip picked on Apex silently
+  // empties the rail on PUBG.
+  useEffect(() => { setRole("all"); setKind("all"); setQ(""); }, [game]);
+
+  // The configured kind, but never at the cost of showing nothing.
+  //
+  // A layout saved with `entityKind: "champion"` on a game that has weapons and
+  // maps used to filter the list to zero and then `return null` — the whole
+  // Game World panel vanished, with no way to tell a misconfiguration from a
+  // game that simply has no roster. A stale config now degrades to showing the
+  // game's actual entities instead of hiding them.
+  const configured = entityKind === "all" ? (all ?? []) : (all ?? []).filter((e) => e.kind === entityKind);
+  const list = all === null ? null : (configured.length > 0 ? configured : all);
+
   if (list && list.length === 0) return null;
-  const roles = [...new Set((list ?? []).map((e) => e.role).filter(Boolean) as string[])].slice(0, 8);
-  const filtered = (list ?? []).filter((e) => (role === "all" || e.role === role) && (!q || e.name.toLowerCase().includes(q.toLowerCase())));
+
+  // Games with more than one kind of thing in their world (PUBG has weapons AND
+  // maps) get a kind row above the roles. Without it the role chips read
+  // "8×8 km · Assault Rifle · 6×6 km · Shotgun" — two taxonomies interleaved,
+  // truncated at eight, with four weapon classes unreachable.
+  const kinds = [...new Set((list ?? []).map((e) => e.kind))];
+  const byKind = kind === "all" ? (list ?? []) : (list ?? []).filter((e) => e.kind === kind);
+  const roles = [...new Set(byKind.map((e) => e.role).filter(Boolean) as string[])];
+  const filtered = byKind.filter((e) => (role === "all" || e.role === role) && (!q || e.name.toLowerCase().includes(q.toLowerCase())));
   const shown = filtered.slice(0, limit);
+  const railKind = kind !== "all" ? kind : (kinds.length === 1 ? kinds[0] : "all");
   return (
-    <RailGroup icon="swords" title={tr(entityLabel(entityKind))} accent="text-violet-200">
+    <RailGroup icon="swords" title={tr(entityLabel(railKind))} accent="text-violet-200" testId="game-world">
       {!list ? <div className="text-xs text-muted animate-pulse">{tr("Loading…")}</div> : (
         <>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`${tr("Search")} ${list.length}…`} className="w-full rounded-lg border border-white/12 bg-black/30 px-2.5 py-1.5 text-xs outline-none focus:border-cyan-400/50 mb-2" />
+          {kinds.length > 1 && (
+            <div className="flex flex-wrap gap-1 mb-1.5">
+              <MiniChip on={kind === "all"} onClick={() => { setKind("all"); setRole("all"); }}>{tr("All")}</MiniChip>
+              {kinds.map((k) => (
+                <MiniChip key={k} on={kind === k} onClick={() => { setKind(k); setRole("all"); }}>{tr(entityLabel(k))}</MiniChip>
+              ))}
+            </div>
+          )}
           {roles.length > 1 && (
             <div className="flex flex-wrap gap-1 mb-2">
               <MiniChip on={role === "all"} onClick={() => setRole("all")}>{tr("All")}</MiniChip>
@@ -639,15 +687,28 @@ function EntityRail({ game, entityKind, limit, onOpen, onExpand }: { game: strin
               champions, so the rail read as a teaser for the directory rather
               than as the game's world. It scrolls either way — this just makes
               the default view worth looking at. */}
-          <div className="grid grid-cols-3 gap-1.5 max-h-[440px] overflow-y-auto pr-0.5 overscroll-contain">
-            {shown.map((e) => (
-              <button key={`${e.kind}-${e.id}`} onClick={() => onOpen(e)} title={e.name} style={{ containerType: "size" }} className="relative rounded-lg overflow-hidden border border-white/10 hover:border-cyan-400/50 transition aspect-square">
-                <EntityImg src={e.image} name={e.name} kind={e.kind} className={`h-full w-full ${entityImgCls(e.kind)}`} />
-                <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#04051a] to-transparent text-[9px] font-bold px-1 pb-0.5 pt-2 truncate">{e.name}</span>
+          {shown.length === 0 ? (
+            // A grid that silently renders nothing looks like a broken panel.
+            // Say which filter emptied it and offer the way back.
+            <div className="rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 text-[11px] text-muted">
+              {tr("Nothing matches that filter.")}{" "}
+              <button type="button" onClick={() => { setQ(""); setRole("all"); setKind("all"); }} className="text-cyan-300 hover:underline">
+                {tr("Show everything")}
               </button>
-            ))}
-          </div>
-          <button onClick={() => onExpand(entityKind)} className="mt-1.5 w-full text-left text-[11px] text-cyan-300 hover:underline">{tr("See all")} {filtered.length} →</button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-1.5 max-h-[440px] overflow-y-auto pr-0.5 overscroll-contain">
+              {shown.map((e) => (
+                <button key={`${e.kind}-${e.id}`} onClick={() => onOpen(e)} title={e.name} style={{ containerType: "size" }} className="relative rounded-lg overflow-hidden border border-white/10 hover:border-cyan-400/50 transition aspect-square">
+                  <EntityImg src={e.image} name={e.name} kind={e.kind} className={`h-full w-full ${entityImgCls(e.kind)}`} />
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-[#04051a] to-transparent text-[9px] font-bold px-1 pb-0.5 pt-2 truncate">{e.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+          {filtered.length > shown.length && (
+            <button onClick={() => onExpand(railKind)} className="mt-1.5 w-full text-left text-[11px] text-cyan-300 hover:underline">{tr("See all")} {filtered.length} →</button>
+          )}
         </>
       )}
     </RailGroup>

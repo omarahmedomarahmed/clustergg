@@ -22,7 +22,6 @@ import { getContent } from "@/lib/cms";
 import { timeAgo } from "@/lib/utils";
 import { slimImg, optImg } from "@/lib/img";
 import { buildSkinnedPlanets } from "@/lib/planets";
-import { getQuestHeroData } from "@/lib/quest-hero";
 import { getPlanetExplore } from "@/lib/planet-explore";
 import { getT } from "@/lib/i18n/t-server";
 import OAuthButtons from "@/components/OAuthButtons";
@@ -138,14 +137,13 @@ export default async function PlanetPage({
   // heading + toggle read from it).
   const skinnedPlanetsRaw = hasSkin ? await buildSkinnedPlanets(db) : [];
   const skinnedPlanets = skinnedPlanetsRaw.map((p) => p.slug === space.slug ? { ...p, name: te("planet", space.id, "name", p.name) } : p);
-  const questHero = hasSkin && skinnedPlanets.length > 0 ? await getQuestHeroData(db, viewer?.id ?? null) : null;
   const planetExplore = hasSkin && skinnedPlanets.length > 0 ? await getPlanetExplore(db, space.slug, te) : null;
 
   return (
     <div>
       {hasSkin && skinnedPlanets.length > 0 ? (
         <>
-          <HeroStage planets={skinnedPlanets} initialSlug={space.slug} quest={questHero} swap={false} explore={planetExplore} />
+          <HeroStage planets={skinnedPlanets} initialSlug={space.slug} swap={false} explore={planetExplore} />
           <div className="mx-auto max-w-6xl px-4 -mt-2 mb-4 flex flex-wrap items-center gap-3">
             <p className="text-muted text-sm mr-auto">{te("planet", space.id, "description", space.description)}</p>
             {gameProviders.map((p) => (
