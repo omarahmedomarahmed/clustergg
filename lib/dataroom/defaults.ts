@@ -314,7 +314,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "16 · The ask",
         title: "We are raising $100,000 for 20%.",
         subtitle:
-          "$500,000 post-money. It buys brand partnerships, more Discord communities onboarded, expanded game coverage and challenge volume, better analytics and campaign tools — and the speed to scale the platform. The product is built and running; this round turns it into revenue.",
+          "$500,000 post-money, six months of runway, and a plan for every dollar of it. The product is built and running — this round buys distribution: a thousand Discord communities, thirty brands through a free first month, and prize pools funded in every game while the first sponsors ramp.",
         data: {
           ask: {
             amount: 100000,
@@ -322,15 +322,15 @@ export const SEED_DOCS: SeedDoc[] = [
             valuation: 400000,
             postMoney: 500000,
             equityPct: 20,
-            runwayMonths: 18,
+            runwayMonths: 6,
             currency: "USD",
           },
           useOfFunds: [
-            { label: "Brand partnerships", pct: 30, note: "Getting the first brands onto the card placement and the first campaigns booked — the case studies that sell the next ten" },
-            { label: "Prize pools", pct: 25, note: "Funding challenges while the first sponsors ramp — the cost of goods, paid before the revenue arrives" },
-            { label: "Onboarding communities", pct: 20, note: "Getting the bot into the servers that should already have it, and supporting the owners who run them" },
-            { label: "Game coverage & tools", pct: 15, note: "More integrations, more challenge volume, and the analytics brands ask for before they renew" },
-            { label: "Infrastructure & legal", pct: 10, note: "Hosting, APIs, prize payout compliance" },
+            { label: "Brand acquisition — the first month free", pct: 30, note: "30 brands × 4 sponsored challenges × $250. Naming rights on challenges we already run, so this is the invoice we don't send rather than cash out — the whole line is customer acquisition cost" },
+            { label: "Prize pools — the competitions themselves", pct: 25, note: "6 games × 4 challenges × 6 months × $175 = $25,200. Every challenge pays out whether or not it's sold; this is what keeps something worth entering live in every game, every week" },
+            { label: "Server onboarding — the welcome challenge", pct: 25, note: "1,000 servers × $25. A funded private competition on the day a community installs the bot — the only offer that reaches members rather than owners" },
+            { label: "Infrastructure, game APIs & partnerships", pct: 10, note: "Hosting, card rendering, the official game-API access every verified stat depends on, and the partnership work that opens new games" },
+            { label: "Team", pct: 10, note: "Four people at early-stage rates for six months. The line that has to rise first, and what the next round is for" },
           ],
           capTable: [
             { holder: "Founders", pct: 70, note: "Fully vesting, 4 years" },
@@ -338,6 +338,17 @@ export const SEED_DOCS: SeedDoc[] = [
             { holder: "Option pool", pct: 10, note: "Reserved for the first engineering and sales hires" },
           ],
         },
+      },
+
+      // ---------- 17. THE MODEL ----------
+      {
+        kind: "finance",
+        anchor: "model",
+        navLabel: "17 · The model",
+        title: "The plan for the money, as a model you can argue with.",
+        subtitle:
+          "Every figure here is computed from the assumptions on the left, and the assumptions are sliders. Breakeven is six paying brands — 20% of the brands we put through a free month — and the plan survives at every conversion rate we could find a reason to worry about. If you don't believe a number, move it.",
+        data: {},
       },
 
       // ================= APPENDIX =================
@@ -583,6 +594,108 @@ export const SEED_DOCS: SeedDoc[] = [
     ],
   },
 
+  // ===================== FINANCIAL MODEL =====================
+  // The model, on its own, because "can we see the numbers" is the question
+  // that follows every good first meeting — and answering it with a spreadsheet
+  // attachment is how a conversation goes cold. This is the same arithmetic the
+  // deck quotes, with the assumptions exposed as controls, so a reader who
+  // doubts a figure can change it and watch the consequence instead of writing
+  // an email about it.
+  {
+    slug: "financial-model",
+    kind: "deck",
+    title: "Cluster — the financial model",
+    subtitle: "Where $100,000 goes, what it buys, and what has to be true",
+    summary:
+      "Use of funds split into cash and foregone revenue, month-by-month cash flow, the breakeven point, four downside scenarios and the valuation the round implies. Every number is computed from the assumptions shown, and the assumptions are editable — including the ones that make us look worse.",
+    accent: "#34d399",
+    accent2: "#8b5cf6",
+    contactEmail: "founders@clustergg.com",
+    contactNote: "If a number here looks wrong, change it on the page and tell us what you got.",
+    sections: [
+      {
+        kind: "hero",
+        anchor: "top",
+        navLabel: "Overview",
+        title: "Every dollar of the raise, accounted for.",
+        subtitle:
+          "$100,000 buys six months, a thousand Discord communities, thirty brands through a free first month, and a funded competition in every game every week. Breakeven is six paying brands. Here is the arithmetic, with nothing rounded in our favour.",
+        data: {},
+      },
+      {
+        kind: "unit",
+        anchor: "unit",
+        navLabel: "1 · The unit",
+        title: "It all rests on one number.",
+        subtitle:
+          "A brand pays $250 for a sponsored challenge. $175 of that is the prize pool and reaches a gamer — we never touch it. The $75 platform fee is the only line the business lives on, and every total in this document is built from it.",
+        data: {},
+      },
+      {
+        kind: "finance",
+        anchor: "model",
+        navLabel: "2 · The model",
+        title: "The plan for the money, as a model you can argue with.",
+        subtitle:
+          "Assumptions on the left, consequences on the right. Cash and foregone revenue are shown separately because only one of them is runway. Free-to-paid conversion has its own scenario table because it is the assumption with no evidence behind it yet.",
+        data: {},
+      },
+      {
+        kind: "text",
+        anchor: "honesty",
+        navLabel: "3 · What we'd challenge",
+        title: "The three numbers we would push back on ourselves.",
+        subtitle:
+          "A model that only flatters the people who built it is not worth reading. These are the assumptions we think an investor should press hardest, and what happens to the plan under each.",
+        data: {
+          bullets: [
+            "Free-to-paid conversion. The plan shows 25 of 30 brands staying — 83%. Nothing in this business has proven that yet, and 20-40% is normal for a B2B free trial. Breakeven is at 20%, so the plan survives the pessimistic case; the difference between 20% and 83% is the difference between a business and a good business, not between surviving and not.",
+            "Server acquisition at $25. A thousand communities in six months is roughly five and a half a day, every day, sustained. The $25 welcome challenge is what makes the offer concrete rather than a cold DM, but the rate is an assumption about outbound effort, not about money.",
+            "The month-six revenue figure. $37,500 MRR is the run rate once every brand has been through its free month — not revenue earned inside month six, which is lower because a brand starts paying the month after it joins. Both numbers are in the cash-flow table and neither is hidden.",
+          ],
+        },
+      },
+      {
+        kind: "raise",
+        anchor: "raise",
+        navLabel: "4 · The round",
+        title: "$100,000 for 20%, at $500,000 post-money.",
+        subtitle:
+          "Six months of runway against a product that is already built and already running. The use-of-funds split below is the same one the model computes — 30% brand acquisition, 25% prize pools, 25% server onboarding, 10% infrastructure, 10% team.",
+        data: {
+          ask: {
+            amount: 100000,
+            instrument: "Priced equity round",
+            valuation: 400000,
+            postMoney: 500000,
+            equityPct: 20,
+            runwayMonths: 6,
+            currency: "USD",
+          },
+          useOfFunds: [
+            { label: "Brand acquisition — the first month free", pct: 30, note: "30 brands x 4 sponsored challenges x $250. Naming rights on challenges we already run, so this is the invoice we don't send rather than cash out" },
+            { label: "Prize pools — the competitions themselves", pct: 25, note: "6 games x 4 challenges x 6 months x $175 = $25,200. Every challenge pays out whether or not it is sold" },
+            { label: "Server onboarding — the welcome challenge", pct: 25, note: "1,000 servers x $25. A funded private competition on the day a community installs the bot" },
+            { label: "Infrastructure, game APIs & partnerships", pct: 10, note: "Hosting, card rendering, official game-API access, and the partnership work that opens new games" },
+            { label: "Team", pct: 10, note: "Four people at early-stage rates for six months" },
+          ],
+          capTable: [
+            { holder: "Founders", pct: 70, note: "Fully vesting, 4 years" },
+            { holder: "This round", pct: 20, note: "$100,000 at $500,000 post-money" },
+            { holder: "Option pool", pct: 10, note: "Reserved for the first engineering and sales hires" },
+          ],
+        },
+      },
+      {
+        kind: "contact",
+        anchor: "contact",
+        navLabel: "Contact",
+        title: "Change a number and tell us what you got.",
+        subtitle: "We would rather defend the model than the slide.",
+      },
+    ],
+  },
+
   // ===================== SALES DECK / COMPANY PROFILE =====================
   // The same argument, told to a buyer rather than an investor: it opens on
   // what they get instead of on what the market is, and it ends on a rate card
@@ -743,6 +856,25 @@ export const SEED_DOCS: SeedDoc[] = [
         title: "There is nothing for you to run.",
         subtitle:
           "No setup fees, no administration fees, no staff, no operations — that is the magic of Cluster as a product. The bot creates the challenge, posts it, scores it from the game's own API, announces the winners and pays the trophies out. Here is where your money goes against a produced event.",
+      },
+      // The offer. Placed before "how it works" because a buyer decides whether
+      // to keep reading on what it costs them, not on the process.
+      {
+        kind: "text",
+        anchor: "offer",
+        navLabel: "The founding offer",
+        title: "The first hundred brands get the first month on us.",
+        subtitle:
+          "We are funding the start of this network out of the round rather than out of your budget. That is not a discount dressed up as a favour — it is how a marketplace with real inventory and no case studies yet buys its first ones.",
+        data: {
+          bullets: [
+            "The placements base drops from $600 to $500 a month for the first hundred brands, and stays there for as long as you keep the plan.",
+            "Taking it unlocks $1,000 of challenge credit for your first month on one game — four sponsored weekly challenges carrying your name, with the prize pools funded by us.",
+            "Nothing changes about what you get: verified entrants read from the game's own API, per-community reporting, your logo on the trophy, and the brand portal to run it yourself.",
+            "One month minimum after that. If the first month does not produce numbers you can take to your CMO, there is nothing to cancel out of.",
+            "Already a customer? The same offer applies to you — a month of challenge credit on any plan you already hold. We are not going to make existing brands pay to watch new ones get a better deal.",
+          ],
+        },
       },
       {
         kind: "gtm",

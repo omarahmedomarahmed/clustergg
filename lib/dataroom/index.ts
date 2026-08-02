@@ -5,6 +5,7 @@ import { networkStats, publicServers, type NetworkStats, type PublicServer } fro
 import { loadMetrics, METRICS, type Metrics } from "@/lib/admin-metrics";
 import { TIERS } from "@/lib/server-portal";
 import { buildPricing, quote, type PricingConfig, type Quote, PRICING_NUMBER_KEYS } from "@/lib/pricing";
+import { buildFinance, FINANCE_CMS_KEYS, type FinanceConfig } from "@/lib/finance";
 import { getContent } from "@/lib/cms";
 import { SEED_DOCS, SEED_PEOPLE } from "@/lib/dataroom/defaults";
 import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
@@ -185,6 +186,8 @@ export type LiveData = {
   tiers: typeof TIERS;
   /** The live rate card, so a deck can never quote a price we stopped charging. */
   pricing: PricingConfig;
+  /** The plan for the money, from the same editable assumptions the admin sets. */
+  finance: FinanceConfig;
   quotes: { reach: Quote; entry: Quote; full: Quote };
   commercial: CommercialStats;
   takenAt: string;
@@ -263,16 +266,18 @@ async function commercialStats(): Promise<CommercialStats> {
 // One pass for a whole document, handed to every section that needs it, so a
 // page with four live sections makes one set of queries rather than four.
 export async function liveData(): Promise<LiveData> {
-  const [network, servers, metrics, priceContent, commercial] = await Promise.all([
+  const [network, servers, metrics, priceContent, financeContent, commercial] = await Promise.all([
     networkStats().catch((): NetworkStats => ({ servers: 0, reach: 0, gamers: 0, linked: 0, challenges: 0, games: 0 })),
     publicServers(12).catch(() => []),
     loadMetrics().catch(() => ({} as Metrics)),
     getContent(PRICING_NUMBER_KEYS).catch(() => ({} as Record<string, string>)),
+    getContent(FINANCE_CMS_KEYS).catch(() => ({} as Record<string, string>)),
     commercialStats(),
   ]);
   const pricing = buildPricing(priceContent);
   return {
-    network, servers, metrics, metricDefs: METRICS, tiers: TIERS, pricing, commercial,
+    network, servers, metrics, metricDefs: METRICS, tiers: TIERS, pricing,
+    finance: buildFinance(financeContent), commercial,
     quotes: {
       reach: quote(pricing, { games: 0 }),
       entry: quote(pricing, { games: 1 }),

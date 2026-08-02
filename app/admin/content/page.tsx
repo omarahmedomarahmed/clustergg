@@ -59,6 +59,42 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
       { key: "pricing.gameSlugs", label: "Sponsorable games (comma-separated slugs; empty = catalogue order)", long: true },
     ],
   },
+  // ===== The plan for the money =====
+  //
+  // These drive the financial-model document, the use-of-funds slide and every
+  // figure quoted next to them. They are here rather than hard-coded because a
+  // plan that can only be changed by a deploy is one that goes stale the first
+  // time a conversation with an investor changes it — and a deck quoting a
+  // number the model no longer computes is worse than no deck.
+  {
+    title: "The financial model — assumptions",
+    note:
+      "Every figure in the financial-model document and on the use-of-funds slide is computed from these. "
+      + "Nothing here is typed twice, so the deck and the model cannot disagree. Leave a field empty for the built-in default.",
+    keys: [
+      { key: "finance.raise", label: "Raising (USD)" },
+      { key: "finance.equityPct", label: "For this % of the company (post-money)" },
+      { key: "finance.months", label: "Months the raise has to last" },
+      { key: "finance.targetBrands", label: "Brands given a free first month" },
+      { key: "finance.freeChallengesPerBrand", label: "Free challenges each of them gets" },
+      { key: "finance.brandsConverting", label: "Of those, how many stay and pay" },
+      { key: "finance.revenuePerBrand", label: "What a paying brand pays per month" },
+      { key: "finance.targetServers", label: "Discord servers onboarded" },
+      { key: "finance.welcomeChallengeCost", label: "Welcome challenge funded per server" },
+      { key: "finance.membersPerServer", label: "Members in a typical server" },
+      { key: "finance.linkedPerServer", label: "Of those, how many link a game account" },
+      { key: "finance.games", label: "Games we run challenges on" },
+      { key: "finance.challengesPerGamePerMonth", label: "Challenges per game per month" },
+      { key: "finance.techBudget", label: "Infrastructure, APIs & partnerships (whole period)" },
+      { key: "finance.hires", label: "People" },
+      { key: "finance.hireMonthlyCost", label: "Cost of each person, per month" },
+      {
+        key: "finance.sponsorsUseHouseInventory",
+        label: "A sponsor names an EXISTING challenge — type false if each sponsored challenge is an extra competition with its own extra prize pool",
+        long: true,
+      },
+    ],
+  },
   {
     title: "Pricing — the copy",
     note: "Feature lists are one bullet per line. The FAQ is one 'Question | Answer' per line.",
