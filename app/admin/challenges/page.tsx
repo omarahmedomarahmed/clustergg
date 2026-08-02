@@ -1,21 +1,22 @@
 import Link from "next/link";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import ChallengeBuilder from "@/components/ChallengeBuilder";
 import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
+import { builderContext } from "@/lib/challenge-builder-data";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Challenges" };
 
 export default async function AdminChallengesPage() {
   const db = await getDb();
-  const [spaces, challenges, trophies, quests] = await Promise.all([
+  const [spaces, challenges, quests, ctx] = await Promise.all([
     db.select().from(schema.spaces),
     db.select().from(schema.challenges).orderBy(desc(schema.challenges.createdAt)).limit(50),
-    db.select().from(schema.trophies),
     db.select({ id: schema.quests.id, name: schema.quests.name, logoUrl: schema.quests.logoUrl }).from(schema.quests).orderBy(schema.quests.sortOrder),
+    builderContext(),
   ]);
 
   const builderProviders = PROVIDERS
@@ -29,8 +30,9 @@ export default async function AdminChallengesPage() {
     <div>
       <h1 className="text-2xl font-bold mb-2">Challenge Builder</h1>
       <p className="text-sm text-muted mb-6">
-        Pick a game and the builder shows exactly what its API can track, recommends a
-        scoring engine, and publishes a glorified event page with live standings.
+        Pick a game and the builder shows what its API can track, proposes a scoring engine, and
+        publishes an event page with live standings. The summary on the right is the decision: what a
+        gamer will read, how many servers it lands in, and who is paying for it.
       </p>
 
       <details className="glass p-6 mb-6 group">
@@ -42,11 +44,12 @@ export default async function AdminChallengesPage() {
           <ChallengeBuilder
             providers={builderProviders}
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
-            trophies={trophies.map((t) => ({
-              id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl,
-              brandId: t.brandId, value: Number(t.value ?? 0),
-            }))}
+            trophies={ctx.trophies}
             quests={quests}
+            guilds={ctx.guilds}
+            brands={ctx.brands}
+            pricing={ctx.pricing}
+            reach={ctx.reach}
           />
         </div>
       </details>

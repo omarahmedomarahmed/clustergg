@@ -509,6 +509,25 @@ export async function saveChallenge(
     })(),
     status: String(formData.get("status") ?? "draft"),
     prizeDescription: String(formData.get("prizeDescription") ?? "").trim() || null,
+    // ===== Sponsorship =====
+    //
+    // The builder could not set these, so every challenge it created was
+    // unsponsored — which meant it never appeared on a brand's report, never
+    // reached billing, and never paid the server it ran in. The columns existed;
+    // only the form didn't write them.
+    //
+    // Price is only meaningful with a brand attached: a price with no sponsor
+    // would put money into billing that nobody owes.
+    ...(() => {
+      const brandId = String(formData.get("sponsorBrandId") ?? "").trim() || null;
+      const campaignId = String(formData.get("sponsorCampaignId") ?? "").trim() || null;
+      const price = Math.max(0, Number(formData.get("sponsorPrice")) || 0);
+      return {
+        sponsorBrandId: brandId,
+        sponsorCampaignId: brandId ? campaignId : null,
+        sponsorPrice: brandId ? price : 0,
+      };
+    })(),
   };
 
   // Say which field is missing. This used to be `return;` — the form posted,

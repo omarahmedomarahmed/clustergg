@@ -10,6 +10,7 @@ import Link from "next/link";
 import { timeAgo } from "@/lib/utils";
 import { seriesPlan } from "@/lib/challenge-series";
 import { deliveryTotals } from "@/lib/challenge-delivery";
+import { builderContext } from "@/lib/challenge-builder-data";
 
 export const dynamic = "force-dynamic";
 
@@ -19,7 +20,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
   const [challenge] = await db.select().from(schema.challenges).where(eq(schema.challenges.id, id)).limit(1);
   if (!challenge) notFound();
 
-  const [participants, events, spaces, trophies, quests, guilds] = await Promise.all([
+  const [participants, events, spaces, quests, ctx] = await Promise.all([
     db.select({ p: schema.challengeParticipants, u: schema.users, a: schema.linkedGameAccounts })
       .from(schema.challengeParticipants)
       .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
@@ -30,18 +31,11 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
       .where(eq(schema.challengeEvents.challengeId, id))
       .orderBy(desc(schema.challengeEvents.createdAt)).limit(30),
     db.select().from(schema.spaces),
-    db.select().from(schema.trophies),
     db.select({ id: schema.quests.id, name: schema.quests.name, logoUrl: schema.quests.logoUrl }).from(schema.quests).orderBy(schema.quests.sortOrder),
-    // Servers with the bot — the picker for a server-gated challenge.
-    db.select({ guildId: schema.discordGuilds.guildId, name: schema.discordGuilds.name })
-      .from(schema.discordGuilds).where(eq(schema.discordGuilds.status, "active")),
+    // Trophies, servers, brands, the rate card and the network's reach — the
+    // same set the create page loads, from one place so the two can't drift.
+    builderContext(),
   ]);
-
-  // Sponsors, so a branded trophy in the podium picker says whose logo is on it.
-  const brandNames = new Map(
-    (await db.select({ id: schema.brands.id, name: schema.brands.name }).from(schema.brands))
-      .map((b) => [b.id, b.name]),
-  );
 
   const builderProviders = PROVIDERS
     .filter((p) => !p.identityOnly && p.capabilities.length > 0)
@@ -61,6 +55,8 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     visibility: challenge.visibility ?? "public", guildId: challenge.guildId, guildIds: challenge.guildIds ?? [],
     accessKey: challenge.accessKey, announceHype: challenge.announceHype ?? false,
     sponsorBrandId: challenge.sponsorBrandId,
+    sponsorCampaignId: challenge.sponsorCampaignId,
+    sponsorPrice: Number(challenge.sponsorPrice ?? 0),
     runsPlanned: challenge.runsPlanned ?? 1, runIndex: challenge.runIndex ?? 1,
   };
 
@@ -183,13 +179,12 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             challenge={editData}
             providers={builderProviders}
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
-            trophies={trophies.map((t) => ({
-              id: t.id, name: t.name, tier: t.tier, imageUrl: t.imageUrl,
-              brandId: t.brandId, brandName: t.brandId ? (brandNames.get(t.brandId) ?? "sponsor") : null,
-              value: Number(t.value ?? 0),
-            }))}
+            trophies={ctx.trophies}
             quests={quests}
-            guilds={guilds.map((g) => ({ guildId: g.guildId, name: g.name }))}
+            guilds={ctx.guilds}
+            brands={ctx.brands}
+            pricing={ctx.pricing}
+            reach={ctx.reach}
           />
         </div>
       </details>
