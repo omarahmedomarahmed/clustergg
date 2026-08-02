@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth";
-import { listDocs, getSections, docAnalytics } from "@/lib/dataroom";
+import { listDocs, getSections, docAnalytics, missingShippedSections } from "@/lib/dataroom";
 import { AdminHeader, AdminSection, AdminSettings } from "@/components/AdminPage";
 import { DocSettings } from "@/components/dataroom/DocForms";
 import Icon from "@/components/Icon";
@@ -19,6 +19,7 @@ export default async function AdminDataroomPage() {
     doc: d,
     sections: (await getSections(d.id, true)).length,
     stats: await docAnalytics(d.id, 30),
+    missing: await missingShippedSections(d.slug, d.id),
   })));
 
   const totalViews = detail.reduce((n, d) => n + d.stats.views, 0);
@@ -46,7 +47,7 @@ export default async function AdminDataroomPage() {
 
       <AdminSection title="Documents" hint="Open one to edit its sections, art and order.">
         <div className="space-y-3">
-          {detail.map(({ doc, sections, stats }) => (
+          {detail.map(({ doc, sections, stats, missing }) => (
             <div key={doc.id} className="rounded-2xl border border-white/10 p-4 sm:p-5">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
@@ -83,6 +84,30 @@ export default async function AdminDataroomPage() {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* A section we shipped that this copy has never had.
+                  Seeding is once-only on purpose, so without this line a slide
+                  written after the first deploy is invisible to the one person
+                  who could publish it. */}
+              {missing.length > 0 && (
+                <div className="mt-4 rounded-xl border border-amber-400/30 bg-amber-500/[0.07] p-3">
+                  <div className="text-[11px] font-semibold text-amber-200">
+                    {missing.length} section{missing.length === 1 ? "" : "s"} we ship {missing.length === 1 ? "isn't" : "aren't"} in your copy
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {missing.map((m) => (
+                      <span key={m.anchor} className="rounded-full border border-amber-400/25 px-2.5 py-0.5 text-[11px] text-amber-100">
+                        {m.navLabel} <span className="text-amber-200/60">#{m.anchor}</span>
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-[11px] leading-snug text-muted">
+                    Your document is never overwritten by a deploy, which is why these haven&apos;t appeared.
+                    Add them by hand, or use <b className="text-ink">Restore the shipped sections</b> inside the
+                    document — that replaces everything, so only do it if you haven&apos;t edited this one.
+                  </p>
                 </div>
               )}
 

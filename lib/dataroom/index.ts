@@ -25,16 +25,27 @@ export type { MilestoneLadder } from "@/lib/dataroom/types-client";
 
 // ===== Seeding =====
 
-// Written once, on first read. Never re-applied — a deploy silently reverting
-// an admin's copy is the fastest way to make a CMS untrusted, so anything that
-// already exists is left exactly as it is.
+// Written once PER DOCUMENT, on first read.
+//
+// A document that already exists is left exactly as it is — a deploy silently
+// reverting an admin's copy is the fastest way to make a CMS untrusted. But
+// this used to check whether the TABLE was empty and return if it wasn't,
+// which meant every document we shipped after the first deploy was invisible
+// forever: the financial model was written, built, deployed, and could not
+// appear on any workspace that already had a deck. Missing is not the same as
+// edited, and only one of the two deserves protection.
 export async function ensureSeeded(): Promise<void> {
   try {
     const db = await getDb();
+    const have = new Set(
+      (await db.select({ slug: schema.dataroomDocs.slug }).from(schema.dataroomDocs))
+        .map((r) => r.slug),
+    );
     const [existing] = await db.select({ c: count() }).from(schema.dataroomDocs);
-    if (Number(existing?.c ?? 0) > 0) return;
+    const firstRun = Number(existing?.c ?? 0) === 0;
 
     for (const [i, d] of SEED_DOCS.entries()) {
+      if (have.has(d.slug)) continue;
       const docId = uid();
       await db.insert(schema.dataroomDocs).values({
         id: docId, slug: d.slug, kind: d.kind, title: d.title, subtitle: d.subtitle,
@@ -55,6 +66,11 @@ export async function ensureSeeded(): Promise<void> {
     // People are shared across every document by default (docId null), because
     // the same founders appear in both and maintaining two copies guarantees
     // they drift.
+    //
+    // Only on a genuinely empty data room. `onConflictDoNothing` protects
+    // nothing here — the id is fresh every time — so running this on every
+    // read would add the same founders again on every page load.
+    if (!firstRun) return;
     for (const [i, p] of SEED_PEOPLE.entries()) {
       await db.insert(schema.dataroomPeople).values({
         id: uid(), docId: null, name: p.name, role: p.role, bio: p.bio,
@@ -62,6 +78,37 @@ export async function ensureSeeded(): Promise<void> {
       }).onConflictDoNothing();
     }
   } catch { /* a data room that can't seed still renders its empty state */ }
+}
+
+/**
+ * Sections we ship that this document doesn't have.
+ *
+ * Once-only seeding protects an admin's edits and, as a side effect, hides
+ * every section written after they first opened the page. The financial model
+ * slide was added to the pitch deck, deployed, and was invisible — not broken,
+ * not unpublished, just never mentioned. Nobody goes looking for a section they
+ * don't know exists, so the console has to say so.
+ *
+ * Matched on anchor, which is the section's stable identity (it is what the
+ * side nav and the analytics key on). A renamed anchor reads as missing, which
+ * is the safe direction: it prompts a look rather than hiding one.
+ */
+export async function missingShippedSections(
+  slug: string, docId: string,
+): Promise<{ anchor: string; navLabel: string }[]> {
+  const seed = SEED_DOCS.find((d) => d.slug === slug);
+  if (!seed) return [];
+  try {
+    const db = await getDb();
+    const have = new Set(
+      (await db.select({ anchor: schema.dataroomSections.anchor })
+        .from(schema.dataroomSections).where(eq(schema.dataroomSections.docId, docId)))
+        .map((r) => r.anchor),
+    );
+    return seed.sections
+      .filter((s) => !have.has(s.anchor))
+      .map((s) => ({ anchor: s.anchor, navLabel: s.navLabel }));
+  } catch { return []; }
 }
 
 // Replace one document's sections with the shipped set.

@@ -341,9 +341,14 @@ export const SEED_DOCS: SeedDoc[] = [
       },
 
       // ---------- 17. THE MODEL ----------
+      //
+      // Anchor `finance`, not `model`: slide 13 is the BUSINESS model and
+      // already owns `#model`. Two sections sharing an anchor render two
+      // elements with the same id, so the side-nav link only ever reaches the
+      // first and per-section reading time silently adds the two together.
       {
         kind: "finance",
-        anchor: "model",
+        anchor: "finance",
         navLabel: "17 · The model",
         title: "The plan for the money, as a model you can argue with.",
         subtitle:
