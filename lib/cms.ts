@@ -29,7 +29,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.hero.title": "Gamers live on Discord.",
   "brand.hero.title2": "Now you can advertise there.",
   "brand.hero.subtitle":
-    "Cluster is the media-buying layer for Discord gaming communities. You sponsor the weekly competition your audience was going to enter anyway — your name on it, your logo on the trophy, and reach, entrants and cost-per-entrant reported back. $250 a challenge. $175 of it goes to the gamers who play.",
+    "The media-buying layer for Discord gaming communities. Sponsor the weekly competition your audience was going to enter anyway — your name on it, your logo on the trophy, cost-per-entrant reported back. $250 a challenge; $175 goes to the gamers.",
   "brand.hero.cta.primary": "See pricing",
   "brand.hero.cta.secondary": "Read the profile",
 
@@ -78,7 +78,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "discord.badge": "ClusterBot for Discord",
   "discord.title": "Monetize your Discord server without selling anything.",
   "discord.subtitle":
-    "Install the bot and your members get ranked profiles, live stats from the games they already play, and weekly challenges with real prize money. Brands fund the prizes; you take a share of the fee on every challenge that runs here. Free forever, and it never reads a message.",
+    "Install the bot and your members get ranked profiles, live stats and weekly challenges with real prize money. Brands fund the prizes; you take a share of every challenge that runs here. Free forever, and it never reads a message.",
   "discord.cta.primary": "Add ClusterBot to your server",
   "discord.cta.secondary": "See who's running it",
 
@@ -92,14 +92,14 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // never quote a figure the product isn't using.
   "discord.hero.title": "Earn money from your Discord server.",
   "discord.hero.subtitle":
-    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Link {threshold} gamers and you take a share of the fee on every sponsored challenge that runs here. Free forever, and it never reads a message.",
+    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Link {threshold} gamers and you earn a share of every sponsored challenge here. Free forever, and it never reads a message.",
 
   // ===== The gamer-facing hero (still the entry point for players) =====
   "hero.badge": "Live stats from the games you already play",
   "hero.title.line1": "Every game.",
   "hero.title.line2": "One identity.",
   "hero.subtitle":
-    "Your ranks, ratings and wins from every game, on one profile worth sharing. Enter as many challenges as you like on one account — you're playing anyway, and one win moves every board you're on. Real prize money, trophies checked against the game's own API.",
+    "Your ranks, ratings and wins from every game on one profile. Enter as many challenges as you like on one account — you're playing anyway, and one win moves every board you're on. Real prize money, checked against the game's own API.",
   "hero.cta.primary": "Claim your profile",
   "hero.cta.secondary": "Explore leaderboards",
   "hero.image": "/assets/hero.png",
