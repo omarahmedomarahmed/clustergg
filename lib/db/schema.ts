@@ -448,6 +448,16 @@ export const adCampaigns = pgTable("ad_campaigns", {
   createdAt: now("created_at"),
 });
 
+/**
+ * One creative, running in one placement, for one campaign.
+ *
+ * This row is the thing impressions and clicks point at, so it is never
+ * deleted — it is RETIRED. A brand replacing the art on a placement used to
+ * delete this row and insert a new one, and every impression and click ever
+ * recorded there went with it on cascade: their thirty-day numbers reset to
+ * zero for uploading a better image. The placement's performance belongs to
+ * the placement, not to whichever file is currently in it.
+ */
 export const adCampaignCreatives = pgTable("ad_campaign_creatives", {
   id: id(),
   campaignId: text("campaign_id").notNull().references(() => adCampaigns.id, { onDelete: "cascade" }),
@@ -455,6 +465,8 @@ export const adCampaignCreatives = pgTable("ad_campaign_creatives", {
   placementId: text("placement_id").notNull().references(() => adPlacements.id, { onDelete: "cascade" }),
   weight: integer("weight").notNull().default(1),
   priority: integer("priority").notNull().default(0),
+  /** Out of rotation since. Null means live. Its history stays either way. */
+  retiredAt: timestamp("retired_at", { withTimezone: true, mode: "date" }),
 });
 
 export const adImpressions = pgTable("ad_impressions", {

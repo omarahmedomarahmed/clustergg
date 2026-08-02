@@ -1,112 +1,58 @@
-# Cluster (ClusterGG.com)
+# Cluster
 
-**The media-buying and monetization platform for Discord gaming communities.**
+**The media-buying and monetization layer for gaming communities.**
 
-Cluster is a B2B SaaS platform for gaming marketing. Brands reach gamers where they really are — inside Discord — by sponsoring the weekly challenge for a game rather than buying an impression next to it. Server owners earn a share of the platform fee on every challenge that runs in their community. Gamers link every game account they own (PC / console / mobile) into one public, fully-customizable profile at `clustergg.com/u/<name>`, enter live **Challenges** scored from real game APIs, chart progress through **Quests** that pay out **Cluster Points (CP)**, and climb per-game **Leaderboards** on interactive **Planet** globes.
+Discord holds the world's gaming audience and has no advertising market. Brands
+can't buy it, server owners can't sell it, and gamers get nothing from either.
+Cluster is the layer that makes all three possible with one bot.
 
-The three sides are the product, and none of them works alone: a stats bot nobody monetizes, an ad network with nothing verified behind it, or a revenue-share deal with no product to attach it to. Revenue comes from sponsored challenges, in-bot and on-site ad **placements**, media-buying packages and campaign analytics, sold through a self-serve brand portal and an admin back office.
+- **Brands** buy sponsored weekly challenges and a creative slot on every card
+  the bot draws — with reach, entrants, CTR and cost-per-entrant reported back.
+- **Server owners** earn a share of every sponsored challenge that runs in their
+  server, and climb tiers as more of their members link a game.
+- **Gamers** link the games they already play, enter as many challenges as they
+  like on one account, and compete for real prize money.
 
-This repository is the entire product: a single Next.js app that serves the public site, the gamer app, the Discord bot, the admin "Mission Control" CMS, the brand and server-owner portals, and the JSON/OAuth/cron APIs.
-
----
-
-## Docs index
-
-| Doc | For | What's in it |
-|---|---|---|
-| **README.md** (this) | Everyone | What the product is, the stack, how to run it, the layout. |
-| [`docs/ENGINEERING_HANDOVER.md`](./docs/ENGINEERING_HANDOVER.md) | Any developer taking over | Deep architecture: data model, auth, DB drivers, self-healing migrations, media/Blob pipeline, ads engine, theming, gotchas. Read this first if you're going to change code. |
-| [`docs/STAFF_OPERATIONS.md`](./docs/STAFF_OPERATIONS.md) | Staff & admins (non-devs) | How to run the platform day-to-day from Mission Control — what every admin page edits and how, with no code. |
-| [`SECURITY.md`](./SECURITY.md) | Devs / reviewers | Threat model, authorization model (incl. delegated staff access), findings & fixes, production checklist. |
-| [`SETUP_GUIDE.md`](./SETUP_GUIDE.md) | Devs | First-run setup, every environment variable, seeding the superadmin. |
-| [`DEPLOYMENT.md`](./DEPLOYMENT.md) | Devs / ops | Deploying to Vercel, Neon + Blob wiring, cron, promotion. |
-| [`docs/PRODUCT_BRIEF.md`](./docs/PRODUCT_BRIEF.md) | Product / investors | Plain-language product overview. |
-| [`docs/COMMERCIAL_MODEL.md`](./docs/COMMERCIAL_MODEL.md) | Sales / product / investors | How we make money: what we charge, what prizes cost us, what servers earn, and where every number lives. |
-| [`docs/GAMIFICATION_PLAN.md`](./docs/GAMIFICATION_PLAN.md) | Product / devs | Quests, tiers and CP design. |
+**$250 buys a sponsored challenge. $175 of it becomes the prize pool and reaches
+a gamer. The $75 platform fee is the only line the business lives on.**
 
 ---
 
-## Tech stack (what's actually used)
-
-| Layer | Choice |
-|---|---|
-| Framework | **Next.js 15** (App Router, React 19, TypeScript, `force-dynamic` server components + server actions) |
-| Styling | **Tailwind CSS v4** |
-| Database | **Neon** (serverless Postgres) in production via `@neondatabase/serverless` (neon-http driver). **PGlite** (in-memory Postgres) in local/demo mode |
-| ORM | **Drizzle ORM** (one schema, dual driver) |
-| Auth | Custom JWT session (**`jose`**) in an httpOnly `cluster_session` cookie. Passwords hashed with **bcryptjs**. OAuth for game/identity providers |
-| Media | **Vercel Blob** (public store) — all uploaded art is downscaled in the browser and stored on Blob; the DB only ever holds short Blob links |
-| Cron | **Vercel Cron** → `/api/cron/sync` (daily), gated by `CRON_SECRET` |
-| Hosting | **Vercel** |
-
-There is **no** NextAuth, Redis, Pusher, or external search dependency — those appeared in the original planning doc but the shipped app is deliberately lean (see the handover doc for why).
-
----
-
-## Run locally
+## Run it
 
 ```bash
 npm install
 npm run dev          # http://localhost:3000
 ```
 
-With **no `DATABASE_URL`**, the app boots a fully-seeded **in-memory PGlite** database (demo mode). Everything works — profiles, planets, challenges, quests, ads — but data resets on restart. This is the fastest way to explore.
-
-For real, persistent data set `DATABASE_URL` (Neon) and `BLOB_READ_WRITE_TOKEN` (a Vercel Blob public store). See [`SETUP_GUIDE.md`](./SETUP_GUIDE.md) for every variable.
-
-### Verify (the production gate)
+With no `DATABASE_URL`, the app boots an **in-memory Postgres** (PGlite) seeded
+with a demo universe — real games, real challenges, a brand portal with a month
+of delivery behind it. Nothing external is required to see the whole product.
 
 ```bash
-npx tsc --noEmit     # type safety — must be clean
-npm run build        # production build — must pass
+DEMO_DB=1 npm run build && DEMO_DB=1 npx next start   # the demo, built
+npx tsc --noEmit                                      # typecheck
 ```
 
-Both must be green before pushing. `npm run build` runs Next's own checks too.
+Demo logins: `nova@demo.gg` / `cluster-demo` · `admin@clustergg.com` / `cluster-admin`.
 
----
+## Where things are
 
-## Repository layout
+| Path | What lives there |
+|---|---|
+| `app/` | Routes. `admin/` is the console, `brands/[slug]` and `servers/[slug]` are the key-gated portals, `api/discord/` is the bot. |
+| `lib/discord/` | The bot: interactions, screens, announcements, HQ. |
+| `lib/cards/` | The PNG card engine — every image the bot posts, and every link preview. |
+| `lib/providers/` | Game integrations. One adapter per API, one registry entry per provider. |
+| `lib/db/` | Drizzle schema, self-healing DDL, and the demo seed. |
+| `docs/` | [Architecture](docs/ARCHITECTURE.md) · [Operations](docs/OPERATIONS.md) · [Deploy](docs/DEPLOY.md) · [Business](docs/BUSINESS.md) · [Security](SECURITY.md) |
 
-```
-app/
-  (public)            landing, /u/[slug] profiles, /planets, /leaderboards, /quests, /games, legal
-  feed/               the signed-in gamer dashboard (profile-style, customizable)
-  admin/              "Mission Control" CMS — one folder per editable area
-  brands/[slug]/      key-gated brand portal (no login) — campaign analytics + creative upload
-  onboarding/         connect-your-accounts flow
-  api/                auth (OAuth callbacks), upload, cron, ads impression/click, setup
-  actions/            server actions (mutations) — admin.ts, connections.ts, quests-admin.ts, …
-components/           all React components (server + client)
-lib/
-  db/                 schema.ts, index.ts (drivers + self-healing migrations), seed.ts (boot maintenance)
-  auth.ts             sessions, roles, requireAdmin/requireStaff
-  permissions.ts      delegated staff-access RBAC (server); areas.ts holds the client-safe constants
-  blob.ts             Vercel Blob upload + re-host helpers
-  theme.ts            profile/feed theming engine
-  brands.ts           ads readiness, analytics, brand-portal aggregation
-  planets.ts / game-regions.ts   planet globes + per-region gamer counts
-  quests.ts / quest-hero.ts      quest engine + hero map
-  storage-audit.ts    image inventory used by /admin/storage
-  sync.ts / providers/           game-account stat sync
-docs/                 the docs listed above
-```
+## The rules that keep it working
 
----
-
-## The three surfaces
-
-1. **Public + gamer app** — landing page, cosmic profiles, interactive planet globes with per-region gamer pins, live challenges with countdowns and trophies, quest treasure-maps with CP milestones, leaderboards, feed, messaging.
-2. **Mission Control (`/admin`)** — a no-JSON CMS where staff/admins edit *everything*: site copy, page & card backgrounds, logos & favicon, the game catalog, planets, challenges, quests & tiers, leaderboards, trophies, users & roles, and the ads back office. Access is role-gated and admins can **delegate** sensitive areas to staff.
-3. **Ads back office + brand portal** — brands → campaigns → creatives → placements, with impression/click analytics, a launch-gating readiness model, and a glorified `/brands/<slug>` portal brands reach with an access key (no account needed).
-
----
-
-## Roles
-
-- **superadmin** — everything, including granting the admin role. The first user registered on a fresh DB becomes superadmin.
-- **admin** — all of Mission Control; can delegate areas to staff.
-- **staff** — content moderation & editing (planets, games, challenges, quests, trophies, leaderboards, site content, backgrounds, partners) plus any areas an admin has delegated (ads, image storage, audit log).
-- **brand** — reserved; brands normally use the key-gated portal instead of an account.
-- **user** — a normal gamer.
-
-See [`docs/STAFF_OPERATIONS.md`](./docs/STAFF_OPERATIONS.md) for what each area does and [`SECURITY.md`](./SECURITY.md) for how access is enforced.
+1. **Never delete a row that analytics point at.** Retire it. A brand's numbers
+   belong to the placement, not to the file currently in it.
+2. **Announcements about a person go to that person's servers.** Fanning them out
+   to every server is how a bot gets muted, then removed.
+3. **Anything that speaks into Discord runs once a day.** Anything that keeps
+   data fresh runs hourly. They are different jobs with different answers.
+4. **The demo has to demonstrate the product**, including its empty states.

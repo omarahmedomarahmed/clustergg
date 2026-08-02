@@ -11,12 +11,16 @@ import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import { getT } from "@/lib/i18n/t-server";
 import { localizeQuest } from "@/lib/i18n/entities";
+import { cardMeta } from "@/lib/og";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ key: string }> }) {
   const { key } = await params;
-  return { title: `Quest · ${key}` };
+  return {
+    title: `Quest · ${key}`,
+    ...cardMeta("quest", { quest: key }, `The ${key} quest on Cluster`),
+  };
 }
 
 export default async function QuestDetailPage({ params }: { params: Promise<{ key: string }> }) {

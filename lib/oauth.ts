@@ -66,7 +66,11 @@ function discordConfig(): OAuth2Config {
     kind: "oauth2",
     authorizeUrl: "https://discord.com/oauth2/authorize",
     tokenUrl: "https://discord.com/api/oauth2/token",
-    scope: "identify email",
+    // `guilds.join` is what lets us put a gamer into the Cluster server as part
+    // of signing in, instead of hoping they find an invite later. It grants
+    // exactly one thing — adding this user to a server the bot is already in —
+    // and Discord shows it on the consent screen, so nobody is surprised.
+    scope: "identify email guilds.join",
     userInfo: async (token) => {
       const r = await fetch("https://discord.com/api/users/@me", {
         headers: { Authorization: `Bearer ${token}` },

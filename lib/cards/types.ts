@@ -149,6 +149,14 @@ export type ChallengeCard = {
   // Live standings. A challenge card without them is a poster; with them it's a
   // scoreboard people come back to.
   standings?: { place: number; name: string; points: number; you?: boolean }[];
+  /**
+   * Who can enter, in the game's own words — "Gold or above in Solo/Duo".
+   *
+   * A gamer deciding whether to tap Join needs to know whether the answer will
+   * be no. Empty means open to everyone, which the card says rather than
+   * leaving blank.
+   */
+  entryRules?: string[];
   theme: CardTheme;
 };
 

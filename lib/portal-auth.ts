@@ -82,6 +82,18 @@ function cookieName(kind: string, id: string): string {
   return `${COOKIE_PREFIX}${kind}_${id}`.slice(0, 96);
 }
 
+/**
+ * The cookie a portal session lives in.
+ *
+ * Exported for the sign-out handler, which has to expire the cookie on the
+ * response rather than through `cookies()`. Deriving the name there instead
+ * would mean two places agreeing on a string, and the failure mode of them
+ * disagreeing is a sign-out that appears to work and doesn't.
+ */
+export function portalCookieName(kind: string, id: string): string {
+  return cookieName(kind, id);
+}
+
 type Setter = { set: (opts: {
   name: string; value: string; httpOnly?: boolean; secure?: boolean;
   sameSite?: "lax" | "strict" | "none"; path?: string; maxAge?: number;

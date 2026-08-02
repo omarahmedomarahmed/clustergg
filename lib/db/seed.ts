@@ -432,10 +432,14 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   }
 
   // Demo brands / campaigns / creatives
-  const brand1 = uid(), brand2 = uid();
+  const brand1 = uid(), brand2 = uid(), brand3 = uid();
   await db.insert(schema.brands).values([
     { id: brand1, name: "NebulaTech", industry: "hardware", contactEmail: "ads@nebulatech.example", status: "active" },
     { id: brand2, name: "AstroFuel", industry: "f&b", contactEmail: "brand@astrofuel.example", status: "active" },
+    // A brand on day one: key issued, nothing bought yet. The portal's empty
+    // states are the ones a real new customer sees first and the ones nobody
+    // ever looks at, so the demo has to contain a brand that shows them.
+    { id: brand3, name: "Ionmark", industry: "tech", contactEmail: "hello@ionmark.example", status: "active" },
   ]);
   const camp1 = uid(), camp2 = uid();
   await db.insert(schema.adCampaigns).values([
@@ -488,6 +492,13 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     await db.insert(schema.discordGuilds).values({
       ...g, status: "active", announcementsEnabled: true,
       channelId: `demo-channel-${g.guildId}`,
+      // A fixed key, so the owner dashboard is openable in the demo.
+      //
+      // Production never has one of these: a real key is minted at install and
+      // DM'd to the owner, and staff are deliberately never shown it. But a
+      // demo where the entire server-owner product is behind a secret nobody
+      // holds is a demo of the lock, not of the portal.
+      portalKey: `DEMO-${g.guildId.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(-8)}`,
       community: { games: ["Chess"], regions: ["mena", "eu"], vibes: ["competitive"], about: "", answeredAt: new Date().toISOString() },
     }).onConflictDoNothing();
   }
@@ -1118,6 +1129,55 @@ export async function ensureCardAdPlacement(db: DB) {
   await db.insert(schema.adCampaignCreatives).values({
     id: uid(), campaignId: camp.id, creativeId: crId, placementId: placement.id, weight: 1, priority: 0,
   });
+}
+
+/**
+ * The blog's two slots, on databases seeded before the blog carried ads.
+ *
+ * Same shape as `ensureCardAdPlacement`, once per placement. The blog is the
+ * only surface where a reader arrives from a search engine rather than from
+ * the product, so it is the one place unsold inventory is genuinely worth
+ * filling with a house creative.
+ */
+export async function ensureBlogAdPlacements(db: DB) {
+  const slots = [
+    { key: "blog_inline", pageScope: "Inside a blog article", width: 728, height: 90, mw: 320, mh: 100, tag: 0 },
+    { key: "blog_sidebar", pageScope: "Blog left rail", width: 300, height: 250, mw: 300, mh: 250, tag: 2 },
+  ];
+
+  const [brand] = await db.select({ id: schema.brands.id }).from(schema.brands)
+    .where(eq(schema.brands.id, HOUSE_BRAND_ID)).limit(1);
+  const [camp] = brand
+    ? await db.select({ id: schema.adCampaigns.id }).from(schema.adCampaigns)
+        .where(eq(schema.adCampaigns.brandId, HOUSE_BRAND_ID)).limit(1)
+    : [undefined];
+
+  for (const s of slots) {
+    await db.insert(schema.adPlacements).values({
+      id: uid(), key: s.key, pageScope: s.pageScope, device: "both",
+      width: s.width, height: s.height, mobileWidth: s.mw, mobileHeight: s.mh,
+    }).onConflictDoNothing();
+
+    if (!camp) continue; // fresh DB: seedHouseAds covers every placement
+    const [placement] = await db.select().from(schema.adPlacements)
+      .where(eq(schema.adPlacements.key, s.key)).limit(1);
+    if (!placement) continue;
+
+    const [link] = await db.select({ id: schema.adCampaignCreatives.id }).from(schema.adCampaignCreatives)
+      .where(and(eq(schema.adCampaignCreatives.campaignId, camp.id), eq(schema.adCampaignCreatives.placementId, placement.id))).limit(1);
+    if (link) continue;
+
+    const t = HOUSE_TAGLINES[s.tag];
+    const crId = uid();
+    await db.insert(schema.adCreatives).values({
+      id: crId, brandId: HOUSE_BRAND_ID, name: `Cluster · ${s.key}`, type: "image",
+      fileUrl: svgAd(placement.width, placement.height, t.from, t.to, "CLUSTER", t.title),
+      clickUrl: t.click, width: placement.width, height: placement.height, status: "approved",
+    });
+    await db.insert(schema.adCampaignCreatives).values({
+      id: uid(), campaignId: camp.id, creativeId: crId, placementId: placement.id, weight: 1, priority: 0,
+    });
+  }
 }
 
 export async function ensureTopBannerAd(db: DB) {

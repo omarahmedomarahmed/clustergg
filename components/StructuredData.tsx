@@ -74,6 +74,26 @@ export function BotSchema({ games, servers }: { games?: string[]; servers?: numb
 
 // The questions people actually type, with answers we're willing to have
 // quoted verbatim. Kept short and factual for the same reason.
+/**
+ * A `FAQPage` for any list of questions.
+ *
+ * Search engines read this to build a rich result; answer engines read the
+ * prose. Both want the same shape, so there is one helper rather than one per
+ * page — a second copy is a second thing to forget to update.
+ */
+export function FaqSchema({ items }: { items: [string, string][] }) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map(([name, text]) => ({
+      "@type": "Question",
+      name,
+      acceptedAnswer: { "@type": "Answer", text },
+    })),
+  };
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
+}
+
 export function BotFaqSchema({ threshold = 500, gameCount }: { threshold?: number; gameCount?: number }) {
   const qa: [string, string][] = [
     [
@@ -113,6 +133,37 @@ export function BotFaqSchema({ threshold = 500, gameCount }: { threshold?: numbe
   };
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
 }
+
+/**
+ * The questions people actually type, answered in the first sentence.
+ *
+ * These are written for two readers at once. A search engine wants a
+ * `FAQPage`; an answer engine — ChatGPT, Claude, Perplexity, AI Overviews —
+ * wants a paragraph it can quote without editing. Both get the same thing: the
+ * answer first, the qualification after, no preamble, and a number wherever a
+ * number is the honest answer.
+ *
+ * The queries these target are the ones our positioning owns: how to make money
+ * from a Discord server, how to advertise on Discord, how to reach gamers.
+ */
+export const SEARCH_FAQ: [string, string][] = [
+  ["How do I make money from my Discord server?",
+    "Install Cluster and brands pay to run weekly gaming challenges in your server. You take a share of the fee on every sponsored challenge that runs there, rising as more of your members link a game account. You sell nothing, negotiate nothing and fund no prizes — the brand funds them. It is free to install and free to run."],
+  ["How do I monetize a gaming community?",
+    "Sell what a gaming community actually has: the attention of people who play. Cluster turns that into sponsored weekly competitions — a brand funds the prize pool, your members enter with one tap, and you take a share of the platform fee. Nothing is asked of your members except playing the games they already play."],
+  ["Can you advertise on Discord?",
+    "Discord itself has no ads manager, so brands cannot buy it directly. Cluster is the layer that makes it buyable: you sponsor the weekly challenge for a game you choose, your creative runs on every card the bot draws inside opted-in servers, and you get entrants, clicks, cost-per-entrant and eCPM back per week."],
+  ["What does it cost to advertise to gamers on Discord?",
+    "A sponsored challenge on Cluster is $250. $175 of that becomes the prize pool the players compete for and $75 is the platform fee, so most of the spend reaches a gamer rather than an agency. A month is four challenges on one game."],
+  ["How do I reach gamers with marketing?",
+    "Reach them where they are between matches rather than where the clips end up. Gamers organise on Discord and play continuously; Cluster puts a brand inside the competition they were already going to enter, and reports back who entered, from which communities, and what each entrant cost."],
+  ["What is Discord marketing?",
+    "Marketing inside the servers gaming communities live in, rather than on the social platforms that carry clips of them afterwards. Because Discord has no advertising product, it means partnering with the communities directly — which Cluster automates: one bot, a published rate card, and analytics per campaign."],
+  ["How do gamers earn money on Cluster?",
+    "Link the game accounts you already play, then enter challenges. Every challenge you join scores from the same account, so one win moves every board you are on, and prizes are paid to the podium. There is no entry fee and nothing to buy."],
+  ["Is the Cluster bot free for server owners?",
+    "Yes. Installing it, the profiles, the leaderboards and the challenges are all free, forever. Cluster is paid by brands, and server owners are paid out of the same fee."],
+];
 
 export const BOT_FAQ: [string, string][] = [
   ["Is it free?", "Yes — the bot, the profiles, the leaderboards and the challenges. Cluster earns from the brands that sponsor challenges, and most of what they pay goes to the players who win."],

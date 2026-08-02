@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { cardMeta } from "@/lib/og";
 import { notFound } from "next/navigation";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
@@ -30,6 +32,22 @@ export const dynamic = "force-dynamic";
 // A "planet" is a community (space) — and, when it's tied to a game, it also
 // surfaces that game's cover, standings and players. One page for everything
 // about a game: the merge of the old game hub + community space.
+// The planet's own card previews a planet link — its live challenges, its
+// board and its top gamer, rather than the same site cover every other page
+// used to show.
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
+  const db = await getDb();
+  const [space] = await db.select().from(schema.spaces).where(eq(schema.spaces.slug, slug)).limit(1);
+  if (!space) return {};
+  const game = space.game || space.name;
+  return {
+    title: space.name,
+    description: space.description || `Challenges, leaderboards and gamers on ${space.name}.`,
+    ...cardMeta("planet", { game }, `${space.name} on Cluster`),
+  };
+}
+
 export default async function PlanetPage({
   params, searchParams,
 }: {

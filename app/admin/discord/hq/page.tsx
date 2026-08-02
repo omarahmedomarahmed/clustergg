@@ -1,5 +1,5 @@
 import { requireAdmin } from "@/lib/auth";
-import { hqStatus, planHqSetup } from "@/lib/discord/hq";
+import { hqStatus, planHqSetup, hqInviteUrl } from "@/lib/discord/hq";
 import { HqServerForm, HqBuildButton, HqPlanTable } from "@/components/HqSetup";
 import { AdminHeader, AdminSection, AdminSettings } from "@/components/AdminPage";
 
@@ -14,7 +14,7 @@ export const metadata = { title: "Admin · HQ server" };
 // in full first and nothing happens until someone presses build.
 export default async function HqPage() {
   await requireAdmin();
-  const [status, plan] = await Promise.all([hqStatus(), planHqSetup()]);
+  const [status, plan, invite] = await Promise.all([hqStatus(), planHqSetup(), hqInviteUrl()]);
 
   return (
     <div className="max-w-3xl">
@@ -24,13 +24,14 @@ export default async function HqPage() {
         back={{ href: "/admin/discord", label: "Discord bot" }}
         stats={[
           { label: "Server id", value: status.guildId ? "set" : "not set", tone: status.guildId ? undefined : "warn" },
+          { label: "Invite", value: invite ? "set" : "not set", tone: invite ? undefined : "warn" },
           { label: "Built", value: status.setupDone ? "yes" : "no", tone: status.setupDone ? undefined : "warn" },
           { label: "To create", value: plan.toCreate, tone: plan.toCreate ? "accent" : undefined },
         ]}
       />
 
       <AdminSection title="Which server is ours">
-        <HqServerForm guildId={status.guildId} />
+        <HqServerForm guildId={status.guildId} invite={invite} />
       </AdminSection>
 
       <AdminSection

@@ -5,6 +5,7 @@ import Icon from "@/components/Icon";
 import CoverFramer from "@/components/CoverFramer";
 import MetricsGuide from "@/components/MetricsGuide";
 import { saveChallenge, type ChallengeSaveState } from "@/app/actions/admin";
+import { RULE_OPS, isRanked, ruleSentence, valueChoices, OPEN_TO_EVERYONE } from "@/lib/challenge-rules";
 
 // How long one run of each cadence lasts. Mirrors lib/challenge-series so the
 // preview the builder draws is the schedule the server will actually create —
@@ -81,7 +82,6 @@ const IDEAS = [
   { name: "First to Target", cadence: "weekly", format: "threshold_race", title: "Threshold Sprint", desc: "First to hit the target points wins. Go fast." },
 ];
 
-const OPS = [">=", ">", "<=", "<", "=="];
 
 export default function ChallengeBuilder({
   providers, spaces, trophies, quests = [], guilds = [], challenge,
@@ -336,28 +336,68 @@ export default function ChallengeBuilder({
           )}
         </div>
 
-        {/* Qualification conditions — visual */}
+        {/* Who can enter — in the game's own words.
+            The stored rule is still `{metric, op, value}`, because that is what
+            the scoring engine compares. What changed is that nobody has to
+            read it: a ranked metric offers the ladder the API returns (Iron,
+            Bronze, Gold…) instead of asking an admin to know that Gold is 4,
+            and the sentence underneath is the exact line a gamer will see on
+            the challenge page and on the card. */}
         <div className="mt-3">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-xs text-muted">Qualification conditions (optional)</span>
-            <button type="button" onClick={() => setConditions((c) => [...c, { metric: caps[0]?.key ?? "", op: ">=", value: 0 }])} className="text-xs text-cyan-300 hover:underline inline-flex items-center gap-1"><Icon name="spark" size={11} /> Add condition</button>
+            <span className="text-xs text-muted">Who can enter</span>
+            <button type="button"
+              onClick={() => setConditions((c) => [...c, { metric: caps[0]?.key ?? "", op: ">=", value: 0 }])}
+              className="text-xs text-cyan-300 hover:underline inline-flex items-center gap-1">
+              <Icon name="plus" size={11} /> Add a requirement
+            </button>
           </div>
           {conditions.length === 0 ? (
-            <div className="text-[11px] text-muted">No conditions — everyone who joins qualifies.</div>
+            <div className="rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-[11px] text-muted">
+              {OPEN_TO_EVERYONE}. Add a requirement to keep a challenge to a skill bracket — that is how a
+              bronze player stops being matched against a challenger.
+            </div>
           ) : (
             <div className="space-y-2">
-              {conditions.map((cond, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <select value={cond.metric} onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, metric: e.target.value } : x))} className="input-cosmic !py-1 text-sm flex-1">
-                    {caps.map((cp) => <option key={cp.key} value={cp.key}>{cp.label}</option>)}
-                  </select>
-                  <select value={cond.op} onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, op: e.target.value } : x))} className="input-cosmic !py-1 !w-20 text-sm">
-                    {OPS.map((o) => <option key={o}>{o}</option>)}
-                  </select>
-                  <input type="number" value={cond.value} onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, value: Number(e.target.value) } : x))} className="input-cosmic !py-1 !w-24 text-sm" />
-                  <button type="button" onClick={() => setConditions((c) => c.filter((_, j) => j !== i))} className="text-rose-300 hover:text-rose-200"><Icon name="x" size={14} /></button>
-                </div>
-              ))}
+              {conditions.map((cond, i) => {
+                const met = caps.find((c) => c.key === cond.metric);
+                const choices = valueChoices(met);
+                const ranked = isRanked(met);
+                return (
+                  <div key={i} className="rounded-lg border border-white/10 bg-black/20 p-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <select value={cond.metric}
+                        onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, metric: e.target.value, value: 0 } : x))}
+                        className="input-cosmic !py-1 text-sm flex-1 min-w-[10rem]">
+                        {caps.map((cp) => <option key={cp.key} value={cp.key}>{cp.label}</option>)}
+                      </select>
+                      <select value={cond.op}
+                        onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, op: e.target.value } : x))}
+                        className="input-cosmic !py-1 text-sm w-32">
+                        {RULE_OPS.map((o) => (
+                          <option key={o.op} value={o.op}>{ranked ? o.ranked : o.numeric}</option>
+                        ))}
+                      </select>
+                      {ranked ? (
+                        <select value={cond.value}
+                          onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, value: Number(e.target.value) } : x))}
+                          className="input-cosmic !py-1 text-sm w-36">
+                          {choices.map((ch) => <option key={ch.value} value={ch.value}>{ch.label}</option>)}
+                        </select>
+                      ) : (
+                        <input type="number" value={cond.value}
+                          onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, value: Number(e.target.value) } : x))}
+                          className="input-cosmic !py-1 !w-28 text-sm" />
+                      )}
+                      <button type="button" onClick={() => setConditions((c) => c.filter((_, j) => j !== i))}
+                        className="text-rose-300 hover:text-rose-200"><Icon name="x" size={14} /></button>
+                    </div>
+                    <div className="mt-1.5 text-[11px] text-cyan-200">
+                      Gamers will read: <b>{ruleSentence(cond, met)}</b>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

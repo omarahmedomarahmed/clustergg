@@ -164,6 +164,35 @@ export async function pinMessage(channelId: string, messageId: string): Promise<
 // ===== Direct messages =====
 
 // Owner DMs (install welcome, 500-gamer unlock) go through a one-off DM channel.
+/**
+ * Put a gamer into a server, using the token THEY granted us.
+ *
+ * `PUT /guilds/{id}/members/{user}` with a user access token carrying the
+ * `guilds.join` scope is the only way to add somebody to a server without them
+ * clicking an invite. It is not a way in for us to servers we don't run: the
+ * bot must already be in the target guild with Create Invite, and the user must
+ * have consented to the scope on the Discord consent screen they just passed.
+ *
+ * Discord answers 201 when it added them and 204 when they were already there;
+ * both are success, and the difference is worth reporting because "we added
+ * 400 people today" and "400 people were already there" are different facts.
+ */
+export async function addGuildMember(
+  guildId: string, userId: string, accessToken: string,
+): Promise<{ ok: boolean; added: boolean; status: number; error?: string }> {
+  const res = await call<unknown>(`/guilds/${guildId}/members/${userId}`, {
+    method: "PUT",
+    body: JSON.stringify({ access_token: accessToken }),
+  });
+  if (!res.ok) return { ok: false, added: false, status: res.status, error: res.error };
+  // 201 returns the new member object; 204 (already a member) returns nothing.
+  // `call` turns the empty body into `undefined`, which is how the two are
+  // told apart — and they are worth telling apart, because "we added four
+  // hundred people today" and "four hundred were already there" are different
+  // facts about the same successful call.
+  return { ok: true, added: res.data !== undefined, status: res.data === undefined ? 204 : 201 };
+}
+
 export async function dmUser(userId: string, payload: Json): Promise<boolean> {
   const chan = await call<Channel>("/users/@me/channels", { method: "POST", body: JSON.stringify({ recipient_id: userId }) });
   if (!chan.ok) return false;

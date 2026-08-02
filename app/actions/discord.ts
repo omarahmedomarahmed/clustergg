@@ -7,7 +7,7 @@ import { ALL_COMMANDS } from "@/lib/discord/commands";
 import { clearCatalog } from "@/lib/discord/catalog";
 import { discordConfigured, CLUSTER_CHANNEL } from "@/lib/discord/config";
 import { postGuides, onboardGuild } from "@/lib/discord/onboard";
-import { broadcastToGuilds, announceChallengeLaunched } from "@/lib/discord/announce";
+import { broadcastToGuilds, announceChallengeLaunched, announceChallengeReminder } from "@/lib/discord/announce";
 import { JOBS, runJob, type JobKey } from "@/lib/jobs";
 import { postAdsToGuilds } from "@/lib/discord/ads";
 import { runHqSetup } from "@/lib/discord/hq";
@@ -107,6 +107,64 @@ export async function announceChallenge(_prev: BotActionState, formData: FormDat
   return { ok: "Announced. A server challenge also sends its entry key to the server it belongs to." };
 }
 
+/**
+ * Nudge a challenge again, by hand.
+ *
+ * The daily job reminds every live challenge once. This is the other case: a
+ * challenge that needs a push today, or all of them at once before a weekend —
+ * to every server, or to a chosen few.
+ *
+ * Private challenges are narrowed to the servers that own them inside
+ * `announceChallengeReminder`, not here: a server picker that could leak one is
+ * a picker someone will eventually use by accident.
+ */
+export async function remindChallenges(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
+
+  const which = String(formData.get("challengeId") ?? "").trim();
+  const only = formData.getAll("guildIds").map(String).map((g) => g.trim()).filter(Boolean);
+
+  const db = await getDb();
+  const ids = which && which !== "all"
+    ? [which]
+    : (await db.select({ id: schema.challenges.id }).from(schema.challenges)
+        .where(eq(schema.challenges.status, "active"))).map((c) => c.id);
+
+  if (!ids.length) return { error: "No challenge is running." };
+
+  const done: string[] = [];
+  const skipped: string[] = [];
+  for (const id of ids) {
+    const res = await announceChallengeReminder(id, { only: only.length ? only : undefined, manual: true });
+    if (res.ok) done.push(id); else skipped.push(res.reason ?? "unknown");
+  }
+  revalidatePath("/admin/discord/broadcast");
+  if (!done.length) {
+    return { error: `Nothing sent — ${skipped[0] === "already_ended" ? "it has already ended" : skipped[0] === "not_running" ? "it isn't running" : skipped[0] ?? "no reason given"}.` };
+  }
+  return {
+    ok: `Reminded ${done.length} challenge${done.length === 1 ? "" : "s"}`
+      + (only.length ? ` in ${only.length} chosen server${only.length === 1 ? "" : "s"}` : " everywhere")
+      + (skipped.length ? ` · ${skipped.length} skipped` : "") + ".",
+  };
+}
+
+/** Re-send the Profile of the Week standings, to all servers or chosen ones. */
+export async function sendWeekUpdate(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
+  const only = formData.getAll("guildIds").map(String).map((g) => g.trim()).filter(Boolean);
+  const { postWeekUpdate } = await import("@/lib/discord/week-feed");
+  // Forced: the daily post is once-per-server-per-day, and an admin pressing
+  // this button has already decided today's should go out again.
+  const res = await postWeekUpdate({ guildIds: only.length ? only : undefined, force: true });
+  revalidatePath("/admin/discord/broadcast");
+  if (!res.considered) return { error: "No server has the bot with announcements on yet." };
+  if (!res.posted) return { error: `Nothing sent — all ${res.considered} skipped. The bot may not be able to post in their channels.` };
+  return { ok: `Posted the weekly standings into ${res.posted} of ${res.considered} server${res.considered === 1 ? "" : "s"}.` };
+}
+
 // Send one ad creative into Discord servers on demand.
 //
 // The cron picks a creative by rotation and respects the one-ad-per-interval
@@ -149,6 +207,21 @@ export async function saveHqServer(_prev: BotActionState, formData: FormData): P
     return { error: "That doesn't look like a Discord server id — it should be 17-20 digits. Turn on Developer Mode, right-click your server, Copy Server ID." };
   }
   await setContent("discord.hq.guildId", id);
+
+  // The public invite, saved alongside the id it belongs to.
+  //
+  // Not minted by the bot: a permanent invite is something a person creates in
+  // Discord with an expiry they chose, and generating one here would quietly
+  // put a link with an unknown lifetime on every card in the product. Accepts
+  // a full link or a bare code, and stores whatever was typed.
+  if (formData.has("invite")) {
+    const raw = String(formData.get("invite") ?? "").trim();
+    if (raw && !/^(https?:\/\/)?(discord\.gg\/|discord\.com\/invite\/)?[A-Za-z0-9-]{2,}$/.test(raw)) {
+      return { error: "That doesn't look like a Discord invite. Paste the link (discord.gg/xxxx) or just the code." };
+    }
+    await setContent("discord.hq.invite", raw);
+  }
+
   revalidatePath("/admin/discord/hq");
   return {
     ok: id

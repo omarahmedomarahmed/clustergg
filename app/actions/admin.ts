@@ -767,9 +767,13 @@ export async function adminUploadCreativeToPlacement(campaignId: string, formDat
     fileUrl, clickUrl, width: placement.width, height: placement.height,
     durationSeconds: type === "video" ? 5 : null, status: "approved",
   });
-  await db.delete(schema.adCampaignCreatives).where(and(
+  // Retire the outgoing assignment rather than deleting it — its impressions
+  // and clicks cascade with the row, and the placement's numbers are the
+  // brand's, not the file's.
+  await db.update(schema.adCampaignCreatives).set({ retiredAt: new Date() }).where(and(
     eq(schema.adCampaignCreatives.campaignId, campaignId),
-    eq(schema.adCampaignCreatives.placementId, placementId)));
+    eq(schema.adCampaignCreatives.placementId, placementId),
+    isNull(schema.adCampaignCreatives.retiredAt)));
   await db.insert(schema.adCampaignCreatives).values({ id: uid(), campaignId, creativeId, placementId, weight: 1, priority: 0 });
   await audit(admin.id, "creative.upload", "campaign", campaignId);
   revalidatePath(`/admin/ads/campaign/${campaignId}`);
@@ -863,7 +867,9 @@ export async function assignCreative(formData: FormData) {
 export async function removeAssignment(id: string) {
   const admin = await requireArea("ads");
   const db = await getDb();
-  await db.delete(schema.adCampaignCreatives).where(eq(schema.adCampaignCreatives.id, id));
+  await db.update(schema.adCampaignCreatives)
+    .set({ retiredAt: new Date() })
+    .where(eq(schema.adCampaignCreatives.id, id));
   await audit(admin.id, "campaign_creative.remove", "campaign_creative", id);
   revalidatePath("/admin/ads/schedule");
   revalidatePath("/admin/creatives");

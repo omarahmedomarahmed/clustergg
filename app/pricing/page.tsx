@@ -15,9 +15,9 @@ import { installUrl } from "@/lib/discord/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Pricing — buy media inside Discord",
+  title: "What it costs to advertise to gamers on Discord",
   description:
-    "The published rate card for Discord gaming communities: placements across every server running ClusterBot, and sponsored weekly challenges in the games you choose. Priced per game, per month, with the prize pool funded and paid by Cluster. No setup fees, no administration fees.",
+    "$250 a sponsored challenge — $175 of it is the prize pool that reaches a gamer. The published rate card for Discord gaming advertising, with reach stated before you spend.",
 };
 
 // The rate card.

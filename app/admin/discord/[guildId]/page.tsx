@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth";
 import { guildDetail } from "@/lib/discord/guilds";
 import { challengesForGuild } from "@/lib/challenges";
 import { listRequests } from "@/lib/challenge-requests";
-import { threadFor, markRead } from "@/lib/server-messages";
+import { readThread, markThreadRead } from "@/lib/threads";
 import ServerThread from "@/components/ServerThread";
 import { BotUsage } from "@/components/DiscordAnalytics";
 import { ChallengeControls } from "@/components/ChallengeRequestReview";
@@ -27,11 +27,11 @@ export default async function GuildDetailPage({ params }: { params: Promise<{ gu
   const [challenges, requests, thread] = await Promise.all([
     challengesForGuild(guildId),
     listRequests({ guildId }),
-    threadFor(guildId),
+    readThread("server", guildId),
   ]);
   // Opening the server IS reading its thread — the inbox badge has to clear
   // when staff actually look at it, not when they remember to press something.
-  await markRead(guildId, "admin");
+  await markThreadRead("server", guildId, "admin");
   const { stats, row, members, challengeJoins, adPosts, adImpressions, commands } = detail;
 
   return (
@@ -53,11 +53,7 @@ export default async function GuildDetailPage({ params }: { params: Promise<{ gu
       <ServerThread
         guildId={guildId}
         ownerKnown={!!row?.ownerDiscordId}
-        messages={thread.map((m) => ({
-          id: m.id, sender: m.sender, body: m.body,
-          createdAt: m.createdAt.toISOString(), source: m.source,
-          delivered: !!m.deliveredAt, deliveryError: m.deliveryError,
-        }))}
+        messages={thread}
       />
 
       <section className="glass p-6 mb-6">

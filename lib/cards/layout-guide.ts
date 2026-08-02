@@ -189,6 +189,7 @@ export const CARD_GUIDES: CardGuide[] = [
       { key: "status", label: "LIVE / key / game pills", note: "The row above the title.", text: "LIVE" },
       { key: "title", label: "Title + description", note: "What the challenge is called and what it asks for." },
       { key: "meta", label: "Days left / joined / prize", note: "The pill row under the title." },
+      { key: "rules", label: "Who can enter", note: "The entry requirement, in the game's own words — \"Gold or above in Solo/Duo\". Absent when a challenge is open to everyone, which is most of them." },
       { key: "timeline", label: "Timeline bar", note: "Start → end, so somebody can tell if they're early enough to matter." },
       { key: "standings", label: "Standings", note: "The top four right now.", text: "STANDINGS" },
       { key: "trophies", label: "Trophy stack", note: "The prizes, top-right under the sponsor." },

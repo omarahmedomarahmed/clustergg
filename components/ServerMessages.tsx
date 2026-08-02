@@ -2,6 +2,8 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import Icon from "@/components/Icon";
+import { RefreshButton, useThread } from "@/components/ThreadRefresh";
+import type { ThreadMessageView } from "@/lib/threads";
 import { portalSendMessage, type PortalActionState } from "@/app/actions/server-portal";
 
 // The owner's conversation with Cluster.
@@ -14,21 +16,14 @@ import { portalSendMessage, type PortalActionState } from "@/app/actions/server-
 // It says plainly where the reply will arrive, because the most common way a
 // support thread fails is somebody waiting on the wrong screen.
 
-export type ThreadMessage = {
-  id: string;
-  sender: "owner" | "admin" | string;
-  body: string;
-  createdAt: string;
-  source: string;
-  delivered: boolean;
-  deliveryError: string | null;
-};
+/** One shape for every conversation — see `lib/threads.ts`. */
+export type ThreadMessage = ThreadMessageView;
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
 export default function ServerMessages({
-  guildId, keyStr, messages, botLive,
+  guildId, keyStr, messages: initial, botLive,
 }: {
   guildId: string;
   keyStr: string;
@@ -41,6 +36,10 @@ export default function ServerMessages({
   );
   const formRef = useRef<HTMLFormElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  // The thread reloads on its own. An owner waiting on an answer should not
+  // have to reload a dashboard of forty queries to find out it arrived.
+  const thread = useThread("server", guildId, "portal", initial);
+  const messages = thread.messages;
 
   useEffect(() => {
     if (state?.ok) formRef.current?.reset();
@@ -52,9 +51,12 @@ export default function ServerMessages({
   return (
     <div className="glass overflow-hidden">
       <div className="border-b border-white/10 p-5">
-        <h2 className="font-bold flex items-center gap-2">
-          <Icon name="messages" size={16} className="text-cyan-300" /> Talk to Cluster
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold flex items-center gap-2">
+            <Icon name="messages" size={16} className="text-cyan-300" /> Talk to Cluster
+          </h2>
+          <RefreshButton onClick={thread.refresh} busy={thread.busy} at={thread.at} error={thread.error} />
+        </div>
         <p className="mt-1 text-sm text-muted max-w-2xl">
           Anything at all — a challenge you want run, a problem with the bot, a brand you&apos;d like on your
           server. Write here or DM the bot with <code className="text-cyan-300">/cluster show:admin</code> →

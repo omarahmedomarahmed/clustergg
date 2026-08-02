@@ -6,7 +6,7 @@ import { saveHqServer, buildHqServer, type BotActionState } from "@/app/actions/
 
 export type PlanRow = { category: string; name: string; kind: string; exists: boolean };
 
-export function HqServerForm({ guildId }: { guildId: string | null }) {
+export function HqServerForm({ guildId, invite }: { guildId: string | null; invite?: string | null }) {
   const [state, act, busy] = useActionState<BotActionState, FormData>(saveHqServer, undefined);
   return (
     <form action={act} className="space-y-3">
@@ -25,6 +25,24 @@ export function HqServerForm({ guildId }: { guildId: string | null }) {
         <p className="text-[11px] text-muted mt-2">
           Discord → User Settings → Advanced → Developer Mode, then right-click the server → Copy Server ID.
           Saving only records the id; nothing is created until you build.
+        </p>
+      </div>
+
+      {/* The invite is what makes the bot answerable.
+          Every card carries a "Get help · our server" button once this is set,
+          and carries nothing where it would be while it is empty — a support
+          button that leads nowhere is worse than no support button. */}
+      <div>
+        <label className="text-xs text-muted block mb-1.5">Public invite to our server</label>
+        <input
+          name="invite" defaultValue={invite ?? ""}
+          placeholder="discord.gg/xxxxxx — or just the code"
+          className="input-cosmic w-full sm:w-80 text-sm"
+        />
+        <p className="text-[11px] text-muted mt-2">
+          Make it <b className="text-ink">never expire</b> with <b className="text-ink">no use limit</b> in
+          Discord (Invite People → Edit invite link), because this goes on every card the bot posts. Leave it
+          empty and the &ldquo;Get help&rdquo; button simply isn&apos;t there.
         </p>
       </div>
       {state?.ok && <p className="text-sm text-emerald-300">{state.ok}</p>}

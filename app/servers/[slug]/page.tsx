@@ -4,7 +4,7 @@ import { getServerBySlugOrId, portalData, serverBoard, serverCommandFeed, TIERS 
 import { hasPortalSession } from "@/lib/portal-auth";
 import { challengesForGuild } from "@/lib/challenges";
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
-import { threadFor, markRead } from "@/lib/server-messages";
+import { readThread, unreadCount, markThreadRead } from "@/lib/threads";
 import { getCommunity } from "@/lib/discord/community";
 import { canAct } from "@/lib/discord/config";
 import ServerMessages from "@/components/ServerMessages";
@@ -63,22 +63,22 @@ export default async function ServerPortalPage({
 
   if (!unlocked) return <PublicView server={server} data={data} base={base} unlock={unlock} left={left} mins={mins} />;
 
-  const [challenges, requests, board, feed, thread, games, community] = await Promise.all([
+  const [challenges, requests, board, feed, thread, unreadFromUs, games, community] = await Promise.all([
     challengesForGuild(server.guildId),
     listRequests({ guildId: server.guildId }),
     serverBoard(),
     serverCommandFeed(server.guildId),
-    threadFor(server.guildId),
+    readThread("server", server.guildId),
+    // Counted BEFORE marking read, so a reply that arrived since their last
+    // visit still announces itself on the tab they're about to open.
+    unreadCount("server", server.guildId, "portal"),
     requestableGames(),
     getCommunity(server.guildId),
   ]);
 
-  // Counted BEFORE marking read, so a reply that arrived since their last visit
-  // still announces itself on the tab they're about to open.
-  const unreadFromUs = thread.filter((m) => m.sender === "admin" && !m.readByOwner).length;
   // Opening the dashboard IS reading the thread — an unread badge that survives
   // the owner looking straight at the messages is a badge nobody trusts again.
-  await markRead(server.guildId, "owner");
+  await markThreadRead("server", server.guildId, "portal");
 
   const pending = requests.filter((r) => r.status === "pending");
 
@@ -205,15 +205,12 @@ export default async function ServerPortalPage({
             key: "messages",
             label: unreadFromUs ? `Messages (${unreadFromUs})` : "Messages",
             icon: "messages",
+            dot: unreadFromUs > 0,
             node: (
               <ServerMessages
                 guildId={server.guildId} keyStr=""
                 botLive={canAct()}
-                messages={thread.map((m) => ({
-                  id: m.id, sender: m.sender, body: m.body,
-                  createdAt: m.createdAt.toISOString(), source: m.source,
-                  delivered: !!m.deliveredAt, deliveryError: m.deliveryError,
-                }))}
+                messages={thread}
               />
             ),
           },

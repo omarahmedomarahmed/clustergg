@@ -1,5 +1,5 @@
 import { createHash } from "crypto";
-import { and, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, isNull} from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import { schema } from "@/lib/db";
 
@@ -60,6 +60,9 @@ export async function serveAds(db: DB, placementKey: string, device: string): Pr
     .innerJoin(schema.brands, eq(schema.adCampaigns.brandId, schema.brands.id))
     .where(and(
       eq(schema.adCampaignCreatives.placementId, placement.id),
+      // Retired rows keep their history and stop being served. Without this
+      // the replaced creative would still rotate alongside its replacement.
+      isNull(schema.adCampaignCreatives.retiredAt),
       eq(schema.adCampaigns.status, "active"),
       eq(schema.adCreatives.status, "approved"),
       eq(schema.brands.status, "active"),

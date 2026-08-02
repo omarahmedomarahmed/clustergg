@@ -15,9 +15,9 @@ import { BotSchema, BotFaqSchema, BOT_FAQ } from "@/components/StructuredData";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "ClusterBot for Discord — ranked profiles, live game stats and challenges",
+  title: "Earn money from your Discord server",
   description:
-    "Add ClusterBot to your Discord server. Members get ranked profiles and live stats from League, Valorant, Apex, CS2, Fortnite and more, plus challenges with real trophies — all inside Discord. Hit 500 linked members and brands start sponsoring weekly challenges there, with the prize money won by your members.",
+    "Install ClusterBot free and brands fund weekly challenges in your gaming community. Your members win real prize money, you take a share of the fee, and the bot never reads a message.",
   alternates: { canonical: "/discord-bot" },
   openGraph: {
     title: "ClusterBot for Discord",

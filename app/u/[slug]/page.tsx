@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { cardMeta } from "@/lib/og";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { getProvider } from "@/lib/providers/registry";
 import { providerInfoList } from "@/lib/providers/serialize";
@@ -46,7 +47,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `${user.displayName} (@${user.slug})`,
     description: user.bio ?? `${user.displayName}'s gamer profile on Cluster.`,
-    openGraph: { title: `${user.displayName} on Cluster`, description: user.bio ?? "Every game. One identity.", images: ["/assets/og.png"] },
+    // Their own card, drawn from live data — the same PNG the bot posts when
+    // they share their profile in Discord. A profile link previewing a generic
+    // logo is a link nobody clicks.
+    openGraph: {
+      title: `${user.displayName} on Cluster`,
+      description: user.bio ?? "Every game. One identity.",
+      ...cardMeta("profile", { slug: user.slug }, `${user.displayName}'s Cluster profile`).openGraph,
+    },
+    twitter: cardMeta("profile", { slug: user.slug }, `${user.displayName}'s Cluster profile`).twitter,
   };
 }
 

@@ -4,6 +4,7 @@ import { desc, eq } from "drizzle-orm";
 import { sendableCreatives, MIN_HOURS_BETWEEN_ADS } from "@/lib/discord/ads";
 import { listGuilds } from "@/lib/discord/guilds";
 import { AdBroadcast, TextBroadcast } from "@/components/AdBroadcast";
+import { ChallengeReminder, WeekBroadcast } from "@/components/ChallengeReminder";
 import { AdminHeader, AdminSection, AdminSettings, EmptyState } from "@/components/AdminPage";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +19,7 @@ export default async function BroadcastPage() {
   await requireAdmin();
   const db = await getDb();
 
-  const [creatives, guilds, rawGuilds, recent] = await Promise.all([
+  const [creatives, guilds, rawGuilds, recent, live] = await Promise.all([
     sendableCreatives(),
     listGuilds(),
     db.select({
@@ -33,7 +34,24 @@ export default async function BroadcastPage() {
       status: schema.discordAdPosts.status,
       createdAt: schema.discordAdPosts.createdAt,
     }).from(schema.discordAdPosts).orderBy(desc(schema.discordAdPosts.createdAt)).limit(25),
+    db.select({
+      id: schema.challenges.id,
+      title: schema.challenges.title,
+      game: schema.challenges.game,
+      endAt: schema.challenges.endAt,
+      visibility: schema.challenges.visibility,
+    }).from(schema.challenges).where(eq(schema.challenges.status, "active"))
+      .orderBy(schema.challenges.endAt),
   ]);
+
+  // Rounded up, and matching what the post itself will say — a list that reads
+  // "0 days left" next to a message that says "11 hours left" is two sources of
+  // truth for the same number.
+  const challenges = live.map((c) => ({
+    id: c.id, title: c.title, game: c.game,
+    daysLeft: Math.max(0, Math.ceil((c.endAt.getTime() - Date.now()) / 86400000)),
+    isPrivate: c.visibility === "private",
+  }));
 
   const nameByGuild = new Map(rawGuilds.map((g) => [g.guildId, g.name || g.guildId]));
   const servers = rawGuilds.map((g) => ({
@@ -91,6 +109,20 @@ export default async function BroadcastPage() {
       </AdminSection>
 
       <AdminSection
+        title="Remind a challenge"
+        hint="The daily job posts a countdown for everything running. This sends one now — one challenge or all of them, everywhere or to chosen servers."
+      >
+        <ChallengeReminder challenges={challenges} servers={servers} />
+      </AdminSection>
+
+      <AdminSection
+        title="Post the Profile of the Week standings"
+        hint="The same weekly card the daily job posts, sent again on demand."
+      >
+        <WeekBroadcast servers={servers} />
+      </AdminSection>
+
+      <AdminSection
         title="Message every server"
         hint="Plain text, markdown and emoji. Not an ad — announcements, notices, anything staff needs to say."
       >
@@ -107,6 +139,17 @@ export default async function BroadcastPage() {
             <b className="text-ink">How often.</b> At most one ad per server every {MIN_HOURS_BETWEEN_ADS} hours.
             This is what keeps the bot from reading as spam, which is the fastest way to get it removed from
             every server it&apos;s in. The manual send can override it, deliberately.
+          </p>
+          <p>
+            <b className="text-ink">Challenge reminders.</b> One post per running challenge per day, skipping
+            anything launched in the last day — it was already announced, and two posts about the same
+            challenge in one day is the noise this exists to avoid. A private challenge is only ever
+            reminded inside the servers that own it.
+          </p>
+          <p>
+            <b className="text-ink">Personal news.</b> &ldquo;Someone joined a challenge&rdquo;, &ldquo;someone linked an
+            account&rdquo; and quest milestones go only to the servers that gamer is actually in. Fanning those
+            out to every server is how a bot gets muted.
           </p>
           <p>
             <b className="text-ink">Where the money shows up.</b> Discord impressions are written to the

@@ -271,6 +271,10 @@ const COLUMN_MIGRATIONS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "dwp_guild_key_idx" ON "discord_week_posts" ("guild_id","post_key")`,
   `CREATE INDEX IF NOT EXISTS "dwp_week_idx" ON "discord_week_posts" ("week_key")`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "guild_id" text`,
+  // Retiring a creative instead of deleting its row: impressions and clicks
+  // point at this row and cascade with it, so a brand replacing their art used
+  // to erase the placement's whole history.
+  `ALTER TABLE "ad_campaign_creatives" ADD COLUMN IF NOT EXISTS "retired_at" timestamptz`,
   `ALTER TABLE "ad_creatives" ADD COLUMN IF NOT EXISTS "cta_label" text`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "community" jsonb NOT NULL DEFAULT '{}'::jsonb`,
   `CREATE TABLE IF NOT EXISTS "sponsored_campaigns" (
@@ -583,7 +587,7 @@ async function ensureProvisioned(db: DB) {
     // table scans — this is what keeps Neon data-transfer from ballooning.
     await runColumnMigrations(db);
     try {
-      const { runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, ensureCardAdPlacement, refreshStaleChallengeWindows, ensureBrandKeys, rehostImagesToBlob } = await import("./seed");
+      const { runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, ensureCardAdPlacement, ensureBlogAdPlacements, refreshStaleChallengeWindows, ensureBrandKeys, rehostImagesToBlob } = await import("./seed");
       await runBootMaintenance(db);
       // Runs EVERY boot (not version-gated): converts any images still stored as
       // base64 data URLs to Blob. Cheap once done (SQL LIKE 'data:%' → 0 rows),
@@ -594,6 +598,7 @@ async function ensureProvisioned(db: DB) {
       await rehostImagesToBlob(db);
       await ensureTopBannerAd(db);
       await ensureCardAdPlacement(db);
+      await ensureBlogAdPlacements(db);
       await refreshStaleChallengeWindows(db);
       await ensureBrandKeys(db);
     } catch { /* non-fatal — ads/skins just won't backfill this boot */ }
@@ -610,13 +615,13 @@ async function ensureProvisioned(db: DB) {
     }
   }
   await runColumnMigrations(db);
-  const { seed, runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, ensureCardAdPlacement, refreshStaleChallengeWindows, ensureBrandKeys, rehostImagesToBlob } = await import("./seed");
+  const { seed, runBootMaintenance, migrateGameImagesToBlob, ensureTopBannerAd, ensureCardAdPlacement, ensureBlogAdPlacements, refreshStaleChallengeWindows, ensureBrandKeys, rehostImagesToBlob } = await import("./seed");
   try {
     await seed(db, { demo: false });
   } catch (e) {
     if (!/duplicate key|already exists/i.test(String(e))) throw e;
   }
-  try { await runBootMaintenance(db); await migrateGameImagesToBlob(db); await rehostImagesToBlob(db); await ensureTopBannerAd(db); await ensureCardAdPlacement(db); await refreshStaleChallengeWindows(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
+  try { await runBootMaintenance(db); await migrateGameImagesToBlob(db); await rehostImagesToBlob(db); await ensureTopBannerAd(db); await ensureCardAdPlacement(db); await ensureBlogAdPlacements(db); await refreshStaleChallengeWindows(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
 }
 
 async function createDb(): Promise<DB> {
@@ -638,11 +643,11 @@ async function createDb(): Promise<DB> {
   // Apply the same idempotent column back-fills so demo mode matches the schema
   // without hand-editing the static DDL for every new column.
   await runColumnMigrations(db);
-  const { seed, runBootMaintenance, ensureBrandKeys } = await import("./seed");
+  const { seed, runBootMaintenance, ensureBrandKeys, ensureBlogAdPlacements } = await import("./seed");
   await seed(db, { demo: true });
   // Demo mode must run the same boot maintenance as production (planet skins,
   // logos/covers, house ads) so globes + connect art show here too.
-  try { await runBootMaintenance(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
+  try { await runBootMaintenance(db); await ensureBlogAdPlacements(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
   return db;
 }
 

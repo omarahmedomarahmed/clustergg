@@ -863,8 +863,8 @@ function LeaderboardBody(d: LeaderboardCard) {
 
 function ChallengeBody(d: ChallengeCard) {
   const t = d.theme;
-  const [pStatus, pMeta, pTime, pStand, pTro, pEmpty] =
-    ["status", "meta", "timeline", "standings", "trophies", "empty"].map((k) => part(t, k));
+  const [pStatus, pMeta, pTime, pStand, pTro, pEmpty, pRules] =
+    ["status", "meta", "timeline", "standings", "trophies", "empty", "rules"].map((k) => part(t, k));
   const ends = new Date(d.endsAt);
   const days = Math.max(0, Math.ceil((ends.getTime() - Date.now()) / 86400000));
   const trophies = pTro.hidden ? [] : d.trophies.slice(0, 3);
@@ -960,6 +960,21 @@ function ChallengeBody(d: ChallengeCard) {
         <Pill size={pMeta.f(20)}>{`${nf(d.participants)} joined`}</Pill>
         {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pMeta.f(20)}>{clamp(d.prize, 20)}</Pill> : null}
       </Section>
+
+      {/* Who can enter, when the answer isn't "anyone".
+          A gamer deciding whether to tap Join needs to know in advance that the
+          answer will be no — finding out after joining is how a competition
+          feels rigged. Nothing is drawn for an open challenge: most are open,
+          and a pill saying "anyone" on every card is a pill nobody reads. */}
+      {(d.entryRules ?? []).length > 0 && !pRules.hidden ? (
+        <Section p={pRules} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+          {(d.entryRules ?? []).slice(0, 2).map((line, i) => (
+            <Pill key={i} color="#a78bfa" bg="rgba(167,139,250,0.14)" size={pRules.f(19)}>
+              {clamp(line, 34)}
+            </Pill>
+          ))}
+        </Section>
+      ) : null}
 
       {/* Timeline: the whole window, not just "5d left". People want to know if
           they're early enough to still matter. */}

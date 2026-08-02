@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull} from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { keysMatch, hasPortalSession } from "@/lib/portal-auth";
@@ -50,10 +50,16 @@ export async function portalUploadCreative(brandId: string, key: string, formDat
     fileUrl, clickUrl, width: placement.width, height: placement.height,
     durationSeconds: type === "video" ? 5 : null, status: "approved",
   });
-  // One creative per placement per campaign — replace any existing assignment.
-  await db.delete(schema.adCampaignCreatives).where(and(
+  // One creative per placement per campaign — retire any existing assignment.
+  //
+  // Retire, never delete: impressions and clicks reference this row and cascade
+  // with it, so deleting it to make room for the replacement wiped every number
+  // the placement had ever earned. Uploading better art must not cost a brand
+  // their reporting.
+  await db.update(schema.adCampaignCreatives).set({ retiredAt: new Date() }).where(and(
     eq(schema.adCampaignCreatives.campaignId, campaign.id),
-    eq(schema.adCampaignCreatives.placementId, placementId)));
+    eq(schema.adCampaignCreatives.placementId, placementId),
+    isNull(schema.adCampaignCreatives.retiredAt)));
   await db.insert(schema.adCampaignCreatives).values({ id: uid(), campaignId: campaign.id, creativeId, placementId, weight: 1, priority: 0 });
   revalidatePath(`/brands/${brand.slug}`);
   return { ok: true };
@@ -142,6 +148,73 @@ export async function portalLaunchCardCreative(brandId: string, key: string, for
   return { ok: true };
 }
 
+/**
+ * Change a creative that is already running, without unpicking anything.
+ *
+ * Replacing art used to mean uploading a new creative and retiring the old
+ * assignment — correct for "run this instead", wrong for "the logo moved 4px"
+ * and wrong for the case this exists for: creatives uploaded before the card
+ * placement required a button have no `ctaLabel` and no `clickUrl`, so they
+ * render on Discord with nothing to click. A brand could not fix that without
+ * removing the creative and losing its numbers.
+ *
+ * So this edits the underlying creative row in place. The assignment id does
+ * not change, which means every impression and click that creative has ever
+ * earned stays attached to it — the point is to fix the ad, not to restart its
+ * reporting.
+ *
+ * Scoped by a join through the brand's own campaigns: an id from somewhere else
+ * must not be able to repoint another brand's creative at a link of your
+ * choosing.
+ */
+export async function portalEditCreative(brandId: string, key: string, formData: FormData) {
+  const { db, brand } = await requireBrand(brandId, key);
+  const campaignCreativeId = String(formData.get("campaignCreativeId") ?? "").trim();
+  if (!campaignCreativeId) return { error: "Nothing to edit." };
+
+  const [row] = await db.select({
+    creativeId: schema.adCampaignCreatives.creativeId,
+    placementKey: schema.adPlacements.key,
+  })
+    .from(schema.adCampaignCreatives)
+    .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id))
+    .innerJoin(schema.adPlacements, eq(schema.adCampaignCreatives.placementId, schema.adPlacements.id))
+    .where(and(
+      eq(schema.adCampaignCreatives.id, campaignCreativeId),
+      eq(schema.adCampaigns.brandId, brandId),
+    )).limit(1);
+  if (!row) return { error: "That creative isn't yours to edit." };
+
+  const patch: Record<string, string | null> = {};
+  if (formData.has("fileUrl")) {
+    const fileUrl = String(formData.get("fileUrl") ?? "").trim();
+    if (!fileUrl) return { error: "The image can be replaced but not removed — upload a new one." };
+    patch.fileUrl = fileUrl;
+  }
+  if (formData.has("clickUrl")) {
+    const clickUrl = safeTarget(String(formData.get("clickUrl") ?? "").trim());
+    // On the Discord card the button IS the ad — art with no destination is an
+    // impression a brand can never attribute. Everywhere else a click-through
+    // is optional, so only the card insists.
+    if (!clickUrl && row.placementKey === CARD_AD_PLACEMENT) {
+      return { error: "Add the link the button should open — a full https:// address." };
+    }
+    patch.clickUrl = clickUrl;
+  }
+  if (formData.has("ctaLabel")) {
+    const ctaLabel = String(formData.get("ctaLabel") ?? "").trim().slice(0, 48);
+    if (!ctaLabel && row.placementKey === CARD_AD_PLACEMENT) {
+      return { error: "Add the button text. It shows as “Sponsored: your brand — your words”." };
+    }
+    patch.ctaLabel = ctaLabel || null;
+  }
+  if (!Object.keys(patch).length) return { error: "Nothing changed." };
+
+  await db.update(schema.adCreatives).set(patch).where(eq(schema.adCreatives.id, row.creativeId));
+  revalidatePath(`/brands/${brand.slug}`);
+  return { ok: true };
+}
+
 /** Pull one creative out of the rotation. The campaign and its stats stay. */
 export async function portalRemoveCardCreative(brandId: string, key: string, campaignCreativeId: string) {
   const { db, brand } = await requireBrand(brandId, key);
@@ -160,7 +233,11 @@ export async function portalRemoveCardCreative(brandId: string, key: string, cam
     )).limit(1);
   if (!row) return { error: "Nothing to remove." };
 
-  await db.delete(schema.adCampaignCreatives).where(eq(schema.adCampaignCreatives.id, row.id));
+  // Out of rotation, not out of the record — the comment above this function
+  // has always promised the stats stay, and deleting the row took them.
+  await db.update(schema.adCampaignCreatives)
+    .set({ retiredAt: new Date() })
+    .where(eq(schema.adCampaignCreatives.id, row.id));
   revalidatePath(`/brands/${brand.slug}`);
   return { ok: true };
 }
