@@ -83,17 +83,28 @@ async function announce(payload: Record<string, unknown>, scope: Scope = {}): Pr
   const landed: string[] = [];
   for (const t of list) {
     try {
-      await postMessage(t.channelId, withSponsorRow(payload, scope.sponsor, t.guildId));
-      if (t.guildId) landed.push(t.guildId);
+      // `postMessage` does NOT throw — the REST layer returns {ok:false} for a
+      // 403, a deleted channel or a missing token. Counting a try/catch as
+      // success therefore counted every server we merely ATTEMPTED, which is
+      // the opposite of what a delivery ledger is for. Check the result.
+      const res = await postMessage(t.channelId, withSponsorRow(payload, scope.sponsor, t.guildId));
+      if (res.ok && t.guildId) landed.push(t.guildId);
     } catch { /* never break the caller */ }
   }
 
-  // Write down where it actually landed. Only servers we posted to without
-  // throwing are counted — a brand's reach number must never include a server
-  // that never received the message.
+  // Write down where it actually landed, and AWAIT it.
+  //
+  // This was a floating promise, which is why a brand whose challenge reached
+  // seven servers saw zero. Announcements run inside a server action or a cron
+  // request; the moment that request returns, the runtime is free to freeze the
+  // function and an un-awaited insert never happens. Reach is the number the
+  // whole business reports on — it cannot be best-effort. One insert of a
+  // handful of rows is not worth saving.
   if (scope.ledger && landed.length) {
-    const { recordDeliveries } = await import("@/lib/challenge-delivery");
-    void recordDeliveries(scope.ledger.challengeId, landed, scope.ledger.kind).catch(() => {});
+    try {
+      const { recordDeliveries } = await import("@/lib/challenge-delivery");
+      await recordDeliveries(scope.ledger.challengeId, landed, scope.ledger.kind);
+    } catch { /* the ledger already swallows its own errors */ }
   }
 }
 

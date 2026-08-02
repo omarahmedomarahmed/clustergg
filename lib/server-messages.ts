@@ -16,7 +16,7 @@ import { uid } from "@/lib/utils";
 // that intent means Discord verification and reading every message in every
 // server, which is not a trade worth making for a support inbox. So the owner's
 // side of the conversation comes from places where Discord hands us the text:
-// a modal in `/cluster admin`, or their portal. Outbound DMs need no intent at
+// a modal in `/cluster show:admin`, or their portal. Outbound DMs need no intent at
 // all, which is why the reply can still arrive as a normal message from the bot.
 
 export type ServerMessage = typeof schema.serverMessages.$inferSelect;

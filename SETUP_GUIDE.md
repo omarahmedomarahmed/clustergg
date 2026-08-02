@@ -248,10 +248,10 @@ Click **Add ClusterBot to a server** on `/admin/discord` (or open
 | The server | `#clustergg` exists, guide cards posted **and pinned**, owner DM'd |
 | Type `/cluster` | All subcommands listed with descriptions |
 | Type `/cluster show ` (with the space) | Autocomplete: profile, CP, every game, every quest |
-| `/cluster home` | Your profile card — sign in with Discord on the site first |
+| `/cluster` | Your profile card — sign in with Discord on the site first |
 | Click a button | The **same message** changes; no new message appears |
 | Click **Back** | Returns to the previous screen, still in place |
-| `/cluster share` | Posts publicly with the "vote for me" message |
+| `/cluster show:share` | Posts publicly with the "vote for me" message |
 
 If the guides posted but didn't pin, the bot is missing **Manage Messages** —
 re-add it using the button on `/admin/discord`, which requests the correct

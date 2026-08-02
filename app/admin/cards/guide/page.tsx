@@ -3,9 +3,10 @@ import { CARD_GUIDES, GUIDE_W, GUIDE_H, artBrief } from "@/lib/cards/layout-guid
 import { allLayouts } from "@/lib/cards/layout-store";
 import { brandCardArt } from "@/lib/cards/brand";
 import { cardBg } from "@/lib/cards/data";
-import { previewUrlFor } from "@/lib/cards/preview";
+import { previewUrlFor, previewSamples, type CardSample } from "@/lib/cards/preview";
 import { assetLibrary } from "@/lib/cards/asset-library";
 import CardStudio, { type StudioCard } from "@/components/CardStudio";
+import { buttonCopy } from "@/lib/discord/button-store";
 import { AdminHeader, AdminSection } from "@/components/AdminPage";
 
 export const dynamic = "force-dynamic";
@@ -24,8 +25,13 @@ export const metadata = { title: "Admin · Card studio" };
 // — a layout applies to a card KIND, which is what makes it worth setting once.
 export default async function CardStudioPage() {
   await requireStaff();
-  const [layouts, brand, library] = await Promise.all([allLayouts(), brandCardArt(), assetLibrary()]);
+  const [layouts, brand, library, buttons] = await Promise.all([
+    allLayouts(), brandCardArt(), assetLibrary(), buttonCopy(),
+  ]);
   const backgrounds = await Promise.all(CARD_GUIDES.map((g) => cardBg(g.bgKey)));
+  // Several real cards per kind, so a layout can be checked against the range of
+  // art it will actually land on rather than against one lucky fixture.
+  const samples = await Promise.all(CARD_GUIDES.map((g) => previewSamples(g.kind)));
 
   const cards: StudioCard[] = CARD_GUIDES.map((g, i) => ({
     kind: g.kind,
@@ -35,7 +41,13 @@ export default async function CardStudioPage() {
     group: g.group,
     bgKey: g.bgKey,
     brief: artBrief(g, layouts[g.kind]),
-    regions: g.regions.map((r) => ({ key: r.key, label: r.label, note: r.note, kind: r.kind })),
+    // Geometry travels with the region now: the editor draws each section
+    // where the guide says it lands, so a box on the canvas is the section
+    // rather than a rectangle in a list.
+    regions: g.regions.map((r) => ({
+      key: r.key, label: r.label, note: r.note, kind: r.kind,
+      x: r.x, y: r.y, w: r.w, h: r.h,
+    })),
     parts: g.parts,
     layout: layouts[g.kind],
     art: {
@@ -44,6 +56,7 @@ export default async function CardStudioPage() {
       markUrl: brand.markUrl,
     },
     previewUrl: previewUrlFor(g.kind),
+    samples: samples[i] as CardSample[],
   }));
 
   return (
@@ -80,7 +93,7 @@ export default async function CardStudioPage() {
         </ul>
       </AdminSection>
 
-      <CardStudio cards={cards} library={library} />
+      <CardStudio cards={cards} library={library} buttonCopy={buttons} />
     </div>
   );
 }

@@ -83,6 +83,14 @@ export type CardPart = {
   note: string;
   /** The built-in wording, when this section has any. */
   text?: string;
+  /**
+   * Drawn in the right-hand column under the sponsor box, not in the text one.
+   *
+   * Its rectangle is computed from the live layout rather than fixed here,
+   * because it hangs off wherever the sponsor box currently sits — drag the ad
+   * and this moves with it.
+   */
+  side?: boolean;
 };
 
 export type CardGuide = {
@@ -236,7 +244,7 @@ export const CARD_GUIDES: CardGuide[] = [
       { key: "title", label: "Name + skin", note: "The entity's name and which skin is being shown." },
       { key: "lore", label: "Lore", note: "A paragraph of the entity's story." },
       { key: "abilities", label: "Abilities", note: "Ability icon, name and what it does — up to four.", text: "ABILITIES" },
-      { key: "art", label: "Splash panel", note: "The same splash as the background, drawn again as a framed portrait down the right side." },
+      { key: "art", label: "Splash banner", side: true, note: "The same splash as the background, drawn again undimmed as a framed banner in the right-hand column — directly below the sponsor box, and it moves when you move the sponsor box." },
       { key: "meta", label: "Stats + skin count", note: "The bottom pill strip." },
     ],
   },
@@ -259,7 +267,7 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "week",
-    command: "/cluster vote  ·  the Sunday announcement",
+    command: "/cluster show:vote  ·  the Sunday announcement",
     group: "competition",
     name: "Profile of the Week",
     summary: "The weekly vote — standings during the week, the podium on Sunday.",
@@ -326,7 +334,7 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "guide",
-    command: "/cluster guide  ·  pinned on install",
+    command: "/cluster show:guide  ·  pinned on install",
     group: "help",
     name: "How-to guide",
     summary: "The pinned onboarding cards. Mostly text — art should be almost abstract.",

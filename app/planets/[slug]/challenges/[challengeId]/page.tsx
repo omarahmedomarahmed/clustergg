@@ -80,6 +80,10 @@ export default async function ChallengePage({
   const trophyById = new Map(prizeTrophies.map((t) => [t.id, t]));
 
   const joined = myParticipation.length > 0;
+  // Which of their accounts is entered — not necessarily the first one linked.
+  const enteredWith = joined
+    ? myAccounts.find((a) => a.id === myParticipation[0].linkedAccountId) ?? null
+    : null;
 
   // Quest-badge entry gate: how many completion badges of a quest are required,
   // and whether the viewer already holds enough.
@@ -228,8 +232,17 @@ export default async function ChallengePage({
                   <Icon name="rocket" size={16} /> {tr("Sign up to compete")}
                 </Link>
               ) : joined ? (
-                <div className="text-emerald-300 font-semibold inline-flex items-center gap-2">
+                <div className="text-emerald-300 font-semibold inline-flex flex-wrap items-center gap-2">
                   <Icon name="check" size={18} /> {tr("You're in — go play")} {challenge.game}. {tr("Points sync automatically.")}
+                  {/* WHICH account is carrying the standing. With two accounts
+                      linked, "you're in" without saying which one is exactly
+                      the ambiguity that made a week of play on the wrong
+                      account look like a scoring bug. */}
+                  {enteredWith && (
+                    <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2.5 py-0.5 text-xs font-semibold">
+                      {tr("as")} {enteredWith.inGameName}{enteredWith.region ? ` · ${enteredWith.region}` : ""}
+                    </span>
+                  )}
                 </div>
               ) : myAccounts.length === 0 ? (
                 <div className="text-sm text-muted inline-flex items-center gap-2">
@@ -246,7 +259,40 @@ export default async function ChallengePage({
                   <p className="text-xs text-muted mt-1">{tr("You have")} {gate.have}/{gate.need}. {tr("Complete the")} <Link href="/quests" className="text-cyan-300 underline">{gate.questName} {tr("quest")}</Link> {gate.need - gate.have} {gate.need - gate.have > 1 ? tr("more times") : tr("more time")} {tr("to unlock this challenge.")}</p>
                 </div>
               ) : (
-                <form action={joinChallenge.bind(null, challenge.id, myAccounts[0].id, path)}>
+                <form action={joinChallenge.bind(null, challenge.id, path)}>
+                  {/* Which account enters.
+                      One account: a hidden field, and the button names it, so
+                      nothing changes for the overwhelming case. Two or more: a
+                      real choice, because a main and a smurf are different
+                      players as far as the game's API is concerned and only one
+                      of them is the one they're about to play on. */}
+                  {myAccounts.length === 1 ? (
+                    <input type="hidden" name="linkedAccountId" value={myAccounts[0].id} />
+                  ) : (
+                    <div className="mb-3">
+                      <div className="text-[11px] uppercase tracking-wider text-muted mb-1.5">
+                        {tr("Enter with which account?")}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {myAccounts.map((a, i) => (
+                          <label
+                            key={a.id}
+                            className="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm hover:border-cyan-400/60 has-[:checked]:border-cyan-400 has-[:checked]:bg-cyan-400/10"
+                          >
+                            <input
+                              type="radio" name="linkedAccountId" value={a.id}
+                              defaultChecked={i === 0} className="accent-cyan-500 mr-2"
+                            />
+                            <b>{a.inGameName}</b>
+                            {a.region && <span className="text-muted"> · {a.region}</span>}
+                          </label>
+                        ))}
+                      </div>
+                      <p className="mt-1.5 text-[11px] text-muted">
+                        {tr("Only this account's play counts here. You can enter other challenges with any of your accounts, including this one.")}
+                      </p>
+                    </div>
+                  )}
                   {gate && (
                     <div className="mb-2 inline-flex items-center gap-1.5 text-xs text-emerald-300 font-semibold">
                       <Icon name="check" size={14} /> {gate.questName} {tr("badges")} {gate.have}/{gate.need} — {tr("you qualify")}
@@ -300,7 +346,8 @@ export default async function ChallengePage({
                     </div>
                   )}
                   <button className="glow-btn pressable rounded-full px-8 py-3.5 font-semibold text-white flex sm:inline-flex w-full sm:w-auto items-center justify-center gap-2">
-                    <Icon name="rocket" size={16} /> {tr("Join with")} {myAccounts[0].inGameName}
+                    <Icon name="rocket" size={16} />{" "}
+                    {myAccounts.length === 1 ? `${tr("Join with")} ${myAccounts[0].inGameName}` : tr("Join challenge")}
                   </button>
                 </form>
               )}

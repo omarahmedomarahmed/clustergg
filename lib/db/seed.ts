@@ -250,6 +250,11 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   await mkDiscord(atlas, "900000000000000005", "atlas");
 
   const novaChess = await mkAccount(nova, "chesscom", "hikaru", "hikaru");
+  // A SECOND account on the same game. This is ordinary — a main and a smurf,
+  // or one per region — and it is the case entry used to get wrong by silently
+  // taking whichever account the query returned first. Seeded so the demo shows
+  // the account picker rather than the single-account happy path.
+  await mkAccount(nova, "chesscom", "hikaru-smurf", "hikaru_alt");
   await mkAccount(nova, "lichess", "penguingim1", "penguingim1");
   const lyraChess = await mkAccount(lyra, "chesscom", "magnuscarlsen", "magnuscarlsen");
   await mkAccount(lyra, "lichess", "drnykterstein", "DrNykterstein");
@@ -360,6 +365,29 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     startAt: new Date(Date.now() - 14 * 86400000),
     endAt: new Date(Date.now() - 7 * 86400000),
     status: "completed",
+    heroType: "image", coverUrl: BANNER_ART.arena, trophyId: trophyIds[0],
+    prizeDescription: "Champion's Nebula Cup",
+    createdBy: admin,
+  });
+
+  // A live challenge nobody has entered yet.
+  //
+  // Every seeded challenge had participants, which meant the demo never showed
+  // two real states: the empty-standings card, and the join form itself — the
+  // one place a gamer with two accounts on this game has to choose which one
+  // enters. A freshly opened challenge is also just the ordinary state of the
+  // first hour of every week.
+  const ch4 = uid();
+  await db.insert(schema.challenges).values({
+    id: ch4, spaceId: spaceIds["chess"], game: "Chess", provider: "chesscom",
+    title: "Endgame Sprint — Just Opened",
+    description: "Fresh on the board: every win this week scores. Nobody has entered yet, so first in leads.",
+    format: "top3", cadence: "weekly",
+    rules: { conditions: [] },
+    pointsEngine: { wins: 10 },
+    startAt: new Date(Date.now() - 3600000),
+    endAt: new Date(Date.now() + 6 * 86400000),
+    status: "active",
     heroType: "image", coverUrl: BANNER_ART.arena, trophyId: trophyIds[0],
     prizeDescription: "Champion's Nebula Cup",
     createdBy: admin,

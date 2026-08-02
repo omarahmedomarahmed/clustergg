@@ -11,7 +11,7 @@ import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestMo
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
-import { joinChallengeFor, challengeGate, keyVisibleTo, setChallengeState } from "@/lib/challenges";
+import { joinChallengeFor, challengeGate, keyVisibleTo, setChallengeState, entryAccounts } from "@/lib/challenges";
 import { submitChallengeRequest } from "@/lib/challenge-requests";
 import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS, linkableProvider } from "@/lib/providers/registry";
@@ -165,6 +165,31 @@ function keySubmit(i: Interaction, who: Who, challengeId: string, key: string) {
         await editOriginal(i.token, { content: `Continue with Discord first, then link your game account: ${siteUrl()}/login` });
         return;
       }
+      // With more than one account for this game, the key is not enough to
+      // enter — WHICH account matters, and picking one for them is how a week
+      // of play ends up scoring nothing. So the key is verified here and the
+      // choice is offered, carrying the key they just typed in the button.
+      // (No new exposure: this reply is ephemeral and they are the person who
+      // typed the key.)
+      const mine = await entryAccounts(ctx.gamer.userId, challengeId);
+      if (mine.length > 1 && !mine.some((a) => a.entered)) {
+        const gate = await challengeGate(challengeId);
+        const right = !gate.locked
+          || (key.trim().toUpperCase() === (gate.accessKey ?? "").trim().toUpperCase());
+        if (!right) {
+          await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: joinFailure("bad_key") }] });
+          return;
+        }
+        const payload = await renderScreen(frame("challenge", challengeId), [frame("home")], ctx);
+        await editOriginal(i.token, {
+          content: "Key accepted. Which account is entering?",
+          embeds: payload.embeds ?? [],
+          components: rows(mine.slice(0, 3).map((a) =>
+            button(`Join as ${a.inGameName}`.slice(0, 40), actionId("join", [challengeId, a.id, key], [frame("home")]), 3, "🏆"))),
+        });
+        return;
+      }
+
       const res = await joinChallengeFor(ctx.gamer.userId, challengeId, { source: "discord", accessKey: key });
       if (!res.ok) {
         await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }] });
@@ -173,8 +198,8 @@ function keySubmit(i: Interaction, who: Who, challengeId: string, key: string) {
       const payload = await renderScreen(frame("challenge", challengeId), [frame("home")], ctx);
       await editOriginal(i.token, {
         content: res.already
-          ? `You were already in **${res.title}**.`
-          : `Key accepted — you're in **${res.title}**. Only activity from now on counts.`,
+          ? `You were already in **${res.title}** as **${res.account}**.`
+          : `Key accepted — you're in **${res.title}** as **${res.account}**. Only activity from now on counts.`,
         embeds: payload.embeds ?? [],
         components: payload.components ?? [],
       });
@@ -373,8 +398,8 @@ function componentPress(i: Interaction) {
         type: InteractionResponseType.ChannelMessageWithSource,
         data: {
           content: game
-            ? `**${game}** can't be linked yet — its stats API isn't open to us. Run \`/cluster link\` to pick a game we can connect, or link it on the site: ${siteUrl()}/profile?tab=accounts`
-            : `Run \`/cluster link\` to pick a game.`,
+            ? `**${game}** can't be linked yet — its stats API isn't open to us. Run \`/cluster show:link\` to pick a game we can connect, or link it on the site: ${siteUrl()}/profile?tab=accounts`
+            : `Run \`/cluster show:link\` to pick a game.`,
           flags: MessageFlags.Ephemeral,
         },
       });
@@ -630,12 +655,22 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
   // same CP award. Only `joinedFrom` differs, which is the funnel metric.
   if (target.screen === "join" && ctx.gamer) {
     const id = target.args[0] ?? "";
+    // Which account, when the card offered a choice. A gamer with a main and a
+    // smurf gets one button per account, and this is the half that makes the
+    // difference between the buttons matter.
+    const accountId = target.args[1] ?? "";
     // Inside the server a gated challenge belongs to, the key is already on the
     // card — so joining there is one tap instead of retyping what you can see.
-    // Everywhere else this button isn't rendered; the key modal is.
+    // Everywhere else the key modal runs first and hands the verified key back
+    // on the button, which is what makes "pick your account" possible on a
+    // gated challenge at all.
     const gate = await challengeGate(id);
-    const key = gate.locked && keyVisibleTo(gate, i.guild_id ?? null) ? gate.accessKey : null;
-    const res = await joinChallengeFor(ctx.gamer.userId, id, { source: "discord", accessKey: key });
+    const key = (target.args[2] ?? null)
+      || (gate.locked && keyVisibleTo(gate, i.guild_id ?? null) ? gate.accessKey : null);
+    const res = await joinChallengeFor(ctx.gamer.userId, id, {
+      ...(accountId ? { linkedAccountId: accountId } : {}),
+      source: "discord", accessKey: key,
+    });
     if (!res.ok) {
       await editOriginal(i.token, {
         embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }],
@@ -745,7 +780,7 @@ async function voteForSlug(slug: string, discordId: string, guildId?: string) {
 
 function joinFailure(reason: string): string {
   switch (reason) {
-    case "no_account": return "You need a linked account for that game first — run `/cluster link`.";
+    case "no_account": return "You need a linked account for that game first — run `/cluster show:link`.";
     case "gated": return "This challenge requires quest badges you haven't earned yet.";
     case "locked": return "This one needs an entry key — it was sent to the server running the challenge.";
     case "bad_key": return "That key isn't right. Ask a mod in the server running this challenge for the current one.";
@@ -754,7 +789,7 @@ function joinFailure(reason: string): string {
   }
 }
 
-// Which provider backs a game, so `/cluster link game:Chess` knows what to
+// Which provider backs a game, so `/cluster show:link game:Chess` knows what to
 // create. Uses the same registry the website links through.
 function providerForGame(game: string): string | null {
   return linkableProvider(game)?.id ?? null;

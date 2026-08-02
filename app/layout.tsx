@@ -1,5 +1,7 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import type { Metadata, Viewport } from "next";
+import { EMBED_HEADER } from "@/middleware";
 import { Space_Grotesk, Cairo } from "next/font/google";
 import "./globals.css";
 import { getLocale } from "@/lib/i18n/server";
@@ -87,8 +89,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const dir = dirOf(locale);
   const uiOverrides = await getUiOverrides(locale);
 
+  // Embed mode, decided on the server.
+  //
+  // `<EmbedMode>` sets this attribute from a client effect, which runs after
+  // the first paint — so a framed profile rendered the entire site chrome, then
+  // hid it. Inside a small iframe that flash IS the bug people report as "two
+  // navs". The middleware promotes `?embed=1` to a request header precisely so
+  // the attribute can be right in the first byte; the client component stays as
+  // the fallback for client-side navigation, where middleware doesn't run.
+  const embedded = (await headers()).get(EMBED_HEADER) === "1";
+
   return (
-    <html lang={locale} dir={dir} className={`${grotesk.variable} ${cairo.variable}`}>
+    <html
+      lang={locale} dir={dir}
+      className={`${grotesk.variable} ${cairo.variable}`}
+      {...(embedded ? { "data-embed": "1" } : {})}
+    >
       <body className={`nebula-bg min-h-screen antialiased ${locale === "ar" ? "font-arabic" : ""}`} style={cpIcon ? ({ ["--cp-icon" as string]: `url(${cpIcon})` }) : undefined}>
         <LocaleProvider locale={locale} overrides={uiOverrides}>
         <RouteProgress />

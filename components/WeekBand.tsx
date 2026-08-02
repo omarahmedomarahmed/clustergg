@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import Icon from "@/components/Icon";
@@ -77,6 +77,20 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   // in the root layout, by a server component that has no pathname.
   const pathname = usePathname();
   const inAdmin = pathname?.startsWith("/admin") ?? false;
+
+  // Never inside an embedded profile either.
+  //
+  // Hiding the chrome in embed mode is a CSS rule on `header`, and the band's
+  // expanded panel is PORTALLED TO <body> — so it sat outside the selector
+  // entirely and rendered on top of the framed profile. Worse, it defaults to
+  // open for anyone signed in, so opening a voter's own snapshot showed them
+  // the board inside the board: the "double nav" this is.
+  //
+  // A CSS rule can't reliably chase a portal, so the component refuses to
+  // mount instead — the same way it already refuses in admin, and for the same
+  // reason: there is nowhere in a frame that a floating global panel belongs.
+  const search = useSearchParams();
+  const embedded = search?.get("embed") === "1";
 
   const [data, setData] = useState<BandData>(initial);
   // Open for gamers, collapsed for visitors.
@@ -171,7 +185,7 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   const streaming = announcing && data.stream.live && !!data.stream.url;
 
   // After every hook, so the hook order never changes between renders.
-  if (inAdmin) return null;
+  if (inAdmin || embedded) return null;
 
   return (
     <>
@@ -862,16 +876,24 @@ function Snapshot({ slug, data, onClose, onVoted, note, setNote }: {
           </button>
         </div>
 
-        {/* The card renders instantly; the live page fills in over it.
-            The frame's height is fixed rather than driven by its contents —
-            if the card image is slow or missing, a height-from-contents box
-            collapses to nothing and the modal looks broken. */}
+        {/* Their own art while the page loads — NOT the Discord card.
+            The placeholder used to be `/api/card/profile`, which is the PNG the
+            bot posts into a server: a completely different object, with a
+            different layout and different content. People clicked a name and
+            were shown a Discord card, which is what this modal exists not to
+            do. Their profile background is the right stand-in because it is
+            literally the top of the thing that is about to appear.
+
+            The frame's height is fixed rather than driven by its contents — a
+            height-from-contents box collapses to nothing while the iframe is
+            empty and the modal looks broken. */}
         <div className="relative overflow-hidden bg-black/50" style={{ height: "min(70vh, 760px)" }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={`/api/card/profile?slug=${encodeURIComponent(entry.slug)}`}
-            alt=""
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${loaded ? "opacity-0" : "opacity-100"}`}
+          <span
+            aria-hidden
+            className={`absolute inset-0 bg-cover bg-center transition-opacity duration-300 ${loaded ? "opacity-0" : "opacity-100"}`}
+            style={entry.bgImage || entry.bannerUrl
+              ? { backgroundImage: `url(${optImg((entry.bgImage || entry.bannerUrl)!, 1400)})` }
+              : { background: `linear-gradient(150deg, ${entry.accent}, ${entry.accent2})` }}
           />
           {!loaded && (
             <span className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-2 text-xs text-muted">

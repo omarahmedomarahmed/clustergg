@@ -4,9 +4,12 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import CardLayoutEditor, { type EditorArt } from "@/components/CardLayoutEditor";
+import BotButtonsEditor from "@/components/BotButtonsEditor";
+import { buttonsForCard, type ButtonCopy } from "@/lib/discord/buttons";
 import type { LibraryGroup } from "@/lib/cards/asset-library";
 import type { CardLayout } from "@/lib/cards/layout";
 import type { CardPart } from "@/lib/cards/layout-guide";
+import type { CardSample } from "@/lib/cards/preview";
 
 // The card studio.
 //
@@ -28,12 +31,14 @@ export type StudioCard = {
   group: string;
   bgKey: string;
   brief: string;
-  regions: { key: string; label: string; note: string; kind: string }[];
+  regions: { key: string; label: string; note: string; kind: string; x: number; y: number; w: number; h: number }[];
   /** The content sections of this card, offered as per-section controls. */
   parts: CardPart[];
   layout: CardLayout;
   art: EditorArt;
   previewUrl: string;
+  /** Real cards of this kind to tune the layout against. */
+  samples: CardSample[];
 };
 
 const GROUPS: { key: string; label: string; icon: string }[] = [
@@ -43,7 +48,12 @@ const GROUPS: { key: string; label: string; icon: string }[] = [
   { key: "help", label: "Help & search", icon: "spark" },
 ];
 
-export default function CardStudio({ cards, library }: { cards: StudioCard[]; library: LibraryGroup[] }) {
+export default function CardStudio({ cards, library, buttonCopy = {} }: {
+  cards: StudioCard[];
+  library: LibraryGroup[];
+  /** Which bot buttons have been reworded, across the whole bot. */
+  buttonCopy?: ButtonCopy;
+}) {
   const [kind, setKind] = useState(cards[0]?.kind ?? "");
   const card = useMemo(() => cards.find((c) => c.kind === kind) ?? cards[0], [cards, kind]);
   if (!card) return null;
@@ -105,8 +115,23 @@ export default function CardStudio({ cards, library }: { cards: StudioCard[]; li
           art={card.art}
           parts={card.parts}
           previewUrl={card.previewUrl}
+          samples={card.samples}
+          regions={card.regions}
           library={library}
         />
+
+        {/* A reply is the card AND the row of buttons under it. Editing the
+            picture without being able to touch the words beneath it was half
+            an editor. Remounted with the card so the panel always shows the
+            buttons this card actually carries. */}
+        <div className="mt-4">
+          <BotButtonsEditor
+            key={card.kind}
+            kind={card.kind}
+            buttons={buttonsForCard(card.kind)}
+            copy={buttonCopy}
+          />
+        </div>
 
         <div className="mt-5 grid md:grid-cols-2 gap-4">
           <div className="glass rounded-2xl p-4">

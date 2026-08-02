@@ -178,7 +178,7 @@ export default async function ServerPortalPage({
                 {requests.length === 0 ? (
                   <p className="text-sm text-muted">
                     No requests yet. Start one on the Challenges tab, or in Discord with{" "}
-                    <code className="text-cyan-300">/cluster admin</code> — either way it lands in the same queue.
+                    <code className="text-cyan-300">/cluster show:admin</code> — either way it lands in the same queue.
                   </p>
                 ) : requests.map((r) => (
                   <div key={r.id} className="glass p-5 flex items-start justify-between gap-4 flex-wrap">
@@ -333,7 +333,7 @@ async function PublicView({ server, data, base, unlock, left = "", mins = "" }: 
           </form>
           {unlock === "bad" && (
             <p className="text-xs text-rose-300 mt-2">
-              That key didn&apos;t match. Check for a missing dash, or run <code className="text-cyan-300">/cluster admin</code> in
+              That key didn&apos;t match. Check for a missing dash, or run <code className="text-cyan-300">/cluster show:admin</code> in
               your server and the bot will DM it again.
               {/* Says how many tries remain, because a lockout that arrives
                   without warning reads as the product being broken. */}
@@ -352,7 +352,7 @@ async function PublicView({ server, data, base, unlock, left = "", mins = "" }: 
           )}
           {alreadyIn && <p className="text-xs text-emerald-300 mt-2">You&apos;re signed in to this portal.</p>}
           <p className="text-[11px] text-muted mt-3">
-            Lost it? Run <code className="text-cyan-300">/cluster server</code> in your Discord server and the bot will DM it again.
+            Lost it? Run <code className="text-cyan-300">/cluster show:server</code> in your Discord server and the bot will DM it again.
           </p>
         </div>
       </div>

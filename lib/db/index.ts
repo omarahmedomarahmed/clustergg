@@ -290,6 +290,27 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "access_key" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announce_hype" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "guild_ids" jsonb NOT NULL DEFAULT '[]'::jsonb`,
+
+  // Repeating challenges.
+  //
+  // A weekly challenge is not one row whose dates keep moving — it is a SERIES
+  // of separate rows, one per run, because each run is a unit of revenue with
+  // its own entrants, standings, winners, trophies and reach. Week 2 must be
+  // reportable on its own a year later, which a sliding window cannot do.
+  //
+  // `series_id` groups them (the first run's own id), `run_index` numbers them,
+  // `runs_planned` is how many were bought (4 for a month; 0 = until stopped),
+  // and `base_title` is the title without the "— Week N" suffix so the suffix
+  // is never appended twice.
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "series_id" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "run_index" integer NOT NULL DEFAULT 1`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "runs_planned" integer NOT NULL DEFAULT 1`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "base_title" text`,
+  `CREATE INDEX IF NOT EXISTS "ch_series_idx" ON "challenges" ("series_id","run_index")`,
+  // Existing challenges are a series of one, named after themselves. Without
+  // this every legacy row has a null series and cannot be grouped or repeated.
+  `UPDATE "challenges" SET "series_id" = "id" WHERE "series_id" IS NULL`,
+  `UPDATE "challenges" SET "base_title" = "title" WHERE "base_title" IS NULL`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "invite_url" text`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "slug" text`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "portal_key" text`,

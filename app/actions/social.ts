@@ -243,12 +243,24 @@ export async function markAllNotificationsRead() {
 // ---------- Challenges ----------
 // Bound as a form action, so the trailing argument is the submitted FormData —
 // that's where an entry key comes from for a server-gated challenge.
-export async function joinChallenge(challengeId: string, linkedAccountId: string, path: string, formData?: FormData) {
+export async function joinChallenge(challengeId: string, path: string, formData?: FormData) {
   const me = await requireUser();
   const accessKey = formData ? String(formData.get("accessKey") ?? "") : undefined;
+  // WHICH account, from the form rather than bound into the action.
+  //
+  // It used to be bound as `myAccounts[0].id` at render time, so a gamer with a
+  // main and a smurf always entered on whichever the query returned first —
+  // with no way to say otherwise and no error to notice. The account is now a
+  // field the person actually chooses; an empty value still means "the only one
+  // I have", which `joinChallengeFor` resolves.
+  const linkedAccountId = formData ? String(formData.get("linkedAccountId") ?? "") : "";
   // The rules (provider match, entry gate, access key, baseline snapshot, CP
   // award) live in lib/challenges.ts so a Discord join and a web join are
   // exactly equivalent.
-  await joinChallengeFor(me.id, challengeId, { linkedAccountId, source: "web", accessKey });
+  await joinChallengeFor(me.id, challengeId, {
+    ...(linkedAccountId ? { linkedAccountId } : {}),
+    source: "web",
+    accessKey,
+  });
   revalidatePath(path);
 }

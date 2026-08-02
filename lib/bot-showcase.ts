@@ -74,7 +74,7 @@ export async function botShowcaseSteps(): Promise<BotStep[]> {
   if (game) {
     steps.push({
       id: "planet",
-      trigger: `/cluster planet game:${game}`,
+      trigger: `/cluster show:planet game:${game}`,
       title: `${game} Planet`,
       body: "Live challenges, the leaderboard, and how many of your members are ranked on it.",
       card: `/api/card/planet?game=${q(game)}`,
@@ -88,7 +88,7 @@ export async function botShowcaseSteps(): Promise<BotStep[]> {
 
     steps.push({
       id: "leaderboard",
-      trigger: `/cluster leaderboard game:${game}`,
+      trigger: `/cluster show:leaderboard game:${game}`,
       title: `${game} leaderboard`,
       body: "Standings from the official game API, refreshed on every sync. Nothing is self-reported.",
       card: `/api/card/leaderboard?game=${q(game)}`,
@@ -103,7 +103,7 @@ export async function botShowcaseSteps(): Promise<BotStep[]> {
   if (challengeId) {
     steps.push({
       id: "challenge",
-      trigger: "/cluster challenge",
+      trigger: "/cluster show:challenge",
       title: "A live challenge",
       body: "Stats are snapshotted the moment someone joins, so only new activity counts. Trophies are real.",
       card: `/api/card/challenge?id=${q(challengeId)}`,
@@ -132,7 +132,7 @@ export async function botShowcaseSteps(): Promise<BotStep[]> {
   if (slug) {
     steps.push({
       id: "profile",
-      trigger: "/cluster home",
+      trigger: "/cluster",
       title: "Your card",
       body: "Ranks, Cluster Points and every game you play, on one card your members can share anywhere.",
       card: `/api/card/profile?slug=${q(slug)}`,

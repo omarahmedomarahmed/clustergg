@@ -118,6 +118,22 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
   // those are different failures with the same symptom.
   if (q.get("debug") === "1") return NextResponse.json(await explain(data));
 
+  // `?json=1` — the resolved card, as data.
+  //
+  // The layout editor draws each of a card's sections as its own box on the
+  // canvas, and a box labelled "Standings" with nothing in it is a diagram.
+  // Showing what that section will ACTUALLY say is the difference between
+  // arranging rectangles and laying out a card, so the editor asks for the same
+  // object the renderer is about to draw.
+  //
+  // No new exposure: every field here is already on the PNG this same URL
+  // serves to anyone, and the PNG is designed to be reposted.
+  if (q.get("json") === "1") {
+    return NextResponse.json(data, {
+      headers: { "cache-control": "no-store" },
+    });
+  }
+
   if (!fresh) {
     // Cache key = everything that identifies this card within its kind, plus
     // which creative is on it.

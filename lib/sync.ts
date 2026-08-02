@@ -124,8 +124,26 @@ export async function scoreChallengesForAccount(db: DB, linkedAccountId: string)
     if (challenge.endAt < new Date()) continue;
     const baseline = participant.baseline ?? {};
     const delta: Record<string, number> = {};
+    // A metric the baseline has never seen starts AT its current value: a
+    // lifetime win count that first appears mid-challenge is not five hundred
+    // wins earned this week.
+    //
+    // That has to be WRITTEN DOWN, though, not re-derived every sync. Joining
+    // before an account's first sync left the baseline empty, and an empty
+    // baseline meant every later sync also treated the current value as the
+    // starting point — so the delta was zero forever and that entrant could
+    // never score, silently, for the whole run. Recording the first value seen
+    // keeps the intent and makes the next sync measurable.
+    const discovered: Record<string, number> = {};
     for (const [k, v] of Object.entries(current)) {
+      if (!(k in baseline)) discovered[k] = v;
       delta[k] = Math.max(0, v - (baseline[k] ?? v));
+    }
+    if (Object.keys(discovered).length) {
+      const merged = { ...baseline, ...discovered };
+      await db.update(schema.challengeParticipants).set({ baseline: merged })
+        .where(eq(schema.challengeParticipants.id, participant.id));
+      participant.baseline = merged;
     }
     const conditionsMet = (challenge.rules?.conditions ?? []).every((c) => {
       const d = delta[c.metric] ?? 0;

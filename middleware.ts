@@ -23,7 +23,28 @@ const SECRET = new TextEncoder().encode(
 );
 const STAFF = new Set(["staff", "admin", "superadmin"]);
 
+/** The header a layout reads to know it is rendering inside our own iframe. */
+export const EMBED_HEADER = "x-cluster-embed";
+
 export async function middleware(req: NextRequest) {
+  // ===== Embedded profiles =====
+  //
+  // Profile of the Week shows a real profile in a frame, because the thing
+  // being voted on IS the profile — its layout, its colours, its cards. But a
+  // page rendered inside our own site brings the whole site with it: the nav,
+  // and the Profile-of-the-Week band itself, which is what produced a band
+  // inside the band and two navs stacked on top of each other.
+  //
+  // `?embed=1` was already on the iframe URL and nothing read it. A layout is a
+  // server component and cannot see search params, so the signal is promoted to
+  // a request header here, where it can.
+  if (req.nextUrl.pathname.startsWith("/u/")) {
+    if (req.nextUrl.searchParams.get("embed") !== "1") return NextResponse.next();
+    const headers = new Headers(req.headers);
+    headers.set(EMBED_HEADER, "1");
+    return NextResponse.next({ request: { headers } });
+  }
+
   const token = req.cookies.get(COOKIE)?.value;
   if (token) {
     try {
@@ -40,7 +61,9 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Only the admin surface. Everything else is public or guarded per-route, and
-  // running middleware on every request costs Edge invocations for nothing.
-  matcher: ["/admin/:path*"],
+  // The admin surface, plus public profiles — the only two paths that need a
+  // decision before rendering. Everything else is public or guarded per-route,
+  // and running middleware on every request costs Edge invocations for nothing.
+  // The profile branch returns immediately unless `?embed=1` is present.
+  matcher: ["/admin/:path*", "/u/:path*"],
 };

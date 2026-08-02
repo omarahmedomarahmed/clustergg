@@ -222,7 +222,11 @@ export const SYSTEMS: SystemDef[] = [
     name: "Gamer identity system",
     icon: "user",
     outcome: "A gamer's profile is theirs, verified, and worth showing off.",
-    pages: ["/admin/users", "/admin/linked-accounts"],
+    // The gamer directory and the linked-account list are NOT here. They are in
+    // `ADMIN_ONLY`: this system's staff work on profiles and sync health, and
+    // neither job requires the ability to read every member's email and every
+    // account they play under. Listing them here would grant exactly that.
+    pages: [],
     brief: {
       role: "You look after the gamers themselves: their profiles, their linked accounts, their standing.",
       doing: [
@@ -344,7 +348,26 @@ export const ALWAYS_OPEN_UNDER = ["/admin/systems"];
 /** Everything universally reachable, for callers that just need the list. */
 export const ALWAYS_OPEN = [...ALWAYS_OPEN_EXACT, ...ALWAYS_OPEN_UNDER];
 
+/**
+ * Pages NO department can ever open, whatever it runs.
+ *
+ * The community: the gamer directory and every linked game account on the
+ * platform. That is our members' real names, emails, Discord handles and the
+ * accounts they play under, all in one searchable list — the single most
+ * sensitive thing in the product and the one with the least operational reason
+ * to be read. A trophy payout needs to confirm one winner, not browse everyone.
+ *
+ * This is a separate list from "no system claims it" on purpose. Unclaimed is
+ * an accident waiting to be filed; this is a decision. Filing these pages under
+ * a system later — which is exactly what happened once — must not quietly hand
+ * them to whoever runs it.
+ *
+ * Admins are not staff for this check; `requireSystemFor` returns before it.
+ */
+export const ADMIN_ONLY = ["/admin/users", "/admin/linked-accounts"];
+
 export function pathAllowedFor(systems: string[], path: string): boolean {
+  if (ADMIN_ONLY.some((p) => path === p || path.startsWith(`${p}/`))) return false;
   if (ALWAYS_OPEN_EXACT.includes(path)) return true;
   if (ALWAYS_OPEN_UNDER.some((p) => path === p || path.startsWith(`${p}/`))) return true;
   const owner = systemForPath(path);

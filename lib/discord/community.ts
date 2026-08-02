@@ -15,7 +15,7 @@ import { getDb, schema } from "@/lib/db";
 //      than an abandoned one, and an owner who feels interrogated at install
 //      removes the bot.
 //   2. **The answers are the owner's, and they can change them.** They are
-//      shown back on the portal and re-editable from `/cluster admin`.
+//      shown back on the portal and re-editable from `/cluster show:admin`.
 //   3. **They are inventory, and the owner is told so.** A server that says
 //      what it plays gets sponsored challenges in those games sooner. Hiding
 //      why we're asking is how you get garbage answers.

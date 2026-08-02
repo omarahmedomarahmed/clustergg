@@ -4,9 +4,10 @@ import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import {
   AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, opacityOf,
-  partOf, plateBg, spotBox, transformOf,
+  partOf, plateBg, sideBox, sideBoxFits, spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset, PartDraw } from "@/lib/cards/layout";
+import { assetPicture } from "@/lib/cards/asset-source";
 import { layoutFor } from "@/lib/cards/layout-store";
 import type {
   CardAdSlot,
@@ -133,19 +134,9 @@ function Frame({ theme, children, corner, side }: {
   // The free rectangle to the right of the content: starts where the text
   // column ends, stops at the canvas edge, and begins under whichever of the
   // sponsor box and the badge hangs lowest. Computed from the LIVE layout, so
-  // an admin who drags the ad somewhere else moves this with it.
-  const sideTop = Math.max(
-    content.top,
-    ad && !l.ad.hidden ? adB.bottom + 14 : 0,
-    corner && !l.badge.hidden ? badgeTop + badge.height + 14 : 0,
-  );
-  const sideLeft = content.left + content.width + 16;
-  const sideBox = {
-    left: sideLeft,
-    top: sideTop,
-    width: Math.max(0, CANVAS_W - 20 - sideLeft),
-    height: Math.max(0, CARD_H - 18 - sideTop),
-  };
+  // an admin who drags the ad somewhere else moves this with it — and computed
+  // by the same helper the layout editor draws it with.
+  const side_ = sideBox(l, { hasAd: !!ad, hasBadge: !!corner });
   return (
     <div style={{ width: CARD_W, height: CARD_H, display: "flex", position: "relative", background: VOID, color: INK }}>
       {theme.bgUrl ? (
@@ -162,11 +153,26 @@ function Frame({ theme, children, corner, side }: {
           unless it is told otherwise — so an inset-only overlay silently
           renders as nothing and the artwork comes through at full brightness. */}
       <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: theme.bgUrl ? veil(l.dim) : VOID }} />
-      {theme.bgUrl && l.scrim ? (
-        <>
-          <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: "linear-gradient(90deg, rgba(4,5,26,0.94) 0%, rgba(4,5,26,0.78) 48%, rgba(4,5,26,0.46) 100%)" }} />
-          <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: "linear-gradient(180deg, rgba(4,5,26,0.62) 0%, rgba(4,5,26,0.30) 38%, rgba(4,5,26,0.90) 100%)" }} />
-        </>
+      {/* The directional scrims ride the SAME slider as the flat veil.
+          They used to be a separate tickbox, which meant the card had two
+          controls both labelled as darkening and neither of them honest: with
+          the tickbox on, dragging the slider to 0 still left the art buried
+          under two gradients, so "no overlay" did not mean no overlay. Scaling
+          them by the slider gives one number that goes all the way to nothing —
+          which is the only way the control can be checked by looking at it.
+          `SCRIM_TUNED_AT` is the dim the gradients were designed against, so
+          the default look is unchanged. */}
+      {theme.bgUrl && l.dim > 0 ? (
+        (() => {
+          const k = Math.min(1.4, l.dim / SCRIM_TUNED_AT);
+          const g = (a: number) => `rgba(4,5,26,${(a * k).toFixed(3)})`;
+          return (
+            <>
+              <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: `linear-gradient(90deg, ${g(0.94)} 0%, ${g(0.78)} 48%, ${g(0.46)} 100%)` }} />
+              <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: `linear-gradient(180deg, ${g(0.62)} 0%, ${g(0.30)} 38%, ${g(0.90)} 100%)` }} />
+            </>
+          );
+        })()
       ) : null}
       {/* The two corner glows. Off by default now: at 1200x630 they read as
           two grey discs bleeding off opposite corners rather than as light,
@@ -204,7 +210,7 @@ function Frame({ theme, children, corner, side }: {
       </div>
       {/* The right-hand column. Drawn before the logo on purpose: the logo is
           the one thing that is never covered. */}
-      {side && sideBox.width > 60 && sideBox.height > 60 ? side(sideBox) : null}
+      {side && sideBoxFits(side_) ? side(side_) : null}
       {/* The real logo mark, drawn on top of everything. Falls back to the
           wordmark only when no logo is configured, so a card is never
           unbranded. */}
@@ -302,6 +308,15 @@ function styleOf(o: { opacity?: number; flipX?: boolean; flipY?: boolean; rotate
   return out;
 }
 
+/**
+ * The `dim` the directional scrims were designed against.
+ *
+ * The gradients above are hand-tuned alpha stops; this is the veil strength
+ * they were tuned at, so scaling by `dim / SCRIM_TUNED_AT` leaves the default
+ * card pixel-identical and makes every other setting proportional.
+ */
+const SCRIM_TUNED_AT = 62;
+
 // ===== Sections =====
 //
 // Every block a card draws is NAMED, and the name is what an admin edits.
@@ -334,7 +349,19 @@ function Section({ p, style, children }: {
 }) {
   if (p.hidden) return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", ...style, ...styleOf({ opacity: p.opacity }) }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        ...style,
+        // The admin's own nudge, width and stacking order — applied LAST so it
+        // wins over the section's built-in style. That is the point of the
+        // editor: whatever the renderer thought, the person looking at the card
+        // gets the final say.
+        ...p.box(),
+        ...styleOf({ opacity: p.opacity }),
+      }}
+    >
       {children}
     </div>
   );
@@ -1444,7 +1471,7 @@ async function prepareCard(d: CardData): Promise<CardData> {
   // Admin-placed art goes through the same resolver as everything else: Satori
   // fetches remote images itself and one unreachable host takes down the whole
   // card, so an asset that won't load is DROPPED rather than drawn as a hole.
-  const layout = await withDeadline(withAssets(rawLayout), { ...rawLayout, assets: [] });
+  const layout = await withDeadline(withAssets(rawLayout, d), { ...rawLayout, assets: [] });
   // Colours are normalised here, once, on the way in — so every card body can
   // use `theme.accent` directly and no unparseable value ever reaches Satori.
   return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad }) } as CardData;
@@ -1464,13 +1491,20 @@ async function resolveBackground(theme: CardTheme): Promise<string | null> {
   return null;
 }
 
-async function withAssets(l: typeof DEFAULT_LAYOUT): Promise<typeof DEFAULT_LAYOUT> {
+async function withAssets(
+  l: typeof DEFAULT_LAYOUT,
+  d: CardData,
+): Promise<typeof DEFAULT_LAYOUT> {
   const list = l.assets ?? [];
   if (!list.length) return l;
+  // Resolve each slot's picture BEFORE fetching: a card-sourced slot points at
+  // a different image on every card, which is the whole point of it. The
+  // resolver is shared with the layout editor's canvas so the two can't drift.
+  const wanted = list.map((a) => assetPicture(a, d));
   const urls = await Promise.all(
     // Asked for at twice the drawn width for crispness — no point decoding a
     // 4000px globe to paint it at 240 on a 1200px canvas.
-    list.map((a) => toEmbeddable(a.url, { maxWidth: Math.min(1600, Math.round(a.w * 2)) })),
+    wanted.map((u, i) => toEmbeddable(u, { maxWidth: Math.min(1600, Math.round(list[i].w * 2)) })),
   );
   return { ...l, assets: list.map((a, i) => ({ ...a, url: urls[i] ?? "" })).filter((a) => a.url) };
 }

@@ -209,7 +209,7 @@ export async function checkUnlock(guildId: string): Promise<boolean> {
           "",
           `That crosses the ${stats.threshold.toLocaleString()} threshold, so brand-sponsored challenges now run in **${row.name || "your server"}** — and every dollar of prize money on them is won by your members.`,
           "",
-          "Nothing else to do — it's active from now on. Run `/cluster admin` any time to see where you stand.",
+          "Nothing else to do — it's active from now on. Run `/cluster show:admin` any time to see where you stand.",
         ].join("\n"),
         color: embedColor("#34d399"),
       }],

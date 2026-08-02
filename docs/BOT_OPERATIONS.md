@@ -69,7 +69,7 @@ This is the loop the whole server-owner story runs on. It is verified as one
 path, and the checks below are the order to follow if something is wrong.
 
 ```
-owner: /cluster admin  →  Request a challenge  →  picks game, sets prize
+owner: /cluster show:admin  →  Request a challenge  →  picks game, sets prize
    ↓
 staff: Admin → Challenge requests  →  Approve
    ↓

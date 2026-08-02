@@ -1,13 +1,14 @@
 import { and, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { ButtonStyle, ComponentType, InteractionResponseType } from "@/lib/discord/types";
-import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, select, selectRow, type Frame, type Button } from "@/lib/discord/components";
+import { frame, navButton, backButton, rows, linkButton, actionId, button, navId, select, selectRow, withButtonCopy, type Frame, type Button } from "@/lib/discord/components";
+import { buttonCopy } from "@/lib/discord/button-store";
 import { cardRef, currentCardGuild, currentSponsor, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
 import { withSponsorRow } from "@/lib/discord/sponsor";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
-import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild } from "@/lib/challenges";
+import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild, entryAccounts } from "@/lib/challenges";
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
@@ -470,9 +471,9 @@ async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       description: [
         "**`/cluster`** — your own card.",
         "**`/cluster <anything>`** — a game, a quest, a guide, or another gamer's name. Start typing and the suggestions fill in from live data.",
-        ctx.isManager ? "**`/cluster admin`** — run a challenge for this server, and see your growth toward ad revenue." : null,
-        "**`/cluster week`** — Profile of the Week: where the vote stands and how long is left.",
-        "**`/cluster share`** — post your card publicly so people can vote for it.",
+        ctx.isManager ? "**`/cluster show:admin`** — run a challenge for this server, and see your growth toward ad revenue." : null,
+        "**`/cluster show:week`** — Profile of the Week: where the vote stands and how long is left.",
+        "**`/cluster show:share`** — post your card publicly so people can vote for it.",
       ].filter(Boolean).join("\n"),
       color: "#8b5cf6",
     })],
@@ -514,9 +515,9 @@ async function planetsScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayl
       color: "#8b5cf6",
     })],
     // 24 games won't fit in 25 buttons alongside Back, so the first 20 get
-    // buttons and `/cluster planet game:` autocompletes the rest.
+    // buttons and `/cluster show:planet game:` autocompletes the rest.
     // 20 games plus the tail is the whole 25-button budget, so the games get
-    // the room and `/cluster planet game:` autocompletes the rest.
+    // the room and `/cluster show:planet game:` autocompletes the rest.
     components: rows([
       ...c.games.slice(0, 20).map((g) => navButton(g.name.slice(0, 24), frame("planet", g.value), trail, gameStyle(g.value))),
       ...tail(ctx, frame("planets"), trail),
@@ -647,32 +648,51 @@ async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Prom
   const { url, data } = await cardRef("challenge", { id });
   if (!data || data.kind !== "challenge") return notYet("That challenge is no longer live.", trail, [], ctx);
 
-  const [joined, webUrl, gate] = await Promise.all([
+  const [joined, webUrl, gate, mine] = await Promise.all([
     ctx.gamer ? hasJoined(ctx.gamer.userId, id) : Promise.resolve(false),
     challengeUrl(siteUrl(), id),
     challengeGate(id),
+    // Which of their accounts could enter. Two League accounts is ordinary,
+    // and the bot used to enter them on whichever came back first.
+    ctx.gamer ? entryAccounts(ctx.gamer.userId, id) : Promise.resolve([]),
   ]);
+  const enteredWith = mine.find((a) => a.entered) ?? null;
 
   // The key was sent to the server the challenge belongs to, so in THAT server
   // the bot can show it and joining is one tap. Anywhere else you can watch the
   // whole thing and are asked for the key to enter.
   const ownHere = gate.locked && keyVisibleTo(gate, ctx.guildId ?? null);
   const footer = joined
-    ? "You're in — your standing updates on every sync."
+    ? enteredWith
+      // Naming the account is the whole point: with two linked, "you're in"
+      // does not say which one has to be played for this to score.
+      ? `You're in as ${enteredWith.inGameName} — only this account's play counts here.`
+      : "You're in — your standing updates on every sync."
     : gate.locked
       ? (ownHere ? `Your server's entry key: ${gate.accessKey}` : "Entry needs the key sent to this challenge's server.")
-      : undefined;
+      : mine.length > 1
+        ? "Pick which account enters. The others stay free for other challenges."
+        : undefined;
+
+  // One button per account when there is a choice to make. Buttons rather than
+  // a select menu because there are rarely more than two or three, and a button
+  // is one tap where a select is three.
+  const joinButtons = (): (Button | null)[] => {
+    if (mine.length <= 1) return [button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆")];
+    return mine.slice(0, 3).map((a) =>
+      button(`Join as ${a.inGameName}`.slice(0, 40), actionId("join", [id, a.id], trail), ButtonStyle.Success, "🏆"));
+  };
 
   return {
     embeds: [embed(url, { title: data.title, color: data.theme.accent, footer })],
     components: rows([
-      !ctx.gamer
-        ? linkButton("Continue with Discord to join", signInUrl(siteUrl(), new URL(webUrl).pathname), "🚀")
+      ...(!ctx.gamer
+        ? [linkButton("Continue with Discord to join", signInUrl(siteUrl(), new URL(webUrl).pathname), "🚀")]
         : joined
-          ? button("You've joined", actionId("noop", [], trail), ButtonStyle.Secondary, "✅")
+          ? [button("You've joined", actionId("noop", [], trail), ButtonStyle.Secondary, "✅")]
           : gate.locked && !ownHere
-            ? button("Enter with key", `open-key|${id}`, ButtonStyle.Primary, "🔑")
-            : button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆"),
+            ? [button("Enter with key", `open-key|${id}`, ButtonStyle.Primary, "🔑")]
+            : joinButtons()),
       navButton("Standings", frame("leaderboard", data.game), trail, ButtonStyle.Secondary, "📊"),
       navButton(`${data.game} planet`.slice(0, 24), frame("planet", data.game), trail, ButtonStyle.Secondary, "🪐"),
       ...tail(ctx, frame("challenge", id), trail),
@@ -716,11 +736,11 @@ async function hasJoined(userId: string, challengeId: string): Promise<boolean> 
 
 // ===== Server owner: run challenges for your community =====
 
-// `/cluster admin challenges`. A server owner's whole reason to recruit for us
+// `/cluster show:admin challenges`. A server owner's whole reason to recruit for us
 // is the revenue unlock, and the way they get there is a competition their
 // members actually want to enter. This is where they run one.
 async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
-  // `/cluster server` folds in here. It was a sibling command showing half the
+  // `/cluster show:server` folds in here. It was a sibling command showing half the
   // picture — growth without the tools to act on it — so it is now a view of
   // the one admin command rather than a second thing to remember.
   if (arg === "growth" || arg === "server") return serverScreen(ctx, trail);
@@ -1419,7 +1439,11 @@ async function searchScreen(query: string, ctx: ScreenCtx, trail: Frame[]): Prom
  */
 export async function renderScreen(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {
   const payload = await renderScreenBody(f, trail, ctx);
-  return withSponsorRow(payload, currentSponsor(), currentCardGuild());
+  const sponsored = withSponsorRow(payload, currentSponsor(), currentCardGuild());
+  // The admin's wording, last: after the screen and after the sponsor, so it
+  // reaches every button the message will actually carry. One choke point
+  // rather than a rename in twenty-one screens.
+  return { ...sponsored, components: withButtonCopy(sponsored.components, await buttonCopy()) };
 }
 
 async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promise<ScreenPayload> {
@@ -1499,7 +1523,42 @@ export async function screenForCommand(query: string): Promise<Frame> {
     case "week":
       return frame("week");
 
-    // One admin command. `/cluster server` used to be a sibling that showed
+    // The nouns people type.
+    //
+    // These screens all existed and were all reachable from a button, but only
+    // some of them answered to their own name: "planets" worked and "planet"
+    // fell through to a text search for the word "planet", which found nothing
+    // and opened a did-you-mean card. Singular/plural is not a distinction any
+    // human makes when typing a command, and the whole point of one box is that
+    // the obvious thing works.
+    //
+    // With a game after them they scope: `planet chess`, `leaderboard chess`.
+    case "planet":
+    case "planets":
+    case "games":
+      return rest ? frame("planet", rest) : frame("planets");
+
+    case "challenge":
+    case "challenges":
+      return frame("challenges", rest);
+
+    case "leaderboard":
+    case "leaderboards":
+    case "board":
+      return rest ? frame("leaderboard", rest) : frame("planets");
+
+    case "quest":
+    case "quests":
+      return rest ? frame("quest", rest) : frame("quests");
+
+    // A trophy case is part of a profile — there is no separate screen, and
+    // sending someone to a search for the word "trophies" is worse than
+    // sending them to the place their trophies actually are.
+    case "trophy":
+    case "trophies":
+      return frame("show", "profile");
+
+    // One admin command. `/cluster show:server` used to be a sibling that showed
     // half the picture; it is a button inside admin now.
     case "admin":
     case "server":

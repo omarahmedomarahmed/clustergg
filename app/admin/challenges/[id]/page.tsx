@@ -6,7 +6,10 @@ import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import ChallengeBuilder, { type ChallengeEdit } from "@/components/ChallengeBuilder";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
+import Link from "next/link";
 import { timeAgo } from "@/lib/utils";
+import { seriesPlan } from "@/lib/challenge-series";
+import { deliveryTotals } from "@/lib/challenge-delivery";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +61,13 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     visibility: challenge.visibility ?? "public", guildId: challenge.guildId, guildIds: challenge.guildIds ?? [],
     accessKey: challenge.accessKey, announceHype: challenge.announceHype ?? false,
     sponsorBrandId: challenge.sponsorBrandId,
+    runsPlanned: challenge.runsPlanned ?? 1, runIndex: challenge.runIndex ?? 1,
   };
+
+  // Every run of this series, so an admin editing week 3 can see week 1 and 2
+  // beside it. A repeating challenge is only comprehensible as a series.
+  const plan = challenge.seriesId ? await seriesPlan(challenge.seriesId) : null;
+  const reach = await deliveryTotals(id);
 
   return (
     <div className="space-y-6">
@@ -72,6 +81,58 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             .map(([k, v]) => `${v}× ${k.replace(/_/g, " ")}`)
             .join(", ") || "participation only"}
         </p>
+
+        {/* What this run actually reached.
+            Counted from the delivery ledger, not recomputed from today's server
+            sizes — this is the number a brand is billed against, and it has to
+            mean the same thing next year. Zero here with a live challenge means
+            the announcement never landed, which is worth seeing immediately
+            rather than discovering in a campaign report. */}
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <Stat value={reach.servers.toLocaleString()} label="servers reached" />
+          <Stat value={reach.members.toLocaleString()} label="gamers reached" />
+          <Stat value={reach.linked.toLocaleString()} label="could enter" />
+          <Stat value={participants.length.toLocaleString()} label="entered" gold />
+        </div>
+        {challenge.status === "active" && reach.servers === 0 && (
+          <p className="mt-2 text-xs text-amber-300">
+            This run has not landed in any server yet. Announce it from Admin → Discord, or check the
+            bot can post in their channels — until it lands, its brand reach is zero.
+          </p>
+        )}
+
+        {/* The series this run belongs to.
+            A weekly challenge is four separate records, and an admin editing
+            week 3 needs week 1 and 2 one click away — with what each delivered,
+            because each is its own unit of revenue. */}
+        {plan && (plan.runs.length > 1 || plan.upcoming.length > 0) && (
+          <div className="mt-5 pt-5 border-t border-violet-500/15">
+            <div className="text-xs uppercase tracking-widest text-muted">
+              {plan.baseTitle} · {plan.runsPlanned > 0 ? `${plan.runsPlanned} ` : ""}{plan.cadence} run{plan.runsPlanned === 1 ? "" : "s"}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {plan.runs.map((r) => (
+                <Link
+                  key={r.id} href={`/admin/challenges/${r.id}`}
+                  className={`rounded-xl border px-3 py-2 text-xs ${
+                    r.id === id
+                      ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-100"
+                      : "border-white/10 bg-black/25 text-muted hover:border-white/25"
+                  }`}
+                >
+                  <b className="block font-semibold">{r.title}</b>
+                  <span>{r.status} · {r.entrants} entered</span>
+                </Link>
+              ))}
+              {plan.upcoming.map((u) => (
+                <div key={u.index} className="rounded-xl border border-dashed border-white/15 px-3 py-2 text-xs text-muted">
+                  <b className="block font-semibold">{u.title}</b>
+                  <span>opens when the one before it ends</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Lifecycle. A challenge ends on its end date — the daily job closes
             anything overdue — but staff need to be able to end one on the spot,
@@ -182,6 +243,18 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
           ))}
         </div>
       </section>
+    </div>
+  );
+}
+
+// One counted number. Deliberately flat and unstyled beyond the value/label
+// split: these are the figures a brand is billed against, and dressing them up
+// is how a dashboard starts implying more precision than it has.
+function Stat({ value, label, gold = false }: { value: string; label: string; gold?: boolean }) {
+  return (
+    <div className={`rounded-xl border p-3 ${gold ? "border-amber-400/30 bg-amber-500/10" : "border-white/10 bg-black/25"}`}>
+      <div className={`text-xl font-bold leading-none ${gold ? "text-amber-300" : "brand-text"}`}>{value}</div>
+      <div className="mt-1.5 text-[10px] uppercase tracking-wider text-muted">{label}</div>
     </div>
   );
 }

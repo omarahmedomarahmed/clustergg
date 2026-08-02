@@ -6,7 +6,7 @@ import { portalRequestChallenge, type PortalActionState } from "@/app/actions/se
 
 // An owner building a challenge for their own community, on the web.
 //
-// The same request `/cluster admin` submits, with room to think. A Discord
+// The same request `/cluster show:admin` submits, with room to think. A Discord
 // modal gives five short inputs and no help text — fine for a quick ask, wrong
 // for the thing an owner is most anxious to get right, because it runs under
 // their name in front of their members.

@@ -34,7 +34,7 @@ export default async function ServerMessagesInboxPage() {
       {rows.length === 0 ? (
         <div className="glass p-6 text-sm text-muted">
           Nothing yet. Owners reach this from their dashboard, or with{" "}
-          <code className="text-cyan-300">/cluster admin</code> → Message Cluster.
+          <code className="text-cyan-300">/cluster show:admin</code> → Message Cluster.
         </div>
       ) : (
         <>

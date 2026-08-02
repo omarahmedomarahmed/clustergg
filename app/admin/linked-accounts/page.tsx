@@ -4,11 +4,17 @@ import { getDb, schema } from "@/lib/db";
 import { adminResyncAccount, adminUnlinkAccount } from "@/app/actions/admin";
 import { getProvider, PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import { timeAgo } from "@/lib/utils";
+import { requireSystemFor } from "@/lib/departments";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Linked accounts" };
 
 export default async function AdminLinkedAccountsPage() {
+  // Admins only. Every linked account on the platform, joined to the person who
+  // owns it, is the most sensitive list in the product — and no department's
+  // job needs to browse it. The rail hides the link; this refuses the page.
+  await requireSystemFor("/admin/linked-accounts");
+
   const db = await getDb();
   const rows = await db.select({ a: schema.linkedGameAccounts, u: schema.users })
     .from(schema.linkedGameAccounts)

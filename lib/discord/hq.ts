@@ -108,7 +108,7 @@ export function hqBlueprint(games: string[]): PlannedCategory[] {
           topic: "Show off your profile. Vote for the ones you like.",
           pin: {
             title: "Show your profile",
-            body: "Customise your profile on the site, then run `/cluster share` here. Votes decide the Best Profile leaderboard.",
+            body: "Customise your profile on the site, then run `/cluster show:share` here. Votes decide the Best Profile leaderboard.",
             buttons: "portal",
           },
         },

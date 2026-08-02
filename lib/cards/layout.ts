@@ -68,6 +68,37 @@ export type PartStyle = {
    * can be typed in by hand is not a leaderboard.
    */
   text?: string;
+  /**
+   * Where this section sits, as a nudge from where the flow put it.
+   *
+   * An OFFSET rather than an absolute position, and the distinction is the
+   * whole design. Sections are drawn in a flex column so that hiding one gives
+   * its space to the next; absolutely positioning every block would break that
+   * and, worse, would be a lie — the editor cannot measure how tall a section
+   * will be once Satori has wrapped real text at render time, so a block pinned
+   * to a y-coordinate would overlap its neighbour the first time somebody's
+   * name ran long. A nudge composes with the flow instead of fighting it.
+   *
+   * Canvas pixels, so they mean the same thing at any preview size.
+   */
+  dx?: number;
+  dy?: number;
+  /**
+   * This section's own width, as a % of the canvas.
+   *
+   * Unset means "as wide as the content box". Narrowing one section is how you
+   * keep a lore paragraph off a character's face without shrinking the whole
+   * column.
+   */
+  w?: number;
+  /**
+   * Where this section comes in the stack. Lower is higher up.
+   *
+   * Unset means the order the renderer declares, which is the order in the
+   * card's guide. Reordering is the single most-requested layout change and
+   * the only one that a flex column makes genuinely safe.
+   */
+  order?: number;
 };
 
 /**
@@ -80,6 +111,20 @@ export type PartStyle = {
 export type CardAsset = {
   id: string;
   url: string;
+  /**
+   * Take the image from the CARD instead of from a fixed URL.
+   *
+   * A placed image was always one specific file, which is right for a seasonal
+   * flourish and useless for the thing people actually want: a slot that shows
+   * *this* champion's splash, *this* gamer's avatar, *this* game's logo — a
+   * frame whose contents change with the card. Without it, "put the splash on
+   * the right" could only be done by pinning one champion's art to every world
+   * card.
+   *
+   * `url` stays as the fallback for when a card has nothing to put here, so a
+   * slot is never an empty rectangle.
+   */
+  source?: string;
   /** Centre, as a % of the canvas. */
   x: number;
   y: number;
@@ -217,6 +262,24 @@ export const BG_SOURCES: { id: string; label: string; note: string }[] = [
 
 export const BG_SOURCE_IDS = new Set(BG_SOURCES.map((s) => s.id));
 
+/**
+ * Where a placed image can take its picture from, per card.
+ *
+ * These make a placed image a SLOT rather than a picture: the frame, the size
+ * and the position are the admin's, and what appears inside it is whatever the
+ * card is about. That is the difference between "the splash goes on the right"
+ * as a rule and as a one-off.
+ */
+export const ASSET_SOURCES: { id: string; label: string; note: string }[] = [
+  { id: "fixed", label: "A fixed image", note: "The one you pick. The same picture on every card of this kind." },
+  { id: "self.art", label: "This thing's own image", note: "The champion's splash, the challenge cover, the quest map — whatever the card is ABOUT. Changes with every card." },
+  { id: "self.logo", label: "The game's logo", note: "The logo of the game this card belongs to." },
+  { id: "self.avatar", label: "The gamer's avatar", note: "Only on cards about a person." },
+  { id: "self.trophy", label: "The top trophy", note: "The first trophy on the card — a challenge's winner prize, a profile's best." },
+];
+
+export const ASSET_SOURCE_IDS = new Set(ASSET_SOURCES.map((s) => s.id));
+
 export const LAYOUT_KINDS: CardKind[] = [
   "profile", "game-stats", "challenge", "leaderboard",
   "planet", "planets", "quest", "cp-summary", "guide", "week", "world", "search",
@@ -263,6 +326,13 @@ function parts(v: unknown): Record<string, PartStyle> {
       // Plain text only, and only ever drawn as a string by Satori — but it
       // also reaches the editor's DOM preview, so the tag characters go.
       ...(text ? { text: text.replace(/[<>]/g, "") } : {}),
+      // Geometry. Clamped hard, because these reach Satori as CSS: a width of
+      // 4000% or a margin of -1e9 is not a broken layout, it is a card that
+      // fails to render at all and a bot reply that never arrives.
+      ...(Number.isFinite(Number(p.dx)) && Number(p.dx) !== 0 ? { dx: num(p.dx, 0, -600, 600) } : {}),
+      ...(Number.isFinite(Number(p.dy)) && Number(p.dy) !== 0 ? { dy: num(p.dy, 0, -400, 400) } : {}),
+      ...(Number.isFinite(Number(p.w)) && Number(p.w) > 0 ? { w: num(p.w, 100, 5, 100) } : {}),
+      ...(Number.isFinite(Number(p.order)) ? { order: num(p.order, 0, -50, 50) } : {}),
     };
   }
   return out;
@@ -275,12 +345,19 @@ function assets(v: unknown): CardAsset[] {
     .map((raw, i): CardAsset | null => {
       const a = (raw ?? {}) as Partial<CardAsset>;
       const url = typeof a.url === "string" ? a.url.trim() : "";
+      const source = typeof a.source === "string" && ASSET_SOURCE_IDS.has(a.source) ? a.source : "fixed";
+      const validUrl = !!url && (/^https?:\/\//i.test(url) || url.startsWith("/") || url.startsWith("data:image/"));
       // Only real image sources. An admin-supplied `javascript:` would go
       // nowhere in Satori, but it would ship into the editor's DOM preview.
-      if (!url || !(/^https?:\/\//i.test(url) || url.startsWith("/") || url.startsWith("data:image/"))) return null;
+      //
+      // A card-sourced slot is kept even with no fallback URL: its picture
+      // comes from the card, and requiring a fixed image first would defeat
+      // the point of it being a slot.
+      if (!validUrl && source === "fixed") return null;
       return {
         id: typeof a.id === "string" && a.id ? a.id.slice(0, 40) : `a${i}`,
-        url,
+        url: validUrl ? url : "",
+        ...(source !== "fixed" ? { source } : {}),
         x: num(a.x, 50, -20, 120),
         y: num(a.y, 50, -20, 120),
         w: num(a.w, 240, 16, 1400),
@@ -354,10 +431,19 @@ export type PartDraw = {
   scale: number;
   opacity: number;
   text?: string;
+  /** Nudge from where the flow put this section, in canvas pixels. */
+  dx: number;
+  dy: number;
+  /** This section's own width as a % of the canvas, when it has one. */
+  w?: number;
+  /** Its place in the stack, when an admin has reordered it. */
+  order?: number;
   /** A font size in canvas pixels, scaled by this section's setting. */
   f: (px: number) => number;
   /** This section's fixed copy, or the admin's replacement for it. */
   say: (built: string) => string;
+  /** Offset/width/order as a style object for the section's own wrapper. */
+  box: () => Record<string, string | number>;
 };
 
 /** How a part should be drawn, with the house default when it's unset. */
@@ -365,14 +451,103 @@ export function partOf(l: CardLayout, key: string): PartDraw {
   const p = l.parts?.[key];
   const scale = typeof p?.scale === "number" ? p.scale : 1;
   const text = typeof p?.text === "string" && p.text ? p.text : undefined;
+  const dx = typeof p?.dx === "number" ? p.dx : 0;
+  const dy = typeof p?.dy === "number" ? p.dy : 0;
+  const w = typeof p?.w === "number" && p.w > 0 ? p.w : undefined;
   return {
     hidden: p?.hidden === true,
     scale,
     opacity: typeof p?.opacity === "number" ? p.opacity : 100,
     text,
+    dx, dy, w,
+    order: typeof p?.order === "number" ? p.order : undefined,
     f: (px: number) => Math.max(8, Math.round(px * scale)),
     say: (built: string) => text ?? built,
+    /**
+     * The style a section carries beyond its own contents.
+     *
+     * `marginLeft`/`marginTop` rather than `left`/`top`: the section stays in
+     * the flex column (so hiding one still gives its space away) and simply
+     * starts somewhere else. `position: relative` with offsets would leave a
+     * hole where the block used to be, which is not what "move it" means.
+     */
+    box: () => {
+      const s: Record<string, string | number> = {};
+      if (dx) s.marginLeft = dx;
+      if (dy) s.marginTop = dy;
+      if (w) s.width = `${w}%`;
+      if (typeof p?.order === "number") s.order = p.order;
+      return s;
+    },
   };
+}
+
+/**
+ * Where each of a card's content sections is drawn, for the editor's canvas.
+ *
+ * The guide carries two lists and they are not the same list. `regions` are art
+ * zones — "keep detail out of here" — and include the furniture (the mascot,
+ * the logo, the sponsor box). `parts` are the blocks the renderer actually
+ * draws. Some keys appear in both, most don't: a profile has regions for
+ * `stats` and `accounts` and parts for `identity`, `trophies` and `challenges`
+ * too. Joining the two by key drew boxes for two sections out of five and
+ * silently dropped the rest, which is worse than drawing none — a canvas that
+ * shows some of the card looks complete.
+ *
+ * So every part gets a box. A hand-tuned region wins where one exists, because
+ * somebody measured it against the real render. Everything else is laid out the
+ * way the renderer genuinely lays it out: a vertical stack inside the content
+ * box, in declared order, sharing the height. That is an approximation of where
+ * a block lands — Satori decides the real heights from the text — and it is an
+ * honest one, because the stack IS the model.
+ */
+export function partBoxes(
+  l: CardLayout,
+  parts: { key: string; side?: boolean }[],
+  regions: { key: string; x: number; y: number; w: number; h: number }[],
+): Record<string, { x: number; y: number; w: number; h: number }> {
+  const out: Record<string, { x: number; y: number; w: number; h: number }> = {};
+  const byKey = new Map(regions.map((r) => [r.key, r]));
+  // A side section — the world card's splash banner — is not in the text
+  // column and does not have a fixed home either: it hangs below the sponsor
+  // box, wherever the sponsor box currently is. Drawing it stacked with the
+  // paragraphs put the one element that moves with the ad in the one place it
+  // never appears.
+  const side = sideBox(l, { hasAd: !l.ad.hidden, hasBadge: false });
+  const sideAsPct = {
+    x: (side.left / CANVAS_W) * 100,
+    y: (side.top / CANVAS_H) * 100,
+    w: (side.width / CANVAS_W) * 100,
+    h: (side.height / CANVAS_H) * 100,
+  };
+  const stacked = parts.filter((p) => !byKey.has(p.key) && !p.side);
+  // A gap between blocks so adjacent boxes are visibly separate rather than one
+  // continuous column an admin cannot tell apart.
+  const GAP = 0.8;
+  const each = stacked.length
+    ? Math.max(4, (l.content.h - GAP * (stacked.length - 1)) / stacked.length)
+    : 0;
+
+  let i = 0;
+  for (const p of parts) {
+    if (p.side && sideBoxFits(side)) {
+      out[p.key] = sideAsPct;
+      continue;
+    }
+    const region = byKey.get(p.key);
+    if (region) {
+      out[p.key] = { x: region.x, y: region.y, w: region.w, h: region.h };
+      continue;
+    }
+    out[p.key] = {
+      x: l.content.x,
+      y: l.content.y + i * (each + GAP),
+      w: l.content.w,
+      h: each,
+    };
+    i++;
+  }
+  return out;
 }
 
 /** The CSS transform for a flipped/rotated element. Satori supports both. */
@@ -388,7 +563,7 @@ export function opacityOf(v: number | undefined): number | undefined {
   return typeof v === "number" && v < 100 ? Math.max(0, v) / 100 : undefined;
 }
 
-/** Absolute pixel box for a placed asset. */
+/** Absolute pixel box for a placed asset, on the real 1200x630 canvas. */
 export function assetBox(a: CardAsset): { left: number; top: number; width: number; height: number } {
   const width = a.w;
   const height = a.w * a.ratio;
@@ -399,6 +574,31 @@ export function assetBox(a: CardAsset): { left: number; top: number; width: numb
     height,
   };
 }
+
+/**
+ * The same box as percentages, for the editor's canvas.
+ *
+ * The editor's canvas is 1200x630 in PROPORTION but never in CSS pixels — it's
+ * whatever width the admin's screen gives it. Positioning a placed image with
+ * `assetBox`'s raw pixels there drew it at the wrong size on every screen
+ * except a 1200px-wide one, so the canvas and the PNG disagreed about how big
+ * an image was. Percentages of the canvas scale with it and agree everywhere,
+ * which is exactly what `spotBox`'s callers already do for the furniture.
+ */
+export function assetBoxPct(a: CardAsset): { left: number; top: number; width: number; height: number } {
+  const b = assetBox(a);
+  return {
+    left: (b.left / CANVAS_W) * 100,
+    top: (b.top / CANVAS_H) * 100,
+    width: (b.width / CANVAS_W) * 100,
+    height: (b.height / CANVAS_H) * 100,
+  };
+}
+
+/** A placed image's width as a % of the card, and back. The stored number is
+ *  canvas pixels; every control that says "%" has to convert or it lies. */
+export const assetWidthPct = (w: number) => (w / CANVAS_W) * 100;
+export const assetWidthPx = (pct: number) => (pct / 100) * CANVAS_W;
 
 // ===== Geometry helpers, shared by the renderer and the editor preview =====
 
@@ -449,6 +649,41 @@ export function badgeTopFor(l: CardLayout, hasAd: boolean, badgeRatio = 1): numb
   // than one that overlaps by a few pixels.
   return Math.min(ad.bottom + 16, CANVAS_H - badge.height - 8);
 }
+
+/**
+ * The right-hand column, under the sponsor box.
+ *
+ * The world card's splash banner lives here, and where it lands is not a fixed
+ * rectangle: it starts where the text column ends and drops below whichever of
+ * the sponsor box and the badge hangs lowest, so dragging the ad drags the
+ * splash with it. That made it invisible to the layout editor, which drew the
+ * splash at the card guide's static home geometry — the one element on the
+ * canvas that was in the wrong place by design.
+ *
+ * Shared, so "below the ad box" means the same rectangle in the editor and in
+ * the PNG.
+ */
+export function sideBox(l: CardLayout, o: { hasAd: boolean; hasBadge: boolean; badgeRatio?: number }): {
+  left: number; top: number; width: number; height: number;
+} {
+  const content = contentBox(l.content);
+  const badge = spotBox(l.badge, o.badgeRatio ?? 1);
+  const top = Math.max(
+    content.top,
+    o.hasAd && !l.ad.hidden ? adBox(l.ad).bottom + 14 : 0,
+    o.hasBadge && !l.badge.hidden ? badgeTopFor(l, o.hasAd, o.badgeRatio ?? 1) + badge.height + 14 : 0,
+  );
+  const left = content.left + content.width + 16;
+  return {
+    left,
+    top,
+    width: Math.max(0, CANVAS_W - 20 - left),
+    height: Math.max(0, CANVAS_H - 18 - top),
+  };
+}
+
+/** True when that column is big enough to be worth drawing at all. */
+export const sideBoxFits = (b: { width: number; height: number }) => b.width > 60 && b.height > 60;
 
 export function contentBox(c: ContentBox): { left: number; top: number; width: number; height: number } {
   return {

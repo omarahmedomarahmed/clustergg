@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     try {
       const summary = await guildSummary(guildId);
       await onboardGuild(guildId, summary?.guild.owner_id);
-    } catch { /* the owner can re-run /cluster admin to retry */ }
+    } catch { /* the owner can re-run /cluster show:admin to retry */ }
   });
 
   return NextResponse.redirect(`${site}/discord-bot?installed=1&guild=${encodeURIComponent(guildId)}`);

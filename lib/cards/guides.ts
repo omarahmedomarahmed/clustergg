@@ -22,8 +22,8 @@ export const GUIDE_TOPICS: Record<string, GuideTopic> = {
     footer: "Type /cluster to see everything",
     steps: [
       { title: "Create your profile", body: "Run /cluster show — sign in with Discord and your cosmic profile is created instantly." },
-      { title: "Link a game account", body: "Run /cluster link and pick your game. Stats sync automatically from the official API." },
-      { title: "Explore a planet", body: "Run /cluster planet and pick a game to see its challenges, leaderboard and top gamers." },
+      { title: "Link a game account", body: "Run /cluster show:link and pick your game. Stats sync automatically from the official API." },
+      { title: "Explore a planet", body: "Run /cluster show:planet and pick a game to see its challenges, leaderboard and top gamers." },
       { title: "Earn Cluster Points", body: "Every action earns CP across four quests. Climb from Bronze to Platinum." },
     ],
   },
@@ -31,9 +31,9 @@ export const GUIDE_TOPICS: Record<string, GuideTopic> = {
     title: "Connect a game account",
     subtitle: "Real stats, verified by API — never self-reported",
     badge: "CONNECT",
-    footer: "/cluster link",
+    footer: "/cluster show:link",
     steps: [
-      { title: "Run /cluster link", body: "Choose your game from the list — 24 games are supported." },
+      { title: "Run /cluster show:link", body: "Choose your game from the list — 24 games are supported." },
       { title: "Enter your in-game name", body: "Fill the short form with your tag and region. That's the whole setup." },
       { title: "Stats sync automatically", body: "Rank, wins, KDA and more are pulled from the official game API and stay live." },
       { title: "Unlock quests + challenges", body: "A linked account lets you join challenges and earn CP toward every quest." },
@@ -55,9 +55,9 @@ export const GUIDE_TOPICS: Record<string, GuideTopic> = {
     title: "How challenges work",
     subtitle: "Real-data competitions. No screenshots.",
     badge: "COMPETE",
-    footer: "/cluster challenge",
+    footer: "/cluster show:challenge",
     steps: [
-      { title: "Find a challenge", body: "Run /cluster challenge and pick a game to see everything live right now." },
+      { title: "Find a challenge", body: "Run /cluster show:challenge and pick a game to see everything live right now." },
       { title: "Join with one tap", body: "Your stats are snapshotted when you join — only NEW activity counts." },
       { title: "Climb the standings", body: "Every sync pulls fresh data from the game API and the board updates live." },
       { title: "Win real trophies", body: "Podium finishers earn trophies with real dollar values, redeemable from your profile." },
@@ -78,13 +78,13 @@ export const GUIDE_TOPICS: Record<string, GuideTopic> = {
     // has to survive the truncation, which is the only part that's actionable.
     steps: [
       { title: "Your profile", body: "Every game, rank and trophy on one card. /cluster" },
-      { title: "Planets", body: "A world per game. /cluster planet" },
-      { title: "Challenges", body: "Real-data contests, real trophies. /cluster challenges" },
-      { title: "Leaderboards", body: "Every board, from the game APIs. /cluster leaderboard" },
-      { title: "Quests", body: "Cluster Points, Bronze to Platinum. /cluster quests" },
-      { title: "Profile of the Week", body: "The platform votes. Sunday on stream. /cluster week" },
-      { title: "Trophies", body: "Podiums pay real value. /cluster trophies" },
-      { title: "Your server", body: "Growth and sponsored challenges. /cluster admin" },
+      { title: "Planets", body: "A world per game. /cluster show:planet" },
+      { title: "Challenges", body: "Real-data contests, real trophies. /cluster show:challenges" },
+      { title: "Leaderboards", body: "Every board, from the game APIs. /cluster show:leaderboard" },
+      { title: "Quests", body: "Cluster Points, Bronze to Platinum. /cluster show:quests" },
+      { title: "Profile of the Week", body: "The platform votes. Sunday on stream. /cluster show:week" },
+      { title: "Trophies", body: "Podiums pay real value. /cluster show:trophies" },
+      { title: "Your server", body: "Growth and sponsored challenges. /cluster show:admin" },
     ],
   },
   "commands": {
@@ -96,7 +96,7 @@ export const GUIDE_TOPICS: Record<string, GuideTopic> = {
       { title: "Type /cluster", body: "That's your own card — profile, Cluster Points, and a button for every game you've linked." },
       { title: "Type /cluster <anything>", body: "A game, a quest, a guide or a gamer's name. The suggestions are live, so whatever exists is typeable." },
       { title: "Press the buttons", body: "Every button edits the same message instead of posting a new one, so the channel stays clean." },
-      { title: "Everything is shareable", body: "Type /cluster share to post your card publicly — it's the only reply anyone else can see." },
+      { title: "Everything is shareable", body: "Type /cluster show:share to post your card publicly — it's the only reply anyone else can see." },
     ],
   },
   "best-profile": {
@@ -106,7 +106,7 @@ export const GUIDE_TOPICS: Record<string, GuideTopic> = {
     footer: "Vote on clustergg.com",
     steps: [
       { title: "Build a profile worth voting for", body: "Customize your layout, colours and cards until it's unmistakably you." },
-      { title: "Share your link", body: "Post your profile in this channel with /cluster share to collect votes." },
+      { title: "Share your link", body: "Post your profile in this channel with /cluster show:share to collect votes." },
       { title: "Voting happens on the platform", body: "Signed-in gamers vote from your profile page — one vote each, on the website." },
       { title: "Climb the Best Profile board", body: "The most-voted profiles are featured on the Cluster homepage." },
     ],
@@ -196,7 +196,7 @@ export async function questGuideCard(questKey: string): Promise<CardData | null>
     badge: "QUEST GUIDE",
     logoUrl: slimImg(q.logoUrl, 300000),
     steps,
-    footer: c[`bot.guide.${topic}.footer`] || `/cluster quest ${q.key}`,
+    footer: c[`bot.guide.${topic}.footer`] || `/cluster show:quest ${q.key}`,
     theme: { accent: q.color, accent2: q.accent2, bgUrl: c[`bot.guide.${topic}.bg`] || slimImg(q.cardBgUrl ?? q.mapArtUrl, 800000) || bg.bgUrl },
   };
   return card;
