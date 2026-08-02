@@ -34,6 +34,31 @@ export type AdminGroup = {
   items: AdminLink[];
 };
 
+/**
+ * Where the rail sends you for a section: its first page.
+ *
+ * The rail used to list all 39 pages at once, which is a table of contents
+ * pretending to be navigation — nobody can hold 39 items, and half of them were
+ * one control each. It now lists the seven sections, and the pages inside a
+ * section appear as tabs across the top of whichever one you opened. Same
+ * pages, one level of choice at a time.
+ */
+export function homeOf(group: AdminGroup): string {
+  return group.items[0]?.href ?? "/admin";
+}
+
+/** The section a path belongs to, so a page can draw its own tab bar. */
+export function groupForPath(groups: AdminGroup[], pathname: string): AdminGroup | null {
+  let best: { group: AdminGroup; len: number } | null = null;
+  for (const g of groups) {
+    for (const i of g.items) {
+      const hit = i.exact ? pathname === i.href : pathname === i.href || pathname.startsWith(`${i.href}/`);
+      if (hit && (!best || i.href.length > best.len)) best = { group: g, len: i.href.length };
+    }
+  }
+  return best?.group ?? null;
+}
+
 export type MetricKey =
   | "users" | "linkedAccounts" | "syncErrors"
   | "guilds" | "guildMembers" | "botCommands" | "challengeRequests" | "serverMessages"
@@ -61,6 +86,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     blurb: "Where everything is, and what needs you today.",
     items: [
       { href: "/admin", label: "Command centre", desc: "Every console, every live number, in one place.", exact: true },
+      { href: "/admin/messages", label: "Messages", desc: "Every conversation with a server owner or a brand, in one queue.", metric: "serverMessages", queue: true },
       { href: "/admin/systems", label: "The systems", desc: "What Cluster is made of, what each part is for, and who runs it.", exact: true },
       { href: "/admin/analytics", label: "Product analytics", desc: "Every metric we track, filterable, with a one-page report per metric.", metric: "users" },
       { href: "/admin/dataroom", label: "Data room", desc: "The investor deck and partner profile — every section editable, every number live.", area: "settings" },
@@ -75,7 +101,6 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/discord", label: "Servers & bot status", desc: "Every connected server, its growth, and whether the bot is configured.", exact: true, metric: "guilds" },
       { href: "/admin/discord/analytics", label: "Bot analytics", desc: "Commands, screens, funnel and latency across every server.", metric: "botCommands" },
       { href: "/admin/discord/requests", label: "Challenge requests", desc: "Server owners asking to run a challenge. Approve or reject.", metric: "challengeRequests", queue: true },
-      { href: "/admin/discord/messages", label: "Server messages", desc: "What owners are asking us, and your replies.", metric: "serverMessages" },
       { href: "/admin/discord/broadcast", label: "Broadcast & ads", desc: "Post to every server at once, or push an ad creative.", area: "ads" },
       { href: "/admin/discord/hq", label: "HQ server", desc: "Build our own Discord: channels, categories, roles, pinned starters.", area: "settings" },
     ],

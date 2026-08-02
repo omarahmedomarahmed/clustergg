@@ -39,6 +39,6 @@ export async function replyToServer(
   } catch { /* an unrecorded audit entry must not undo the reply */ }
 
   revalidatePath(`/admin/discord/${guildId}`);
-  revalidatePath("/admin/discord/messages");
+  revalidatePath("/admin/messages");
   return { ok: "Sent — it's in their DMs and on their dashboard." };
 }

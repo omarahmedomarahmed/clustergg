@@ -122,3 +122,99 @@ export async function markThreadRead(kind: ThreadKind, id: string, side: ThreadS
       .where(and(eq(schema.brandMessages.brandId, id), eq(schema.brandMessages.sender, from)));
   } catch { /* an unread badge that lingers is not worth failing a page load */ }
 }
+
+// ===== The inbox =====
+//
+// One list, both kinds. Staff answering a server owner and staff answering a
+// brand are the same job at the same desk, and splitting them across two pages
+// (one of which lived three clicks inside a brand's detail page) meant the
+// brand side went unanswered for days at a time — nobody had a reason to open
+// it, because nothing told them there was anything in it.
+//
+// Ordered by the last message rather than by unread count: a support queue is a
+// queue of conversations, and the oldest unanswered one is the one that costs.
+
+export type InboxThread = {
+  kind: ThreadKind;
+  /** guildId for a server, brandId for a brand. */
+  id: string;
+  name: string;
+  iconUrl: string | null;
+  /** Where staff go to answer it. */
+  href: string;
+  lastBody: string;
+  lastSender: string;
+  lastAt: Date;
+  unread: number;
+  /** Server threads only: replies that never reached Discord. */
+  undelivered: number;
+};
+
+export async function adminInbox(): Promise<InboxThread[]> {
+  const [servers, brands] = await Promise.all([serverThreads(), brandThreads()]);
+  return [...servers, ...brands].sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime());
+}
+
+async function serverThreads(): Promise<InboxThread[]> {
+  try {
+    const { inbox } = await import("@/lib/server-messages");
+    return (await inbox()).map((r) => ({
+      kind: "server" as const,
+      id: r.guildId,
+      name: r.name,
+      iconUrl: r.iconUrl,
+      href: `/admin/discord/${r.guildId}#messages`,
+      lastBody: r.lastBody,
+      lastSender: r.lastSender,
+      lastAt: r.lastAt,
+      unread: r.unread,
+      undelivered: r.undelivered,
+    }));
+  } catch { return []; }
+}
+
+async function brandThreads(): Promise<InboxThread[]> {
+  try {
+    const db = await getDb();
+    const rows = await db
+      .select({
+        brandId: schema.brandMessages.brandId,
+        name: schema.brands.name,
+        logoUrl: schema.brands.logoUrl,
+        body: schema.brandMessages.body,
+        sender: schema.brandMessages.sender,
+        createdAt: schema.brandMessages.createdAt,
+        readByAdmin: schema.brandMessages.readByAdmin,
+      })
+      .from(schema.brandMessages)
+      .innerJoin(schema.brands, eq(schema.brandMessages.brandId, schema.brands.id))
+      .orderBy(desc(schema.brandMessages.createdAt));
+
+    // Grouped in memory rather than with a lateral join: this is a support
+    // inbox, not a feed — it is tens of rows, and one query beats N+1.
+    const byBrand = new Map<string, InboxThread>();
+    for (const r of rows) {
+      const at = r.createdAt ?? new Date(0);
+      const existing = byBrand.get(r.brandId);
+      if (!existing) {
+        byBrand.set(r.brandId, {
+          kind: "brand",
+          id: r.brandId,
+          name: r.name,
+          iconUrl: r.logoUrl,
+          href: `/admin/brands/${r.brandId}#messages`,
+          lastBody: r.body,
+          lastSender: r.sender,
+          lastAt: at,
+          // Only a message FROM the brand can be unread by us. A reply we wrote
+          // ourselves is not a thing we are waiting on.
+          unread: r.sender === "brand" && !r.readByAdmin ? 1 : 0,
+          undelivered: 0,
+        });
+      } else if (r.sender === "brand" && !r.readByAdmin) {
+        existing.unread += 1;
+      }
+    }
+    return [...byBrand.values()];
+  } catch { return []; }
+}

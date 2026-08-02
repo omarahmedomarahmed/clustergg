@@ -366,8 +366,24 @@ export const ALWAYS_OPEN = [...ALWAYS_OPEN_EXACT, ...ALWAYS_OPEN_UNDER];
  */
 export const ADMIN_ONLY = ["/admin/users", "/admin/linked-accounts"];
 
+/**
+ * Pages that more than one system legitimately shares.
+ *
+ * `systemForPath` returns a single owner by design — one page, one desk — and
+ * that is right for almost everything. The unified inbox is the exception: it
+ * carries server-owner threads and brand threads in one queue, so the bot desk
+ * and the brand desk both need it. Written as a deliberate exception rather
+ * than by listing the page under two systems, where the longest-match rule
+ * would silently hand it to whichever one happens to come first.
+ */
+const SHARED_PAGES: { path: string; systems: string[] }[] = [
+  { path: "/admin/messages", systems: ["bot", "brand"] },
+];
+
 export function pathAllowedFor(systems: string[], path: string): boolean {
   if (ADMIN_ONLY.some((p) => path === p || path.startsWith(`${p}/`))) return false;
+  const shared = SHARED_PAGES.find((s) => path === s.path || path.startsWith(`${s.path}/`));
+  if (shared) return shared.systems.some((k) => systems.includes(k));
   if (ALWAYS_OPEN_EXACT.includes(path)) return true;
   if (ALWAYS_OPEN_UNDER.some((p) => path === p || path.startsWith(`${p}/`))) return true;
   const owner = systemForPath(path);

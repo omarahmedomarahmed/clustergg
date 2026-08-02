@@ -32,7 +32,7 @@ export const METRICS: MetricDef[] = [
   { key: "guildMembers", label: "Reach", definition: "Combined member count of every server running the bot — the audience the bot can address.", group: "discord", href: "/admin/discord", goodWhenUp: true },
   { key: "botCommands", label: "Bot interactions", definition: "Every logged slash command and button press, across all servers.", group: "discord", href: "/admin/discord/analytics", goodWhenUp: true },
   { key: "challengeRequests", label: "Challenge requests waiting", definition: "Server owners who asked to run a challenge and are waiting on our review.", group: "discord", href: "/admin/discord/requests" },
-  { key: "serverMessages", label: "Servers waiting on a reply", definition: "Server owners who wrote to us and haven't been answered. Counted per server, not per message — one owner asking three things is one conversation.", group: "discord", href: "/admin/discord/messages" },
+  { key: "serverMessages", label: "Servers waiting on a reply", definition: "Server owners who wrote to us and haven't been answered. Counted per server, not per message — one owner asking three things is one conversation.", group: "discord", href: "/admin/messages" },
 
   { key: "games", label: "Games", definition: "Active games in the catalog.", group: "content", href: "/admin/games" },
   { key: "planets", label: "Planets", definition: "Active planets — one per game.", group: "content", href: "/admin/spaces" },

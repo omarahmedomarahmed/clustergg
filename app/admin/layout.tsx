@@ -1,12 +1,13 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getCurrentUser, isAdmin, isStaff } from "@/lib/auth";
-import { AdminRail, AdminMobileNav } from "@/components/AdminNav";
-import { navFor, navForSystems, accessOf } from "@/lib/admin-nav";
+import { AdminRail, AdminMobileNav, AdminSectionTabs } from "@/components/AdminNav";
+import { navFor, navForSystems, accessOf, homeOf } from "@/lib/admin-nav";
 import { areaAllowed, getStaffGrants } from "@/lib/permissions";
 import { currentAccess } from "@/lib/departments";
 import { pathAllowedFor, systemBy } from "@/lib/systems";
 import { countPendingRequests } from "@/lib/challenge-requests";
+import { adminInbox } from "@/lib/threads";
 
 // The chrome only. Which pages exist and what they do live in lib/admin-nav.ts;
 // who may open them lives in lib/systems.ts and a person's department.
@@ -32,19 +33,27 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     ? navFor(true, grants, areaAllowed)
     : navForSystems(systems, pathAllowedFor);
 
-  const pendingRequests = admin || systems.includes("challenges")
-    ? await countPendingRequests()
-    : 0;
+  // The two queues the rail is allowed to shout about. Everything else is a
+  // page you go to; these are people waiting on a person.
+  const [pendingRequests, waitingMessages] = await Promise.all([
+    admin || systems.includes("challenges") ? countPendingRequests() : 0,
+    admin || systems.includes("bot") || systems.includes("brand")
+      ? adminInbox().then((rows) => rows.filter((r) => r.unread > 0).length).catch(() => 0)
+      : 0,
+  ]);
 
   const groups = nav.map((g) => ({
     section: g.section,
     icon: g.icon,
+    home: homeOf(g),
     items: g.items.map((i) => ({
       href: i.href,
       label: i.label,
       exact: i.exact,
       access: accessOf(i.area),
-      badge: i.href === "/admin/discord/requests" ? pendingRequests : undefined,
+      badge: i.href === "/admin/discord/requests" ? pendingRequests
+        : i.href === "/admin/messages" ? waitingMessages
+        : undefined,
     })),
   }));
 
@@ -65,7 +74,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         {/* A staff member nobody has placed yet. Not an error — somebody has to
             decide what they run before they can run it — so it says exactly
             that instead of showing an admin that looks broken. */}
-        {!admin && !department ? <NoDepartment name={user.displayName} /> : children}
+        {!admin && !department ? <NoDepartment name={user.displayName} /> : (
+          <>
+            {/* The section's pages, as tabs. Rendered once here so every admin
+                page gets its own bar without each page remembering to draw
+                one — which is what turns a folder of pages into one page with
+                panels. */}
+            <AdminSectionTabs groups={groups} />
+            {children}
+          </>
+        )}
       </div>
     </div>
   );
