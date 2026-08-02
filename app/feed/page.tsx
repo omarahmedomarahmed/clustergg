@@ -12,7 +12,6 @@ import HeroStage from "@/components/HeroStage";
 import FeedControlPanel from "@/components/FeedControlPanel";
 import FeedDashboard, { type Widget } from "@/components/FeedDashboard";
 import { buildSkinnedPlanets } from "@/lib/planets";
-import { getQuestHeroData } from "@/lib/quest-hero";
 import { getTotalCp, getUserQuests } from "@/lib/quests";
 import { getTrophyCase, getMyRedeems } from "@/lib/trophies";
 import TrophyCase from "@/components/TrophyCase";
@@ -76,7 +75,6 @@ export default async function FeedPage() {
   const liveChallenges = challenges.slice(0, 4);
 
   const skinnedPlanets = await buildSkinnedPlanets(db);
-  const questHero = await getQuestHeroData(db, user.id);
   const [myTrophies, myTrophyRedeems] = await Promise.all([getTrophyCase(db, user.id), getMyRedeems(db, user.id)]);
 
   // ===== Control-panel data =====
@@ -174,7 +172,7 @@ export default async function FeedPage() {
           links in a worse form. */}
       {skinnedPlanets.length > 0 && (
         <div className="mb-8">
-          <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading={t("feed.explore")} quest={questHero} />
+          <HeroStage planets={skinnedPlanets} initialSlug={skinnedPlanets[0].slug} heading={t("feed.explore")} />
         </div>
       )}
 

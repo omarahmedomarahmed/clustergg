@@ -16,7 +16,6 @@ import { BrandHero, ProblemSection, InsightSection, SolutionSection, LoopSection
 import { pricingLive } from "@/lib/pricing-live";
 import { money } from "@/lib/pricing";
 import { buildSkinnedPlanets } from "@/lib/planets";
-import { getQuestHeroData } from "@/lib/quest-hero";
 import { getUserQuests, getQuestTops } from "@/lib/quests";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { getT } from "@/lib/i18n/t-server";
@@ -38,7 +37,6 @@ export default async function LandingPage() {
 
   // Quest hero data — the homepage toggle can swap the planet globe for the
   // primary quest's treasure map without leaving the page.
-  const questHero = await getQuestHeroData(db, viewer?.id ?? null);
   // Full quests + CP tops for the "Chart your quests" card grid.
   const homeQuests = await getUserQuests(db, viewer?.id ?? null);
   const questTops = await getQuestTops(db, homeQuests.map((q) => q.id), 6);
@@ -151,28 +149,24 @@ export default async function LandingPage() {
       <WebSiteSchema />
       <BotSchema servers={network.servers} />
 
-      {/* ===== THE GALAXY, COLLAPSED =====
-          A banner of game logos rather than 700px of globe. A gamer opens it in
-          one tap; everyone else reads the argument first. Signed-in gamers get
-          it open by default — they came to play, not to be sold to. */}
-      {skinnedPlanets.length > 0 && (
-        <HeroBanner
-          planets={skinnedPlanets}
-          quest={questHero}
-          heading={tr("The Cluster galaxy — pick a game")}
-          label={c["hero.banner.label"]}
-          note={c["hero.banner.note"]}
-          defaultOpen={Boolean(viewer)}
-        />
-      )}
+      {/* ===== THE HERO =====
+          One section, one background: a collapsed band of game logos on top of
+          the headline that follows it. The band is not a separate card above the
+          hero — it is the hero's first line, and opening it swaps the globe in
+          place rather than sending the reader to a planet page.
 
-      {/* ===== THE COMMERCIAL ARGUMENT (guests only) =====
-          A signed-in gamer has already bought in; showing them a rate card is
-          noise. A guest is far more likely to be a brand or a server owner, and
-          this is the order the argument has to arrive in: what it costs to reach
-          gamers today → why → what we built → what it costs here. */}
-      {!viewer && (
-        <>
+          The commercial argument only runs for guests. A signed-in gamer has
+          already bought in; showing them a rate card is noise. A guest is far
+          more likely to be a brand or a server owner, and this is the order the
+          argument has to arrive in: what reaching gamers costs today → why
+          → what we built → what it costs here. */}
+      <HeroBanner
+        planets={skinnedPlanets}
+        heading={tr("The Cluster galaxy — pick a game")}
+        label={c["hero.banner.label"]}
+        note={c["hero.banner.note"]}
+      >
+        {!viewer && (
           <BrandHero
             c={c}
             stats={[
@@ -184,6 +178,11 @@ export default async function LandingPage() {
                 : { label: "prize money a month", value: money(pricing.cfg.games * pricing.cfg.challengesPerGame * pricing.cfg.prizePool, pricing.cfg.currency) },
             ]}
           />
+        )}
+      </HeroBanner>
+
+      {!viewer && (
+        <>
           <ProblemSection c={c} bg={cardBg} />
           <InsightSection c={c} bg={cardBg} />
           <SolutionSection c={c} bg={cardBg} />

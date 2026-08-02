@@ -43,7 +43,7 @@ type Sel =
 // hero (switch planets, lazy-loading each). Modules with no data are hidden, so
 // the same layout fits every game.
 export default function PlanetExplorer({
-  planets, initialSlug, initial, swap = false, heading, toggle, compact = false,
+  planets, initialSlug, initial, swap = false, heading, toggle, compact = false, onPlanetChange,
 }: {
   planets: PlanetData[];
   initialSlug: string;
@@ -52,6 +52,9 @@ export default function PlanetExplorer({
   heading?: string;
   toggle?: React.ReactNode;
   compact?: boolean;   // feed teaser: single-column so a narrow container looks right
+  /** Fired when the reader picks a game here, so a game band outside the hero
+   *  can follow along instead of drifting out of sync with what's on screen. */
+  onPlanetChange?: (slug: string) => void;
 }) {
   const tr = useTr();
   const start = Math.max(0, planets.findIndex((x) => x.slug === initialSlug));
@@ -91,8 +94,22 @@ export default function PlanetExplorer({
   const pickPlanet = (i: number) => {
     setIdx(i); setSel(null);
     const slug = planets[i]?.slug;
-    if (swap && slug && slug !== data?.slug) load(slug);
+    if (!slug) return;
+    onPlanetChange?.(slug);
+    if (swap && slug !== data?.slug) load(slug);
   };
+
+  // The parent can drive the selection too — the hero's collapsed game band is
+  // the same control as the row of games above the globe, and pressing either
+  // has to move both. Guarded on the index so the callback above can't bounce
+  // back into a loop.
+  useEffect(() => {
+    const i = planets.findIndex((x) => x.slug === initialSlug);
+    if (i < 0 || i === idx) return;
+    setIdx(i); setSel(null);
+    if (swap && initialSlug !== data?.slug) load(initialSlug);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [initialSlug]);
   const refresh = () => data && load(data.slug);
 
   function onMove(e: React.MouseEvent) {
