@@ -59,6 +59,12 @@ export const BOT_BUTTONS: BotButton[] = [
   { key: "More", label: "More", emoji: "🧭", note: "The rest of the product, so no card has to choose between being complete and being readable." },
   { key: "Open Cluster", label: "Open Cluster", emoji: "🔗", note: "Out to the website." },
   {
+    key: "Get help · our server",
+    label: "Get help · our server",
+    emoji: "💬",
+    note: "On every card, once an HQ invite is set in Admin → Discord. A bot with no support channel is a bot people uninstall the first time something confuses them — and it is usually a five-second answer. Also the top of the funnel for our own community: the people most likely to join a Cluster server are the ones already using Cluster.",
+  },
+  {
     key: "Vote for Cluster · earn CP",
     label: "Vote for Cluster · earn CP",
     emoji: "⭐",

@@ -220,6 +220,45 @@ Two things that matter if you touch it:
   Roles are therefore created *before* staff-only channels, since those channels
   grant VIEW_CHANNEL to a role that must already exist.
 
+### Signing in puts a gamer in HQ
+
+Discord sign-in requests `identify email guilds.join`, and the callback spends
+that third scope immediately: `joinHq()` calls
+`PUT /guilds/{hq}/members/{user}` with the token the gamer just granted. It is
+the cheapest distribution the platform has — everyone signing in is already in
+Discord, already consenting, and one API call from being somewhere we can talk
+to them.
+
+Three things this needs, and they are all in Discord rather than in code:
+
+1. **The bot must be in HQ** with **Create Invite**. `guilds.join` cannot add
+   anyone to a server the bot isn't in — the scope is not a way into servers we
+   don't run.
+2. **The OAuth app and the bot must be the same application.** They already are:
+   `appId()` falls back to `DISCORD_CLIENT_ID`.
+3. **The HQ server id must be set** in Admin → Discord → HQ. With no id, nothing
+   is attempted and nothing fails.
+
+Adding a scope means the consent screen changes, so **people who signed in
+before this shipped are not in HQ** — their old grant didn't include it. They
+join the next time they sign in with Discord. Nothing prompts them; that is the
+trade for not nagging.
+
+A failure here never reaches the person signing in. It is fired and forgotten
+on purpose: not being added to a Discord server is not a reason to fail a login.
+
+### The invite, and the button on every card
+
+Separately, Admin → Discord → HQ takes a **public invite**. Set it and every
+card the bot posts carries a **Get help · our server** button; leave it empty
+and the button isn't rendered at all, because a support button that leads
+nowhere is worse than none.
+
+It is pasted rather than minted: a permanent invite is something a person
+creates with an expiry they chose, and generating one from the bot would put a
+link of unknown lifetime on every card in the product. Make it **never expire,
+no use limit**.
+
 ---
 
 ## Out of scope, on purpose

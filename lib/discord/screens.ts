@@ -12,6 +12,7 @@ import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesFo
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
+import { hqInviteUrl } from "@/lib/discord/hq";
 import { clusterPctFor, nextEarnTier, ownerPctFor } from "@/lib/server-earnings";
 import { REGIONS, VIBES, completeness, getCommunity, regionLabel, vibeLabel } from "@/lib/discord/community";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
@@ -42,6 +43,14 @@ export type ScreenCtx = {
   // Running a challenge is a server-staff action, so it can't be inferred from
   // "is in the guild" — every member is.
   isManager?: boolean;
+  /**
+   * The invite into our own server, when one is configured.
+   *
+   * Resolved once per interaction and carried on the context because the
+   * button tail is synchronous. Null means no invite is set, and the button is
+   * simply absent — a "get help" button that goes nowhere is worse than none.
+   */
+  hqInvite?: string | null;
 };
 
 export async function loadCtx(
@@ -64,7 +73,8 @@ export async function loadCtx(
   // came from — so that's where attribution is recorded. It's insert-if-absent,
   // so the first server they use it in gets the credit.
   if (gamer && guildId) void attributeMember(guildId, gamer.userId).catch(() => {});
-  return { discordId, discordName, guildId, gamer, isManager };
+  const hqInvite = await hqInviteUrl().catch(() => null);
+  return { discordId, discordName, guildId, gamer, isManager, hqInvite };
 }
 
 function embed(url: string, opts: { title?: string; description?: string; color?: string | null; footer?: string } = {}) {
@@ -142,6 +152,21 @@ function voteButton(): Button {
   return linkButton("Vote for Cluster · earn CP", `${siteUrl()}/vote`, "⭐");
 }
 
+/**
+ * The way to reach a person.
+ *
+ * A bot with no support channel is a bot people uninstall the first time
+ * something confuses them — and the thing that confuses them is usually a
+ * five-second answer. This lands them in our server, where the answer is
+ * somebody typing rather than a form.
+ *
+ * It doubles as the top of the funnel for the platform itself: the people most
+ * likely to join a Cluster community are the ones already using Cluster.
+ */
+function supportButton(ctx: ScreenCtx): Button | null {
+  return ctx.hqInvite ? linkButton("Get help · our server", ctx.hqInvite, "💬") : null;
+}
+
 // `here` is the screen being drawn, so the tail never offers a button that
 // leads back to the card you're already looking at.
 function tail(ctx: ScreenCtx, here: Frame, trail: Frame[]): (Button | null)[] {
@@ -151,9 +176,10 @@ function tail(ctx: ScreenCtx, here: Frame, trail: Frame[]): (Button | null)[] {
     on("home") ? null : profileButton(ctx, trail),
     on("more") ? null : moreButton(trail),
     backButton(trail),
-    // Last in the tail, so it never displaces navigation — `rows()` fills five
+    // Last in the tail, so they never displace navigation — `rows()` fills five
     // to a row and the tail is what a card can't do without.
     voteButton(),
+    supportButton(ctx),
   ];
 }
 

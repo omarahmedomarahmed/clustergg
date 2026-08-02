@@ -207,6 +207,21 @@ export async function saveHqServer(_prev: BotActionState, formData: FormData): P
     return { error: "That doesn't look like a Discord server id — it should be 17-20 digits. Turn on Developer Mode, right-click your server, Copy Server ID." };
   }
   await setContent("discord.hq.guildId", id);
+
+  // The public invite, saved alongside the id it belongs to.
+  //
+  // Not minted by the bot: a permanent invite is something a person creates in
+  // Discord with an expiry they chose, and generating one here would quietly
+  // put a link with an unknown lifetime on every card in the product. Accepts
+  // a full link or a bare code, and stores whatever was typed.
+  if (formData.has("invite")) {
+    const raw = String(formData.get("invite") ?? "").trim();
+    if (raw && !/^(https?:\/\/)?(discord\.gg\/|discord\.com\/invite\/)?[A-Za-z0-9-]{2,}$/.test(raw)) {
+      return { error: "That doesn't look like a Discord invite. Paste the link (discord.gg/xxxx) or just the code." };
+    }
+    await setContent("discord.hq.invite", raw);
+  }
+
   revalidatePath("/admin/discord/hq");
   return {
     ok: id

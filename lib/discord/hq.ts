@@ -29,6 +29,10 @@ import { cardRef, embedColor } from "@/lib/discord/cards";
 
 const HQ_ID_KEY = "discord.hq.guildId";
 const HQ_DONE_KEY = "discord.hq.setupFor";   // the guild id we've already built
+const HQ_INVITE_KEY = "discord.hq.invite";   // the public link into HQ
+
+/** Every CMS key HQ reads, so a page can fetch them in one call. */
+export const HQ_CMS_KEYS = [HQ_ID_KEY, HQ_DONE_KEY, HQ_INVITE_KEY];
 
 export type PlannedChannel = {
   name: string;
@@ -212,6 +216,53 @@ export async function hqGuildId(): Promise<string | null> {
     const c = await getContent([HQ_ID_KEY]);
     return (c[HQ_ID_KEY] || "").trim() || null;
   } catch { return null; }
+}
+
+/**
+ * The public invite into our own server.
+ *
+ * Set by hand in Admin → Discord: a permanent invite is a thing a person
+ * creates in Discord's UI with an expiry they chose, and minting one from the
+ * bot would quietly create a link nobody knows the lifetime of. Empty until
+ * someone pastes one, and every button that would use it disappears rather
+ * than pointing at nothing.
+ */
+export async function hqInviteUrl(): Promise<string | null> {
+  try {
+    const c = await getContent([HQ_INVITE_KEY]);
+    const raw = (c[HQ_INVITE_KEY] || "").trim();
+    if (!raw) return null;
+    // Accept a bare code as well as a full link — people paste both.
+    if (/^https?:\/\//i.test(raw)) return raw;
+    return `https://discord.gg/${raw.replace(/^\/+/, "")}`;
+  } catch { return null; }
+}
+
+/**
+ * Put a gamer into HQ, on the consent they just gave.
+ *
+ * Signing in with Discord asks for `guilds.join`, and this is what that scope
+ * is for: the gamer lands in our server as part of signing up rather than
+ * having to find an invite later. It is the cheapest distribution we have —
+ * everyone who signs in is already in Discord, already consenting, and one API
+ * call away from being somewhere we can talk to them.
+ *
+ * Never throws and never blocks a sign-in. Not being added to a Discord server
+ * is not a reason to fail somebody's login.
+ */
+export async function joinHq(
+  discordUserId: string, accessToken: string,
+): Promise<{ ok: boolean; added: boolean; reason?: string }> {
+  try {
+    if (!canAct()) return { ok: false, added: false, reason: "bot_not_configured" };
+    if (!discordUserId || !accessToken) return { ok: false, added: false, reason: "no_token" };
+    const guildId = await hqGuildId();
+    if (!guildId) return { ok: false, added: false, reason: "no_hq_configured" };
+    const { addGuildMember } = await import("@/lib/discord/rest");
+    const res = await addGuildMember(guildId, discordUserId, accessToken);
+    if (!res.ok) return { ok: false, added: false, reason: `discord_${res.status}` };
+    return { ok: true, added: res.added };
+  } catch { return { ok: false, added: false, reason: "error" }; }
 }
 
 async function hqSetupDoneFor(): Promise<string | null> {

@@ -33,6 +33,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
 
   // Resolve the third-party profile.
   let profile: OAuthProfile;
+  // Kept for Discord: `guilds.join` needs the token the gamer just granted, and
+  // it is only usable here — we never store it.
+  let userToken: string | null = null;
   try {
     if (cfg.kind === "openid") {
       const steamId = await verifySteamOpenId(sp);
@@ -42,6 +45,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
       const code = sp.get("code");
       if (!code) return fail(sp.get("error") || "no_code");
       const token = await exchangeCode(provider, code, origin);
+      userToken = token;
       profile = await cfg.userInfo(token);
     }
   } catch (e) {
@@ -71,6 +75,26 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     } catch { /* non-fatal — the game link can be retried from onboarding */ }
   };
 
+  /**
+   * Put a Discord sign-in into the Cluster server.
+   *
+   * Fire-and-forget by design: being added to a Discord server is a nice thing
+   * that happens during sign-in, not a step sign-in depends on. A failure here
+   * — no HQ configured, the bot missing Create Invite, Discord having a bad
+   * minute — must never turn into a login error, so nothing is awaited into the
+   * response path and nothing is surfaced to the person signing in.
+   */
+  const joinOurServer = () => {
+    if (provider !== "discord" || !userToken) return;
+    const token = userToken;
+    void (async () => {
+      try {
+        const { joinHq } = await import("@/lib/discord/hq");
+        await joinHq(profile.providerUserId, token);
+      } catch { /* never a reason to fail a sign-in */ }
+    })();
+  };
+
   const attachIdentity = async (userId: string) => {
     await db.insert(schema.oauthIdentities).values({
       id: uid(), userId, provider, providerUserId: profile.providerUserId,
@@ -78,6 +102,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   };
 
   const finish = async (userId: string, role: string, dest: string) => {
+    joinOurServer();
     await db.update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, userId));
     try { const { evaluateBadgesForUser } = await import("@/lib/badges"); await evaluateBadgesForUser(db, userId); } catch { /* non-fatal */ }
     await createSession(userId, role);
