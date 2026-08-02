@@ -1,4 +1,4 @@
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, isNull} from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { serveAds } from "@/lib/ads";
@@ -128,6 +128,8 @@ export async function sendableCreatives(): Promise<{
       .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id))
       .innerJoin(schema.brands, eq(schema.adCampaigns.brandId, schema.brands.id))
       .innerJoin(schema.adPlacements, eq(schema.adCampaignCreatives.placementId, schema.adPlacements.id))
+      // Staff pick from what is running, not from everything that ever ran.
+      .where(isNull(schema.adCampaignCreatives.retiredAt))
       .limit(60);
   } catch { return []; }
 }

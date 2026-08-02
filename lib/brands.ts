@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql, isNull} from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import { schema } from "@/lib/db";
 
@@ -60,6 +60,7 @@ export async function getCardCampaign(db: DB, brandId: string, placementKey: str
     clickUrl: schema.adCreatives.clickUrl,
     ctaLabel: schema.adCreatives.ctaLabel,
     createdAt: schema.adCreatives.createdAt,
+    retiredAt: schema.adCampaignCreatives.retiredAt,
     campaignId: schema.adCampaigns.id,
     campaignName: schema.adCampaigns.name,
     status: schema.adCampaigns.status,
@@ -74,6 +75,10 @@ export async function getCardCampaign(db: DB, brandId: string, placementKey: str
       eq(schema.adCampaigns.brandId, brandId),
     ))
     .orderBy(desc(schema.adCreatives.createdAt));
+  // Retired rows are read but not listed: their impressions and clicks still
+  // count towards the placement's totals below, while the panel only offers to
+  // manage the art that is actually running.
+  const liveRows = rows.filter((r) => !r.retiredAt);
 
   const base = { id: placement.id, width: placement.width, height: placement.height };
   if (!rows.length) return { ...empty, placement: base };
@@ -98,16 +103,20 @@ export async function getCardCampaign(db: DB, brandId: string, placementKey: str
       id: first.campaignId, name: first.campaignName, status: first.status,
       startDate: first.startDate, endDate: first.endDate,
     },
-    creatives: rows.map((r) => ({
+    // Only what is running is listed and manageable…
+    creatives: liveRows.map((r) => ({
       campaignCreativeId: r.ccId, creativeId: r.creativeId, fileUrl: r.fileUrl,
       clickUrl: r.clickUrl, ctaLabel: r.ctaLabel, createdAt: r.createdAt,
       impressions: impBy.get(r.ccId) ?? 0, clicks: clickBy.get(r.ccId) ?? 0,
     })),
+    // …but the placement's totals span everything that ever ran in it,
+    // retired art included. That total is the brand's performance, and it
+    // must not fall when they replace an image.
     impressions: [...impBy.values()].reduce((a, b) => a + b, 0),
     clicks: [...clickBy.values()].reduce((a, b) => a + b, 0),
     // What the rotation engine actually requires — stated here so the portal
     // can say "live" or "not live" for the same reasons `serveAds` does.
-    live: rows.some((r) => r.status === "active" && r.startDate.getTime() <= now && r.endDate.getTime() >= now),
+    live: liveRows.some((r) => r.status === "active" && r.startDate.getTime() <= now && r.endDate.getTime() >= now),
   };
 }
 
@@ -126,7 +135,13 @@ export async function getCampaignReadiness(db: DB, campaignId: string): Promise<
     fileUrl: schema.adCreatives.fileUrl, clickUrl: schema.adCreatives.clickUrl,
   }).from(schema.adCampaignCreatives)
     .innerJoin(schema.adCreatives, eq(schema.adCampaignCreatives.creativeId, schema.adCreatives.id))
-    .where(eq(schema.adCampaignCreatives.campaignId, campaignId));
+    .where(and(
+      eq(schema.adCampaignCreatives.campaignId, campaignId),
+      // Readiness is about what is RUNNING. A retired assignment keeps its
+      // history but is not a filled slot, and counting it as one would launch
+      // a campaign with an empty placement.
+      isNull(schema.adCampaignCreatives.retiredAt),
+    ));
   const byPlacement = new Map(assigned.map((a) => [a.placementId, a]));
   const slots: PlacementSlot[] = placements.map((p) => {
     const a = byPlacement.get(p.id);

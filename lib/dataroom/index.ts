@@ -285,6 +285,7 @@ async function commercialStats(): Promise<CommercialStats> {
           .innerJoin(schema.adCampaigns, eq(schema.adCampaignCreatives.campaignId, schema.adCampaigns.id))
           .where(and(
             eq(schema.adCampaignCreatives.placementId, cardPlacement[0].id),
+            isNull(schema.adCampaignCreatives.retiredAt),
             sql`${schema.adCampaigns.brandId} <> ${HOUSE_BRAND_ID}`,
           ))).length
       : 0;

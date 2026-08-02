@@ -271,6 +271,10 @@ const COLUMN_MIGRATIONS = [
   `CREATE UNIQUE INDEX IF NOT EXISTS "dwp_guild_key_idx" ON "discord_week_posts" ("guild_id","post_key")`,
   `CREATE INDEX IF NOT EXISTS "dwp_week_idx" ON "discord_week_posts" ("week_key")`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "guild_id" text`,
+  // Retiring a creative instead of deleting its row: impressions and clicks
+  // point at this row and cascade with it, so a brand replacing their art used
+  // to erase the placement's whole history.
+  `ALTER TABLE "ad_campaign_creatives" ADD COLUMN IF NOT EXISTS "retired_at" timestamptz`,
   `ALTER TABLE "ad_creatives" ADD COLUMN IF NOT EXISTS "cta_label" text`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "community" jsonb NOT NULL DEFAULT '{}'::jsonb`,
   `CREATE TABLE IF NOT EXISTS "sponsored_campaigns" (

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull} from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { keysMatch, hasPortalSession } from "@/lib/portal-auth";
@@ -50,10 +50,16 @@ export async function portalUploadCreative(brandId: string, key: string, formDat
     fileUrl, clickUrl, width: placement.width, height: placement.height,
     durationSeconds: type === "video" ? 5 : null, status: "approved",
   });
-  // One creative per placement per campaign — replace any existing assignment.
-  await db.delete(schema.adCampaignCreatives).where(and(
+  // One creative per placement per campaign — retire any existing assignment.
+  //
+  // Retire, never delete: impressions and clicks reference this row and cascade
+  // with it, so deleting it to make room for the replacement wiped every number
+  // the placement had ever earned. Uploading better art must not cost a brand
+  // their reporting.
+  await db.update(schema.adCampaignCreatives).set({ retiredAt: new Date() }).where(and(
     eq(schema.adCampaignCreatives.campaignId, campaign.id),
-    eq(schema.adCampaignCreatives.placementId, placementId)));
+    eq(schema.adCampaignCreatives.placementId, placementId),
+    isNull(schema.adCampaignCreatives.retiredAt)));
   await db.insert(schema.adCampaignCreatives).values({ id: uid(), campaignId: campaign.id, creativeId, placementId, weight: 1, priority: 0 });
   revalidatePath(`/brands/${brand.slug}`);
   return { ok: true };
@@ -160,7 +166,11 @@ export async function portalRemoveCardCreative(brandId: string, key: string, cam
     )).limit(1);
   if (!row) return { error: "Nothing to remove." };
 
-  await db.delete(schema.adCampaignCreatives).where(eq(schema.adCampaignCreatives.id, row.id));
+  // Out of rotation, not out of the record — the comment above this function
+  // has always promised the stats stay, and deleting the row took them.
+  await db.update(schema.adCampaignCreatives)
+    .set({ retiredAt: new Date() })
+    .where(eq(schema.adCampaignCreatives.id, row.id));
   revalidatePath(`/brands/${brand.slug}`);
   return { ok: true };
 }
