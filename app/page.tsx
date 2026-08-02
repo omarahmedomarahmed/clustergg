@@ -26,7 +26,7 @@ import { networkStats, publicServers } from "@/lib/network";
 import { DiscordSection } from "@/components/DiscordSection";
 import { botShowcaseSteps } from "@/lib/bot-showcase";
 import { installUrl } from "@/lib/discord/config";
-import { OrganizationSchema, WebSiteSchema, BotSchema } from "@/components/StructuredData";
+import { OrganizationSchema, WebSiteSchema, BotSchema, FaqSchema, SEARCH_FAQ } from "@/components/StructuredData";
 
 export const dynamic = "force-dynamic";
 
@@ -139,6 +139,172 @@ export default async function LandingPage() {
     { n: counts.challenges, label: tr("Challenges"), icon: "zap" },
   ];
 
+  // The gamer half of the page, hoisted so it can sit in either position.
+  //
+  // A signed-in gamer sees it first — they came to play. A guest sees the
+  // commercial argument first and this underneath as the proof of it, because
+  // "here is the thing your money buys" only lands after they know what the
+  // thing is. Same blocks, two orders, one definition.
+  const gamerSections = (
+    <>
+        {/* ===== LIVE TICKER ===== */}
+        {ticker.length > 0 && (
+          <section className="border-y border-violet-500/15 bg-[#070826]/60 py-3 overflow-hidden">
+            <div className="flex w-max ticker-track gap-10">
+              {ticker.map((t, i) => (
+                <Link key={i} href={`/u/${t.user.slug}`} className="flex items-center gap-2 text-sm whitespace-nowrap text-muted hover:text-ink">
+                  <Avatar name={t.user.displayName} src={t.user.avatarUrl} size={22} />
+                  <span className="text-ink font-semibold">{t.user.displayName}</span>
+                  <span className="text-cyan-300 font-bold">{t.points} {tr("pts")}</span>
+                  <span>{tr("in")} {t.challenge.title}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ===== LIVE CHALLENGES — event hero cards ===== */}
+        {activeChallenges.length > 0 && (
+          <section className="relative py-20">
+            <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${optImg(c["banner.arena"], 1200)})` }} />
+            <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a] via-transparent to-[#04051a]" />
+            <div className="mx-auto max-w-6xl px-4">
+              <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
+                <div>
+                  <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
+                    <Icon name="zap" size={30} className="text-amber-300" />
+                    {c["section.challenges.title"].split(" ")[0]} <span className="grad-text">{c["section.challenges.title"].split(" ").slice(1).join(" ") || "Challenges"}</span>
+                  </h2>
+                  <p className="text-muted mt-2 max-w-xl">{c["section.challenges.subtitle"]}</p>
+                </div>
+                <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">{tr("All challenges")}</Link>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-5">
+                {activeChallenges.map(({ challenge, space }) => {
+                  const top3 = top3ByChallenge.get(challenge.id) ?? [];
+                  return (
+                    <Link
+                      key={challenge.id}
+                      href={`/planets/${space.slug}/challenges/${challenge.id}`}
+                      className="event-card glass card-lift overflow-hidden group relative block"
+                      style={{ background: cardBgStyle(cardBg, "challenge") }}
+                    >
+                      <div className="h-40 relative overflow-hidden">
+                        <div
+                          className="event-cover absolute inset-0 bg-cover bg-center"
+                          style={{ backgroundImage: `url(${optImg(challenge.coverUrl ?? c["banner.arena"], 1200)})` }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/40 to-transparent" />
+                        <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-emerald-300">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> {tr("Live")} · {challenge.cadence}
+                        </div>
+                        <div className="absolute bottom-3 left-4 right-4">
+                          <div className="font-bold text-lg leading-tight drop-shadow">{challenge.title}</div>
+                          <div className="text-xs text-muted mt-0.5 inline-flex items-center gap-1.5">
+                            <Icon name="clock" size={11} /> {tr("ends")} {timeAgo(challenge.endAt).replace(" ago", "")} · {challenge.game}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-4">
+                        <div className="text-xs text-muted line-clamp-2 min-h-[2rem]">{challenge.description}</div>
+                        {/* Hover reveal: live top 3 */}
+                        <div className="event-reveal mt-3 space-y-1.5">
+                          {top3.length === 0 && (
+                            <div className="text-xs text-cyan-300 inline-flex items-center gap-1.5"><Icon name="crown" size={12} /> {tr("Throne unclaimed — join first")}</div>
+                          )}
+                          {top3.map((t, i) => (
+                            <div key={t.slug} className="flex items-center gap-2 text-sm">
+                              <span className={`rank-chip rank-chip-${i + 1} !h-6 !min-w-6 text-xs`}>{i + 1}</span>
+                              <Avatar name={t.name} src={t.avatarUrl} size={20} />
+                              <span className="truncate text-xs">{t.name}</span>
+                              <span className="ml-auto text-cyan-200 font-bold text-xs">{t.points} {tr("pts")}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex items-center justify-between">
+                          {challenge.prizeDescription && (
+                            <span className="inline-flex items-center gap-1.5 text-[11px] text-amber-300 truncate">
+                              <Icon name="trophy" size={12} /> {challenge.prizeDescription.split("+")[0]}
+                            </span>
+                          )}
+                          <span className="inline-flex items-center gap-1 text-xs text-cyan-300 shrink-0">{tr("Compete")} <Icon name="chevronRight" size={12} /></span>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ===== AD ===== */}
+        <div className="mx-auto max-w-6xl px-4">
+          <AdSlot placement="landing_hero_banner" />
+        </div>
+
+        {/* ===== GAMES GALAXY ===== */}
+        <section className="mx-auto max-w-6xl px-4 py-20">
+          <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
+            <div>
+              <h2 className="text-3xl md:text-4xl font-bold">
+                {tr("The")} <span className="grad-text">{tr("Game Galaxy")}</span>
+              </h2>
+              <p className="text-muted mt-2 max-w-xl">{c["section.games.subtitle"]}</p>
+            </div>
+            <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">{tr("All planets")}</Link>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {games.map((g, i) => {
+              const cover = slimImg(g.coverUrl);
+              return (
+                <Link key={g.id} href={`/games/${g.slug}`} className="glass card-lift overflow-hidden group relative" style={{ animationDelay: `${i * 0.3}s` }}>
+                  <div className="h-28 relative overflow-hidden">
+                    {cover ? (
+                      <div className="absolute inset-0 bg-cover transition-transform duration-500 group-hover:scale-110"
+                        style={{ backgroundImage: `url(${optImg(cover, 1200)})`, backgroundPosition: `${g.coverAdjust?.x ?? 50}% ${g.coverAdjust?.y ?? 50}%` }} />
+                    ) : (
+                      <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/30 to-transparent" />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="transition-transform duration-300 group-hover:scale-110 drop-shadow-2xl">
+                        <GameLogo logoUrl={g.logoUrl} name={g.name} size={54} rounded="rounded-2xl" className="ring-1 ring-white/15" />
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-2.5 text-center text-xs font-semibold truncate">{g.name}</div>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ===== QUESTS — same card layout as /quests ===== */}
+        {homeQuestsL.length > 0 && (
+          <section className="mx-auto max-w-6xl px-4 pb-20">
+            <div className="text-center">
+              <h2 className="text-3xl md:text-4xl font-bold">
+                {tr("Chart your")} <span className="grad-text">{tr("Quests")}</span>
+              </h2>
+              <p className="text-muted mt-3 max-w-lg mx-auto">
+                {tr("Everything you do earns Cluster Points across galaxy-spanning quests. Climb each map from Bronze to Platinum.")}
+              </p>
+            </div>
+            <div className="mt-10 grid md:grid-cols-2 gap-5">
+              {homeQuestsL.map((q) => <QuestCard key={q.id} quest={q} top={questTops.get(q.id) ?? []} />)}
+            </div>
+            <div className="mt-8 text-center">
+              <Link href="/quests" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm inline-flex items-center gap-2">
+                {tr("Explore all quests")} <Icon name="arrowRight" size={15} />
+              </Link>
+            </div>
+          </section>
+        )}
+    </>
+  );
+
   return (
     <div className="overflow-x-clip">
       {/* Machine-readable facts about what Cluster is. An assistant asked
@@ -181,8 +347,39 @@ export default async function LandingPage() {
         )}
       </HeroBanner>
 
+      {viewer && gamerSections}
+
       {!viewer && (
         <>
+          {/* ===== WHICH ONE ARE YOU =====
+              Three audiences arrive here and only one of them wants the next
+              screen. Saying so in the first fold — and jumping straight to the
+              section that answers them — is the difference between a landing
+              page and a brochure that has to be read in order. */}
+          <section className="mx-auto max-w-6xl px-4 pt-4 pb-2">
+            <div className="grid gap-4 md:grid-cols-3">
+              <DoorCard
+                icon="target" tone="violet" title="I want to reach gamers"
+                body={`Sponsored challenges and placements from ${money(pricing.cfg.reachBase, pricing.cfg.currency)} a month, on a published rate card. Your name on the competition, not a banner they scroll past.`}
+                href="#brands" cta="What it costs"
+              />
+              <DoorCard
+                icon="satellite" tone="emerald" title="I run a Discord server"
+                body="Install the bot free. Brands fund the prizes, your members win them, and your server takes a share of the fee."
+                href="#servers" cta="What you earn"
+              />
+              <DoorCard
+                icon="gamepad" tone="cyan" title="I play games"
+                body={`One profile for every game you play, and a weekly competition worth ${money(pricing.cfg.prize1, pricing.cfg.currency)} to win. You were playing anyway.`}
+                href="#gamers" cta="What you win"
+              />
+            </div>
+          </section>
+
+          {/* Proof before argument. A brand reading a pitch wants to know the
+              audience is real before it wants to know why. */}
+          <ProofBand net={network} games={pricing.games.length || pricing.cfg.games} cfg={pricing.cfg} />
+
           <ProblemSection c={c} bg={cardBg} />
           <InsightSection c={c} bg={cardBg} />
           <SolutionSection c={c} bg={cardBg} />
@@ -194,9 +391,10 @@ export default async function LandingPage() {
           demo on the same screen. */}
       <DiscordSection stats={network} servers={topServers} copy={c} steps={botSteps} installUrl={install} />
 
-      {/* ===== PRICING (guests only) ===== */}
+      {/* ===== FOR BRANDS: what it costs (guests only) ===== */}
       {!viewer && (
         <>
+          <div id="brands" className="scroll-mt-24" />
           <PrizeSection c={c} cfg={pricing.cfg} bg={cardBg} />
 
           <section id="pricing" className="relative py-20 scroll-mt-24" style={{ background: cardBgStyle(cardBg, "sec_pricing") }}>
@@ -224,9 +422,10 @@ export default async function LandingPage() {
             </div>
           </section>
 
+          <div id="servers" className="scroll-mt-24" />
           <LoopSection c={c} bg={cardBg} />
 
-          {/* ===== THE OTHER SIDE: servers get paid ===== */}
+          {/* ===== FOR SERVER OWNERS: what they earn ===== */}
           <section className="relative py-20 border-y border-violet-500/15" style={{ background: cardBgStyle(cardBg, "sec_servers") }}>
             <div className="relative mx-auto max-w-6xl px-4">
               <ServerEarnCards installUrl={install || undefined} />
@@ -278,157 +477,46 @@ export default async function LandingPage() {
         </section>
       )}
 
-      {/* ===== LIVE TICKER ===== */}
-      {ticker.length > 0 && (
-        <section className="border-y border-violet-500/15 bg-[#070826]/60 py-3 overflow-hidden">
-          <div className="flex w-max ticker-track gap-10">
-            {ticker.map((t, i) => (
-              <Link key={i} href={`/u/${t.user.slug}`} className="flex items-center gap-2 text-sm whitespace-nowrap text-muted hover:text-ink">
-                <Avatar name={t.user.displayName} src={t.user.avatarUrl} size={22} />
-                <span className="text-ink font-semibold">{t.user.displayName}</span>
-                <span className="text-cyan-300 font-bold">{t.points} {tr("pts")}</span>
-                <span>{tr("in")} {t.challenge.title}</span>
-              </Link>
+
+      {/* ===== FOR GAMERS: what they play for =====
+          A guest reaches this having read what a brand buys and what a server
+          earns. This is the thing both of those are actually buying: real
+          competitions with real people in them. */}
+      {!viewer && (
+        <section className="mx-auto max-w-6xl px-4 pt-16 text-center">
+          <div id="gamers" className="scroll-mt-24" />
+          <div className="text-[11px] uppercase tracking-[0.25em] text-cyan-300">For gamers</div>
+          <h2 className="mt-2 text-3xl font-bold md:text-4xl">This is what the money buys.</h2>
+          <p className="mx-auto mt-3 max-w-xl text-muted">
+            Every challenge below is funded, live, and scored from the game&apos;s own API. Entering more
+            costs nothing — one account, as many as you like.
+          </p>
+        </section>
+      )}
+      {gamerSections}
+
+      {/* ===== THE QUESTIONS PEOPLE ACTUALLY ASK =====
+          The same eight answers the /answers page publishes, on the page most
+          people land on. Written as self-contained paragraphs so an answer
+          engine can quote one, and marked up as FAQPage for the same reason. */}
+      {!viewer && (
+        <section className="mx-auto max-w-4xl px-4 py-20">
+          <FaqSchema items={SEARCH_FAQ} />
+          <div className="mb-8 text-center">
+            <h2 className="text-3xl font-bold md:text-4xl">Straight answers</h2>
+            <p className="mt-3 text-muted">The questions we get before anyone signs anything.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {SEARCH_FAQ.map(([q, a]) => (
+              <div key={q} className="glass p-5">
+                <h3 className="text-sm font-bold text-ink">{q}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted">{a}</p>
+              </div>
             ))}
           </div>
-        </section>
-      )}
-
-      {/* ===== LIVE CHALLENGES — event hero cards ===== */}
-      {activeChallenges.length > 0 && (
-        <section className="relative py-20">
-          <div className="absolute inset-0 -z-10 bg-cover bg-center opacity-30" style={{ backgroundImage: `url(${optImg(c["banner.arena"], 1200)})` }} />
-          <div className="absolute inset-0 -z-10 bg-gradient-to-b from-[#04051a] via-transparent to-[#04051a]" />
-          <div className="mx-auto max-w-6xl px-4">
-            <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
-              <div>
-                <h2 className="text-3xl md:text-4xl font-bold flex items-center gap-3">
-                  <Icon name="zap" size={30} className="text-amber-300" />
-                  {c["section.challenges.title"].split(" ")[0]} <span className="grad-text">{c["section.challenges.title"].split(" ").slice(1).join(" ") || "Challenges"}</span>
-                </h2>
-                <p className="text-muted mt-2 max-w-xl">{c["section.challenges.subtitle"]}</p>
-              </div>
-              <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">{tr("All challenges")}</Link>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-5">
-              {activeChallenges.map(({ challenge, space }) => {
-                const top3 = top3ByChallenge.get(challenge.id) ?? [];
-                return (
-                  <Link
-                    key={challenge.id}
-                    href={`/planets/${space.slug}/challenges/${challenge.id}`}
-                    className="event-card glass card-lift overflow-hidden group relative block"
-                    style={{ background: cardBgStyle(cardBg, "challenge") }}
-                  >
-                    <div className="h-40 relative overflow-hidden">
-                      <div
-                        className="event-cover absolute inset-0 bg-cover bg-center"
-                        style={{ backgroundImage: `url(${optImg(challenge.coverUrl ?? c["banner.arena"], 1200)})` }}
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/40 to-transparent" />
-                      <div className="absolute top-3 left-3 inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/50 px-2.5 py-1 text-[10px] uppercase tracking-widest text-emerald-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> {tr("Live")} · {challenge.cadence}
-                      </div>
-                      <div className="absolute bottom-3 left-4 right-4">
-                        <div className="font-bold text-lg leading-tight drop-shadow">{challenge.title}</div>
-                        <div className="text-xs text-muted mt-0.5 inline-flex items-center gap-1.5">
-                          <Icon name="clock" size={11} /> {tr("ends")} {timeAgo(challenge.endAt).replace(" ago", "")} · {challenge.game}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="p-4">
-                      <div className="text-xs text-muted line-clamp-2 min-h-[2rem]">{challenge.description}</div>
-                      {/* Hover reveal: live top 3 */}
-                      <div className="event-reveal mt-3 space-y-1.5">
-                        {top3.length === 0 && (
-                          <div className="text-xs text-cyan-300 inline-flex items-center gap-1.5"><Icon name="crown" size={12} /> {tr("Throne unclaimed — join first")}</div>
-                        )}
-                        {top3.map((t, i) => (
-                          <div key={t.slug} className="flex items-center gap-2 text-sm">
-                            <span className={`rank-chip rank-chip-${i + 1} !h-6 !min-w-6 text-xs`}>{i + 1}</span>
-                            <Avatar name={t.name} src={t.avatarUrl} size={20} />
-                            <span className="truncate text-xs">{t.name}</span>
-                            <span className="ml-auto text-cyan-200 font-bold text-xs">{t.points} {tr("pts")}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-3 flex items-center justify-between">
-                        {challenge.prizeDescription && (
-                          <span className="inline-flex items-center gap-1.5 text-[11px] text-amber-300 truncate">
-                            <Icon name="trophy" size={12} /> {challenge.prizeDescription.split("+")[0]}
-                          </span>
-                        )}
-                        <span className="inline-flex items-center gap-1 text-xs text-cyan-300 shrink-0">{tr("Compete")} <Icon name="chevronRight" size={12} /></span>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ===== AD ===== */}
-      <div className="mx-auto max-w-6xl px-4">
-        <AdSlot placement="landing_hero_banner" />
-      </div>
-
-      {/* ===== GAMES GALAXY ===== */}
-      <section className="mx-auto max-w-6xl px-4 py-20">
-        <div className="flex items-end justify-between flex-wrap gap-3 mb-8">
-          <div>
-            <h2 className="text-3xl md:text-4xl font-bold">
-              {tr("The")} <span className="grad-text">{tr("Game Galaxy")}</span>
-            </h2>
-            <p className="text-muted mt-2 max-w-xl">{c["section.games.subtitle"]}</p>
-          </div>
-          <Link href="/planets" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">{tr("All planets")}</Link>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {games.map((g, i) => {
-            const cover = slimImg(g.coverUrl);
-            return (
-              <Link key={g.id} href={`/games/${g.slug}`} className="glass card-lift overflow-hidden group relative" style={{ animationDelay: `${i * 0.3}s` }}>
-                <div className="h-28 relative overflow-hidden">
-                  {cover ? (
-                    <div className="absolute inset-0 bg-cover transition-transform duration-500 group-hover:scale-110"
-                      style={{ backgroundImage: `url(${optImg(cover, 1200)})`, backgroundPosition: `${g.coverAdjust?.x ?? 50}% ${g.coverAdjust?.y ?? 50}%` }} />
-                  ) : (
-                    <div className="absolute inset-0 bg-cover bg-center opacity-60" style={{ backgroundImage: "url(/assets/ambient.png)" }} />
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[#0b0d26] via-[#0b0d26]/30 to-transparent" />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="transition-transform duration-300 group-hover:scale-110 drop-shadow-2xl">
-                      <GameLogo logoUrl={g.logoUrl} name={g.name} size={54} rounded="rounded-2xl" className="ring-1 ring-white/15" />
-                    </span>
-                  </div>
-                </div>
-                <div className="p-2.5 text-center text-xs font-semibold truncate">{g.name}</div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* ===== QUESTS — same card layout as /quests ===== */}
-      {homeQuestsL.length > 0 && (
-        <section className="mx-auto max-w-6xl px-4 pb-20">
-          <div className="text-center">
-            <h2 className="text-3xl md:text-4xl font-bold">
-              {tr("Chart your")} <span className="grad-text">{tr("Quests")}</span>
-            </h2>
-            <p className="text-muted mt-3 max-w-lg mx-auto">
-              {tr("Everything you do earns Cluster Points across galaxy-spanning quests. Climb each map from Bronze to Platinum.")}
-            </p>
-          </div>
-          <div className="mt-10 grid md:grid-cols-2 gap-5">
-            {homeQuestsL.map((q) => <QuestCard key={q.id} quest={q} top={questTops.get(q.id) ?? []} />)}
-          </div>
           <div className="mt-8 text-center">
-            <Link href="/quests" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm inline-flex items-center gap-2">
-              {tr("Explore all quests")} <Icon name="arrowRight" size={15} />
+            <Link href="/answers" className="ghost-btn pressable inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm">
+              All of them, in one page <Icon name="arrowRight" size={15} />
             </Link>
           </div>
         </section>
@@ -483,8 +571,47 @@ export default async function LandingPage() {
   );
 }
 
-// One of the three doors at the bottom of the page. Kept local: this layout is
-// the closing argument of the home page specifically, not a shared pattern.
+// The audience, before the argument.
+//
+// A brand reading a pitch wants to know the audience is real before it wants to
+// know why. Every number here is read from production on this request — if one
+// is small, it says so, because a landing page that inflates its own reach gets
+// found out in the first campaign.
+function ProofBand({ net, games, cfg }: {
+  net: { servers: number; reach: number; gamers: number; linked: number };
+  games: number;
+  cfg: { challengePrice: number; prizePool: number; currency: string };
+}) {
+  const stats = [
+    { value: net.servers.toLocaleString(), label: "Discord servers running the bot" },
+    { value: net.reach.toLocaleString(), label: "members inside them" },
+    { value: net.linked.toLocaleString(), label: "gamers with a verified game account" },
+    { value: String(games), label: "games, one weekly competition each" },
+  ];
+  return (
+    <section className="border-y border-violet-500/12 bg-[#070826]/40 py-10">
+      <div className="mx-auto max-w-6xl px-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          {stats.map((s) => (
+            <div key={s.label} className="text-center">
+              <div className="brand-text text-3xl font-bold leading-none">{s.value}</div>
+              <div className="mt-2 text-[11px] uppercase tracking-wider text-muted">{s.label}</div>
+            </div>
+          ))}
+        </div>
+        <p className="mt-6 text-center text-xs text-muted">
+          Read from production as this page loaded. A sponsored challenge is{" "}
+          <b className="text-ink">{money(cfg.challengePrice, cfg.currency)}</b>, of which{" "}
+          <b className="text-ink">{money(cfg.prizePool, cfg.currency)}</b> is prize money won by players.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+// One of the three doors. Used twice: as the audience selector under the hero,
+// and as the closing CTA. Kept local — this layout is the home page's argument,
+// not a shared pattern.
 function DoorCard({
   icon, tone, title, body, href, cta,
 }: { icon: string; tone: "violet" | "emerald" | "cyan"; title: string; body: string; href: string; cta: string }) {
