@@ -1131,6 +1131,55 @@ export async function ensureCardAdPlacement(db: DB) {
   });
 }
 
+/**
+ * The blog's two slots, on databases seeded before the blog carried ads.
+ *
+ * Same shape as `ensureCardAdPlacement`, once per placement. The blog is the
+ * only surface where a reader arrives from a search engine rather than from
+ * the product, so it is the one place unsold inventory is genuinely worth
+ * filling with a house creative.
+ */
+export async function ensureBlogAdPlacements(db: DB) {
+  const slots = [
+    { key: "blog_inline", pageScope: "Inside a blog article", width: 728, height: 90, mw: 320, mh: 100, tag: 0 },
+    { key: "blog_sidebar", pageScope: "Blog left rail", width: 300, height: 250, mw: 300, mh: 250, tag: 2 },
+  ];
+
+  const [brand] = await db.select({ id: schema.brands.id }).from(schema.brands)
+    .where(eq(schema.brands.id, HOUSE_BRAND_ID)).limit(1);
+  const [camp] = brand
+    ? await db.select({ id: schema.adCampaigns.id }).from(schema.adCampaigns)
+        .where(eq(schema.adCampaigns.brandId, HOUSE_BRAND_ID)).limit(1)
+    : [undefined];
+
+  for (const s of slots) {
+    await db.insert(schema.adPlacements).values({
+      id: uid(), key: s.key, pageScope: s.pageScope, device: "both",
+      width: s.width, height: s.height, mobileWidth: s.mw, mobileHeight: s.mh,
+    }).onConflictDoNothing();
+
+    if (!camp) continue; // fresh DB: seedHouseAds covers every placement
+    const [placement] = await db.select().from(schema.adPlacements)
+      .where(eq(schema.adPlacements.key, s.key)).limit(1);
+    if (!placement) continue;
+
+    const [link] = await db.select({ id: schema.adCampaignCreatives.id }).from(schema.adCampaignCreatives)
+      .where(and(eq(schema.adCampaignCreatives.campaignId, camp.id), eq(schema.adCampaignCreatives.placementId, placement.id))).limit(1);
+    if (link) continue;
+
+    const t = HOUSE_TAGLINES[s.tag];
+    const crId = uid();
+    await db.insert(schema.adCreatives).values({
+      id: crId, brandId: HOUSE_BRAND_ID, name: `Cluster · ${s.key}`, type: "image",
+      fileUrl: svgAd(placement.width, placement.height, t.from, t.to, "CLUSTER", t.title),
+      clickUrl: t.click, width: placement.width, height: placement.height, status: "approved",
+    });
+    await db.insert(schema.adCampaignCreatives).values({
+      id: uid(), campaignId: camp.id, creativeId: crId, placementId: placement.id, weight: 1, priority: 0,
+    });
+  }
+}
+
 export async function ensureTopBannerAd(db: DB) {
   await db.insert(schema.adPlacements).values({
     id: uid(), key: "top_banner", pageScope: "Global top banner (all pages)", device: "both",
