@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
+import { ruleLines } from "@/lib/challenge-rules";
+import { PROVIDERS } from "@/lib/providers/registry";
 import Avatar from "@/components/Avatar";
 import Flag from "@/components/Flag";
 import GameLogo from "@/components/GameLogo";
@@ -484,7 +486,7 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
           <div>
             <div className="text-[10px] uppercase tracking-widest text-cyan-200 mb-1 flex items-center gap-1"><Icon name="target" size={11} /> {tr("How to win")}</div>
             {c.description && <p className="text-[12px] text-white/85 leading-relaxed mb-1.5 whitespace-pre-line">{c.description}</p>}
-            <div className="text-[11px] text-white/70">{winCondition(c.format, c.conditions)}</div>
+            <div className="text-[11px] text-white/70">{winCondition(c.format, c.conditions, game ?? undefined)}</div>
           </div>
           {c.prize && <div className="rounded-lg border border-amber-400/25 bg-amber-500/[0.06] p-2 text-[11px]"><span className="text-amber-200 font-semibold inline-flex items-center gap-1"><Icon name="trophy" size={11} /> {tr("Prize")}:</span> {c.prize}</div>}
           <div>
@@ -754,11 +756,14 @@ function fmtDateTime(iso: string): string {
   try { return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); } catch { return ""; }
 }
 const OP_LABEL: Record<string, string> = { ">=": "reach", ">": "exceed", "<=": "stay under", "<": "drop below", "==": "hit", "=": "hit" };
-function winCondition(format: string, conditions: { metric: string; op: string; value: number }[]): string {
+function winCondition(format: string, conditions: { metric: string; op: string; value: number }[], game?: string): string {
   const base = format === "top1" ? "Finish #1 on the challenge leaderboard." : format === "threshold_race" ? "Be first to reach the target." : "Finish in the top 3 of the challenge leaderboard.";
   if (!conditions || conditions.length === 0) return base;
-  const parts = conditions.map((c) => `${OP_LABEL[c.op] ?? c.op} ${Number(c.value).toLocaleString()} ${c.metric.replace(/_/g, " ")}`);
-  return `${base} Scoring: ${parts.join(", ")}.`;
+  // The game's own words — "Gold or above in Solo/Duo" — rather than the
+  // stored `solo_tier >= 4`, which reads as a bug to anyone who isn't us.
+  const caps = PROVIDERS.filter((p) => !game || p.game === game).flatMap((p) => p.capabilities);
+  const lines = ruleLines(conditions, caps);
+  return lines.length ? `${base} Entry: ${lines.join(", ")}.` : base;
 }
 
 // One gamer's real stats for whichever game's planet you're standing on.

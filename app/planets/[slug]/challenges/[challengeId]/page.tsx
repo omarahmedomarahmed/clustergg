@@ -9,6 +9,7 @@ import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n/t-server";
 import { getProvider } from "@/lib/providers/registry";
+import { ruleLines, OPEN_TO_EVERYONE } from "@/lib/challenge-rules";
 import { getContent } from "@/lib/cms";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
@@ -424,9 +425,24 @@ export default async function ChallengePage({
             <div className="font-bold text-ink flex items-center gap-2"><Icon name="satellite" size={15} /> {tr("How scoring works")}</div>
             <p>{tr("Your stats are snapshotted when you join. Only")} <b className="text-ink">{tr("new")}</b> {tr("activity counts.")}</p>
             <p>{tr("Every sync pulls fresh data from the")} {provider?.name} {tr("API and the board updates in real time.")}</p>
-            {(challenge.rules?.conditions?.length ?? 0) > 0 && (
-              <p>{tr("Qualification:")} {challenge.rules.conditions.map((cd) => `${cd.metric} ${cd.op} ${cd.value}`).join(" AND ")}</p>
-            )}
+            {/* The entry rules, in the game's own words.
+                This used to print the stored form — `solo_tier >= 4` — which
+                is a sentence in a language only we speak. */}
+            <div>
+              <div className="text-ink font-semibold">{tr("Who can enter")}</div>
+              {ruleLines(challenge.rules?.conditions, provider?.capabilities ?? []).length === 0 ? (
+                <p>{tr(OPEN_TO_EVERYONE)}</p>
+              ) : (
+                <ul className="mt-1 space-y-1">
+                  {ruleLines(challenge.rules?.conditions, provider?.capabilities ?? []).map((line) => (
+                    <li key={line} className="flex items-start gap-1.5">
+                      <Icon name="check" size={12} className="mt-1 shrink-0 text-emerald-300" />
+                      <span className="text-ink">{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
           <AdSlot placement="challenge_sidebar" />
         </aside>

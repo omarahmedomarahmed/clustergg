@@ -3,7 +3,13 @@
   "installCommand": "npm install --no-audit --no-fund",
   "buildCommand": "next build",
   "crons": [
-    { "path": "/api/cron/sync", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/daily", "schedule": "0 12 * * *" }
+    {
+      "path": "/api/cron/sync",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 12 * * *"
+    }
   ]
 }

@@ -451,10 +451,17 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
     serverName = guild?.name || null;
   }
 
+  // The entry rules, resolved through the provider that scores this game so
+  // the card says "Gold or above" rather than the stored `solo_tier >= 4`.
+  const { ruleLines } = await import("@/lib/challenge-rules");
+  const { getProvider } = await import("@/lib/providers/registry");
+  const entryRules = ruleLines(ch.rules?.conditions, getProvider(ch.provider)?.capabilities ?? []);
+
   return {
     kind: "challenge",
     title: ch.title,
     game: ch.game,
+    entryRules,
     logoUrl: g?.logoUrl ?? null,
     description: ch.description || null,
     startsAt: ch.startAt.toISOString(),
