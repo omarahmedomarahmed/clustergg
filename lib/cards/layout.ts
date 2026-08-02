@@ -443,6 +443,58 @@ export function partOf(l: CardLayout, key: string): PartDraw {
   };
 }
 
+/**
+ * Where each of a card's content sections is drawn, for the editor's canvas.
+ *
+ * The guide carries two lists and they are not the same list. `regions` are art
+ * zones — "keep detail out of here" — and include the furniture (the mascot,
+ * the logo, the sponsor box). `parts` are the blocks the renderer actually
+ * draws. Some keys appear in both, most don't: a profile has regions for
+ * `stats` and `accounts` and parts for `identity`, `trophies` and `challenges`
+ * too. Joining the two by key drew boxes for two sections out of five and
+ * silently dropped the rest, which is worse than drawing none — a canvas that
+ * shows some of the card looks complete.
+ *
+ * So every part gets a box. A hand-tuned region wins where one exists, because
+ * somebody measured it against the real render. Everything else is laid out the
+ * way the renderer genuinely lays it out: a vertical stack inside the content
+ * box, in declared order, sharing the height. That is an approximation of where
+ * a block lands — Satori decides the real heights from the text — and it is an
+ * honest one, because the stack IS the model.
+ */
+export function partBoxes(
+  l: CardLayout,
+  parts: { key: string }[],
+  regions: { key: string; x: number; y: number; w: number; h: number }[],
+): Record<string, { x: number; y: number; w: number; h: number }> {
+  const out: Record<string, { x: number; y: number; w: number; h: number }> = {};
+  const byKey = new Map(regions.map((r) => [r.key, r]));
+  const stacked = parts.filter((p) => !byKey.has(p.key));
+  // A gap between blocks so adjacent boxes are visibly separate rather than one
+  // continuous column an admin cannot tell apart.
+  const GAP = 0.8;
+  const each = stacked.length
+    ? Math.max(4, (l.content.h - GAP * (stacked.length - 1)) / stacked.length)
+    : 0;
+
+  let i = 0;
+  for (const p of parts) {
+    const region = byKey.get(p.key);
+    if (region) {
+      out[p.key] = { x: region.x, y: region.y, w: region.w, h: region.h };
+      continue;
+    }
+    out[p.key] = {
+      x: l.content.x,
+      y: l.content.y + i * (each + GAP),
+      w: l.content.w,
+      h: each,
+    };
+    i++;
+  }
+  return out;
+}
+
 /** The CSS transform for a flipped/rotated element. Satori supports both. */
 export function transformOf(o: { flipX?: boolean; flipY?: boolean; rotate?: number }): string | undefined {
   const parts: string[] = [];

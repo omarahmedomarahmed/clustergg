@@ -29,7 +29,7 @@ export type StudioCard = {
   group: string;
   bgKey: string;
   brief: string;
-  regions: { key: string; label: string; note: string; kind: string }[];
+  regions: { key: string; label: string; note: string; kind: string; x: number; y: number; w: number; h: number }[];
   /** The content sections of this card, offered as per-section controls. */
   parts: CardPart[];
   layout: CardLayout;
@@ -109,6 +109,7 @@ export default function CardStudio({ cards, library }: { cards: StudioCard[]; li
           parts={card.parts}
           previewUrl={card.previewUrl}
           samples={card.samples}
+          regions={card.regions}
           library={library}
         />
 

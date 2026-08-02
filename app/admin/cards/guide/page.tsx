@@ -38,7 +38,13 @@ export default async function CardStudioPage() {
     group: g.group,
     bgKey: g.bgKey,
     brief: artBrief(g, layouts[g.kind]),
-    regions: g.regions.map((r) => ({ key: r.key, label: r.label, note: r.note, kind: r.kind })),
+    // Geometry travels with the region now: the editor draws each section
+    // where the guide says it lands, so a box on the canvas is the section
+    // rather than a rectangle in a list.
+    regions: g.regions.map((r) => ({
+      key: r.key, label: r.label, note: r.note, kind: r.kind,
+      x: r.x, y: r.y, w: r.w, h: r.h,
+    })),
     parts: g.parts,
     layout: layouts[g.kind],
     art: {

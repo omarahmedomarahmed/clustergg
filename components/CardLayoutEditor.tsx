@@ -1,16 +1,18 @@
 "use client";
 
-import { useActionState, useCallback, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/Icon";
 import { saveCardLayout, resetCardLayout, type CardActionState } from "@/app/actions/cards";
 import ImageUpload from "@/components/ImageUpload";
 import {
-  DEFAULT_LAYOUT, BG_SOURCES, AD_RATIO, assetBox, badgeTopFor,
+  DEFAULT_LAYOUT, BG_SOURCES, AD_RATIO, assetBox, badgeTopFor, partBoxes,
   type CardLayout, type CardAsset, type ContentBox, type PartStyle, type Spot,
 } from "@/lib/cards/layout";
 import type { LibraryGroup } from "@/lib/cards/asset-library";
 import type { CardPart } from "@/lib/cards/layout-guide";
 import type { CardSample } from "@/lib/cards/preview";
+import type { CardData } from "@/lib/cards/types";
+import { partContent } from "@/lib/cards/part-content";
 
 // Drag the furniture on a rendered card.
 //
@@ -31,11 +33,11 @@ export type EditorArt = {
 };
 
 // `asset:<id>` is a handle too — one pointer path for everything on the canvas.
-type Handle = "mascot" | "mark" | "badge" | "ad" | "content" | `asset:${string}`;
+type Handle = "mascot" | "mark" | "badge" | "ad" | "content" | `asset:${string}` | `part:${string}`;
 
 const ASPECT = 1200 / 630;
 
-export default function CardLayoutEditor({ kind, name, initial, art, parts = [], previewUrl, library = [], samples = [] }: {
+export default function CardLayoutEditor({ kind, name, initial, art, parts = [], previewUrl, library = [], samples = [], regions = [] }: {
   kind: string;
   name: string;
   initial: CardLayout;
@@ -48,6 +50,8 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
   library?: LibraryGroup[];
   /** Real cards of this kind, to check the layout against varied art. */
   samples?: CardSample[];
+  /** Where each section is drawn — the card guide's own geometry. */
+  regions?: { key: string; x: number; y: number; w: number; h: number }[];
 }) {
   const [l, setL] = useState<CardLayout>(initial);
   // Which real card the preview is showing. A layout is tuned against art, and
@@ -112,7 +116,31 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
   // draws is now a row here: turn it off, fade it, resize its type, and where
   // the section has fixed copy of its own, rewrite it.
   const [openPart, setOpenPart] = useState<string | null>(null);
+
+  // The card, as data.
+  //
+  // The canvas draws each section as its own box, and a box labelled
+  // "Standings" with nothing in it is a diagram — arranging diagrams is not
+  // designing. So the editor asks the card API for the same object the renderer
+  // is about to draw and fills every box with what it will really say.
+  const [cardData, setCardData] = useState<CardData | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const url = sampleUrl(previewUrl, sample, nonce).replace("?", "?json=1&");
+    fetch(url, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (alive) setCardData(j); })
+      .catch(() => { if (alive) setCardData(null); });
+    return () => { alive = false; };
+  }, [previewUrl, sample, nonce]);
   const partOf = (key: string): PartStyle => l.parts?.[key] ?? {};
+  // Where every section is drawn.
+  //
+  // Computed rather than looked up: `regions` and `parts` are different lists
+  // with only some keys in common, so joining them by key drew boxes for two of
+  // a profile's five sections and silently dropped the rest.
+  const boxes = useMemo(() => partBoxes(l, parts, regions), [l, parts, regions]);
+  const regionFor = (key: string) => boxes[key] ?? null;
   const patchPart = (key: string, patch: Partial<PartStyle>) =>
     setL((c) => ({ ...c, parts: { ...(c.parts ?? {}), [key]: { ...(c.parts?.[key] ?? {}), ...patch } } }));
 
@@ -130,6 +158,24 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
     const y = Math.max(0, Math.min(100, ((e.clientY - r.top) / r.height) * 100));
     if (drag === "content") {
       setL((cur) => ({ ...cur, content: { ...cur.content, x: round(x), y: round(y) } }));
+    } else if (drag.startsWith("part:")) {
+      // A section is nudged, not placed: the offset is measured from where the
+      // flow put it, so it composes with the column instead of replacing it.
+      const key = drag.slice(5);
+      const geo = boxes[key];
+      if (geo) {
+        setL((cur) => ({
+          ...cur,
+          parts: {
+            ...(cur.parts ?? {}),
+            [key]: {
+              ...(cur.parts?.[key] ?? {}),
+              dx: Math.round(((x - geo.x) / 100) * 1200),
+              dy: Math.round(((y - geo.y) / 100) * 630),
+            },
+          },
+        }));
+      }
     } else if (drag.startsWith("asset:")) {
       const id = drag.slice(6);
       setL((cur) => ({
@@ -211,6 +257,66 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
               active={drag === "content"}
               onGrab={() => setDrag("content")}
             />
+
+            {/* Every section of the card, where it is drawn, saying what it
+                will really say. The guide gives each one its home geometry;
+                the admin's nudge moves it from there. Click to select — the
+                controls on the right jump to the same section — and drag to
+                move. Sections with nothing in them for THIS sample are drawn
+                faint and labelled, because "empty here" and "I forgot to map
+                it" look identical otherwise. */}
+            {parts.map((pt) => {
+              const geo = regionFor(pt.key);
+              if (!geo) return null;
+              const st = partOf(pt.key);
+              if (st.hidden) return null;
+              const content = cardData ? partContent(cardData, pt.key) : { lines: [], images: [], empty: true };
+              const on = openPart === pt.key;
+              return (
+                <button
+                  key={pt.key}
+                  type="button"
+                  onPointerDown={(e) => { e.preventDefault(); setOpenPart(pt.key); setDrag(`part:${pt.key}`); }}
+                  data-part={pt.key}
+                  title={`${pt.label} — drag to nudge`}
+                  className={`absolute cursor-move overflow-hidden rounded-md border text-left transition ${
+                    on ? "border-cyan-400 bg-cyan-400/10" : "border-white/25 border-dashed bg-black/20 hover:border-white/50"
+                  }`}
+                  style={{
+                    left: `${geo.x}%`,
+                    top: `${geo.y}%`,
+                    width: `${st.w ?? geo.w}%`,
+                    height: `${geo.h}%`,
+                    // The nudge, in canvas pixels — converted to % so the box
+                    // moves by the same amount the renderer will move it.
+                    marginLeft: `${((st.dx ?? 0) / 1200) * 100}%`,
+                    marginTop: `${((st.dy ?? 0) / 630) * 100}%`,
+                    opacity: (st.opacity ?? 100) / 100,
+                  }}
+                >
+                  <span className={`block px-1 pt-0.5 text-[8px] font-bold uppercase tracking-wider ${on ? "text-cyan-200" : "text-white/55"}`}>
+                    {pt.label}
+                  </span>
+                  {content.empty ? (
+                    <span className="block px-1 text-[8px] italic text-white/35">nothing on this card</span>
+                  ) : (
+                    <span className="block px-1 leading-tight" style={{ fontSize: `${8 * (st.scale ?? 1)}px` }}>
+                      {content.lines.slice(0, 4).map((line, i) => (
+                        <span key={i} className="block truncate text-white/85">{st.text && i === 0 ? st.text : line}</span>
+                      ))}
+                    </span>
+                  )}
+                  {content.images.length > 0 && (
+                    <span className="mt-0.5 flex gap-0.5 px-1">
+                      {content.images.slice(0, 4).map((src, i) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img key={i} src={src} alt="" className="h-3 w-3 rounded object-cover" />
+                      ))}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
 
             {!l.mascot.hidden && (
               <Grab
@@ -629,8 +735,16 @@ function Grab({ label, spot, active, onGrab, img, tint, ratio = 1, centerY }: {
       }}
     >
       {img ? (
+        // Drawn at the opacity it will actually render at. The border and the
+        // label stay solid so a faded mark is still findable and draggable —
+        // fading the handle along with the art would make a watermark
+        // impossible to grab.
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt="" className="pointer-events-none h-full w-full object-contain" />
+        <img
+          src={img} alt=""
+          className="pointer-events-none h-full w-full object-contain"
+          style={{ opacity: (spot.opacity ?? 100) / 100 }}
+        />
       ) : null}
       <span className="pointer-events-none absolute -top-5 left-0 whitespace-nowrap rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-semibold">
         {label}
@@ -671,6 +785,17 @@ function SpotFields({ label, prefix, spot, onChange, hint }: {
         <Num name={`${prefix}.y`} label="Y %" value={spot.y} onChange={(v) => onChange({ y: v })} />
         <Num name={`${prefix}.size`} label="Size px" value={spot.size} onChange={(v) => onChange({ size: v })} />
       </div>
+      {/* Opacity, so art can sit UNDER the card rather than compete with it.
+          The layout could already fade a placed image and could not fade the
+          two pieces of furniture that are on every single card — so the only
+          way to stop a 250px logo fighting a headline was to hide it, which
+          also removes the branding these cards exist to carry. */}
+      <Slider
+        name={`${prefix}.opacity`} label="Opacity" value={Math.round(spot.opacity ?? 100)}
+        min={5} max={100} suffix="%"
+        hint="Below about 40% it reads as a watermark behind the content — which is usually what you want from a mark this size."
+        onChange={(v) => onChange({ opacity: v })}
+      />
       <label className="mt-2 flex items-center gap-2 text-xs text-muted">
         <input
           type="checkbox" name={`${prefix}.hidden`} checked={spot.hidden ?? false}
