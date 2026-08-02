@@ -2,6 +2,8 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import Icon from "@/components/Icon";
+import { RefreshButton, useThread } from "@/components/ThreadRefresh";
+import type { ThreadMessageView } from "@/lib/threads";
 import { replyToServer, type ReplyState } from "@/app/actions/server-messages";
 
 // Staff answering a server owner.
@@ -14,15 +16,7 @@ import { replyToServer, type ReplyState } from "@/app/actions/server-messages";
 // Discord is an owner who thinks they were ignored — worse than not answering —
 // so the failure is stated on the message itself rather than logged somewhere.
 
-export type AdminThreadMessage = {
-  id: string;
-  sender: string;
-  body: string;
-  createdAt: string;
-  source: string;
-  delivered: boolean;
-  deliveryError: string | null;
-};
+export type AdminThreadMessage = ThreadMessageView;
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
@@ -35,7 +29,7 @@ const WHY: Record<string, string> = {
 };
 
 export default function ServerThread({
-  guildId, messages, ownerKnown,
+  guildId, messages: initial, ownerKnown,
 }: {
   guildId: string;
   messages: AdminThreadMessage[];
@@ -47,13 +41,20 @@ export default function ServerThread({
   );
   const formRef = useRef<HTMLFormElement>(null);
   useEffect(() => { if (state?.ok) formRef.current?.reset(); }, [state]);
+  // Staff sit on this page while an owner is typing. Reloading a server's
+  // whole analytics page to see the next line is the wrong cost.
+  const thread = useThread("server", guildId, "admin", initial);
+  const messages = thread.messages;
 
   return (
     <section id="messages" className="glass mb-6 overflow-hidden">
       <div className="border-b border-white/10 p-6">
-        <h2 className="font-bold flex items-center gap-2">
-          <Icon name="messages" size={16} className="text-cyan-300" /> Conversation with this owner
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-bold flex items-center gap-2">
+            <Icon name="messages" size={16} className="text-cyan-300" /> Conversation with this owner
+          </h2>
+          <RefreshButton onClick={thread.refresh} busy={thread.busy} at={thread.at} error={thread.error} />
+        </div>
         <p className="mt-1 text-sm text-muted">
           Your reply is delivered as a DM from ClusterBot and appears on their dashboard.
           {!ownerKnown && " We have no owner Discord id for this server, so it will only appear on their dashboard."}

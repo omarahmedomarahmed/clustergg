@@ -2,8 +2,10 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { saveCampaign, saveBrand, adminSendBrandMessage } from "@/app/actions/admin";
-import { getBrandInbox, getBrandAnalytics } from "@/lib/brands";
+import { getBrandAnalytics } from "@/lib/brands";
+import { readThread, markThreadRead } from "@/lib/threads";
 import AdminBrandKey from "@/components/AdminBrandKey";
+import BrandInbox from "@/components/BrandInbox";
 import BrandChartBuilder from "@/components/BrandChartBuilder";
 import ImageUpload from "@/components/ImageUpload";
 import { timeAgo } from "@/lib/utils";
@@ -18,9 +20,11 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
 
   const [campaigns, inbox, analytics] = await Promise.all([
     db.select().from(schema.adCampaigns).where(eq(schema.adCampaigns.brandId, id)).orderBy(desc(schema.adCampaigns.createdAt)),
-    getBrandInbox(db, id),
+    readThread("brand", id),
     getBrandAnalytics(db, id, { days: 90 }),
   ]);
+  // Opening the brand IS reading its thread.
+  await markThreadRead("brand", id, "admin");
   const activeCampaigns = campaigns.filter((c) => c.status === "active").length;
   const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 
@@ -106,22 +110,11 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
       </div>
 
       {/* Shared inbox with the brand */}
-      <div className="glass p-6">
-        <h2 className="font-bold mb-3">Shared inbox — {brand.name}</h2>
-        <form action={adminSendBrandMessage.bind(null, id)} className="flex gap-2 mb-4">
-          <input name="body" placeholder="Reply to the brand…" className="input-cosmic flex-1" />
-          <button className="glow-btn rounded-full px-5 py-2 text-sm font-semibold text-white">Send</button>
-        </form>
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {inbox.length === 0 && <p className="text-sm text-muted">No messages yet.</p>}
-          {inbox.map((m) => (
-            <div key={m.id} className={`rounded-xl border p-3 text-sm ${m.sender === "admin" ? "border-cyan-400/25 bg-cyan-500/[0.05]" : "border-white/10 bg-white/[0.02]"}`}>
-              <div className="text-[10px] uppercase tracking-widest text-muted mb-1">{m.sender === "admin" ? "You (Cluster)" : brand.name} · {new Date(m.createdAt).toLocaleString()}</div>
-              {m.body}
-            </div>
-          ))}
-        </div>
-      </div>
+      <BrandInbox
+        brandId={brand.id} brandName={brand.name} side="admin"
+        messages={inbox}
+        send={adminSendBrandMessage.bind(null, id)}
+      />
     </div>
   );
 }

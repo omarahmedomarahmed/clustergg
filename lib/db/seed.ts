@@ -432,10 +432,14 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   }
 
   // Demo brands / campaigns / creatives
-  const brand1 = uid(), brand2 = uid();
+  const brand1 = uid(), brand2 = uid(), brand3 = uid();
   await db.insert(schema.brands).values([
     { id: brand1, name: "NebulaTech", industry: "hardware", contactEmail: "ads@nebulatech.example", status: "active" },
     { id: brand2, name: "AstroFuel", industry: "f&b", contactEmail: "brand@astrofuel.example", status: "active" },
+    // A brand on day one: key issued, nothing bought yet. The portal's empty
+    // states are the ones a real new customer sees first and the ones nobody
+    // ever looks at, so the demo has to contain a brand that shows them.
+    { id: brand3, name: "Ionmark", industry: "tech", contactEmail: "hello@ionmark.example", status: "active" },
   ]);
   const camp1 = uid(), camp2 = uid();
   await db.insert(schema.adCampaigns).values([
@@ -488,6 +492,13 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     await db.insert(schema.discordGuilds).values({
       ...g, status: "active", announcementsEnabled: true,
       channelId: `demo-channel-${g.guildId}`,
+      // A fixed key, so the owner dashboard is openable in the demo.
+      //
+      // Production never has one of these: a real key is minted at install and
+      // DM'd to the owner, and staff are deliberately never shown it. But a
+      // demo where the entire server-owner product is behind a secret nobody
+      // holds is a demo of the lock, not of the portal.
+      portalKey: `DEMO-${g.guildId.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(-8)}`,
       community: { games: ["Chess"], regions: ["mena", "eu"], vibes: ["competitive"], about: "", answeredAt: new Date().toISOString() },
     }).onConflictDoNothing();
   }
