@@ -57,7 +57,7 @@ export default function ServerMessages({
         </h2>
         <p className="mt-1 text-sm text-muted max-w-2xl">
           Anything at all — a challenge you want run, a problem with the bot, a brand you&apos;d like on your
-          server. Write here or DM the bot with <code className="text-cyan-300">/cluster admin</code> →
+          server. Write here or DM the bot with <code className="text-cyan-300">/cluster show:admin</code> →
           Message Cluster. Our reply lands in this thread <b className="text-ink">and</b> as a DM from the bot.
         </p>
       </div>

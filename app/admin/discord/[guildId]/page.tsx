@@ -96,7 +96,7 @@ export default async function GuildDetailPage({ params }: { params: Promise<{ gu
         {challenges.length === 0 ? (
           <p className="text-sm text-muted">
             None yet. This server can request one from their dashboard, or with{" "}
-            <code className="text-cyan-300">/cluster admin</code>.
+            <code className="text-cyan-300">/cluster show:admin</code>.
           </p>
         ) : (
           <div className="space-y-4">

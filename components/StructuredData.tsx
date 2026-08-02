@@ -94,7 +94,7 @@ export function BotFaqSchema({ threshold = 500, gameCount }: { threshold?: numbe
     ],
     [
       "How does a Discord server earn money with Cluster?",
-      `When ${threshold.toLocaleString()} of a server's members have joined Cluster and linked a game account, brand-sponsored challenges start running in that server, with the prize money won by its own members. The counter is visible from the day the bot is installed via /cluster admin.`,
+      `When ${threshold.toLocaleString()} of a server's members have joined Cluster and linked a game account, brand-sponsored challenges start running in that server, with the prize money won by its own members. The counter is visible from the day the bot is installed via /cluster show:admin.`,
     ],
     [
       "Can stats be faked?",

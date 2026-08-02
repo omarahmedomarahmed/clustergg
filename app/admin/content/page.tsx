@@ -150,7 +150,7 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
   },
   {
     title: "Sharing",
-    note: "Used by the profile share button on the site AND by /cluster share in Discord. {name} and {url} are replaced automatically.",
+    note: "Used by the profile share button on the site AND by /cluster show:share in Discord. {name} and {url} are replaced automatically.",
     keys: [
       { key: "share.profile.message", label: "Profile share message", long: true },
     ],

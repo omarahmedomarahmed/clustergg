@@ -259,7 +259,7 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "week",
-    command: "/cluster vote  ·  the Sunday announcement",
+    command: "/cluster show:vote  ·  the Sunday announcement",
     group: "competition",
     name: "Profile of the Week",
     summary: "The weekly vote — standings during the week, the podium on Sunday.",
@@ -326,7 +326,7 @@ export const CARD_GUIDES: CardGuide[] = [
   },
   {
     kind: "guide",
-    command: "/cluster guide  ·  pinned on install",
+    command: "/cluster show:guide  ·  pinned on install",
     group: "help",
     name: "How-to guide",
     summary: "The pinned onboarding cards. Mostly text — art should be almost abstract.",

@@ -38,7 +38,7 @@ export default async function ServerLoginPage({
 
         <p className="mt-5 text-[11px] leading-relaxed text-muted">
           {MAX_FAILURES} wrong keys locks this server&apos;s portal for a while and reports the attempt to our
-          team. Lost the key? Run <code className="rounded bg-white/[0.06] px-1">/cluster server</code> in
+          team. Lost the key? Run <code className="rounded bg-white/[0.06] px-1">/cluster show:server</code> in
           your own server and the bot will send it again.
         </p>
 

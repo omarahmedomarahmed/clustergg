@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import Avatar from "@/components/Avatar";
 import { setUserStatus, setUserRole } from "@/app/actions/admin";
 import { timeAgo } from "@/lib/utils";
+import { requireSystemFor } from "@/lib/departments";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Users" };
@@ -11,6 +12,13 @@ export const metadata = { title: "Admin · Users" };
 export default async function AdminUsersPage({
   searchParams,
 }: { searchParams: Promise<{ q?: string }> }) {
+  // Admins only, and enforced HERE rather than by the rail.
+  //
+  // The rail hiding a link is presentation; this is the guard. This page had
+  // neither — it was reachable by anyone on staff who typed the URL, and it
+  // lists every member's name, email and handle.
+  await requireSystemFor("/admin/users");
+
   const { q } = await searchParams;
   const db = await getDb();
   const users = await db.select().from(schema.users)

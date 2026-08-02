@@ -223,7 +223,7 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           </div>
 
           <p className="text-xs text-muted mt-6 max-w-3xl">
-            Run <code className="text-cyan-300">/cluster admin</code> in your server any time to see how many members
+            Run <code className="text-cyan-300">/cluster show:admin</code> in your server any time to see how many members
             have joined Cluster and linked a game, how far you are from the next stage, and what you&apos;ve earned.
             Private challenges locked to your members with an access key are available from day one.
           </p>

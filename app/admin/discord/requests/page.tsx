@@ -72,7 +72,7 @@ export default async function ChallengeRequestsPage() {
 
       {pending.length === 0 && reviewed.length === 0 ? (
         <div className="glass p-6 text-sm text-muted">
-          Nothing yet. Server admins reach this with <code className="text-cyan-300">/cluster admin</code> → Request a challenge.
+          Nothing yet. Server admins reach this with <code className="text-cyan-300">/cluster show:admin</code> → Request a challenge.
         </div>
       ) : null}
 

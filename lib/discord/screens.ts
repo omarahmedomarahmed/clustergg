@@ -470,9 +470,9 @@ async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       description: [
         "**`/cluster`** — your own card.",
         "**`/cluster <anything>`** — a game, a quest, a guide, or another gamer's name. Start typing and the suggestions fill in from live data.",
-        ctx.isManager ? "**`/cluster admin`** — run a challenge for this server, and see your growth toward ad revenue." : null,
-        "**`/cluster week`** — Profile of the Week: where the vote stands and how long is left.",
-        "**`/cluster share`** — post your card publicly so people can vote for it.",
+        ctx.isManager ? "**`/cluster show:admin`** — run a challenge for this server, and see your growth toward ad revenue." : null,
+        "**`/cluster show:week`** — Profile of the Week: where the vote stands and how long is left.",
+        "**`/cluster show:share`** — post your card publicly so people can vote for it.",
       ].filter(Boolean).join("\n"),
       color: "#8b5cf6",
     })],
@@ -514,9 +514,9 @@ async function planetsScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayl
       color: "#8b5cf6",
     })],
     // 24 games won't fit in 25 buttons alongside Back, so the first 20 get
-    // buttons and `/cluster planet game:` autocompletes the rest.
+    // buttons and `/cluster show:planet game:` autocompletes the rest.
     // 20 games plus the tail is the whole 25-button budget, so the games get
-    // the room and `/cluster planet game:` autocompletes the rest.
+    // the room and `/cluster show:planet game:` autocompletes the rest.
     components: rows([
       ...c.games.slice(0, 20).map((g) => navButton(g.name.slice(0, 24), frame("planet", g.value), trail, gameStyle(g.value))),
       ...tail(ctx, frame("planets"), trail),
@@ -716,11 +716,11 @@ async function hasJoined(userId: string, challengeId: string): Promise<boolean> 
 
 // ===== Server owner: run challenges for your community =====
 
-// `/cluster admin challenges`. A server owner's whole reason to recruit for us
+// `/cluster show:admin challenges`. A server owner's whole reason to recruit for us
 // is the revenue unlock, and the way they get there is a competition their
 // members actually want to enter. This is where they run one.
 async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
-  // `/cluster server` folds in here. It was a sibling command showing half the
+  // `/cluster show:server` folds in here. It was a sibling command showing half the
   // picture — growth without the tools to act on it — so it is now a view of
   // the one admin command rather than a second thing to remember.
   if (arg === "growth" || arg === "server") return serverScreen(ctx, trail);
@@ -1499,7 +1499,42 @@ export async function screenForCommand(query: string): Promise<Frame> {
     case "week":
       return frame("week");
 
-    // One admin command. `/cluster server` used to be a sibling that showed
+    // The nouns people type.
+    //
+    // These screens all existed and were all reachable from a button, but only
+    // some of them answered to their own name: "planets" worked and "planet"
+    // fell through to a text search for the word "planet", which found nothing
+    // and opened a did-you-mean card. Singular/plural is not a distinction any
+    // human makes when typing a command, and the whole point of one box is that
+    // the obvious thing works.
+    //
+    // With a game after them they scope: `planet chess`, `leaderboard chess`.
+    case "planet":
+    case "planets":
+    case "games":
+      return rest ? frame("planet", rest) : frame("planets");
+
+    case "challenge":
+    case "challenges":
+      return frame("challenges", rest);
+
+    case "leaderboard":
+    case "leaderboards":
+    case "board":
+      return rest ? frame("leaderboard", rest) : frame("planets");
+
+    case "quest":
+    case "quests":
+      return rest ? frame("quest", rest) : frame("quests");
+
+    // A trophy case is part of a profile — there is no separate screen, and
+    // sending someone to a search for the word "trophies" is worse than
+    // sending them to the place their trophies actually are.
+    case "trophy":
+    case "trophies":
+      return frame("show", "profile");
+
+    // One admin command. `/cluster show:server` used to be a sibling that showed
     // half the picture; it is a button inside admin now.
     case "admin":
     case "server":

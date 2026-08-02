@@ -373,8 +373,8 @@ function componentPress(i: Interaction) {
         type: InteractionResponseType.ChannelMessageWithSource,
         data: {
           content: game
-            ? `**${game}** can't be linked yet — its stats API isn't open to us. Run \`/cluster link\` to pick a game we can connect, or link it on the site: ${siteUrl()}/profile?tab=accounts`
-            : `Run \`/cluster link\` to pick a game.`,
+            ? `**${game}** can't be linked yet — its stats API isn't open to us. Run \`/cluster show:link\` to pick a game we can connect, or link it on the site: ${siteUrl()}/profile?tab=accounts`
+            : `Run \`/cluster show:link\` to pick a game.`,
           flags: MessageFlags.Ephemeral,
         },
       });
@@ -745,7 +745,7 @@ async function voteForSlug(slug: string, discordId: string, guildId?: string) {
 
 function joinFailure(reason: string): string {
   switch (reason) {
-    case "no_account": return "You need a linked account for that game first — run `/cluster link`.";
+    case "no_account": return "You need a linked account for that game first — run `/cluster show:link`.";
     case "gated": return "This challenge requires quest badges you haven't earned yet.";
     case "locked": return "This one needs an entry key — it was sent to the server running the challenge.";
     case "bad_key": return "That key isn't right. Ask a mod in the server running this challenge for the current one.";
@@ -754,7 +754,7 @@ function joinFailure(reason: string): string {
   }
 }
 
-// Which provider backs a game, so `/cluster link game:Chess` knows what to
+// Which provider backs a game, so `/cluster show:link game:Chess` knows what to
 // create. Uses the same registry the website links through.
 function providerForGame(game: string): string | null {
   return linkableProvider(game)?.id ?? null;

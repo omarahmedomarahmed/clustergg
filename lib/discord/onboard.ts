@@ -37,7 +37,7 @@ export async function onboardGuild(guildId: string, ownerDiscordId?: string): Pr
       await dmUser(ownerDiscordId, {
         content:
           `Thanks for adding Cluster! I couldn't create the **#${CLUSTER_CHANNEL}** channel — I'm missing the **Manage Channels** permission.\n\n` +
-          `Either grant it and re-invite me, or create the channel yourself and run \`/cluster admin\` in it.`,
+          `Either grant it and re-invite me, or create the channel yourself and run \`/cluster show:admin\` in it.`,
       });
     }
     return { ok: false, posted: 0, pinned: 0, reason: "no_channel" };
@@ -128,10 +128,10 @@ async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: 
         "One profile that carries every game they play, stats synced from official APIs, Cluster Points across four quests, and challenges with real trophies.",
         "",
         "**What you get**",
-        `Run \`/cluster admin\` any time to see how many of your members have joined Cluster and linked a game. At **${threshold.toLocaleString()} linked gamers your server unlocks brand-sponsored challenges** — real prize money, paid to the members who win them.`,
+        `Run \`/cluster show:admin\` any time to see how many of your members have joined Cluster and linked a game. At **${threshold.toLocaleString()} linked gamers your server unlocks brand-sponsored challenges** — real prize money, paid to the members who win them.`,
         "",
         "**How to get there fastest**",
-        "Run `/cluster admin` and request a challenge for your community. You pick the game, the length, the prize and the trophies; we review it, then post it here with an entry key only your server has. Your members link a game to enter — which is exactly the number that unlocks brand-sponsored challenges here.",
+        "Run `/cluster show:admin` and request a challenge for your community. You pick the game, the length, the prize and the trophies; we review it, then post it here with an entry key only your server has. Your members link a game to enter — which is exactly the number that unlocks brand-sponsored challenges here.",
         "",
         "The challenge itself is public on Cluster: everyone can see your standings, your trophies and your server — but only people with your key can enter. That puts your community in front of our whole audience.",
         "",

@@ -125,7 +125,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "footer.brands.title": "For brands",
   "footer.servers.title": "For server owners",
   // Copy used everywhere a gamer shares their profile — the site's share button
-  // and the bot's /cluster share. `{name}` and `{url}` are substituted.
+  // and the bot's /cluster show:share. `{name}` and `{url}` are substituted.
   "share.profile.message": "Check out my profile on Cluster — and vote for me",
   // Platform logo (shown in the nav + footer), admin-editable with framing.
   "brand.logo": "/assets/logo.png",       // square letter-mark

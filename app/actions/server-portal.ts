@@ -58,7 +58,7 @@ export async function portalMarkRead(guildId: string, key: string): Promise<void
 /**
  * An owner building a challenge for their community, from the web.
  *
- * The same request `/cluster admin` submits, from a form with room to think.
+ * The same request `/cluster show:admin` submits, from a form with room to think.
  * A Discord modal allows five short inputs and no help text, which is fine for
  * a quick ask and wrong for the thing an owner is most nervous about getting
  * right — so both paths exist and land in the same queue.
