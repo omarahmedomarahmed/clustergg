@@ -1,4 +1,5 @@
 import { closeExpiredChallenges } from "@/lib/challenges";
+import { remindLiveChallenges } from "@/lib/discord/announce";
 import { postAdsToGuilds } from "@/lib/discord/ads";
 import { postLeaderboardUpdates } from "@/lib/discord/leaderboard-feed";
 import { postWeekUpdate } from "@/lib/discord/week-feed";
@@ -14,7 +15,7 @@ import { postBotListStats } from "@/lib/botlist-post";
 // Each job must be safe to run repeatedly. Closing challenges is idempotent,
 // and ad posting has its own per-server interval.
 
-export type JobKey = "challenges" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats";
+export type JobKey = "challenges" | "challenge-reminders" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats";
 
 export type JobResult = { key: JobKey; ok: boolean; summary: string };
 
@@ -23,6 +24,11 @@ export const JOBS: { key: JobKey; label: string; description: string }[] = [
     key: "challenges",
     label: "End finished challenges",
     description: "Freezes final standings, marks challenges completed and awards the podium trophies for anything past its end date.",
+  },
+  {
+    key: "challenge-reminders",
+    label: "Remind every server what's still running",
+    description: "One post per live challenge saying how long is left. Skips anything launched in the last day (it was already announced) and keeps private challenges inside the servers that own them.",
   },
   {
     key: "discord-ads",
@@ -52,6 +58,17 @@ export async function runJob(key: JobKey): Promise<JobResult> {
       case "challenges": {
         const r = await closeExpiredChallenges();
         return { key, ok: true, summary: r.closed ? `Ended ${r.closed} challenge${r.closed === 1 ? "" : "s"} and awarded their trophies.` : "No challenges were due to end." };
+      }
+      case "challenge-reminders": {
+        const r = await remindLiveChallenges();
+        return {
+          key, ok: true,
+          summary: r.sent
+            ? `Reminded ${r.sent} challenge${r.sent === 1 ? "" : "s"}${r.skipped ? ` · ${r.skipped} skipped` : ""}.`
+            : r.skipped
+              ? `Nothing to remind — ${r.skipped} skipped (just launched, or not running).`
+              : "No challenge is running.",
+        };
       }
       case "discord-ads": {
         const r = await postAdsToGuilds();
