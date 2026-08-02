@@ -71,6 +71,10 @@ function readLayout(fd: FormData): CardLayout {
     glows: on("glows"),
     bar: on("bar"),
     scrim: on("scrim"),
+    // What the top-right badge shows on this card kind. Round-tripped through
+    // parseLayout like everything else, so an unknown value falls back to
+    // "auto" rather than reaching the renderer.
+    badgeShow: String(fd.get("badgeShow") ?? "auto"),
     assets: json("assets", d.assets),
     parts: json("parts", d.parts),
     bgSources: json("bgSources", d.bgSources),
@@ -100,18 +104,30 @@ export async function saveCardLayout(_prev: CardActionState, fd: FormData): Prom
  * The mascot, the mark, the badge and the sponsor box are the four things every
  * card has, and getting them consistent meant opening twelve editors and
  * repeating the same four positions twelve times — which nobody did, so they
- * drifted. One press copies position, size, opacity and visibility across the
- * whole set.
+ * drifted.
  *
- * ONLY those four. Everything else about a card is specific to it: a challenge's
- * content box has nothing to say about a quest's, and copying background sources
- * or placed art between kinds would silently destroy work. The narrow scope is
- * the reason this is safe enough to be a single button.
+ * ONE ELEMENT AT A TIME, by default. Copying all four together was the first
+ * version and it was wrong in a way that only shows up in use: the badge shows
+ * something different on each card kind and belongs in a different place
+ * because of it, while the logo belongs in exactly the same corner everywhere.
+ * Bundling them forced an admin to accept a badge move they did not want in
+ * order to make a logo fix they did. `only` names the element; without it, all
+ * four travel, which is still the right default for a first-time setup.
+ *
+ * ONLY these four, ever. Everything else about a card is specific to it: a
+ * challenge's content box has nothing to say about a quest's, and copying
+ * background sources or placed art between kinds would silently destroy work.
+ * The narrow scope is the reason this is safe enough to be a single button.
  */
 export async function applyFurnitureEverywhere(_prev: CardActionState, fd: FormData): Promise<CardActionState> {
   await requireStaff();
   const from = String(fd.get("kind") ?? "");
   if (!LAYOUT_KINDS.includes(from as never)) return { error: "Unknown card kind." };
+
+  const FURNITURE = ["mascot", "mark", "badge", "ad"] as const;
+  type Furniture = (typeof FURNITURE)[number];
+  const asked = String(fd.get("only") ?? "");
+  const which: Furniture[] = FURNITURE.includes(asked as Furniture) ? [asked as Furniture] : [...FURNITURE];
 
   // Read the furniture off the form — the CURRENT state of the editor, not what
   // was last saved. Applying stale values would make the button do something
@@ -124,13 +140,8 @@ export async function applyFurnitureEverywhere(_prev: CardActionState, fd: FormD
   let changed = 0;
   for (const kind of LAYOUT_KINDS) {
     const current = layouts[kind] ?? DEFAULT_LAYOUT;
-    const next: CardLayout = {
-      ...current,
-      mascot: source.mascot,
-      mark: source.mark,
-      badge: source.badge,
-      ad: source.ad,
-    };
+    const next: CardLayout = { ...current };
+    for (const k of which) next[k] = source[k];
     if (JSON.stringify(next) === JSON.stringify(current)) continue;
     await setContent(layoutKey(kind), JSON.stringify(next));
     changed++;
@@ -142,9 +153,13 @@ export async function applyFurnitureEverywhere(_prev: CardActionState, fd: FormD
   let dropped = 0;
   for (const kind of LAYOUT_KINDS) dropped += await invalidateCards(kind);
 
+  const NAMES: Record<Furniture, string> = {
+    mascot: "Astronaut", mark: "Logo", badge: "Badge", ad: "Sponsor box",
+  };
+  const label = which.length === 1 ? NAMES[which[0]] : "Astronaut, logo, badge and sponsor box";
   revalidatePath("/admin/cards/guide");
   return {
-    ok: `Mascot, logo, badge and sponsor box copied to ${changed} card kind${changed === 1 ? "" : "s"}.`
+    ok: `${label} copied to ${changed} card kind${changed === 1 ? "" : "s"}.`
       + (dropped > 0 ? ` ${dropped} cached card${dropped === 1 ? "" : "s"} cleared.` : ""),
   };
 }

@@ -160,6 +160,19 @@ export type CardLayout = {
    * that ships in the install flow, say — and every other card keeps earning.
    */
   ad: Spot;
+  /**
+   * What the top-right badge SHOWS on this card kind.
+   *
+   * Each card body used to decide this for itself — a level pill on a profile,
+   * a game logo on a planet, the trophy row on a challenge — which meant the
+   * one piece of furniture an admin can move was the one whose contents they
+   * could not choose. On some cards the right answer is the game's logo; on
+   * others it is nothing at all, because the art already carries it.
+   *
+   * "auto" keeps whatever the card decided, so this changes nothing until
+   * somebody sets it.
+   */
+  badgeShow?: BadgeShow;
   content: ContentBox;
   /** Darkness (0-100) of the plate drawn behind text blocks. 0 turns it off. */
   plate: number;
@@ -238,6 +251,7 @@ export const DEFAULT_LAYOUT: CardLayout = {
   glows: false,
   bar: true,
   scrim: true,
+  badgeShow: "auto",
   parts: {},
   assets: [],
   bgSources: [],
@@ -279,6 +293,19 @@ export const ASSET_SOURCES: { id: string; label: string; note: string }[] = [
 ];
 
 export const ASSET_SOURCE_IDS = new Set(ASSET_SOURCES.map((s) => s.id));
+
+/** What the top-right badge can be told to show. */
+export type BadgeShow = "auto" | "game" | "level" | "trophy" | "none";
+
+export const BADGE_SHOWS: { id: BadgeShow; label: string; note: string }[] = [
+  { id: "auto", label: "Whatever suits the card", note: "The level pill on a profile, the game's logo on a planet, the trophy row on a challenge. The default, and right most of the time." },
+  { id: "game", label: "The game's logo", note: "Always the logo of the game this card belongs to. Nothing on a card with no game." },
+  { id: "level", label: "The gamer's level", note: "A level pill. Nothing on a card that isn't about a person." },
+  { id: "trophy", label: "The prize", note: "The trophy being competed for. Nothing where there isn't one." },
+  { id: "none", label: "Nothing", note: "Leaves the corner empty — the right answer when the artwork already fills it." },
+];
+
+export const BADGE_SHOW_IDS = new Set(BADGE_SHOWS.map((b) => b.id));
 
 export const LAYOUT_KINDS: CardKind[] = [
   "profile", "game-stats", "challenge", "leaderboard",
@@ -412,6 +439,8 @@ export function parseLayout(raw: string | null | undefined): CardLayout {
     glows: o.glows === true,
     bar: o.bar !== false,
     scrim: o.scrim !== false,
+    badgeShow: typeof o.badgeShow === "string" && BADGE_SHOW_IDS.has(o.badgeShow as BadgeShow)
+      ? (o.badgeShow as BadgeShow) : "auto",
     parts: parts(o.parts),
     assets: assets(o.assets),
     bgSources: bgSources(o.bgSources),
@@ -495,11 +524,22 @@ export function partOf(l: CardLayout, key: string): PartDraw {
  * shows some of the card looks complete.
  *
  * So every part gets a box. A hand-tuned region wins where one exists, because
- * somebody measured it against the real render. Everything else is laid out the
- * way the renderer genuinely lays it out: a vertical stack inside the content
- * box, in declared order, sharing the height. That is an approximation of where
- * a block lands — Satori decides the real heights from the text — and it is an
- * honest one, because the stack IS the model.
+ * somebody measured it against the real render.
+ *
+ * ===== The part that had to be rewritten =====
+ *
+ * Everything without a region used to share the WHOLE content box, which meant
+ * it was drawn straight on top of the sections that did have one — a headline
+ * and a grid of game logos rendered in the same rectangle, unreadable, and
+ * nothing like the card. Every one of the twelve kinds mixes the two, so this
+ * was not an edge case; it was the canvas.
+ *
+ * Un-regioned sections now stack only in the vertical space the placed ones
+ * leave free, in DRAW ORDER. Walk the parts as the renderer does: a placed
+ * section takes its rectangle and pushes the cursor below it; a run of
+ * un-regioned sections shares the band between the cursor and whatever is
+ * placed next. That is exactly how a column of blocks around fixed elements
+ * behaves, so the canvas stops being a diagram and starts being a preview.
  */
 export function partBoxes(
   l: CardLayout,
@@ -520,34 +560,98 @@ export function partBoxes(
     w: (side.width / CANVAS_W) * 100,
     h: (side.height / CANVAS_H) * 100,
   };
-  const stacked = parts.filter((p) => !byKey.has(p.key) && !p.side);
+
   // A gap between blocks so adjacent boxes are visibly separate rather than one
   // continuous column an admin cannot tell apart.
   const GAP = 0.8;
-  const each = stacked.length
-    ? Math.max(4, (l.content.h - GAP * (stacked.length - 1)) / stacked.length)
-    : 0;
+  const MIN_H = 4;
+  const top = l.content.y;
+  const bottom = l.content.y + l.content.h;
 
-  let i = 0;
-  for (const p of parts) {
-    if (p.side && sideBoxFits(side)) {
-      out[p.key] = sideAsPct;
+  // A placed region only pushes the stack down if it is actually IN the text
+  // column. Several guides put a region beside it — the challenge card's trophy
+  // strip runs down the right — and treating those as blockers shoved the whole
+  // column into the bottom of the card for no reason. Half the column's width is
+  // the test: sharing an edge is not being in the way.
+  const blocks = (r: { x: number; w: number }) => {
+    const overlap = Math.min(l.content.x + l.content.w, r.x + r.w) - Math.max(l.content.x, r.x);
+    return overlap > l.content.w * 0.5;
+  };
+
+  type Slot = { key: string; region?: { x: number; y: number; w: number; h: number }; side?: boolean };
+  const slots: Slot[] = parts.map((p) => ({
+    key: p.key,
+    side: p.side && sideBoxFits(side),
+    region: byKey.get(p.key),
+  }));
+
+  let cursor = top;
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i];
+    if (slot.side) { out[slot.key] = sideAsPct; continue; }
+    if (slot.region) {
+      out[slot.key] = { ...slot.region };
+      // Only ever move DOWN: a region placed above the cursor (the guide is
+      // free to order them however it likes) must not drag the stack back up
+      // into sections already laid out.
+      if (blocks(slot.region)) cursor = Math.max(cursor, slot.region.y + slot.region.h + GAP);
       continue;
     }
-    const region = byKey.get(p.key);
-    if (region) {
-      out[p.key] = { x: region.x, y: region.y, w: region.w, h: region.h };
-      continue;
-    }
-    out[p.key] = {
-      x: l.content.x,
-      y: l.content.y + i * (each + GAP),
-      w: l.content.w,
-      h: each,
-    };
-    i++;
+
+    // A run of un-regioned sections, sharing the band before the next thing
+    // that is genuinely in their way. Collected per run rather than divided
+    // globally, because the space available depends on what surrounds it.
+    const run: number[] = [];
+    let j = i;
+    while (j < slots.length && !slots[j].region && !slots[j].side) { run.push(j); j++; }
+    const next = slots.slice(j).find((sl) => sl.region && blocks(sl.region));
+    const limit = next ? next.region!.y - GAP : bottom;
+    // The band can be tighter than the minimum height would like. When it is,
+    // the run SHRINKS to fit rather than overflowing into the section below —
+    // an approximate box in the right place beats an exact one in the wrong one.
+    const band = Math.max(1, limit - cursor);
+    const each = Math.max(1, (band - GAP * (run.length - 1)) / run.length);
+
+    run.forEach((idx, k) => {
+      const y = cursor + k * (each + GAP);
+      out[slots[idx].key] = {
+        x: l.content.x,
+        y,
+        // Narrowed around anything sitting BESIDE it at the same height — the
+        // game-account card's match strip, the challenge card's trophy column.
+        // Those don't push the stack down, but they do take width away from it,
+        // and a box drawn under one is a box in the wrong shape.
+        w: narrowed(l, slots, byKey, blocks, y, each),
+        h: each,
+      };
+    });
+    cursor = cursor + run.length * (each + GAP);
+    i = j - 1;
   }
   return out;
+}
+
+/** The column's usable width at a given height, once side-by-side regions take
+ *  their share. Never narrower than a third, because a sliver is not a preview. */
+function narrowed(
+  l: CardLayout,
+  slots: { key: string; region?: { x: number; y: number; w: number; h: number }; side?: boolean }[],
+  byKey: Map<string, { x: number; y: number; w: number; h: number }>,
+  blocks: (r: { x: number; w: number }) => boolean,
+  y: number,
+  h: number,
+): number {
+  let right = l.content.x + l.content.w;
+  for (const s of slots) {
+    const r = s.region;
+    if (!r || blocks(r)) continue;
+    // Same height band, and starts to the right of where the column begins.
+    const sameBand = y < r.y + r.h && r.y < y + h;
+    if (!sameBand || r.x <= l.content.x) continue;
+    right = Math.min(right, r.x - 0.8);
+  }
+  void byKey;
+  return Math.max(l.content.w / 3, right - l.content.x);
 }
 
 /** The CSS transform for a flipped/rotated element. Satori supports both. */

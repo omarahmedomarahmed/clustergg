@@ -125,6 +125,23 @@ function moreButton(trail: Frame[]): Button {
   return navButton("More", frame("more"), trail, ButtonStyle.Secondary, "🧭");
 }
 
+/**
+ * Vote for Cluster on the bot lists, and get paid for it.
+ *
+ * On EVERY card, because bot-list ranking is votes and the lists are how a
+ * server that has never heard of us finds us. It is a link button rather than
+ * a navigation one — voting happens on the list's own site — and it points at
+ * one page rather than one list, because which lists we are live on changes and
+ * a button baked with a URL goes stale the moment a listing is approved.
+ *
+ * The label says what you get. "Vote for Cluster" is a favour being asked;
+ * "Vote for Cluster · earn CP" is a trade, and the difference is most of the
+ * conversion.
+ */
+function voteButton(): Button {
+  return linkButton("Vote for Cluster · earn CP", `${siteUrl()}/vote`, "⭐");
+}
+
 // `here` is the screen being drawn, so the tail never offers a button that
 // leads back to the card you're already looking at.
 function tail(ctx: ScreenCtx, here: Frame, trail: Frame[]): (Button | null)[] {
@@ -134,6 +151,9 @@ function tail(ctx: ScreenCtx, here: Frame, trail: Frame[]): (Button | null)[] {
     on("home") ? null : profileButton(ctx, trail),
     on("more") ? null : moreButton(trail),
     backButton(trail),
+    // Last in the tail, so it never displaces navigation — `rows()` fills five
+    // to a row and the tail is what a card can't do without.
+    voteButton(),
   ];
 }
 
@@ -693,10 +713,39 @@ async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Prom
           : gate.locked && !ownHere
             ? [button("Enter with key", `open-key|${id}`, ButtonStyle.Primary, "🔑")]
             : joinButtons()),
-      navButton("Standings", frame("leaderboard", data.game), trail, ButtonStyle.Secondary, "📊"),
+      // THIS challenge's standings, not the game's lifetime board — those are
+      // different lists and only one of them answers "where am I in this".
+      navButton("Standings", frame("standings", id), [frame("challenge", id), ...trail], ButtonStyle.Secondary, "📊"),
       navButton(`${data.game} planet`.slice(0, 24), frame("planet", data.game), trail, ButtonStyle.Secondary, "🪐"),
       ...tail(ctx, frame("challenge", id), trail),
       linkButton("Full details", webUrl, "🔗"),
+    ]),
+  };
+}
+
+/**
+ * THIS challenge's standings.
+ *
+ * The button used to go to the game's leaderboard, which is a different list
+ * entirely: everyone who plays the game, ranked on a lifetime metric, most of
+ * whom never entered this competition. Somebody pressing "Standings" on a
+ * challenge card is asking where they are in THAT challenge, and the honest
+ * answer is the points people have earned inside it.
+ */
+async function standingsScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const here = frame("standings", id);
+  const { url, data } = await cardRef("leaderboard", { challenge: id });
+  if (!data) return notYet("Those standings aren't available yet.", trail, [], ctx);
+  const title = data.kind === "leaderboard" ? data.title : "Standings";
+  return {
+    embeds: [embed(url, {
+      title: `${title} — standings`,
+      color: data.theme.accent,
+      footer: "Points earned since each player entered. Updates on every sync.",
+    })],
+    components: rows([
+      navButton("Back to the challenge", frame("challenge", id), trail, ButtonStyle.Primary, "🏆"),
+      ...tail(ctx, here, trail),
     ]),
   };
 }
@@ -1461,6 +1510,7 @@ async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promi
     case "planets": return planetsScreen(ctx, trail);
     case "leaderboard": return leaderboardScreen(a, f.args[1] ?? "", ctx, trail);
     case "challenge": return challengeScreen(a, ctx, trail);
+    case "standings": return standingsScreen(a, ctx, trail);
     case "challenges": return challengesScreen(a, ctx, trail);
     case "link": return linkScreen(a, ctx, trail);
     case "server": return serverScreen(ctx, trail);

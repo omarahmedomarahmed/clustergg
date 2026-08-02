@@ -10,6 +10,11 @@ import { hqStatus } from "@/lib/discord/hq";
 import { tierFor } from "@/lib/server-portal";
 import { AdminHeader, AdminSection, AdminSettings, EmptyState } from "@/components/AdminPage";
 import { JOBS } from "@/lib/jobs";
+import FoundingOffers from "@/components/FoundingOffers";
+import { offers } from "@/lib/offers";
+import BotListsPanel from "@/components/BotListsPanel";
+import { BOT_LIST_CMS_KEYS, BOT_LISTS } from "@/lib/botlists";
+import { getContent } from "@/lib/cms";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +37,13 @@ export default async function AdminDiscordPage() {
   const ready = discordConfigured();
   const install = installUrl();
 
-  const [guilds, pending, hq] = await Promise.all([listGuilds(), countPendingRequests(), hqStatus()]);
+  const [guilds, pending, hq, offerState, listValues] = await Promise.all([
+    listGuilds(), countPendingRequests(), hqStatus(), offers(),
+    getContent([
+      ...BOT_LIST_CMS_KEYS,
+      ...BOT_LISTS.filter((l) => l.votes).map((l) => `botlist.${l.id}.webhook`),
+    ]).catch(() => ({} as Record<string, string>)),
+  ]);
 
   const checks: { label: string; ok: boolean; detail: string }[] = [
     {
@@ -165,6 +176,28 @@ export default async function AdminDiscordPage() {
             </table>
           </div>
         )}
+      </AdminSection>
+
+      {/* How anybody finds the bot in the first place.
+          Discord has no app store: the lists ARE discovery, and their ranking
+          is votes. Placed next to the offers because it is the same job —
+          getting the bot in front of servers that don't know it exists. */}
+      <AdminSection
+        title="Bot lists — where servers find us"
+        hint="Every list ranks by votes, and a vote can be cast every twelve hours. This is the checklist for getting listed, the tokens once we are, and the webhook that pays a voter in CP."
+      >
+        <BotListsPanel values={listValues} siteOrigin={liveOrigin} />
+      </AdminSection>
+
+      {/* The founding offers, and the servers still owed one. Placed above
+          Operations because it is the thing that has a deadline: a server that
+          installed the bot and got nothing back is a server that will remove
+          it. */}
+      <AdminSection
+        title="The founding offers"
+        hint="Both are retroactive by design — every server and every brand that arrived before the offer is owed it. These are the buttons that pay that back."
+      >
+        <FoundingOffers offers={offerState} />
       </AdminSection>
 
       <AdminSection title="Operations" hint="The jobs the cron runs, on demand. Vercel's plan allows one daily run, so these are how a job happens now rather than tomorrow.">

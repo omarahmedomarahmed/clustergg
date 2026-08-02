@@ -58,6 +58,12 @@ export const BOT_BUTTONS: BotButton[] = [
   { key: "My profile", label: "My profile", emoji: "👤", note: "Back to their own card from anywhere." },
   { key: "More", label: "More", emoji: "🧭", note: "The rest of the product, so no card has to choose between being complete and being readable." },
   { key: "Open Cluster", label: "Open Cluster", emoji: "🔗", note: "Out to the website." },
+  {
+    key: "Vote for Cluster · earn CP",
+    label: "Vote for Cluster · earn CP",
+    emoji: "⭐",
+    note: "On every card. Bot-list ranking is votes, and the lists are how a server that has never heard of us finds us — this is the single button that grows the platform rather than the gamer's standing in it. The label names the trade rather than asking a favour, which is most of the conversion.",
+  },
 
   // ===== The gamer's own card =====
   { key: "Share my profile", label: "Share my profile", emoji: "📣", note: "Posts their card publicly in the channel. The viral loop.", on: ["profile"] },

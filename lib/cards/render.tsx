@@ -106,7 +106,39 @@ function safeTheme(theme: CardTheme): CardTheme {
 // Every position here comes from the card's LAYOUT (Admin → Card layouts), not
 // from constants. The defaults reproduce the geometry this frame used to
 // hard-code, so an unedited card is pixel-identical to what it drew before.
-function Frame({ theme, children, corner, side }: {
+/**
+ * What the badge shows, once the admin has had a say.
+ *
+ * The card body proposes (a level pill, a game logo, a trophy row) and the
+ * layout disposes. "auto" keeps the body's proposal, which is why setting this
+ * changes nothing until somebody chooses — and why a choice that the card has
+ * no data for shows nothing rather than something wrong.
+ */
+function badgeContent(
+  theme: CardTheme,
+  proposed: React.ReactNode,
+): React.ReactNode {
+  const show = theme.layout?.badgeShow ?? "auto";
+  if (show === "auto") return proposed;
+  if (show === "none") return undefined;
+  const b = theme.badge ?? {};
+  if (show === "game" && b.gameLogoUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={b.gameLogoUrl} alt="" width={72} height={72}
+      style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />;
+  }
+  if (show === "level" && typeof b.level === "number") {
+    return <Pill color={theme.accent2} bg="rgba(0,0,0,0.45)">{`LV ${b.level}`}</Pill>;
+  }
+  if (show === "trophy" && b.trophyUrl) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={b.trophyUrl} alt="" width={72} height={72}
+      style={{ width: 72, height: 72, objectFit: "contain" }} />;
+  }
+  return undefined;
+}
+
+function Frame({ theme, children, corner: proposedCorner, side }: {
   theme: CardTheme;
   children: React.ReactNode;
   corner?: React.ReactNode;
@@ -120,6 +152,7 @@ function Frame({ theme, children, corner, side }: {
    */
   side?: (box: { left: number; top: number; width: number; height: number }) => React.ReactNode;
 }) {
+  const corner = badgeContent(theme, proposedCorner);
   const l = theme.layout ?? DEFAULT_LAYOUT;
   const mascot = spotBox(l.mascot, 1);
   const mark = spotBox(l.mark, 1);
@@ -850,18 +883,56 @@ function ChallengeBody(d: ChallengeCard) {
           <img src={d.logoUrl} alt="" width={58} height={58} style={{ width: 58, height: 58, borderRadius: 14, objectFit: "cover" }} />
         ) : null}
         {trophies.length ? (
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
-            {trophies.map((tr, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(88) }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={tr.imageUrl} alt="" width={pTro.f(68)} height={pTro.f(68)}
-                  style={{ width: pTro.f(68), height: pTro.f(68), objectFit: "contain" }} />
-                <div style={{ display: "flex", fontSize: pTro.f(16), fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
-                  {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
+          // A PODIUM, not a row.
+          //
+          // The prize pool is what a challenge is FOR, and three equal tiles in
+          // rank order read as a list of files rather than as first, second and
+          // third. Silver on the left, gold raised in the middle, bronze on the
+          // right, on plinths of decreasing height — the shape everyone already
+          // knows, so the hierarchy is legible before a single word is read.
+          (() => {
+            const byPlace = (n: number) => trophies.find((x) => x.place === n);
+            const order = [byPlace(2), byPlace(1), byPlace(3)].filter(Boolean) as typeof trophies;
+            const PLINTH: Record<number, number> = { 1: 34, 2: 22, 3: 14 };
+            const COLOUR: Record<number, string> = { 1: "#fbbf24", 2: "#cbd5e1", 3: "#b45309" };
+            const total = trophies.reduce((sum, x) => sum + (x.value || 0), 0);
+            return (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                {total > 0 ? (
+                  <div style={{ display: "flex", fontSize: pTro.f(17), fontWeight: 800, color: "#fbbf24", letterSpacing: 0.4 }}>
+                    {`$${nf(total)} PRIZE POOL`}
+                  </div>
+                ) : null}
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
+                  {order.map((tr, i) => {
+                    const c = COLOUR[tr.place] ?? MUTED;
+                    const lift = pTro.f(PLINTH[tr.place] ?? 14);
+                    return (
+                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(tr.place === 1 ? 96 : 82) }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={tr.imageUrl} alt="" width={pTro.f(tr.place === 1 ? 76 : 60)} height={pTro.f(tr.place === 1 ? 76 : 60)}
+                          style={{ width: pTro.f(tr.place === 1 ? 76 : 60), height: pTro.f(tr.place === 1 ? 76 : 60), objectFit: "contain" }} />
+                        <div style={{ display: "flex", fontSize: pTro.f(15), fontWeight: 800, color: c }}>
+                          {tr.value > 0 ? `$${nf(tr.value)}` : `${tr.place}`}
+                        </div>
+                        {/* The plinth. Explicit height per place — Satori has no
+                            flex-grow tricks to lean on here, and the difference
+                            in height IS the ranking. */}
+                        <div style={{
+                          display: "flex", alignItems: "flex-start", justifyContent: "center",
+                          width: "100%", height: lift, borderRadius: 6,
+                          background: alpha(c, 0.22), border: `1px solid ${alpha(c, 0.5)}`,
+                          fontSize: pTro.f(14), fontWeight: 800, color: c, paddingTop: 2,
+                        }}>
+                          {tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })()
         ) : null}
       </div>
     )}>
@@ -1472,9 +1543,22 @@ async function prepareCard(d: CardData): Promise<CardData> {
   // fetches remote images itself and one unreachable host takes down the whole
   // card, so an asset that won't load is DROPPED rather than drawn as a hole.
   const layout = await withDeadline(withAssets(rawLayout, d), { ...rawLayout, assets: [] });
+  // What the badge COULD show on this card, gathered once. An admin can
+  // override what the corner draws per card kind, and the override needs these
+  // to hand — dug out of the union here rather than inside the renderer, so
+  // "the game's logo" means the same thing on every kind that has one.
+  const any = body as Record<string, unknown>;
+  const firstTrophy = Array.isArray(any.trophies) && any.trophies.length
+    ? (any.trophies[0] as { imageUrl?: string }).imageUrl ?? null
+    : (any.trophy as { imageUrl?: string } | undefined)?.imageUrl ?? null;
+  const badge = {
+    gameLogoUrl: typeof any.logoUrl === "string" ? any.logoUrl : null,
+    level: typeof any.level === "number" ? any.level : null,
+    trophyUrl: firstTrophy,
+  };
   // Colours are normalised here, once, on the way in — so every card body can
   // use `theme.accent` directly and no unparseable value ever reaches Satori.
-  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad }) } as CardData;
+  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad, badge }) } as CardData;
 }
 
 // The background, with fallbacks. Tried in order and stops at the first that

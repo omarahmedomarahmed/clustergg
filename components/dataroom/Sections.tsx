@@ -4,6 +4,7 @@ import AdSlot from "@/components/AdSlot";
 import BotShowcase from "@/components/BotShowcase";
 import { Milestones, GtmStages, TeamGrid, Gallery, MetricTiles, Explainer, CardShowcase } from "@/components/dataroom/Interactive";
 import { RaiseSection, UnitSection, SaasSection, MarketSection } from "@/components/dataroom/Investor";
+import FinanceModel from "@/components/dataroom/FinanceModel";
 import CompareMatrix from "@/components/viz/CompareMatrix";
 import OpsSplit from "@/components/viz/OpsSplit";
 import PlacementMap from "@/components/viz/PlacementMap";
@@ -418,6 +419,17 @@ function Body({ section, doc, live, people, steps, installUrl }: {
         <>
           <Heading section={section} accent={accent} />
           <UnitSection d={d} accent={accent} />
+        </>
+      );
+
+    // The model itself, not a picture of it. Assumptions are sliders, so a
+    // reader who disagrees with a number can move it and see the consequence
+    // instead of arguing with a static table.
+    case "finance":
+      return (
+        <>
+          <Heading section={section} accent={accent} />
+          <FinanceModel initial={live.finance} pricing={live.pricing} accent={accent} />
         </>
       );
 

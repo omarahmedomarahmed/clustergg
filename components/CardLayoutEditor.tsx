@@ -5,8 +5,8 @@ import Icon from "@/components/Icon";
 import { saveCardLayout, resetCardLayout, applyFurnitureEverywhere, type CardActionState } from "@/app/actions/cards";
 import ImageUpload from "@/components/ImageUpload";
 import {
-  DEFAULT_LAYOUT, BG_SOURCES, ASSET_SOURCES, AD_RATIO, assetBoxPct, assetWidthPct, assetWidthPx,
-  badgeTopFor, partBoxes,
+  DEFAULT_LAYOUT, BG_SOURCES, ASSET_SOURCES, BADGE_SHOWS, AD_RATIO,
+  assetBoxPct, assetWidthPct, assetWidthPx, badgeTopFor, partBoxes,
   type CardLayout, type CardAsset, type ContentBox, type PartStyle, type Spot,
 } from "@/lib/cards/layout";
 import { assetPicture } from "@/lib/cards/asset-source";
@@ -62,6 +62,9 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
   const [drag, setDrag] = useState<Handle | null>(null);
   const [nonce, setNonce] = useState(0);
   const canvas = useRef<HTMLDivElement>(null);
+  // Which single element the "put this on every card" press should copy. A
+  // hidden field, not the button's own name/value — see the note by the buttons.
+  const onlyRef = useRef<HTMLInputElement>(null);
 
   const [saveState, save, saving] = useActionState<CardActionState, FormData>(
     async (prev, fd) => {
@@ -211,8 +214,11 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
   return (
     <div className="space-y-4">
       <div className="grid lg:grid-cols-[minmax(0,1fr)_300px] gap-5 items-start">
-        {/* ===== The canvas ===== */}
-        <div>
+        {/* ===== The canvas =====
+            Sticky, because the controls column is long and adjusting a card you
+            cannot see is guessing. It follows you down the settings so the
+            change and its consequence are on screen together. */}
+        <div className="lg:sticky lg:top-20">
           <div
             ref={canvas}
             onPointerMove={onMove}
@@ -416,7 +422,31 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
 
           <SpotFields label="Mascot" prefix="mascot" spot={l.mascot} onChange={(p) => setSpot("mascot", p)} />
           <SpotFields label="Logo" prefix="mark" spot={l.mark} onChange={(p) => setSpot("mark", p)} />
-          <SpotFields label="Top-right badge" prefix="badge" spot={l.badge} onChange={(p) => setSpot("badge", p)} />
+          <SpotFields
+            label="Top-right badge" prefix="badge" spot={l.badge} onChange={(p) => setSpot("badge", p)}
+            hint="The small thing under the sponsor box. What it SHOWS is set below — it does not have to be the same thing on every card."
+          />
+          {/* What the badge shows, per card kind.
+              The card body used to decide this for itself, which made the badge
+              the one piece of furniture an admin could move but not fill. On a
+              planet the game's logo is right; on a challenge the prize is; on a
+              card whose artwork already carries the game, nothing is. */}
+          <label className="block rounded-xl border border-white/10 p-3">
+            <span className="mb-1 block text-[11px] uppercase tracking-widest text-muted">
+              What the badge shows here
+            </span>
+            <select
+              name="badgeShow"
+              value={l.badgeShow ?? "auto"}
+              onChange={(e) => setL((c) => ({ ...c, badgeShow: e.target.value as CardLayout["badgeShow"] }))}
+              className="input-cosmic w-full px-2 py-1.5 text-xs"
+            >
+              {BADGE_SHOWS.map((b) => <option key={b.id} value={b.id}>{b.label}</option>)}
+            </select>
+            <span className="mt-1.5 block text-[11px] leading-snug text-muted">
+              {BADGE_SHOWS.find((b) => b.id === (l.badgeShow ?? "auto"))?.note}
+            </span>
+          </label>
           <SpotFields
             label="Sponsor box"
             prefix="ad"
@@ -425,42 +455,83 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
             hint="A brand's creative, drawn on every render of this card. Size is the box WIDTH — the height follows the 640×200 creative. Hiding it takes this card kind out of the ad rotation."
           />
 
-          {/* One press, every card.
+          {/* One press per element, every card.
               These four are the only elements common to all twelve kinds, and
               they are exactly the ones that must not drift: a logo in a
-              different corner on each card is not branding, and a sponsor box
-              that moves between cards is inventory a brand cannot recognise.
-              Setting them meant opening twelve editors and repeating the same
-              four positions, which nobody did. */}
-          <div className="rounded-xl border border-cyan-400/25 bg-cyan-500/5 p-3">
+              different corner on each card is not branding.
+
+              But they are not one decision. A badge belongs somewhere different
+              on a challenge than on a profile, while the logo belongs in exactly
+              the same place on both — so copying all four together forced an
+              admin to accept a badge position they did not want in order to fix
+              a logo they did. Each element now travels on its own. */}
+          <fieldset className="rounded-xl border border-cyan-400/25 bg-cyan-500/5 p-3 space-y-2">
+            <legend className="px-1.5 text-[11px] uppercase tracking-widest text-cyan-200">
+              Put one of these on every card
+            </legend>
+            <p className="text-[11px] leading-snug text-muted">
+              Copies where it sits, how big it is, how see-through it is and whether it shows —
+              for that ONE element, onto all 12 cards. Nothing else on the other cards changes.
+            </p>
+            {/* WHICH element travels, in a hidden field rather than on the
+                button.
+                React does not serialise a submit button's name/value when its
+                `formAction` is a server action — it dispatches the action
+                itself and the submitter is dropped. So `name="only"` on the
+                button arrived as nothing, every press applied all four, and
+                the four buttons would have looked like they worked. The field
+                is written straight to the DOM on click, because a state update
+                is not guaranteed to flush before the form is read. */}
+            <input type="hidden" name="only" ref={onlyRef} defaultValue="" />
+            <div className="grid grid-cols-2 gap-1.5">
+              {([
+                ["mascot", "Astronaut"],
+                ["mark", "Logo"],
+                ["badge", "Badge"],
+                ["ad", "Sponsor box"],
+              ] as const).map(([which, label]) => (
+                <button
+                  key={which}
+                  // MUST be a submit button. `formAction` is only honoured on a
+                  // submit; with type="button" the browser never submits, so the
+                  // action never ran and the press did nothing at all.
+                  type="submit"
+                  data-only={which}
+                  formAction={applyAll}
+                  disabled={applying}
+                  onClick={(e) => {
+                    if (!confirm(`Put the ${label.toLowerCase()} in this exact spot on all 12 cards?\n\nOnly the ${label.toLowerCase()} moves. Everything else on the other cards stays as it is.`)) {
+                      e.preventDefault();
+                      return;
+                    }
+                    if (onlyRef.current) onlyRef.current.value = which;
+                  }}
+                  className="ghost-btn pressable inline-flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-[11px] font-semibold disabled:opacity-60"
+                >
+                  <Icon name="layers" size={11} />
+                  {label}
+                </button>
+              ))}
+            </div>
             <button
-              // MUST be a submit button. `formAction` is only honoured on a
-              // submit; with type="button" the browser never submits, so the
-              // action never ran and the press did nothing at all.
               type="submit"
+              data-only="all"
               formAction={applyAll}
               disabled={applying}
               onClick={(e) => {
-                // `formAction` submits the whole form, which is what carries the
-                // CURRENT unsaved numbers — applying what was last saved would
-                // make the button do something other than what the canvas shows.
-                if (!confirm("Copy the mascot, logo, badge and sponsor box — position, size, opacity and visibility — onto all 12 card kinds?\n\nNothing else about the other cards is touched.")) {
+                if (!confirm("Put all four — astronaut, logo, badge and sponsor box — in these exact spots on all 12 cards?")) {
                   e.preventDefault();
+                  return;
                 }
+                if (onlyRef.current) onlyRef.current.value = "";
               }}
-              className="ghost-btn pressable inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold disabled:opacity-60"
+              className="ghost-btn pressable w-full rounded-lg px-2.5 py-1.5 text-[11px] disabled:opacity-60"
             >
-              <Icon name="layers" size={12} />
-              {applying ? "Applying…" : "Apply these four to every card"}
+              {applying ? "Copying…" : "All four at once"}
             </button>
-            <p className="mt-2 text-[11px] leading-snug text-muted">
-              Copies position, size, opacity and show/hide for the mascot, the logo, the top-right badge
-              and the sponsor box. Everything else on the other cards — their content boxes, their
-              sections, their placed art — is left exactly as it is.
-            </p>
-            {applyState?.ok && <p className="mt-2 text-[11px] text-emerald-300">{applyState.ok}</p>}
-            {applyState?.error && <p className="mt-2 text-[11px] text-amber-300">{applyState.error}</p>}
-          </div>
+            {applyState?.ok && <p className="text-[11px] text-emerald-300">{applyState.ok}</p>}
+            {applyState?.error && <p className="text-[11px] text-amber-300">{applyState.error}</p>}
+          </fieldset>
 
           {/* ===== What this card actually says ===== */}
           {parts.length > 0 && (
@@ -469,9 +540,10 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
                 Sections on this card
               </legend>
               <p className="text-[11px] text-muted leading-snug pb-1">
-                Every block this card draws, in the order it draws them. Turn one off and the space
-                goes to what&apos;s below it. Sections with their own wording can be rewritten —
-                the live numbers underneath never can.
+                Every block this card draws, top to bottom. Untick one to hide it and the space
+                goes to whatever is below. Click a block to change its size, its width, where it
+                sits and — where it has words of its own — what it says. Live numbers can never
+                be typed over.
               </p>
               {parts.map((sec) => {
                 const st = partOf(sec.key);
@@ -501,12 +573,36 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
                         <p className="text-[10px] leading-snug text-muted">{sec.note}</p>
                         <Slider
                           name="" label="Text size" value={Math.round((st.scale ?? 1) * 100)} min={50} max={200} suffix="%"
+                          hint="Bigger or smaller type, just for this block."
                           onChange={(v) => patchPart(sec.key, { scale: v / 100 })}
                         />
                         <Slider
-                          name="" label="Opacity" value={Math.round(st.opacity ?? 100)} min={10} max={100} suffix="%"
+                          name="" label="How see-through" value={Math.round(st.opacity ?? 100)} min={10} max={100} suffix="%"
+                          hint="100% is solid. Lower it to push a section into the background."
                           onChange={(v) => patchPart(sec.key, { opacity: v })}
                         />
+                        {/* Width, per section.
+                            The content box set ONE width for everything inside
+                            it, so a headline and an eight-row table had to be
+                            the same shape — and the only way to narrow one was
+                            to narrow the other. This is the control that was
+                            missing: how wide THIS block is, as a share of the
+                            content box. */}
+                        <Slider
+                          name="" label="How wide" value={Math.round(st.w ?? 100)} min={20} max={100} suffix="%"
+                          hint="Of the content box. Narrow a block to keep it clear of art on the right, or to force a headline onto two lines."
+                          onChange={(v) => patchPart(sec.key, { w: v })}
+                        />
+                        <div className="grid grid-cols-2 gap-2">
+                          <Slider
+                            name="" label="Nudge sideways" value={Math.round(st.dx ?? 0)} min={-200} max={200} suffix="px"
+                            onChange={(v) => patchPart(sec.key, { dx: v })}
+                          />
+                          <Slider
+                            name="" label="Nudge up / down" value={Math.round(st.dy ?? 0)} min={-150} max={150} suffix="px"
+                            onChange={(v) => patchPart(sec.key, { dy: v })}
+                          />
+                        </div>
                         {sec.text !== undefined && (
                           <label className="block">
                             <span className="mb-1 block text-[10px] text-muted">Its wording</span>

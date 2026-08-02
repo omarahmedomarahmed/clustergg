@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, desc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getProvider, PROVIDERS } from "@/lib/providers/registry";
 import { getUserQuests, getTotalCp } from "@/lib/quests";
@@ -413,7 +413,13 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
   ]);
 
   // Podium prizes are trophy-id lists per place; resolve them to art + value.
-  const prizes = ch.prizes ?? {};
+  //
+  // Falls back to the legacy single `trophyId` as first place, exactly as the
+  // challenge page does. Without it, every challenge created before podium
+  // prizes existed rendered a card with no prize on it at all — while the same
+  // challenge's web page showed the trophy — so the card was quietly hiding
+  // the one thing a competition is for.
+  const prizes = ch.prizes ?? (ch.trophyId ? { first: [ch.trophyId] } : {});
   const wanted: { id: string; place: number }[] = [
     ...(prizes.first ?? []).map((id) => ({ id, place: 1 })),
     ...(prizes.second ?? []).map((id) => ({ id, place: 2 })),
@@ -505,6 +511,68 @@ export async function leaderboardCard(game: string, metricKey?: string | null): 
       avatarUrl: r.avatarUrl,
     })),
     theme: { ...BRAND, bgUrl: g[0]?.coverUrl || bg.bgUrl, bgFallbacks: [bg.bgUrl] },
+  };
+}
+
+/**
+ * THIS challenge's standings — not the game's leaderboard.
+ *
+ * The two were the same button for a long time, and they are not the same
+ * thing: a game's board ranks everyone who plays it on a lifetime metric, while
+ * a challenge's standings rank only the people who entered, on points earned
+ * since they entered. Sending somebody who asked "where am I in this
+ * competition?" to a lifetime ladder they are not competing on is the wrong
+ * answer to the right question.
+ *
+ * Rendered as a leaderboard card because that is what it is — a ranked list —
+ * but titled and scoped to the challenge, with the prize pool named underneath.
+ */
+export async function challengeStandingsCard(challengeId: string): Promise<CardData | null> {
+  const db = await getDb();
+  const [ch] = await db.select().from(schema.challenges)
+    .where(eq(schema.challenges.id, challengeId)).limit(1);
+  if (!ch) return null;
+
+  const [rows, g, bg] = await Promise.all([
+    db.select({
+      points: schema.challengeParticipants.currentPoints,
+      status: schema.challengeParticipants.status,
+      name: schema.users.displayName,
+      avatarUrl: schema.users.avatarUrl,
+      account: schema.linkedGameAccounts.inGameName,
+    })
+      .from(schema.challengeParticipants)
+      .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
+      .innerJoin(schema.linkedGameAccounts, eq(schema.challengeParticipants.linkedAccountId, schema.linkedGameAccounts.id))
+      .where(eq(schema.challengeParticipants.challengeId, challengeId))
+      .orderBy(desc(schema.challengeParticipants.currentPoints))
+      .limit(10),
+    db.select({ logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl })
+      .from(schema.games).where(eq(schema.games.name, ch.game)).limit(1),
+    cardBg("bot_leaderboard"),
+  ]);
+
+  const live = rows.filter((r) => r.status !== "disqualified");
+  return {
+    kind: "leaderboard",
+    title: ch.title,
+    game: ch.game,
+    logoUrl: g[0]?.logoUrl ?? null,
+    // Says what these numbers ARE. "Live standings" on a lifetime board and on
+    // a week-old competition would read identically, and they mean opposite
+    // things.
+    subtitle: live.length
+      ? `Points earned in this challenge · ${live.length} entered`
+      : "Nobody has scored yet — first point leads",
+    rows: live.map((r, i) => ({
+      rank: i + 1,
+      // The ACCOUNT that is competing, next to the person. With two accounts on
+      // one game these are different names, and only one of them is entered.
+      name: r.account && r.account !== r.name ? `${r.name} · ${r.account}` : r.name,
+      value: `${r.points} pts`,
+      avatarUrl: r.avatarUrl,
+    })),
+    theme: { ...BRAND, bgUrl: ch.coverUrl || g[0]?.coverUrl || bg.bgUrl, bgFallbacks: [bg.bgUrl] },
   };
 }
 

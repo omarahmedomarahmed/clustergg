@@ -42,6 +42,20 @@ export type CardTheme = {
   // cache, so each brand's version of a card is stored and reused separately
   // rather than one of them silently overwriting the other.
   ad?: CardAdSlot | null;
+  /**
+   * The material the top-right badge can be built from, for this card.
+   *
+   * Each card body proposes what its badge shows, but an admin can override it
+   * per card kind — and an override needs the ingredients to hand. Collected
+   * once when the card is prepared rather than dug out of a union type inside
+   * the renderer, so "show the game's logo" means the same thing on every kind
+   * that has one and draws nothing on the kinds that don't.
+   */
+  badge?: {
+    gameLogoUrl?: string | null;
+    level?: number | null;
+    trophyUrl?: string | null;
+  };
 };
 
 export type ProfileCard = {

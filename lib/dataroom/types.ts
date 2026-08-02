@@ -31,6 +31,7 @@ export type SectionKind =
   // deck — it's a product tour.
   | "raise"       // the ask, the instrument, use of funds, the cap table
   | "unit"        // unit economics, per challenge and per game
+  | "finance"     // the plan for the money: use of funds, cash flow, breakeven
   | "saas"        // MRR / ARR / brands / ARPA, live from the database
   | "market"      // market sizing, with the source next to every number
   | "compare"     // the competitor matrix
@@ -60,6 +61,7 @@ export const SECTION_KINDS: { kind: SectionKind; label: string; blurb: string; l
   { kind: "ad", label: "Ad placement", blurb: "The live investor-doc ad slot — shows a partner exactly what they'd buy.", live: true },
   { kind: "raise", label: "The raise", blurb: "Amount, instrument, valuation, equity, use of funds and the cap table — as charts, not a paragraph." },
   { kind: "unit", label: "Unit economics", blurb: "What one challenge and one game-month cost and earn, with the margin drawn." },
+  { kind: "finance", label: "Financial model", blurb: "The whole plan for the money — use of funds split into cash and foregone revenue, month-by-month cash flow, breakeven, downside scenarios and the implied valuation. Every figure computed from editable assumptions, so nothing on the page can disagree with anything else on it.", live: true },
   { kind: "saas", label: "SaaS metrics", blurb: "MRR, ARR, paying brands, ARPA — read live from the campaigns actually running.", live: true },
   { kind: "market", label: "Market size", blurb: "TAM / SAM / SOM with the source stated beside each number." },
   { kind: "compare", label: "Competitor matrix", blurb: "Us against giveaway bots, tournament platforms and agencies, capability by capability." },

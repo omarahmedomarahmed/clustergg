@@ -5,7 +5,7 @@ import { DEFAULT_LAYOUT } from "@/lib/cards/layout";
 import { previewFixtures } from "@/lib/cards/preview";
 import { getOrRenderCard } from "@/lib/cards/cache";
 import { withCardAd, PREVIEW_AD } from "@/lib/cards/ads";
-import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, weekCard, worldCard, searchCard, cardBg } from "@/lib/cards/data";
+import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, challengeStandingsCard, planetCard, planetsCard, challengeCard, weekCard, worldCard, searchCard, cardBg } from "@/lib/cards/data";
 import type { PreviewFixtures } from "@/lib/cards/preview";
 import { guideCard, GUIDE_TOPICS } from "@/lib/cards/guides";
 import type { CardData } from "@/lib/cards/types";
@@ -54,9 +54,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
       case "cp-summary":
         if (slug) data = await cpSummaryCard(slug);
         break;
-      case "leaderboard":
-        if (game) data = await leaderboardCard(game, q.get("metric"));
+      case "leaderboard": {
+        // Scoped to a challenge when one is named — that is the challenge's own
+        // standings, which is a different list from the game's lifetime board.
+        const forChallenge = q.get("challenge");
+        if (forChallenge) data = await challengeStandingsCard(forChallenge);
+        else if (game) data = await leaderboardCard(game, q.get("metric"));
         break;
+      }
       case "planet":
         if (game) data = await planetCard(game);
         break;
