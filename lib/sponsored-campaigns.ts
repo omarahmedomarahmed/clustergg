@@ -364,13 +364,25 @@ export async function openSlot(campaignId: string, index: number): Promise<strin
 }
 
 /**
- * A slot's challenge finished — open the next one.
+ * A slot's challenge finished — move the campaign on to the next one.
  *
- * Called when a challenge ends. This is the one-at-a-time rule made real: the
- * next week does not exist as a challenge until the current one is over, so a
- * game never carries two sponsored competitions at once.
+ * Two ways the next week can begin, and this handles both:
+ *
+ *  1. **The series already opened it.** A campaign challenge created with a
+ *     weekly cadence rolls itself over the moment it closes, so week two is a
+ *     live challenge before this runs. The campaign's job is then only to bind
+ *     the slot to it — asking staff to approve a week the brand already bought
+ *     would stall a paid campaign behind a queue.
+ *  2. **Nothing opened it.** Older campaigns whose slots are individually
+ *     approved fall back to raising the next request, which is the original
+ *     one-at-a-time behaviour.
+ *
+ * Either way, a game never carries two sponsored competitions at once.
  */
-export async function advanceCampaign(challengeId: string): Promise<string | null> {
+export async function advanceCampaign(
+  challengeId: string,
+  nextChallengeId?: string | null,
+): Promise<string | null> {
   try {
     const db = await getDb();
     const [c] = await db.select().from(schema.sponsoredCampaigns)
@@ -383,6 +395,19 @@ export async function advanceCampaign(challengeId: string): Promise<string | nul
 
     const done = slots.map((s) => (s.index === current.index ? { ...s, status: "done" as const } : s));
     const next = done.find((s) => s.status === "waiting");
+
+    // The series already produced the next week — bind it and go live.
+    if (next && nextChallengeId) {
+      const bound = done.map((s) =>
+        s.index === next.index
+          ? { ...s, challengeId: nextChallengeId, status: "live" as const }
+          : s);
+      await db.update(schema.sponsoredCampaigns)
+        .set({ slotState: bound, status: "running" })
+        .where(eq(schema.sponsoredCampaigns.id, c.id));
+      return nextChallengeId;
+    }
+
     await db.update(schema.sponsoredCampaigns).set({
       slotState: done,
       status: next ? "running" : "completed",

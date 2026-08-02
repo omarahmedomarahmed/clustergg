@@ -289,6 +289,20 @@ export const challenges = pgTable("challenges", {
   endAt: timestamp("end_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("draft"), // draft | active | completed | cancelled
   cadence: text("cadence").notNull().default("custom"), // daily | weekly | monthly | custom
+  // ===== Repeating series =====
+  //
+  // A repeating challenge is a series of separate rows, one per run, because a
+  // run is the unit of revenue: its own entrants, standings, winners, trophies
+  // and reach, all still reportable a year later. A single row with a sliding
+  // end date can report none of that.
+  /** Groups every run of one repeating challenge. The first run's own id. */
+  seriesId: text("series_id"),
+  /** 1-based: Week 1, Week 2… Also what the title suffix is built from. */
+  runIndex: integer("run_index").notNull().default(1),
+  /** How many runs were bought. 4 = a sponsored month. 0 = until stopped. */
+  runsPlanned: integer("runs_planned").notNull().default(1),
+  /** The title without its "— Week N" suffix, so the suffix never doubles up. */
+  baseTitle: text("base_title"),
   heroType: text("hero_type").notNull().default("image"), // image | video | stream
   heroUrl: text("hero_url"),
   coverUrl: text("cover_url"),

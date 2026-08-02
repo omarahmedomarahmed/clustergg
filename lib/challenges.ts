@@ -291,19 +291,37 @@ export async function closeChallenge(challengeId: string): Promise<CloseResult> 
     } catch { /* non-fatal */ }
   }
 
-  void announceChallengeEnded(challengeId).catch(() => {});
-
-  // The one-at-a-time rule, made real.
+  // Announce the winners, and WAIT for it.
   //
-  // A brand bought four weeks; only the first ever exists as a live challenge.
-  // This is the moment the next one is allowed to: the week that just finished
-  // is marked done and week two enters the review queue. Fire-and-forget, like
-  // the announcement — a campaign that fails to advance is a support ticket,
-  // while a close that fails is a competition with no winners.
+  // This was fire-and-forget, which in a cron or server-action request means it
+  // frequently never ran: the moment the request returns the runtime may freeze
+  // the function. A challenge that ends without ever announcing its podium is
+  // the single most visible failure this system can have, so it is worth the
+  // extra second.
+  try { await announceChallengeEnded(challengeId); } catch { /* podium is frozen either way */ }
+
+  // Open the next run.
+  //
+  // A weekly challenge is a series of separate runs, and this is the seam
+  // between two of them: the week that just finished keeps its standings and
+  // trophies forever, and week two opens immediately with the same entrants and
+  // their scores reset. `openNextRun` is a no-op for a challenge that does not
+  // repeat or whose last planned run this was.
+  let nextRunId: string | null = null;
+  try {
+    const { openNextRun } = await import("@/lib/challenge-series");
+    const next = await openNextRun(challengeId);
+    if (next.ok) nextRunId = next.challengeId;
+  } catch { /* the finished run is still correctly closed */ }
+
+  // A sponsored campaign tracks which of its four slots is live, so it has to
+  // learn that this one is done — and, when the series opened week two itself,
+  // which challenge that week is. Awaited for the same reason as above.
   if (c.sponsorCampaignId) {
-    void import("@/lib/sponsored-campaigns")
-      .then((m) => m.advanceCampaign(challengeId))
-      .catch(() => {});
+    try {
+      const m = await import("@/lib/sponsored-campaigns");
+      await m.advanceCampaign(challengeId, nextRunId);
+    } catch { /* a stale campaign slot is a support ticket, not a lost podium */ }
   }
 
   return { ok: true, winners: Math.min(3, standings.length) };

@@ -8,6 +8,7 @@ import { requireArea, setStaffGrants } from "@/lib/permissions";
 import { uid, slugify } from "@/lib/utils";
 import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
 import { syncAccount } from "@/lib/sync";
+import { CADENCE_DAYS, isRepeating, runTitle, stripRunSuffix } from "@/lib/challenge-series";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
 
@@ -380,10 +381,24 @@ export async function togglePinPost(postId: string, pin: boolean, path: string) 
 }
 
 // ---------- Challenges ----------
-export async function saveChallenge(formData: FormData) {
+/**
+ * What the builder gets back.
+ *
+ * This action used to return nothing at all, and its only failure path was a
+ * bare `return` — so a challenge that couldn't save looked exactly like one
+ * that had. Every outcome is now reported, because "I pressed Launch and
+ * nothing happened" is the worst possible answer to give someone committing a
+ * brand's month.
+ */
+export type ChallengeSaveState = { ok?: string; error?: string; challengeId?: string } | null;
+
+export async function saveChallenge(
+  _prev: ChallengeSaveState,
+  formData: FormData,
+): Promise<ChallengeSaveState> {
   const admin = await requireStaff();
   const db = await getDb();
-  const challengeId = String(formData.get("challengeId") ?? "");
+  let challengeId = String(formData.get("challengeId") ?? "");
 
   let pointsEngine: Record<string, number> = {};
   const rawPoints = String(formData.get("pointsEngine") ?? "{}");
@@ -405,12 +420,47 @@ export async function saveChallenge(formData: FormData) {
     }
   } catch { conditions = []; }
 
+  // ===== Dates =====
+  //
+  // Three separate bugs lived in the six lines this replaces, and together they
+  // are why "the start date and the end date are broken":
+  //
+  //  1. `formData.get("startAt") ?? <default>` — an empty date input submits
+  //     "" and not null, so `??` never fired and `new Date("")` produced an
+  //     Invalid Date. Inserting that into a timestamp column throws, and the
+  //     action's only error path was a bare `return`, so saving did nothing
+  //     and said nothing.
+  //  2. Picking a cadence SILENTLY OVERWROTE the end date with start + 7 days.
+  //     Staff typed an end date, saved, and got a different one back with no
+  //     explanation.
+  //  3. Nothing rejected an end date before its start, so a challenge could be
+  //     saved already expired and would be closed by the next sweep.
+  //
+  // Now: cadence sets the DEFAULT length of a run, an explicit end date always
+  // wins, and anything unparseable is reported rather than swallowed.
   const cadence = String(formData.get("cadence") ?? "custom");
-  const startAt = new Date(String(formData.get("startAt") ?? new Date().toISOString()));
-  const cadenceDays: Record<string, number> = { daily: 1, weekly: 7, monthly: 30 };
-  const endAt = cadenceDays[cadence]
-    ? new Date(startAt.getTime() + cadenceDays[cadence] * 86400000)
-    : new Date(String(formData.get("endAt") ?? new Date(Date.now() + 7 * 86400000).toISOString()));
+  const parseDate = (raw: FormDataEntryValue | null): Date | null => {
+    const s = String(raw ?? "").trim();
+    if (!s) return null;
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+
+  const startAt = parseDate(formData.get("startAt")) ?? new Date();
+  const runDays = CADENCE_DAYS[cadence] ?? 7;
+  const endAt = parseDate(formData.get("endAt"))
+    ?? new Date(startAt.getTime() + runDays * 86400000);
+  if (endAt.getTime() <= startAt.getTime()) {
+    return { error: "The end date has to be after the start date." };
+  }
+
+  // How many runs this series has. Only meaningful for a repeating cadence —
+  // a one-off is a series of one, which keeps every challenge on the same
+  // model instead of special-casing the common case.
+  const runsPlanned = isRepeating(cadence)
+    ? Math.max(1, Math.min(52, Number(formData.get("runsPlanned")) || 1))
+    : 1;
+
   const adjust = {
     zoom: Number(formData.get("coverZoom")) || 1,
     x: Number(formData.get("coverX")) || 50,
@@ -460,21 +510,82 @@ export async function saveChallenge(formData: FormData) {
     status: String(formData.get("status") ?? "draft"),
     prizeDescription: String(formData.get("prizeDescription") ?? "").trim() || null,
   };
-  if (!values.title || !values.spaceId || !values.provider) return;
 
-  if (challengeId) {
-    await db.update(schema.challenges).set(values).where(eq(schema.challenges.id, challengeId));
-    // Completed challenge → hand the podium trophies to the placed gamers.
-    if (values.status === "completed") {
-      try { const { awardChallengeTrophies } = await import("@/lib/trophies"); await awardChallengeTrophies(db, challengeId); } catch { /* non-fatal */ }
+  // Say which field is missing. This used to be `return;` — the form posted,
+  // nothing happened, and nothing explained why.
+  const missing = [
+    !values.title && "a title",
+    !values.spaceId && "a planet",
+    !values.provider && "a game",
+  ].filter(Boolean) as string[];
+  if (missing.length) return { error: `Still needs ${missing.join(", ")}.` };
+
+  // The title carries its run number, and `baseTitle` is the name without it.
+  // Editing "Ramen Rush — Week 2" must not produce "Ramen Rush — Week 2 — Week 3"
+  // when week three opens, so the suffix is always rebuilt from the base.
+  const baseTitle = stripRunSuffix(values.title);
+
+  try {
+    if (challengeId) {
+      const [before] = await db.select({
+        status: schema.challenges.status,
+        runIndex: schema.challenges.runIndex,
+        cadence: schema.challenges.cadence,
+      }).from(schema.challenges).where(eq(schema.challenges.id, challengeId)).limit(1);
+
+      await db.update(schema.challenges).set({
+        ...values,
+        baseTitle,
+        title: runTitle(baseTitle, cadence, before?.runIndex ?? 1),
+        runsPlanned,
+      }).where(eq(schema.challenges.id, challengeId));
+
+      // Completed challenge → hand the podium trophies to the placed gamers.
+      if (values.status === "completed") {
+        try { const { awardChallengeTrophies } = await import("@/lib/trophies"); await awardChallengeTrophies(db, challengeId); } catch { /* non-fatal */ }
+      }
+      // Going live is what fans the challenge out to every server — and that
+      // fan-out is what writes the delivery ledger a brand's reach is read
+      // from. It used to require staff to remember a second button on another
+      // page, which is why sponsored challenges reported zero servers.
+      if (before?.status !== "active" && values.status === "active") {
+        await launchChallenge(challengeId);
+      }
+      await audit(admin.id, "challenge.update", "challenge", challengeId);
+      revalidatePath(`/admin/challenges/${challengeId}`);
+    } else {
+      // A new challenge is the first run of its own series, so the series is
+      // named after it. Every later run points back at this id.
+      const id = uid();
+      await db.insert(schema.challenges).values({
+        id, createdBy: admin.id, ...values,
+        seriesId: id, runIndex: 1, runsPlanned, baseTitle,
+        title: runTitle(baseTitle, cadence, 1),
+      });
+      if (values.status === "active") await launchChallenge(id);
+      await audit(admin.id, "challenge.create", "challenge", values.title);
+      challengeId = id;
     }
-    await audit(admin.id, "challenge.update", "challenge", challengeId);
-    revalidatePath(`/admin/challenges/${challengeId}`);
-  } else {
-    await db.insert(schema.challenges).values({ id: uid(), createdBy: admin.id, ...values });
-    await audit(admin.id, "challenge.create", "challenge", values.title);
+  } catch (e) {
+    return { error: `Couldn't save: ${e instanceof Error ? e.message : "unknown error"}` };
   }
+
   revalidatePath("/admin/challenges");
+  return { ok: "Saved.", challengeId };
+}
+
+/**
+ * Announce a challenge that has just gone live.
+ *
+ * Awaited, not fired-and-forgotten: the announcement is what writes the
+ * delivery ledger, and the ledger is where every brand-facing reach number
+ * comes from. A dropped promise here is a campaign that reports zero.
+ */
+async function launchChallenge(challengeId: string): Promise<void> {
+  try {
+    const { announceChallengeLaunched } = await import("@/lib/discord/announce");
+    await announceChallengeLaunched(challengeId);
+  } catch { /* the challenge is live either way */ }
 }
 
 export async function setParticipantStatus(participantId: string, status: "active" | "disqualified", challengeId: string) {

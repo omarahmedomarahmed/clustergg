@@ -1,10 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import CoverFramer from "@/components/CoverFramer";
 import MetricsGuide from "@/components/MetricsGuide";
-import { saveChallenge } from "@/app/actions/admin";
+import { saveChallenge, type ChallengeSaveState } from "@/app/actions/admin";
+
+// How long one run of each cadence lasts. Mirrors lib/challenge-series so the
+// preview the builder draws is the schedule the server will actually create —
+// this file is a client component and can't import the server module.
+const CADENCE_DAYS: Record<string, number | undefined> = { daily: 1, weekly: 7, monthly: 30 };
+
+const toLocal = (d: Date) =>
+  new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
 export type BuilderProvider = {
   id: string;
@@ -39,6 +47,9 @@ export type ChallengeEdit = {
   visibility: string; guildId: string | null; guildIds?: string[]; accessKey: string | null; announceHype: boolean;
   /** Set when a brand paid for this one — it changes which trophies belong on it. */
   sponsorBrandId?: string | null;
+  /** How many runs this series has. 4 = a sponsored month. */
+  runsPlanned?: number;
+  runIndex?: number;
 };
 
 // Points recommendation: reward the primary "win-like" metric heavily, add a
@@ -88,6 +99,12 @@ export default function ChallengeBuilder({
 
   const [providerId, setProviderId] = useState(challenge?.provider ?? providers[0]?.id ?? "");
   const [cadence, setCadence] = useState(challenge?.cadence ?? "weekly");
+  const [startAt, setStartAt] = useState(toLocal(challenge ? new Date(challenge.startAt) : new Date()));
+  const [endAt, setEndAt] = useState(
+    toLocal(challenge ? new Date(challenge.endAt) : new Date(Date.now() + 7 * 86400000)),
+  );
+  const [runs, setRuns] = useState(challenge?.runsPlanned ?? 4);
+  const [state, save] = useActionState<ChallengeSaveState, FormData>(saveChallenge, null);
   const [format, setFormat] = useState(challenge?.format ?? "top3");
   const [heroType, setHeroType] = useState(challenge?.heroType ?? "image");
   const [title, setTitle] = useState(challenge?.title ?? "");
@@ -117,11 +134,44 @@ export default function ChallengeBuilder({
 
   const pointsJson = JSON.stringify(Object.fromEntries(Object.entries(pointsMap).filter(([, v]) => v > 0)));
   const conditionsJson = JSON.stringify(conditions.filter((c) => c.metric));
-  const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
+  // The repeat plan, drawn before anything is saved.
+  //
+  // Staff are committing a brand's month, so they should see all four weeks and
+  // their dates on the way in rather than discovering week 3's window when it
+  // opens. Only week 1 is created — the rest are what WILL happen.
+  const repeating = !!CADENCE_DAYS[cadence];
+  const noun = cadence === "daily" ? "Day" : cadence === "monthly" ? "Month" : "Week";
+  const plan = useMemo(() => {
+    if (!repeating) return [];
+    const days = CADENCE_DAYS[cadence]!;
+    const base = new Date(startAt);
+    if (Number.isNaN(base.getTime())) return [];
+    const fmt = (d: Date) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    return Array.from({ length: runs }, (_, i) => {
+      const s = new Date(base.getTime() + i * days * 86400000);
+      const e = new Date(s.getTime() + days * 86400000);
+      return {
+        index: i + 1,
+        title: i === 0 ? title || "Untitled" : `${title || "Untitled"} — ${noun} ${i + 1}`,
+        startLabel: fmt(s), endLabel: fmt(e),
+      };
+    });
+  }, [repeating, cadence, startAt, runs, title, noun]);
 
   return (
-    <form action={saveChallenge} className="space-y-5">
+    <form action={save} className="space-y-5">
       {editing && <input type="hidden" name="challengeId" value={challenge.id} />}
+      {state?.error && (
+        <p className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+          {state.error}
+        </p>
+      )}
+      {state?.ok && (
+        <p className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          {state.ok}
+        </p>
+      )}
       {/* Ideas */}
       <div>
         <div className="text-xs uppercase tracking-widest text-muted mb-2">Start from an idea (optional)</div>
@@ -159,27 +209,84 @@ export default function ChallengeBuilder({
         </div>
       </div>
 
-      {/* Step 3: window */}
+      {/* Step 3: window + repeat
+          Both dates are ALWAYS editable. The end field used to disappear the
+          moment a cadence was picked, and the server then overwrote whatever
+          had been typed with start + 7 days — so staff set an end date, saved,
+          and silently got a different one. Cadence now only fills the field in;
+          what is in the field is what gets saved. */}
       <div>
         <div className="text-xs uppercase tracking-widest text-muted mb-2">3 · Time window</div>
         <div className="flex flex-wrap gap-2 mb-3">
           {CADENCES.map((cd) => (
-            <button key={cd.key} type="button" onClick={() => setCadence(cd.key)} className={`stat-tab ${cadence === cd.key ? "stat-tab-active" : ""}`} title={cd.desc}>{cd.label}</button>
+            <button
+              key={cd.key} type="button"
+              onClick={() => { setCadence(cd.key); const d = CADENCE_DAYS[cd.key]; if (d) setEndAt(toLocal(new Date(new Date(startAt).getTime() + d * 86400000))); }}
+              className={`stat-tab ${cadence === cd.key ? "stat-tab-active" : ""}`} title={cd.desc}
+            >{cd.label}</button>
           ))}
         </div>
         <input type="hidden" name="cadence" value={cadence} />
         <div className="grid sm:grid-cols-2 gap-3">
           <label className="text-xs text-muted">Starts
-            <input name="startAt" type="datetime-local" defaultValue={toLocal(challenge ? new Date(challenge.startAt) : new Date())} className="input-cosmic mt-1" />
+            <input
+              name="startAt" type="datetime-local" required value={startAt}
+              onChange={(e) => {
+                setStartAt(e.target.value);
+                const d = CADENCE_DAYS[cadence];
+                if (d && e.target.value) setEndAt(toLocal(new Date(new Date(e.target.value).getTime() + d * 86400000)));
+              }}
+              className="input-cosmic mt-1"
+            />
           </label>
-          {cadence === "custom" ? (
-            <label className="text-xs text-muted">Ends
-              <input name="endAt" type="datetime-local" defaultValue={toLocal(challenge ? new Date(challenge.endAt) : new Date(Date.now() + 7 * 86400000))} className="input-cosmic mt-1" />
-            </label>
-          ) : (
-            <div className="text-xs text-muted self-end pb-3">Ends automatically {cadence === "daily" ? "24 hours" : cadence === "weekly" ? "7 days" : "30 days"} after start.</div>
-          )}
+          <label className="text-xs text-muted">
+            {repeating ? `Week 1 ends` : "Ends"}
+            <input
+              name="endAt" type="datetime-local" required value={endAt}
+              onChange={(e) => setEndAt(e.target.value)} className="input-cosmic mt-1"
+            />
+          </label>
         </div>
+
+        {/* The repeat plan.
+            This is the thing a sponsored month actually is: one challenge, run
+            four times. Each run is a separate record with its own entrants,
+            standings, winners and reach — which is what makes "what did week 3
+            deliver" a question with an answer. */}
+        {repeating && (
+          <div className="mt-3 rounded-2xl border border-cyan-400/25 bg-cyan-500/5 p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="text-xs text-muted">
+                Repeat for
+                <input
+                  name="runsPlanned" type="number" min={1} max={52} value={runs}
+                  onChange={(e) => setRuns(Math.max(1, Math.min(52, Number(e.target.value) || 1)))}
+                  className="input-cosmic mt-1 !w-24"
+                />
+              </label>
+              <span className="text-xs text-muted self-end pb-3">
+                {noun.toLowerCase()}{runs === 1 ? "" : "s"}
+                {runs === 4 && cadence === "weekly" && " — one sponsored month"}
+              </span>
+            </div>
+            <ol className="mt-3 space-y-1.5">
+              {plan.map((p) => (
+                <li key={p.index} className="flex flex-wrap items-baseline gap-2 text-xs">
+                  <span className={`rank-chip !h-5 !min-w-5 text-[10px] ${p.index === 1 ? "rank-chip-1" : ""}`}>{p.index}</span>
+                  <b className="font-semibold">{p.title}</b>
+                  <span className="text-muted">{p.startLabel} → {p.endLabel}</span>
+                  {p.index === 1 && <span className="text-emerald-300">goes live on save</span>}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-3 text-[11px] leading-relaxed text-muted">
+              Only {noun.toLowerCase()} 1 is created now. When it ends, Cluster announces the winners,
+              hands out the trophies, and opens {noun.toLowerCase()} 2 automatically — with everyone
+              already entered and every score back to zero. Each {noun.toLowerCase()} is saved as its own
+              completed challenge, so its standings and reach stay reportable forever.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Step 4: scoring — visual, no JSON */}
