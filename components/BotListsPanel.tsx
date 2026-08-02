@@ -182,8 +182,8 @@ export default function BotListsPanel({ values, siteOrigin }: {
       </form>
 
       <p className="text-[11px] leading-snug text-muted">
-        The full walkthrough — including the paid Top.gg auction and what to do when a list declines us — is in{" "}
-        <code className="text-cyan-300">docs/BOT_LISTS.md</code>.
+        Which list to do first, and what to do when one declines us, is in{" "}
+        <code className="text-cyan-300">docs/OPERATIONS.md</code>.
       </p>
     </div>
   );

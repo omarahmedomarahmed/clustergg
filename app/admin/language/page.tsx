@@ -65,7 +65,7 @@ export default async function LanguageAdminPage() {
         <h1 className="text-2xl font-bold flex items-center gap-2"><Icon name="globe" size={20} className="text-cyan-300" /> Language &amp; flags</h1>
         <p className="text-sm text-muted mt-1">
           Edit every word on every page in English and Arabic, translate the marketing copy, and manage the country flags.
-          Gamers switch language with the country-flag toggle in the nav. Roadmap: <span className="font-mono text-[12px]">docs/arabic-localization-plan.md</span>.
+          Gamers switch language with the country-flag toggle in the nav.
         </p>
       </div>
       <UiStringsEditor groups={uiGroups} />
