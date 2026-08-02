@@ -883,18 +883,56 @@ function ChallengeBody(d: ChallengeCard) {
           <img src={d.logoUrl} alt="" width={58} height={58} style={{ width: 58, height: 58, borderRadius: 14, objectFit: "cover" }} />
         ) : null}
         {trophies.length ? (
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
-            {trophies.map((tr, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(88) }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={tr.imageUrl} alt="" width={pTro.f(68)} height={pTro.f(68)}
-                  style={{ width: pTro.f(68), height: pTro.f(68), objectFit: "contain" }} />
-                <div style={{ display: "flex", fontSize: pTro.f(16), fontWeight: 700, color: ["#fbbf24", "#cbd5e1", "#b45309"][tr.place - 1] ?? MUTED }}>
-                  {`${tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}${tr.value > 0 ? ` · $${nf(tr.value)}` : ""}`}
+          // A PODIUM, not a row.
+          //
+          // The prize pool is what a challenge is FOR, and three equal tiles in
+          // rank order read as a list of files rather than as first, second and
+          // third. Silver on the left, gold raised in the middle, bronze on the
+          // right, on plinths of decreasing height — the shape everyone already
+          // knows, so the hierarchy is legible before a single word is read.
+          (() => {
+            const byPlace = (n: number) => trophies.find((x) => x.place === n);
+            const order = [byPlace(2), byPlace(1), byPlace(3)].filter(Boolean) as typeof trophies;
+            const PLINTH: Record<number, number> = { 1: 34, 2: 22, 3: 14 };
+            const COLOUR: Record<number, string> = { 1: "#fbbf24", 2: "#cbd5e1", 3: "#b45309" };
+            const total = trophies.reduce((sum, x) => sum + (x.value || 0), 0);
+            return (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                {total > 0 ? (
+                  <div style={{ display: "flex", fontSize: pTro.f(17), fontWeight: 800, color: "#fbbf24", letterSpacing: 0.4 }}>
+                    {`$${nf(total)} PRIZE POOL`}
+                  </div>
+                ) : null}
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
+                  {order.map((tr, i) => {
+                    const c = COLOUR[tr.place] ?? MUTED;
+                    const lift = pTro.f(PLINTH[tr.place] ?? 14);
+                    return (
+                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(tr.place === 1 ? 96 : 82) }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={tr.imageUrl} alt="" width={pTro.f(tr.place === 1 ? 76 : 60)} height={pTro.f(tr.place === 1 ? 76 : 60)}
+                          style={{ width: pTro.f(tr.place === 1 ? 76 : 60), height: pTro.f(tr.place === 1 ? 76 : 60), objectFit: "contain" }} />
+                        <div style={{ display: "flex", fontSize: pTro.f(15), fontWeight: 800, color: c }}>
+                          {tr.value > 0 ? `$${nf(tr.value)}` : `${tr.place}`}
+                        </div>
+                        {/* The plinth. Explicit height per place — Satori has no
+                            flex-grow tricks to lean on here, and the difference
+                            in height IS the ranking. */}
+                        <div style={{
+                          display: "flex", alignItems: "flex-start", justifyContent: "center",
+                          width: "100%", height: lift, borderRadius: 6,
+                          background: alpha(c, 0.22), border: `1px solid ${alpha(c, 0.5)}`,
+                          fontSize: pTro.f(14), fontWeight: 800, color: c, paddingTop: 2,
+                        }}>
+                          {tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })()
         ) : null}
       </div>
     )}>

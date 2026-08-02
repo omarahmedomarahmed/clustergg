@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { getOrRenderCard } from "@/lib/cards/cache";
 import { withCardAd, logCardAdImpression, type PickedAd } from "@/lib/cards/ads";
-import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, planetCard, planetsCard, challengeCard, weekCard, worldCard } from "@/lib/cards/data";
+import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, challengeStandingsCard, planetCard, planetsCard, challengeCard, weekCard, worldCard } from "@/lib/cards/data";
 import { guideCard } from "@/lib/cards/guides";
 import { siteUrl } from "@/lib/discord/config";
 import type { CardData } from "@/lib/cards/types";
@@ -34,7 +34,11 @@ const loaders: Record<string, (a: Record<string, string>) => Promise<CardData | 
   "game-stats": (a) => gameStatsCard(a.slug, a.game),
   quest: (a) => questCard(a.slug || null, a.quest),
   cp: (a) => cpSummaryCard(a.slug),
-  leaderboard: (a) => leaderboardCard(a.game, a.metric || null),
+  // A challenge id scopes this to that competition's own standings; without
+  // one it is the game's lifetime board. Same card, two different lists.
+  leaderboard: (a) => (a.challenge
+    ? challengeStandingsCard(a.challenge)
+    : leaderboardCard(a.game, a.metric || null)),
   planet: (a) => planetCard(a.game),
   planets: () => planetsCard(),
   challenge: (a) => challengeCard(a.id),

@@ -693,10 +693,39 @@ async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Prom
           : gate.locked && !ownHere
             ? [button("Enter with key", `open-key|${id}`, ButtonStyle.Primary, "🔑")]
             : joinButtons()),
-      navButton("Standings", frame("leaderboard", data.game), trail, ButtonStyle.Secondary, "📊"),
+      // THIS challenge's standings, not the game's lifetime board — those are
+      // different lists and only one of them answers "where am I in this".
+      navButton("Standings", frame("standings", id), [frame("challenge", id), ...trail], ButtonStyle.Secondary, "📊"),
       navButton(`${data.game} planet`.slice(0, 24), frame("planet", data.game), trail, ButtonStyle.Secondary, "🪐"),
       ...tail(ctx, frame("challenge", id), trail),
       linkButton("Full details", webUrl, "🔗"),
+    ]),
+  };
+}
+
+/**
+ * THIS challenge's standings.
+ *
+ * The button used to go to the game's leaderboard, which is a different list
+ * entirely: everyone who plays the game, ranked on a lifetime metric, most of
+ * whom never entered this competition. Somebody pressing "Standings" on a
+ * challenge card is asking where they are in THAT challenge, and the honest
+ * answer is the points people have earned inside it.
+ */
+async function standingsScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const here = frame("standings", id);
+  const { url, data } = await cardRef("leaderboard", { challenge: id });
+  if (!data) return notYet("Those standings aren't available yet.", trail, [], ctx);
+  const title = data.kind === "leaderboard" ? data.title : "Standings";
+  return {
+    embeds: [embed(url, {
+      title: `${title} — standings`,
+      color: data.theme.accent,
+      footer: "Points earned since each player entered. Updates on every sync.",
+    })],
+    components: rows([
+      navButton("Back to the challenge", frame("challenge", id), trail, ButtonStyle.Primary, "🏆"),
+      ...tail(ctx, here, trail),
     ]),
   };
 }
@@ -1461,6 +1490,7 @@ async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promi
     case "planets": return planetsScreen(ctx, trail);
     case "leaderboard": return leaderboardScreen(a, f.args[1] ?? "", ctx, trail);
     case "challenge": return challengeScreen(a, ctx, trail);
+    case "standings": return standingsScreen(a, ctx, trail);
     case "challenges": return challengesScreen(a, ctx, trail);
     case "link": return linkScreen(a, ctx, trail);
     case "server": return serverScreen(ctx, trail);
