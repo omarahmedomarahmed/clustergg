@@ -128,11 +128,10 @@ export const ADMIN_NAV: AdminGroup[] = [
     icon: "planet",
     blurb: "The worlds we sync and what lives on them.",
     items: [
-      { href: "/admin/games", label: "Games catalog", desc: "Every game, its art, theme and planet layout.", metric: "games" },
+      { href: "/admin/games", label: "Games & planets", desc: "Every game, its art and theme, and the planet it appears as — edited together.", metric: "games" },
       { href: "/admin/game-worlds", label: "Game worlds", desc: "Champions, agents, weapons and lore per game." },
       { href: "/admin/connect", label: "Connect providers", desc: "Which APIs we link accounts through, and their onboarding cards." },
-      { href: "/admin/spaces", label: "Planets", desc: "One planet per game — pins, regions and hero layout.", metric: "planets" },
-      { href: "/admin/spaces/requests", label: "Planet requests", desc: "Gamers asking for a game we don't carry yet.", metric: "planetRequests", queue: true },
+      { href: "/admin/spaces/requests", label: "Game requests", desc: "Gamers asking for a game we don't carry yet.", metric: "planetRequests", queue: true },
     ],
   },
   {

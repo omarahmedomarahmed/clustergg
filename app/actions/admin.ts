@@ -281,7 +281,7 @@ export async function saveSpace(formData: FormData) {
     }).onConflictDoNothing();
     await audit(admin.id, "space.create", "space", values.name);
   }
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
   revalidatePath("/planets");
 }
 
@@ -296,7 +296,7 @@ export async function deleteSpace(spaceId: string) {
   await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, spaceId));
   await db.delete(schema.spaces).where(eq(schema.spaces.id, spaceId));
   await audit(admin.id, "space.delete", "space", spaceId);
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
   revalidatePath("/planets");
 }
 
@@ -317,7 +317,7 @@ export async function ensurePlanetsForGames() {
     }).onConflictDoNothing();
   }
   await audit(admin.id, "planets.ensure_for_games", "space");
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
   revalidatePath("/planets");
 }
 
@@ -335,7 +335,7 @@ export async function deleteLegacyPlanets() {
     await db.delete(schema.spaces).where(eq(schema.spaces.id, s.id));
   }
   await audit(admin.id, "planets.delete_legacy", "space");
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
   revalidatePath("/planets");
 }
 
@@ -369,7 +369,7 @@ export async function adminDeletePost(postId: string) {
   const db = await getDb();
   await db.update(schema.posts).set({ deletedAt: new Date() }).where(eq(schema.posts.id, postId));
   await audit(admin.id, "post.delete", "post", postId);
-  revalidatePath("/admin/spaces");
+  revalidatePath("/admin/games");
 }
 
 export async function togglePinPost(postId: string, pin: boolean, path: string) {

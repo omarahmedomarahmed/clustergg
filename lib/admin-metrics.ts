@@ -35,7 +35,7 @@ export const METRICS: MetricDef[] = [
   { key: "serverMessages", label: "Servers waiting on a reply", definition: "Server owners who wrote to us and haven't been answered. Counted per server, not per message — one owner asking three things is one conversation.", group: "discord", href: "/admin/messages" },
 
   { key: "games", label: "Games", definition: "Active games in the catalog.", group: "content", href: "/admin/games" },
-  { key: "planets", label: "Planets", definition: "Active planets — one per game.", group: "content", href: "/admin/spaces" },
+  { key: "planets", label: "Planets", definition: "Active planets — one per game.", group: "content", href: "/admin/games" },
   { key: "planetRequests", label: "Planet requests waiting", definition: "Gamers asking for a game we don't carry yet.", group: "content", href: "/admin/spaces/requests" },
 
   { key: "challenges", label: "Live challenges", definition: "Challenges with status active.", group: "competition", href: "/admin/challenges", goodWhenUp: true },
