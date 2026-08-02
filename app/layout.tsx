@@ -56,14 +56,14 @@ export async function generateMetadata(): Promise<Metadata> {
     // purpose: a brand has to see what we sell, and a gamer has to see what
     // they get, because the same URL serves both.
     title: {
-      default: "Cluster — the media-buying platform for Discord gaming communities",
+      default: "Cluster — monetize your Discord server, or advertise to gamers on it",
       template: "%s · Cluster",
     },
     description:
-      "Brands reach gamers where they really are. Cluster turns Discord gaming communities into a media channel: sponsored weekly challenges gamers enter for the chance to win, placements inside every server running the bot, and real analytics. Server owners earn from the audience they built; gamers link every game they play into one profile and compete for real prize money.",
+      "The media-buying and monetization layer for gaming communities. Server owners earn money from their Discord server without selling anything; brands advertise on Discord by sponsoring the weekly challenge — $250, of which $175 is prize money that reaches a gamer; gamers link every game they play into one profile and compete for real prizes.",
     openGraph: {
-      title: "Cluster — the media-buying platform for Discord gaming communities",
-      description: "Brands reach gamers where they really are. Server owners earn. Gamers play, win, and share.",
+      title: "Cluster — monetize your Discord server, or advertise to gamers on it",
+      description: "Sponsored weekly challenges inside gaming communities. Brands reach gamers. Owners earn. Gamers win real prizes.",
       url: appUrl,
       siteName: "Cluster",
       // The platform, drawn from live data — not a logo, and not a file that

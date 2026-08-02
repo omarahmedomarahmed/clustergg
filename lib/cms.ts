@@ -25,60 +25,60 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   //
   // Card lists are "Heading | body" per line (see `pairs()` in lib/pricing.ts),
   // so an admin edits one textarea instead of twelve fields.
-  "brand.hero.badge": "B2B SaaS · gaming marketing",
+  "brand.hero.badge": "Discord advertising, bought like advertising",
   "brand.hero.title": "Gamers live on Discord.",
-  "brand.hero.title2": "Now you can buy it.",
+  "brand.hero.title2": "Now you can advertise there.",
   "brand.hero.subtitle":
-    "Cluster is the media-buying and monetization platform for Discord gaming communities. Brands sponsor gameplay instead of content, server owners earn from the audience they built, and gamers play for the chance to win. Sponsoring a challenge isn't ad spend — it's putting your brand inside a gamer's home and paying them to play.",
+    "Cluster is the media-buying layer for Discord gaming communities. You sponsor the weekly competition your audience was going to enter anyway — your name on it, your logo on the trophy, and reach, entrants and cost-per-entrant reported back. $250 a challenge. $175 of it goes to the gamers who play.",
   "brand.hero.cta.primary": "See pricing",
   "brand.hero.cta.secondary": "Read the profile",
 
-  "brand.problem.title": "Brands spend a lot to reach gamers. The system is broken.",
+  "brand.problem.title": "Marketing to gamers means paying twice and reaching neither.",
   "brand.problem.subtitle":
-    "A tournament sponsorship, then a social budget to promote the tournament. Brands pay twice — and still aren't advertising where gamers spend most of their time.",
+    "A tournament sponsorship, then a social budget to promote the tournament — and still nothing where gamers actually spend the day.",
   "brand.problem.items":
-    "Pay once for the event | An esports sponsorship costs six figures and lasts one or two days. Much of the value depends on whatever content gets cut afterwards, and the ROI is hard to measure while it's happening.\n"
-    + "Pay again for the attention | Then the clips go to Meta and TikTok and you buy the same audience a second time — a gamer on their phone in the break between two matches, scrolling past on the way back to the lobby.\n"
-    + "Still not where they live | Neither purchase reaches Discord, where a gamer starts the day, returns between matches and ends the night. There's no ads manager there, so until now there was no way to buy it.",
+    "Pay once for the event | Six figures, two days, and the value depends on whatever clips get cut afterwards.\n"
+    + "Pay again for the attention | Those clips go to Meta and TikTok, and you buy the same audience a second time.\n"
+    + "Still not where they live | Neither reaches Discord — where the squad is, between every match. No ads manager, no way in.",
 
-  "brand.insight.title": "Gamers live on Discord.",
+  "brand.insight.title": "Discord is where gamers actually are.",
   "brand.insight.body":
-    "A gamer may open TikTok. A gamer may open Instagram. A gamer may go to a weekend event. But before that, they're on Discord — and after it, they go back to Discord. It's where the squad is, where the match gets organised, and where the argument about the last game happens.\n\n"
-    + "Discord is home. And unlike every other place an audience this size gathers, there's no Business Suite, no targeting, no pixel and no self-serve buy. That isn't a gap in a media plan — it's the entire gaming audience sitting behind a door with no handle.\n\n"
-    + "Cluster is the handle. We turn Discord from an unstructured community space into a real media-buying and monetization platform for gaming.",
+    "A gamer might open TikTok. They might watch a tournament. But before and after both, they're on Discord — it's where the squad is and where the next match gets organised.\n\n"
+    + "Every other audience this size has a Business Suite, targeting and a self-serve buy. Discord has none of it. That's not a gap in a media plan; it's the whole gaming audience behind a door with no handle.\n\n"
+    + "Cluster is the handle.",
   "brand.insight.stat": "100%",
   "brand.insight.statLabel": "of gamers are on Discord",
   "brand.insight.stat2": "0",
   "brand.insight.stat2Label": "ads managers to buy it with",
 
-  "brand.solution.title": "Cluster unlocks Discord advertising, in a structured way.",
+  "brand.solution.title": "How to advertise on Discord, without asking anyone.",
   "brand.solution.subtitle":
-    "Not a banner network bolted onto a chat app. A media-buying layer over the communities gamers already live in — buyable, measurable and repeatable, with the brand inside the competition rather than next to it.",
+    "Not banners bolted onto a chat app. Your brand inside the competition rather than beside it — buyable in an afternoon, measurable by Friday.",
   "brand.solution.items":
-    "Sponsored challenges | Your name on the weekly competition for a game you choose. The community was going to enter it anyway — now it carries your brand.\n"
-    + "In-bot ad placements | Your creative on every card the bot renders, in every opted-in server, with your click button underneath it. Swap it yourself from the portal, any time.\n"
-    + "Branded trophies | Your logo on the trophy the winner keeps on their profile. The brand isn't seen — it becomes part of the win.\n"
-    + "Trackable analytics | Impressions, clicks, entrants, standings and ROAS, per challenge and per community. Structured gamer attention, not vague awareness.",
+    "Sponsored challenges | Your name on the weekly competition for a game you pick. They were going to play anyway.\n"
+    + "A slot on every card | Your creative on every image the bot draws, with your button under it. Swap it yourself, any time.\n"
+    + "Branded trophies | Your logo on the trophy the winner keeps on their profile. Not seen — kept.\n"
+    + "Numbers that mean something | Entrants, clicks, cost-per-entrant and eCPM, per week, with the servers it landed in named.",
 
   "brand.loop.title": "A three-sided platform",
   "brand.loop.subtitle":
-    "Brands spend. Gamers engage. Server owners earn. Cluster takes platform revenue — and no side works without the other two, which is what makes the loop run on its own.",
+    "Brands spend, gamers play, owners earn. No side works without the other two, which is what makes it run without us.",
   "brand.loop.items":
-    "Brands buy | Sponsored challenges and placements on a published rate card, bought for a month at a time, with reach and targeting stated before you spend.\n"
-    + "Gamers play | They link a verified account, enter for the chance to win, and keep a trophy carrying your logo on the profile they share.\n"
-    + "Owners earn | The community that hosted it takes a share of the platform fee. No sales team, no admin burden, no seeding.\n"
-    + "Cluster runs it | The bot creates, posts, scores, announces and pays out. Every week, in every server, with nobody operating anything.",
+    "Brands buy | A month of challenges on a published rate card, with the reach stated before you spend.\n"
+    + "Gamers play | One verified account, as many challenges as they like, a trophy that stays on their profile.\n"
+    + "Owners earn | A share of the fee on every challenge that runs in their server. No sales team, no admin.\n"
+    + "Cluster runs it | The bot posts it, scores it, announces it and pays out. Nobody operates anything.",
 
-  "brand.prize.title": "This isn't ad spend. You're paying gamers to play.",
+  "brand.prize.title": "Most of it isn't ad spend. It's prize money.",
   "brand.prize.body":
-    "70% of what you pay for a challenge is prize money. It goes to three players as trophies carrying your logo, and Cluster funds and pays every one. No setup fees, no administration fees, no staff, no operations — that's the magic of Cluster as a product, and it's why the rest of your money buys reach instead of overhead.",
+    "70% of what you pay goes to the players as prizes, on trophies carrying your logo. No setup fee, no admin fee, no agency. That's why the rest buys reach instead of overhead.",
 
   // ===== The Discord section: the server-owner pitch =====
   // The other side of the marketplace. Brands pay in; servers get paid out.
   "discord.badge": "ClusterBot for Discord",
-  "discord.title": "Your community is media. Get paid like it.",
+  "discord.title": "Monetize your Discord server without selling anything.",
   "discord.subtitle":
-    "Install the bot and your members get ranked profiles, live stats from the games they already play, and challenges with real prize money — without leaving your server. Link 500 gamers and brands start sponsoring challenges here: your members win the prizes, and you take a share of the platform fee. Free forever, and it never reads a message.",
+    "Install the bot and your members get ranked profiles, live stats from the games they already play, and weekly challenges with real prize money. Brands fund the prizes; you take a share of the fee on every challenge that runs here. Free forever, and it never reads a message.",
   "discord.cta.primary": "Add ClusterBot to your server",
   "discord.cta.secondary": "See who's running it",
 
@@ -90,23 +90,23 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // JSX and kept saying the old thing after every other surface had moved.
   // `{threshold}` is substituted with the live unlock number, so the copy can
   // never quote a figure the product isn't using.
-  "discord.hero.title": "Your community is media. Get paid like it.",
+  "discord.hero.title": "Earn money from your Discord server.",
   "discord.hero.subtitle":
-    "Your members get ranked profiles and live stats from the games they already play, plus weekly challenges with real prize money — without leaving your server. Link {threshold} gamers and brands start sponsoring challenges here: your members win the prizes, and you take a share of the platform fee on every one. Free forever, and it never reads a message.",
+    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Link {threshold} gamers and you take a share of the fee on every sponsored challenge that runs here. Free forever, and it never reads a message.",
 
   // ===== The gamer-facing hero (still the entry point for players) =====
-  "hero.badge": "Live stat sync across real game networks",
+  "hero.badge": "Live stats from the games you already play",
   "hero.title.line1": "Every game.",
   "hero.title.line2": "One identity.",
   "hero.subtitle":
-    "Cluster pulls your ranks, ratings and wins from every game you play into one shareable profile. Enter sponsored challenges for the chance to win real money, earn trophies verified against the game's own API, and climb leaderboards that actually mean something. You don't sit through the ads here — you play them.",
+    "Your ranks, ratings and wins from every game, on one profile worth sharing. Enter as many challenges as you like on one account — you're playing anyway, and one win moves every board you're on. Real prize money, trophies checked against the game's own API.",
   "hero.cta.primary": "Claim your profile",
   "hero.cta.secondary": "Explore leaderboards",
   "hero.image": "/assets/hero.png",
   "hero.banner.label": "The Cluster galaxy",
   "hero.banner.note": "Six worlds, one weekly challenge each. Tap a game to open its planet.",
   "section.challenges.title": "Live Challenges",
-  "section.challenges.subtitle": "Real API data. Real money. Join, play your game, and watch the standings move.",
+  "section.challenges.subtitle": "Join, play the game you were going to play, watch the board move. One account, as many as you like.",
   "section.games.title": "The Game Galaxy",
   "section.games.subtitle": "Every world we run — each with its own weekly challenge, leaderboards and community.",
   "section.leaderboards.title": "Leaderboards",
@@ -115,13 +115,13 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "section.badges.subtitle": "Earned from linked accounts, rank thresholds, community reputation and challenge placements. The criteria are code.",
   "section.partners.title": "Trusted by",
   "section.cta.title": "Three sides, one network",
-  "section.cta.subtitle": "Brands sponsor the challenge. Server owners host it and earn. Gamers play and win. Pick your side.",
+  "section.cta.subtitle": "Brands sponsor it. Owners host it and earn. Gamers play and win. Pick your side.",
   "section.cta.button": "Join the Cluster — it's free",
   "banner.arena": BANNER_ART.arena,
   "banner.games": BANNER_ART.games,
   "banner.profileDefault": BANNER_ART.profileDefault,
   "footer.tagline":
-    "The media-buying and monetization platform for Discord gaming communities. Brands reach gamers where they really are, server owners earn from the audience they built, and gamers play, win and share.",
+    "The media-buying and monetization layer for gaming communities. Advertise on Discord, monetize your server, or play and win.",
   "footer.brands.title": "For brands",
   "footer.servers.title": "For server owners",
   // Copy used everywhere a gamer shares their profile — the site's share button

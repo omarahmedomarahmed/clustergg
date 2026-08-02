@@ -11,9 +11,9 @@ import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
-  title: "Your community is media. Get paid like it.",
+  title: "Discord servers earning with Cluster",
   description:
-    "Install ClusterBot free, link 500 gamers, and take a share of the platform fee on every challenge a brand sponsors in the games your members already play. Plus every community already running it.",
+    "Gaming communities monetizing their Discord server with sponsored weekly challenges. See who is running the bot, how many gamers they brought, and what they earn.",
 };
 
 // The server-owner page.
