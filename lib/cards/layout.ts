@@ -68,6 +68,37 @@ export type PartStyle = {
    * can be typed in by hand is not a leaderboard.
    */
   text?: string;
+  /**
+   * Where this section sits, as a nudge from where the flow put it.
+   *
+   * An OFFSET rather than an absolute position, and the distinction is the
+   * whole design. Sections are drawn in a flex column so that hiding one gives
+   * its space to the next; absolutely positioning every block would break that
+   * and, worse, would be a lie — the editor cannot measure how tall a section
+   * will be once Satori has wrapped real text at render time, so a block pinned
+   * to a y-coordinate would overlap its neighbour the first time somebody's
+   * name ran long. A nudge composes with the flow instead of fighting it.
+   *
+   * Canvas pixels, so they mean the same thing at any preview size.
+   */
+  dx?: number;
+  dy?: number;
+  /**
+   * This section's own width, as a % of the canvas.
+   *
+   * Unset means "as wide as the content box". Narrowing one section is how you
+   * keep a lore paragraph off a character's face without shrinking the whole
+   * column.
+   */
+  w?: number;
+  /**
+   * Where this section comes in the stack. Lower is higher up.
+   *
+   * Unset means the order the renderer declares, which is the order in the
+   * card's guide. Reordering is the single most-requested layout change and
+   * the only one that a flex column makes genuinely safe.
+   */
+  order?: number;
 };
 
 /**
@@ -263,6 +294,13 @@ function parts(v: unknown): Record<string, PartStyle> {
       // Plain text only, and only ever drawn as a string by Satori — but it
       // also reaches the editor's DOM preview, so the tag characters go.
       ...(text ? { text: text.replace(/[<>]/g, "") } : {}),
+      // Geometry. Clamped hard, because these reach Satori as CSS: a width of
+      // 4000% or a margin of -1e9 is not a broken layout, it is a card that
+      // fails to render at all and a bot reply that never arrives.
+      ...(Number.isFinite(Number(p.dx)) && Number(p.dx) !== 0 ? { dx: num(p.dx, 0, -600, 600) } : {}),
+      ...(Number.isFinite(Number(p.dy)) && Number(p.dy) !== 0 ? { dy: num(p.dy, 0, -400, 400) } : {}),
+      ...(Number.isFinite(Number(p.w)) && Number(p.w) > 0 ? { w: num(p.w, 100, 5, 100) } : {}),
+      ...(Number.isFinite(Number(p.order)) ? { order: num(p.order, 0, -50, 50) } : {}),
     };
   }
   return out;
@@ -354,10 +392,19 @@ export type PartDraw = {
   scale: number;
   opacity: number;
   text?: string;
+  /** Nudge from where the flow put this section, in canvas pixels. */
+  dx: number;
+  dy: number;
+  /** This section's own width as a % of the canvas, when it has one. */
+  w?: number;
+  /** Its place in the stack, when an admin has reordered it. */
+  order?: number;
   /** A font size in canvas pixels, scaled by this section's setting. */
   f: (px: number) => number;
   /** This section's fixed copy, or the admin's replacement for it. */
   say: (built: string) => string;
+  /** Offset/width/order as a style object for the section's own wrapper. */
+  box: () => Record<string, string | number>;
 };
 
 /** How a part should be drawn, with the house default when it's unset. */
@@ -365,13 +412,34 @@ export function partOf(l: CardLayout, key: string): PartDraw {
   const p = l.parts?.[key];
   const scale = typeof p?.scale === "number" ? p.scale : 1;
   const text = typeof p?.text === "string" && p.text ? p.text : undefined;
+  const dx = typeof p?.dx === "number" ? p.dx : 0;
+  const dy = typeof p?.dy === "number" ? p.dy : 0;
+  const w = typeof p?.w === "number" && p.w > 0 ? p.w : undefined;
   return {
     hidden: p?.hidden === true,
     scale,
     opacity: typeof p?.opacity === "number" ? p.opacity : 100,
     text,
+    dx, dy, w,
+    order: typeof p?.order === "number" ? p.order : undefined,
     f: (px: number) => Math.max(8, Math.round(px * scale)),
     say: (built: string) => text ?? built,
+    /**
+     * The style a section carries beyond its own contents.
+     *
+     * `marginLeft`/`marginTop` rather than `left`/`top`: the section stays in
+     * the flex column (so hiding one still gives its space away) and simply
+     * starts somewhere else. `position: relative` with offsets would leave a
+     * hole where the block used to be, which is not what "move it" means.
+     */
+    box: () => {
+      const s: Record<string, string | number> = {};
+      if (dx) s.marginLeft = dx;
+      if (dy) s.marginTop = dy;
+      if (w) s.width = `${w}%`;
+      if (typeof p?.order === "number") s.order = p.order;
+      return s;
+    },
   };
 }
 

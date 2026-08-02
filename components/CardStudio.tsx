@@ -7,6 +7,7 @@ import CardLayoutEditor, { type EditorArt } from "@/components/CardLayoutEditor"
 import type { LibraryGroup } from "@/lib/cards/asset-library";
 import type { CardLayout } from "@/lib/cards/layout";
 import type { CardPart } from "@/lib/cards/layout-guide";
+import type { CardSample } from "@/lib/cards/preview";
 
 // The card studio.
 //
@@ -34,6 +35,8 @@ export type StudioCard = {
   layout: CardLayout;
   art: EditorArt;
   previewUrl: string;
+  /** Real cards of this kind to tune the layout against. */
+  samples: CardSample[];
 };
 
 const GROUPS: { key: string; label: string; icon: string }[] = [
@@ -105,6 +108,7 @@ export default function CardStudio({ cards, library }: { cards: StudioCard[]; li
           art={card.art}
           parts={card.parts}
           previewUrl={card.previewUrl}
+          samples={card.samples}
           library={library}
         />
 

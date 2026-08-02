@@ -10,6 +10,7 @@ import {
 } from "@/lib/cards/layout";
 import type { LibraryGroup } from "@/lib/cards/asset-library";
 import type { CardPart } from "@/lib/cards/layout-guide";
+import type { CardSample } from "@/lib/cards/preview";
 
 // Drag the furniture on a rendered card.
 //
@@ -34,7 +35,7 @@ type Handle = "mascot" | "mark" | "badge" | "ad" | "content" | `asset:${string}`
 
 const ASPECT = 1200 / 630;
 
-export default function CardLayoutEditor({ kind, name, initial, art, parts = [], previewUrl, library = [] }: {
+export default function CardLayoutEditor({ kind, name, initial, art, parts = [], previewUrl, library = [], samples = [] }: {
   kind: string;
   name: string;
   initial: CardLayout;
@@ -45,8 +46,13 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
   previewUrl: string;
   /** Platform images offered in the "place an image" picker. */
   library?: LibraryGroup[];
+  /** Real cards of this kind, to check the layout against varied art. */
+  samples?: CardSample[];
 }) {
   const [l, setL] = useState<CardLayout>(initial);
+  // Which real card the preview is showing. A layout is tuned against art, and
+  // one fixture only ever proves the layout works on that fixture.
+  const [sample, setSample] = useState<CardSample | null>(samples[0] ?? null);
   const [drag, setDrag] = useState<Handle | null>(null);
   const [nonce, setNonce] = useState(0);
   const canvas = useRef<HTMLDivElement>(null);
@@ -158,12 +164,20 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
             {/* Exactly the overlays the renderer draws, in the same order, so
                 the editor is not a diagram of the card — it is the card. */}
             <div className="absolute inset-0" style={{ background: `rgba(4,5,26,${l.dim / 100})` }} />
-            {art.bgUrl && l.scrim && (
-              <>
-                <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, rgba(4,5,26,0.94) 0%, rgba(4,5,26,0.78) 48%, rgba(4,5,26,0.46) 100%)" }} />
-                <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(4,5,26,0.62) 0%, rgba(4,5,26,0.30) 38%, rgba(4,5,26,0.90) 100%)" }} />
-              </>
-            )}
+            {art.bgUrl && l.dim > 0 && (() => {
+              // Same maths as the renderer. One slider drives the flat veil AND
+              // the two directional scrims, so dragging it to 0 really does
+              // show the artwork — which is what an overlay control has to do
+              // to be worth having.
+              const k = Math.min(1.4, l.dim / 62);
+              const g = (a: number) => `rgba(4,5,26,${(a * k).toFixed(3)})`;
+              return (
+                <>
+                  <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, ${g(0.94)} 0%, ${g(0.78)} 48%, ${g(0.46)} 100%)` }} />
+                  <div className="absolute inset-0" style={{ background: `linear-gradient(180deg, ${g(0.62)} 0%, ${g(0.30)} 38%, ${g(0.90)} 100%)` }} />
+                </>
+              );
+            })()}
             {l.bar && <div className="absolute inset-x-0 top-0 h-[1.3%] bg-sky-500" />}
 
             {/* Placed images, at their real box and their own opacity — the
@@ -350,7 +364,7 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
             <legend className="px-1.5 text-[11px] uppercase tracking-widest text-muted">Background &amp; plates</legend>
             <Slider
               name="dim" label="Dark overlay on the art" value={l.dim} min={0} max={100} suffix="%"
-              hint="How far the artwork is darkened before anything is drawn on it."
+              hint="The only darkening control. Drives the flat veil AND the directional shading down the left column and along the bottom — set it to 0 and you see the artwork exactly as it was drawn."
               onChange={(v) => setL((c) => ({ ...c, dim: v }))}
             />
             <Slider
@@ -362,7 +376,6 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
               name="plateRadius" label="Plate corner radius" value={l.plateRadius} min={0} max={60} suffix="px"
               onChange={(v) => setL((c) => ({ ...c, plateRadius: v }))}
             />
-            <Check name="scrim" label="Directional scrim" checked={l.scrim} hint="Extra darkening down the left column and along the bottom." onChange={(v) => setL((c) => ({ ...c, scrim: v }))} />
             <Check name="bar" label="Top accent bar" checked={l.bar} onChange={(v) => setL((c) => ({ ...c, bar: v }))} />
             <Check name="glows" label="Corner glow circles" checked={l.glows} hint="Two large accent discs bleeding off opposite corners. Off by default — they read as grey smudges over real art." onChange={(v) => setL((c) => ({ ...c, glows: v }))} />
           </fieldset>
@@ -511,30 +524,82 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
       </div>
 
       {/* ===== The real thing ===== */}
-      <div className="grid sm:grid-cols-[minmax(0,1fr)_auto] gap-3 items-end">
-        <div>
-          <div className="text-[11px] uppercase tracking-widest text-muted mb-2">Rendered {name.toLowerCase()} card</div>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            key={nonce}
-            src={`${previewUrl}${previewUrl.includes("?") ? "&" : "?"}v=${nonce}`}
-            alt=""
-            className="w-full rounded-xl border border-white/10 bg-black/40"
-            style={{ aspectRatio: `${ASPECT}` }}
-          />
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div className="text-[11px] uppercase tracking-widest text-muted">Rendered {name.toLowerCase()} card</div>
+          <div className="flex items-center gap-2">
+            {/* Look at it before committing to it.
+                The preview is a real 1200x630 render, so it cannot follow every
+                drag — it used to update only on save, which meant the only way
+                to see a change was to ship it. This re-renders on demand with
+                the CURRENT unsaved layout. */}
+            <button
+              type="button" onClick={() => setNonce((n) => n + 1)}
+              className="ghost-btn pressable inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-semibold"
+              title="Re-render the card with what's on the canvas right now"
+            >
+              <Icon name="spark" size={12} /> Refresh view
+            </button>
+            <form action={reset}>
+              <input type="hidden" name="kind" value={kind} />
+              <button disabled={resetting} className="ghost-btn pressable rounded-full px-4 py-1.5 text-xs disabled:opacity-60">
+                {resetting ? "Resetting…" : "Reset to default"}
+              </button>
+            </form>
+          </div>
         </div>
-        <form action={reset}>
-          <input type="hidden" name="kind" value={kind} />
-          <button disabled={resetting} className="ghost-btn pressable rounded-full px-5 py-2 text-sm disabled:opacity-60">
-            {resetting ? "Resetting…" : "Reset to default"}
-          </button>
-        </form>
+
+        {/* Which card. Deliberately spans art-heavy and art-less samples: a
+            layout that only works over a dark space wallpaper is a layout that
+            breaks the first time somebody uploads a white splash. */}
+        {samples.length > 1 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {samples.map((sm) => (
+              <button
+                key={sm.id} type="button"
+                onClick={() => { setSample(sm); setNonce((n) => n + 1); }}
+                title={sm.note}
+                className={`rounded-full border px-3 py-1.5 text-[11px] transition ${
+                  sample?.id === sm.id
+                    ? "border-cyan-400/60 bg-cyan-500/10 text-cyan-100"
+                    : "border-white/12 bg-black/25 text-muted hover:border-white/30"
+                }`}
+              >
+                <b className="font-semibold">{sm.label}</b>
+                <span className="ml-1.5 opacity-70">{sm.note}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          key={`${sample?.id ?? "default"}-${nonce}`}
+          src={sampleUrl(previewUrl, sample, nonce)}
+          alt=""
+          className="w-full rounded-xl border border-white/10 bg-black/40"
+          style={{ aspectRatio: `${ASPECT}` }}
+        />
       </div>
     </div>
   );
 }
 
 const round = (n: number) => Math.round(n * 10) / 10;
+
+/**
+ * The preview URL for one sample.
+ *
+ * `v` busts the browser cache — a rendered card is served from a content-hashed
+ * Blob URL, so without it the img element happily shows the version from before
+ * the edit and the editor appears to do nothing.
+ */
+function sampleUrl(base: string, sample: CardSample | null, nonce: number): string {
+  const u = new URL(base, "http://x");
+  for (const [k, v] of Object.entries(sample?.params ?? {})) u.searchParams.set(k, v);
+  u.searchParams.set("v", String(nonce));
+  return `${u.pathname}?${u.searchParams.toString()}`;
+}
 
 // ===== Canvas pieces =====
 

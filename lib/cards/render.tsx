@@ -162,11 +162,26 @@ function Frame({ theme, children, corner, side }: {
           unless it is told otherwise — so an inset-only overlay silently
           renders as nothing and the artwork comes through at full brightness. */}
       <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: theme.bgUrl ? veil(l.dim) : VOID }} />
-      {theme.bgUrl && l.scrim ? (
-        <>
-          <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: "linear-gradient(90deg, rgba(4,5,26,0.94) 0%, rgba(4,5,26,0.78) 48%, rgba(4,5,26,0.46) 100%)" }} />
-          <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: "linear-gradient(180deg, rgba(4,5,26,0.62) 0%, rgba(4,5,26,0.30) 38%, rgba(4,5,26,0.90) 100%)" }} />
-        </>
+      {/* The directional scrims ride the SAME slider as the flat veil.
+          They used to be a separate tickbox, which meant the card had two
+          controls both labelled as darkening and neither of them honest: with
+          the tickbox on, dragging the slider to 0 still left the art buried
+          under two gradients, so "no overlay" did not mean no overlay. Scaling
+          them by the slider gives one number that goes all the way to nothing —
+          which is the only way the control can be checked by looking at it.
+          `SCRIM_TUNED_AT` is the dim the gradients were designed against, so
+          the default look is unchanged. */}
+      {theme.bgUrl && l.dim > 0 ? (
+        (() => {
+          const k = Math.min(1.4, l.dim / SCRIM_TUNED_AT);
+          const g = (a: number) => `rgba(4,5,26,${(a * k).toFixed(3)})`;
+          return (
+            <>
+              <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: `linear-gradient(90deg, ${g(0.94)} 0%, ${g(0.78)} 48%, ${g(0.46)} 100%)` }} />
+              <div style={{ position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex", background: `linear-gradient(180deg, ${g(0.62)} 0%, ${g(0.30)} 38%, ${g(0.90)} 100%)` }} />
+            </>
+          );
+        })()
       ) : null}
       {/* The two corner glows. Off by default now: at 1200x630 they read as
           two grey discs bleeding off opposite corners rather than as light,
@@ -302,6 +317,15 @@ function styleOf(o: { opacity?: number; flipX?: boolean; flipY?: boolean; rotate
   return out;
 }
 
+/**
+ * The `dim` the directional scrims were designed against.
+ *
+ * The gradients above are hand-tuned alpha stops; this is the veil strength
+ * they were tuned at, so scaling by `dim / SCRIM_TUNED_AT` leaves the default
+ * card pixel-identical and makes every other setting proportional.
+ */
+const SCRIM_TUNED_AT = 62;
+
 // ===== Sections =====
 //
 // Every block a card draws is NAMED, and the name is what an admin edits.
@@ -334,7 +358,19 @@ function Section({ p, style, children }: {
 }) {
   if (p.hidden) return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", ...style, ...styleOf({ opacity: p.opacity }) }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        ...style,
+        // The admin's own nudge, width and stacking order — applied LAST so it
+        // wins over the section's built-in style. That is the point of the
+        // editor: whatever the renderer thought, the person looking at the card
+        // gets the final say.
+        ...p.box(),
+        ...styleOf({ opacity: p.opacity }),
+      }}
+    >
       {children}
     </div>
   );
