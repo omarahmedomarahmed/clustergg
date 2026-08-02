@@ -52,6 +52,15 @@ export type BotList = {
   extra?: Record<string, number>;
   /** Does this list send vote webhooks we can reward? */
   votes: boolean;
+  /**
+   * Where a gamer actually casts the vote. `{id}` is our application id.
+   *
+   * Null for lists with no voting. This is the URL the bot's own button points
+   * at, so it has to be the vote page rather than the listing — a button that
+   * lands somebody on a page where they still have to find the vote button is
+   * a button that loses half the people who pressed it.
+   */
+  voteUrl: string | null;
   /** Roughly how big — for deciding what to chase first. */
   note: string;
 };
@@ -74,6 +83,7 @@ export const BOT_LISTS: BotList[] = [
     authHeader: "Authorization",
     countField: "server_count",
     votes: true,
+    voteUrl: "https://top.gg/bot/{id}/vote",
     note: "The largest by a distance, and the one with a paid advertising auction. Getting listed here is the single highest-value item on this page.",
   },
   {
@@ -87,6 +97,7 @@ export const BOT_LISTS: BotList[] = [
     authPrefix: "Bot ",
     countField: "guilds",
     votes: true,
+    voteUrl: "https://discordbotlist.com/bots/{id}/upvote",
     note: "Second by traffic. Also sends vote webhooks, so the vote reward works here too.",
   },
   {
@@ -99,6 +110,7 @@ export const BOT_LISTS: BotList[] = [
     authHeader: "Authorization",
     countField: "guildCount",
     votes: false,
+    voteUrl: null,
     note: "Long-running and well indexed by search engines, which is where a lot of its value is.",
   },
   {
@@ -111,6 +123,7 @@ export const BOT_LISTS: BotList[] = [
     authHeader: "Authorization",
     countField: "server_count",
     votes: true,
+    voteUrl: "https://botlist.me/bots/{id}/vote",
     note: "Smaller, but free to be on and it costs one token to keep updated.",
   },
   {
@@ -124,6 +137,7 @@ export const BOT_LISTS: BotList[] = [
     authHeader: "",
     countField: "server_count",
     votes: false,
+    voteUrl: null,
     note: "One POST that fans out to the long tail. Worth having once the big four are done, not before — it can only forward keys you already hold.",
   },
 ];
@@ -166,3 +180,20 @@ export const VOTE_ACTION = "botlist_vote" as const;
 /** How often a list lets the same person vote. Every major list uses twelve
  *  hours, and the daily cap on the action is set from it rather than guessed. */
 export const VOTE_COOLDOWN_HOURS = 12;
+
+/**
+ * Every place a gamer can vote for us right now.
+ *
+ * Only lists we are actually LIVE on. A vote page offering four links where two
+ * 404 is worse than one that offers two — somebody who clicks a dead link
+ * doesn't try the next one, they leave.
+ */
+export function voteLinks(
+  appId: string,
+  statuses: Record<string, string>,
+): { id: string; name: string; url: string }[] {
+  if (!appId) return [];
+  return BOT_LISTS
+    .filter((l) => l.voteUrl && statuses[botListStatusName(l.id)] === "live")
+    .map((l) => ({ id: l.id, name: l.name, url: l.voteUrl!.replace("{id}", appId) }));
+}

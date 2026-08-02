@@ -125,6 +125,23 @@ function moreButton(trail: Frame[]): Button {
   return navButton("More", frame("more"), trail, ButtonStyle.Secondary, "🧭");
 }
 
+/**
+ * Vote for Cluster on the bot lists, and get paid for it.
+ *
+ * On EVERY card, because bot-list ranking is votes and the lists are how a
+ * server that has never heard of us finds us. It is a link button rather than
+ * a navigation one — voting happens on the list's own site — and it points at
+ * one page rather than one list, because which lists we are live on changes and
+ * a button baked with a URL goes stale the moment a listing is approved.
+ *
+ * The label says what you get. "Vote for Cluster" is a favour being asked;
+ * "Vote for Cluster · earn CP" is a trade, and the difference is most of the
+ * conversion.
+ */
+function voteButton(): Button {
+  return linkButton("Vote for Cluster · earn CP", `${siteUrl()}/vote`, "⭐");
+}
+
 // `here` is the screen being drawn, so the tail never offers a button that
 // leads back to the card you're already looking at.
 function tail(ctx: ScreenCtx, here: Frame, trail: Frame[]): (Button | null)[] {
@@ -134,6 +151,9 @@ function tail(ctx: ScreenCtx, here: Frame, trail: Frame[]): (Button | null)[] {
     on("home") ? null : profileButton(ctx, trail),
     on("more") ? null : moreButton(trail),
     backButton(trail),
+    // Last in the tail, so it never displaces navigation — `rows()` fills five
+    // to a row and the tail is what a card can't do without.
+    voteButton(),
   ];
 }
 

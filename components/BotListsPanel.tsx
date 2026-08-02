@@ -54,6 +54,44 @@ export default function BotListsPanel({ values, siteOrigin }: {
 
               <p className="text-[11px] leading-snug text-muted">{list.note}</p>
 
+              {/* The steps, in the place the work is done.
+                  A separate document is a document nobody has open while they
+                  are pasting a token, and the order matters: submit first, get
+                  approved, THEN the token exists. */}
+              <details className="rounded-lg border border-white/10 bg-black/20 p-2.5">
+                <summary className="cursor-pointer text-[11px] font-semibold text-cyan-300">
+                  How to get listed here, step by step
+                </summary>
+                <ol className="mt-2 list-decimal space-y-1.5 pl-4 text-[11px] leading-snug text-muted">
+                  <li>
+                    Make sure the bot is <b className="text-ink">online</b> and{" "}
+                    <b className="text-ink">Public Bot is ON</b> in the Discord Developer Portal. A bot that is
+                    offline or private during review is declined, and re-submitting goes to the back of the queue.
+                  </li>
+                  <li>
+                    Open <a href={list.submitUrl} target="_blank" rel="noreferrer" className="text-cyan-300 hover:underline">{list.submitUrl}</a>{" "}
+                    and paste the <b className="text-ink">Application ID</b> (Developer Portal → General Information).
+                  </li>
+                  <li>
+                    Fill in the description, tags, invite link and support server. Add screenshots of the rendered
+                    cards — every list ranks a listing with images above one without.
+                  </li>
+                  <li>Submit, and wait for their review. They email you either way.</li>
+                  <li>
+                    Once approved, get the token: <span className="text-ink">{list.keyHint}</span>
+                  </li>
+                  <li>Paste it below, set <b className="text-ink">Where we stand</b> to Live, and Save.</li>
+                  {list.votes && (
+                    <li>
+                      Invent a long random <b className="text-ink">webhook secret</b>, save it below, then paste{" "}
+                      <b className="text-ink">both</b> the webhook URL and that same secret into this list&apos;s
+                      webhook settings. Votes then pay CP.
+                    </li>
+                  )}
+                  <li>Press <b className="text-ink">Post now</b> to push the server count immediately.</li>
+                </ol>
+              </details>
+
               <div className="flex flex-wrap items-center gap-3 text-[11px]">
                 <a href={list.submitUrl} target="_blank" rel="noreferrer" className="text-cyan-300 hover:underline inline-flex items-center gap-1">
                   <Icon name="rocket" size={11} /> Submit the bot
@@ -142,6 +180,11 @@ export default function BotListsPanel({ values, siteOrigin }: {
         {postState?.ok && <p className="mt-2 whitespace-pre-line text-[11px] text-emerald-300">{postState.ok}</p>}
         {postState?.error && <p className="mt-2 whitespace-pre-line text-[11px] text-amber-300">{postState.error}</p>}
       </form>
+
+      <p className="text-[11px] leading-snug text-muted">
+        The full walkthrough — including the paid Top.gg auction and what to do when a list declines us — is in{" "}
+        <code className="text-cyan-300">docs/BOT_LISTS.md</code>.
+      </p>
     </div>
   );
 }
