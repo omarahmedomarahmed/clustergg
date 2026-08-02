@@ -7,6 +7,7 @@ import {
   partOf, plateBg, spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset, PartDraw } from "@/lib/cards/layout";
+import { assetPicture } from "@/lib/cards/asset-source";
 import { layoutFor } from "@/lib/cards/layout-store";
 import type {
   CardAdSlot,
@@ -1480,7 +1481,7 @@ async function prepareCard(d: CardData): Promise<CardData> {
   // Admin-placed art goes through the same resolver as everything else: Satori
   // fetches remote images itself and one unreachable host takes down the whole
   // card, so an asset that won't load is DROPPED rather than drawn as a hole.
-  const layout = await withDeadline(withAssets(rawLayout), { ...rawLayout, assets: [] });
+  const layout = await withDeadline(withAssets(rawLayout, d), { ...rawLayout, assets: [] });
   // Colours are normalised here, once, on the way in — so every card body can
   // use `theme.accent` directly and no unparseable value ever reaches Satori.
   return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad }) } as CardData;
@@ -1500,13 +1501,20 @@ async function resolveBackground(theme: CardTheme): Promise<string | null> {
   return null;
 }
 
-async function withAssets(l: typeof DEFAULT_LAYOUT): Promise<typeof DEFAULT_LAYOUT> {
+async function withAssets(
+  l: typeof DEFAULT_LAYOUT,
+  d: CardData,
+): Promise<typeof DEFAULT_LAYOUT> {
   const list = l.assets ?? [];
   if (!list.length) return l;
+  // Resolve each slot's picture BEFORE fetching: a card-sourced slot points at
+  // a different image on every card, which is the whole point of it. The
+  // resolver is shared with the layout editor's canvas so the two can't drift.
+  const wanted = list.map((a) => assetPicture(a, d));
   const urls = await Promise.all(
     // Asked for at twice the drawn width for crispness — no point decoding a
     // 4000px globe to paint it at 240 on a 1200px canvas.
-    list.map((a) => toEmbeddable(a.url, { maxWidth: Math.min(1600, Math.round(a.w * 2)) })),
+    wanted.map((u, i) => toEmbeddable(u, { maxWidth: Math.min(1600, Math.round(list[i].w * 2)) })),
   );
   return { ...l, assets: list.map((a, i) => ({ ...a, url: urls[i] ?? "" })).filter((a) => a.url) };
 }

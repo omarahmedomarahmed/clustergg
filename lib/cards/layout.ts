@@ -111,6 +111,20 @@ export type PartStyle = {
 export type CardAsset = {
   id: string;
   url: string;
+  /**
+   * Take the image from the CARD instead of from a fixed URL.
+   *
+   * A placed image was always one specific file, which is right for a seasonal
+   * flourish and useless for the thing people actually want: a slot that shows
+   * *this* champion's splash, *this* gamer's avatar, *this* game's logo — a
+   * frame whose contents change with the card. Without it, "put the splash on
+   * the right" could only be done by pinning one champion's art to every world
+   * card.
+   *
+   * `url` stays as the fallback for when a card has nothing to put here, so a
+   * slot is never an empty rectangle.
+   */
+  source?: string;
   /** Centre, as a % of the canvas. */
   x: number;
   y: number;
@@ -248,6 +262,24 @@ export const BG_SOURCES: { id: string; label: string; note: string }[] = [
 
 export const BG_SOURCE_IDS = new Set(BG_SOURCES.map((s) => s.id));
 
+/**
+ * Where a placed image can take its picture from, per card.
+ *
+ * These make a placed image a SLOT rather than a picture: the frame, the size
+ * and the position are the admin's, and what appears inside it is whatever the
+ * card is about. That is the difference between "the splash goes on the right"
+ * as a rule and as a one-off.
+ */
+export const ASSET_SOURCES: { id: string; label: string; note: string }[] = [
+  { id: "fixed", label: "A fixed image", note: "The one you pick. The same picture on every card of this kind." },
+  { id: "self.art", label: "This thing's own image", note: "The champion's splash, the challenge cover, the quest map — whatever the card is ABOUT. Changes with every card." },
+  { id: "self.logo", label: "The game's logo", note: "The logo of the game this card belongs to." },
+  { id: "self.avatar", label: "The gamer's avatar", note: "Only on cards about a person." },
+  { id: "self.trophy", label: "The top trophy", note: "The first trophy on the card — a challenge's winner prize, a profile's best." },
+];
+
+export const ASSET_SOURCE_IDS = new Set(ASSET_SOURCES.map((s) => s.id));
+
 export const LAYOUT_KINDS: CardKind[] = [
   "profile", "game-stats", "challenge", "leaderboard",
   "planet", "planets", "quest", "cp-summary", "guide", "week", "world", "search",
@@ -313,12 +345,19 @@ function assets(v: unknown): CardAsset[] {
     .map((raw, i): CardAsset | null => {
       const a = (raw ?? {}) as Partial<CardAsset>;
       const url = typeof a.url === "string" ? a.url.trim() : "";
+      const source = typeof a.source === "string" && ASSET_SOURCE_IDS.has(a.source) ? a.source : "fixed";
+      const validUrl = !!url && (/^https?:\/\//i.test(url) || url.startsWith("/") || url.startsWith("data:image/"));
       // Only real image sources. An admin-supplied `javascript:` would go
       // nowhere in Satori, but it would ship into the editor's DOM preview.
-      if (!url || !(/^https?:\/\//i.test(url) || url.startsWith("/") || url.startsWith("data:image/"))) return null;
+      //
+      // A card-sourced slot is kept even with no fallback URL: its picture
+      // comes from the card, and requiring a fixed image first would defeat
+      // the point of it being a slot.
+      if (!validUrl && source === "fixed") return null;
       return {
         id: typeof a.id === "string" && a.id ? a.id.slice(0, 40) : `a${i}`,
-        url,
+        url: validUrl ? url : "",
+        ...(source !== "fixed" ? { source } : {}),
         x: num(a.x, 50, -20, 120),
         y: num(a.y, 50, -20, 120),
         w: num(a.w, 240, 16, 1400),
@@ -508,7 +547,7 @@ export function opacityOf(v: number | undefined): number | undefined {
   return typeof v === "number" && v < 100 ? Math.max(0, v) / 100 : undefined;
 }
 
-/** Absolute pixel box for a placed asset. */
+/** Absolute pixel box for a placed asset, on the real 1200x630 canvas. */
 export function assetBox(a: CardAsset): { left: number; top: number; width: number; height: number } {
   const width = a.w;
   const height = a.w * a.ratio;
@@ -519,6 +558,31 @@ export function assetBox(a: CardAsset): { left: number; top: number; width: numb
     height,
   };
 }
+
+/**
+ * The same box as percentages, for the editor's canvas.
+ *
+ * The editor's canvas is 1200x630 in PROPORTION but never in CSS pixels — it's
+ * whatever width the admin's screen gives it. Positioning a placed image with
+ * `assetBox`'s raw pixels there drew it at the wrong size on every screen
+ * except a 1200px-wide one, so the canvas and the PNG disagreed about how big
+ * an image was. Percentages of the canvas scale with it and agree everywhere,
+ * which is exactly what `spotBox`'s callers already do for the furniture.
+ */
+export function assetBoxPct(a: CardAsset): { left: number; top: number; width: number; height: number } {
+  const b = assetBox(a);
+  return {
+    left: (b.left / CANVAS_W) * 100,
+    top: (b.top / CANVAS_H) * 100,
+    width: (b.width / CANVAS_W) * 100,
+    height: (b.height / CANVAS_H) * 100,
+  };
+}
+
+/** A placed image's width as a % of the card, and back. The stored number is
+ *  canvas pixels; every control that says "%" has to convert or it lies. */
+export const assetWidthPct = (w: number) => (w / CANVAS_W) * 100;
+export const assetWidthPx = (pct: number) => (pct / 100) * CANVAS_W;
 
 // ===== Geometry helpers, shared by the renderer and the editor preview =====
 

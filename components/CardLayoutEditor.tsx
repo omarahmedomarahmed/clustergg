@@ -5,9 +5,11 @@ import Icon from "@/components/Icon";
 import { saveCardLayout, resetCardLayout, applyFurnitureEverywhere, type CardActionState } from "@/app/actions/cards";
 import ImageUpload from "@/components/ImageUpload";
 import {
-  DEFAULT_LAYOUT, BG_SOURCES, AD_RATIO, assetBox, badgeTopFor, partBoxes,
+  DEFAULT_LAYOUT, BG_SOURCES, ASSET_SOURCES, AD_RATIO, assetBoxPct, assetWidthPct, assetWidthPx,
+  badgeTopFor, partBoxes,
   type CardLayout, type CardAsset, type ContentBox, type PartStyle, type Spot,
 } from "@/lib/cards/layout";
+import { assetPicture } from "@/lib/cards/asset-source";
 import type { LibraryGroup } from "@/lib/cards/asset-library";
 import type { CardPart } from "@/lib/cards/layout-guide";
 import type { CardSample } from "@/lib/cards/preview";
@@ -100,12 +102,20 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
   const assets = l.assets ?? [];
   const active = assets.find((a) => a.id === sel) ?? null;
 
-  const addAsset = (url: string) => {
-    if (!url) return;
+  // `source` makes it a SLOT rather than a picture: the frame is the admin's,
+  // what appears inside it comes from each card. An empty url is only valid
+  // with a source — a fixed image with no image is nothing.
+  const addAsset = (url: string, source?: string) => {
+    if (!url && !source) return;
     const id = `a${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     setL((c) => ({
       ...c,
-      assets: [...(c.assets ?? []), { id, url, x: 60, y: 20, w: 28, ratio: 1, opacity: 100, front: true }],
+      assets: [...(c.assets ?? []), {
+        // Canvas pixels — a quarter of the card wide, big enough to see and
+        // grab without covering what's underneath it.
+        id, url, x: 60, y: 20, w: Math.round(assetWidthPx(26)), ratio: 1, opacity: 100, front: true,
+        ...(source ? { source } : {}),
+      }],
     }));
     setSel(id);
     setPicking(false);
@@ -238,21 +248,38 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
                 renderer draws them exactly here. Click one to select it; drag
                 once selected. */}
             {assets.map((a) => {
-              const box = assetBox(a);
+              const box = assetBoxPct(a);
               const tf = [
                 a.rotate ? `rotate(${a.rotate}deg)` : "",
                 a.flipX || a.flipY ? `scale(${a.flipX ? -1 : 1}, ${a.flipY ? -1 : 1})` : "",
               ].filter(Boolean).join(" ");
+              // The picture for THIS sample. A sourced slot shows a different
+              // image on every card, so the canvas resolves it exactly the way
+              // the renderer will — switch samples and the frame refills.
+              const pic = assetPicture(a, cardData);
               return (
                 <button
                   key={a.id} type="button"
                   onPointerDown={(e) => { e.preventDefault(); setSel(a.id); setDrag(`asset:${a.id}`); }}
                   className={`absolute cursor-move ${a.id === sel ? "outline outline-1 outline-cyan-400" : ""}`}
-                  style={{ ...box, opacity: a.opacity / 100, transform: tf || undefined }}
-                  title="Drag to move"
+                  style={{
+                    left: `${box.left}%`, top: `${box.top}%`,
+                    width: `${box.width}%`, height: `${box.height}%`,
+                    opacity: a.opacity / 100, transform: tf || undefined,
+                  }}
+                  title={a.source ? "Filled from the card — drag to move" : "Drag to move"}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={a.url} alt="" className="h-full w-full object-contain pointer-events-none" />
+                  {pic ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={pic} alt="" className="h-full w-full object-contain pointer-events-none" />
+                  ) : (
+                    // A sourced slot this card has no picture for. Drawn as the
+                    // empty frame rather than hidden, because the renderer will
+                    // drop it and the admin needs to SEE which sample loses it.
+                    <span className="flex h-full w-full items-center justify-center rounded border border-dashed border-cyan-300/60 bg-cyan-400/5 px-1 text-center text-[9px] leading-tight text-cyan-200/80 pointer-events-none">
+                      empty here
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -551,10 +578,16 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
                     className={`h-11 w-11 rounded-lg overflow-hidden border transition-all ${
                       a.id === sel ? "border-cyan-400 ring-1 ring-cyan-400/60" : "border-white/15 opacity-70 hover:opacity-100"
                     }`}
-                    title="Select to edit"
+                    title={a.source ? "Filled from the card — select to edit" : "Select to edit"}
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={a.url} alt="" className="h-full w-full object-cover" />
+                    {assetPicture(a, cardData) ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={assetPicture(a, cardData)} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <span className="flex h-full w-full items-center justify-center bg-cyan-400/10 text-[8px] text-cyan-200">
+                        slot
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -568,12 +601,47 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
                     Remove
                   </button>
                 </div>
+
+                {/* What goes IN the frame.
+                    This is the difference between placing a picture and placing
+                    a slot: pick "this thing's own image" and the frame shows
+                    this champion's splash, this challenge's cover, this gamer's
+                    avatar — a different picture on every card of the kind.
+                    Switch the sample chips above the canvas to watch it refill. */}
+                <label className="block">
+                  <span className="mb-1 block text-[10px] text-muted">What fills it</span>
+                  <select
+                    value={active.source ?? "fixed"}
+                    onChange={(e) => patchAsset(active.id, {
+                      source: e.target.value === "fixed" ? undefined : e.target.value,
+                    })}
+                    className="input-cosmic w-full px-2 py-1 text-xs"
+                  >
+                    {ASSET_SOURCES.map((s) => (
+                      <option key={s.id} value={s.id}>{s.label}</option>
+                    ))}
+                  </select>
+                  <span className="mt-1 block text-[10px] text-muted leading-snug">
+                    {ASSET_SOURCES.find((s) => s.id === (active.source ?? "fixed"))?.note}
+                    {active.source && active.source !== "fixed" && (
+                      active.url
+                        ? " The image you picked stays as the fallback when a card has none."
+                        : " No fallback picked — cards without one skip this frame."
+                    )}
+                  </span>
+                </label>
+
                 <div className="grid grid-cols-2 gap-2">
                   <Num name="" label="Left %" value={Math.round(active.x)} onChange={(v) => patchAsset(active.id, { x: v })} />
                   <Num name="" label="Top %" value={Math.round(active.y)} onChange={(v) => patchAsset(active.id, { y: v })} />
                 </div>
-                <Slider name="" label="Width" value={Math.round(active.w)} min={2} max={100} suffix="%"
-                  onChange={(v) => patchAsset(active.id, { w: v })} />
+                {/* Stored in canvas pixels, shown as a share of the card. The
+                    slider used to write its 2–100 straight into the pixel
+                    field, so "50%" rendered fifty pixels wide — a control that
+                    reads one unit and writes another. */}
+                <Slider name="" label="Width" value={Math.round(assetWidthPct(active.w))} min={2} max={100} suffix="%"
+                  hint="Across the card. 100% spans it edge to edge."
+                  onChange={(v) => patchAsset(active.id, { w: Math.round(assetWidthPx(v)) })} />
                 <Slider name="" label="Height ratio" value={Math.round(active.ratio * 100)} min={20} max={400} suffix="%"
                   hint="Height as a share of the width. 100% is square."
                   onChange={(v) => patchAsset(active.id, { ratio: v / 100 })} />
@@ -595,6 +663,17 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setPicking((p) => !p)} className="ghost-btn pressable rounded-full px-4 py-1.5 text-xs">
                 {picking ? "Close library" : "Add an image"}
+              </button>
+              {/* A frame with no picture in it yet — the card brings the
+                  picture. Separate from the library because there is nothing to
+                  browse: you are placing a hole for the card to fill. */}
+              <button
+                type="button"
+                onClick={() => addAsset("", "self.art")}
+                className="ghost-btn pressable rounded-full px-4 py-1.5 text-xs"
+                title="A frame filled by whatever the card is about"
+              >
+                Add a card-filled slot
               </button>
             </div>
 
