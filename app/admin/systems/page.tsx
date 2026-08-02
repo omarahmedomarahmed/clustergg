@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireStaff } from "@/lib/auth";
 import { currentAccess } from "@/lib/departments";
 import { SYSTEMS } from "@/lib/systems";
+import { pagesOfSystem } from "@/lib/admin-nav";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -52,8 +53,8 @@ export default async function SystemsPage() {
               </div>
               <p className="mt-2 text-sm text-muted">{s.outcome}</p>
               <p className="mt-3 text-[11px] text-muted/70">
-                {s.pages.length} page{s.pages.length === 1 ? "" : "s"} · {s.brief.withWhom.length} systems it
-                works with
+                {pagesOfSystem(s.key).length} page{pagesOfSystem(s.key).length === 1 ? "" : "s"} ·{" "}
+                {s.brief.withWhom.length} systems it works with
               </p>
             </Link>
           );

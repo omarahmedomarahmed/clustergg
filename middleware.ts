@@ -26,6 +26,18 @@ const STAFF = new Set(["staff", "admin", "superadmin"]);
 /** The header a layout reads to know it is rendering inside our own iframe. */
 export const EMBED_HEADER = "x-cluster-embed";
 
+/**
+ * The admin path, promoted to a header so the admin layout can enforce
+ * department access in ONE place.
+ *
+ * A layout is a server component and cannot see the pathname. Without it, the
+ * only way to stop a staff member typing a URL for a page their department
+ * doesn't own was a guard call at the top of every page — and of forty-odd
+ * admin pages, three had one. The rail hid the rest, which is a suggestion, not
+ * a boundary.
+ */
+export const ADMIN_PATH_HEADER = "x-cluster-path";
+
 export async function middleware(req: NextRequest) {
   // ===== Embedded profiles =====
   //
@@ -49,7 +61,11 @@ export async function middleware(req: NextRequest) {
   if (token) {
     try {
       const { payload } = await jwtVerify(token, SECRET);
-      if (STAFF.has(String(payload.role))) return NextResponse.next();
+      if (STAFF.has(String(payload.role))) {
+        const headers = new Headers(req.headers);
+        headers.set(ADMIN_PATH_HEADER, req.nextUrl.pathname);
+        return NextResponse.next({ request: { headers } });
+      }
     } catch { /* expired, tampered or signed with a different secret */ }
   }
   // Same destination the layout uses, so the experience is unchanged for a

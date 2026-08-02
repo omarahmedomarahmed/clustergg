@@ -1,4 +1,5 @@
-import { redirect } from "next/navigation";
+import { redirect, notFound } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { getCurrentUser, isAdmin, isStaff } from "@/lib/auth";
 import { AdminRail, AdminMobileNav, AdminSectionTabs } from "@/components/AdminNav";
@@ -6,6 +7,7 @@ import { navFor, navForSystems, accessOf, homeOf } from "@/lib/admin-nav";
 import { areaAllowed, getStaffGrants } from "@/lib/permissions";
 import { currentAccess } from "@/lib/departments";
 import { pathAllowedFor, systemBy } from "@/lib/systems";
+import { ADMIN_PATH_HEADER } from "@/middleware";
 import { countPendingRequests } from "@/lib/challenge-requests";
 import { adminInbox } from "@/lib/threads";
 
@@ -56,6 +58,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         : undefined,
     })),
   }));
+
+  // ===== The boundary, enforced once =====
+  //
+  // The rail only ever offered a department the pages it owns, and that is a
+  // suggestion: three of forty-odd admin pages called a guard of their own, so
+  // typing the URL of somebody else's page worked. It is checked here instead,
+  // for every admin page at once, using the same predicate that built the rail.
+  //
+  // `notFound()` rather than a message: a console that says "you may not open
+  // the ad desk" tells a staff member what to ask for. 404 is what a page they
+  // have no business knowing about should look like.
+  const path = (await headers()).get(ADMIN_PATH_HEADER) ?? "";
+  if (!admin && path && !pathAllowedFor(systems, path)) notFound();
 
   const staffNote = admin
     ? undefined
