@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Icon from "@/components/Icon";
 import { downscale } from "@/lib/downscale";
 import {
-  portalLaunchCardCreative, portalRemoveCardCreative, portalSetCardCampaignRunning,
+  portalLaunchCardCreative, portalRemoveCardCreative, portalSetCardCampaignRunning, portalEditCreative,
 } from "@/app/actions/brand-portal";
 
 // The card campaign panel — the first and biggest thing in the brand portal.
@@ -217,33 +217,132 @@ export default function BrandCardCampaign({
           </div>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {creatives.map((c) => (
-              <div key={c.campaignCreativeId} className="overflow-hidden rounded-xl border border-white/10 bg-black/25">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.fileUrl} alt="" className="w-full object-cover" style={{ aspectRatio: "640 / 200" }} />
-                {/* Each creative has its OWN button and destination — a brand
-                    running three creatives is running three messages. */}
-                <div className="border-t border-white/8 px-2 py-1.5">
-                  <div className="truncate rounded bg-[#5865F2] px-2 py-1 text-[10px] font-semibold text-white">
-                    {`Sponsored: ${brandName} — ${c.ctaLabel || "no tagline"}`}
-                  </div>
-                  {c.clickUrl && <div className="mt-1 truncate text-[10px] text-muted">→ {c.clickUrl}</div>}
-                </div>
-                <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[11px]">
-                  <span className="text-muted">{n(c.impressions)} impressions · {n(c.clicks)} clicks</span>
-                  <button
-                    type="button" onClick={() => remove(c.campaignCreativeId)} disabled={working}
-                    title="Take out of rotation"
-                    className="shrink-0 text-muted transition hover:text-rose-300 disabled:opacity-50"
-                  >
-                    <Icon name="x" size={13} />
-                  </button>
-                </div>
-              </div>
+              <CreativeTile
+                key={c.campaignCreativeId} c={c} brandId={brandId} keyStr={keyStr} brandName={brandName}
+                busy={working} onRemove={() => remove(c.campaignCreativeId)} onMessage={setMsg}
+              />
             ))}
           </div>
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * One creative, editable where it sits.
+ *
+ * Every creative has its own button and its own destination — a brand running
+ * three creatives is running three messages, and the one they most need to
+ * change is usually the one that has been running longest. Editing happens in
+ * place so its impressions and clicks stay attached to it: the point is to fix
+ * an ad, not to restart its reporting.
+ *
+ * This is also the only way to repair a creative uploaded before the card
+ * placement required a button. Those render on Discord with nothing to click,
+ * and the tile says so rather than leaving a brand to notice.
+ */
+function CreativeTile({ c, brandId, keyStr, brandName, busy, onRemove, onMessage }: {
+  c: CardCreativeView;
+  brandId: string; keyStr: string; brandName: string;
+  busy: boolean;
+  onRemove: () => void;
+  onMessage: (m: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [label, setLabel] = useState(c.ctaLabel ?? "");
+  const [url, setUrl] = useState(c.clickUrl ?? "");
+  const [working, setWorking] = useState(false);
+  const [pending, start] = useTransition();
+  const incomplete = !c.ctaLabel || !c.clickUrl;
+
+  const save = (fileUrl?: string) => start(async () => {
+    const fd = new FormData();
+    fd.set("campaignCreativeId", c.campaignCreativeId);
+    fd.set("ctaLabel", label);
+    fd.set("clickUrl", url);
+    if (fileUrl) fd.set("fileUrl", fileUrl);
+    const r = await portalEditCreative(brandId, keyStr, fd);
+    onMessage(r?.error ?? "Saved. The next card the bot draws uses it.");
+    if (!r?.error) setOpen(false);
+  });
+
+  const replaceImage = async (file: File) => {
+    setWorking(true);
+    onMessage(null);
+    try {
+      const dataUrl = await downscale(file, 1280, 0.88);
+      const res = await fetch("/api/brands/upload", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ brandId, key: keyStr, dataUrl }),
+      });
+      const json = await res.json();
+      if (!json?.url) { onMessage(json?.error ?? "Upload failed"); setWorking(false); return; }
+      save(json.url);
+    } catch (e) {
+      onMessage(`Upload failed — ${(e as Error)?.message || "the browser couldn't read that file"}`);
+    }
+    setWorking(false);
+  };
+
+  const disabled = busy || working || pending;
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-white/10 bg-black/25">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={c.fileUrl} alt="" className="w-full object-cover" style={{ aspectRatio: "640 / 200" }} />
+      <div className="border-t border-white/8 px-2 py-1.5">
+        <div className={`truncate rounded px-2 py-1 text-[10px] font-semibold ${c.ctaLabel ? "bg-[#5865F2] text-white" : "border border-amber-400/40 bg-amber-500/10 text-amber-200"}`}>
+          {c.ctaLabel ? `Sponsored: ${brandName} — ${c.ctaLabel}` : "No button — this creative can't be clicked"}
+        </div>
+        {c.clickUrl && <div className="mt-1 truncate text-[10px] text-muted">→ {c.clickUrl}</div>}
+      </div>
+      <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 text-[11px]">
+        <span className="text-muted">{c.impressions.toLocaleString()} impressions · {c.clicks.toLocaleString()} clicks</span>
+        <span className="flex shrink-0 items-center gap-2">
+          <button type="button" onClick={() => setOpen((v) => !v)} disabled={disabled}
+            title="Edit this creative" className={`transition disabled:opacity-50 ${incomplete ? "text-amber-300 hover:text-amber-200" : "text-muted hover:text-cyan-300"}`}>
+            <Icon name="edit" size={13} />
+          </button>
+          <button type="button" onClick={onRemove} disabled={disabled}
+            title="Take out of rotation" className="text-muted transition hover:text-rose-300 disabled:opacity-50">
+            <Icon name="x" size={13} />
+          </button>
+        </span>
+      </div>
+
+      {open && (
+        <div className="space-y-2 border-t border-white/10 bg-black/30 p-2.5">
+          {incomplete && (
+            <p className="text-[10px] leading-snug text-amber-200">
+              This one went up before a button was required, so it shows on Discord with nothing to click.
+              Add the two lines below and it starts earning clicks — its impressions stay.
+            </p>
+          )}
+          <input value={label} onChange={(e) => setLabel(e.target.value)} maxLength={48}
+            placeholder="Button text — e.g. 40% off this week"
+            className="input-cosmic w-full !py-1 text-xs" />
+          <input value={url} onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://your-site.com/offer"
+            className="input-cosmic w-full !py-1 text-xs" />
+          <div className="truncate rounded bg-[#5865F2] px-2 py-1 text-[10px] font-semibold text-white">
+            {`Sponsored: ${brandName} — ${label.trim() || "your tagline here"}`.slice(0, 80)}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => save()} disabled={disabled}
+              className="cta-btn pressable rounded-full px-4 py-1 text-[11px] font-semibold disabled:opacity-60">
+              {pending ? "Saving…" : "Save"}
+            </button>
+            <label className={`ghost-btn pressable cursor-pointer rounded-full px-3 py-1 text-[11px] ${disabled ? "opacity-60" : ""}`}>
+              {working ? "Uploading…" : "Replace image"}
+              <input type="file" accept="image/*" className="hidden" disabled={disabled}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) void replaceImage(f); e.currentTarget.value = ""; }} />
+            </label>
+            <button type="button" onClick={() => setOpen(false)} className="text-[11px] text-muted hover:text-ink">Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
