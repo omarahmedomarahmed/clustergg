@@ -12,8 +12,54 @@ import { announceChallengeJoined, announceChallengeEnded } from "@/lib/discord/a
 // or a Discord join would quietly be worth more or less than a web join.
 
 export type JoinResult =
-  | { ok: true; already: boolean; game: string; title: string }
+  | { ok: true; already: boolean; game: string; title: string; account: string }
   | { ok: false; reason: "not_found" | "not_active" | "no_account" | "gated" | "locked" | "bad_key" };
+
+export type EntryAccount = {
+  id: string;
+  inGameName: string;
+  region: string | null;
+  /** Already entered in this challenge — the one that carries the standing. */
+  entered: boolean;
+};
+
+/**
+ * Which of a gamer's accounts can enter this challenge.
+ *
+ * People genuinely have two League accounts — a main and a smurf, or one per
+ * region — and Cluster has always linked and shown both. Entry did not: it
+ * silently took the first account in the list, so a gamer whose second account
+ * is the one they actually play on entered with the wrong one and watched a
+ * week of play score nothing. There was no error to see, which is the worst
+ * shape a bug can have.
+ *
+ * So the choice is surfaced. This is the one list both the website and the bot
+ * ask, so the two can't offer different accounts.
+ */
+export async function entryAccounts(userId: string, challengeId: string): Promise<EntryAccount[]> {
+  const db = await getDb();
+  const [challenge] = await db.select({ provider: schema.challenges.provider })
+    .from(schema.challenges).where(eq(schema.challenges.id, challengeId)).limit(1);
+  if (!challenge) return [];
+  const [accounts, entries] = await Promise.all([
+    db.select().from(schema.linkedGameAccounts).where(and(
+      eq(schema.linkedGameAccounts.userId, userId),
+      eq(schema.linkedGameAccounts.provider, challenge.provider),
+    )),
+    db.select({ linkedAccountId: schema.challengeParticipants.linkedAccountId })
+      .from(schema.challengeParticipants).where(and(
+        eq(schema.challengeParticipants.challengeId, challengeId),
+        eq(schema.challengeParticipants.userId, userId),
+      )),
+  ]);
+  const entered = new Set(entries.map((e) => e.linkedAccountId));
+  return accounts.map((a) => ({
+    id: a.id,
+    inGameName: a.inGameName,
+    region: a.region ?? null,
+    entered: entered.has(a.id),
+  }));
+}
 
 export async function joinChallengeFor(
   userId: string,
@@ -44,6 +90,11 @@ export async function joinChallengeFor(
       eq(schema.linkedGameAccounts.userId, userId),
       eq(schema.linkedGameAccounts.provider, challenge.provider),
     ));
+  //
+  // An unknown id is NOT quietly replaced by the first account. Falling back
+  // would enter someone on an account they didn't choose and report success —
+  // the exact silent-wrong-account failure this whole path exists to remove.
+  // No id at all still means "the only one you have", which is the common case.
   const account = opts.linkedAccountId
     ? accounts.find((a) => a.id === opts.linkedAccountId)
     : accounts[0];
@@ -55,13 +106,23 @@ export async function joinChallengeFor(
     if (have < challenge.gateMinBadges) return { ok: false, reason: "gated" };
   }
 
-  const [existing] = await db.select({ id: schema.challengeParticipants.id })
+  const [existing] = await db.select({
+    id: schema.challengeParticipants.id,
+    linkedAccountId: schema.challengeParticipants.linkedAccountId,
+  })
     .from(schema.challengeParticipants)
     .where(and(
       eq(schema.challengeParticipants.challengeId, challengeId),
       eq(schema.challengeParticipants.userId, userId),
     )).limit(1);
-  if (existing) return { ok: true, already: true, game: challenge.game, title: challenge.title };
+  if (existing) {
+    return {
+      ok: true, already: true, game: challenge.game, title: challenge.title,
+      // The account that actually carries their standing, which is not
+      // necessarily the one they just pressed — worth saying so.
+      account: accounts.find((a) => a.id === existing.linkedAccountId)?.inGameName ?? account.inGameName,
+    };
+  }
 
   // Snapshot current stats as the baseline: only activity AFTER joining counts.
   const stats = await db.select().from(schema.statCurrent)
@@ -79,7 +140,7 @@ export async function joinChallengeFor(
   // result: a failed announcement must never fail the join.
   void announceChallengeJoined(userId, challengeId).catch(() => {});
 
-  return { ok: true, already: false, game: challenge.game, title: challenge.title };
+  return { ok: true, already: false, game: challenge.game, title: challenge.title, account: account.inGameName };
 }
 
 // The web URL for a challenge. There is no top-level /challenges route — a

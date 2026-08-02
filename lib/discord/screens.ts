@@ -8,7 +8,7 @@ import { withSponsorRow } from "@/lib/discord/sponsor";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
-import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild } from "@/lib/challenges";
+import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild, entryAccounts } from "@/lib/challenges";
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
@@ -648,32 +648,51 @@ async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Prom
   const { url, data } = await cardRef("challenge", { id });
   if (!data || data.kind !== "challenge") return notYet("That challenge is no longer live.", trail, [], ctx);
 
-  const [joined, webUrl, gate] = await Promise.all([
+  const [joined, webUrl, gate, mine] = await Promise.all([
     ctx.gamer ? hasJoined(ctx.gamer.userId, id) : Promise.resolve(false),
     challengeUrl(siteUrl(), id),
     challengeGate(id),
+    // Which of their accounts could enter. Two League accounts is ordinary,
+    // and the bot used to enter them on whichever came back first.
+    ctx.gamer ? entryAccounts(ctx.gamer.userId, id) : Promise.resolve([]),
   ]);
+  const enteredWith = mine.find((a) => a.entered) ?? null;
 
   // The key was sent to the server the challenge belongs to, so in THAT server
   // the bot can show it and joining is one tap. Anywhere else you can watch the
   // whole thing and are asked for the key to enter.
   const ownHere = gate.locked && keyVisibleTo(gate, ctx.guildId ?? null);
   const footer = joined
-    ? "You're in — your standing updates on every sync."
+    ? enteredWith
+      // Naming the account is the whole point: with two linked, "you're in"
+      // does not say which one has to be played for this to score.
+      ? `You're in as ${enteredWith.inGameName} — only this account's play counts here.`
+      : "You're in — your standing updates on every sync."
     : gate.locked
       ? (ownHere ? `Your server's entry key: ${gate.accessKey}` : "Entry needs the key sent to this challenge's server.")
-      : undefined;
+      : mine.length > 1
+        ? "Pick which account enters. The others stay free for other challenges."
+        : undefined;
+
+  // One button per account when there is a choice to make. Buttons rather than
+  // a select menu because there are rarely more than two or three, and a button
+  // is one tap where a select is three.
+  const joinButtons = (): (Button | null)[] => {
+    if (mine.length <= 1) return [button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆")];
+    return mine.slice(0, 3).map((a) =>
+      button(`Join as ${a.inGameName}`.slice(0, 40), actionId("join", [id, a.id], trail), ButtonStyle.Success, "🏆"));
+  };
 
   return {
     embeds: [embed(url, { title: data.title, color: data.theme.accent, footer })],
     components: rows([
-      !ctx.gamer
-        ? linkButton("Continue with Discord to join", signInUrl(siteUrl(), new URL(webUrl).pathname), "🚀")
+      ...(!ctx.gamer
+        ? [linkButton("Continue with Discord to join", signInUrl(siteUrl(), new URL(webUrl).pathname), "🚀")]
         : joined
-          ? button("You've joined", actionId("noop", [], trail), ButtonStyle.Secondary, "✅")
+          ? [button("You've joined", actionId("noop", [], trail), ButtonStyle.Secondary, "✅")]
           : gate.locked && !ownHere
-            ? button("Enter with key", `open-key|${id}`, ButtonStyle.Primary, "🔑")
-            : button("Join challenge", actionId("join", [id], trail), ButtonStyle.Success, "🏆"),
+            ? [button("Enter with key", `open-key|${id}`, ButtonStyle.Primary, "🔑")]
+            : joinButtons()),
       navButton("Standings", frame("leaderboard", data.game), trail, ButtonStyle.Secondary, "📊"),
       navButton(`${data.game} planet`.slice(0, 24), frame("planet", data.game), trail, ButtonStyle.Secondary, "🪐"),
       ...tail(ctx, frame("challenge", id), trail),
