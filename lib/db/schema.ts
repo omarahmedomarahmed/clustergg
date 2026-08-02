@@ -367,6 +367,16 @@ export const brands = pgTable("brands", {
   industry: text("industry").notNull().default("other"),
   contactEmail: text("contact_email"),
   status: text("status").notNull().default("active"), // active | paused
+  /**
+   * When this brand was granted its founding month of challenge credit.
+   *
+   * Null means it is owed one. Existing customers are owed it too — we are not
+   * going to make the brands who backed us first pay to watch new ones get a
+   * better deal.
+   */
+  founderCreditAt: timestamp("founder_credit_at", { withTimezone: true, mode: "date" }),
+  /** What was granted, in dollars, so the ledger is not inferred from a date. */
+  founderCreditValue: doublePrecision("founder_credit_value").notNull().default(0),
   createdAt: now("created_at"),
 });
 
@@ -783,6 +793,17 @@ export const discordGuilds = pgTable("discord_guilds", {
   announcementsEnabled: boolean("announcements_enabled").notNull().default(true),
   adOptIn: boolean("ad_opt_in").notNull().default(true),
   adUnlockedAt: timestamp("ad_unlocked_at", { withTimezone: true, mode: "date" }),
+  /**
+   * When this server's funded welcome challenge was created.
+   *
+   * Null means it is owed one — including for every server that installed the
+   * bot BEFORE the offer existed. That is deliberate: an offer only new
+   * signups can take teaches your earliest supporters that waiting would have
+   * been better.
+   */
+  welcomeChallengeAt: timestamp("welcome_challenge_at", { withTimezone: true, mode: "date" }),
+  /** The challenge itself, so it can be found again rather than re-created. */
+  welcomeChallengeId: text("welcome_challenge_id"),
   revenueSharePct: integer("revenue_share_pct").notNull().default(70),
   // Public invite to this server. A private challenge is visible to everyone,
   // so the only way to GET the key is to be in the server — which makes this

@@ -10,6 +10,8 @@ import { hqStatus } from "@/lib/discord/hq";
 import { tierFor } from "@/lib/server-portal";
 import { AdminHeader, AdminSection, AdminSettings, EmptyState } from "@/components/AdminPage";
 import { JOBS } from "@/lib/jobs";
+import FoundingOffers from "@/components/FoundingOffers";
+import { offers } from "@/lib/offers";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +34,9 @@ export default async function AdminDiscordPage() {
   const ready = discordConfigured();
   const install = installUrl();
 
-  const [guilds, pending, hq] = await Promise.all([listGuilds(), countPendingRequests(), hqStatus()]);
+  const [guilds, pending, hq, offerState] = await Promise.all([
+    listGuilds(), countPendingRequests(), hqStatus(), offers(),
+  ]);
 
   const checks: { label: string; ok: boolean; detail: string }[] = [
     {
@@ -165,6 +169,17 @@ export default async function AdminDiscordPage() {
             </table>
           </div>
         )}
+      </AdminSection>
+
+      {/* The founding offers, and the servers still owed one. Placed above
+          Operations because it is the thing that has a deadline: a server that
+          installed the bot and got nothing back is a server that will remove
+          it. */}
+      <AdminSection
+        title="The founding offers"
+        hint="Both are retroactive by design — every server and every brand that arrived before the offer is owed it. These are the buttons that pay that back."
+      >
+        <FoundingOffers offers={offerState} />
       </AdminSection>
 
       <AdminSection title="Operations" hint="The jobs the cron runs, on demand. Vercel's plan allows one daily run, so these are how a job happens now rather than tomorrow.">

@@ -149,6 +149,11 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "cover_url" text`,
   `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "about" text`,
   `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "portal_bg_url" text`,
+  // The founding offers. Nullable and defaulted, so every row that already
+  // exists reads as "owed it" rather than as "had it" — which is the whole
+  // point: the offer is retroactive.
+  `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "founder_credit_at" timestamptz`,
+  `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "founder_credit_value" double precision NOT NULL DEFAULT 0`,
   `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "chart_prefs" jsonb`,
   `ALTER TABLE "ad_campaigns" ADD COLUMN IF NOT EXISTS "launched_at" timestamp with time zone`,
   `ALTER TABLE "ad_campaigns" ADD COLUMN IF NOT EXISTS "cover_url" text`,
@@ -226,6 +231,10 @@ const COLUMN_MIGRATIONS = [
     PRIMARY KEY ("guild_id","user_id")
   )`,
   `CREATE INDEX IF NOT EXISTS "dgm_guild_idx" ON "discord_guild_members" ("guild_id","first_linked_at")`,
+  // AFTER the CREATE above, not before it. An ALTER that runs before its table
+  // exists takes the whole boot with it, and this array is executed in order.
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "welcome_challenge_at" timestamptz`,
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "welcome_challenge_id" text`,
   `CREATE TABLE IF NOT EXISTS "discord_command_logs" (
     "id" text PRIMARY KEY NOT NULL,
     "guild_id" text,
