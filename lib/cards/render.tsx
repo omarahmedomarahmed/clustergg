@@ -4,7 +4,7 @@ import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import {
   AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, opacityOf,
-  partOf, plateBg, spotBox, transformOf,
+  partOf, plateBg, sideBox, sideBoxFits, spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset, PartDraw } from "@/lib/cards/layout";
 import { assetPicture } from "@/lib/cards/asset-source";
@@ -134,19 +134,9 @@ function Frame({ theme, children, corner, side }: {
   // The free rectangle to the right of the content: starts where the text
   // column ends, stops at the canvas edge, and begins under whichever of the
   // sponsor box and the badge hangs lowest. Computed from the LIVE layout, so
-  // an admin who drags the ad somewhere else moves this with it.
-  const sideTop = Math.max(
-    content.top,
-    ad && !l.ad.hidden ? adB.bottom + 14 : 0,
-    corner && !l.badge.hidden ? badgeTop + badge.height + 14 : 0,
-  );
-  const sideLeft = content.left + content.width + 16;
-  const sideBox = {
-    left: sideLeft,
-    top: sideTop,
-    width: Math.max(0, CANVAS_W - 20 - sideLeft),
-    height: Math.max(0, CARD_H - 18 - sideTop),
-  };
+  // an admin who drags the ad somewhere else moves this with it — and computed
+  // by the same helper the layout editor draws it with.
+  const side_ = sideBox(l, { hasAd: !!ad, hasBadge: !!corner });
   return (
     <div style={{ width: CARD_W, height: CARD_H, display: "flex", position: "relative", background: VOID, color: INK }}>
       {theme.bgUrl ? (
@@ -220,7 +210,7 @@ function Frame({ theme, children, corner, side }: {
       </div>
       {/* The right-hand column. Drawn before the logo on purpose: the logo is
           the one thing that is never covered. */}
-      {side && sideBox.width > 60 && sideBox.height > 60 ? side(sideBox) : null}
+      {side && sideBoxFits(side_) ? side(side_) : null}
       {/* The real logo mark, drawn on top of everything. Falls back to the
           wordmark only when no logo is configured, so a card is never
           unbranded. */}

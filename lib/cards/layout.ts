@@ -503,12 +503,24 @@ export function partOf(l: CardLayout, key: string): PartDraw {
  */
 export function partBoxes(
   l: CardLayout,
-  parts: { key: string }[],
+  parts: { key: string; side?: boolean }[],
   regions: { key: string; x: number; y: number; w: number; h: number }[],
 ): Record<string, { x: number; y: number; w: number; h: number }> {
   const out: Record<string, { x: number; y: number; w: number; h: number }> = {};
   const byKey = new Map(regions.map((r) => [r.key, r]));
-  const stacked = parts.filter((p) => !byKey.has(p.key));
+  // A side section — the world card's splash banner — is not in the text
+  // column and does not have a fixed home either: it hangs below the sponsor
+  // box, wherever the sponsor box currently is. Drawing it stacked with the
+  // paragraphs put the one element that moves with the ad in the one place it
+  // never appears.
+  const side = sideBox(l, { hasAd: !l.ad.hidden, hasBadge: false });
+  const sideAsPct = {
+    x: (side.left / CANVAS_W) * 100,
+    y: (side.top / CANVAS_H) * 100,
+    w: (side.width / CANVAS_W) * 100,
+    h: (side.height / CANVAS_H) * 100,
+  };
+  const stacked = parts.filter((p) => !byKey.has(p.key) && !p.side);
   // A gap between blocks so adjacent boxes are visibly separate rather than one
   // continuous column an admin cannot tell apart.
   const GAP = 0.8;
@@ -518,6 +530,10 @@ export function partBoxes(
 
   let i = 0;
   for (const p of parts) {
+    if (p.side && sideBoxFits(side)) {
+      out[p.key] = sideAsPct;
+      continue;
+    }
     const region = byKey.get(p.key);
     if (region) {
       out[p.key] = { x: region.x, y: region.y, w: region.w, h: region.h };
@@ -633,6 +649,41 @@ export function badgeTopFor(l: CardLayout, hasAd: boolean, badgeRatio = 1): numb
   // than one that overlaps by a few pixels.
   return Math.min(ad.bottom + 16, CANVAS_H - badge.height - 8);
 }
+
+/**
+ * The right-hand column, under the sponsor box.
+ *
+ * The world card's splash banner lives here, and where it lands is not a fixed
+ * rectangle: it starts where the text column ends and drops below whichever of
+ * the sponsor box and the badge hangs lowest, so dragging the ad drags the
+ * splash with it. That made it invisible to the layout editor, which drew the
+ * splash at the card guide's static home geometry — the one element on the
+ * canvas that was in the wrong place by design.
+ *
+ * Shared, so "below the ad box" means the same rectangle in the editor and in
+ * the PNG.
+ */
+export function sideBox(l: CardLayout, o: { hasAd: boolean; hasBadge: boolean; badgeRatio?: number }): {
+  left: number; top: number; width: number; height: number;
+} {
+  const content = contentBox(l.content);
+  const badge = spotBox(l.badge, o.badgeRatio ?? 1);
+  const top = Math.max(
+    content.top,
+    o.hasAd && !l.ad.hidden ? adBox(l.ad).bottom + 14 : 0,
+    o.hasBadge && !l.badge.hidden ? badgeTopFor(l, o.hasAd, o.badgeRatio ?? 1) + badge.height + 14 : 0,
+  );
+  const left = content.left + content.width + 16;
+  return {
+    left,
+    top,
+    width: Math.max(0, CANVAS_W - 20 - left),
+    height: Math.max(0, CANVAS_H - 18 - top),
+  };
+}
+
+/** True when that column is big enough to be worth drawing at all. */
+export const sideBoxFits = (b: { width: number; height: number }) => b.width > 60 && b.height > 60;
 
 export function contentBox(c: ContentBox): { left: number; top: number; width: number; height: number } {
   return {
