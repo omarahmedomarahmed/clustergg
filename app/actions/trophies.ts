@@ -4,8 +4,31 @@ import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser, requireStaff } from "@/lib/auth";
-import { payoutLast4 } from "@/lib/trophies";
+import { payer } from "@/lib/payments";
+import { METHOD_OPTIONS, savePayoutPreference } from "@/lib/payouts";
 import { uid } from "@/lib/utils";
+
+// Cashing out a trophy.
+//
+// This flow used to ask a gamer for a routing number, an account number and an
+// account type, store all three, and mask them to a last-4 in the UI. It
+// doesn't any more, and the old values have been erased — see the migration
+// block in lib/db/index.ts.
+//
+// What replaced it. The gamer says HOW they'd like to be paid, as one word:
+// bank, PayPal, mobile wallet, gift card. Staff approve. The payout provider is
+// then handed an amount and a name and returns a link; the gamer opens that
+// link and chooses for themselves, on the provider's page, in their own
+// country, between two thousand options. We never learn which one they picked
+// and we never hold the destination.
+//
+// That is not only safer, it is the only version that works globally. A form
+// with "routing number (9 digits)" on it is a form that cannot pay anybody
+// outside the United States, and most of a gaming audience is outside the
+// United States.
+//
+// Award states along the way: held → pending (locked in a request) → redeemed
+// (paid). A cancelled or rejected request puts them back.
 
 const MAX_METHOD_CHANGES = 3;
 
@@ -24,54 +47,50 @@ async function notifyAdmins(db: Awaited<ReturnType<typeof getDb>>, title: string
   for (const a of admins) await notify(db, a.id, title, body, "/admin/redeems");
 }
 
+const methodLabel = (m: string) => METHOD_OPTIONS.find((o) => o.key === m)?.label ?? m;
+
 // ===== Gamer: request a redeem =====
-// Validates the payout method per currency, enforces the 3-change method lock
-// (alerting admins when someone keeps changing it), locks the selected awards
-// as "pending" and files the request for admin approval.
 export async function requestRedeem(input: {
   awardIds: string[];
-  currency: "USD" | "EGP";
-  method: "ach" | "wallet" | "instapay";
-  details: Record<string, string>;
+  currency: string;
+  /** A preference, not a destination. See METHOD_OPTIONS. */
+  method: string;
+  /** ISO-3166 alpha-2, so the provider offers methods that exist where they live. */
+  country?: string;
 }): Promise<{ ok?: true; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in first." };
   const db = await getDb();
 
-  // Validate the payout method.
-  const d: Record<string, string> = {};
-  if (input.currency === "USD") {
-    if (input.method !== "ach") return { error: "USD payouts use ACH transfer." };
-    d.routing = String(input.details.routing ?? "").replace(/\D/g, "");
-    d.account = String(input.details.account ?? "").replace(/\D/g, "");
-    d.accountType = input.details.accountType === "savings" ? "savings" : "checking";
-    d.holderName = String(input.details.holderName ?? "").trim().slice(0, 120);
-    if (d.routing.length !== 9) return { error: "Routing number must be 9 digits." };
-    if (d.account.length < 4 || d.account.length > 17) return { error: "Enter a valid account number." };
-    if (!d.holderName) return { error: "Enter the account holder name." };
-  } else {
-    if (input.method !== "wallet" && input.method !== "instapay") return { error: "EGP payouts use Mobile Wallet or InstaPay." };
-    d.mobile = String(input.details.mobile ?? "").replace(/[^\d+]/g, "");
-    if (d.mobile.replace(/\D/g, "").length < 10) return { error: "Enter a valid mobile number." };
+  if (!METHOD_OPTIONS.some((m) => m.key === input.method)) {
+    return { error: "Pick how you'd like to be paid." };
   }
+  const currency = (input.currency || "USD").slice(0, 3).toUpperCase();
 
-  // Saved-method handling + 3-change lock.
+  // The 3-change lock survives, because a payout preference that keeps moving
+  // is still the signal it always was — it just guards a word now instead of a
+  // bank account, so being locked out costs the gamer nothing but a message.
   const [me] = await db.select({ pm: schema.users.payoutMethod, changes: schema.users.payoutChanges })
     .from(schema.users).where(eq(schema.users.id, user.id)).limit(1);
-  const incoming = { currency: input.currency, method: input.method, details: d };
-  const same = me?.pm && JSON.stringify(me.pm) === JSON.stringify(incoming);
+  const incoming = { currency, method: input.method };
+  const same = me?.pm && me.pm.currency === currency && me.pm.method === input.method;
   if (!same) {
     const changes = Number(me?.changes ?? 0);
     if (me?.pm && changes >= MAX_METHOD_CHANGES) {
-      return { error: "Payout method is locked after 3 changes — contact support to update it." };
+      return { error: "Your payout preference is locked after 3 changes — message support to update it." };
     }
     await db.update(schema.users)
       .set({ payoutMethod: incoming, payoutChanges: me?.pm ? changes + 1 : changes })
       .where(eq(schema.users.id, user.id));
     if (me?.pm && changes + 1 >= MAX_METHOD_CHANGES) {
-      await notifyAdmins(db, "Payout method locked", `${user.displayName} (@${user.slug}) changed their trophy payout method ${changes + 1} times — now locked. Review the account.`);
+      await notifyAdmins(db, "Payout preference locked", `${user.displayName} (@${user.slug}) changed their trophy payout preference ${changes + 1} times — now locked. Review the account.`);
     }
   }
+  await savePayoutPreference("gamer", user.id, {
+    method: input.method,
+    country: input.country ?? user.country ?? null,
+    currency,
+  });
 
   // Lock the awards + compute the amount from the live trophy values.
   const ids = [...new Set(input.awardIds)].slice(0, 50);
@@ -84,13 +103,12 @@ export async function requestRedeem(input: {
   const amount = awards.reduce((s, a) => s + Number(a.value ?? 0), 0);
   if (amount <= 0) return { error: "These trophies have no redeemable value yet." };
 
-  const redeemId = uid();
   await db.insert(schema.trophyRedeems).values({
-    id: redeemId, userId: user.id, awardIds: ids, amount,
-    currency: input.currency, method: input.method, details: d, status: "pending",
+    id: uid(), userId: user.id, awardIds: ids, amount,
+    currency, method: input.method, status: "pending",
   });
   await db.update(schema.userTrophies).set({ status: "pending" }).where(inArray(schema.userTrophies.id, ids));
-  await notifyAdmins(db, "Trophy redeem request", `${user.displayName} (@${user.slug}) requested $${amount.toLocaleString()} ${input.currency} for ${ids.length} ${ids.length === 1 ? "trophy" : "trophies"}.`);
+  await notifyAdmins(db, "Trophy redeem request", `${user.displayName} (@${user.slug}) requested $${amount.toLocaleString()} ${currency} for ${ids.length} ${ids.length === 1 ? "trophy" : "trophies"} — prefers ${methodLabel(input.method).toLowerCase()}.`);
   revalidateTrophyPages();
   return { ok: true };
 }
@@ -109,34 +127,100 @@ export async function cancelRedeem(redeemId: string): Promise<{ ok?: true; error
   return { ok: true };
 }
 
-// Gamer confirms the payout details after admin approval (the "please confirm
-// bank info" step — shown with last-4 only).
+/**
+ * "I've collected it."
+ *
+ * The gamer opens the provider's link, chooses their payout and comes back to
+ * say so. That closes the request and turns the trophies into history.
+ *
+ * Their word is enough here on purpose: the money has already left, the
+ * provider has its own record of the redemption, and making somebody chase
+ * staff to mark their own payout received would be a support queue built out of
+ * nothing. Staff can still mark it paid themselves, and the provider's
+ * dashboard is the authority if the two ever disagree.
+ */
 export async function confirmRedeem(redeemId: string): Promise<{ ok?: true; error?: string }> {
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in first." };
   const db = await getDb();
   const [r] = await db.select().from(schema.trophyRedeems)
     .where(and(eq(schema.trophyRedeems.id, redeemId), eq(schema.trophyRedeems.userId, user.id))).limit(1);
-  if (!r || r.status !== "approved") return { error: "Nothing to confirm." };
-  await db.update(schema.trophyRedeems).set({ gamerConfirmedAt: new Date() }).where(eq(schema.trophyRedeems.id, r.id));
-  await notifyAdmins(db, "Redeem payout confirmed", `${user.displayName} (@${user.slug}) confirmed the payout details for their $${Number(r.amount).toLocaleString()} ${r.currency} redeem — ready to pay.`);
+  if (!r) return { error: "Nothing to confirm." };
+  if (r.status !== "sent") return { error: "This payout hasn't been sent yet." };
+
+  await db.update(schema.trophyRedeems)
+    .set({ status: "paid", gamerConfirmedAt: new Date(), paidAt: new Date() })
+    .where(eq(schema.trophyRedeems.id, r.id));
+  if (r.awardIds?.length) {
+    await db.update(schema.userTrophies).set({ status: "redeemed" }).where(inArray(schema.userTrophies.id, r.awardIds));
+  }
+  await notifyAdmins(db, "Trophy payout collected", `${user.displayName} (@${user.slug}) collected their $${Number(r.amount).toLocaleString()} ${r.currency} payout.`);
   revalidateTrophyPages();
   return { ok: true };
 }
 
-// ===== Admin lifecycle =====
+// ===== Staff lifecycle =====
+
 export async function approveRedeem(redeemId: string) {
   await requireStaff();
   const db = await getDb();
   const [r] = await db.select().from(schema.trophyRedeems).where(eq(schema.trophyRedeems.id, redeemId)).limit(1);
   if (!r || r.status !== "pending") return;
   await db.update(schema.trophyRedeems).set({ status: "approved", decidedAt: new Date() }).where(eq(schema.trophyRedeems.id, r.id));
-  const methodLabel = r.method === "ach" ? "ACH transfer" : r.method === "wallet" ? "Mobile Wallet" : "InstaPay";
   await notify(db, r.userId,
-    "Trophy redeem approved — confirm your payout",
-    `Please confirm your ${methodLabel} details ending in ${payoutLast4(r.details)} to redeem $${Number(r.amount).toLocaleString()} ${r.currency}. Payout takes 5–7 business days after confirmation.`,
+    "Trophy redeem approved",
+    `Your $${Number(r.amount).toLocaleString()} ${r.currency} payout is approved. We'll send it shortly — you'll get a link to choose exactly how you want the money.`,
     "/profile");
   revalidateTrophyPages();
+}
+
+/**
+ * Send it.
+ *
+ * The only place in the gamer-facing product that talks to a payment provider.
+ * With Tremendous connected this mints a redemption link and the gamer picks
+ * their own method; with nothing connected it moves to "sent" with no link and
+ * staff transfer it by hand, which is a complete and honest workflow rather
+ * than a broken one.
+ */
+export async function sendRedeem(redeemId: string): Promise<{ ok?: true; error?: string; link?: string | null }> {
+  await requireStaff();
+  const db = await getDb();
+  const [r] = await db.select().from(schema.trophyRedeems).where(eq(schema.trophyRedeems.id, redeemId)).limit(1);
+  if (!r) return { error: "That request no longer exists." };
+  if (r.status !== "approved") return { error: "Approve it first." };
+
+  const [gamer] = await db.select({
+    id: schema.users.id, name: schema.users.displayName,
+    email: schema.users.email, country: schema.users.country,
+  }).from(schema.users).where(eq(schema.users.id, r.userId)).limit(1);
+  if (!gamer) return { error: "That gamer no longer exists." };
+
+  const { adapter } = await payer("rewards");
+  const res = await adapter.send({
+    payoutRef: r.id,
+    to: { ref: gamer.id, name: gamer.name, email: gamer.email, country: gamer.country },
+    amount: { amount: Number(r.amount), currency: r.currency },
+    memo: `Cluster trophy payout — ${(r.awardIds ?? []).length} ${((r.awardIds ?? []).length === 1 ? "trophy" : "trophies")}`,
+  });
+  if (!res.ok) return { error: res.error };
+
+  await db.update(schema.trophyRedeems).set({
+    status: "sent",
+    sentAt: new Date(),
+    providerKey: adapter.key,
+    providerRef: res.ref || null,
+    collectUrl: res.link || null,
+  }).where(eq(schema.trophyRedeems.id, r.id));
+
+  await notify(db, r.userId,
+    res.link ? "Your trophy payout is ready to collect" : "Your trophy payout is on its way",
+    res.link
+      ? `Open your trophy case to collect $${Number(r.amount).toLocaleString()} ${r.currency} — you choose how you want it: bank transfer, PayPal, a prepaid card or a gift card in your own currency.`
+      : `$${Number(r.amount).toLocaleString()} ${r.currency} is being sent by ${methodLabel(r.method).toLowerCase()}. We'll confirm when it lands.`,
+    "/profile");
+  revalidateTrophyPages();
+  return { ok: true, link: res.link ?? null };
 }
 
 export async function rejectRedeem(redeemId: string) {
@@ -146,25 +230,30 @@ export async function rejectRedeem(redeemId: string) {
   if (!r || (r.status !== "pending" && r.status !== "approved")) return;
   await db.update(schema.trophyRedeems).set({ status: "rejected", decidedAt: new Date() }).where(eq(schema.trophyRedeems.id, r.id));
   if (r.awardIds?.length) await db.update(schema.userTrophies).set({ status: "held" }).where(inArray(schema.userTrophies.id, r.awardIds));
-  await notify(db, r.userId, "Trophy redeem declined", "Your redeem request was declined — your trophies are back on your shelf. Contact support for details.", "/profile");
+  await notify(db, r.userId, "Trophy redeem declined", "Your redeem request was declined — your trophies are back on your shelf. Message support for details.", "/profile");
   revalidateTrophyPages();
 }
 
-// Admin uploads the payment confirmation → request is PAID and the trophies
-// leave the gamer's shelf (they stay visible in redeem history).
+/**
+ * Staff record that it landed.
+ *
+ * Used for a manual transfer, and as the override when a gamer has collected
+ * but never came back to say so. `proofUrl` is a receipt staff uploaded — an
+ * image of a bank confirmation, not an instrument.
+ */
 export async function markRedeemPaid(redeemId: string, formData: FormData) {
   await requireStaff();
   const db = await getDb();
   const proofUrl = String(formData.get("proofUrl") ?? "").trim();
   const [r] = await db.select().from(schema.trophyRedeems).where(eq(schema.trophyRedeems.id, redeemId)).limit(1);
-  if (!r || r.status !== "approved") return;
+  if (!r || (r.status !== "approved" && r.status !== "sent")) return;
   await db.update(schema.trophyRedeems)
     .set({ status: "paid", paidAt: new Date(), proofUrl: proofUrl || null })
     .where(eq(schema.trophyRedeems.id, r.id));
   if (r.awardIds?.length) await db.update(schema.userTrophies).set({ status: "redeemed" }).where(inArray(schema.userTrophies.id, r.awardIds));
   await notify(db, r.userId,
     "Trophy redeem paid",
-    `Your $${Number(r.amount).toLocaleString()} ${r.currency} payout was sent${proofUrl ? " — the payment confirmation is attached to the request" : ""}. The redeemed trophies moved to your history.`,
+    `Your $${Number(r.amount).toLocaleString()} ${r.currency} payout was sent${proofUrl ? " — the confirmation is attached to the request" : ""}. The redeemed trophies moved to your history.`,
     "/profile");
   revalidateTrophyPages();
 }

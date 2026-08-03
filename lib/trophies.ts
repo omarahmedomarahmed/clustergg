@@ -13,16 +13,21 @@ export type TrophyAward = {
 };
 
 export type RedeemView = {
-  id: string; awardIds: string[]; amount: number; currency: string; method: string;
-  last4: string; status: string; gamerConfirmedAt: string | null; proofUrl: string | null;
-  createdAt: string; decidedAt: string | null; paidAt: string | null;
+  id: string; awardIds: string[]; amount: number; currency: string;
+  /** A preference word — "bank", "paypal", "giftcard". Never an account. */
+  method: string;
+  status: string;
+  /**
+   * Where the gamer goes to collect it and choose how.
+   *
+   * Only ever sent to the gamer it belongs to. This replaced a form that asked
+   * for a routing number: the choice now happens on the payout provider's own
+   * page, which is why there is nothing here to mask and no `last4` any more.
+   */
+  collectUrl: string | null;
+  gamerConfirmedAt: string | null; proofUrl: string | null;
+  createdAt: string; decidedAt: string | null; sentAt: string | null; paidAt: string | null;
 };
-
-// The last digits of the payout destination (never expose the full number in UI).
-export function payoutLast4(details: Record<string, string> | null | undefined): string {
-  const v = details?.account || details?.mobile || "";
-  return v.length >= 4 ? v.slice(-4) : v;
-}
 
 // Everything on a gamer's trophy shelf, newest first. Includes redeemed ones —
 // callers filter by status (redeemed stays visible only in history views).
@@ -64,16 +69,17 @@ export async function getTrophyCase(db: DB, userId: string): Promise<TrophyAward
   });
 }
 
-// A gamer's redeem requests, newest first (details reduced to last-4).
+// A gamer's redeem requests, newest first.
 export async function getMyRedeems(db: DB, userId: string): Promise<RedeemView[]> {
   const rows = await db.select().from(schema.trophyRedeems)
     .where(eq(schema.trophyRedeems.userId, userId))
     .orderBy(desc(schema.trophyRedeems.createdAt)).limit(30);
   return rows.map((r) => ({
     id: r.id, awardIds: r.awardIds ?? [], amount: Number(r.amount), currency: r.currency, method: r.method,
-    last4: payoutLast4(r.details), status: r.status,
+    status: r.status, collectUrl: r.collectUrl,
     gamerConfirmedAt: r.gamerConfirmedAt?.toISOString() ?? null, proofUrl: r.proofUrl,
     createdAt: r.createdAt.toISOString(), decidedAt: r.decidedAt?.toISOString() ?? null,
+    sentAt: r.sentAt?.toISOString() ?? null,
     paidAt: r.paidAt?.toISOString() ?? null,
   }));
 }
