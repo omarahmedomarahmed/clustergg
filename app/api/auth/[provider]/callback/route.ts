@@ -10,7 +10,16 @@ import type { OAuthProfile } from "@/lib/oauth";
 export const dynamic = "force-dynamic";
 
 // Identity providers that also map to a stats game account we can link instantly.
-const GAME_LINK: Record<string, string> = { steam: "steam" };
+// Signing in with one of these ALSO proves a game account, because the game's
+// account id is derived from the identity that just authenticated rather than
+// being a separate credential.
+//
+//   steam    → the Steam account itself
+//   opendota → Dota 2, whose Friend ID is the low 32 bits of the SteamID64
+//
+// Both are stamped `openid`: OpenID authenticated the SteamID, and everything
+// here follows from it arithmetically.
+const GAME_LINK: Record<string, string[]> = { steam: ["steam", "opendota"] };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
@@ -54,35 +63,65 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
 
   const db = await getDb();
   const session = await getSession();
-  const gameProvider = GAME_LINK[provider];
+  const gameProviders = GAME_LINK[provider] ?? [];
 
-  // Ensure a Steam sign-in also links the Steam game account (+ first sync).
+  /**
+   * A Steam sign-in links AND proves every game account it implies.
+   *
+   * If a row already exists it is stamped rather than skipped — that is the
+   * whole point of the button on the profile. Somebody who typed their Dota
+   * Friend ID by hand last month presses "Verify with Steam", signs in, and the
+   * row they already have becomes proven. Skipping when a row exists (which is
+   * what this did) made that button sign you in, return you, and change
+   * nothing.
+   */
   const linkGameAccount = async (userId: string) => {
-    if (!gameProvider) return;
-    try {
-      const [have] = await db.select({ id: schema.linkedGameAccounts.id }).from(schema.linkedGameAccounts)
-        .where(and(eq(schema.linkedGameAccounts.userId, userId), eq(schema.linkedGameAccounts.provider, gameProvider), eq(schema.linkedGameAccounts.providerAccountId, profile.providerUserId))).limit(1);
-      if (have) return;
-      // Signing in with Steam PROVES the SteamID — OpenID is the strongest
-      // proof we have for Steam and Dota 2, whose Friend ID is derived from it.
-      // But it still cannot take an account another gamer already holds.
-      const { accountHeldByOther, transferClaim } = await import("@/lib/account-ownership");
-      const clash = await accountHeldByOther(db, gameProvider, profile.providerUserId, userId);
-      // A proven claim beats an unproven one: whoever merely typed this SteamID
-      // loses it to the person who just signed in with it.
-      if (clash?.proven) return;
-      if (clash) await transferClaim(db, clash.accountId);
-      const accId = uid();
-      await db.insert(schema.linkedGameAccounts).values({
-        id: accId, userId, provider: gameProvider, providerAccountId: profile.providerUserId,
-        inGameName: profile.username, verified: true, verifiedMethod: "openid",
-        verifiedAt: new Date(), syncStatus: "pending",
-      });
-      const [acc] = await db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.id, accId)).limit(1);
-      if (acc) { const { syncAccount } = await import("@/lib/sync"); await syncAccount(db, acc); }
-      const { awardQuestAction } = await import("@/lib/quests");
-      await awardQuestAction(db, userId, "connect_account", { refType: "account", refId: accId });
-    } catch { /* non-fatal — the game link can be retried from onboarding */ }
+    if (gameProviders.length === 0) return;
+    const { accountHeldByOther, transferClaim, dotaAccountIdFromSteamId } =
+      await import("@/lib/account-ownership");
+    const { syncAccount } = await import("@/lib/sync");
+    const { awardQuestAction } = await import("@/lib/quests");
+
+    for (const gameProvider of gameProviders) {
+      try {
+        // Dota's id is derived from the SteamID; everything else uses it as-is.
+        const accountId = gameProvider === "opendota"
+          ? dotaAccountIdFromSteamId(profile.providerUserId)
+          : profile.providerUserId;
+        if (!accountId) continue;
+
+        const proven = { verified: true, verifiedMethod: "openid", verifiedAt: new Date(), ownershipStatus: "ok" };
+
+        const [have] = await db.select({ id: schema.linkedGameAccounts.id })
+          .from(schema.linkedGameAccounts)
+          .where(and(
+            eq(schema.linkedGameAccounts.userId, userId),
+            eq(schema.linkedGameAccounts.provider, gameProvider),
+            eq(schema.linkedGameAccounts.providerAccountId, accountId),
+          )).limit(1);
+        if (have) {
+          await db.update(schema.linkedGameAccounts).set(proven)
+            .where(eq(schema.linkedGameAccounts.id, have.id));
+          continue;
+        }
+
+        // Proof beats a claim, so whoever merely typed this id loses it to the
+        // person who just signed in with it — but never beats another proof.
+        const clash = await accountHeldByOther(db, gameProvider, accountId, userId);
+        if (clash?.proven) continue;
+        if (clash) await transferClaim(db, clash.accountId);
+
+        const accId = uid();
+        await db.insert(schema.linkedGameAccounts).values({
+          id: accId, userId, provider: gameProvider, providerAccountId: accountId,
+          inGameName: profile.username, syncStatus: "pending", ...proven,
+        });
+        const [acc] = await db.select().from(schema.linkedGameAccounts)
+          .where(eq(schema.linkedGameAccounts.id, accId)).limit(1);
+        if (acc) await syncAccount(db, acc);
+        await awardQuestAction(db, userId, "connect_account", { refType: "account", refId: accId });
+      } catch { /* non-fatal — one game failing must not fail the sign-in */ }
+    }
   };
 
   /**

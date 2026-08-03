@@ -21,6 +21,8 @@ export type VerifyInfo = {
   proofKind: string;
   proofLabel: string;
   proofHow: string;
+  /** False when the proof is designed but not yet built end to end. */
+  proofWired?: boolean;
   /** A challenge already issued and still open. */
   pendingIconId?: number | null;
   disputed?: boolean;
@@ -60,12 +62,16 @@ export default function VerifyAccount({ info }: { info: VerifyInfo }) {
     );
   }
 
-  // Nothing to offer: saying "unverified" without a way to fix it is a dead end,
-  // so the reason is stated instead.
-  if (info.proofKind === "none") {
+  // Nothing to offer: saying "unverified" without a way to fix it is a dead
+  // end, so the reason is stated instead. A proof that exists on paper but not
+  // in code counts as nothing to offer — a button that signs you in and changes
+  // nothing is worse than no button.
+  if (info.proofKind === "none" || info.proofWired === false) {
     return (
       <span className="text-[11px] text-muted" title={info.proofHow}>
-        {info.gameName} has no ownership check
+        {info.proofKind === "none"
+          ? `${info.gameName} has no ownership check`
+          : `Ownership check for ${info.gameName} is coming`}
       </span>
     );
   }

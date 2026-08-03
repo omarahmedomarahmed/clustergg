@@ -135,6 +135,7 @@ export default async function OwnProfilePage() {
                       proofKind: proofFor(a.provider).kind,
                       proofLabel: proofFor(a.provider).label,
                       proofHow: proofFor(a.provider).how,
+                      proofWired: proofFor(a.provider).wired,
                       pendingIconId: ((a.proofChallenge ?? {}) as { iconId?: number }).iconId ?? null,
                       disputed: a.ownershipStatus === "disputed",
                     }} />

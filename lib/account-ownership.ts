@@ -43,7 +43,21 @@ export type ProofKind = "riot-icon" | "steam-openid" | "epic-oauth" | "vc" | "no
  * is better than implying a verification we can't perform. Ordered by the six
  * games that are live today.
  */
-export const OWNERSHIP_PROOF: Record<string, { kind: ProofKind; label: string; how: string }> = {
+export type ProofSpec = {
+  kind: ProofKind;
+  label: string;
+  how: string;
+  /**
+   * Is the whole path built, end to end?
+   *
+   * A declared proof with no wiring behind it is a button that signs someone
+   * in, returns them, and leaves the account exactly as unproven as before —
+   * worse than no button. The UI only offers a proof that can finish.
+   */
+  wired: boolean;
+};
+
+export const OWNERSHIP_PROOF: Record<string, ProofSpec> = {
   // League: set your in-game profile icon to the one we name, then press check.
   // Works on a DEVELOPMENT Riot key — summoner-v4 is not a production-gated
   // endpoint — which is what makes this the only Riot proof we can ship today.
@@ -51,6 +65,7 @@ export const OWNERSHIP_PROOF: Record<string, { kind: ProofKind; label: string; h
     kind: "riot-icon",
     label: "Profile icon check",
     how: "Change your League profile icon to the one we show, then press Verify. Change it back after.",
+    wired: true,
   },
   // VALORANT rides on it. Riot accounts share one PUUID across League and
   // VALORANT, so a PUUID proven through League is the same person in VALORANT.
@@ -60,6 +75,10 @@ export const OWNERSHIP_PROOF: Record<string, { kind: ProofKind; label: string; h
     kind: "riot-icon",
     label: "Riot account check",
     how: "Verify the same Riot account in League of Legends — VALORANT shares one Riot ID, so proving it once proves both.",
+    // VALORANT is identity-only today (VAL-* stats need Riot production
+    // approval), so there is no VALORANT row to stamp yet. The carry-over is
+    // built and tested; it starts working the day VALORANT becomes linkable.
+    wired: false,
   },
   // Dota: the Friend ID is derived from the SteamID, and Steam OpenID proves
   // the SteamID. Signing in with Steam is therefore proof of the Dota account.
@@ -67,30 +86,53 @@ export const OWNERSHIP_PROOF: Record<string, { kind: ProofKind; label: string; h
     kind: "steam-openid",
     label: "Sign in with Steam",
     how: "Sign in with Steam. Your Dota 2 Friend ID comes from your SteamID, so Steam proves it.",
+    wired: true,
   },
   steam: {
     kind: "steam-openid",
     label: "Sign in with Steam",
     how: "Sign in with Steam — that IS the account.",
+    wired: true,
   },
   // Fortnite: Epic's own OAuth returns the account id the stats are keyed to.
   fortnite: {
     kind: "epic-oauth",
     label: "Sign in with Epic",
     how: "Sign in with Epic Games. Your Epic account is the Fortnite account.",
+    // Epic OAuth exists and returns an account id, but Fortnite's stats API is
+    // keyed on the Epic DISPLAY NAME, not that id — so matching the signed-in
+    // Epic account to the linked Fortnite row is a step that is not built yet.
+    // Declared, not offered.
+    wired: false,
   },
   // Mobile Legends already had the strongest proof on the platform: a code
   // Moonton mails into the game, which only the account holder can read.
-  "mobile-legends": { kind: "vc", label: "In-game code", how: "Enter the code Moonton sends to your in-game mail." },
+  "mobile-legends": {
+    kind: "vc", label: "In-game code",
+    how: "Enter the code Moonton sends to your in-game mail.", wired: true,
+  },
   // No ownership check exists. The PUBG API keys on player name and TRN on the
   // EA name; neither exposes anything only the owner could produce. Saying
   // "verified" here would be a lie, so these stay claimed.
-  pubg: { kind: "none", label: "Not available", how: "PUBG's API has no ownership check. First claim holds the name." },
-  apex: { kind: "none", label: "Not available", how: "The Apex tracker API has no ownership check. First claim holds the name." },
+  pubg: { kind: "none", label: "Not available", how: "PUBG's API has no ownership check. First claim holds the name.", wired: false },
+  apex: { kind: "none", label: "Not available", how: "The Apex tracker API has no ownership check. First claim holds the name.", wired: false },
 };
 
-export function proofFor(providerId: string) {
-  return OWNERSHIP_PROOF[providerId] ?? { kind: "none" as ProofKind, label: "Not available", how: "This game has no ownership check yet." };
+export function proofFor(providerId: string): ProofSpec {
+  return OWNERSHIP_PROOF[providerId]
+    ?? { kind: "none", label: "Not available", how: "This game has no ownership check yet.", wired: false };
+}
+
+/**
+ * The SteamID64 → Dota 2 Friend ID conversion.
+ *
+ * Valve's account id is the low 32 bits of the SteamID64, which is why signing
+ * in with Steam proves a Dota account: the Friend ID is not a separate
+ * credential, it is derived from the SteamID that OpenID just authenticated.
+ */
+export function dotaAccountIdFromSteamId(steamId64: string): string | null {
+  if (!/^\d{17}$/.test(steamId64.trim())) return null;
+  try { return String(BigInt(steamId64.trim()) - 76561197960265728n); } catch { return null; }
 }
 
 /** The Riot account id a proven League link authorizes for VALORANT, and back. */
