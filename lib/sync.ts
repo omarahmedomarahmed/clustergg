@@ -90,8 +90,15 @@ export async function syncAccount(db: DB, account: Account): Promise<{ ok: boole
     }
   }
 
+  // NOTE: `verified` is deliberately NOT touched here.
+  //
+  // A successful sync proves the account exists and that we can read it. It
+  // says nothing about who owns it — and this line setting `verified: true` on
+  // every sync is what made the flag meaningless in the first place: any
+  // ownership state we recorded would be overwritten within thirty minutes by
+  // a cron. Ownership is proven once, in lib/account-ownership.ts, and stays.
   await db.update(schema.linkedGameAccounts)
-    .set({ syncStatus: "ok", syncError: null, verified: true, lastSyncedAt: new Date(), nextSyncAt: nextOk })
+    .set({ syncStatus: "ok", syncError: null, lastSyncedAt: new Date(), nextSyncAt: nextOk })
     .where(eq(schema.linkedGameAccounts.id, account.id));
 
   await scoreChallengesForAccount(db, account.id);

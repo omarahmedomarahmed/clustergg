@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { isProof } from "@/lib/account-ownership";
 import { cardMeta } from "@/lib/og";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { getProvider } from "@/lib/providers/registry";
@@ -184,7 +185,9 @@ export default async function ProfilePage({ params }: Props) {
       tag: a.inGameName,
       providerName: p?.name ?? a.provider,
       gameName: p?.game ?? "",
-      verified: a.verified,
+      // Proven, not merely readable — a tick that means "the API answered"
+      // is the exact claim this platform can't afford to make.
+      verified: a.verified && isProof(a.verifiedMethod),
       logoUrl: slimImg(resolveGame(games, p?.game ?? "")?.logoUrl ?? null, 300000),
       coverUrl: slimImg(resolveGame(games, p?.game ?? "")?.coverUrl ?? null, 400000),
       avatar: accountAvatar(a),
