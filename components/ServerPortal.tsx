@@ -262,7 +262,37 @@ export type EarningRowView = {
   membersWon: number;
 };
 
-export function EarningsPanel({ ownerPct, clusterPct, nextPct, nextAt, linked, earned, pending, membersWon, rows }: {
+export type PayoutView = {
+  id: string;
+  status: string;
+  total: number;
+  currency: string;
+  createdAt: string;
+  paidAt: string | null;
+  note: string | null;
+  lines: { id: string; label: string; amount: number }[];
+};
+
+/**
+ * The Earnings tab.
+ *
+ * Two earning types, shown as two separate things and never added together:
+ *
+ *   YOUR SHARE — the cut of what a brand paid, scaled by how many of your
+ *                members are linked. Yours. This is what gets paid out.
+ *
+ *   YOUR MEMBERS' WINNINGS — the prize money people in your server won. Not
+ *                yours, never was, and paid directly to them. It is here
+ *                because it is the best evidence you have that hosting the bot
+ *                did something for your community — and because an owner who
+ *                believes the prize pool is their revenue is going to find out
+ *                at the worst possible moment.
+ */
+export function EarningsPanel({
+  tierName, ownerPct, clusterPct, nextPct, nextAt, linked, earned, pending, membersWon, rows,
+  paidOut, inFlight, payouts, payoutMethod, payoutStatus,
+}: {
+  tierName: string;
   ownerPct: number;
   clusterPct: number;
   nextPct: number | null;
@@ -272,33 +302,131 @@ export function EarningsPanel({ ownerPct, clusterPct, nextPct, nextAt, linked, e
   pending: number;
   membersWon: number;
   rows: EarningRowView[];
+  paidOut: number;
+  inFlight: number;
+  payouts: PayoutView[];
+  payoutMethod: string | null;
+  payoutStatus: string;
 }) {
   const usd = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: n % 1 ? 2 : 0, maximumFractionDigits: 2 })}`;
+  const awaiting = Math.max(0, Math.round((earned - paidOut - inFlight) * 100) / 100);
+
   return (
     <div className="space-y-6">
+      {/* The tier, stated first. An owner opening this tab is asking "what am I
+          worth", and the tier IS the answer — the percentage follows from it. */}
       <div className="glass p-6">
-        <h2 className="font-bold mb-1">What you earn</h2>
-        <p className="text-sm text-muted">
-          A brand pays for a sponsored challenge. <b className="text-ink">70%</b> of it becomes prize money your
-          members play for. The remaining 30% is split between you and Cluster — and the more gamers you bring,
-          the more of it is yours.
-        </p>
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Money label="Your share" value={`${ownerPct}%`} accent />
-          <Money label="Cluster keeps" value={`${clusterPct}%`} />
-          <Money label="Earned" value={usd(earned)} accent />
-          <Money label="Still running" value={usd(pending)} />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-muted">Your tier</div>
+            <div className="flex items-center gap-2 text-xl font-black">
+              <Icon name="crown" size={20} className="text-amber-300" /> {tierName}
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[10px] uppercase tracking-widest text-muted">Your share of every sponsored challenge</div>
+            <div className="text-xl font-black text-emerald-300">{ownerPct}% <span className="text-xs font-bold text-muted">/ {clusterPct}% Cluster</span></div>
+          </div>
         </div>
         {nextPct != null && nextAt != null && (
           <p className="mt-3 text-xs text-amber-200">
             {(nextAt - linked).toLocaleString()} more linked gamers takes your share from {ownerPct}% to {nextPct}%.
           </p>
         )}
-        <p className="mt-3 text-[11px] leading-snug text-muted">
+      </div>
+
+      {/* The two types. */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="glass border border-emerald-400/25 p-5">
+          <div className="flex items-center gap-2 text-sm font-bold text-emerald-200">
+            <Icon name="diamond" size={15} /> Sponsored challenge share
+          </div>
+          <div className="mt-1 text-3xl font-black text-emerald-300 tabular-nums">{usd(earned)}</div>
+          <p className="mt-1.5 text-xs text-muted">
+            Your cut of what brands paid, scaled by how many of a challenge&apos;s entrants came from your
+            server. <b className="text-ink">This is yours</b> and it is what gets paid out.
+          </p>
+          <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+            <Money label="Paid to you" value={usd(paidOut)} />
+            <Money label="In flight" value={usd(inFlight)} />
+            <Money label="Awaiting payout" value={usd(awaiting)} accent />
+          </div>
+          {pending > 0 && (
+            <p className="mt-2 text-[11px] text-amber-200">
+              {usd(pending)} more is still running and isn&apos;t payable until those challenges finish.
+            </p>
+          )}
+        </div>
+
+        <div className="glass border border-violet-400/25 p-5">
+          <div className="flex items-center gap-2 text-sm font-bold text-violet-200">
+            <Icon name="trophy" size={15} /> Your members&apos; winnings
+          </div>
+          <div className="mt-1 text-3xl font-black text-violet-300 tabular-nums">{usd(membersWon)}</div>
+          <p className="mt-1.5 text-xs text-muted">
+            Prize money won by people in your server. Every cent of it goes straight to the gamer who won it —
+            <b className="text-ink"> it is not paid to you and never will be</b>. It&apos;s here because it is
+            the clearest proof of what running the bot did for your community.
+          </p>
+        </div>
+      </div>
+
+      {/* How you get paid. Nothing on this panel is a bank detail — see
+          lib/payouts.ts for why there is nowhere for one to be entered. */}
+      <div className="glass p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold">How you get paid</h3>
+            <p className="mt-0.5 text-xs text-muted">
+              {payoutMethod
+                ? <>You&apos;ve told us you prefer <b className="text-ink">{payoutMethod}</b>.</>
+                : <>You haven&apos;t told us how you&apos;d like to be paid yet.</>}
+              {" "}Cluster never stores your bank details — they live with our payout provider, on their page.
+            </p>
+          </div>
+          <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-widest ${
+            payoutStatus === "ready" ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-200"
+              : payoutStatus === "pending" ? "border-amber-400/40 bg-amber-500/10 text-amber-200"
+                : "border-white/15 text-muted"}`}>
+            {payoutStatus === "ready" ? "ready to pay" : payoutStatus === "pending" ? "finishing setup" : "not set up"}
+          </span>
+        </div>
+
+        {payouts.length > 0 && (
+          <div className="mt-4 space-y-2">
+            <div className="text-[10px] uppercase tracking-widest text-muted">Payout history</div>
+            {payouts.map((p) => (
+              <details key={p.id} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                <summary className="flex cursor-pointer flex-wrap items-center gap-2 text-sm">
+                  <b className="tabular-nums text-emerald-300">{usd(p.total)} {p.currency}</b>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                    p.status === "paid" ? "bg-emerald-500/15 text-emerald-300"
+                      : p.status === "failed" || p.status === "cancelled" ? "bg-rose-500/15 text-rose-300"
+                        : "bg-amber-500/15 text-amber-300"}`}>{p.status}</span>
+                  <span className="ml-auto text-[11px] text-muted">
+                    {new Date(p.paidAt ?? p.createdAt).toLocaleDateString()}
+                  </span>
+                </summary>
+                <div className="mt-2 space-y-1 border-t border-white/5 pt-2 text-xs">
+                  {p.lines.map((l) => (
+                    <div key={l.id} className="flex items-start justify-between gap-3">
+                      <span className={l.amount < 0 ? "text-emerald-200" : "text-muted"}>{l.label}</span>
+                      <span className="shrink-0 tabular-nums font-semibold">{usd(l.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="glass p-6">
+        <h2 className="font-bold mb-1">The ledger</h2>
+        <p className="text-sm text-muted">
           A challenge runs in more than one server, so its fee is divided by where the entrants came from: your
-          share of a challenge is your share of its players. Every row below shows that division.
-          Your members have also won <b className="text-ink">{usd(membersWon)}</b> in prize money, which is
-          theirs, not yours.
+          share of a challenge is your share of its players. Every row shows that division, so you can check
+          the total rather than take it on trust.
         </p>
       </div>
 

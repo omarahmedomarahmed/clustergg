@@ -172,6 +172,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/leaderboards", label: "Leaderboards", desc: "Every board on every game — a game can run several.", metric: "leaderboards" , system: "challenges" },
       { href: "/admin/trophies", label: "Trophies", desc: "The prize catalogue and what each is worth.", metric: "trophies" , system: "trophies" },
       { href: "/admin/redeems", label: "Trophy redemptions", desc: "Winners cashing in. Pay out or reject.", metric: "redeems", queue: true , system: "trophies" },
+      { href: "/admin/marketplace", label: "Marketplace", desc: "Trophies bought with Cluster Points — the shelf, the ledger and what we owe.", system: "trophies" },
     ],
   },
   {
@@ -191,7 +192,9 @@ export const ADMIN_NAV: AdminGroup[] = [
     area: "ads",
     blurb: "Offline sales, run through the platform.",
     items: [
-      { href: "/admin/billing", label: "Billing & revenue", desc: "What came in, what we owe gamers and servers, and what's left." , system: "billing" },
+      { href: "/admin/billing", label: "Billing & revenue", desc: "Brand invoices, what came in, what we owe gamers and servers, and what's left." , system: "billing" },
+      { href: "/admin/payouts", label: "Payouts", desc: "What server owners earned, and releasing it to them." , system: "billing" },
+      { href: "/admin/payments", label: "Payment providers", desc: "Who collects from brands and who pays owners and gamers.", area: "settings" },
       { href: "/admin/brand-enquiries", label: "Enquiries", desc: "Brands who asked to buy, with the plan they configured.", metric: "brandEnquiries" , system: "billing" },
       { href: "/admin/brands", label: "Brands", desc: "Advertisers and their portals.", metric: "brands" , system: "billing" },
       { href: "/admin/creatives", label: "Creatives", desc: "The artwork that runs.", metric: "creatives" , system: "ad" },

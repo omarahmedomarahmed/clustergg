@@ -258,6 +258,7 @@ async function moreScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       navButton("Planets", frame("planets"), t, ButtonStyle.Primary, "🪐"),
       navButton("Challenges", frame("challenges"), t, ButtonStyle.Success, "🏆"),
       navButton("Profile of the Week", frame("week"), t, ButtonStyle.Success, "👑"),
+      navButton("Trophy marketplace", frame("market"), t, ButtonStyle.Secondary, "🏆"),
       navButton("Quests", frame("quests"), t, ButtonStyle.Secondary, "🗺"),
       navButton("Leaderboards", frame("leaderboard", ""), t, ButtonStyle.Secondary, "📊"),
       navButton("How it works", frame("guide", "getting-started"), t, ButtonStyle.Secondary, "📖"),
@@ -265,6 +266,51 @@ async function moreScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       navButton("Commands", frame("help"), t, ButtonStyle.Secondary, "❓"),
       ...tail(ctx, here, trail),
       linkButton("Open Cluster", siteUrl(), "🔗"),
+    ]),
+  };
+}
+
+/**
+ * The trophy marketplace, in Discord.
+ *
+ * The SHELF is shown here — balance, the closest trophies, what they redeem
+ * for — but the purchase itself happens on the website, deliberately. Spending
+ * something that converts to real money should happen where the gamer is signed
+ * in and can see what they are getting, which is the same reason voting links
+ * out rather than resolving in a button.
+ */
+async function marketScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const here = frame("market");
+  const t = [here, ...trail];
+  const site = siteUrl();
+
+  const { marketCard } = await import("@/lib/cards/data");
+  const data = await marketCard({ userId: ctx.gamer?.userId ?? null });
+  const { url } = await cardRef("market", { gamer: ctx.gamer?.userId ?? "" });
+  const six = (data && data.kind === "market" ? data.trophies : []).slice(0, 6);
+
+  // A button per trophy, numbered to match the tile it sits under — the card
+  // is a picture, so the only thing tying a button to a trophy is the number
+  // printed on both.
+  const buys = six.map((x, i) => button(
+    `${i + 1} · ${x.cpPrice.toLocaleString()} CP`,
+    actionId("buy", [x.id], t),
+    x.affordable ? ButtonStyle.Success : ButtonStyle.Secondary,
+  ));
+
+  return {
+    embeds: [embed(url, {
+      title: "Trophy marketplace",
+      description: ctx.gamer
+        ? undefined
+        : "Continue with Discord and your balance is waiting — points are earned free, just by playing.",
+      color: "#fbbf24",
+    })],
+    components: rows([
+      ...buys,
+      ctx.gamer ? null : linkButton("Continue with Discord", signInUrl(site, "/marketplace"), "🔗"),
+      linkButton("Open the marketplace", `${site}/marketplace`, "🏆"),
+      ...tail(ctx, here, trail),
     ]),
   };
 }
@@ -1526,6 +1572,7 @@ async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promi
   switch (f.screen) {
     case "home": return homeScreen(ctx, trail);
     case "more": return moreScreen(ctx, trail);
+    case "market": return marketScreen(ctx, trail);
     case "help": return helpScreen(ctx, trail);
     case "show": return showScreen(a, ctx, trail);
     case "gamer": return otherGamerScreen(a, f.args[1] ?? "", ctx, trail);
@@ -1633,6 +1680,16 @@ export async function screenForCommand(query: string): Promise<Frame> {
     case "trophy":
     case "trophies":
       return frame("show", "profile");
+
+    // …but the SHOP is its own thing, and the words people type for it are the
+    // words for shopping, not for trophies.
+    case "market":
+    case "marketplace":
+    case "shop":
+    case "store":
+    case "buy":
+    case "spend":
+      return frame("market");
 
     // One admin command. `/cluster show:server` used to be a sibling that showed
     // half the picture; it is a button inside admin now.

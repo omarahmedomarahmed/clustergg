@@ -201,6 +201,14 @@ export default async function Nav() {
                   <Icon name="search" size={18} />
                 </Link>
               )}
+              {/* The marketplace, beside search and messages.
+                  CP is only worth playing for if the place it spends is one
+                  click from anywhere — burying it under the profile menu would
+                  make it a feature nobody found. */}
+              <Link href="/marketplace" title="Trophy marketplace"
+                className="text-muted hover:text-amber-200 hidden sm:inline-flex">
+                <Icon name="trophy" size={18} />
+              </Link>
               {show("brandsLink") && <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>}
               {show("serversLink") && <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>}
               {show("alerts") && <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />}
@@ -229,6 +237,14 @@ export default async function Nav() {
                   <Icon name="search" size={18} />
                 </Link>
               )}
+              {/* The marketplace, beside search and messages.
+                  CP is only worth playing for if the place it spends is one
+                  click from anywhere — burying it under the profile menu would
+                  make it a feature nobody found. */}
+              <Link href="/marketplace" title="Trophy marketplace"
+                className="text-muted hover:text-amber-200 hidden sm:inline-flex">
+                <Icon name="trophy" size={18} />
+              </Link>
               {show("brandsLink") && <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>}
               {show("serversLink") && <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>}
               {show("loginLink") && <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>}
@@ -267,7 +283,7 @@ export default async function Nav() {
           default and covered Mission Control with a fixed panel that swallowed
           every click underneath it — the card studio was unusable. Admin is a
           workspace, not somewhere anyone votes. */}
-      {show("weekBand") && <WeekBand initial={bandData} />}
+      {show("weekBand") && <WeekBand initial={bandData} bgUrl={navBg ? optImg(navBg, 1200) ?? "" : ""} />}
     </header>
     </>
   );

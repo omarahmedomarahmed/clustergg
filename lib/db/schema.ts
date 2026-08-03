@@ -38,7 +38,16 @@ export const users = pgTable("users", {
   profileViews: integer("profile_views").notNull().default(0), // public view counter (brag number)
   discordViews: integer("discord_views").notNull().default(0), // views that came from someone showing this profile in Discord
   voteCount: integer("vote_count").notNull().default(0),       // Best Profile votes, denormalized for cheap sorting
-  payoutMethod: jsonb("payout_method").$type<{ currency: string; method: string; details: Record<string, string> }>(), // saved trophy-redeem payout method
+  /**
+   * A PREFERENCE, not an instrument: {currency: "USD", method: "bank"}.
+   *
+   * This column used to carry a `details` object holding routing and account
+   * numbers. It doesn't any more, and the migration in lib/db/index.ts strips
+   * that key from every existing row — see the comment there. Where the money
+   * actually goes is decided by the gamer on the payout provider's own page,
+   * which is the only place it is ever typed.
+   */
+  payoutMethod: jsonb("payout_method").$type<{ currency: string; method: string }>(),
   payoutChanges: integer("payout_changes").notNull().default(0), // method edits used (locks at 3)
   profileVisibility: text("profile_visibility").notNull().default("public"), // public | followers | private
   allowMessagesFrom: text("allow_messages_from").notNull().default("everyone"), // everyone | following | nobody
@@ -73,7 +82,29 @@ export const linkedGameAccounts = pgTable("linked_game_accounts", {
   providerAccountId: text("provider_account_id").notNull(),
   inGameName: text("in_game_name").notNull(),
   region: text("region"),
+  /**
+   * Ownership is PROVEN, not merely asserted.
+   *
+   * This used to be set true whenever the provider's API answered — which only
+   * ever proved the account exists. Anyone could type "Faker#KR1" and wear it.
+   * It now means what it says, and `verifiedMethod` says how we know.
+   */
   verified: boolean("verified").notNull().default(false),
+  /** claimed | exists | icon | oauth | openid | vc | admin — see lib/account-ownership.ts */
+  verifiedMethod: text("verified_method").notNull().default("claimed"),
+  verifiedAt: timestamp("verified_at", { withTimezone: true, mode: "date" }),
+  /**
+   * An open ownership challenge: what the gamer has to do to prove it, and
+   * until when. Null once proven (or when the game has no proof available).
+   */
+  proofChallenge: jsonb("proof_challenge").$type<Record<string, unknown>>(),
+  proofExpiresAt: timestamp("proof_expires_at", { withTimezone: true, mode: "date" }),
+  /**
+   * ok | disputed. Set when two gamers already held the same account before
+   * uniqueness was enforced. Nothing is deleted — a season of prize-money
+   * history is not something to silently discard — so staff resolve it.
+   */
+  ownershipStatus: text("ownership_status").notNull().default("ok"),
   syncStatus: text("sync_status").notNull().default("pending"), // pending | ok | rate_limited | error | revoked | needs_key
   syncError: text("sync_error"),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true, mode: "date" }),
@@ -581,7 +612,45 @@ export const trophies = pgTable("trophies", {
    * competition would put the wrong logo on somebody's profile forever.
    */
   brandId: text("brand_id").references(() => brands.id, { onDelete: "set null" }),
+  /**
+   * What it costs in Cluster Points, and whether the marketplace lists it.
+   *
+   * 0 means "let the model price it" — see lib/marketplace.ts. A price set here
+   * is an explicit admin override and always wins.
+   */
+  cpPrice: integer("cp_price").notNull().default(0),
+  inMarketplace: boolean("in_marketplace").notNull().default(true),
 });
+
+/**
+ * A trophy bought with Cluster Points, for yourself or as a gift.
+ *
+ * The ledger is the point. CP is earned free, so the only thing standing
+ * between a gamer and an unlimited pile of redeemable trophies is that every
+ * purchase is written down and subtracted from a balance — and this table IS
+ * that subtraction. `lib/marketplace.ts` computes balance as earned minus the
+ * sum of this table, which is also why buying never costs a gamer a level:
+ * quest progress is untouched, and levels read progress, not balance.
+ */
+export const marketplaceOrders = pgTable("marketplace_orders", {
+  id: id(),
+  buyerId: text("buyer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Who ends up owning it — the buyer, or whoever they gifted it to. */
+  recipientId: text("recipient_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  trophyId: text("trophy_id").notNull().references(() => trophies.id, { onDelete: "restrict" }),
+  /** The award row this created, so a refund can find it. */
+  awardId: text("award_id"),
+  cpSpent: integer("cp_spent").notNull(),
+  /** The trophy's cash value at purchase time — what it redeems for later. */
+  value: doublePrecision("value").notNull().default(0),
+  kind: text("kind").notNull().default("self"), // self | gift
+  message: text("message"),
+  status: text("status").notNull().default("complete"), // complete | refunded
+  createdAt: now("created_at"),
+}, (t) => [
+  index("mo_buyer_idx").on(t.buyerId, t.createdAt),
+  index("mo_recipient_idx").on(t.recipientId),
+]);
 
 // A trophy AWARDED to a gamer (challenge podium win). Lives on their profile
 // until redeemed; "pending" = locked inside an open redeem request.
@@ -595,21 +664,43 @@ export const userTrophies = pgTable("user_trophies", {
   awardedAt: timestamp("awarded_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// A gamer's request to cash out one or more trophy awards. pending → approved
-// (admin) → paid (admin uploads payment proof; awards become redeemed).
+/**
+ * A gamer's request to cash out trophies.
+ *
+ * pending → approved (staff) → sent (the provider issues a collection link) →
+ * paid (the gamer collected it, or staff recorded a manual transfer).
+ *
+ * `details` is dead. It used to hold the routing and account numbers a gamer
+ * typed into our form; the migration nulls it on every row and nothing writes
+ * it again. The column stays only so a deploy that rolls back does not error on
+ * a missing NOT NULL column — it is empty, and it is meant to be.
+ *
+ * What replaced it: `method` is a preference word, and `collectUrl` is a link
+ * to the provider's page where the gamer picks a gift card, a bank transfer or
+ * PayPal for themselves. We never learn which.
+ */
 export const trophyRedeems = pgTable("trophy_redeems", {
   id: id(),
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   awardIds: jsonb("award_ids").$type<string[]>().notNull().default([]),
   amount: doublePrecision("amount").notNull().default(0),
-  currency: text("currency").notNull().default("USD"),  // USD | EGP
-  method: text("method").notNull().default("ach"),      // ach | wallet | instapay
+  currency: text("currency").notNull().default("USD"),
+  /** bank | paypal | wallet | giftcard | other — a word, never an account. */
+  method: text("method").notNull().default("bank"),
+  /** Deprecated and permanently empty. See the comment above. */
   details: jsonb("details").$type<Record<string, string>>().notNull().default({}),
-  status: text("status").notNull().default("pending"),  // pending | approved | paid | rejected | cancelled
+  /** pending | approved | sent | paid | rejected | cancelled */
+  status: text("status").notNull().default("pending"),
+  /** Which provider was used, and its id for this payment. */
+  providerKey: text("provider_key"),
+  providerRef: text("provider_ref"),
+  /** Where the gamer goes to choose how they want the money. Shown only to them. */
+  collectUrl: text("collect_url"),
   gamerConfirmedAt: timestamp("gamer_confirmed_at", { withTimezone: true }),
-  proofUrl: text("proof_url"),                          // admin-uploaded payment confirmation
+  proofUrl: text("proof_url"),                          // staff-recorded confirmation, for manual sends
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   decidedAt: timestamp("decided_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
   paidAt: timestamp("paid_at", { withTimezone: true }),
 });
 
@@ -1295,6 +1386,158 @@ export const portalLoginAttempts = pgTable("portal_login_attempts", {
   userAgent: text("user_agent"),
   createdAt: now("created_at"),
 }, (t) => [index("pla_portal_idx").on(t.kind, t.portalId, t.createdAt)]);
+
+// ===== Money =====
+//
+// Three flows, three sets of tables, one rule that governs all of them:
+// **nothing in here is a payment detail.** No card, no IBAN, no wallet address,
+// no routing number. What is stored is a preference ("pay me by bank transfer")
+// and an opaque handle a provider gave us. Everything that could be used to
+// move money lives with the provider, behind their login, on their page.
+//
+// That is not caution for its own sake. A gaming platform holding the bank
+// details of a few thousand teenagers is a breach waiting to be somebody's
+// worst year, and the only version of this feature worth shipping is the one
+// where there is nothing to steal.
+
+/**
+ * How a counterparty prefers to be paid — and, when a provider is connected,
+ * their id on that provider's system.
+ *
+ * `providerRecipientId` is the whole point: an opaque string from Trolley or
+ * Tremendous that means "the bank details you already hold for this person".
+ * We can pay them with it and can learn nothing from it.
+ */
+export const payoutAccounts = pgTable("payout_accounts", {
+  id: id(),
+  /** "server" (a guild id) | "gamer" (a user id). */
+  ownerType: text("owner_type").notNull(),
+  ownerId: text("owner_id").notNull(),
+  /** Which provider holds their details. */
+  providerKey: text("provider_key").notNull().default("manual"),
+  providerRecipientId: text("provider_recipient_id"),
+  /**
+   * A word, not an account. "bank" | "paypal" | "wallet" | "giftcard" | "other".
+   * Shown so staff know what to expect and the recipient knows what they chose;
+   * useless to anybody who reads it.
+   */
+  methodPreference: text("method_preference"),
+  /** ISO-3166 alpha-2. Decides which methods a provider will offer, nothing else. */
+  country: text("country"),
+  currency: text("currency").notNull().default("USD"),
+  /** none | pending | ready | blocked */
+  status: text("status").notNull().default("none"),
+  /** Free text from staff — why it's blocked, what's missing. Never details. */
+  note: text("note"),
+  updatedAt: now("updated_at"),
+}, (t) => [uniqueIndex("payout_acct_owner_idx").on(t.ownerType, t.ownerId)]);
+
+/**
+ * What a brand owes.
+ *
+ * The totals are NOT stored. An invoice's total is the sum of its lines, always
+ * recomputed, because an invoice whose stored total disagrees with its own line
+ * items is the single worst bug this table could have — and it is the one that
+ * happens the first time somebody edits a line and forgets to re-save the head.
+ */
+export const brandInvoices = pgTable("brand_invoices", {
+  id: id(),
+  brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  /** Human-facing, sequential, never reused: CGG-0007. */
+  number: text("number").notNull(),
+  /** draft | sent | paid | void */
+  status: text("status").notNull().default("draft"),
+  currency: text("currency").notNull().default("USD"),
+  /** The month this bills for, as a date staff can read. */
+  periodLabel: text("period_label"),
+  issuedAt: timestamp("issued_at", { withTimezone: true, mode: "date" }),
+  dueAt: timestamp("due_at", { withTimezone: true, mode: "date" }),
+  paidAt: timestamp("paid_at", { withTimezone: true, mode: "date" }),
+  /** Shown on the invoice, editable. Terms, PO number, anything. */
+  notes: text("notes"),
+  /**
+   * Where the brand pays. Either minted by a provider adapter or pasted in by
+   * staff from Payoneer, Wise, a bank — the invoice does not care which.
+   */
+  payLinkUrl: text("pay_link_url"),
+  payProvider: text("pay_provider"),
+  payRef: text("pay_ref"),
+  /** Whether that link is safe to iframe. Hosted checkouts usually are not. */
+  payEmbeddable: boolean("pay_embeddable").notNull().default(false),
+  /** How it was actually settled, recorded by staff. A note, not an instrument. */
+  paidVia: text("paid_via"),
+  paidRef: text("paid_ref"),
+  /** The unguessable token in /pay/<token>. Rotatable; never the invoice id. */
+  payToken: text("pay_token"),
+  createdAt: now("created_at"),
+}, (t) => [
+  uniqueIndex("brand_invoice_number_idx").on(t.number),
+  index("brand_invoice_brand_idx").on(t.brandId, t.createdAt),
+]);
+
+/**
+ * One line on an invoice. Every field is editable by an admin, including the
+ * label and the amount, because the alternative is sales negotiating a number
+ * the software refuses to print.
+ *
+ * A discount is a line with a negative amount rather than a separate concept:
+ * one list that sums to the total is an invoice a brand can check, and two
+ * lists that have to be reconciled is a dispute.
+ */
+export const invoiceLines = pgTable("invoice_lines", {
+  id: id(),
+  invoiceId: text("invoice_id").notNull().references(() => brandInvoices.id, { onDelete: "cascade" }),
+  /** base | game | challenge | addon | discount | credit | adjustment */
+  kind: text("kind").notNull().default("adjustment"),
+  label: text("label").notNull(),
+  quantity: doublePrecision("quantity").notNull().default(1),
+  unitAmount: doublePrecision("unit_amount").notNull().default(0),
+  /** What generated it, when something did — a campaign, a challenge. */
+  sourceType: text("source_type"),
+  sourceId: text("source_id"),
+  sortOrder: integer("sort_order").notNull().default(0),
+}, (t) => [index("invoice_line_inv_idx").on(t.invoiceId, t.sortOrder)]);
+
+/**
+ * A payment to a server owner.
+ *
+ * Always initiated by an admin — an owner cannot press a button and make money
+ * leave. They can see what they are owed and ask about it; the release is ours.
+ */
+export const serverPayouts = pgTable("server_payouts", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  /** Denormalised so a server that removes the bot keeps a readable payout history. */
+  guildName: text("guild_name"),
+  /** draft | requested | approved | processing | paid | failed | cancelled */
+  status: text("status").notNull().default("draft"),
+  currency: text("currency").notNull().default("USD"),
+  periodStart: timestamp("period_start", { withTimezone: true, mode: "date" }),
+  periodEnd: timestamp("period_end", { withTimezone: true, mode: "date" }),
+  /** Which provider sent it, and its id over there. */
+  providerKey: text("provider_key"),
+  providerRef: text("provider_ref"),
+  /** Set when the recipient has to open something to collect it. */
+  collectUrl: text("collect_url"),
+  note: text("note"),
+  /** Who released it. Payouts are never anonymous. */
+  requestedBy: text("requested_by"),
+  requestedAt: timestamp("requested_at", { withTimezone: true, mode: "date" }),
+  paidAt: timestamp("paid_at", { withTimezone: true, mode: "date" }),
+  failedReason: text("failed_reason"),
+  createdAt: now("created_at"),
+}, (t) => [index("server_payout_guild_idx").on(t.guildId, t.createdAt)]);
+
+/** What a payout is made of, so an owner can check it line by line. */
+export const serverPayoutLines = pgTable("server_payout_lines", {
+  id: id(),
+  payoutId: text("payout_id").notNull().references(() => serverPayouts.id, { onDelete: "cascade" }),
+  /** sponsored_share | bonus | adjustment */
+  kind: text("kind").notNull().default("sponsored_share"),
+  label: text("label").notNull(),
+  challengeId: text("challenge_id"),
+  amount: doublePrecision("amount").notNull().default(0),
+}, (t) => [index("server_payout_line_idx").on(t.payoutId)]);
 
 export const publicUserColumns = {
   id: users.id,

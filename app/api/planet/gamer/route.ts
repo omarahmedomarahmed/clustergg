@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { isProof } from "@/lib/account-ownership";
 import { PROVIDERS } from "@/lib/providers/registry";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +62,7 @@ export async function GET(req: Request) {
       inGameName: schema.linkedGameAccounts.inGameName,
       region: schema.linkedGameAccounts.region,
       verified: schema.linkedGameAccounts.verified,
+      verifiedMethod: schema.linkedGameAccounts.verifiedMethod,
       lastSyncedAt: schema.linkedGameAccounts.lastSyncedAt,
     }).from(schema.linkedGameAccounts)
       .where(and(
@@ -96,7 +98,8 @@ export async function GET(req: Request) {
         provider: a.provider,
         inGameName: a.inGameName,
         region: a.region,
-        verified: a.verified,
+        // A tick on a public planet card means ownership was proven.
+        verified: a.verified && isProof(a.verifiedMethod),
         syncedAt: a.lastSyncedAt?.toISOString() ?? null,
         stats: (byAccount.get(a.id) ?? []).map((s) => ({ ...s, display: num(s.value) })),
       })),

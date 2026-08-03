@@ -1,11 +1,10 @@
 import Link from "next/link";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import ChallengeBuilder from "@/components/ChallengeBuilder";
 import Icon from "@/components/Icon";
 import { timeAgo } from "@/lib/utils";
-import { builderContext } from "@/lib/challenge-builder-data";
+import { builderContext, builderProviders } from "@/lib/challenge-builder-data";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Challenges" };
@@ -19,12 +18,7 @@ export default async function AdminChallengesPage() {
     builderContext(),
   ]);
 
-  const builderProviders = PROVIDERS
-    .filter((p) => !p.identityOnly && p.capabilities.length > 0)
-    .map((p) => ({
-      id: p.id, name: p.name, game: p.game, live: isProviderLive(p), authType: p.authType, docsUrl: p.docsUrl,
-      capabilities: p.capabilities.map((c) => ({ key: c.key, label: c.label, unit: c.unit, higherIsBetter: c.higherIsBetter })),
-    }));
+  const providers = builderProviders();
 
   return (
     <div>
@@ -42,7 +36,7 @@ export default async function AdminChallengesPage() {
         </summary>
         <div className="mt-4 border-t border-violet-400/15 pt-4">
           <ChallengeBuilder
-            providers={builderProviders}
+            providers={providers}
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
             trophies={ctx.trophies}
             quests={quests}

@@ -238,7 +238,9 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     const id = uid();
     await db.insert(schema.linkedGameAccounts).values({
       id, userId, provider, providerAccountId, inGameName,
-      verified: true, syncStatus: "pending", nextSyncAt: new Date(0),
+      // Same rule a real link follows: seeding proves the row exists, not that
+      // anyone owns it. See lib/account-ownership.ts.
+      verified: false, verifiedMethod: "exists", syncStatus: "pending", nextSyncAt: new Date(0),
     });
     return id;
   };

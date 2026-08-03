@@ -52,6 +52,7 @@ export default function UserMenu({
             {/* Close per-link (not on the wrapper) so clicking Sign out does not
                 unmount the logout <form> before the server action submits. */}
             <Link href="/profile" onClick={() => setOpen(false)} className={item}><Icon name="edit" size={16} className="text-violet-300" /> Customize profile</Link>
+            <Link href="/marketplace" onClick={() => setOpen(false)} className={item}><Icon name="trophy" size={16} className="text-amber-300" /> Trophy marketplace</Link>
             <Link href="/settings/account" onClick={() => setOpen(false)} className={item}><Icon name="settings" size={16} className="text-violet-300" /> Settings</Link>
             {canAdmin && (
               <Link href="/admin" onClick={() => setOpen(false)} className={`${item} !text-amber-300 hover:!text-amber-200`}>

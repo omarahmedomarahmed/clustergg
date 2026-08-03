@@ -10,7 +10,16 @@ import type { OAuthProfile } from "@/lib/oauth";
 export const dynamic = "force-dynamic";
 
 // Identity providers that also map to a stats game account we can link instantly.
-const GAME_LINK: Record<string, string> = { steam: "steam" };
+// Signing in with one of these ALSO proves a game account, because the game's
+// account id is derived from the identity that just authenticated rather than
+// being a separate credential.
+//
+//   steam    → the Steam account itself
+//   opendota → Dota 2, whose Friend ID is the low 32 bits of the SteamID64
+//
+// Both are stamped `openid`: OpenID authenticated the SteamID, and everything
+// here follows from it arithmetically.
+const GAME_LINK: Record<string, string[]> = { steam: ["steam", "opendota"] };
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
@@ -54,25 +63,65 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
 
   const db = await getDb();
   const session = await getSession();
-  const gameProvider = GAME_LINK[provider];
+  const gameProviders = GAME_LINK[provider] ?? [];
 
-  // Ensure a Steam sign-in also links the Steam game account (+ first sync).
+  /**
+   * A Steam sign-in links AND proves every game account it implies.
+   *
+   * If a row already exists it is stamped rather than skipped — that is the
+   * whole point of the button on the profile. Somebody who typed their Dota
+   * Friend ID by hand last month presses "Verify with Steam", signs in, and the
+   * row they already have becomes proven. Skipping when a row exists (which is
+   * what this did) made that button sign you in, return you, and change
+   * nothing.
+   */
   const linkGameAccount = async (userId: string) => {
-    if (!gameProvider) return;
-    try {
-      const [have] = await db.select({ id: schema.linkedGameAccounts.id }).from(schema.linkedGameAccounts)
-        .where(and(eq(schema.linkedGameAccounts.userId, userId), eq(schema.linkedGameAccounts.provider, gameProvider), eq(schema.linkedGameAccounts.providerAccountId, profile.providerUserId))).limit(1);
-      if (have) return;
-      const accId = uid();
-      await db.insert(schema.linkedGameAccounts).values({
-        id: accId, userId, provider: gameProvider, providerAccountId: profile.providerUserId,
-        inGameName: profile.username, verified: true, syncStatus: "pending",
-      });
-      const [acc] = await db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.id, accId)).limit(1);
-      if (acc) { const { syncAccount } = await import("@/lib/sync"); await syncAccount(db, acc); }
-      const { awardQuestAction } = await import("@/lib/quests");
-      await awardQuestAction(db, userId, "connect_account", { refType: "account", refId: accId });
-    } catch { /* non-fatal — the game link can be retried from onboarding */ }
+    if (gameProviders.length === 0) return;
+    const { accountHeldByOther, transferClaim, dotaAccountIdFromSteamId } =
+      await import("@/lib/account-ownership");
+    const { syncAccount } = await import("@/lib/sync");
+    const { awardQuestAction } = await import("@/lib/quests");
+
+    for (const gameProvider of gameProviders) {
+      try {
+        // Dota's id is derived from the SteamID; everything else uses it as-is.
+        const accountId = gameProvider === "opendota"
+          ? dotaAccountIdFromSteamId(profile.providerUserId)
+          : profile.providerUserId;
+        if (!accountId) continue;
+
+        const proven = { verified: true, verifiedMethod: "openid", verifiedAt: new Date(), ownershipStatus: "ok" };
+
+        const [have] = await db.select({ id: schema.linkedGameAccounts.id })
+          .from(schema.linkedGameAccounts)
+          .where(and(
+            eq(schema.linkedGameAccounts.userId, userId),
+            eq(schema.linkedGameAccounts.provider, gameProvider),
+            eq(schema.linkedGameAccounts.providerAccountId, accountId),
+          )).limit(1);
+        if (have) {
+          await db.update(schema.linkedGameAccounts).set(proven)
+            .where(eq(schema.linkedGameAccounts.id, have.id));
+          continue;
+        }
+
+        // Proof beats a claim, so whoever merely typed this id loses it to the
+        // person who just signed in with it — but never beats another proof.
+        const clash = await accountHeldByOther(db, gameProvider, accountId, userId);
+        if (clash?.proven) continue;
+        if (clash) await transferClaim(db, clash.accountId);
+
+        const accId = uid();
+        await db.insert(schema.linkedGameAccounts).values({
+          id: accId, userId, provider: gameProvider, providerAccountId: accountId,
+          inGameName: profile.username, syncStatus: "pending", ...proven,
+        });
+        const [acc] = await db.select().from(schema.linkedGameAccounts)
+          .where(eq(schema.linkedGameAccounts.id, accId)).limit(1);
+        if (acc) await syncAccount(db, acc);
+        await awardQuestAction(db, userId, "connect_account", { refType: "account", refId: accId });
+      } catch { /* non-fatal — one game failing must not fail the sign-in */ }
+    }
   };
 
   /**
@@ -95,10 +144,42 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     })();
   };
 
-  const attachIdentity = async (userId: string) => {
+  /**
+   * Attach this third-party identity to a Cluster account — one gamer only.
+   *
+   * `oauth_identities` is unique on (provider, provider_user_id), so a second
+   * claim on the same Discord was already impossible at the database level.
+   * What was NOT impossible: the insert used `onConflictDoNothing`, so a gamer
+   * who signed up with EMAIL could run the "link Discord" flow against a
+   * Discord that already belonged to someone else, have the insert silently do
+   * nothing, and still get `users.discord_username` written and a success
+   * redirect. Two Cluster profiles then displayed the same Discord handle, one
+   * of them without owning it, and every Discord-keyed feature — the bot's
+   * identity lookup, server attribution, HQ join — resolved to the other
+   * person. It reported success and did the opposite.
+   *
+   * Returns false when the identity belongs to somebody else; the caller stops.
+   */
+  const attachIdentity = async (userId: string): Promise<boolean> => {
+    const [owner] = await db.select({ userId: schema.oauthIdentities.userId })
+      .from(schema.oauthIdentities)
+      .where(and(
+        eq(schema.oauthIdentities.provider, provider),
+        eq(schema.oauthIdentities.providerUserId, profile.providerUserId),
+      )).limit(1);
+    if (owner) return owner.userId === userId;
     await db.insert(schema.oauthIdentities).values({
       id: uid(), userId, provider, providerUserId: profile.providerUserId,
     }).onConflictDoNothing();
+    // Read back rather than trusting the insert: two tabs finishing the same
+    // OAuth flow race here, and the loser must not believe it won.
+    const [after] = await db.select({ userId: schema.oauthIdentities.userId })
+      .from(schema.oauthIdentities)
+      .where(and(
+        eq(schema.oauthIdentities.provider, provider),
+        eq(schema.oauthIdentities.providerUserId, profile.providerUserId),
+      )).limit(1);
+    return after?.userId === userId;
   };
 
   const finish = async (userId: string, role: string, dest: string) => {
@@ -111,7 +192,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
 
   // 1) Linking to the currently signed-in account.
   if (flow.intent === "link" && session) {
-    await attachIdentity(session.uid);
+    if (!(await attachIdentity(session.uid))) {
+      return NextResponse.redirect(new URL(
+        `${flow.next || "/profile"}?error=${encodeURIComponent(`That ${provider} account is already connected to a different Cluster gamer.`)}`,
+        base,
+      ));
+    }
+    // Only ever written for an identity we actually hold. The handle is shown
+    // as this gamer's identity across the whole product; borrowing someone
+    // else's is exactly the impersonation this path used to allow.
     if (provider === "discord") {
       await db.update(schema.users).set({ discordUsername: profile.username }).where(eq(schema.users.id, session.uid));
     }
@@ -132,7 +221,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
     const [u] = await db.select({ id: schema.users.id, role: schema.users.role, avatarUrl: schema.users.avatarUrl }).from(schema.users)
       .where(eq(schema.users.email, profile.email.toLowerCase())).limit(1);
     if (u) {
-      await attachIdentity(u.id);
+      // An identity already held by another gamer must not be re-pointed here
+      // either — matching on email is a convenience, not a proof of ownership.
+      if (!(await attachIdentity(u.id))) return fail("already_linked_elsewhere");
       const patch: Record<string, unknown> = {};
       if (provider === "discord") { patch.discordUsername = profile.username; if (!u.avatarUrl && profile.avatarUrl) patch.avatarUrl = profile.avatarUrl; }
       if (Object.keys(patch).length) await db.update(schema.users).set(patch).where(eq(schema.users.id, u.id));

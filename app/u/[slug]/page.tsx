@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { and, count, desc, eq, gt, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { isProof } from "@/lib/account-ownership";
 import { cardMeta } from "@/lib/og";
 import { getCurrentUser, isAdmin } from "@/lib/auth";
 import { getProvider } from "@/lib/providers/registry";
@@ -184,7 +185,9 @@ export default async function ProfilePage({ params }: Props) {
       tag: a.inGameName,
       providerName: p?.name ?? a.provider,
       gameName: p?.game ?? "",
-      verified: a.verified,
+      // Proven, not merely readable — a tick that means "the API answered"
+      // is the exact claim this platform can't afford to make.
+      verified: a.verified && isProof(a.verifiedMethod),
       logoUrl: slimImg(resolveGame(games, p?.game ?? "")?.logoUrl ?? null, 300000),
       coverUrl: slimImg(resolveGame(games, p?.game ?? "")?.coverUrl ?? null, 400000),
       avatar: accountAvatar(a),
@@ -217,10 +220,19 @@ export default async function ProfilePage({ params }: Props) {
           <section key={key}>
             <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
               <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: theme.text }}><Icon name="trophy" size={19} style={{ color: theme.accent }} /> {poss} {tr("trophy case")}</h2>
-              {isOwner && (
-                <TrophyCase variant="button" awards={trophyShelfAll} redeems={myRedeems}
-                  savedMethod={user.payoutMethod ?? null} changesUsed={user.payoutChanges ?? 0} />
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* The shelf is also a shop. A visitor looking at somebody's
+                    trophy case is the most likely person on the site to want
+                    one, and the owner is the most likely to want another. */}
+                <a href="/marketplace"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-200 hover:bg-amber-500/20">
+                  <Icon name="trophy" size={13} /> {tr("Trophy marketplace")}
+                </a>
+                {isOwner && (
+                  <TrophyCase variant="button" awards={trophyShelfAll} redeems={myRedeems}
+                    savedMethod={user.payoutMethod ?? null} changesUsed={user.payoutChanges ?? 0} />
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               {trophyShelf.map((a) => (

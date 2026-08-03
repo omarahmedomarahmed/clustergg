@@ -5,7 +5,7 @@ import { DEFAULT_LAYOUT } from "@/lib/cards/layout";
 import { previewFixtures } from "@/lib/cards/preview";
 import { getOrRenderCard } from "@/lib/cards/cache";
 import { withCardAd, PREVIEW_AD } from "@/lib/cards/ads";
-import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, challengeStandingsCard, planetCard, planetsCard, challengeCard, weekCard, worldCard, searchCard, cardBg } from "@/lib/cards/data";
+import { profileCard, gameStatsCard, questCard, cpSummaryCard, leaderboardCard, challengeStandingsCard, planetCard, planetsCard, challengeCard, weekCard, marketCard, worldCard, searchCard, cardBg } from "@/lib/cards/data";
 import type { PreviewFixtures } from "@/lib/cards/preview";
 import { guideCard, GUIDE_TOPICS } from "@/lib/cards/guides";
 import type { CardData } from "@/lib/cards/types";
@@ -75,6 +75,12 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
       }
       case "guide":
         data = await guideCard(q.get("topic") ?? "getting-started", q.get("quest"));
+        break;
+      case "market":
+        // The shelf is per-gamer: what a viewer can afford is the whole point,
+        // so an anonymous render shows the shop with a zero balance rather than
+        // somebody else's.
+        data = await marketCard({ userId: q.get("gamer") });
         break;
       case "week":
         data = await weekCard({

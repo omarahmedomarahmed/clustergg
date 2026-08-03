@@ -6,7 +6,7 @@ import type { CardLayout } from "@/lib/cards/layout";
 export type CardKind =
   | "profile" | "game-stats" | "quest" | "cp-summary"
   | "leaderboard" | "challenge" | "planet" | "planets" | "guide" | "week"
-  | "world" | "search";
+  | "world" | "search" | "market";
 
 /**
  * The sponsor shown on this render of this card.
@@ -185,6 +185,42 @@ export type PlanetCard = {
 // long is left. `result` is Sunday's: who won and what each of them was handed.
 // Same shape because it is the same competition, and a server that has been
 // watching the race all week should recognise the card that ends it.
+/**
+ * The trophy marketplace, as a card.
+ *
+ * Six trophies, two rows of three, each with BOTH numbers on it: what it costs
+ * in Cluster Points and what it redeems for in dollars. Showing only the CP
+ * price would make it a game currency; showing both is what tells a gamer their
+ * free points are worth actual money, which is the entire argument for playing
+ * after you have lost a challenge.
+ *
+ * The viewer's balance sits at the top, because a shelf you can't price
+ * yourself against is a catalogue.
+ */
+export type MarketCard = {
+  kind: "market";
+  title: string;
+  subtitle?: string | null;
+  /** The viewer's spendable balance, and what they've earned all-time. */
+  balance: number;
+  earned: number;
+  /** Exactly six, or fewer if the shelf is short. */
+  trophies: {
+    id: string;
+    name: string;
+    imageUrl?: string | null;
+    tier: string;
+    cpPrice: number;
+    value: number;
+    /** Can the viewer afford it right now — drives the dimming. */
+    affordable: boolean;
+  }[];
+  /** How many CP buy a dollar, stated so the exchange is never a mystery. */
+  cpPerDollar: number;
+  theme: CardTheme;
+  ad?: CardAdSlot | null;
+};
+
 export type WeekCard = {
   kind: "week";
   mode: "race" | "result";
@@ -284,4 +320,4 @@ export type SearchCard = {
 export type CardData =
   | ProfileCard | GameStatsCard | QuestCard | CpSummaryCard
   | LeaderboardCard | ChallengeCard | PlanetCard | PlanetsCard | GuideCard | WeekCard
-  | WorldCard | SearchCard;
+  | WorldCard | SearchCard | MarketCard;

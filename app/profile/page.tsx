@@ -17,6 +17,8 @@ import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
 import BrandGlyph from "@/components/BrandGlyph";
 import { unlinkGameAccount, resyncGameAccount } from "@/app/actions/connections";
+import VerifyAccount from "@/components/VerifyAccount";
+import { proofFor } from "@/lib/account-ownership";
 import { timeAgo } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -115,6 +117,29 @@ export default async function OwnProfilePage() {
                       Session expired — your stats are safe. Re-link below with a fresh in-game code to resume syncing.
                     </div>
                   )}
+                  {a.ownershipStatus === "disputed" && (
+                    <div className="mt-1 text-[11px] text-amber-300/90">
+                      Another gamer proved ownership of this account, so it no longer syncs here. Your history is kept — contact support if this is wrong.
+                    </div>
+                  )}
+                  {/* Whether this account is PROVEN yours, and how to prove it.
+                      Linking only ever showed the provider answered; a tick
+                      that means "exists" on a platform paying prize money is
+                      worse than no tick at all. */}
+                  <div className="mt-1.5">
+                    <VerifyAccount info={{
+                      accountId: a.id,
+                      gameName: p?.game || p?.name || a.provider,
+                      verified: a.verified,
+                      method: a.verifiedMethod,
+                      proofKind: proofFor(a.provider).kind,
+                      proofLabel: proofFor(a.provider).label,
+                      proofHow: proofFor(a.provider).how,
+                      proofWired: proofFor(a.provider).wired,
+                      pendingIconId: ((a.proofChallenge ?? {}) as { iconId?: number }).iconId ?? null,
+                      disputed: a.ownershipStatus === "disputed",
+                    }} />
+                  </div>
                 </div>
                 {a.provider !== "mobile-legends" && (
                   <form action={resyncGameAccount.bind(null, a.id, "/profile")}>

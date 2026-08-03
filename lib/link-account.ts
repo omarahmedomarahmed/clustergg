@@ -8,6 +8,7 @@ import { evaluateBadgesForUser } from "@/lib/badges";
 import { awardQuestAction } from "@/lib/quests";
 import { announceAccountLinked } from "@/lib/discord/announce";
 import { markMemberLinked } from "@/lib/discord/guilds";
+import { accountHeldByOther, conflictMessage, proofFor } from "@/lib/account-ownership";
 
 // Linking a game account, in one place.
 //
@@ -17,8 +18,14 @@ import { markMemberLinked } from "@/lib/discord/guilds";
 // same CP — otherwise a Discord link would be a second-class account.
 
 export type LinkResult =
-  | { ok: true; accountId: string; game: string; name: string }
-  | { ok: false; error: string };
+  | {
+    ok: true; accountId: string; game: string; name: string;
+    /** True only when we PROVED ownership, not merely that the account exists. */
+    proven: boolean;
+    /** Set when the game offers a proof the gamer still has to complete. */
+    proofAvailable: boolean;
+  }
+  | { ok: false; error: string; conflict?: boolean };
 
 export async function linkGameAccountFor(
   userId: string,
@@ -47,11 +54,31 @@ export async function linkGameAccountFor(
   )).limit(1);
   if (existing) return { ok: false, error: "That account is already linked." };
 
+  // One game account, one gamer.
+  //
+  // The unique index was on (user_id, provider, account_id) — unique PER USER —
+  // so two Cluster gamers could hold the same Riot account, both enter the same
+  // challenge on it, and both be paid for the same week of play. Checked here
+  // as well as in the database because the message a person reads matters:
+  // "someone else has this" is actionable, a constraint violation is not.
+  const conflict = await accountHeldByOther(db, providerId, verified.accountId, userId);
+  if (conflict) {
+    return { ok: false, conflict: true, error: conflictMessage(conflict, provider.game) };
+  }
+
+  // What we actually know at this moment.
+  //
+  // `adapter.verify()` proved the account EXISTS. It did not prove this person
+  // owns it, and writing `verified: true` here — which is what used to happen —
+  // put a verification tick on an unproven claim across the whole product. The
+  // tick is now earned separately; see lib/account-ownership.ts.
+  const proof = proofFor(providerId);
   const id = uid();
   await db.insert(schema.linkedGameAccounts).values({
     id, userId, provider: providerId,
     providerAccountId: verified.accountId, inGameName: verified.name,
-    region: verified.region ?? region ?? null, verified: true, syncStatus: "pending",
+    region: verified.region ?? region ?? null,
+    verified: false, verifiedMethod: "exists", syncStatus: "pending",
   });
 
   const [account] = await db.select().from(schema.linkedGameAccounts)
@@ -66,5 +93,8 @@ export async function linkGameAccountFor(
   // Never awaited into the result — a failed announcement must not fail a link.
   void announceAccountLinked(userId, provider.game).catch(() => {});
 
-  return { ok: true, accountId: id, game: provider.game, name: verified.name };
+  return {
+    ok: true, accountId: id, game: provider.game, name: verified.name,
+    proven: false, proofAvailable: proof.kind !== "none",
+  };
 }

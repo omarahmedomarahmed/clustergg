@@ -1,5 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { marketplaceCatalog } from "@/lib/marketplace";
+import TrophyMarket from "@/components/TrophyMarket";
 import { getT } from "@/lib/i18n/t-server";
 import { localizeQuest } from "@/lib/i18n/entities";
 import { getUserQuests, getQuestTops, getCpLedger } from "@/lib/quests";
@@ -16,6 +18,8 @@ export const metadata = { title: "Quests" };
 export default async function QuestsPage() {
   const user = await getCurrentUser();
   const db = await getDb();
+  // The shelf, for the section below the quests.
+  const market = await marketplaceCatalog(db, { userId: user?.id ?? null });
   const questsRaw = await getUserQuests(db, user?.id ?? null);
   const [tops, ledger] = await Promise.all([
     getQuestTops(db, questsRaw.map((q) => q.id), 8),
@@ -82,6 +86,14 @@ export default async function QuestsPage() {
           <CpLedger entries={ledger} quests={quests.map((q) => ({ key: q.key, name: q.name, color: q.color }))} title={tr("Your complete CP history")} />
         </div>
       )}
+
+      {/* The marketplace, in full, on the page where CP is earned.
+          A points bar with nothing to spend on is a score; putting the shelf
+          directly under it is what makes the number mean something. */}
+      <div className="mt-10">
+        <TrophyMarket trophies={market.trophies} wallet={market.wallet} signedIn={!!user}
+          heading="Spend your Cluster Points" />
+      </div>
 
       {/* Sponsor banner at the bottom of the quests page */}
       <div className="mt-10">

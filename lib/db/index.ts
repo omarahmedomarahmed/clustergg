@@ -569,6 +569,177 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "droom_view_idx" ON "dataroom_views" ("doc_id","created_at")`,
+
+  // ----- Trophy marketplace -----
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "cp_price" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "in_marketplace" boolean NOT NULL DEFAULT true`,
+  `CREATE TABLE IF NOT EXISTS "marketplace_orders" (
+    "id" text PRIMARY KEY NOT NULL,
+    "buyer_id" text NOT NULL,
+    "recipient_id" text NOT NULL,
+    "trophy_id" text NOT NULL,
+    "award_id" text,
+    "cp_spent" integer NOT NULL,
+    "value" double precision NOT NULL DEFAULT 0,
+    "kind" text NOT NULL DEFAULT 'self',
+    "message" text,
+    "status" text NOT NULL DEFAULT 'complete',
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "mo_buyer_idx" ON "marketplace_orders" ("buyer_id","created_at")`,
+  `CREATE INDEX IF NOT EXISTS "mo_recipient_idx" ON "marketplace_orders" ("recipient_id")`,
+
+  // ----- One game account, one gamer -----
+  //
+  // `linked_game_accounts` was unique on (user_id, provider, account_id), which
+  // is unique PER USER: two gamers could hold the same Riot account and both be
+  // paid for the same week of play. Uniqueness now spans the platform.
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "verified_method" text NOT NULL DEFAULT 'claimed'`,
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "verified_at" timestamp with time zone`,
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "proof_challenge" jsonb`,
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "proof_expires_at" timestamp with time zone`,
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "ownership_status" text NOT NULL DEFAULT 'ok'`,
+
+  // Mobile Legends already had the strongest proof on the platform: a code
+  // Moonton delivers into the game, which only the account holder can read.
+  // Those links keep their tick, correctly labelled.
+  `UPDATE "linked_game_accounts" SET "verified_method" = 'vc', "verified_at" = COALESCE("verified_at", "created_at")
+     WHERE "verified_method" = 'claimed' AND "provider" = 'mobile-legends'`,
+  // Every other pre-existing row was marked verified the moment the provider's
+  // API answered — which proved the account EXISTS, not that the person owns
+  // it. The tick is withdrawn and the truth recorded; owners re-earn it in
+  // seconds through the proof their game supports.
+  `UPDATE "linked_game_accounts" SET "verified" = false, "verified_method" = 'exists'
+     WHERE "verified_method" = 'claimed'`,
+
+  // Collisions that already exist are MARKED, never deleted — a deleted account
+  // cascades its stats, its challenge entries and its standings, and a season of
+  // prize-money history is not something to discard to make an index build. The
+  // earliest claim keeps the account; the rest are flagged for staff.
+  `UPDATE "linked_game_accounts" a SET "ownership_status" = 'disputed', "verified" = false
+     WHERE a."ownership_status" = 'ok' AND EXISTS (
+       SELECT 1 FROM "linked_game_accounts" b
+        WHERE b."provider" = a."provider"
+          AND b."provider_account_id" = a."provider_account_id"
+          AND b."user_id" <> a."user_id"
+          AND (b."created_at" < a."created_at" OR (b."created_at" = a."created_at" AND b."id" < a."id"))
+     )`,
+  // Partial, so the disputed rows above can't stop it building. Going forward
+  // no two live claims can share one account, whatever code path tries.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "lga_provider_acct_unique_idx"
+     ON "linked_game_accounts" ("provider","provider_account_id") WHERE "ownership_status" = 'ok'`,
+
+  // ----- Money: billing, payouts, and getting payment details OUT of here -----
+  //
+  // Read the block comment above `payoutAccounts` in schema.ts first. The short
+  // version: Cluster stores a preference and an opaque provider handle, and
+  // nothing else. Everything that can move money lives with the provider.
+  `CREATE TABLE IF NOT EXISTS "payout_accounts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "owner_type" text NOT NULL,
+    "owner_id" text NOT NULL,
+    "provider_key" text NOT NULL DEFAULT 'manual',
+    "provider_recipient_id" text,
+    "method_preference" text,
+    "country" text,
+    "currency" text NOT NULL DEFAULT 'USD',
+    "status" text NOT NULL DEFAULT 'none',
+    "note" text,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "payout_acct_owner_idx" ON "payout_accounts" ("owner_type","owner_id")`,
+
+  `CREATE TABLE IF NOT EXISTS "brand_invoices" (
+    "id" text PRIMARY KEY NOT NULL,
+    "brand_id" text NOT NULL,
+    "number" text NOT NULL,
+    "status" text NOT NULL DEFAULT 'draft',
+    "currency" text NOT NULL DEFAULT 'USD',
+    "period_label" text,
+    "issued_at" timestamp with time zone,
+    "due_at" timestamp with time zone,
+    "paid_at" timestamp with time zone,
+    "notes" text,
+    "pay_link_url" text,
+    "pay_provider" text,
+    "pay_ref" text,
+    "pay_embeddable" boolean NOT NULL DEFAULT false,
+    "paid_via" text,
+    "paid_ref" text,
+    "pay_token" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "brand_invoice_number_idx" ON "brand_invoices" ("number")`,
+  `CREATE INDEX IF NOT EXISTS "brand_invoice_brand_idx" ON "brand_invoices" ("brand_id","created_at")`,
+
+  `CREATE TABLE IF NOT EXISTS "invoice_lines" (
+    "id" text PRIMARY KEY NOT NULL,
+    "invoice_id" text NOT NULL,
+    "kind" text NOT NULL DEFAULT 'adjustment',
+    "label" text NOT NULL,
+    "quantity" double precision NOT NULL DEFAULT 1,
+    "unit_amount" double precision NOT NULL DEFAULT 0,
+    "source_type" text,
+    "source_id" text,
+    "sort_order" integer NOT NULL DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS "invoice_line_inv_idx" ON "invoice_lines" ("invoice_id","sort_order")`,
+
+  `CREATE TABLE IF NOT EXISTS "server_payouts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "guild_name" text,
+    "status" text NOT NULL DEFAULT 'draft',
+    "currency" text NOT NULL DEFAULT 'USD',
+    "period_start" timestamp with time zone,
+    "period_end" timestamp with time zone,
+    "provider_key" text,
+    "provider_ref" text,
+    "collect_url" text,
+    "note" text,
+    "requested_by" text,
+    "requested_at" timestamp with time zone,
+    "paid_at" timestamp with time zone,
+    "failed_reason" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "server_payout_guild_idx" ON "server_payouts" ("guild_id","created_at")`,
+
+  `CREATE TABLE IF NOT EXISTS "server_payout_lines" (
+    "id" text PRIMARY KEY NOT NULL,
+    "payout_id" text NOT NULL,
+    "kind" text NOT NULL DEFAULT 'sponsored_share',
+    "label" text NOT NULL,
+    "challenge_id" text,
+    "amount" double precision NOT NULL DEFAULT 0
+  )`,
+  `CREATE INDEX IF NOT EXISTS "server_payout_line_idx" ON "server_payout_lines" ("payout_id")`,
+
+  `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "provider_key" text`,
+  `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "provider_ref" text`,
+  `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "collect_url" text`,
+  `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "sent_at" timestamp with time zone`,
+
+  // ===== The deletion =====
+  //
+  // Every routing number, account number and mobile wallet number a gamer ever
+  // typed into the old redeem form is erased here, permanently, on the next
+  // boot. Nothing reads these columns any more and nothing writes them.
+  //
+  // This is destructive and it is meant to be. Holding a few thousand gamers'
+  // bank details to save a support ticket is a trade nobody should take, and
+  // the replacement is better anyway: the gamer chooses where the money goes on
+  // the provider's own page, every time, and we never see it.
+  //
+  // The method WORD survives, remapped to the vocabulary the new flow uses, so
+  // a gamer who already told us "pay me by bank transfer" is not asked again.
+  `UPDATE "trophy_redeems" SET "details" = '{}'::jsonb WHERE "details" <> '{}'::jsonb`,
+  `UPDATE "trophy_redeems" SET "method" = 'bank' WHERE "method" IN ('ach','instapay')`,
+  `UPDATE "trophy_redeems" SET "method" = 'wallet' WHERE "method" NOT IN ('bank','paypal','wallet','giftcard','other')`,
+  `UPDATE "users" SET "payout_method" = "payout_method" - 'details'
+     WHERE "payout_method" IS NOT NULL AND "payout_method" ? 'details'`,
+  `UPDATE "users" SET "payout_method" = jsonb_set("payout_method", '{method}', '"bank"')
+     WHERE "payout_method" IS NOT NULL AND "payout_method"->>'method' IN ('ach','instapay')`,
 ];
 
 async function runColumnMigrations(db: DB) {

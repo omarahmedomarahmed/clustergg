@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { setParticipantStatus } from "@/app/actions/admin";
-import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import ChallengeBuilder, { type ChallengeEdit } from "@/components/ChallengeBuilder";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
@@ -10,7 +9,7 @@ import Link from "next/link";
 import { timeAgo } from "@/lib/utils";
 import { seriesPlan } from "@/lib/challenge-series";
 import { deliveryTotals } from "@/lib/challenge-delivery";
-import { builderContext } from "@/lib/challenge-builder-data";
+import { builderContext, builderProviders } from "@/lib/challenge-builder-data";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +36,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     builderContext(),
   ]);
 
-  const builderProviders = PROVIDERS
-    .filter((p) => !p.identityOnly && p.capabilities.length > 0)
-    .map((p) => ({ id: p.id, name: p.name, game: p.game, live: isProviderLive(p), authType: p.authType, docsUrl: p.docsUrl, capabilities: p.capabilities.map((c) => ({ key: c.key, label: c.label, unit: c.unit, higherIsBetter: c.higherIsBetter })) }));
+  const providers = builderProviders();
 
   const editData: ChallengeEdit = {
     id: challenge.id, spaceId: challenge.spaceId, provider: challenge.provider, game: challenge.game,
@@ -177,7 +174,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
         <div className="mt-5 border-t border-violet-500/15 pt-5">
           <ChallengeBuilder
             challenge={editData}
-            providers={builderProviders}
+            providers={providers}
             spaces={spaces.map((s) => ({ id: s.id, name: s.name, game: s.game }))}
             trophies={ctx.trophies}
             quests={quests}

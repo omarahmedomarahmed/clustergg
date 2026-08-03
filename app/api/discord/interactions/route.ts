@@ -138,8 +138,14 @@ function linkSubmit(i: Interaction, who: Who, provider: string, fields: Map<stri
       // Re-render the stats screen so they immediately see what they just linked.
       const target = frame("show", `game:${res.game}`);
       const payload = await renderScreen(target, [frame("home")], { ...ctx });
+      // Linking proves the account exists. Prize money needs it to be THEIRS,
+      // and the proof lives on the website — so say so here rather than letting
+      // someone find out at payout time.
+      const next = res.proofAvailable
+        ? `\nOne more step to compete for prizes: prove it's yours at ${siteUrl()}/profile — takes about a minute.`
+        : "";
       await editOriginal(i.token, {
-        content: `**${res.name}** linked. Your ${res.game} stats sync from here on.`,
+        content: `**${res.name}** linked. Your ${res.game} stats sync from here on.${next}`,
         embeds: payload.embeds ?? [],
         components: payload.components ?? [],
       });
@@ -192,7 +198,7 @@ function keySubmit(i: Interaction, who: Who, challengeId: string, key: string) {
 
       const res = await joinChallengeFor(ctx.gamer.userId, challengeId, { source: "discord", accessKey: key });
       if (!res.ok) {
-        await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }] });
+        await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason, res.unmet) }] });
         return;
       }
       const payload = await renderScreen(frame("challenge", challengeId), [frame("home")], ctx);
@@ -673,7 +679,7 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
     });
     if (!res.ok) {
       await editOriginal(i.token, {
-        embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }],
+        embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason, res.unmet) }],
       });
       return;
     }
@@ -758,6 +764,40 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
     }
   }
 
+  // Buying a trophy from the marketplace card.
+  //
+  // The price, the balance and the ownership check all live in
+  // `buyTrophy` — nothing here is trusted from the button, because a card
+  // posted an hour ago carries an hour-old balance on its face.
+  if (target.screen === "buy") {
+    if (!ctx.gamer) {
+      await editOriginal(i.token, {
+        embeds: [{
+          color: 0xf59e0b,
+          description: `Continue with Discord first and your balance is waiting: ${siteUrl()}/login`,
+        }],
+      });
+      return;
+    }
+    const { buyTrophy } = await import("@/lib/marketplace");
+    const res = await buyTrophy(ctx.gamer.userId, target.args[0] ?? "");
+    if (!res.ok) {
+      await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: res.error }] });
+      return;
+    }
+    // Fall through to the re-render, so the card comes back with the new
+    // balance and the tiles they can now afford — but say what happened first,
+    // because a picture changing is not an acknowledgement.
+    const payload = await renderScreen(frame("market"), trail, ctx);
+    await editOriginal(i.token, {
+      content: `**${res.trophy}** is yours — ${res.cpSpent.toLocaleString()} CP spent, `
+        + `${res.balance.toLocaleString()} left. It's on your profile and it can be redeemed for cash.`,
+      embeds: payload.embeds ?? [],
+      components: payload.components ?? [],
+    });
+    return;
+  }
+
   // Re-render whatever screen the action was launched from, so the button
   // state (e.g. "Join" → "You've joined") reflects what just happened.
   const back = trail[0] ?? frame("home");
@@ -778,8 +818,14 @@ async function voteForSlug(slug: string, discordId: string, guildId?: string) {
   return castDiscordVote(u.id, discordId, guildId ?? null);
 }
 
-function joinFailure(reason: string): string {
+function joinFailure(reason: string, unmet?: string[]): string {
   switch (reason) {
+    case "requirements":
+      // Name the rank they need, not "you don't qualify". A gate a gamer can't
+      // read is a gate they'll argue with in the server's chat.
+      return unmet?.length
+        ? `This challenge is for a skill bracket you're not in yet: **${unmet.join("**, **")}**. Your rank syncs automatically — come back when you climb.`
+        : "You don't meet this challenge's entry requirements yet.";
     case "no_account": return "You need a linked account for that game first — run `/cluster show:link`.";
     case "gated": return "This challenge requires quest badges you haven't earned yet.";
     case "locked": return "This one needs an entry key — it was sent to the server running the challenge.";

@@ -1,9 +1,29 @@
 import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { pricingConfig } from "@/lib/pricing-live";
+import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import type {
-  BuilderBrand, BuilderGuild, BuilderPricing, BuilderReach, BuilderTrophy,
+  BuilderBrand, BuilderGuild, BuilderPricing, BuilderProvider, BuilderReach, BuilderTrophy,
 } from "@/components/ChallengeBuilder";
+
+/**
+ * The games the builder can build on, with everything their APIs expose.
+ *
+ * One function because both admin pages listed the capability fields by hand
+ * and both forgot `ranks` — so the builder never knew a metric had a ladder,
+ * `isRanked()` was false for every game, and "Flex 5v5 tier" asked staff to
+ * type a number that a gamer then read back as "At least 9 flex 5v5 tier".
+ * Passing the whole MetricDef means there is no list to forget from.
+ */
+export function builderProviders(): BuilderProvider[] {
+  return PROVIDERS
+    .filter((p) => !p.identityOnly && p.capabilities.length > 0)
+    .map((p) => ({
+      id: p.id, name: p.name, game: p.game, live: isProviderLive(p),
+      authType: p.authType, docsUrl: p.docsUrl,
+      capabilities: p.capabilities,
+    }));
+}
 
 // Everything the challenge builder needs that isn't the challenge.
 //

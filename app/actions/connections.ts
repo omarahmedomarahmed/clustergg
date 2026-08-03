@@ -86,7 +86,10 @@ export async function mlbbConfirmLink(_prev: LinkState, formData: FormData): Pro
     accountId = uid();
     await db.insert(schema.linkedGameAccounts).values({
       id: accountId, userId: me.id, provider: "mobile-legends",
-      providerAccountId, inGameName, region: zoneId, verified: true,
+      providerAccountId, inGameName, region: zoneId,
+      // Moonton mails the code into the game, so only the account holder can
+      // read it. That is genuine ownership proof — the strongest we have.
+      verified: true, verifiedMethod: "vc", verifiedAt: new Date(),
       syncStatus: "pending", providerData,
     });
   }

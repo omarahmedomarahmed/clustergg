@@ -589,6 +589,40 @@ export async function challengeStandingsCard(challengeId: string): Promise<CardD
 // standings and the clock. Once a week is called it's the result, and the
 // placements carry the trophy each of them was actually handed, because a
 // podium that doesn't show the prize is just a list of names.
+/**
+ * The marketplace shelf, for a specific gamer.
+ *
+ * Six trophies chosen the way a shop chooses a window: what they can afford
+ * first, then the closest things they can't. An all-affordable shelf gives them
+ * nothing to play for and an all-unaffordable one gives them nothing to buy.
+ */
+export async function marketCard(opts: { userId?: string | null } = {}): Promise<CardData | null> {
+  const db = await getDb();
+  const bg = await cardBg("bot_market");
+  const { marketplaceCatalog } = await import("@/lib/marketplace");
+  const { trophies, wallet, rate } = await marketplaceCatalog(db, { userId: opts.userId ?? null });
+
+  const afford = trophies.filter((t) => t.affordable);
+  const reach = trophies.filter((t) => !t.affordable).sort((a, b) => a.cpPrice - b.cpPrice);
+  const six = [...afford.slice(0, 4), ...reach].slice(0, 6);
+
+  return {
+    kind: "market",
+    title: "Trophy marketplace",
+    subtitle: opts.userId
+      ? "Your points, in trophies you can keep or cash out"
+      : "Earn points by playing — spend them on trophies worth real money",
+    balance: wallet.balance,
+    earned: wallet.earned,
+    cpPerDollar: rate,
+    trophies: six.map((t) => ({
+      id: t.id, name: t.name, imageUrl: t.imageUrl, tier: t.tier,
+      cpPrice: t.cpPrice, value: t.value, affordable: t.affordable,
+    })),
+    theme: { ...BRAND, accent: "#fbbf24", accent2: "#22d3ee", bgUrl: bg.bgUrl },
+  };
+}
+
 export async function weekCard(opts: { weekKey?: string; mode?: "race" | "result" } = {}): Promise<CardData | null> {
   const { weekBoard, currentWeek } = await import("@/lib/profile-week");
   const week = opts.weekKey ? undefined : await currentWeek();

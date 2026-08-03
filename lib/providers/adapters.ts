@@ -103,7 +103,6 @@ const lichess = {
 };
 
 // ============ OpenDota — Dota 2 (public) ============
-const DOTA_RANKS = ["Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal"];
 const opendota = {
   async verify(accountId: string): Promise<VerifyResult> {
     try {
@@ -123,9 +122,10 @@ const opendota = {
       const wins = num(wl?.win) ?? 0, losses = num(wl?.lose) ?? 0;
       const total = wins + losses;
       const rankTier = num(p?.rank_tier);
-      const rankLabel = rankTier
-        ? `${DOTA_RANKS[Math.floor(rankTier / 10) - 1] ?? "Unranked"} ${rankTier % 10 || ""}`.trim()
-        : undefined;
+      // Named from the same table the rank ladder is built from, so "Legend 5"
+      // on a profile and "Legend 5" in a challenge rule are the same rung.
+      const { dotaRankLabel } = await import("@/lib/providers/registry");
+      const rankLabel = dotaRankLabel(rankTier);
       return {
         ok: true,
         metrics: metricsOf({
@@ -276,8 +276,16 @@ const riotLol = {
       ]);
       const solo = entries.find((e) => e.queueType === "RANKED_SOLO_5x5");
       const flex = entries.find((e) => e.queueType === "RANKED_FLEX_SR");
-      const TIERS = ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND","MASTER","GRANDMASTER","CHALLENGER"];
-      const tierVal = (e: any) => e?.tier ? TIERS.indexOf(e.tier) * 400 + (num(e.leaguePoints) ?? 0) : undefined;
+      // The rank scale lives in the registry, beside the ladder the challenge
+      // builder offers, because the two only mean anything together: a rule
+      // that says "Diamond I" has to store the number a Diamond I account
+      // actually syncs to. Division-aware — Gold IV and Gold I used to store
+      // the same value.
+      const { lolTierValue } = await import("@/lib/providers/registry");
+      const tierVal = (e: any) =>
+        e?.tier ? lolTierValue(e.tier, e.rank, num(e.leaguePoints) ?? 0) : undefined;
+      const tierName = (e: any) => `${e.tier} ${e.rank ?? ""}`.trim()
+        .replace(/[_-]+/g, " ").toLowerCase().replace(/\b[a-z]/g, (c: string) => c.toUpperCase());
       const wins = num(solo?.wins), losses = num(solo?.losses);
       // Persist game-specific avatar (profile icon) + champion mastery so the
       // planet page / leaderboards read them without any live Riot call.
@@ -293,12 +301,8 @@ const riotLol = {
         metrics: metricsOf({
           summoner_level: num(summoner?.summonerLevel),
           solo_lp: num(solo?.leaguePoints),
-          solo_tier: solo?.tier
-            ? { value: tierVal(solo)!, rankLabel: `${solo.tier} ${solo.rank ?? ""}`.trim() }
-            : undefined,
-          flex_tier: flex?.tier
-            ? { value: tierVal(flex)!, rankLabel: `${flex.tier} ${flex.rank ?? ""}`.trim() }
-            : undefined,
+          solo_tier: solo?.tier ? { value: tierVal(solo)!, rankLabel: tierName(solo) } : undefined,
+          flex_tier: flex?.tier ? { value: tierVal(flex)!, rankLabel: tierName(flex) } : undefined,
           wins, losses,
           win_rate: wins != null && losses != null && wins + losses > 0
             ? Math.round((wins / (wins + losses)) * 1000) / 10 : undefined,

@@ -1,10 +1,112 @@
+/**
+ * One rung of a game's own ladder.
+ *
+ * `value` is the STORED metric value at the bottom of the rung — not an index.
+ * That distinction is the whole point: League stores a tier as
+ * `tier * 400 + division * 100 + LP`, Dota stores OpenDota's `rank_tier`
+ * (medal × 10 + star), FACEIT stores 1–10. A ladder that only listed names and
+ * assumed the position was the value would read every League rank as
+ * Challenger, which is precisely what it did.
+ */
+export type RankRung = { value: number; label: string };
+
 export type MetricDef = {
   key: string;
   label: string;
   unit?: string;
   higherIsBetter?: boolean;
-  rankLabels?: string[];
+  /**
+   * The named ladder this game uses for the metric, ascending, when it has one.
+   * Present means "show rank names, never a number box" — in the challenge
+   * builder, on the challenge page, and on every card.
+   */
+  ranks?: RankRung[];
 };
+
+// ===== The ladders, and the arithmetic that stores them =====
+//
+// Each ladder lives beside the function the adapter uses to write a value onto
+// it, because the two only mean anything together. Split them and the builder
+// offers "Diamond I" while a synced Diamond I player is stored somewhere else
+// entirely — a rule nobody can ever satisfy and no test would notice.
+
+/** `GRANDMASTER` → `Grandmaster`. The APIs shout; a challenge page shouldn't. */
+function pretty(s: string): string {
+  return s.replace(/[_-]+/g, " ").toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase());
+}
+
+// --- League of Legends -------------------------------------------------------
+export const LOL_TIERS = [
+  "IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND",
+  "MASTER", "GRANDMASTER", "CHALLENGER",
+];
+/** Riot orders divisions IV (lowest) → I (highest). */
+export const LOL_DIVISIONS = ["IV", "III", "II", "I"];
+const LOL_TIER_STRIDE = 400;
+const LOL_DIVISION_STRIDE = 100;
+/** Master and above have no divisions — one LP pool each. */
+const LOL_APEX_FROM = LOL_TIERS.indexOf("MASTER");
+
+/**
+ * A League rank as one sortable number.
+ *
+ * Division-aware, which it was not: `tier * 400 + LP` alone put Gold IV and
+ * Gold I at the same value, so a leaderboard couldn't separate the bottom of a
+ * tier from the top and a rank rule couldn't name a division. LP is clamped
+ * inside its own band so no rank can ever outrank the tier above it.
+ */
+export function lolTierValue(tier: string, division?: string | null, lp = 0): number {
+  const t = LOL_TIERS.indexOf(String(tier ?? "").toUpperCase());
+  if (t < 0) return 0;
+  const base = t * LOL_TIER_STRIDE;
+  const points = Math.max(0, Math.floor(lp) || 0);
+  if (t >= LOL_APEX_FROM) return base + Math.min(points, LOL_TIER_STRIDE - 1);
+  const d = Math.max(0, LOL_DIVISIONS.indexOf(String(division ?? "IV").toUpperCase()));
+  return base + d * LOL_DIVISION_STRIDE + Math.min(points, LOL_DIVISION_STRIDE - 1);
+}
+
+function lolLadder(): RankRung[] {
+  const out: RankRung[] = [];
+  LOL_TIERS.forEach((tier, t) => {
+    const name = pretty(tier);
+    if (t >= LOL_APEX_FROM) { out.push({ value: t * LOL_TIER_STRIDE, label: name }); return; }
+    LOL_DIVISIONS.forEach((d, i) => {
+      out.push({ value: t * LOL_TIER_STRIDE + i * LOL_DIVISION_STRIDE, label: `${name} ${d}` });
+    });
+  });
+  return out;
+}
+
+// --- Dota 2 (OpenDota) -------------------------------------------------------
+/** OpenDota's `rank_tier` is `medal × 10 + star`; Immortal has no stars. */
+export const DOTA_MEDALS = [
+  "Herald", "Guardian", "Crusader", "Archon", "Legend", "Ancient", "Divine", "Immortal",
+];
+
+/** Name an OpenDota `rank_tier`, e.g. `55` → `Legend 5`, `80` → `Immortal`. */
+export function dotaRankLabel(rankTier: number | null | undefined): string | undefined {
+  if (!rankTier) return undefined;
+  const medal = DOTA_MEDALS[Math.floor(rankTier / 10) - 1];
+  if (!medal) return undefined;
+  const star = rankTier % 10;
+  return star && medal !== "Immortal" ? `${medal} ${star}` : medal;
+}
+
+function dotaLadder(): RankRung[] {
+  const out: RankRung[] = [];
+  DOTA_MEDALS.forEach((medal, i) => {
+    const base = (i + 1) * 10;
+    if (medal === "Immortal") { out.push({ value: base, label: medal }); return; }
+    for (let star = 1; star <= 5; star++) out.push({ value: base + star, label: `${medal} ${star}` });
+  });
+  return out;
+}
+
+// --- CS2 (FACEIT) ------------------------------------------------------------
+/** FACEIT's ladder really is numbered — but "Level 7" is its name for it. */
+function faceitLadder(): RankRung[] {
+  return Array.from({ length: 10 }, (_, i) => ({ value: i + 1, label: `Level ${i + 1}` }));
+}
 
 export type ProviderDef = {
   id: string;
@@ -62,7 +164,7 @@ export const PROVIDERS: ProviderDef[] = [
       { key: "wins", label: "Wins", higherIsBetter: true },
       { key: "losses", label: "Losses" },
       { key: "win_rate", label: "Win rate %", unit: "%", higherIsBetter: true },
-      { key: "rank_tier", label: "Rank tier", higherIsBetter: true },
+      { key: "rank_tier", label: "Rank medal", higherIsBetter: true, ranks: dotaLadder() },
     ],
   },
   {
@@ -104,8 +206,8 @@ export const PROVIDERS: ProviderDef[] = [
     docsUrl: "https://developer.riotgames.com",
     capabilities: [
       { key: "solo_lp", label: "Solo/Duo LP", higherIsBetter: true },
-      { key: "solo_tier", label: "Solo/Duo tier", higherIsBetter: true, rankLabels: ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND","MASTER","GRANDMASTER","CHALLENGER"] },
-      { key: "flex_tier", label: "Flex 5v5 tier", higherIsBetter: true, rankLabels: ["IRON","BRONZE","SILVER","GOLD","PLATINUM","EMERALD","DIAMOND","MASTER","GRANDMASTER","CHALLENGER"] },
+      { key: "solo_tier", label: "Solo/Duo tier", higherIsBetter: true, ranks: lolLadder() },
+      { key: "flex_tier", label: "Flex 5v5 tier", higherIsBetter: true, ranks: lolLadder() },
       { key: "wins", label: "Ranked wins", higherIsBetter: true },
       { key: "losses", label: "Ranked losses" },
       { key: "win_rate", label: "Win rate %", unit: "%", higherIsBetter: true },
@@ -164,7 +266,7 @@ export const PROVIDERS: ProviderDef[] = [
     phase: 2, docsUrl: "https://developers.faceit.com",
     capabilities: [
       { key: "elo", label: "FACEIT Elo", higherIsBetter: true },
-      { key: "skill_level", label: "Skill level", higherIsBetter: true },
+      { key: "skill_level", label: "Skill level", higherIsBetter: true, ranks: faceitLadder() },
     ],
   },
   {

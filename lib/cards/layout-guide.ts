@@ -300,6 +300,28 @@ export const CARD_GUIDES: CardGuide[] = [
     ],
   },
   {
+    kind: "market",
+    command: "/cluster market  ·  the Trophy marketplace button",
+    group: "competition",
+    name: "Trophy marketplace",
+    summary: "Six trophies, two rows of three, each priced in Cluster Points AND in dollars.",
+    bgKey: "bot_market",
+    regions: [
+      ...COMMON,
+      { key: "title", label: "Title", kind: "text", x: 4.6, y: 6, w: 58, h: 13, note: "'Trophy marketplace' and the one-line pitch." },
+      { key: "balance", label: "Their CP balance", kind: "text", x: 4.6, y: 20, w: 58, h: 8, note: "What the viewer has to spend, and what they've earned all-time." },
+      { key: "tiles", label: "The six trophies", kind: "text", x: 4.6, y: 29, w: 60, h: 50, note: "Two rows of three tiles: art, name, tier, CP price and dollar value." },
+      { key: "pills", label: "The exchange rate", kind: "text", x: 4.6, y: 89, w: 60, h: 8, note: "What CP is worth, and that spending never costs a level." },
+    ],
+    parts: [
+      { key: "title", label: "Title", note: "The heading and the one-line pitch." },
+      { key: "balance", label: "Their CP balance", note: "What they have to spend, stated before the shelf." },
+      { key: "tiles", label: "The six trophies", note: "Both numbers on every tile — CP to buy, dollars to redeem." },
+      { key: "pills", label: "The exchange rate", note: "The bottom strip." },
+      { key: "empty", label: "Empty-shelf message", note: "Shown when no trophy is on sale.", text: "The shelf is empty right now — check back once staff put trophies up." },
+    ],
+  },
+  {
     kind: "planets",
     command: "/cluster show planets  ·  every START HERE button",
     group: "game",
