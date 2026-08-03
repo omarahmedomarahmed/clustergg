@@ -1,4 +1,5 @@
 import { ButtonStyle, ComponentType } from "@/lib/discord/types";
+import { installUrl } from "@/lib/discord/config";
 
 // Discord gives every button a `custom_id` of at most 100 characters and gives
 // us no server-side session to go with it. So the WHOLE navigation state —
@@ -117,10 +118,37 @@ export function backButton(trail: Frame[]): Button | null {
 // it twice — two buttons doing the same thing is the fastest way to make a card
 // look untrustworthy. Deduping centrally means a screen can add whatever it
 // needs without knowing what the tail will contribute.
+/**
+ * The button that grows the network.
+ *
+ * Discord has no app store and no search worth the name. A bot spreads because
+ * somebody sees it working in one server and wants it in theirs — and the
+ * moment they want it is the moment they are looking at a card, not the moment
+ * they next visit a website. So the way to add it is ON the card, every card,
+ * with no step in between.
+ *
+ * Null when the app isn't configured, which is the same graceful degradation
+ * every other Discord helper does: no credentials, no button, everything else
+ * unchanged.
+ */
+export function addToServerButton(): Button | null {
+  const url = installUrl();
+  return url ? linkButton("Add ClusterGG to your server", url, "➕") : null;
+}
+
 export function rows(buttons: (Button | null)[]): { type: 1; components: Button[] }[] {
+  // Appended here rather than at thirty call sites, because "every card" has to
+  // mean every card — including the ones added next month. Every message the
+  // bot sends, interactive or proactive, builds its components through this
+  // function, so this is the one place that can promise it.
+  //
+  // Last, so it can never displace a card's own actions, and deduped below so a
+  // screen that already offers it (the install prompt itself) doesn't show two.
+  const all = [...buttons, addToServerButton()];
+
   const seen = new Set<string>();
   const list: Button[] = [];
-  for (const b of buttons) {
+  for (const b of all) {
     if (!b) continue;
     // Identity is where the button GOES, not what it says: two labels for the
     // same destination are still one destination.

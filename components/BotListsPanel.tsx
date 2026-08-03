@@ -39,6 +39,35 @@ export default function BotListsPanel({ values, siteOrigin }: {
         </div>
       </div>
 
+      {/* Every list asks for the command JSON, and every list means the array
+          Discord ANSWERS with — not the one we send it. Pasting the
+          registration payload is what produces "we were unable to parse your
+          discord application command JSON". This link serves the response
+          shape, proxied live from Discord when the bot token is set. */}
+      <div className="glass rounded-2xl p-4">
+        <div className="flex flex-wrap items-start gap-2">
+          <Icon name="type" size={16} className="mt-0.5 shrink-0 text-cyan-300" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs leading-relaxed text-muted">
+              When a list asks you to <b className="text-ink">import your slash commands</b>, give it this
+              file. It is the exact array Discord&apos;s API returns for our app — the shape their
+              parsers expect. Our registration payload is a different, smaller shape, and pasting that
+              is what gets rejected as unparseable.
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-3">
+              <a
+                href={`${siteOrigin}/api/discord/commands.json`}
+                target="_blank" rel="noreferrer"
+                className="ghost-btn pressable inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs"
+              >
+                <Icon name="arrowRight" size={12} /> Open the command JSON
+              </a>
+              <code className="truncate text-[11px] text-muted">{siteOrigin}/api/discord/commands.json</code>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <form action={save} className="space-y-3">
         {BOT_LISTS.map((list) => {
           const status = values[botListStatusName(list.id)] || "none";

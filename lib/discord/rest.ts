@@ -217,3 +217,19 @@ export function registerGuildCommands(guildId: string, commands: Json[]) {
 }
 
 export { canAct };
+
+/**
+ * The commands Discord currently has registered for this app.
+ *
+ * Read-only, and the exact array Discord's own API returns — which is what a
+ * bot list's "import your commands" wants pasted into it. Ours is a `PUT`
+ * payload (name, description, options) and Discord's response is a richer
+ * object (id, application_id, type, version, integration_types…), so handing a
+ * list the payload we send is handing it something it has never been asked to
+ * parse.
+ */
+export function listGlobalCommands() {
+  const id = appId();
+  if (!id) return Promise.resolve({ ok: false as const, status: 0, error: "no_app_id" });
+  return call<unknown[]>(`/applications/${id}/commands`, { method: "GET" });
+}
