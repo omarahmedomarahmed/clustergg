@@ -10,6 +10,9 @@ import { networkStats } from "@/lib/network";
 import { brandCampaigns, campaignQuote, networkReach, nextMonday, slotWindows } from "@/lib/sponsored-campaigns";
 import { brandChallengeReports, campaignReport, brandTestimonials, brandTier, challengeServers } from "@/lib/brand-report";
 import { pricingConfig } from "@/lib/pricing-live";
+import { listInvoices } from "@/lib/invoices";
+import { money } from "@/lib/pricing";
+import InvoiceView, { InvoiceStatus, DueLine, PayBlock } from "@/components/InvoiceView";
 import BrandCampaignReports from "@/components/BrandCampaignReports";
 import BrandTierStrip from "@/components/BrandTierStrip";
 import BrandInbox from "@/components/BrandInbox";
@@ -208,14 +211,22 @@ export default async function BrandPortalPage({
   }
 
   // ---- Overview: all campaigns + brand-wide intelligence ----
-  const [data, brandAnalytics, cardCampaign, net, reach, sponsored] = await Promise.all([
+  const [data, brandAnalytics, cardCampaign, net, reach, sponsored, invoices] = await Promise.all([
     getBrandPortalData(db, brand.id),
     getBrandAnalytics(db, brand.id, { days: 90 }),
     getCardCampaign(db, brand.id, CARD_AD_PLACEMENT),
     networkStats().catch(() => null),
     networkReach(),
     brandCampaigns(brand.id),
+    listInvoices({ brandId: brand.id, limit: 60 }),
   ]);
+
+  // Drafts are ours, not theirs. A brand seeing a bill that staff are still
+  // building is a conversation nobody wanted to have yet.
+  const bills = invoices.filter((i) => i.status !== "draft");
+  const dueNow = bills.filter((i) => i.status === "sent");
+  const owed = dueNow.reduce((a, i) => a + i.total, 0);
+  const anyOverdue = dueNow.some((i) => i.overdue);
 
   // What the builder needs: every game with its own audience, plus which ones
   // are already taken — by anybody this week, or by THIS brand for the month.
@@ -589,6 +600,69 @@ export default async function BrandPortalPage({
                   </div>
                 </section>
 
+              </div>
+            ),
+          },
+          {
+            // Between Analytics and Appearance on purpose: a brand checking
+            // what they got should find what they owe on the way past, not
+            // buried behind the cosmetic settings.
+            key: "billing",
+            label: owed > 0 ? `Billing (${money(owed, cfg.currency)})` : "Billing",
+            icon: "diamond",
+            dot: anyOverdue,
+            node: (
+              <div className="space-y-6">
+                <div>
+                  <h2 className="text-lg font-bold">Your bills</h2>
+                  <p className="mt-0.5 text-sm text-muted">
+                    One invoice a month, {"30"} days to pay from the day it&apos;s issued. Every line is itemised —
+                    what the placements cost, what each game&apos;s challenges cost, and any discount you were given.
+                    Payment is taken by our payment provider on their own page; Cluster never sees or stores your
+                    card or bank details.
+                  </p>
+                </div>
+
+                {bills.length === 0 ? (
+                  <div className="glass p-8 text-center text-sm text-muted">
+                    Nothing invoiced yet. Your first bill appears here when your campaign goes live.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {bills.map((inv) => (
+                      <details key={inv.id} className="glass overflow-hidden" open={inv.status === "sent"}>
+                        <summary className="flex cursor-pointer flex-wrap items-center gap-3 p-5">
+                          <span className="font-bold">{inv.number}</span>
+                          <InvoiceStatus invoice={inv} />
+                          <span className="text-xs text-muted">{inv.periodLabel ?? ""}</span>
+                          <span className="text-xs"><DueLine invoice={inv} /></span>
+                          <span className="ml-auto text-lg font-black tabular-nums">{money(inv.total, inv.currency)}</span>
+                        </summary>
+                        <div className="border-t border-white/10 p-5">
+                          <InvoiceView invoice={inv} dense />
+                          <div className="mt-5">
+                            <PayBlock invoice={inv} />
+                          </div>
+                          {inv.payToken && inv.status === "sent" && (
+                            <p className="mt-3 text-center text-[11px] text-muted">
+                              Need to forward this to finance?{" "}
+                              <a href={`/pay/${inv.payToken}`} target="_blank" rel="noreferrer" className="text-cyan-300 hover:underline">
+                                Send them this link
+                              </a> — it opens the invoice and the payment page, no portal key needed.
+                            </p>
+                          )}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                )}
+
+                <ContactUs
+                  title="Something wrong on a bill?"
+                  body="Tell us which invoice and which line. We'd rather fix it than have you pay something you don't agree with."
+                  topic="A question about one of our invoices."
+                  send={sendToCluster}
+                />
               </div>
             ),
           },

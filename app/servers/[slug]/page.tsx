@@ -13,6 +13,10 @@ import Tabs from "@/components/Tabs";
 import Icon from "@/components/Icon";
 import PortalKeyHandoff from "@/components/PortalKeyHandoff";
 import { ServerBoard, TierLadder, FunnelPanel, ChallengeRow, CommandFeed, EarningsPanel } from "@/components/ServerPortal";
+import PayoutSetup from "@/components/PayoutSetup";
+import { listPayouts, payoutTotals, getPayoutAccount, METHOD_OPTIONS } from "@/lib/payouts";
+import { payer } from "@/lib/payments";
+import { vendorBy } from "@/lib/payments/vendors";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +67,7 @@ export default async function ServerPortalPage({
 
   if (!unlocked) return <PublicView server={server} data={data} base={base} unlock={unlock} left={left} mins={mins} />;
 
-  const [challenges, requests, board, feed, thread, unreadFromUs, games, community] = await Promise.all([
+  const [challenges, requests, board, feed, thread, unreadFromUs, games, community, payouts, payoutSums, account, pay] = await Promise.all([
     challengesForGuild(server.guildId),
     listRequests({ guildId: server.guildId }),
     serverBoard(),
@@ -74,7 +78,12 @@ export default async function ServerPortalPage({
     unreadCount("server", server.guildId, "portal"),
     requestableGames(),
     getCommunity(server.guildId),
+    listPayouts({ guildId: server.guildId, limit: 24 }),
+    payoutTotals(server.guildId),
+    getPayoutAccount("server", server.guildId),
+    payer("payout"),
   ]);
+  const payVendor = vendorBy(pay.adapter.key);
 
   // Opening the dashboard IS reading the thread — an unread badge that survives
   // the owner looking straight at the messages is a badge nobody trusts again.
@@ -125,9 +134,13 @@ export default async function ServerPortalPage({
             // Second tab, not last: an owner opens this portal to find out what
             // their community is worth, and the answer should not be three
             // clicks in.
-            key: "earnings", label: "Earnings", icon: "diamond",
+            key: "earnings",
+            label: payoutSums.open > 0 ? `Earnings ($${Math.round(payoutSums.open).toLocaleString()} in flight)` : "Earnings",
+            icon: "diamond",
             node: (
+              <div className="space-y-6">
               <EarningsPanel
+                tierName={data.tier.current.name}
                 ownerPct={data.earnings.ownerPct}
                 clusterPct={data.earnings.clusterPct}
                 nextPct={data.earnings.nextPct}
@@ -136,6 +149,16 @@ export default async function ServerPortalPage({
                 earned={data.earnings.earned}
                 pending={data.earnings.pending}
                 membersWon={data.earnings.membersWon}
+                paidOut={payoutSums.paid}
+                inFlight={payoutSums.open}
+                payoutMethod={METHOD_OPTIONS.find((m) => m.key === account?.methodPreference)?.label.toLowerCase() ?? null}
+                payoutStatus={account?.status ?? "none"}
+                payouts={payouts.map((p) => ({
+                  id: p.id, status: p.status, total: p.total, currency: p.currency,
+                  createdAt: p.createdAt.toISOString(), paidAt: p.paidAt?.toISOString() ?? null,
+                  note: p.note,
+                  lines: p.lines.map((l) => ({ id: l.id, label: l.label, amount: l.amount })),
+                }))}
                 rows={data.earnings.rows.map((r) => ({
                   challengeId: r.challengeId, title: r.title, game: r.game,
                   brandName: r.brandName, endsAt: r.endsAt.toISOString(), ended: r.ended,
@@ -144,6 +167,16 @@ export default async function ServerPortalPage({
                   owner: r.owner, membersWon: r.membersWon,
                 }))}
               />
+              <PayoutSetup
+                guildId={server.guildId}
+                method={account?.methodPreference ?? null}
+                country={account?.country ?? null}
+                currency={account?.currency ?? "USD"}
+                status={account?.status ?? "none"}
+                providerName={payVendor?.name ?? "our payout partner"}
+                providerConnected={!pay.reason}
+              />
+              </div>
             ),
           },
           {

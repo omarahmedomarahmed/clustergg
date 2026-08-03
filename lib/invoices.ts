@@ -226,11 +226,18 @@ export function draftLines(opts: {
   const q = quote(cfg, { games: opts.games, addon: opts.addon });
   const out: { kind: string; label: string; quantity: number; unitAmount: number; sourceType?: string; sourceId?: string }[] = [];
 
+  // The base line always quotes the LIST price — placements on their own — and
+  // the reduction that sponsoring earns is a separate discount line below.
+  //
+  // Quoting the already-reduced base here and then also subtracting the
+  // reduction takes it off twice, which is a $100 hole per invoice per month
+  // that reconciles against nothing. The rule: one line states the price, one
+  // line states the discount, and the total is what `quote()` says.
   out.push({
     kind: "base",
     label: "Placements — clustergg.com and every Discord server on the network",
     quantity: 1,
-    unitAmount: q.base,
+    unitAmount: cfg.reachBase,
   });
 
   if (opts.games > 0) {
