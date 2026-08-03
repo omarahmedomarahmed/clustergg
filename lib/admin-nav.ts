@@ -172,6 +172,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/leaderboards", label: "Leaderboards", desc: "Every board on every game — a game can run several.", metric: "leaderboards" , system: "challenges" },
       { href: "/admin/trophies", label: "Trophies", desc: "The prize catalogue and what each is worth.", metric: "trophies" , system: "trophies" },
       { href: "/admin/redeems", label: "Trophy redemptions", desc: "Winners cashing in. Pay out or reject.", metric: "redeems", queue: true , system: "trophies" },
+      { href: "/admin/marketplace", label: "Marketplace", desc: "Trophies bought with Cluster Points — the shelf, the ledger and what we owe.", system: "trophies" },
     ],
   },
   {

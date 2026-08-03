@@ -67,7 +67,20 @@ export type BandData = {
 const STORE_KEY = "cluster.week.collapsed";
 const nf = (n: number) => n.toLocaleString();
 
-export default function WeekBand({ initial }: { initial: BandData }) {
+export default function WeekBand({ initial, bgUrl = "" }: {
+  initial: BandData;
+  /**
+   * The nav's background art.
+   *
+   * The strip painted a flat `#04051a/70` over it, so the art stopped dead at
+   * the band and the header read as two stacked bars. The expanded board has
+   * the same problem for a different reason: it is portalled to <body>, so it
+   * inherits nothing from the header at all. Both are given the art here, with
+   * the same dark veil the nav uses, so the header is one surface whether the
+   * board is open or shut.
+   */
+  bgUrl?: string;
+}) {
   // Never in the admin area.
   //
   // Staff are signed in, so the board opened by default and dropped a fixed
@@ -93,14 +106,16 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   const embedded = search?.get("embed") === "1";
 
   const [data, setData] = useState<BandData>(initial);
-  // Open for gamers, collapsed for visitors.
+  // Collapsed by default, for everyone.
   //
-  // The board is the engagement hook for someone who has a profile in it, and
-  // 700px of vote standings over the pitch for someone who doesn't. A guest is
-  // far more likely to be a brand or a server owner reading the argument, so
-  // they get the strip and a chevron; a signed-in gamer gets the board. Anyone
-  // who has actually chosen keeps their choice (below).
-  const [open, setOpen] = useState(initial.signedIn);
+  // It used to open for anyone signed in, on the reasoning that the board is
+  // the hook for someone who has a profile in it. In practice that meant 700px
+  // of vote standings dropped over whatever page you actually opened —
+  // including the brand and server portals, where a gamer voting board is
+  // nobody's business. The strip still carries the podium and a chevron, so
+  // the board is one click away and never in the way. Anyone who chooses to
+  // open it keeps that choice (below).
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [openSlug, setOpenSlug] = useState<string | null>(null);
   const [note, setNote] = useState<{ slug: string; text: string } | null>(null);
@@ -114,8 +129,8 @@ export default function WeekBand({ initial }: { initial: BandData }) {
     setMounted(true);
     try {
       const stored = window.localStorage.getItem(STORE_KEY);
-      // Only an explicit stored choice overrides the signed-in default — an
-      // absent key means they've never touched it, not that they want it open.
+      // Only an explicit stored choice reopens it — an absent key means they've
+      // never touched it, not that they want it open.
       if (stored === "1" || stored === "0") setOpen(stored === "0");
     } catch { /* private mode */ }
   }, []);
@@ -190,7 +205,11 @@ export default function WeekBand({ initial }: { initial: BandData }) {
   return (
     <>
       {/* ===== The strip — always in the sticky header ===== */}
-      <div className="border-t border-white/10 bg-[#04051a]/70">
+      <div
+        className={`border-t border-white/10 ${bgUrl ? "bg-cover bg-center" : "bg-[#04051a]/70"}`}
+        style={bgUrl ? {
+          backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${bgUrl})`,
+        } : undefined}>
         <div className="mx-auto flex h-11 max-w-6xl items-center gap-3 px-4">
           <button
             type="button"
@@ -255,8 +274,12 @@ export default function WeekBand({ initial }: { initial: BandData }) {
             style={{ top: "var(--nav-h, 96px)" }}
           />
           <section
-            className="fixed inset-x-0 z-[61] max-h-[calc(100dvh-var(--nav-h,96px))] overflow-y-auto overscroll-contain border-b border-white/10 bg-[#04051a]/95 backdrop-blur-xl shadow-2xl"
-            style={{ top: "var(--nav-h, 96px)" }}
+            className={`fixed inset-x-0 z-[61] max-h-[calc(100dvh-var(--nav-h,96px))] overflow-y-auto overscroll-contain border-b border-white/10 backdrop-blur-xl shadow-2xl ${bgUrl ? "bg-cover bg-center bg-fixed" : "bg-[#04051a]/95"}`}
+            style={{
+              top: "var(--nav-h, 96px)",
+              // A heavier veil than the strip: this one has body copy over it.
+              ...(bgUrl ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.94), rgba(4,5,26,0.97)), url(${bgUrl})` } : {}),
+            }}
             role="region"
             aria-label="Profile of the Week"
           >

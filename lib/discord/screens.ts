@@ -258,6 +258,7 @@ async function moreScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       navButton("Planets", frame("planets"), t, ButtonStyle.Primary, "🪐"),
       navButton("Challenges", frame("challenges"), t, ButtonStyle.Success, "🏆"),
       navButton("Profile of the Week", frame("week"), t, ButtonStyle.Success, "👑"),
+      navButton("Trophy marketplace", frame("market"), t, ButtonStyle.Secondary, "🏆"),
       navButton("Quests", frame("quests"), t, ButtonStyle.Secondary, "🗺"),
       navButton("Leaderboards", frame("leaderboard", ""), t, ButtonStyle.Secondary, "📊"),
       navButton("How it works", frame("guide", "getting-started"), t, ButtonStyle.Secondary, "📖"),
@@ -265,6 +266,76 @@ async function moreScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       navButton("Commands", frame("help"), t, ButtonStyle.Secondary, "❓"),
       ...tail(ctx, here, trail),
       linkButton("Open Cluster", siteUrl(), "🔗"),
+    ]),
+  };
+}
+
+/**
+ * The trophy marketplace, in Discord.
+ *
+ * The SHELF is shown here — balance, the closest trophies, what they redeem
+ * for — but the purchase itself happens on the website, deliberately. Spending
+ * something that converts to real money should happen where the gamer is signed
+ * in and can see what they are getting, which is the same reason voting links
+ * out rather than resolving in a button.
+ */
+async function marketScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  const here = frame("market");
+  const t = [here, ...trail];
+  const site = siteUrl();
+
+  if (!ctx.gamer) {
+    return {
+      embeds: [{
+        title: "🏆 Trophy marketplace",
+        description:
+          "Every trophy on Cluster can be bought with the points you earn just by playing — "
+          + "keep it on your profile or cash it out. Continue with Discord and your balance is waiting.",
+        color: 0xfbbf24,
+      }],
+      components: rows([
+        linkButton("Open the marketplace", `${site}/marketplace`, "🏆"),
+        ...tail(ctx, here, trail),
+      ]),
+    };
+  }
+
+  const { getDb } = await import("@/lib/db");
+  const { marketplaceCatalog } = await import("@/lib/marketplace");
+  const db = await getDb();
+  const { trophies, wallet } = await marketplaceCatalog(db, { userId: ctx.gamer.userId });
+
+  // What they can afford, then what's closest — so the card always has
+  // something to want rather than an empty shelf.
+  const afford = trophies.filter((x) => x.cpPrice <= wallet.balance).slice(0, 3);
+  const nearly = trophies
+    .filter((x) => x.cpPrice > wallet.balance)
+    .sort((a, b) => a.cpPrice - b.cpPrice)
+    .slice(0, 3);
+
+  const line = (x: { name: string; cpPrice: number; value: number }) =>
+    `**${x.name}** — ${x.cpPrice.toLocaleString()} CP${x.value > 0 ? ` · redeems for $${x.value.toLocaleString()}` : ""}`;
+
+  const parts = [
+    `You have **${wallet.balance.toLocaleString()} CP** to spend (${wallet.earned.toLocaleString()} earned all-time).`,
+    "",
+    afford.length ? `**You can get right now**\n${afford.map(line).join("\n")}` : "",
+    nearly.length ? `**Closest to reach**\n${nearly.map(line).join("\n")}` : "",
+    "",
+    "_Spending never lowers your level — your quest progress keeps everything you climbed._",
+  ].filter(Boolean);
+
+  return {
+    embeds: [{
+      title: "🏆 Trophy marketplace",
+      description: parts.join("\n"),
+      color: 0xfbbf24,
+    }],
+    components: rows([
+      linkButton("Spend my points", `${site}/marketplace`, "🏆"),
+      navButton("Quests", frame("quests"), t, ButtonStyle.Secondary, "🗺"),
+      linkButton("My profile", `${site}/u/${ctx.gamer.slug}`, "👤"),
+      ...tail(ctx, here, trail),
     ]),
   };
 }
@@ -1526,6 +1597,7 @@ async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promi
   switch (f.screen) {
     case "home": return homeScreen(ctx, trail);
     case "more": return moreScreen(ctx, trail);
+    case "market": return marketScreen(ctx, trail);
     case "help": return helpScreen(ctx, trail);
     case "show": return showScreen(a, ctx, trail);
     case "gamer": return otherGamerScreen(a, f.args[1] ?? "", ctx, trail);
@@ -1633,6 +1705,16 @@ export async function screenForCommand(query: string): Promise<Frame> {
     case "trophy":
     case "trophies":
       return frame("show", "profile");
+
+    // …but the SHOP is its own thing, and the words people type for it are the
+    // words for shopping, not for trophies.
+    case "market":
+    case "marketplace":
+    case "shop":
+    case "store":
+    case "buy":
+    case "spend":
+      return frame("market");
 
     // One admin command. `/cluster show:server` used to be a sibling that showed
     // half the picture; it is a button inside admin now.

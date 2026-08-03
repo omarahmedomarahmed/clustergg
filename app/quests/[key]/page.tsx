@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
+import { marketplaceCatalog } from "@/lib/marketplace";
+import TrophyMarket from "@/components/TrophyMarket";
 import { getQuestByKey, getTotalCp, getCpLedger, getStarterMissions } from "@/lib/quests";
 import { getQuestPanelArt } from "@/lib/quest-hero";
 import { getContent } from "@/lib/cms";
@@ -27,6 +29,7 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   const { key } = await params;
   const user = await getCurrentUser();
   const db = await getDb();
+  const market = await marketplaceCatalog(db, { userId: user?.id ?? null });
   const detail = await getQuestByKey(db, key, user?.id ?? null);
   if (!detail) notFound();
 
@@ -120,6 +123,14 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
             <CpLedger entries={questLedger} title={`${quest.name} ${tr("CP history")}`} />
           </div>
         )}
+
+        {/* The whole marketplace, on the page where these points are earned.
+            A gamer looking at their progress bar is exactly the person who
+            needs to see what the bar is worth. */}
+        <div className="mt-10">
+          <TrophyMarket trophies={market.trophies} wallet={market.wallet} signedIn={!!user}
+            heading="Spend your Cluster Points" />
+        </div>
       </div>
     </div>
   );

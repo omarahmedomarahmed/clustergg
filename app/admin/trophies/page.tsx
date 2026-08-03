@@ -45,6 +45,11 @@ export default async function AdminTrophiesPage() {
           </select>
           <input name="game" placeholder="Game (optional — blank = universal)" className="input-cosmic" />
           <input name="value" type="number" min={0} step="0.01" placeholder="Value in USD (e.g. 25)" className="input-cosmic" />
+          {/* Blank prices it from value and tier; a number here overrides. */}
+          <input name="cpPrice" type="number" min={0} step={100} placeholder="CP price (blank = auto)" className="input-cosmic" />
+          <label className="flex items-center gap-2 text-xs text-muted">
+            <input type="checkbox" name="inMarketplace" defaultChecked /> Sell in the marketplace
+          </label>
           <label className="sm:col-span-2 text-xs text-muted">
             <span className="mb-1 block">Sponsor</span>
             <select name="brandId" className="input-cosmic w-full">
@@ -110,7 +115,12 @@ function Grid({
             <input type="hidden" name="game" value={t.game ?? ""} />
             <div className="flex items-center justify-center gap-1.5">
               <span className="text-emerald-300 font-bold text-sm">$</span>
-              <input name="value" type="number" min={0} step="0.01" defaultValue={t.value ?? 0} className="input-cosmic !py-1 !px-2 text-xs w-20" />
+              <input name="value" type="number" min={0} step="0.01" defaultValue={t.value ?? 0} className="input-cosmic !py-1 !px-2 text-xs w-20" title="Cash value" />
+              <input name="cpPrice" type="number" min={0} step={100} defaultValue={t.cpPrice || ""} placeholder="auto"
+                className="input-cosmic !py-1 !px-2 text-xs w-24" title="CP price — blank prices it from value and tier" />
+              <label className="flex items-center gap-1 text-[11px] text-muted" title="Show on the marketplace shelf">
+                <input type="checkbox" name="inMarketplace" defaultChecked={t.inMarketplace} /> Sell
+              </label>
             </div>
             <select name="brandId" defaultValue={t.brandId ?? ""} className="input-cosmic !py-1 !px-2 text-[11px] w-full">
               <option value="">No sponsor</option>

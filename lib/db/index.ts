@@ -570,6 +570,25 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "droom_view_idx" ON "dataroom_views" ("doc_id","created_at")`,
 
+  // ----- Trophy marketplace -----
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "cp_price" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "in_marketplace" boolean NOT NULL DEFAULT true`,
+  `CREATE TABLE IF NOT EXISTS "marketplace_orders" (
+    "id" text PRIMARY KEY NOT NULL,
+    "buyer_id" text NOT NULL,
+    "recipient_id" text NOT NULL,
+    "trophy_id" text NOT NULL,
+    "award_id" text,
+    "cp_spent" integer NOT NULL,
+    "value" double precision NOT NULL DEFAULT 0,
+    "kind" text NOT NULL DEFAULT 'self',
+    "message" text,
+    "status" text NOT NULL DEFAULT 'complete',
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "mo_buyer_idx" ON "marketplace_orders" ("buyer_id","created_at")`,
+  `CREATE INDEX IF NOT EXISTS "mo_recipient_idx" ON "marketplace_orders" ("recipient_id")`,
+
   // ----- One game account, one gamer -----
   //
   // `linked_game_accounts` was unique on (user_id, provider, account_id), which

@@ -1117,6 +1117,11 @@ export async function saveTrophy(formData: FormData) {
     // A branded trophy carries a sponsor's logo, so it is only ever offered in
     // that sponsor's own challenges. Blank means the general catalogue.
     brandId: String(formData.get("brandId") ?? "").trim() || null,
+    // Marketplace: 0 lets lib/marketplace.ts price it from value and tier; any
+    // other number is an explicit override that always wins. Hiding a trophy
+    // takes it off the shelf without touching the challenges that award it.
+    cpPrice: Math.max(0, Math.round(Number(formData.get("cpPrice")) || 0)),
+    inMarketplace: formData.get("inMarketplace") !== null,
   };
   if (!values.name || !values.imageUrl) return;
   if (trophyId) {

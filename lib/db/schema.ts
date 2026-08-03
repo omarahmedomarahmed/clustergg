@@ -603,7 +603,45 @@ export const trophies = pgTable("trophies", {
    * competition would put the wrong logo on somebody's profile forever.
    */
   brandId: text("brand_id").references(() => brands.id, { onDelete: "set null" }),
+  /**
+   * What it costs in Cluster Points, and whether the marketplace lists it.
+   *
+   * 0 means "let the model price it" — see lib/marketplace.ts. A price set here
+   * is an explicit admin override and always wins.
+   */
+  cpPrice: integer("cp_price").notNull().default(0),
+  inMarketplace: boolean("in_marketplace").notNull().default(true),
 });
+
+/**
+ * A trophy bought with Cluster Points, for yourself or as a gift.
+ *
+ * The ledger is the point. CP is earned free, so the only thing standing
+ * between a gamer and an unlimited pile of redeemable trophies is that every
+ * purchase is written down and subtracted from a balance — and this table IS
+ * that subtraction. `lib/marketplace.ts` computes balance as earned minus the
+ * sum of this table, which is also why buying never costs a gamer a level:
+ * quest progress is untouched, and levels read progress, not balance.
+ */
+export const marketplaceOrders = pgTable("marketplace_orders", {
+  id: id(),
+  buyerId: text("buyer_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Who ends up owning it — the buyer, or whoever they gifted it to. */
+  recipientId: text("recipient_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  trophyId: text("trophy_id").notNull().references(() => trophies.id, { onDelete: "restrict" }),
+  /** The award row this created, so a refund can find it. */
+  awardId: text("award_id"),
+  cpSpent: integer("cp_spent").notNull(),
+  /** The trophy's cash value at purchase time — what it redeems for later. */
+  value: doublePrecision("value").notNull().default(0),
+  kind: text("kind").notNull().default("self"), // self | gift
+  message: text("message"),
+  status: text("status").notNull().default("complete"), // complete | refunded
+  createdAt: now("created_at"),
+}, (t) => [
+  index("mo_buyer_idx").on(t.buyerId, t.createdAt),
+  index("mo_recipient_idx").on(t.recipientId),
+]);
 
 // A trophy AWARDED to a gamer (challenge podium win). Lives on their profile
 // until redeemed; "pending" = locked inside an open redeem request.
