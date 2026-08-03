@@ -73,7 +73,29 @@ export const linkedGameAccounts = pgTable("linked_game_accounts", {
   providerAccountId: text("provider_account_id").notNull(),
   inGameName: text("in_game_name").notNull(),
   region: text("region"),
+  /**
+   * Ownership is PROVEN, not merely asserted.
+   *
+   * This used to be set true whenever the provider's API answered — which only
+   * ever proved the account exists. Anyone could type "Faker#KR1" and wear it.
+   * It now means what it says, and `verifiedMethod` says how we know.
+   */
   verified: boolean("verified").notNull().default(false),
+  /** claimed | exists | icon | oauth | openid | vc | admin — see lib/account-ownership.ts */
+  verifiedMethod: text("verified_method").notNull().default("claimed"),
+  verifiedAt: timestamp("verified_at", { withTimezone: true, mode: "date" }),
+  /**
+   * An open ownership challenge: what the gamer has to do to prove it, and
+   * until when. Null once proven (or when the game has no proof available).
+   */
+  proofChallenge: jsonb("proof_challenge").$type<Record<string, unknown>>(),
+  proofExpiresAt: timestamp("proof_expires_at", { withTimezone: true, mode: "date" }),
+  /**
+   * ok | disputed. Set when two gamers already held the same account before
+   * uniqueness was enforced. Nothing is deleted — a season of prize-money
+   * history is not something to silently discard — so staff resolve it.
+   */
+  ownershipStatus: text("ownership_status").notNull().default("ok"),
   syncStatus: text("sync_status").notNull().default("pending"), // pending | ok | rate_limited | error | revoked | needs_key
   syncError: text("sync_error"),
   lastSyncedAt: timestamp("last_synced_at", { withTimezone: true, mode: "date" }),

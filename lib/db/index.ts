@@ -569,6 +569,46 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "droom_view_idx" ON "dataroom_views" ("doc_id","created_at")`,
+
+  // ----- One game account, one gamer -----
+  //
+  // `linked_game_accounts` was unique on (user_id, provider, account_id), which
+  // is unique PER USER: two gamers could hold the same Riot account and both be
+  // paid for the same week of play. Uniqueness now spans the platform.
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "verified_method" text NOT NULL DEFAULT 'claimed'`,
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "verified_at" timestamp with time zone`,
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "proof_challenge" jsonb`,
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "proof_expires_at" timestamp with time zone`,
+  `ALTER TABLE "linked_game_accounts" ADD COLUMN IF NOT EXISTS "ownership_status" text NOT NULL DEFAULT 'ok'`,
+
+  // Mobile Legends already had the strongest proof on the platform: a code
+  // Moonton delivers into the game, which only the account holder can read.
+  // Those links keep their tick, correctly labelled.
+  `UPDATE "linked_game_accounts" SET "verified_method" = 'vc', "verified_at" = COALESCE("verified_at", "created_at")
+     WHERE "verified_method" = 'claimed' AND "provider" = 'mobile-legends'`,
+  // Every other pre-existing row was marked verified the moment the provider's
+  // API answered — which proved the account EXISTS, not that the person owns
+  // it. The tick is withdrawn and the truth recorded; owners re-earn it in
+  // seconds through the proof their game supports.
+  `UPDATE "linked_game_accounts" SET "verified" = false, "verified_method" = 'exists'
+     WHERE "verified_method" = 'claimed'`,
+
+  // Collisions that already exist are MARKED, never deleted — a deleted account
+  // cascades its stats, its challenge entries and its standings, and a season of
+  // prize-money history is not something to discard to make an index build. The
+  // earliest claim keeps the account; the rest are flagged for staff.
+  `UPDATE "linked_game_accounts" a SET "ownership_status" = 'disputed', "verified" = false
+     WHERE a."ownership_status" = 'ok' AND EXISTS (
+       SELECT 1 FROM "linked_game_accounts" b
+        WHERE b."provider" = a."provider"
+          AND b."provider_account_id" = a."provider_account_id"
+          AND b."user_id" <> a."user_id"
+          AND (b."created_at" < a."created_at" OR (b."created_at" = a."created_at" AND b."id" < a."id"))
+     )`,
+  // Partial, so the disputed rows above can't stop it building. Going forward
+  // no two live claims can share one account, whatever code path tries.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "lga_provider_acct_unique_idx"
+     ON "linked_game_accounts" ("provider","provider_account_id") WHERE "ownership_status" = 'ok'`,
 ];
 
 async function runColumnMigrations(db: DB) {

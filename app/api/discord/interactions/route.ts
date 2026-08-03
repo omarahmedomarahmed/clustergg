@@ -138,8 +138,14 @@ function linkSubmit(i: Interaction, who: Who, provider: string, fields: Map<stri
       // Re-render the stats screen so they immediately see what they just linked.
       const target = frame("show", `game:${res.game}`);
       const payload = await renderScreen(target, [frame("home")], { ...ctx });
+      // Linking proves the account exists. Prize money needs it to be THEIRS,
+      // and the proof lives on the website — so say so here rather than letting
+      // someone find out at payout time.
+      const next = res.proofAvailable
+        ? `\nOne more step to compete for prizes: prove it's yours at ${siteUrl()}/profile — takes about a minute.`
+        : "";
       await editOriginal(i.token, {
-        content: `**${res.name}** linked. Your ${res.game} stats sync from here on.`,
+        content: `**${res.name}** linked. Your ${res.game} stats sync from here on.${next}`,
         embeds: payload.embeds ?? [],
         components: payload.components ?? [],
       });
