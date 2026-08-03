@@ -284,57 +284,32 @@ async function marketScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   const t = [here, ...trail];
   const site = siteUrl();
 
-  if (!ctx.gamer) {
-    return {
-      embeds: [{
-        title: "🏆 Trophy marketplace",
-        description:
-          "Every trophy on Cluster can be bought with the points you earn just by playing — "
-          + "keep it on your profile or cash it out. Continue with Discord and your balance is waiting.",
-        color: 0xfbbf24,
-      }],
-      components: rows([
-        linkButton("Open the marketplace", `${site}/marketplace`, "🏆"),
-        ...tail(ctx, here, trail),
-      ]),
-    };
-  }
+  const { marketCard } = await import("@/lib/cards/data");
+  const data = await marketCard({ userId: ctx.gamer?.userId ?? null });
+  const { url } = await cardRef("market", { gamer: ctx.gamer?.userId ?? "" });
+  const six = (data && data.kind === "market" ? data.trophies : []).slice(0, 6);
 
-  const { getDb } = await import("@/lib/db");
-  const { marketplaceCatalog } = await import("@/lib/marketplace");
-  const db = await getDb();
-  const { trophies, wallet } = await marketplaceCatalog(db, { userId: ctx.gamer.userId });
-
-  // What they can afford, then what's closest — so the card always has
-  // something to want rather than an empty shelf.
-  const afford = trophies.filter((x) => x.cpPrice <= wallet.balance).slice(0, 3);
-  const nearly = trophies
-    .filter((x) => x.cpPrice > wallet.balance)
-    .sort((a, b) => a.cpPrice - b.cpPrice)
-    .slice(0, 3);
-
-  const line = (x: { name: string; cpPrice: number; value: number }) =>
-    `**${x.name}** — ${x.cpPrice.toLocaleString()} CP${x.value > 0 ? ` · redeems for $${x.value.toLocaleString()}` : ""}`;
-
-  const parts = [
-    `You have **${wallet.balance.toLocaleString()} CP** to spend (${wallet.earned.toLocaleString()} earned all-time).`,
-    "",
-    afford.length ? `**You can get right now**\n${afford.map(line).join("\n")}` : "",
-    nearly.length ? `**Closest to reach**\n${nearly.map(line).join("\n")}` : "",
-    "",
-    "_Spending never lowers your level — your quest progress keeps everything you climbed._",
-  ].filter(Boolean);
+  // A button per trophy, numbered to match the tile it sits under — the card
+  // is a picture, so the only thing tying a button to a trophy is the number
+  // printed on both.
+  const buys = six.map((x, i) => button(
+    `${i + 1} · ${x.cpPrice.toLocaleString()} CP`,
+    actionId("buy", [x.id], t),
+    x.affordable ? ButtonStyle.Success : ButtonStyle.Secondary,
+  ));
 
   return {
-    embeds: [{
-      title: "🏆 Trophy marketplace",
-      description: parts.join("\n"),
-      color: 0xfbbf24,
-    }],
+    embeds: [embed(url, {
+      title: "Trophy marketplace",
+      description: ctx.gamer
+        ? undefined
+        : "Continue with Discord and your balance is waiting — points are earned free, just by playing.",
+      color: "#fbbf24",
+    })],
     components: rows([
-      linkButton("Spend my points", `${site}/marketplace`, "🏆"),
-      navButton("Quests", frame("quests"), t, ButtonStyle.Secondary, "🗺"),
-      linkButton("My profile", `${site}/u/${ctx.gamer.slug}`, "👤"),
+      ...buys,
+      ctx.gamer ? null : linkButton("Continue with Discord", signInUrl(site, "/marketplace"), "🔗"),
+      linkButton("Open the marketplace", `${site}/marketplace`, "🏆"),
       ...tail(ctx, here, trail),
     ]),
   };

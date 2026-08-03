@@ -36,6 +36,7 @@ export const CARD_BG_TYPES: { key: string; label: string; note: string }[] = [
   { key: "bot_planets", label: "Bot · Game picker card", note: "Backdrop of the 'pick your game' card that every START HERE button opens." },
   { key: "bot_guide", label: "Bot · How-to guide cards", note: "Backdrop for the pinned how-to guide PNGs." },
   { key: "bot_week", label: "Bot · Profile of the Week", note: "Backdrop of the weekly vote standings and the Sunday winners card." },
+  { key: "bot_market", label: "Bot · Trophy marketplace", note: "Backdrop of the six-trophy shelf card, with CP and dollar prices." },
   { key: "bot_world", label: "Bot · Game world / lore card", note: "Fallback behind a champion, agent, weapon or map. That entity's own splash art wins when it has one." },
   { key: "bot_search", label: "Bot · Search results card", note: "Backdrop of the 'did you mean' card when a search matches more than one thing." },
 ];

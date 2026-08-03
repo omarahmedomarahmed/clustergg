@@ -309,7 +309,7 @@ export const BADGE_SHOW_IDS = new Set(BADGE_SHOWS.map((b) => b.id));
 
 export const LAYOUT_KINDS: CardKind[] = [
   "profile", "game-stats", "challenge", "leaderboard",
-  "planet", "planets", "quest", "cp-summary", "guide", "week", "world", "search",
+  "planet", "planets", "quest", "cp-summary", "guide", "week", "market", "world", "search",
 ];
 
 export const layoutKey = (kind: string) => `card.layout.${kind}`;

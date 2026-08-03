@@ -11,7 +11,7 @@ import { assetPicture } from "@/lib/cards/asset-source";
 import { layoutFor } from "@/lib/cards/layout-store";
 import type {
   CardAdSlot,
-  CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard,
+  CardData, CardTheme, ProfileCard, GameStatsCard, QuestCard, CpSummaryCard, MarketCard,
   LeaderboardCard, ChallengeCard, PlanetCard, PlanetsCard, GuideCard, WeekCard,
   WorldCard, SearchCard,
 } from "@/lib/cards/types";
@@ -1123,6 +1123,118 @@ function Empty({ children, p }: { children: React.ReactNode; p?: PartDraw }) {
 // `race` is the daily post and `result` is Sunday's. They deliberately share a
 // frame: a server that has watched the standings move all week should recognise
 // the card that ends it, with the podium in the same place the leaders were.
+/**
+ * The marketplace shelf: two rows of three, both numbers on every tile.
+ *
+ * The dollar value is the point. A CP price alone reads as a game currency;
+ * "12,000 CP · $8" is a gamer's free points quoted in money, which is the whole
+ * reason to keep playing a week you already lost.
+ */
+function MarketBody(d: MarketCard) {
+  const t = d.theme;
+  const [pBal, pTiles, pPills, pEmpty] = ["balance", "tiles", "pills", "empty"].map((k) => part(t, k));
+  // Six, in two rows of three. The tile is sized to the CONTENT column, not to
+  // the canvas: the ad slot owns the top-right, so a tile wide enough to look
+  // right against 1200px wraps to two-per-row and pushes the second row off the
+  // bottom — which is exactly what the first draft did.
+  const shown = (d.trophies ?? []).slice(0, 6);
+  const TILE_W = 218;
+  const TILE_H = 138;
+
+  return (
+    <Frame theme={t}>
+      <Title text={d.title} sub={clamp(d.subtitle, 64)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+
+      {/* The balance, in its own region — a shelf you can't price yourself
+          against is a catalogue. Positioned rather than in flow, because every
+          other block on this card is absolutely placed by the layout editor and
+          a single in-flow element lands underneath them. */}
+      <Section p={pBal} style={{ marginTop: 4 }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+          <span style={{ display: "flex", fontSize: pBal.f(40), fontWeight: 900, color: t.accent2 }}>
+            {d.balance.toLocaleString()} CP
+          </span>
+          <span style={{ display: "flex", fontSize: pBal.f(19), fontWeight: 700, color: MUTED }}>
+            {pBal.say(`to spend · ${d.earned.toLocaleString()} earned all-time`)}
+          </span>
+        </div>
+      </Section>
+
+      {shown.length === 0 ? (
+        <Section p={pEmpty} style={{ marginTop: 40 }}>
+          <div style={{ display: "flex", fontSize: pEmpty.f(25), color: MUTED, lineHeight: 1.3 }}>
+            {pEmpty.say("The shelf is empty right now — check back once staff put trophies up.")}
+          </div>
+        </Section>
+      ) : (
+        <Section p={pTiles}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, width: TILE_W * 3 + 24 }}>
+            {shown.map((x, i) => (
+              <div key={x.id} style={{
+                display: "flex", flexDirection: "column", width: TILE_W, height: TILE_H,
+                borderRadius: 16, padding: 11, gap: 4,
+                background: "rgba(0,0,0,0.38)",
+                border: `2px solid ${x.affordable ? `${t.accent}66` : "rgba(255,255,255,0.10)"}`,
+                // Out of reach reads dimmer rather than absent: it is the thing
+                // worth playing for, so it has to stay on the shelf.
+                opacity: x.affordable ? 1 : 0.6,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                  {x.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={x.imageUrl} alt="" width={44} height={44}
+                      style={{ width: 44, height: 44, objectFit: "contain" }} />
+                  ) : (
+                    <div style={{ display: "flex", width: 44, height: 44, borderRadius: 11, background: "rgba(255,255,255,0.07)" }} />
+                  )}
+                  <div style={{
+                    display: "flex", width: 26, height: 26, borderRadius: 999,
+                    alignItems: "center", justifyContent: "center", marginLeft: "auto",
+                    fontSize: 16, fontWeight: 900, color: "#0b1020", background: t.accent2,
+                  }}>
+                    {i + 1}
+                  </div>
+                </div>
+                {/* Fixed height and a hard clamp: "Champion's Nebula Cup"
+                    wrapped to two lines and landed on top of the tier, which is
+                    the one failure mode a fixed-size tile has. */}
+                {/* No fixed height: clipping a box to hold one line cut the
+                    descenders off every name with a p or a y in it. The clamp
+                    keeps it to one line instead, which is the actual goal. */}
+                <div style={{ display: "flex", fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>
+                  {clamp(x.name, 17)}
+                </div>
+                <div style={{ display: "flex", height: 15, fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1 }}>
+                  {x.tier}
+                </div>
+                {/* BOTH numbers. The CP price alone reads as a game currency;
+                    the dollar beside it is what says the free points are money. */}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: "auto" }}>
+                  <span style={{ display: "flex", fontSize: 23, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED }}>
+                    {x.cpPrice.toLocaleString()} CP
+                  </span>
+                  <span style={{ display: "flex", fontSize: 18, fontWeight: 800, color: "#34d399" }}>
+                    = ${x.value.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      <Section p={pPills} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        <Pill color={t.accent2} bg={alpha(t.accent2, 0.13)} size={pPills.f(19)}>
+          {`${d.cpPerDollar.toLocaleString()} CP = $1`}
+        </Pill>
+        <Pill color="#34d399" bg="rgba(52,211,153,0.13)" size={pPills.f(19)}>
+          Spending never lowers your level
+        </Pill>
+      </Section>
+    </Frame>
+  );
+}
+
 function WeekBody(d: WeekCard) {
   const t = d.theme;
   const [pRows, pPills, pEmpty] = ["rows", "pills", "empty"].map((k) => part(t, k));
@@ -1507,6 +1619,7 @@ function body(d: CardData) {
     case "planets": return PlanetsBody(d);
     case "guide": return GuideBody(d);
     case "week": return WeekBody(d);
+    case "market": return MarketBody(d);
     case "world": return WorldBody(d);
     case "search": return SearchBody(d);
   }
@@ -1702,6 +1815,20 @@ async function prepareBody(d: CardData): Promise<CardData> {
     case "planets": {
       const [bgUrl, ...logos] = await Promise.all([bg, ...d.games.map((g) => toEmbeddable(g.logoUrl, ICON))]);
       return { ...d, games: d.games.map((g, i) => ({ ...g, logoUrl: logos[i] })), theme: { ...d.theme, bgUrl } };
+    }
+    case "market": {
+      const [bgUrl, ...arts] = await Promise.all([
+        bg,
+        ...d.trophies.map((x) => toEmbeddable(x.imageUrl, { maxWidth: 160 })),
+      ]);
+      return {
+        ...d,
+        // A tile SURVIVES its art failing: the name, the price and the dollar
+        // value are the payload, and dropping the trophy because an image host
+        // was slow would leave a gap where the offer should be.
+        trophies: d.trophies.map((x, i) => ({ ...x, imageUrl: arts[i] })),
+        theme: { ...d.theme, bgUrl },
+      };
     }
     case "week": {
       // The trophy art is fetched once and reused for every placement — all

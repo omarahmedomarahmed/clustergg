@@ -141,6 +141,8 @@ export async function previewSamples(kind: string): Promise<CardSample[]> {
           params: { topic: k },
         }));
       }
+      case "market":
+        return [{ id: "shelf", label: "The shelf", note: "six trophies, CP and dollar prices", params: {} }];
       case "week":
         return [
           { id: "race", label: "Mid-week race", note: "voting open, standings moving", params: { mode: "race" } },

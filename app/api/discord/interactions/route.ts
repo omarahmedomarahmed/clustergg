@@ -764,6 +764,40 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
     }
   }
 
+  // Buying a trophy from the marketplace card.
+  //
+  // The price, the balance and the ownership check all live in
+  // `buyTrophy` — nothing here is trusted from the button, because a card
+  // posted an hour ago carries an hour-old balance on its face.
+  if (target.screen === "buy") {
+    if (!ctx.gamer) {
+      await editOriginal(i.token, {
+        embeds: [{
+          color: 0xf59e0b,
+          description: `Continue with Discord first and your balance is waiting: ${siteUrl()}/login`,
+        }],
+      });
+      return;
+    }
+    const { buyTrophy } = await import("@/lib/marketplace");
+    const res = await buyTrophy(ctx.gamer.userId, target.args[0] ?? "");
+    if (!res.ok) {
+      await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: res.error }] });
+      return;
+    }
+    // Fall through to the re-render, so the card comes back with the new
+    // balance and the tiles they can now afford — but say what happened first,
+    // because a picture changing is not an acknowledgement.
+    const payload = await renderScreen(frame("market"), trail, ctx);
+    await editOriginal(i.token, {
+      content: `**${res.trophy}** is yours — ${res.cpSpent.toLocaleString()} CP spent, `
+        + `${res.balance.toLocaleString()} left. It's on your profile and it can be redeemed for cash.`,
+      embeds: payload.embeds ?? [],
+      components: payload.components ?? [],
+    });
+    return;
+  }
+
   // Re-render whatever screen the action was launched from, so the button
   // state (e.g. "Join" → "You've joined") reflects what just happened.
   const back = trail[0] ?? frame("home");

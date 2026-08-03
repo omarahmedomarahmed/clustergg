@@ -216,6 +216,27 @@ function resolve(d: CardData, key: string): PartContent {
         default: return EMPTY;
       }
 
+    // market | title, tiles, pills, empty
+    case "market":
+      switch (key) {
+        case "title":
+          return made(take([d.title, d.subtitle]));
+        case "balance":
+          return made(take([`${d.balance.toLocaleString()} CP to spend`, `${d.earned.toLocaleString()} earned all-time`]));
+        case "tiles":
+          return made(
+            take(d.trophies.map((x) => `${x.name} — ${x.cpPrice.toLocaleString()} CP = $${x.value}`), 6),
+            d.trophies.map((x) => x.imageUrl),
+          );
+        case "pills":
+          return made(take([
+            `${d.cpPerDollar.toLocaleString()} CP = $1`,
+            "Spending never lowers your level",
+            "Redeem a bought trophy for cash",
+          ]));
+        default: return EMPTY;
+      }
+
     // week | title, rows, pills, empty
     case "week":
       switch (key) {
