@@ -192,7 +192,7 @@ function keySubmit(i: Interaction, who: Who, challengeId: string, key: string) {
 
       const res = await joinChallengeFor(ctx.gamer.userId, challengeId, { source: "discord", accessKey: key });
       if (!res.ok) {
-        await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }] });
+        await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason, res.unmet) }] });
         return;
       }
       const payload = await renderScreen(frame("challenge", challengeId), [frame("home")], ctx);
@@ -673,7 +673,7 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
     });
     if (!res.ok) {
       await editOriginal(i.token, {
-        embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason) }],
+        embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason, res.unmet) }],
       });
       return;
     }
@@ -778,8 +778,14 @@ async function voteForSlug(slug: string, discordId: string, guildId?: string) {
   return castDiscordVote(u.id, discordId, guildId ?? null);
 }
 
-function joinFailure(reason: string): string {
+function joinFailure(reason: string, unmet?: string[]): string {
   switch (reason) {
+    case "requirements":
+      // Name the rank they need, not "you don't qualify". A gate a gamer can't
+      // read is a gate they'll argue with in the server's chat.
+      return unmet?.length
+        ? `This challenge is for a skill bracket you're not in yet: **${unmet.join("**, **")}**. Your rank syncs automatically — come back when you climb.`
+        : "You don't meet this challenge's entry requirements yet.";
     case "no_account": return "You need a linked account for that game first — run `/cluster show:link`.";
     case "gated": return "This challenge requires quest badges you haven't earned yet.";
     case "locked": return "This one needs an entry key — it was sent to the server running the challenge.";

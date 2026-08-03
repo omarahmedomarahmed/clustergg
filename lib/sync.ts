@@ -4,6 +4,7 @@ import { schema } from "@/lib/db";
 import { ADAPTERS } from "@/lib/providers/adapters";
 import { getProvider, isProviderLive } from "@/lib/providers/registry";
 import { evaluateBadgesForUser, grantBadgeByCode } from "@/lib/badges";
+import { meetsRule } from "@/lib/challenge-rules";
 import { awardQuestAction } from "@/lib/quests";
 import { uid } from "@/lib/utils";
 
@@ -145,16 +146,14 @@ export async function scoreChallengesForAccount(db: DB, linkedAccountId: string)
         .where(eq(schema.challengeParticipants.id, participant.id));
       participant.baseline = merged;
     }
-    const conditionsMet = (challenge.rules?.conditions ?? []).every((c) => {
-      const d = delta[c.metric] ?? 0;
-      switch (c.op) {
-        case ">=": return d >= c.value;
-        case ">": return d > c.value;
-        case "<=": return d <= c.value;
-        case "<": return d < c.value;
-        default: return d >= c.value;
-      }
-    });
+    // Entry rules are measured against what the account HOLDS, not against what
+    // this run produced. They used to be compared to the delta, which made a
+    // rank rule unsatisfiable by construction: "Gold or above in Solo/Duo" is
+    // stored as `solo_tier >= 1200`, and read as a delta that demanded a gamer
+    // climb 1,200 tier-points inside one week or score nothing. Points still
+    // come from the delta — that part was never in question.
+    const conditionsMet = (challenge.rules?.conditions ?? [])
+      .every((c) => meetsRule(c, current[c.metric] ?? 0));
     let points = 0;
     if (conditionsMet) {
       for (const [metric, pts] of Object.entries(challenge.pointsEngine ?? {})) {

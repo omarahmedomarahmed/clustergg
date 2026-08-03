@@ -16,7 +16,7 @@ import AdSlot from "@/components/AdSlot";
 import Countdown from "@/components/Countdown";
 import LiveChallengeBoard from "@/components/LiveChallengeBoard";
 import { joinChallenge } from "@/app/actions/social";
-import { joinLocked } from "@/lib/challenges";
+import { joinLocked, unmetEntryRules } from "@/lib/challenges";
 import { recordServerEvent } from "@/lib/server-portal";
 import { getQuestCompletions } from "@/lib/quests";
 
@@ -117,6 +117,12 @@ export default async function ChallengePage({
       gate = { questName: gq.name, logoUrl: gq.logoUrl, need: challenge.gateMinBadges, have, ok: have >= challenge.gateMinBadges };
     }
   }
+
+  // The skill rules the viewer's account doesn't meet, resolved through the same
+  // function the join door uses so the page can't promise entry the door denies.
+  const unmet = !joined && myAccounts.length > 0
+    ? await unmetEntryRules(db, challenge, myAccounts[0].id)
+    : [];
 
   // A server-gated challenge is fully visible — standings, trophies, countdown,
   // everyone's progress. Only ENTERING needs the key that was sent to the
@@ -270,6 +276,26 @@ export default async function ChallengePage({
                   <Icon name="link" size={15} />
                   {tr("You need a linked")} <b>{provider?.name}</b> {tr("account —")}{" "}
                   <Link href="/profile" className="text-cyan-300 underline">{tr("link it on your profile")}</Link>.
+                </div>
+              ) : unmet.length > 0 ? (
+                /* Named, not just refused. A gamer who is told "Diamond I" can
+                   go and climb; one who is told "you don't qualify" argues
+                   about it in their server's chat instead. */
+                <div className="rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4 text-sm">
+                  <div className="flex items-center gap-2 font-semibold text-amber-200">
+                    <Icon name="lock" size={15} /> {tr("This one is for a skill bracket you're not in yet")}
+                  </div>
+                  <ul className="mt-1.5 space-y-1 text-xs text-muted">
+                    {unmet.map((line) => (
+                      <li key={line} className="flex items-start gap-1.5">
+                        <Icon name="x" size={12} className="mt-0.5 shrink-0 text-amber-300" />
+                        <span>{line}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1.5 text-xs text-muted">
+                    {tr("Your rank syncs automatically — this unlocks the moment you get there.")}
+                  </p>
                 </div>
               ) : gate && !gate.ok ? (
                 <div className="rounded-2xl border border-amber-400/30 bg-amber-500/5 p-4 text-sm">

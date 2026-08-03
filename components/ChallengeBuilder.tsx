@@ -6,6 +6,7 @@ import CoverFramer from "@/components/CoverFramer";
 import MetricsGuide from "@/components/MetricsGuide";
 import { saveChallenge, type ChallengeSaveState } from "@/app/actions/admin";
 import { RULE_OPS, isRanked, ruleSentence, valueChoices, OPEN_TO_EVERYONE } from "@/lib/challenge-rules";
+import type { MetricDef } from "@/lib/providers/registry";
 
 // How long one run of each cadence lasts. Mirrors lib/challenge-series so the
 // preview the builder draws is the schedule the server will actually create —
@@ -25,7 +26,9 @@ export type BuilderProvider = {
   live: boolean;
   authType?: string;
   docsUrl?: string;
-  capabilities: { key: string; label: string; unit?: string; higherIsBetter?: boolean }[];
+  /** The provider's own MetricDefs, whole. Listing the fields by hand is how
+   *  `ranks` got dropped and every rank rule became a number box. */
+  capabilities: MetricDef[];
 };
 export type BuilderSpace = { id: string; name: string; game: string | null };
 export type BuilderTrophy = {
@@ -187,6 +190,11 @@ export default function ChallengeBuilder({
 
   const pointsJson = JSON.stringify(Object.fromEntries(Object.entries(pointsMap).filter(([, v]) => v > 0)));
   const conditionsJson = JSON.stringify(conditions.filter((c) => c.metric));
+
+  // Where a fresh rule starts. A ranked metric starts at the bottom rung of its
+  // own ladder rather than at 0 — Dota's Herald 1 is stored as 11, and a rule
+  // that opened at "at least 0" would name a rank while letting everyone in.
+  const startValue = (key: string) => valueChoices(caps.find((c) => c.key === key))[0]?.value ?? 0;
 
   // The sentence a gamer reads, built by the same function the challenge page
   // and the Discord card use — so the summary is not a second opinion.
@@ -475,7 +483,7 @@ export default function ChallengeBuilder({
         <Step n={6} title="Who can enter" hint="most challenges should be open">
           <div className="mb-1.5 flex items-center justify-end">
             <button type="button"
-              onClick={() => setConditions((c) => [...c, { metric: caps[0]?.key ?? "", op: ">=", value: 0 }])}
+              onClick={() => setConditions((c) => [...c, { metric: caps[0]?.key ?? "", op: ">=", value: startValue(caps[0]?.key ?? "") }])}
               className="inline-flex items-center gap-1 text-xs text-cyan-300 hover:underline">
               <Icon name="plus" size={11} /> Add a requirement
             </button>
@@ -495,21 +503,23 @@ export default function ChallengeBuilder({
                   <div key={i} className="rounded-lg border border-white/10 bg-black/20 p-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <select value={cond.metric}
-                        onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, metric: e.target.value, value: 0 } : x))}
+                        onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, metric: e.target.value, value: startValue(e.target.value) } : x))}
                         className="input-cosmic !py-1 min-w-[10rem] flex-1 text-sm">
                         {caps.map((cp) => <option key={cp.key} value={cp.key}>{cp.label}</option>)}
                       </select>
                       <select value={cond.op}
                         onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, op: e.target.value } : x))}
                         className="input-cosmic !py-1 w-32 text-sm">
-                        {RULE_OPS.map((o) => (
-                          <option key={o.op} value={o.op}>{ranked ? o.ranked : o.numeric}</option>
-                        ))}
+                        {RULE_OPS.map((o) => <option key={o.op} value={o.op}>{o.label}</option>)}
                       </select>
                       {ranked ? (
+                        /* The game's own ladder — every rung it has, divisions
+                           included. The option's value is the number a synced
+                           account at that rank actually holds, so picking
+                           "Diamond I" stores what Diamond I means. */
                         <select value={cond.value}
                           onChange={(e) => setConditions((c) => c.map((x, j) => j === i ? { ...x, value: Number(e.target.value) } : x))}
-                          className="input-cosmic !py-1 w-36 text-sm">
+                          className="input-cosmic !py-1 w-40 text-sm">
                           {choices.map((ch) => <option key={ch.value} value={ch.value}>{ch.label}</option>)}
                         </select>
                       ) : (

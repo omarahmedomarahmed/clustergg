@@ -1,5 +1,5 @@
 import { and, desc, eq, lt } from "drizzle-orm";
-import { getDb, schema } from "@/lib/db";
+import { getDb, schema, type DB } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
 import { announceChallengeJoined, announceChallengeEnded } from "@/lib/discord/announce";
@@ -13,7 +13,12 @@ import { announceChallengeJoined, announceChallengeEnded } from "@/lib/discord/a
 
 export type JoinResult =
   | { ok: true; already: boolean; game: string; title: string; account: string }
-  | { ok: false; reason: "not_found" | "not_active" | "no_account" | "gated" | "locked" | "bad_key" };
+  | {
+    ok: false;
+    reason: "not_found" | "not_active" | "no_account" | "gated" | "locked" | "bad_key" | "requirements";
+    /** For "requirements": the entry rules this account doesn't meet, in plain English. */
+    unmet?: string[];
+  };
 
 export type EntryAccount = {
   id: string;
@@ -106,6 +111,16 @@ export async function joinChallengeFor(
     if (have < challenge.gateMinBadges) return { ok: false, reason: "gated" };
   }
 
+  // Skill entry rules — "At least Diamond I in Flex 5v5 tier".
+  //
+  // These are checked HERE, at the door, which they were not. The rules were
+  // only consulted by the scorer, against the delta a run produced, so a Bronze
+  // account could enter a Diamond-gated challenge, play all week, and end on
+  // zero points with nothing on screen explaining why. Whoever built the
+  // challenge would see a full leaderboard of zeroes.
+  const unmet = await unmetEntryRules(db, challenge, account.id);
+  if (unmet.length) return { ok: false, reason: "requirements", unmet };
+
   const [existing] = await db.select({
     id: schema.challengeParticipants.id,
     linkedAccountId: schema.challengeParticipants.linkedAccountId,
@@ -141,6 +156,35 @@ export async function joinChallengeFor(
   void announceChallengeJoined(userId, challengeId).catch(() => {});
 
   return { ok: true, already: false, game: challenge.game, title: challenge.title, account: account.inGameName };
+}
+
+/**
+ * Which of a challenge's entry rules an account fails, in plain English.
+ *
+ * One function so the door and the page agree. A challenge page that says "you
+ * need Diamond I" and a join button that lets you in anyway is worse than
+ * either alone, and that is exactly what two copies of this logic produce.
+ *
+ * Measured against what the account HOLDS — its synced rank, its lifetime win
+ * count — because "who can enter" has no other meaning.
+ */
+export async function unmetEntryRules(
+  db: DB,
+  challenge: { provider: string; rules?: { conditions?: { metric: string; op: string; value: number }[] } | null },
+  linkedAccountId: string,
+): Promise<string[]> {
+  const conditions = challenge.rules?.conditions ?? [];
+  if (conditions.length === 0) return [];
+  const [{ unmetRules }, { getProvider }] = await Promise.all([
+    import("@/lib/challenge-rules"),
+    import("@/lib/providers/registry"),
+  ]);
+  const rows = await db.select({
+    metricKey: schema.statCurrent.metricKey, metricValue: schema.statCurrent.metricValue,
+  }).from(schema.statCurrent).where(eq(schema.statCurrent.linkedAccountId, linkedAccountId));
+  const stats: Record<string, number> = {};
+  for (const r of rows) stats[r.metricKey] = r.metricValue;
+  return unmetRules(conditions, stats, getProvider(challenge.provider)?.capabilities ?? []);
 }
 
 // The web URL for a challenge. There is no top-level /challenges route — a
