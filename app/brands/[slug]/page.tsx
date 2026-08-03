@@ -35,9 +35,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function BrandPortalPage({
   params, searchParams,
-}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; unlock?: string; campaign?: string; filter?: string; left?: string; mins?: string }> }) {
+}: { params: Promise<{ slug: string }>; searchParams: Promise<{ key?: string; unlock?: string; campaign?: string; challenge?: string; filter?: string; left?: string; mins?: string }> }) {
   const { slug } = await params;
-  const { key = "", unlock = "", campaign: campaignId = "", filter = "all", left = "", mins = "" } = await searchParams;
+  const { key = "", unlock = "", campaign: campaignId = "", challenge: challengeId = "", filter = "all", left = "", mins = "" } = await searchParams;
   const db = await getDb();
   const brand = await getBrandBySlugOrId(db, slug);
   if (!brand) notFound();
@@ -51,7 +51,14 @@ export default async function BrandPortalPage({
   // render may not write cookies) and can't `redirect()` there either — App
   // Router redirects go through the client router, which doesn't reliably
   // follow a route handler's 307.
-  if (key) return <PortalKeyHandoff kind="brand" slug={brand.slug ?? brand.id} portalKey={key} />;
+  // The deep-link target travels with the key so a shared "open this week"
+  // link lands on the week rather than the portal home.
+  if (key) {
+    const deep = new URLSearchParams();
+    if (challengeId) deep.set("challenge", challengeId);
+    if (campaignId) deep.set("campaign", campaignId);
+    return <PortalKeyHandoff kind="brand" slug={brand.slug ?? brand.id} portalKey={key} deep={deep.toString()} />;
+  }
   const unlocked = await hasPortalSession("brand", brand.id);
   const cover = brand.coverUrl;
   const base = `/brands/${brand.slug}`;
@@ -118,6 +125,35 @@ export default async function BrandPortalPage({
   ]);
   await markThreadRead("brand", brand.id, "portal");
   const sendToCluster = portalSendMessage.bind(null, brand.id, key);
+
+  // ---- One sponsored challenge, in full ----
+  //
+  // A brand that bought four weeks had a cover image and a podium per week.
+  // This is the week itself: the trophies their logo is on, everyone who
+  // entered, where each entrant came from, and how any one of them scored.
+  if (challengeId) {
+    const { brandChallengeDetail } = await import("@/lib/brand-challenge-detail");
+    const detail = await brandChallengeDetail(brand.id, challengeId);
+    if (!detail) {
+      return (
+        <div className="min-h-screen mx-auto max-w-5xl px-4 py-10">
+          <a href={base} className="text-cyan-300">← Back to portal</a>
+          <div className="glass p-6 mt-4 text-muted">
+            That challenge isn&apos;t one of yours. If you think it should be, message us from the Messages tab.
+          </div>
+        </div>
+      );
+    }
+    const BrandChallengeDetailView = (await import("@/components/BrandChallengeDetail")).default;
+    return (
+      <div className="min-h-screen">
+        <PortalHeader name={brand.name} logo={brand.logoUrl} cover={detail.coverUrl || cover} subtitle={detail.title} />
+        <div className="mx-auto max-w-5xl px-4 py-8">
+          <BrandChallengeDetailView detail={detail} brandId={brand.id} keyStr={key} backHref={base} />
+        </div>
+      </div>
+    );
+  }
 
   // ---- Per-campaign drill-down view ----
   if (campaignId) {
@@ -339,12 +375,145 @@ export default async function BrandPortalPage({
             ),
           },
           {
-            // The card placement: the only inventory a brand cannot buy
-            // anywhere else, and uploading to it is the whole launch — no
-            // account manager in the way.
-            key: "card", label: "Discord card", icon: "image", dot: cardEmpty,
+            // Every campaign a brand is running, in one place — the sponsored
+            // months AND the ad campaigns. This used to be a section buried at
+            // the bottom of the analytics tab, which is why nobody found the
+            // week-by-week detail that sits one click inside it.
+            key: "campaigns", label: "Campaigns", icon: "rocket",
             node: (
-              <div className="space-y-6">
+              <div className="space-y-8">
+                {/* Every week of every sponsored month, as its own card.
+                    `sponsored` is the CAMPAIGNS a brand bought; the weeks
+                    inside them are the challenges that actually ran, and the
+                    week is what a brand wants to open. */}
+                {campaignViews.length > 0 && (
+                  <section>
+                    <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+                      <Icon name="trophy" size={18} className="text-amber-300" /> Sponsored challenges
+                    </h2>
+                    <p className="mb-3 text-xs text-muted">
+                      Open any week for the full field, the trophies your logo is on, and how each gamer scored.
+                    </p>
+                    <div className="space-y-5">
+                      {campaignViews.map((cv) => (
+                        <div key={cv.campaign.id}>
+                          <div className="mb-2 flex flex-wrap items-baseline gap-2">
+                            <span className="text-sm font-bold">{cv.campaign.game}</span>
+                            <span className="text-[11px] text-muted">
+                              {cv.campaign.slots} week{cv.campaign.slots === 1 ? "" : "s"} · {cv.totals.entrants} entrants · {num(cv.totals.members)} reached
+                            </span>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            {cv.weeks.map((w) => {
+                              const r = w.report;
+                              const inner = (
+                                <>
+                                  <div className="relative h-20">
+                                    {(w.coverUrl || cover) ? (
+                                      /* eslint-disable-next-line @next/next/no-img-element */
+                                      <img src={w.coverUrl || cover || ""} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80 transition group-hover:opacity-100" />
+                                    ) : <div className="absolute inset-0" style={{ background: "radial-gradient(120% 140% at 10% 0%, #8b5cf655, transparent 60%), #0a0a1c" }} />}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1c] to-transparent" />
+                                    <div className="absolute bottom-2 left-3 right-3">
+                                      <div className="truncate text-sm font-bold">{r?.title ?? `Week ${w.index}`}</div>
+                                      <div className="text-[10px] uppercase tracking-wider text-muted">Week {w.index} · {w.status}</div>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-3 gap-2 p-3 text-center">
+                                    <MiniStat label="Entrants" value={num(r?.entrants ?? 0)} />
+                                    <MiniStat label="Reached" value={num(r?.reach.members ?? 0)} />
+                                    <MiniStat label="Clicks" value={num(r?.clicks ?? 0)} />
+                                  </div>
+                                </>
+                              );
+                              // A week that hasn't been created yet has nothing
+                              // to open — showing a dead link would be worse
+                              // than showing it greyed.
+                              return w.challengeId ? (
+                                <a key={w.index} href={`${base}?challenge=${w.challengeId}`}
+                                  className="glass group overflow-hidden transition hover:ring-1 hover:ring-cyan-400/40">
+                                  {inner}
+                                  <div className="flex items-center justify-end px-3 pb-3">
+                                    <span className="inline-flex items-center gap-1 text-[11px] text-cyan-300 transition-all group-hover:gap-2">
+                                      Open the week <Icon name="arrowRight" size={12} />
+                                    </span>
+                                  </div>
+                                </a>
+                              ) : (
+                                <div key={w.index} className="glass overflow-hidden opacity-60">
+                                  {inner}
+                                  <div className="px-3 pb-3 text-right text-[11px] text-muted">Not scheduled yet</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+              {/* Campaigns — filter + clickable cards → per-campaign analytics */}
+              <section>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                  <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="rocket" size={18} className="text-cyan-300" /> Your campaigns</h2>
+                  <div className="flex flex-wrap gap-1.5">
+                    {chip("all", `All (${data.totals.total})`)}
+                    {chip("active", "Live")}
+                    {chip("paused", "Paused")}
+                    {chip("draft", "Draft")}
+                    {chip("completed", "Ended")}
+                  </div>
+                </div>
+                {shown.length === 0 && <div className="glass p-6 text-center text-muted">No campaigns in this filter.</div>}
+                <div className="grid md:grid-cols-2 gap-3">
+                  {shown.map((c) => (
+                    <a key={c.id} href={`${base}?campaign=${c.id}`} className="glass overflow-hidden group hover:ring-1 hover:ring-cyan-400/40 transition">
+                      <div className="h-20 relative">
+                        {(c.coverUrl || cover) ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={c.coverUrl || cover || ""} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition" />
+                        ) : <div className="absolute inset-0" style={{ background: "radial-gradient(120% 140% at 10% 0%, #8b5cf655, transparent 60%), #0a0a1c" }} />}
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1c] to-transparent" />
+                        <div className="absolute bottom-2 left-3 right-3 flex items-center gap-2">
+                          {(c.logoUrl || brand.logoUrl) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={c.logoUrl || brand.logoUrl || ""} alt="" className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20 bg-black/40" />}
+                          <div className="font-bold truncate">{c.name}</div>
+                          <span className={`ml-auto text-[10px] font-semibold ${c.status === "active" ? "text-emerald-300" : "text-amber-300"}`}>● {c.status}</span>
+                        </div>
+                      </div>
+                      <div className="p-3 grid grid-cols-3 gap-2 text-center">
+                        <MiniStat label="Impr." value={num(c.impressions)} />
+                        <MiniStat label="Clicks" value={num(c.clicks)} />
+                        <MiniStat label="CTR" value={`${(c.ctr * 100).toFixed(1)}%`} />
+                      </div>
+                      <div className="px-3 pb-3 flex items-center justify-between">
+                        <span className={`text-[11px] ${c.ready ? "text-emerald-300" : "text-amber-300"}`}>{c.filled}/{c.total} placements ready</span>
+                        <span className="text-[11px] text-cyan-300 inline-flex items-center gap-1 group-hover:gap-2 transition-all">Open analytics <Icon name="arrowRight" size={12} /></span>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </section>
+
+                {campaignViews.length === 0 && data.totals.total === 0 && (
+                  <ContactUs
+                    title="No campaigns yet"
+                    body="Buy a month of sponsored challenges on the Buy tab — it goes live without anyone in the way. Or tell us what you're trying to reach and we'll build it with you."
+                    topic="We'd like to start a campaign."
+                    send={sendToCluster}
+                  />
+                )}
+              </div>
+            ),
+          },
+          {
+            // Every creative, both surfaces, on one page. A brand uploading art
+            // should not have to work out which tab a given surface lives
+            // behind — the Discord card had a tab of its own and the website
+            // placements were inside the analytics tab.
+            key: "creatives", label: "Creatives", icon: "image", dot: cardEmpty || adsIncomplete,
+            node: (
+              <div className="space-y-8">
                 <BrandCardCampaign
                   brandId={brand.id} keyStr={key} brandName={brand.name}
                   creatives={cardCampaign.creatives.map((c) => ({
@@ -358,11 +527,32 @@ export default async function BrandPortalPage({
                   clicks={cardCampaign.clicks}
                   reach={{ servers: net?.servers ?? 0, gamers: net?.reach ?? 0 }}
                 />
+
+                <section>
+                  <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
+                    <Icon name="grid" size={18} className="text-cyan-300" /> Website placements
+                  </h2>
+                  {data.totals.total === 0 ? (
+                    <ContactUs
+                      title="Want the website placements too?"
+                      body="Your Discord card runs from the panel above — that part needs nobody. The banner and rail placements across clustergg.com are sold per campaign, so we open those with you."
+                      topic="We'd like the website placements on clustergg.com set up."
+                      send={sendToCluster}
+                    />
+                  ) : (
+                    <p className="text-xs text-muted">
+                      Open a campaign from the Campaigns tab to upload or replace the art for each of its placements.
+                    </p>
+                  )}
+                </section>
               </div>
             ),
           },
           {
-            key: "ads", label: "Website ads", icon: "grid", dot: adsIncomplete,
+            // Renamed from "Website ads": it carries BOTH surfaces now, and a
+            // brand asking "how did we do" shouldn't have to know that the bot
+            // and the website were ever separate products.
+            key: "analytics", label: "Analytics", icon: "chart", dot: adsIncomplete,
             node: data.totals.total === 0 ? (
               <ContactUs
                 title="Want the website placements too?"
@@ -399,47 +589,6 @@ export default async function BrandPortalPage({
                   </div>
                 </section>
 
-                {/* Campaigns — filter + clickable cards → per-campaign analytics */}
-                <section>
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                    <h2 className="font-bold text-lg flex items-center gap-2"><Icon name="rocket" size={18} className="text-cyan-300" /> Your campaigns</h2>
-                    <div className="flex flex-wrap gap-1.5">
-                      {chip("all", `All (${data.totals.total})`)}
-                      {chip("active", "Live")}
-                      {chip("paused", "Paused")}
-                      {chip("draft", "Draft")}
-                      {chip("completed", "Ended")}
-                    </div>
-                  </div>
-                  {shown.length === 0 && <div className="glass p-6 text-center text-muted">No campaigns in this filter.</div>}
-                  <div className="grid md:grid-cols-2 gap-3">
-                    {shown.map((c) => (
-                      <a key={c.id} href={`${base}?campaign=${c.id}`} className="glass overflow-hidden group hover:ring-1 hover:ring-cyan-400/40 transition">
-                        <div className="h-20 relative">
-                          {(c.coverUrl || cover) ? (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={c.coverUrl || cover || ""} alt="" className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition" />
-                          ) : <div className="absolute inset-0" style={{ background: "radial-gradient(120% 140% at 10% 0%, #8b5cf655, transparent 60%), #0a0a1c" }} />}
-                          <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1c] to-transparent" />
-                          <div className="absolute bottom-2 left-3 right-3 flex items-center gap-2">
-                            {(c.logoUrl || brand.logoUrl) && /* eslint-disable-next-line @next/next/no-img-element */ <img src={c.logoUrl || brand.logoUrl || ""} alt="" className="h-8 w-8 rounded-lg object-cover ring-1 ring-white/20 bg-black/40" />}
-                            <div className="font-bold truncate">{c.name}</div>
-                            <span className={`ml-auto text-[10px] font-semibold ${c.status === "active" ? "text-emerald-300" : "text-amber-300"}`}>● {c.status}</span>
-                          </div>
-                        </div>
-                        <div className="p-3 grid grid-cols-3 gap-2 text-center">
-                          <MiniStat label="Impr." value={num(c.impressions)} />
-                          <MiniStat label="Clicks" value={num(c.clicks)} />
-                          <MiniStat label="CTR" value={`${(c.ctr * 100).toFixed(1)}%`} />
-                        </div>
-                        <div className="px-3 pb-3 flex items-center justify-between">
-                          <span className={`text-[11px] ${c.ready ? "text-emerald-300" : "text-amber-300"}`}>{c.filled}/{c.total} placements ready</span>
-                          <span className="text-[11px] text-cyan-300 inline-flex items-center gap-1 group-hover:gap-2 transition-all">Open analytics <Icon name="arrowRight" size={12} /></span>
-                        </div>
-                      </a>
-                    ))}
-                  </div>
-                </section>
               </div>
             ),
           },

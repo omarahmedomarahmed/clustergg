@@ -2,19 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { keysMatch, hasPortalSession } from "@/lib/portal-auth";
-import { getBrandAnalytics } from "@/lib/brands";
+import { brandGamerScoring } from "@/lib/brand-challenge-detail";
 
 export const dynamic = "force-dynamic";
 
-// Key-gated analytics for the brand portal so its chart + placement table can
-// refresh in place (ajax) without a page reload. Validates the brand access key,
-// mirroring /api/brands/upload.
+// How one gamer earned their points in one sponsored challenge.
+//
+// Fetched on click rather than rendered for the whole field: a week can be four
+// hundred entrants with a scoring event each per sync, and nobody opens four
+// hundred of them.
+//
+// Two gates, not one. The brand key proves who is asking, and
+// `brandGamerScoring` re-checks that the challenge is theirs — a brand may
+// hold a valid key and still name somebody else's challenge id.
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const brandId = String(sp.get("brand") ?? "");
   const key = String(sp.get("key") ?? "");
-  const campaignId = sp.get("campaign") || undefined;
-  const days = Math.max(1, Math.min(365, Number(sp.get("days")) || 90));
+  const challengeId = String(sp.get("challenge") ?? "");
+  const userId = String(sp.get("gamer") ?? "");
 
   const db = await getDb();
   const [brand] = await db.select({ accessKey: schema.brands.accessKey })
@@ -28,6 +34,8 @@ export async function GET(req: NextRequest) {
   // /api/brands/upload already does.
   const allowed = keysMatch(brand.accessKey, key) || await hasPortalSession("brand", brandId);
   if (!allowed) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  const data = await getBrandAnalytics(db, brandId, { campaignId, days });
-  return NextResponse.json({ ...data, updatedAt: Date.now() });
+
+  const data = await brandGamerScoring(brandId, challengeId, userId);
+  if (!data) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  return NextResponse.json(data);
 }

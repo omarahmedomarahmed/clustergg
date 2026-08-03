@@ -34,7 +34,33 @@ async function resolve(kind: Kind, slug: string): Promise<{ id: string; name: st
   return { id: brand.id, name: brand.name, key: brand.accessKey, url: `/brands/${brand.slug}` };
 }
 
-async function unlock(req: NextRequest, kind: string, slug: string, key: string) {
+/**
+ * The one thing a caller may influence about the destination.
+ *
+ * A shared link like `/brands/x?key=…&challenge=abc` used to lose the
+ * `challenge` on the way through: the exchange redirects to the CLEAN portal
+ * URL, and everything but the key went with it. So the deep link that a brand
+ * was actually sent — open this week — landed them on the portal home instead.
+ *
+ * Allow-listed and re-encoded rather than passed through, because "preserve
+ * whatever the caller sent" on a redirect is how an open redirect is born.
+ */
+const DEEP_LINK_PARAMS = ["challenge", "campaign", "tab"] as const;
+
+function applyDeepLink(dest: URL, deep: string) {
+  if (!deep) return;
+  try {
+    const src = new URLSearchParams(deep);
+    for (const name of DEEP_LINK_PARAMS) {
+      const v = src.get(name);
+      // Ids and tab names only — no slashes, no protocol, nothing that could
+      // steer the redirect somewhere other than the portal we resolved.
+      if (v && /^[\w-]{1,64}$/.test(v)) dest.searchParams.set(name, v);
+    }
+  } catch { /* a malformed deep link just means the portal home */ }
+}
+
+async function unlock(req: NextRequest, kind: string, slug: string, key: string, deep = "") {
   // The destination is built from the portal we resolved, never from anything
   // the caller sent — otherwise this is an open redirect with a login on it.
   const home = new URL(kind === "brand" ? "/brands" : "/servers", req.nextUrl.origin);
@@ -44,6 +70,7 @@ async function unlock(req: NextRequest, kind: string, slug: string, key: string)
   if (!portal) return NextResponse.redirect(home);
 
   const dest = new URL(portal.url, req.nextUrl.origin);
+  applyDeepLink(dest, deep);
   const who = {
     ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
     userAgent: req.headers.get("user-agent"),
@@ -85,6 +112,7 @@ export async function POST(req: NextRequest) {
     String(form?.get("kind") ?? ""),
     String(form?.get("slug") ?? ""),
     String(form?.get("key") ?? "").trim(),
+    String(form?.get("deep") ?? ""),
   );
 }
 

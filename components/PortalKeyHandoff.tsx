@@ -15,10 +15,12 @@ import Icon from "@/components/Icon";
 // URL, and the key never lands in history because it travelled in the body
 // rather than the query string. Without JavaScript the same form is one button
 // press away, so the link still works.
-export default function PortalKeyHandoff({ kind, slug, portalKey }: {
+export default function PortalKeyHandoff({ kind, slug, portalKey, deep = "" }: {
   kind: "server" | "brand";
   slug: string;
   portalKey: string;
+  /** The rest of the query string, so a deep link survives the exchange. */
+  deep?: string;
 }) {
   const form = useRef<HTMLFormElement | null>(null);
   useEffect(() => { form.current?.submit(); }, []);
@@ -36,6 +38,7 @@ export default function PortalKeyHandoff({ kind, slug, portalKey }: {
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="key" value={portalKey} />
+        <input type="hidden" name="deep" value={deep} />
         <button className="glow-btn pressable rounded-full px-6 py-2.5 text-sm font-bold">Continue</button>
       </form>
     </div>

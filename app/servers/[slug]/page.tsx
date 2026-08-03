@@ -53,7 +53,7 @@ export default async function ServerPortalPage({
   // render may not write cookies) and can't `redirect()` there either — App
   // Router redirects go through the client router, which doesn't reliably
   // follow a route handler's 307.
-  if (key) return <PortalKeyHandoff kind="server" slug={server.slug ?? server.guildId} portalKey={key} />;
+  if (key) return <PortalKeyHandoff kind="server" slug={server.slug ?? server.guildId} portalKey={key} deep="" />;
   const unlocked = await hasPortalSession("server", server.guildId);
 
   const data = await portalData(server);
