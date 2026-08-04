@@ -51,11 +51,53 @@ export default function LolCard({
   const box = "rounded-xl p-2.5";
   const soft = "rgba(255,255,255,0.06)";
 
+  // The stat grid — the ranks included — comes from `statNumbers`, which the
+  // server rendered from OUR OWN `stat_current` rows. It does not need Riot.
+  //
+  // These two early returns used to swallow it: a failed or pending snapshot
+  // replaced the whole card with one line of text, so with no RIOT_API_KEY, or
+  // during a Riot outage, or simply for the second it takes the request to
+  // land, a gamer's Solo/Duo and Flex ranks were invisible — data we already
+  // hold, hidden behind somebody else's API. Rank first, live extras after.
+  const rankGrid = statNumbers.length > 0 ? (
+    <div>
+      <div className="text-[11px] uppercase tracking-widest mb-1.5" style={{ color: c.muted }}>Ranked &amp; profile</div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        {statNumbers.map((s, i) => (
+          <div key={i} className={box} style={{ background: soft }}>
+            <div className="text-[10px] uppercase tracking-wider truncate" style={{ color: c.muted }}>{s.label}</div>
+            <div className="font-bold" style={{ color: c.accent2 }}>{s.value}</div>
+          </div>
+        ))}
+        {/* There is deliberately NO summoner-level tile here.
+            `statNumbers` already carries one: `summoner_level` is a tracked
+            capability of the Riot provider, it syncs, it backs a leaderboard,
+            and it arrives in this grid labelled "Summoner level". This
+            component used to append a second tile from the live snapshot, so
+            the same figure appeared twice side by side in one grid — and a
+            third time as the "· Lv N" pill on the collapsed account row above.
+            The pill stays: it is an identity marker on a closed row, not a stat
+            in the stats grid, and it is the only level visible before the card
+            is opened. Do not helpfully add the tile back. */}
+      </div>
+    </div>
+  ) : null;
+
   if (err && !snap?.matches.length && !snap?.champions.length) {
-    return <div className="text-xs pt-1" style={{ color: c.muted }}>{err}</div>;
+    return (
+      <div className="space-y-3">
+        {rankGrid}
+        <div className="text-xs" style={{ color: c.muted }}>{err}</div>
+      </div>
+    );
   }
   if (!snap) {
-    return <div className="text-xs pt-1 animate-pulse" style={{ color: c.muted }}>Loading League snapshot…</div>;
+    return (
+      <div className="space-y-3">
+        {rankGrid}
+        <div className="text-xs animate-pulse" style={{ color: c.muted }}>Loading League snapshot…</div>
+      </div>
+    );
   }
 
   // ---- Champion detail ----
@@ -153,26 +195,9 @@ export default function LolCard({
         </div>
       )}
 
-      {/* Existing stat numbers */}
-      {statNumbers.length > 0 && (
-        <div>
-          <div className="text-[11px] uppercase tracking-widest mb-1.5" style={{ color: c.muted }}>Ranked & profile</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {statNumbers.map((s, i) => (
-              <div key={i} className={box} style={{ background: soft }}>
-                <div className="text-[10px] uppercase tracking-wider truncate" style={{ color: c.muted }}>{s.label}</div>
-                <div className="font-bold" style={{ color: c.accent2 }}>{s.value}</div>
-              </div>
-            ))}
-            {snap.summonerLevel != null && (
-              <div className={box} style={{ background: soft }}>
-                <div className="text-[10px] uppercase tracking-wider" style={{ color: c.muted }}>Summoner level</div>
-                <div className="font-bold" style={{ color: c.accent2 }}>{snap.summonerLevel}</div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* The rank grid, built above so it also renders when the live
+          snapshot is missing or still loading. */}
+      {rankGrid}
 
       {err && <div className="text-[11px]" style={{ color: c.muted }}>{err}</div>}
     </div>

@@ -16,6 +16,7 @@ import { getTotalCp, getUserQuests } from "@/lib/quests";
 import { getTrophyCase, getMyRedeems } from "@/lib/trophies";
 import TrophyCase from "@/components/TrophyCase";
 import { getProvider } from "@/lib/providers/registry";
+import { metricLabel, metricText, metricUnit } from "@/lib/metric-display";
 import { resolveTheme, themeToVars, bgLayerStyle } from "@/lib/theme";
 import { getContent } from "@/lib/cms";
 import { getT } from "@/lib/i18n/t-server";
@@ -128,7 +129,24 @@ export default async function FeedPage() {
     const a = acctById.get(s.linkedAccountId);
     const gameName = a ? (getProvider(a.provider)?.game ?? null) : null;
     const g = gameName ? gameByName.get(gameName) : undefined;
-    return { accountId: s.linkedAccountId, game: gameName ?? s.game, logoUrl: slimImg(g?.logoUrl ?? null, 300000), metricKey: s.metricKey, metricLabel: s.metricKey.replace(/_/g, " "), value: s.metricValue, inGameName: a?.inGameName ?? "" };
+    // `display` is computed here, on the server, rather than in the dashboard.
+    //
+    // This projection used to drop `rankLabel` entirely and send only the raw
+    // number, so a League gamer's Solo/Duo rank rendered as "2,700" — the
+    // sortable ladder position we derived, not the "Gold II" they earned. It
+    // also named the stat by de-underscoring the key ("solo tier") instead of
+    // asking the provider registry what the game calls it ("Solo/Duo tier").
+    //
+    // Resolved server-side so the client component stays dumb and the whole
+    // PROVIDERS registry does not have to cross the boundary to render a label.
+    return {
+      accountId: s.linkedAccountId, game: gameName ?? s.game,
+      logoUrl: slimImg(g?.logoUrl ?? null, 300000), metricKey: s.metricKey,
+      metricLabel: metricLabel(a?.provider ?? null, s.metricKey),
+      value: s.metricValue,
+      display: metricText({ metricValue: s.metricValue, rankLabel: s.rankLabel, unit: metricUnit(a?.provider ?? null, s.metricKey) }),
+      inGameName: a?.inGameName ?? "",
+    };
   });
   const lolAccounts = accounts.filter((a) => a.provider === "riot-lol").map((a) => ({ accountId: a.id, tag: a.inGameName, region: a.region ?? null }));
   const dashboardWidgets = (Array.isArray(prefs.dashboard) ? prefs.dashboard : []) as Widget[];

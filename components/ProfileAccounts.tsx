@@ -21,6 +21,15 @@ export type AccountCard = {
   coverUrl: string | null;
   avatar: string | null;
   stats: { label: string; value: string }[];
+  /**
+   * The synced summoner level, for the collapsed-row pill.
+   *
+   * Read from our own `stat_current` rather than from the live Riot snapshot,
+   * which is what it used to use: the level would vanish whenever Riot was
+   * unconfigured, rate-limited or simply slow, even though we already hold the
+   * number. Null for every non-League provider.
+   */
+  summonerLevel: number | null;
   standings: { rank: number; total: number; label: string; game: string; metricKey: string }[];
 };
 
@@ -152,7 +161,7 @@ function AccountRow({ account: a, colors: c, active, onToggle }: { account: Acco
           </div>
           <div className="text-xs flex items-center gap-2" style={{ color: c.muted }}>
             {a.providerName}
-            {isLol && snap?.summonerLevel != null && <span>· Lv {snap.summonerLevel}</span>}
+            {isLol && (a.summonerLevel ?? snap?.summonerLevel) != null && <span>· Lv {a.summonerLevel ?? snap?.summonerLevel}</span>}
           </div>
         </div>
         <Icon name={active ? "chevronDown" : "chevronRight"} size={16} style={{ color: c.muted }} />

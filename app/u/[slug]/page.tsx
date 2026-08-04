@@ -33,6 +33,7 @@ import { getTrophyCase, getMyRedeems } from "@/lib/trophies";
 import TrophyCase from "@/components/TrophyCase";
 import { localizeQuest } from "@/lib/i18n/entities";
 import { levelFromCp } from "@/lib/level";
+import { metricLabel, metricText, metricUnit } from "@/lib/metric-display";
 import { startConversation } from "@/app/actions/social";
 import { fmtNum, timeAgo } from "@/lib/utils";
 
@@ -191,7 +192,16 @@ export default async function ProfilePage({ params }: Props) {
       logoUrl: slimImg(resolveGame(games, p?.game ?? "")?.logoUrl ?? null, 300000),
       coverUrl: slimImg(resolveGame(games, p?.game ?? "")?.coverUrl ?? null, 400000),
       avatar: accountAvatar(a),
-      stats: aStats.slice(0, 6).map((s) => ({ label: caps.find((c) => c.key === s.metricKey)?.label ?? s.metricKey, value: s.rankLabel ?? fmtNum(s.metricValue) })),
+      // Through the shared helper rather than a local `rankLabel ?? fmtNum` —
+      // this surface was already correct, but four hand-written copies of the
+      // rule is how the fifth surface (the feed dashboard) ended up without it.
+      stats: aStats.slice(0, 6).map((s) => ({
+        label: metricLabel(a.provider, s.metricKey),
+        value: metricText({ metricValue: s.metricValue, rankLabel: s.rankLabel, unit: metricUnit(a.provider, s.metricKey) }),
+      })),
+      // Taken from the full stat set, not from `stats` above — that one is
+      // capped at six tiles and the level is often the seventh.
+      summonerLevel: aStats.find((s) => s.metricKey === "summoner_level")?.metricValue ?? null,
       standings: (S.standings ? st.slice(0, 3) : []).map((x) => ({ rank: x.rank, total: x.total, label: x.title.split("·")[1]?.trim() ?? x.metricKey, game: x.game, metricKey: x.metricKey })),
     };
   });
