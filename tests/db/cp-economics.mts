@@ -224,6 +224,26 @@ const mpd = minutesPerDollar(cfg)!;
 ok("a determined faker needs hours per dollar, not minutes", mpd > 60, `${mpd.toFixed(0)} min/$`);
 console.log(`       (cheapest path: ${surface[0].label} at ${surface[0].cpPerMinute.toFixed(1)} CP/min → ${(mpd / 60).toFixed(1)} hours per dollar)`);
 
+// The plan's load-bearing bullet for B16.2: "assert through the real award
+// path, not the settings row." A calculator that writes somewhere the engine
+// does not read is the most dangerous kind of admin page, because it looks like
+// it worked.
+console.log("\n== what the calculator writes is what the engine pays ==");
+const [conquest] = await db.select().from(schema.quests).where(sqlEq(schema.quests.key, "conquest")).limit(1);
+const conqW = { ...(conquest.actionWeights as Record<string, number>) };
+const conqC = { ...(conquest.dailyCaps as Record<string, number>) };
+// Exactly the write saveCpConfig performs: the quest's own maps.
+await db.update(schema.quests)
+  .set({ actionWeights: { ...conqW, join_challenge: 7 }, dailyCaps: { ...conqC, join_challenge: 3 } })
+  .where(sqlEq(schema.quests.id, conquest.id));
+const retuned = await newGamer("retuned");
+await awardQuestAction(db, retuned, "join_challenge", { refType: "ch", refId: "a" });
+eq("a weight written to the quest is the weight the engine pays", await cpToday(retuned), 7);
+for (const r of ["b", "c", "d"]) await awardQuestAction(db, retuned, "join_challenge", { refType: "ch", refId: r });
+eq("…and the cap written beside it is the cap it enforces", await cpToday(retuned), 21);
+await db.update(schema.quests).set({ actionWeights: conqW, dailyCaps: conqC })
+  .where(sqlEq(schema.quests.id, conquest.id));
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);

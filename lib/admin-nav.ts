@@ -171,6 +171,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/profile-week", label: "Profile of the Week", desc: "The weekly vote: standings, adjustments, disqualifications, the Sunday stream and the podium." , system: "challenges" },
       { href: "/admin/challenges", label: "Challenges", desc: "Build, gate, pause and end every challenge.", metric: "challenges" , system: "challenges" },
       { href: "/admin/quests", label: "Quests", desc: "Tiers, thresholds, maps and Cluster Point rewards.", metric: "quests" , system: "quests" },
+      { href: "/admin/cp-calculator", label: "CP calculator", desc: "What every action pays, what it costs at a million gamers, and what a second account would farm first.", system: "quests" },
       { href: "/admin/leaderboards", label: "Leaderboards", desc: "Every board on every game — a game can run several.", metric: "leaderboards" , system: "challenges" },
       { href: "/admin/trophies", label: "Trophies", desc: "The prize catalogue and what each is worth.", metric: "trophies" , system: "trophies" },
       { href: "/admin/redeems", label: "Trophy redemptions", desc: "Winners cashing in. Pay out or reject.", metric: "redeems", queue: true , system: "trophies" },

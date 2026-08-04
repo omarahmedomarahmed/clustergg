@@ -276,7 +276,7 @@ the remaining edits; Part II is the whole platform.
 | B13 | The bot guides, rebuilt — fewer than nine, redesigned | `lib/cards/*`, `lib/discord/onboard.ts`, `/cluster guide` | batch 2 | ☐ |
 | B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
 | B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
-| B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☐ |
+| B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
 | B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☐ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
 | B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
@@ -2809,6 +2809,7 @@ the correct state for it.
 | `gamer.missions.progress` | "Your first week, one step at a time" | the feed | not captured — placeholder |
 | `server.profile.incomplete` | "A server we cannot describe is a server we cannot sell" | the portal's profile form, incomplete | not captured — placeholder |
 | `admin.email.compose` | "Email any gamer, brand or server owner" | `/admin/email`, composer open | not captured — placeholder |
+| `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` | not captured — placeholder |
 | *(add a row per B47+ item that anyone can see)* | | |
 
 **B28 retires rows**: anywhere a page demonstrates a bot card, the live render
