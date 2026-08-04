@@ -6,6 +6,7 @@ import { emailConfigured, emailFrom } from "@/lib/email";
 import { TEMPLATE_KEYS } from "@/lib/email/templates";
 import { timeAgo } from "@/lib/utils";
 import Icon from "@/components/Icon";
+import AdminEmailCompose, { type Recipient } from "@/components/AdminEmailCompose";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Email" };
@@ -35,6 +36,24 @@ export default async function AdminEmailPage({ searchParams }: { searchParams: P
 
   const rows = await db.select().from(schema.emailLog)
     .orderBy(desc(schema.emailLog.createdAt)).limit(300);
+
+  // Everyone an admin could write to. Addressless recipients are INCLUDED and
+  // shown disabled — "we cannot reach them" is a fact this console exists to
+  // surface, and a picker that quietly omits them teaches an admin the list is
+  // everybody.
+  const [gamers, brands, servers] = await Promise.all([
+    db.select({ id: schema.users.id, name: schema.users.displayName, email: schema.users.email })
+      .from(schema.users).limit(200),
+    db.select({ id: schema.brands.id, name: schema.brands.name, email: schema.brands.contactEmail })
+      .from(schema.brands).limit(200),
+    db.select({ id: schema.discordGuilds.guildId, name: schema.discordGuilds.name, email: schema.discordGuilds.contactEmail })
+      .from(schema.discordGuilds).limit(200),
+  ]);
+  const recipients: Recipient[] = [
+    ...gamers.map((g) => ({ id: g.id, name: g.name, email: g.email, kind: "gamer" as const })),
+    ...brands.map((b) => ({ id: b.id, name: b.name, email: b.email, kind: "brand" as const })),
+    ...servers.map((s) => ({ id: s.id, name: s.name || s.id, email: s.email, kind: "server" as const })),
+  ];
   const failed = rows.filter((r) => ["bounced", "complained", "failed"].includes(r.status));
   const skipped = rows.filter((r) => r.status === "skipped");
   const shown = filter === "failed" ? failed : filter === "skipped" ? skipped : rows;
@@ -66,6 +85,8 @@ export default async function AdminEmailPage({ searchParams }: { searchParams: P
         )}
         <span className="text-muted ml-auto">{TEMPLATE_KEYS.length} templates</span>
       </div>
+
+      <AdminEmailCompose recipients={recipients} />
 
       <div className="flex flex-wrap gap-2 mb-4 text-xs">
         {[
