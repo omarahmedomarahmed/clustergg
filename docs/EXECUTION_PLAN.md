@@ -1125,7 +1125,10 @@ arrives late still gets the introduction.
 
 ## B15 — The new CP actions, wired into the quests that already exist
 
-`ACTION_CATALOG` in `lib/quests.ts` has 20 actions. The features shipped since
+`ACTION_CATALOG` in `lib/quests.ts` has **19** actions (counted from the
+catalogue itself — an earlier draft of this document said 20, and B34's table is
+19 existing plus the 4 below, which is where the number matters). The features
+shipped since
 it was written earn nothing:
 
 | New action | Quest | Why there |
