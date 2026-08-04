@@ -176,6 +176,51 @@ reopens Part I as the next `B<n>`, goes through the same four steps, and Part II
 restarts from the registry rows it touches. That is cheaper than it sounds,
 because the registries say exactly which rows those are.
 
+### 1.5 Universal rule — commit and push every small chunk
+
+**Every chunk of work that stands on its own gets its own commit and its own
+push, the moment it works.** Not at the end of the item, not at the end of the
+day. A build item is usually three to eight commits, not one.
+
+A chunk is "standing on its own" when it typechecks, builds, and leaves the app
+in a state you would be willing to hand over. That is the only bar.
+
+Why this is a rule rather than a preference, in this project specifically:
+
+- The session that does the work is **ephemeral**. The container is reclaimed;
+  anything not pushed is gone. Unpushed work is not slow progress, it is *no*
+  progress.
+- A twelve-file commit that broke something is a bisect. A one-concern commit
+  that broke something is a revert.
+- The push is the only durable record that a decision was made. The plan says
+  what we intend; the commit says what we did.
+
+Write the *reason* in the commit message, not the diff — the diff is already in
+the commit. The next person needs to know why, and they will read the log before
+they read the code.
+
+### 1.6 Universal rule — the order is reorderable
+
+The ledger's numbering is a **build order, not a priority order**. B9 is not
+more important than B20; it arrived first.
+
+**Before starting a work session, re-read the ledger and pick what to build
+next.** Priorities can be reordered at any time, and near the end they should
+be — by then it is clear which items are load-bearing and which were nice ideas.
+Reordering is a first-class action, not a deviation:
+
+- **Never renumber.** B14 stays B14 wherever it sits in the queue. Renumbering
+  breaks every registry reference and every commit message that named it.
+- Reorder by editing the ledger's `Built` column and, if it helps, adding a
+  `Priority` column. The section stays where it is in the document.
+- If an item is dropped, say so in the ledger with one line on why, and delete
+  its registry rows. A dropped item that leaves orphan rows in R1 means Part II
+  hunts for a suite that has nothing to test.
+- **Dependencies are the only hard constraint on order**, and there are few:
+  B16 must precede B17 (caps need the model that sets them), B7 must precede
+  B23's slot placement, B13/B14 share card infrastructure. Everything else can
+  move.
+
 ---
 
 # PART I — THE BUILD
@@ -208,9 +253,28 @@ the remaining edits; Part II is the whole platform.
 | B6 | Redeem and marketplace, step by step, on the web | new `/redeem`, `/marketplace` confirm step | plan v1 | ☐ |
 | B7 | The screenshot system — the plumbing only | new `feature_shots`, `<FeatureShot>`, `/admin/shots` | plan v1 | ☐ |
 | B8 | The claim registry and the copy rewrite | `lib/claims.ts` (new), every marketing page, `lib/cms.ts` EN+AR, deck, data room | plan v1 | ☐ |
-| B9+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
+| B9 | Nav: the marketplace badge beside the planets badge | `components/Nav.tsx`, the chrome editor, `lib/mobile-nav.ts` | batch 2 | ☐ |
+| B10 | One background image behind a component group, not three copies | the nav + Profile-of-the-Week group, then every other bg surface | batch 2 | ☐ |
+| B11 | Nav game badges open the planet in place, not by navigating | `components/Nav.tsx`, the homepage hero world component (reused) | batch 2 | ☐ |
+| B12 | Planet hero: live only; completed challenges + standings on the page | `app/planets/[slug]`, the planet hero, `lib/challenges.ts` | batch 2 | ☐ |
+| B13 | The bot guides, rebuilt — fewer than nine, redesigned | `lib/cards/*`, `lib/discord/onboard.ts`, `/cluster guide` | batch 2 | ☐ |
+| B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
+| B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
+| B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☐ |
+| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardAction`, quest cards, the CP history | batch 2 | ☐ |
+| B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
+| B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
+| B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
+| B21 | The economy, explained in visuals, everywhere | bot guides, quests, wallet, homepage, deck | batch 2 | ☐ |
+| B22 | Track the bot install, and pay for it | `app/api/discord/installed/route.ts`, the signal quest | batch 2 | ☐ |
+| B23 | Page consolidation, the footer, and the copy rewrite | `/servers`+`/discord-bot`→one, new `/for-brands`, `/brands`→`/contact`, `/pricing`, `/`, `/blog`, the footer | batch 2 | ☐ |
+| B24 | Park localization (keep the machinery, drop the switch) | the footer, the AR copy workflow | batch 2 | ☐ |
+| B25+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **Part I closed on: _______** (fill this in; until then Part II does not start.)
+
+**Reordering:** the numbers are arrival order, not priority — see §1.6. Reorder
+freely, never renumber.
 
 ---
 
@@ -816,14 +880,565 @@ is checkable); no broken images anywhere.
 
 ---
 
-## B9+ — Everything added from here
+## B9 — Nav: the marketplace badge
 
-This section is deliberately empty and deliberately last. Each new instruction
-becomes the next numbered heading below — `## B9 — <what it is>` — written to
-the same shape as B1–B8:
+The trophy marketplace is an icon in the nav. It becomes a **badge, beside the
+planets badge**, in the same visual family — and **admin-editable** the same way
+the planets badge is (art, label, visibility, order), through the existing
+chrome editor rather than a new one.
+
+Files: `components/Nav.tsx`, `lib/admin-nav.ts` / the chrome CMS keys,
+`lib/mobile-nav.ts` for the mobile equivalent.
+
+**Verification owed → `tests/ui/nav.mjs`:**
+- The marketplace badge renders beside the planets badge, not as a bare icon.
+- An admin change to its art/label shows on the next render.
+- It appears in the mobile drawer too, in the same order.
+
+**Shots owed:** `nav.badges` — "One nav, two doors: your planets and the
+marketplace" — the signed-in nav.
+**New routes:** none.
+
+---
+
+## B10 — One background image behind a component group, not three copies
+
+The nav art is painted **three times**: once behind the nav, once behind the
+collapsed Profile-of-the-Week band, once behind the expanded band (darker). It
+should be **one image, one element, overflowing** — the nav sits on it, the
+collapsed band continues it, and when the band expands the same image continues
+into the expanded panel.
+
+The general rule, which is the part that outlives this instance: **a background
+image belongs to a component *group*, not to each component in it.** One
+positioned layer at the group root, children transparent over it, the darker
+expanded state achieved with a veil over the shared image rather than a second
+copy of the image.
+
+Why this matters beyond looks: three copies means three downloads, three
+decodes, and three chances for the art to align a pixel differently — which is
+exactly why the seam is visible today.
+
+Apply to the nav + Profile-of-the-Week group first, then **audit every other
+background-art surface for the same pattern** (`lib/card-bg.ts` consumers, the
+page-background editor, the feed cards) and collapse any other duplicates found.
+Record what was found in the commit message.
+
+**Verification owed → `tests/ui/backgrounds.mjs`:**
+- Exactly one element carries the nav background art URL (count nodes whose
+  computed `background-image` resolves to it).
+- The collapsed band and the nav share one continuous image (assert the layer is
+  a common ancestor of both).
+- Expanding the band does not add a second copy; the darker look comes from an
+  overlay.
+- No other component group paints the same URL more than once.
+
+**Shots owed:** `nav.potw.expanded` — "One continuous surface" — nav with the
+Profile-of-the-Week band expanded.
+**New routes:** none.
+
+---
+
+## B11 — Nav game badges open the planet, in place
+
+Clicking a game logo in the nav navigates to that game's planet page. It should
+instead **expand a dropdown**, exactly like the Profile-of-the-Week dropdown:
+full-width, the hero globe art, the game world, everything the planet page shows
+— and clicking a **different** game logo swaps the world in place rather than
+closing and reopening.
+
+This is the same interaction the homepage hero already implements (game logos
+expand a world; clicking another game changes it). **Reuse that component. Do
+not write a second one** — two implementations of the game-world hero will
+diverge inside a month, and the homepage one is the one that has been tuned.
+
+The dropdown ends with a **"Open the planet"** button to the full page, because
+the dropdown is a preview surface, not a replacement for the page.
+
+Files: `components/Nav.tsx`, the homepage hero world component, `lib/hero-layout.ts`.
+
+**Verification owed → `tests/ui/nav-planet.mjs`:**
+- Clicking a game badge expands a panel and does **not** navigate.
+- The globe art and the game world render inside it with real data.
+- Clicking a second game swaps the content without collapsing the panel.
+- The "Open the planet" button navigates to `/planets/<slug>`.
+- Escape and outside-click close it (the existing dropdown behaviour).
+
+**Shots owed:** `nav.planet.dropdown` — "Every game, one click from anywhere" —
+the nav dropdown with a game world open.
+**New routes:** none.
+
+---
+
+## B12 — Planet hero shows live challenges only; completed ones live on the page
+
+The planet hero globe currently lists challenges regardless of state. Split it:
+
+- **Hero: live challenges only.** A hero is a "what can I do right now" surface,
+  and an ended challenge in it is an invitation to do nothing.
+- **Planet page: a Completed section.** Every finished challenge for that game,
+  with its **final standings, the scoring, and the numbers** — who placed where,
+  on what metric, with what figure. This is the proof the scoring is real, and
+  it is currently only visible while a challenge is running, which is precisely
+  backwards.
+
+Files: `app/planets/[slug]/page.tsx`, the planet hero components, `lib/challenges.ts`.
+
+**Verification owed → `tests/ui/planet.mjs`:**
+- The hero lists only challenges whose state is live.
+- A completed challenge appears in the Completed section on the page.
+- Its standings render with real placements and metric figures.
+- A game with no completed challenges shows an honest empty state, not a gap.
+
+**Shots owed:** `planet.completed.standings` — "Every challenge settles in
+public" — a planet page's completed section with standings.
+**New routes:** none.
+
+---
+
+## B13 — The bot guides, rebuilt
+
+Fewer than nine cards, redesigned from scratch, each one a *thing a gamer needs
+to understand* rather than a step in a manual:
+
+1. **Challenges and scoring** — how you enter, how you are scored, what the
+   game's own ladder has to do with it, what happens when it ends.
+2. **Trophies and redeem** — what a trophy is, that it holds a cash value, how
+   you cash it out, and that we never ask for your bank details.
+3. **Cluster Points** — the overview: every action that earns, what each is
+   worth, the daily cap on each, and what points turn into.
+
+Plus the three install cards (B14), which are also reachable from Home.
+
+Design bar: these are the product's teaching surface and they currently read
+like documentation. Every one is a **visual** — boxes, icons, numbers — not a
+paragraph. The coin (B2) beside every figure.
+
+**Verification owed → `tests/ui/bot-guides.mjs`:**
+- Fewer than nine guide kinds are registered.
+- Each renders 200 from `/api/card/<kind>` at a plausible byte size.
+- The CP guide lists every earning action with its weight and its daily cap,
+  and those numbers equal `ACTION_CATALOG` (assert against the source, so the
+  card cannot drift from the engine).
+- Every guide is reachable from Home and from `/cluster guide`.
+
+**Shots owed:** `bot.guide.cp`, `bot.guide.challenges`, `bot.guide.trophies` —
+"The bot teaches in cards" — `/api/card/<kind>`.
+**New routes:** none.
+
+---
+
+## B14 — The Home card: a Cluster home page, in Discord
+
+`Home` gets a new card kind, `home`, which is the gamer's actual home page:
+
+**Background:** their own profile customization if they have one, otherwise the
+admin-set card background — so a decorated profile is visibly rewarded and an
+undecorated one still looks deliberate.
+
+**Top left:** their Discord display name, their avatar, and beneath the name
+**the logos only** of the games they have linked. No labels — the logos are the
+statement.
+
+**Row 1 — three live challenges**, side by side, each glorified with the
+challenge cover and the game logo on it, plus a **More challenges** button →
+an all-challenges card, filterable by game, showing **active challenges only**.
+
+**Row 2 — the four quests**, side by side, plus a **Quests** button → all
+quests. Opening a quest shows the gamer's progress, their CP (with the coin),
+and a clear, organised list of **the actions that earn CP on that quest** —
+each with its value and its daily cap (B17).
+
+The three install cards (B13) are reachable from here too, so a gamer who
+arrives late still gets the introduction.
+
+**Verification owed → `tests/ui/bot-home.mjs` + `tests/db/bot-home.mts`:**
+- The card renders for a gamer with a customized profile and for one without.
+- Linked-game logos match that gamer's linked accounts exactly.
+- Row 1 holds three challenges, all live.
+- Row 2 holds four quests with the gamer's real progress.
+- The game filter on the all-challenges card returns only that game's active
+  challenges.
+- A gamer with zero linked games and zero progress still gets a card that
+  renders (the empty state is the most common first impression).
+
+**Shots owed:** `bot.home` — "Your whole Cluster, in one card" —
+`/api/card/home`.
+**New routes:** none.
+
+---
+
+## B15 — The new CP actions, wired into the quests that already exist
+
+`ACTION_CATALOG` in `lib/quests.ts` has 20 actions. The features shipped since
+it was written earn nothing:
+
+| New action | Quest | Why there |
+|---|---|---|
+| `redeem_trophy` | ascension | Cashing out is the end of the loop and should be celebrated, not silent |
+| `gift_sent` | orbit | Giving is the most social act in the product |
+| `gift_received` | orbit | And receiving pulls the recipient back in |
+| `bot_added` | signal | See B22 — this one grows the platform |
+
+Weights and caps are set by B16's calculator, not picked here.
+
+**Glorify the actions themselves.** Quests can now earn real money — a gamer
+who tops up their CP is topping up something redeemable — and the whole site
+still talks about them as if they were a score. Every quest surface should make
+the action feel like the opportunity it is.
+
+**Verification owed → `tests/db/quests.mts`:**
+- Each new action awards on the real code path (redeem, gift send, gift receive,
+  bot add), not a test-only shim.
+- Each is deduped by `(quest, action, ref)` like every existing action.
+- Each respects its daily cap.
+
+**Shots owed:** `gamer.quest.actions` — "Every action, what it pays, what it
+caps at" — a quest page's action list.
+**New routes:** none.
+
+---
+
+## B16 — The CP economics model and the admin calculator
+
+**This is the most important item in Part I, and the only one where getting it
+wrong costs money rather than time.**
+
+### B16.0 What the code says today
+
+Grounded in `lib/quests.ts` and `lib/marketplace.ts`, not assumed:
+
+- **1,000 CP = $1** (`DEFAULT_CP_PER_DOLLAR`), admin-movable via
+  `platform_settings["marketplace.cpPerDollar"]`.
+- Ten actions carry a `defaultCap`. **Nine do not** — `finish_challenge`,
+  `top3_challenge`, `win_challenge`, `join_planet`, `follower_gained`,
+  `profile_views_25`, `connect_account`, `profile_vote_received`,
+  `best_profile_award`.
+- Maximum **capped** earnings, one quest per action, per gamer per day:
+
+  | Action | CP | Cap/day | CP/day |
+  |---|---|---|---|
+  | `stat_levelup` | 25 | 20 | 500 |
+  | `reaction_received` | 3 | 50 | 150 |
+  | `write_post` | 10 | 10 | 100 |
+  | `write_comment` | 5 | 20 | 100 |
+  | `botlist_vote` | 50 | 2 | 100 |
+  | `join_challenge` | 15 | 5 | 75 |
+  | `reaction_given` | 2 | 30 | 60 |
+  | `message_new` | 4 | 15 | 60 |
+  | `ad_impression` | 1 | 60 | 60 |
+  | `ad_click` | 5 | 10 | 50 |
+  | **Total** | | | **1,255 CP/day = $1.26/gamer/day** |
+
+  Plus an **unbounded tail** from the nine uncapped actions.
+
+- **An action can pay more than once.** `awardAction` credits **every quest
+  listening to that action**, and the cap is stored per quest. Point two quests
+  at `ad_impression` and both the reward and the cap double. This is a feature
+  as designed and a multiplier that must appear in the model.
+
+At $1.26/day the worst case is **$1,255/day at 1,000 gamers, $125,500/day at
+100,000, $1.26M/day at 1,000,000** — before the uncapped tail. That is the
+number this item exists to bring under control.
+
+### B16.1 The model
+
+`lib/cp-economics.ts` — pure functions, no I/O, so it can be tested and reused
+by the calculator, the admin dashboards and the financial model:
 
 ```
-## B9 — <the instruction, in the owner's own words where possible>
+maxDailyCp(config)            → per gamer, with the multi-quest multiplier applied
+maxDailyCost(config, gamers)  → dollars, at any population
+exposure(config)              → { capped, uncapped[], worstCase, realistic }
+abuseSurface(config)          → every action reachable without spending money
+                                 or playing a game, ranked by CP per minute
+```
+
+Every uncapped action is listed by `exposure()` as an open liability with the
+reason it is open — some genuinely should be (winning a challenge should not be
+rationed) and the model must say so rather than silently zeroing them.
+
+### B16.2 The calculator
+
+`/admin/cp-calculator`, staff-visible, admin-editable:
+
+- Every action, its CP weight, its daily cap, which quests listen to it, and its
+  resulting **CP/day and $/day per gamer** — recomputed live as you drag.
+- **Population sliders**: 1k / 10k / 100k / 1M, and a free entry.
+- **Participation assumptions**, because "every gamer maxes every action" is the
+  worst case, not the forecast: what share are daily-active, what share of the
+  cap an active gamer actually reaches. Both editable, both shown beside the
+  worst case so the two numbers are never confused.
+- **Offsetting revenue** on the same screen — ad revenue per impression, brand
+  spend per challenge — so the question is answered as *margin*, not as cost.
+- **Save**: writes the weights and caps back to the quests and to
+  `platform_settings`, platform-wide, in one transaction, with an audit-log
+  entry recording who changed what from what to what. **Money settings are the
+  one place where "who changed this" is not optional.**
+
+### B16.3 Defaults that keep us safe
+
+Propose and apply a default cap for **every** action, including the nine open
+ones, chosen so that **maximum CP per gamer per day lands under a stated ceiling
+in dollars** — the ceiling itself being an admin setting, so the policy is one
+number rather than twenty.
+
+Where an action should not be rationed (winning a challenge), cap it at a level
+no honest gamer reaches but a script does, and say that in the UI.
+
+**Verification owed → `tests/db/cp-economics.mts`:**
+- `maxDailyCp` equals a hand-computed figure for a known config (the table
+  above is the fixture).
+- The multi-quest multiplier is counted: an action on two quests pays twice and
+  caps twice.
+- No action in `ACTION_CATALOG` lacks a cap after the defaults are applied.
+- Saving from the calculator changes what `awardAction` actually grants — assert
+  through the real award path, not the settings row.
+- The worst-case daily cost at 1M gamers is under the configured ceiling.
+- The audit log records every change.
+
+**Shots owed:** `admin.cp.calculator` — "Every point we give away, modelled
+before we give it" — `/admin/cp-calculator`.
+**New routes:** `/admin/cp-calculator`.
+
+---
+
+## B17 — Daily caps on every action, enforced silently and shown honestly
+
+Two halves, and the second is what makes the first humane.
+
+**Enforce:** every action carries a cap (B16.3). `awardAction` already checks
+one; extend it so no action is uncapped, and so the cap is evaluated across
+quests, not per quest, when the config says so.
+
+**Say nothing when it is reached.** No error, no toast, no "you've hit your
+limit", no disabled button. The action still works — the post posts, the ad
+still counts as an impression for the brand — it simply stops earning. A gamer
+who is told they have hit a limit feels metered; a gamer who is not told feels
+nothing, and comes back tomorrow.
+
+**But never hide it.** The cap for every action is stated **up front** on the
+quest card and in the CP guide, and when today's cap is reached the CP history
+shows the entry — *"Ad views — daily maximum reached (60/60)"* — so anyone who
+looks can see exactly what happened and when it resets. The rule is **no
+interruption, full disclosure**: nothing blocks, nothing surprises.
+
+**Verification owed → `tests/db/caps.mts` + `tests/ui/caps.mjs`:**
+- Past the cap, the underlying action still succeeds and awards zero.
+- No error is returned, thrown or rendered, and no control is disabled.
+- The cap resets at UTC midnight (the boundary `startOfUtcDay()` already uses).
+- Every quest card renders the cap next to every action.
+- The CP history shows a maxed entry with the figure and the reset.
+
+**Shots owed:** `gamer.cp.capped` — "Capped, and told plainly" — the CP history
+showing a maxed action.
+**New routes:** none.
+
+---
+
+## B18 — The wallet
+
+A new gamer page, `/wallet`, which is the gamer's financial statement.
+
+**Centre of the page: Cluster Points, with the dollar value beside them, always.**
+A currency whose worth is a mystery is a score. Below it, the **trophy case**:
+each trophy with its own cash value, the total, and a redeem action on each.
+
+Below that, **the ledger** — one list, in and out, like a bank statement:
+
+| | |
+|---|---|
+| Earned 120 CP — Connected a game account | `+` |
+| Bought *Nebula Cup* — 5,000 CP | `−` |
+| Trophy received — *Nebula Cup*, worth $5.00 | `+` trophy in |
+| Redeemed *Nebula Cup* — $5.00 | `−` trophy out |
+| Gift received — *Comet Shard*, worth $2.00 | `+` trophy in |
+
+Every CP movement with what it was for; every trophy movement in or out with
+what it was worth. A gamer should be able to answer "where did my points go and
+what do I have" without asking anyone.
+
+The **marketplace is embedded here too** — buying is a wallet action, and making
+someone navigate elsewhere to spend the balance they are looking at is a
+self-inflicted drop-off.
+
+**Verification owed → `tests/ui/wallet.mjs` + `tests/db/wallet.mts`:**
+- CP balance and its dollar value both render, and the dollar value equals
+  `balance / cpPerDollar`.
+- Trophy case totals equal the sum of the individual values.
+- The ledger contains an entry for every CP movement and every trophy movement,
+  signed correctly, and reconciles: balance = earned − spent.
+- Redeeming from the wallet reaches the same server function as the trophy case.
+- No payment detail appears on the page, in any state.
+
+**Shots owed:** `gamer.wallet` — "Your points, your trophies, what they are
+worth" — `/wallet`; `gamer.wallet.ledger` — "Every point accounted for".
+**New routes:** `/wallet`.
+
+---
+
+## B19 — Marketplace, revamped
+
+`/marketplace` and the marketplace section on the quests page, rebuilt to match
+the wallet: every trophy with its CP price **and its dollar value**, what your
+balance buys right now, and the confirm step from B6.
+
+**Verification owed → `tests/ui/marketplace.mjs`** (extend the existing suite):
+- Every trophy shows CP price and dollar value.
+- Affordability is computed against the real balance.
+- The quests-page section and the page itself show the same prices.
+
+**Shots owed:** `gamer.marketplace.shelf` (already registered — recapture).
+**New routes:** none.
+
+---
+
+## B20 — The wallet card, in Discord
+
+The bot's wallet card, working properly: CP with its dollar value, the trophy
+case with its dollar value, **recent transactions**, and a **redeem** flow that
+completes inside Discord (B3.4's stepper, reached from here).
+
+Same numbers as `/wallet`, from the same functions — assert it, because two
+implementations of a balance is how a support ticket starts.
+
+**Verification owed → `tests/ui/bot-wallet.mjs`:**
+- The card renders with balance, dollar value, trophy case and recent movements.
+- Its figures equal `/wallet`'s for the same gamer.
+- Redeem completes from Discord and shows in the web ledger.
+
+**Shots owed:** `bot.card.wallet` — "Your wallet, in Discord" —
+`/api/card/wallet`.
+**New routes:** none.
+
+---
+
+## B21 — The economy, explained in visuals
+
+The loop, told everywhere it matters, in pictures rather than paragraphs:
+
+> **You earn points for free, by doing things. Points buy trophies. Trophies
+> redeem for real money.**
+>
+> Enter a challenge for a chance at a trophy. **Lose, and you still earn** — for
+> entering, for linking an account, for showing up. You can earn as little as
+> watching an ad or clicking one. Every action has a daily maximum, and it is
+> written next to the action.
+
+This runs through the bot guides (B13), the quest pages, the wallet (B18), the
+homepage (B23) and the pitch deck. Same loop, same order, same visual language
+everywhere — a gamer who learns it in Discord should recognise it on the site.
+
+**Verification owed → `tests/ui/economy-copy.mjs`:**
+- Every surface in the list states the loop in the same order.
+- Every surface that mentions earning also states the cap.
+- No surface promises an amount the caps make unreachable.
+
+**Shots owed:** `gamer.economy.loop` — "Free points → trophies → real money".
+**New routes:** none.
+
+---
+
+## B22 — Track the bot install, and pay for it
+
+Anyone who clicks **Add the bot to your server** and completes the install
+should earn CP on the **signal** quest — a Cluster member who brings us a server
+has done the single most valuable thing a gamer can do for us.
+
+- Attribute the click: a signed state parameter through the OAuth install URL
+  back to `app/api/discord/installed/route.ts`, which already receives
+  `guild_id`. Attribute to the signed-in Cluster user, if there is one.
+- Award once per guild, not once per click — the dedup key is the guild id.
+- **Default 500 CP, adjustable** in the calculator (B16) like every other
+  weight. Ad impression and ad click likewise become adjustable there rather
+  than living as constants.
+
+**Verification owed → `tests/db/bot-attribution.mts`:**
+- A completed install by a signed-in gamer awards signal CP once.
+- A second install of the same guild awards nothing.
+- An install by somebody with no Cluster account awards nothing and does not
+  error.
+- The award respects the daily cap and the configured weight.
+
+**Shots owed:** `gamer.quest.signal` — "Bring us a server, get paid for it".
+**New routes:** none.
+
+---
+
+## B23 — The page consolidation, the footer, and the copy
+
+The public site says the same things in several places with different words. One
+page per audience, and each one carries the screenshots that prove it.
+
+| Page | Becomes |
+|---|---|
+| `/servers` + `/discord-bot` | **One server-owner page.** The pitch, the portal screenshot, the three tiers glorified. One hero, one argument. |
+| *(new)* `/for-brands` | **The brand page.** Same shape as the server-owner page, different colour treatment, the brand-portal screenshot, the three pricing tiers. |
+| `/brands` | It is a contact form, so it becomes **`/contact`**, linked from the footer. |
+| `/pricing` | **One element only**: the tier switcher — *brands pay* ⇄ *owners earn* — with links to the two pages above. Nothing else. |
+| `/` (guest **and** signed-in) | **The gamers page.** The homepage is the for-gamers page, in both states, fully rewritten and reordered. |
+| `/blog` | Revamped to the same structure and rhythm as the rest. |
+| Footer | Rebuilt: structured, clean, one system across every page. **Remove the language switch** (B24). |
+
+Every section on every one of these pages carries **the screenshot that belongs
+to that section** — `<FeatureShot>` slots placed during this item, filled by V1.
+
+Copy: rewritten end to end. The positioning holds — *the media-buying and
+monetization layer for gaming communities* — but each page now argues to one
+audience instead of three, and every section is **claim → proof**.
+
+**Verification owed → `tests/ui/pages.mjs`:**
+- Each consolidated page renders, with its hero, its tiers and its shot slots.
+- `/servers` and `/discord-bot` resolve to the one page (redirect, not a
+  duplicate).
+- `/brands` redirects to `/contact` and the old URL does not 404 for anyone who
+  bookmarked it.
+- `/pricing` contains the switcher and no second pitch.
+- The homepage renders the gamers page signed in and signed out.
+- The footer is identical across pages and carries no language switch.
+- Every nav and footer link resolves (crawl, do not assume).
+
+**Shots owed:** `page.servers.hero`, `server.tiers.three`, `page.brands.hero`,
+`brand.tiers.three`, `page.pricing.switch`, `page.home.gamer` — one per page,
+plus the per-section slots.
+**New routes:** `/for-brands`, `/contact` (and redirects from `/servers`,
+`/discord-bot`, `/brands`).
+
+---
+
+## B24 — Park localization
+
+Translation is out of scope until the product stops moving. Rewriting copy twice
+in two languages while the pages themselves are being consolidated is paying for
+the same work twice and getting the Arabic wrong both times.
+
+- **Remove the language switch from the footer.**
+- Stop maintaining AR alongside every copy change; English is the working
+  language for the whole of Part I.
+- **Keep the machinery.** `lib/i18n`, the locale-namespaced CMS keys, the
+  per-entity translation columns all stay exactly where they are, unused. This
+  is a pause, not a removal, and ripping the plumbing out would make resuming
+  cost more than the pause saved.
+- Add a line to the V4 report saying localization is parked and what it will
+  take to restart.
+
+**Verification owed → `tests/ui/pages.mjs`** (same suite as B23):
+- No language switch renders in the footer.
+- Setting a locale does not break a page (the machinery still resolves).
+
+**Shots owed:** none.
+**New routes:** none.
+
+---
+
+## B25+ — Everything added from here
+
+This section is deliberately empty and deliberately last. Each new instruction
+becomes the next numbered heading below — `## B25 — <what it is>` — written to
+the same shape as B1–B24:
+
+```
+## B25 — <the instruction, in the owner's own words where possible>
 
 <what changes, and why — including the reason it was asked for, because that
  is the thing that gets lost and the thing that decides the edge cases>
@@ -864,7 +1479,12 @@ during Part I and executed after it.
 Order of execution once Part I closes: **V0** (infrastructure and the showcase
 seed) → **V1** (capture every shot) → **V2** (prove every claim, delete the
 unprovable ones) → **V3** (the E2E matrix, every operation for every user type)
-→ **V4** (the report).
+→ **V5** (user acceptance testing — human-run, two rounds per role) → **V4**
+(the report, written last because V5 feeds it).
+
+V3 and V5 are not alternatives. V3 proves the software does what the code says;
+V5 proves it does what the person who asked for it meant. They fail in different
+places, which is the reason for having both.
 
 ---
 
@@ -905,7 +1525,22 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/redeem-flow.mjs` | **B6** | every step; back; refresh mid-flow; totals; **no bank field on any step** | owed |
 | `tests/ui/shots.mjs` | **B7** | the component renders, falls back visibly, admin-replaceable, propagates everywhere | owed |
 | `tests/ui/claims.mjs` | **B8** | every claim resolves to a shot; no page carries an unproven claim | owed |
+| `tests/ui/nav.mjs` | **B9** | the marketplace badge, admin-editable, mobile too | owed |
+| `tests/ui/backgrounds.mjs` | **B10** | one element per background image; no duplicate paints anywhere | owed |
+| `tests/ui/nav-planet.mjs` | **B11** | the badge expands instead of navigating; swapping games; open-the-planet | owed |
+| `tests/ui/planet.mjs` | **B12** | live-only hero; completed section with real standings | owed |
+| `tests/ui/bot-guides.mjs` | **B13** | fewer than nine guides; the CP guide's numbers equal `ACTION_CATALOG` | owed |
+| `tests/ui/bot-home.mjs` + `tests/db/bot-home.mts` | **B14** | the home card, both background states, three live + four quests, the empty state | owed |
+| `tests/db/quests.mts` | **B15** | the new actions award on the real code path, deduped, capped | owed |
+| `tests/db/cp-economics.mts` | **B16** | the model against a hand-computed fixture; the multi-quest multiplier; no uncapped action survives; saving changes what `awardAction` grants | owed |
+| `tests/db/caps.mts` + `tests/ui/caps.mjs` | **B17** | past the cap the action still succeeds and awards zero, silently; the cap is shown up front; the maxed entry appears in history | owed |
+| `tests/ui/wallet.mjs` + `tests/db/wallet.mts` | **B18** | dollar value correct; the ledger reconciles; no payment field in any state | owed |
+| `tests/ui/bot-wallet.mjs` | **B20** | the card's figures equal `/wallet`'s; redeem completes from Discord | owed |
+| `tests/ui/economy-copy.mjs` | **B21** | the loop stated in one order everywhere; every earning claim states its cap | owed |
+| `tests/db/bot-attribution.mts` | **B22** | one award per guild; no account, no error | owed |
+| `tests/ui/pages.mjs` | **B23**, **B24** | every consolidated page; the redirects; one footer; no language switch; every link resolves | owed |
 | `tests/ui/e2e-*.mjs`, `tests/db/e2e-*.mts` | **V3** | the full matrix, per user type | owed |
+| `docs/UAT/*.md` | **V5** | human acceptance, two rounds per role — not automatable, by design | owed |
 
 ### R2 — The shot registry
 
@@ -935,7 +1570,24 @@ requirement.
 | `bot.card.welcome` | "The bot opens like a home page" | the welcome card |
 | `bot.card.challenges` | "Cards, not walls of text" | `/api/card/challenges` |
 | `bot.card.srv_earnings` | "Run your server from Discord" | `/api/card/srv_earnings` |
-| *(add a row per B9+ item that anyone can see)* | | |
+| `nav.badges` | "One nav, two doors: planets and the marketplace" | the signed-in nav |
+| `nav.potw.expanded` | "One continuous surface" | nav + Profile-of-the-Week expanded |
+| `nav.planet.dropdown` | "Every game, one click from anywhere" | the nav game dropdown |
+| `planet.completed.standings` | "Every challenge settles in public" | a planet page's completed section |
+| `bot.guide.cp` · `bot.guide.challenges` · `bot.guide.trophies` | "The bot teaches in cards" | `/api/card/<kind>` |
+| `bot.home` | "Your whole Cluster, in one card" | `/api/card/home` |
+| `bot.card.wallet` | "Your wallet, in Discord" | `/api/card/wallet` |
+| `gamer.quest.actions` | "Every action, what it pays, what it caps at" | a quest page's action list |
+| `gamer.quest.signal` | "Bring us a server, get paid for it" | the signal quest |
+| `gamer.cp.capped` | "Capped, and told plainly" | the CP history, maxed entry |
+| `gamer.wallet` · `gamer.wallet.ledger` | "Your points, your trophies, what they are worth" | `/wallet` |
+| `gamer.economy.loop` | "Free points → trophies → real money" | the explainer |
+| `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` |
+| `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page |
+| `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` |
+| `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` |
+| `page.home.gamer` | the gamer argument | `/` |
+| *(add a row per B25+ item that anyone can see)* | | |
 
 ### R3 — The surface registry
 
@@ -946,7 +1598,12 @@ this by hand** — generate it, so a page added in B9 cannot be forgotten:
 find app -name page.tsx | sed 's|^app||; s|/page.tsx$||; s|^$|/|' | sort
 ```
 
-106 routes today. The registry is that list plus, per route, three facts kept
+106 routes today, plus what Part I adds: `/wallet`, `/for-brands`, `/contact`,
+`/admin/cp-calculator`, and the redirects standing in for `/servers`,
+`/discord-bot` and `/brands`. Regenerate rather than edit — that is the point of
+generating it.
+
+The registry is that list plus, per route, three facts kept
 in `tests/lib/surfaces.mjs`: **who can reach it** (visitor / gamer / owner /
 brand / staff / admin), **whether it makes a claim** (→ needs a shot), and
 **whether it is dynamic** (needs a seeded id from the showcase seed).
@@ -1204,10 +1861,104 @@ table) · every migration is idempotent (boot twice, compare).
   prevents it.
 - Every screenshot captured, its key, and where it appears on the site.
 - Every claim on the website, and the shot that proves it.
+- **Every UAT round: who ran it, what failed, what each fail became.** The
+  misunderstandings are the most useful rows in the document — they are the
+  places the product was right and could not say so.
+- Localization is parked (B24) and what restarting it costs.
 - **What is still not covered, and why.** The most useful section in the
   document, and the one there is most temptation to leave out. Anything that
   needs live Discord credentials, a real payment provider, or a real game API
   key belongs here, stated plainly.
+
+---
+
+---
+
+## V5 — User acceptance testing
+
+The automated suites in V3 prove the software does what the *code* says. UAT
+proves it does what the *person who asked for it* meant. They fail differently,
+which is the whole reason for having both: a suite asserts the payout page
+renders and the total is right; UAT catches that a server owner looked at it and
+could not tell whether they had been paid.
+
+**Be clear about what this is: UAT is run by a human, not by me.** A model
+writing and then "passing" its own acceptance test has proved nothing — it is
+the same judgement that built the thing, marking its own work. What I can build
+is everything around it: the scripts, the seeded environment, the recording of
+results, and the fixes. The sign-off is yours.
+
+### V5.1 The scripts
+
+`docs/UAT/` — one script per user type, committed, in plain language, written so
+somebody who has never seen the code can run it:
+
+```
+docs/UAT/
+  README.md            ← how to run a session, what to record, how to report a fail
+  gamer.md
+  server-owner.md
+  brand.md
+  staff.md
+  admin.md
+  discord.md           ← run inside Discord, not a browser
+  mobile.md            ← the same journeys at 390px
+```
+
+Every step is written as **do this → you should see this**, with a checkbox and
+a notes column. Never "verify the payout page works" — that is not a test, it is
+a wish. Instead:
+
+> **12.** From the portal, open **Payouts**.
+> **You should see:** what you have been paid, what is in flight, and what is
+> still being counted — as three separate numbers, each with a date.
+> ☐ Pass ☐ Fail — Notes: ______
+
+Each script ends with three questions that catch what checkboxes cannot:
+
+1. Was there any point where you did not know what to do next?
+2. Was there anything you expected to find and could not?
+3. Would you trust this with your money?
+
+Question 3 is the one that matters, and it is the one that only a human can
+answer.
+
+### V5.2 The environment
+
+UAT runs against the **showcase seed** (V0.2), on a deployed preview — not a
+local server, because "it works on the machine that built it" is exactly the
+failure UAT exists to catch. Credentials for each role are listed in
+`docs/UAT/README.md`, and every account is fictional by construction.
+
+### V5.3 Recording results
+
+`docs/UAT/results/<date>-<role>.md`, committed — the filled-in script, with a
+line per fail: **what was expected, what happened, and where.** Nothing else,
+because a fail report that argues about the cause is a fail report nobody can
+act on.
+
+Each fail becomes one of:
+
+| | |
+|---|---|
+| **A bug** | Fixed, with a regression assertion added to the suite that should have caught it. The suite missing it is itself a finding — record why it was missed. |
+| **A misunderstanding** | The product is right and the person could not tell. That is a copy or design fix, not a shrug. |
+| **A new build item** | It works as specified and the specification was wrong. New `B<n>`, full intake protocol (§1.2). |
+
+### V5.4 The rounds
+
+UAT is not one pass. Round one finds a pile; round two, after the fixes, finds
+the things round one's confusion was hiding. **Two rounds minimum per role**,
+and a role is signed off when a full script runs with no fails and question 3
+answers yes.
+
+Sign-off goes in the ledger, dated. That signature — not a green suite — is what
+"done" means for a user-facing product.
+
+**Verification owed:** UAT *is* the verification. What is owed here is that
+every script exists, every role has been run twice, every fail is resolved into
+one of the three buckets above, and every resolution is linked from
+`docs/VERIFICATION_REPORT.md` (V4).
 
 ---
 
@@ -1268,5 +2019,8 @@ stops them being decided badly at 2am.
 - Every marketing claim has a shot behind it, or is gone (V2).
 - An admin can change any shot from `/admin/shots` and see it change on every
   page that uses it.
+- **Every UAT script has been run twice by a human, every fail resolved, and
+  every role signed off and dated in the ledger** (V5). A green suite is not a
+  sign-off.
 - `docs/VERIFICATION_REPORT.md` is written and honest — including the section
   on what is still not covered.
