@@ -1560,3 +1560,38 @@ export type PublicUser = {
   title: string | null;
   discordUsername: string | null;
 };
+
+// ===== Feature screenshots (B7) =====
+//
+// One row per COMPONENT worth proving, keyed by a stable name like
+// "server.earnings.ledger". Every page that claims that component renders
+// `<FeatureShot shotKey="server.earnings.ledger" />`, so changing this one row
+// updates the picture everywhere it appears — which is the entire requirement:
+// an admin changes one image and it changes on every page the component is
+// claimed on.
+//
+// The text lives here too, not in the page. An admin who can swap the picture
+// but not the caption under it can only half-fix a stale claim, and the caption
+// is a claim: it is the sentence the screenshot is being used to support.
+export const featureShots = pgTable("feature_shots", {
+  /** Stable component name, e.g. "gamer.cp.ledger". The primary key. */
+  key: text("key").primaryKey(),
+  /** Blob URL. Null means "not captured yet" — the component shows a labelled placeholder. */
+  imageUrl: text("image_url"),
+  /** Accessibility text. Also a claim, so it is admin-editable like the rest. */
+  altText: text("alt_text").notNull().default(""),
+  /** The line printed under the shot. Empty renders no caption rather than an empty bar. */
+  caption: text("caption").notNull().default(""),
+  /** What this shot is being used to prove. Shown in the admin console, never to visitors. */
+  claim: text("claim").notNull().default(""),
+  /** {title, subtitle, badge, focusRect, blur[]} — drawn over the image. */
+  overlay: jsonb("overlay").$type<Record<string, unknown>>().default({}),
+  /** The route it was captured from, so it can be recaptured without guessing. */
+  capturedFrom: text("captured_from"),
+  capturedAt: timestamp("captured_at", { withTimezone: true, mode: "date" }),
+  /** Natural size, so the component can reserve the right box and never shift the page. */
+  width: integer("width"),
+  height: integer("height"),
+  updatedBy: text("updated_by"),
+  updatedAt: now("updated_at"),
+});

@@ -267,26 +267,26 @@ the remaining edits; Part II is the whole platform.
 | B4 | The server portal, inside Discord | new `discord_guild_roles`, `/cluster admin`, six `srv_*` card kinds, `lib/server-portal.ts` (read only) | plan v1 | ☐ |
 | B5 | Gifting — search as you type, web and Discord | `components/TrophyMarket.tsx`, new `/api/gamers/search`, the bot gift flow | plan v1 | ☐ |
 | B6 | Redeem and marketplace, step by step, on the web | new `/redeem`, `/marketplace` confirm step | plan v1 | ☐ |
-| B7 | The screenshot system — the plumbing only | new `feature_shots`, `<FeatureShot>`, `/admin/shots` | plan v1 | ☐ |
+| B7 | The screenshot system — plumbing **and** an admin who can replace any image | new `feature_shots`, `lib/shots.ts`, `<FeatureShot>`, `/admin/shots` | plan v1 | ☑ |
 | B8 | The claim registry and the copy rewrite | `lib/claims.ts` (new), every marketing page, `lib/cms.ts` EN+AR, deck, data room | plan v1 | ☐ |
-| B9 | Nav: the marketplace badge beside the planets badge | `components/Nav.tsx`, the chrome editor, `lib/mobile-nav.ts` | batch 2 | ☐ |
-| B10 | One background image behind a component group, not three copies | the nav + Profile-of-the-Week group, then every other bg surface | batch 2 | ☐ |
+| B9 | Nav: the marketplace badge beside the planets badge | `components/Nav.tsx`, `lib/site-chrome.ts`, `components/BrandingEditor.tsx` | batch 2 | ☑ |
+| B10 | One background image behind a component group, not three copies | `components/Nav.tsx`, `components/WeekBand.tsx` | batch 2 | ☑ |
 | B11 | Nav game badges open the planet in place, not by navigating | `components/Nav.tsx`, the homepage hero world component (reused) | batch 2 | ☐ |
-| B12 | Planet hero: live only; completed challenges + standings on the page | `app/planets/[slug]`, the planet hero, `lib/challenges.ts` | batch 2 | ☐ |
+| B12 | Planet hero: live only; completed challenges + standings on the page | `lib/planet-explore.ts`, `app/planets/[slug]/page.tsx` | batch 2 | ☑ |
 | B13 | The bot guides, rebuilt — fewer than nine, redesigned | `lib/cards/*`, `lib/discord/onboard.ts`, `/cluster guide` | batch 2 | ☐ |
 | B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
 | B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☐ |
-| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardAction`, quest cards, the CP history | batch 2 | ☐ |
+| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☐ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
 | B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
 | B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
 | B21 | The economy, explained in visuals, everywhere | bot guides, quests, wallet, homepage, deck | batch 2 | ☐ |
 | B22 | Track the bot install, and pay for it | `app/api/discord/installed/route.ts`, the signal quest | batch 2 | ☐ |
 | B23 | Page consolidation, the footer, and the copy rewrite | `/servers`+`/discord-bot`→one, new `/for-brands`, `/brands`→`/contact`, `/pricing`, `/`, `/blog`, the footer | batch 2 | ☐ |
-| B24 | Park localization (keep the machinery, drop the switch) | the footer, the AR copy workflow | batch 2 | ☐ |
-| B25 | The gamer's Discord card: trophy case ×3, one button per account | the profile card kind, `lib/discord/screens.ts` | batch 3 | ☐ |
-| B26 | LoL stats read as ranks; the level stops appearing twice | `lib/providers/adapters.ts` consumers, every metric renderer | batch 3 | ☐ |
+| B24 | Park localization (keep the machinery, drop the switch) | `components/Footer.tsx` | batch 2 | ☑ |
+| B25 | The gamer's Discord card: trophy case ×3, one button per account | `lib/cards/data.ts`, `lib/cards/render.tsx`, `lib/discord/screens.ts` | batch 3 | ☑ |
+| B26 | LoL stats read as ranks; the level stops appearing twice | new `lib/metric-display.ts`, `app/feed`, `components/LolCard.tsx`, `components/ProfileAccounts.tsx` | batch 3 | ☑ |
 | B27 | Every bot card: data reads well, buttons grouped by meaning and position | every card kind, `lib/discord/components.ts` | batch 3 | ☐ |
 | B28 | The bot preview rebuilt — scoped per section, live renders instead of shots | the preview component, the marketing pages | batch 3 | ☐ |
 | B29 | Everything new is an admin system, staffable by department | `lib/systems.ts`, every new surface | batch 3 | ☐ |
@@ -307,7 +307,16 @@ the remaining edits; Part II is the whole platform.
 | B44 | The promotional campaigns console (amends B30) + funding figure is $100K | `/admin/offers`, `lib/invoices.ts`, the deck | batch 4 | ☐ |
 | B45 | The portal key follows ownership | the guild refresh path, key rotation | batch 4 | ☐ |
 | B46 | Spend limits on storage and rendering | `lib/storage-audit.ts`, the card cache, `/admin/storage` | batch 4 | ☐ |
+| S1 | **The demo activity layer** — 36 of 74 tables had no rows, so every screen that reports on activity reported zero | new `lib/db/seed-activity.ts`, `lib/db/seed.ts` | wave 1 | ☑ |
+| S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
+| S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
+
+**S rows** are work that shipped without being planned — support the build
+needed rather than an instruction that arrived. They are lettered, not numbered,
+so they can never be confused with an instruction from the owner, and they are
+in the ledger because a ledger that only lists what was asked for stops being an
+index of what happened.
 
 **Part I closed on: _______** (fill this in; until then Part II does not start.)
 
@@ -1125,7 +1134,10 @@ arrives late still gets the introduction.
 
 ## B15 — The new CP actions, wired into the quests that already exist
 
-`ACTION_CATALOG` in `lib/quests.ts` has 20 actions. The features shipped since
+`ACTION_CATALOG` in `lib/quests.ts` has **19** actions (counted from the
+catalogue itself — an earlier draft of this document said 20, and B34's table is
+19 existing plus the 4 below, which is where the number matters). The features
+shipped since
 it was written earn nothing:
 
 | New action | Quest | Why there |
@@ -1187,7 +1199,7 @@ Grounded in `lib/quests.ts` and `lib/marketplace.ts`, not assumed:
 
   Plus an **unbounded tail** from the nine uncapped actions.
 
-- **An action can pay more than once.** `awardAction` credits **every quest
+- **An action can pay more than once.** `awardQuestAction` credits **every quest
   listening to that action**, and the cap is stored per quest. Point two quests
   at `ad_impression` and both the reward and the cap double. This is a feature
   as designed and a multiplier that must appear in the model.
@@ -1253,7 +1265,7 @@ no honest gamer reaches but a script does, and say that in the UI.
 - The multi-quest multiplier is counted: an action on two quests pays twice and
   caps twice.
 - No action in `ACTION_CATALOG` lacks a cap after the defaults are applied.
-- Saving from the calculator changes what `awardAction` actually grants — assert
+- Saving from the calculator changes what `awardQuestAction` actually grants — assert
   through the real award path, not the settings row.
 - The worst-case daily cost at 1M gamers is under the configured ceiling.
 - The audit log records every change.
@@ -1268,7 +1280,7 @@ before we give it" — `/admin/cp-calculator`.
 
 Two halves, and the second is what makes the first humane.
 
-**Enforce:** every action carries a cap (B16.3). `awardAction` already checks
+**Enforce:** every action carries a cap (B16.3). `awardQuestAction` already checks
 one; extend it so no action is uncapped, and so the cap is evaluated across
 quests, not per quest, when the config says so.
 
@@ -1529,33 +1541,82 @@ card" — `/api/card/profile`.
 
 Two defects in the League of Legends surfaces, both visible today.
 
-**Ranks render as numbers instead of ranks.** `lib/providers/adapters.ts` already
-returns `solo_tier` and `flex_tier` as `{ value, rankLabel }`, where `rankLabel`
-is the real thing — *"GOLD II"* — and `value` is the sortable ladder position it
-was derived from. The cards render `value`. A gamer looking at their own LoL
-card sees a score they have never heard of instead of the rank they earned.
+> **Corrected before build.** This section was written from an assumption about
+> where each defect lives. Both defects are real; both were in a different place
+> than described. The corrected diagnosis is below — the original wording, kept
+> for the record, said "the cards render `value`" (most of them do not) and
+> blamed "a generic `level` metric" (no such metric exists on the LoL provider).
+> What follows is what the code actually does, read line by line.
 
-Fix: **wherever a metric carries a `rankLabel`, that label is the display value
-and the number is only for sorting.** Not a LoL special case — Dota's
-`rank_tier` carries one too (`dotaRankLabel`), and every ladder game added later
-will. Make it a rule in the metric renderer, once, and the next game inherits it.
+**Ranks render as numbers instead of ranks — on the feed dashboard, and only
+there.** `lib/providers/adapters.ts:304-305` returns `solo_tier` and `flex_tier`
+as `{ value, rankLabel }`, where `rankLabel` is the real thing — *"Gold II"* —
+and `value` is the sortable ladder position it was derived from.
+
+Most surfaces already get this right and must not be touched:
+`app/u/[slug]/page.tsx:194`, `components/LeaderboardWidget.tsx:72,103` and the
+Discord card data at `lib/cards/data.ts:160,350,517` all read
+`rankLabel ?? fmtNum(value)`.
+
+The one offender is the **feed dashboard**. `app/feed/page.tsx:131` builds
+`dashStats` without selecting `rankLabel` at all, so
+`components/FeedDashboard.tsx:189,197` can only print
+`s.value.toLocaleString()` — a LoL gamer's Solo/Duo rank reads as `2700`. The
+same projection derives its label as `metricKey.replace(/_/g, " ")` → *"solo
+tier"*, rather than the registry's declared `label` → *"Solo/Duo tier"*.
+
+Fix, in the order that makes the next game inherit it:
+
+1. Carry `rankLabel` through the `dashStats` projection and add it to
+   `DashStat` in `components/FeedDashboard.tsx:14`.
+2. Resolve the display label from the provider registry's `capabilities[].label`
+   (`lib/providers/registry.ts`), falling back to the de-underscored key only
+   when the registry has no entry.
+3. **Wherever a metric carries a `rankLabel`, that label is the display value
+   and the number is only for sorting.** Not a LoL special case — Dota's
+   `rank_tier` carries one too (`adapters.ts:128-134`), and every ladder game
+   added later will. Put it in one shared helper rather than a fourth copy of
+   `rankLabel ?? fmtNum(value)`, and have the three existing correct call sites
+   use it so there is one definition to change.
 
 Show **both** LoL ranks as text on the card: **Solo/Duo** and **Flex**.
 
-**The level appears twice.** The LoL stats card lists the summoner level as two
-separate tracked stats — `summoner_level` from the adapter and a generic `level`
-metric that shadows it. One of them must go; keep the named one, and check the
-same collision on every other provider before closing this out (the generic
-`level` mapping near `adapters.ts:614` is shared).
+**The level appears three times, and no metric is at fault.** There is no
+generic `level` metric on the LoL provider — `level` is declared only by Apex
+(`registry.ts:329`) and Mobile Legends (`registry.ts:363`), different providers
+that cannot collide with `summoner_level`. `adapters.ts:614` is the MLBB
+mapping, not a shared one. The duplication is purely in the rendering:
+
+| Where | What it prints |
+|---|---|
+| `LolCard.tsx` `statNumbers` | the `summoner_level` metric tile, labelled "Summoner level" |
+| `LolCard.tsx:167-172` | a **second** "Summoner level" tile, from the rich snapshot |
+| `ProfileAccounts.tsx:155` | a **third**, as `· Lv N` in the account header |
+
+Fix: delete the snapshot tile at `LolCard.tsx:167-172` — the metric tile is the
+tracked, synced, leaderboard-backed one and is the copy to keep. Keep the header
+`· Lv N`: it is a different affordance (an identity pill on a collapsed row, not
+a stat in the stats grid) and it is the only level visible before the card is
+expanded. Leave a comment at the deletion site saying why, so the snapshot tile
+is not helpfully added back.
+
+Then check the same *rendering* collision on every other provider: the rule is
+that a component holding both a metrics list and its own rich snapshot must not
+print a figure the metrics list already carries.
 
 **Verification owed → `tests/db/metrics.mts` + `tests/ui/lol-card.mjs`:**
 - A metric with a `rankLabel` renders the label, never the number, on every
-  surface: profile, planet, leaderboard, and the Discord card.
+  surface: profile, planet, leaderboard, the feed dashboard, and the Discord
+  card. The feed dashboard is the one that was broken — assert it by name.
+- A metric's displayed label comes from the provider registry, so `solo_tier`
+  reads "Solo/Duo tier" and never "solo tier".
 - Sorting still uses the number (assert a leaderboard orders correctly while
   displaying labels).
 - The LoL card shows Solo and Flex, both as text.
-- No stat key appears twice on any account card, for any provider — assert
-  across all of them, not just LoL.
+- No stat label appears twice inside one account card, for any provider —
+  assert across all of them, not just LoL, and count rendered tiles rather than
+  metric keys, because the duplication was a second renderer and not a second
+  metric.
 
 **Shots owed:** `gamer.lol.card` — "Your rank, in the game's own words" — a
 profile's LoL account card.
@@ -1874,8 +1935,15 @@ arrived" — `/admin/email`.
 
 ## B33 — Announcements become a queue
 
+> **Re-verified against the code before building.** The loop, the call sites and
+> the absence of `maxDuration` are all exactly as described. `grep -rn
+> maxDuration app lib` returns only `app/admin/storage/page.tsx`,
+> `app/api/cron/daily`, `app/api/cron/sync` and `app/api/setup` — nothing that
+> covers a server action. The loop body is lines 105–119; the section says
+> 105–117, which is the same loop.
+
 **A verified live bug that gets worse with exactly the growth we are building
-for.** `lib/discord/announce.ts:105–117` posts to guilds **sequentially, awaiting
+for.** `lib/discord/announce.ts:105–119` posts to guilds **sequentially, awaiting
 each call**, and it is invoked from server actions — `app/actions/admin.ts:606`,
 `app/actions/discord.ts:106`, `app/actions/challenge-requests.ts:113`,
 `lib/challenge-series.ts:174`, `lib/welcome-challenge.ts:103`. **None of those
@@ -1922,6 +1990,16 @@ than a slow one.
 **This item supersedes the numbers in B16 and B17. B16 still builds the model
 and the calculator; B17 still builds the enforcement. B34 is the decision about
 what the numbers are.**
+
+> **Re-verified against the code before repricing.** All four load-bearing facts
+> hold: `DEFAULT_CP_PER_DOLLAR = 1000` (`lib/marketplace.ts:40`);
+> `ACTION_CATALOG` carries 19 actions, 10 with a `defaultCap` and 9 without; the
+> capped ten sum to exactly **1,255 CP/day**
+> (75+100+100+60+150+60+100+500+60+50); and the award path credits every active
+> quest whose `actionWeights[actionKey] > 0`, checking `quest.dailyCaps` **per
+> quest**, so one action can pay N times and the cap is per quest rather than
+> per action. One naming correction: the function is **`awardQuestAction`**
+> (`lib/quests.ts:240`), not `awardAction` — corrected throughout this document.
 
 ### B34.0 The decision, and why
 
@@ -1994,7 +2072,7 @@ than twenty numbers that have to be re-summed every time one moves.
 
 ### B34.2 CP is awarded once; progress counts everywhere
 
-`awardAction` currently credits **every quest listening to an action**, with the
+`awardQuestAction` currently credits **every quest listening to an action**, with the
 cap stored per quest — so pointing two quests at `ad_impression` doubles both
 the payout and the ceiling. That is a silent multiplier on cost.
 
@@ -2437,6 +2515,7 @@ the corrections are usually the most important lines in it.
 | B31 | "admin can edit it or delete it… create a challenge type called welcome challenge" | **B43**: the draft is admin-visible from creation regardless of owner onboarding, and a `welcome` challenge type can be created for any server at any time. |
 | §1.1 | "implement your recommendation for all 3 insights" | Money-touching items (B33–B37, B39) now carry their suites; B28 gains a static fallback; wave 1 slot placement avoids the pages B23 rewrites. |
 | the deck | funding is $100K, not $30K | Corrected in **B44**; every stale $30K reference is part of that item. |
+| §1.1, V1 | the capture pass ran in wave 1 | **The 28 screenshots now in `public/shots/` are PROVISIONAL.** The capture was run early, against a wave-1 build, which is a deviation from §1.1's ordering. The reason that rule exists is directly ahead in the queue: **B23** rewrites `/`, `/pricing`, `/servers`, `/discord-bot`, `/brands` and `/blog`, so every full-page shot of those is a picture of copy that will not exist; **B41** replaces the homepage entirely; **B2** puts the coin on every CP figure; **B27** changes the button layout on every bot card; **B34** reprices the currency, so every dollar figure in a shot changes; and **B28** retires the `bot.card.*` rows in favour of live renders. A **full recapture is owed** once Part I closes — see V1.R. Until then the stale shots stay: they are not recaptured piecemeal, and the capture script is not re-run at the end of each wave. |
 | — | *(next amendment here)* | |
 
 ---
@@ -2504,7 +2583,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/bot-guides.mjs` | **B13** | fewer than nine guides; the CP guide's numbers equal `ACTION_CATALOG` | owed |
 | `tests/ui/bot-home.mjs` + `tests/db/bot-home.mts` | **B14** | the home card, both background states, three live + four quests, the empty state | owed |
 | `tests/db/quests.mts` | **B15** | the new actions award on the real code path, deduped, capped | owed |
-| `tests/db/cp-economics.mts` | **B16** | the model against a hand-computed fixture; the multi-quest multiplier; no uncapped action survives; saving changes what `awardAction` grants | owed |
+| `tests/db/cp-economics.mts` | **B16** | the model against a hand-computed fixture; the multi-quest multiplier; no uncapped action survives; saving changes what `awardQuestAction` grants | owed |
 | `tests/db/caps.mts` + `tests/ui/caps.mjs` | **B17** | past the cap the action still succeeds and awards zero, silently; the cap is shown up front; the maxed entry appears in history | owed |
 | `tests/ui/wallet.mjs` + `tests/db/wallet.mts` | **B18** | dollar value correct; the ledger reconciles; no payment field in any state | owed |
 | `tests/ui/bot-wallet.mjs` | **B20** | the card's figures equal `/wallet`'s; redeem completes from Discord | owed |
@@ -2540,55 +2619,70 @@ One row per component worth proving. The `key` is the primary key of
 **change the row, and every page claiming it updates**, which is the whole
 requirement.
 
-| Shot key | Proves the claim | Captured from |
-|---|---|---|
-| `gamer.linked.verified` | "Every account is verified against the game's own API" | profile → linked accounts, a verified LoL account |
-| `gamer.marketplace.shelf` | "Spend points on real trophies" | `/marketplace`, signed in with a balance |
-| `gamer.redeem.method` | "Cash out without giving us your bank" | `/redeem` step 2 |
-| `gamer.cp.ledger` | "Every point is accounted for" | the CP ledger with real entries |
-| `gamer.quest.map` | "Quests you actually travel" | a quest page mid-progress |
-| `gamer.profile.public` | "A profile worth sharing" | `/u/<slug>` on a decorated profile |
-| `admin.challenge.rules` | "Rules in the game's own ladder" | challenge builder, "At least Diamond I in Flex 5v5" |
-| `admin.payments.providers` | "Real payout rails, not promises" | `/admin/payments` |
-| `brand.reach.perserver` | "Counted reach, not projections" | brand portal → challenge → servers table |
-| `brand.invoice` | "One invoice a month, every line itemised" | brand portal → Billing |
-| `brand.campaign.builder` | "Buy a sponsored challenge like a media placement" | the campaign builder |
-| `brand.analytics.roas` | "See what it returned" | brand portal → Analytics |
-| `server.tier.flagship` | "Owners take 25% at 5,000 linked" | Flagship server portal → Earnings |
-| `server.members.winnings` | "Your members' winnings, paid to them" | server portal → the itemised list |
-| `server.growth.journey` | "A ladder you can see yourself climbing" | server portal → the journey to 5,000 |
-| `server.payout.history` | "Paid, in flight, awaiting — all visible" | server portal → Payouts |
-| `bot.card.welcome` | "The bot opens like a home page" | the welcome card |
-| `bot.card.challenges` | "Cards, not walls of text" | `/api/card/challenges` |
-| `bot.card.srv_earnings` | "Run your server from Discord" | `/api/card/srv_earnings` |
-| `nav.badges` | "One nav, two doors: planets and the marketplace" | the signed-in nav |
-| `nav.potw.expanded` | "One continuous surface" | nav + Profile-of-the-Week expanded |
-| `nav.planet.dropdown` | "Every game, one click from anywhere" | the nav game dropdown |
-| `planet.completed.standings` | "Every challenge settles in public" | a planet page's completed section |
-| `bot.guide.cp` · `bot.guide.challenges` · `bot.guide.trophies` | "The bot teaches in cards" | `/api/card/<kind>` |
-| `bot.home` | "Your whole Cluster, in one card" | `/api/card/home` |
-| `bot.card.wallet` | "Your wallet, in Discord" | `/api/card/wallet` |
-| `gamer.quest.actions` | "Every action, what it pays, what it caps at" | a quest page's action list |
-| `gamer.quest.signal` | "Bring us a server, get paid for it" | the signal quest |
-| `gamer.cp.capped` | "Capped, and told plainly" | the CP history, maxed entry |
-| `gamer.wallet` · `gamer.wallet.ledger` | "Your points, your trophies, what they are worth" | `/wallet` |
-| `gamer.economy.loop` | "Free points → trophies → real money" | the explainer |
-| `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` |
-| `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page |
-| `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` |
-| `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` |
-| `page.home.gamer` | the gamer argument | `/` |
-| `bot.card.profile` | "Your trophies and every account, on one card" | `/api/card/profile` |
-| `gamer.lol.card` | "Your rank, in the game's own words" | a profile's LoL account card |
-| `admin.offers.console` | "Every founding offer, switchable and counted" | `/admin/offers` |
-| `brand.invoice.discount` | "The full price, and what we covered" | a discounted invoice |
-| `server.welcome.draft` | "Your first challenge is already waiting" | the portal's Challenges tab |
-| `admin.welcome.ledger` | "What we spent to grow, on the same bill as everything else" | Cluster's brand invoice |
-| `admin.email.console` | "Every message we send, and whether it arrived" | `/admin/email` |
-| `admin.abuse.review` | "Growth we look at before we pay for it" | the server review page |
-| `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | a challenge invoice |
-| `home.quests.section` · `home.missions` | "Free points, capped and stated" | `/` |
-| `gamer.missions.progress` | "Your first week, one step at a time" | the feed |
+**State, as of wave 1:** every key below marked *captured (provisional)* has a
+real image in `public/shots/`, taken during the early capture pass. Provisional
+means exactly what it says — the shot exists, it is a real screenshot of a real
+screen, and it is **not finished work**. B2, B23, B27, B28, B34 and B41 all
+change what these show. The recapture that settles them is **V1.R**. A key with
+no marker has never been captured and renders a labelled placeholder, which is
+the correct state for it.
+
+| Shot key | Proves the claim | Captured from | State |
+|---|---|---|---|
+| `gamer.linked.verified` | "Every account is verified against the game's own API" | profile → linked accounts, a verified LoL account | **captured (provisional)** → V1.R |
+| `gamer.marketplace.shelf` | "Spend points on real trophies" | `/marketplace`, signed in with a balance | **captured (provisional)** → V1.R |
+| `gamer.redeem.method` | "Cash out without giving us your bank" | `/redeem` step 2 | **captured (provisional)** → V1.R |
+| `gamer.cp.ledger` | "Every point is accounted for" | the CP ledger with real entries | **captured (provisional)** → V1.R |
+| `gamer.quest.map` | "Quests you actually travel" | a quest page mid-progress | **captured (provisional)** → V1.R |
+| `gamer.profile.public` | "A profile worth sharing" | `/u/<slug>` on a decorated profile | **captured (provisional)** → V1.R |
+| `admin.challenge.rules` | "Rules in the game's own ladder" | challenge builder, "At least Diamond I in Flex 5v5" | **captured (provisional)** → V1.R |
+| `admin.payments.providers` | "Real payout rails, not promises" | `/admin/payments` | **captured (provisional)** → V1.R |
+| `brand.reach.perserver` | "Counted reach, not projections" | brand portal → challenge → servers table | **captured (provisional)** → V1.R |
+| `brand.invoice` | "One invoice a month, every line itemised" | brand portal → Billing | **captured (provisional)** → V1.R |
+| `brand.campaign.builder` | "Buy a sponsored challenge like a media placement" | the campaign builder | **captured (provisional)** → V1.R |
+| `brand.analytics.roas` | "See what it returned" | brand portal → Analytics | **captured (provisional)** → V1.R |
+| `server.tier.flagship` | "Owners take 25% at 5,000 linked" | Flagship server portal → Earnings | **captured (provisional)** → V1.R |
+| `server.members.winnings` | "Your members' winnings, paid to them" | server portal → the itemised list | **captured (provisional)** → V1.R |
+| `server.growth.journey` | "A ladder you can see yourself climbing" | server portal → the journey to 5,000 | **captured (provisional)** → V1.R |
+| `server.payout.history` | "Paid, in flight, awaiting — all visible" | server portal → Payouts | **captured (provisional)** → V1.R |
+| `bot.card.welcome` | "The bot opens like a home page" | the welcome card | not captured · retired by B28 → never captured, row is deleted |
+| `bot.card.challenges` | "Cards, not walls of text" | `/api/card/challenges` | not captured · retired by B28 → never captured, row is deleted |
+| `bot.card.srv_earnings` | "Run your server from Discord" | `/api/card/srv_earnings` | not captured · retired by B28 → never captured, row is deleted |
+| `nav.badges` | "One nav, two doors: planets and the marketplace" | the signed-in nav | **captured (provisional)** → V1.R |
+| `nav.potw.expanded` | "One continuous surface" | nav + Profile-of-the-Week expanded | **captured (provisional)** → V1.R |
+| `nav.planet.dropdown` | "Every game, one click from anywhere" | the nav game dropdown | not captured — placeholder |
+| `planet.completed.standings` | "Every challenge settles in public" | a planet page's completed section | **captured (provisional)** → V1.R |
+| `bot.guide.cp` · `bot.guide.challenges` · `bot.guide.trophies` | "The bot teaches in cards" | `/api/card/<kind>` | not captured — placeholder |
+| `bot.home` | "Your whole Cluster, in one card" | `/api/card/home` | not captured — placeholder |
+| `bot.card.wallet` | "Your wallet, in Discord" | `/api/card/wallet` | not captured · retired by B28 → never captured, row is deleted |
+| `gamer.quest.actions` | "Every action, what it pays, what it caps at" | a quest page's action list | not captured — placeholder |
+| `admin.shots.console` | "Every screenshot on the site is one row an admin owns" | `/admin/shots` | **captured (provisional)** → V1.R |
+| `bot.card.challenge` | "A challenge card anyone can join from Discord" | `/api/card/planets` | **captured (provisional)** · retired by B28 → V1.R deletes it |
+| `bot.card.market` | "The marketplace, inside Discord" | `/api/card/market` | **captured (provisional)** · retired by B28 → V1.R deletes it |
+| `gamer.feed.dashboard` | "Build the dashboard you want to look at" | `/feed` | **captured (provisional)** → V1.R |
+| `gamer.leaderboard.rank` | "Ranked against everyone who plays it" | `/leaderboards` | **captured (provisional)** → V1.R |
+| `gamer.planet.page` | "A planet per game, with its own world" | `/planets` | **captured (provisional)** → V1.R |
+| `server.earnings.ledger` | "Every line itemised" | `/servers/demo-guild-nebula-1?key=DEMO-DNEBULA1` | **captured (provisional)** → V1.R |
+| `gamer.quest.signal` | "Bring us a server, get paid for it" | the signal quest | not captured — placeholder |
+| `gamer.cp.capped` | "Capped, and told plainly" | the CP history, maxed entry | not captured — placeholder |
+| `gamer.wallet` · `gamer.wallet.ledger` | "Your points, your trophies, what they are worth" | `/wallet` | not captured — placeholder |
+| `gamer.economy.loop` | "Free points → trophies → real money" | the explainer | not captured — placeholder |
+| `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` | not captured — placeholder |
+| `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page | not captured — placeholder |
+| `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` | not captured — placeholder |
+| `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` | not captured — placeholder |
+| `page.home.gamer` | the gamer argument | `/` | not captured — placeholder |
+| `bot.card.profile` | "Your trophies and every account, on one card" | `/api/card/profile` | **captured (provisional)** · retired by B28 → V1.R deletes it |
+| `gamer.lol.card` | "Your rank, in the game's own words" | a profile's LoL account card | **captured (provisional)** → V1.R |
+| `admin.offers.console` | "Every founding offer, switchable and counted" | `/admin/offers` | not captured — placeholder |
+| `brand.invoice.discount` | "The full price, and what we covered" | a discounted invoice | not captured — placeholder |
+| `server.welcome.draft` | "Your first challenge is already waiting" | the portal's Challenges tab | not captured — placeholder |
+| `admin.welcome.ledger` | "What we spent to grow, on the same bill as everything else" | Cluster's brand invoice | not captured — placeholder |
+| `admin.email.console` | "Every message we send, and whether it arrived" | `/admin/email` | not captured — placeholder |
+| `admin.abuse.review` | "Growth we look at before we pay for it" | the server review page | not captured — placeholder |
+| `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | a challenge invoice | not captured — placeholder |
+| `home.quests.section` · `home.missions` | "Free points, capped and stated" | `/` | not captured — placeholder |
+| `gamer.missions.progress` | "Your first week, one step at a time" | the feed | not captured — placeholder |
 | *(add a row per B47+ item that anyone can see)* | | |
 
 **B28 retires rows**: anywhere a page demonstrates a bot card, the live render
@@ -2747,6 +2841,49 @@ worse than no shot — it is a confident lie about the product.
 
 Then load them: `/admin/shots` bulk-imports the manifest, so the capture run
 and the live site share one source of truth.
+
+### V1.R — The recapture, which is the one that counts
+
+**A capture pass already ran, in wave 1.** It built the machinery
+(`scripts/capture-shots.mjs`, `lib/shots.ts`, `<FeatureShot>`, `/admin/shots`)
+and left 28 images in `public/shots/`. Those images are **provisional**. They
+are pictures of a wave-1 product and most of them are already wrong by the time
+Part I closes.
+
+So V1's real job is a **recapture**, not a first capture:
+
+```bash
+npm run build
+DEMO_DB=1 npx next start -p 3031
+node scripts/capture-shots.mjs          # every key, or name keys to redo some
+```
+
+Three rules for that run, each of which somebody will otherwise get wrong:
+
+1. **Replace every bundled image.** Not the ones that look stale — all of them.
+   Deciding shot-by-shot which copy changed is the judgement call the single
+   pass exists to avoid.
+2. **`bot.card.*` rows are DELETED, not recaptured.** B28 replaces bot-card
+   screenshots with live renders from `/api/card/<kind>`, so `bot.card.profile`,
+   `bot.card.market`, `bot.card.challenge` and any sibling key are removed from
+   `SHOT_REGISTRY`, their rows dropped from `feature_shots`, and their files
+   deleted from `public/shots/`. A live render cannot go stale; a screenshot of
+   one can, which is the entire reason B28 exists.
+3. **An admin's override must survive.** `seedFeatureShots` already skips any
+   row whose `imageUrl` is not the bundled path, because that means somebody
+   replaced it through `/admin/shots` and their version wins. **Do not remove
+   that skip while doing a bulk recapture** — it is the difference between
+   refreshing our own screenshots and overwriting the customer's.
+
+**And do not recapture before then.** Not mid-item when a shot goes visibly
+stale, not at the end of each wave. Capture is a single pass over a settled
+product; running it three times is precisely the waste §1.1's ordering was
+designed to avoid. A stale shot between now and Part I closing is expected, and
+the right response to noticing one is to leave it.
+
+New slots keep being placed as pages are touched in waves 2 and 3 — register the
+key in R2 and leave the image **empty**. The placeholder is doing its job when
+it is visible.
 
 ## V2 — The claim-proof pass
 

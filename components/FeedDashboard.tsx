@@ -11,7 +11,11 @@ import { useTr } from "@/components/LocaleProvider";
 
 export type DashQuest = { key: string; name: string; color: string; logoUrl: string | null; qp: number; totalCp: number; pct: number; tierName: string };
 export type DashLeaderboard = { game: string; metricKey: string; title: string; slug: string | null; logoUrl: string | null; coverUrl: string | null };
-export type DashStat = { accountId: string; game: string; logoUrl: string | null; metricKey: string; metricLabel: string; value: number; inGameName: string };
+// `display` is the human string, resolved on the server (lib/metric-display).
+// `value` stays because widgets sort and compare on it — but nothing renders it.
+// A ladder stat's `value` is a position we derived, and printing it shows a
+// gamer a score they have never heard of instead of the rank they earned.
+export type DashStat = { accountId: string; game: string; logoUrl: string | null; metricKey: string; metricLabel: string; value: number; display: string; inGameName: string };
 export type DashLolAccount = { accountId: string; tag: string; region: string | null };
 export type Widget = { id: string; type: "quest" | "cp" | "stat" | "leaderboard" | "lolaccount"; w: number; config: Record<string, string> };
 
@@ -177,7 +181,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
           <div className="flex items-center gap-3">
             <GameLogo logoUrl={s.logoUrl} name={s.game} size={38} rounded="rounded-lg" className="ring-1 ring-white/15" />
             <div className="min-w-0">
-              <div className="text-2xl font-bold">{s.value.toLocaleString()}</div>
+              <div className="text-2xl font-bold">{s.display}</div>
               <div className="text-[10px] text-muted truncate">{s.metricLabel} · {s.inGameName}</div>
             </div>
           </div>
@@ -186,7 +190,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
           <div className="text-xs text-muted space-y-1">
             <div>Game: <b className="text-ink">{s.game}</b></div>
             <div>Account: <b className="text-ink">{s.inGameName}</b></div>
-            <div>Metric: <b className="text-ink">{s.metricLabel}</b> — {s.value.toLocaleString()}</div>
+            <div>Metric: <b className="text-ink">{s.metricLabel}</b> — {s.display}</div>
           </div>
         ),
       };
@@ -194,7 +198,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
     if (widget.type === "lolaccount") {
       const la = sources.lolAccounts.find((x) => x.accountId === c.accountId) ?? sources.lolAccounts[0];
       if (!la) return { compact: <Empty label={tr("No League account linked")} />, expanded: null, fullHref: "/profile" };
-      const numbers = sources.stats.filter((s) => s.accountId === la.accountId).map((s) => ({ label: s.metricLabel, value: s.value.toLocaleString() }));
+      const numbers = sources.stats.filter((s) => s.accountId === la.accountId).map((s) => ({ label: s.metricLabel, value: s.display }));
       return {
         fullHref: "/profile",
         compact: (

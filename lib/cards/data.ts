@@ -38,7 +38,7 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     cardBg("bot_profile"),
     // Trophies they hold, newest first. A redeemed trophy still counts as won —
     // cashing out a prize isn't the same as never having earned it.
-    db.select({ name: schema.trophies.name, imageUrl: schema.trophies.imageUrl, awardedAt: schema.userTrophies.awardedAt })
+    db.select({ name: schema.trophies.name, imageUrl: schema.trophies.imageUrl, value: schema.trophies.value, awardedAt: schema.userTrophies.awardedAt })
       .from(schema.userTrophies)
       .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
       .where(eq(schema.userTrophies.userId, user.id)),
@@ -98,9 +98,16 @@ export async function profileCard(slug: string): Promise<CardData | null> {
         headline: s ? (s.rankLabel ?? `${s.metricKey.replace(/_/g, " ")}: ${s.metricValue}`) : game,
       };
     }),
+    // The three most VALUABLE, not the three most recent.
+    //
+    // A trophy case is a brag, and what a gamer brags about is the best thing
+    // they have won, not the last one. Ties break on recency so the order is
+    // stable rather than whatever the query happened to return. The cash value
+    // travels with each one: a trophy nobody can price reads as a badge, and
+    // the entire point of this economy is that these are worth real money.
     trophies: [...won]
-      .sort((a, b) => b.awardedAt.getTime() - a.awardedAt.getTime())
-      .map((t) => ({ name: t.name, imageUrl: t.imageUrl })),
+      .sort((a, b) => (b.value - a.value) || (b.awardedAt.getTime() - a.awardedAt.getTime()))
+      .map((t) => ({ name: t.name, imageUrl: t.imageUrl, value: t.value })),
     trophyCount: won.length,
     challenges,
     theme: {
@@ -126,12 +133,20 @@ export async function profileCard(slug: string): Promise<CardData | null> {
 
 // One linked game's stats for a gamer — the same snapshot the public profile
 // shows: rank and metrics, who they main, and how the last few games went.
-export async function gameStatsCard(slug: string, game: string): Promise<CardData | null> {
+export async function gameStatsCard(slug: string, game: string, accountId?: string | null): Promise<CardData | null> {
   const db = await getDb();
   const [user] = await db.select().from(schema.users).where(eq(schema.users.slug, slug)).limit(1);
   if (!user) return null;
   const accounts = await db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id));
-  const acc = accounts.find((a) => (getProvider(a.provider)?.game ?? "").toLowerCase() === game.toLowerCase());
+  const ofGame = accounts.filter((a) => (getProvider(a.provider)?.game ?? "").toLowerCase() === game.toLowerCase());
+  // WHICH account, when a gamer has two on one game.
+  //
+  // A main and a smurf, or one per region, is ordinary — and this used to take
+  // whichever row the query returned first, so the second account was
+  // unreachable and the card silently showed the wrong player's stats. The id
+  // is checked against this user's own accounts, so a guessed or stale id
+  // cannot read somebody else's.
+  const acc = (accountId ? ofGame.find((a) => a.id === accountId) : null) ?? ofGame[0];
   if (!acc) return null;
 
   const p = getProvider(acc.provider);

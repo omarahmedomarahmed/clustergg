@@ -715,6 +715,26 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "server_payout_line_idx" ON "server_payout_lines" ("payout_id")`,
 
+  // Feature screenshots (B7). One row per component worth proving; every page
+  // claiming that component reads the same row, so one admin edit updates the
+  // picture everywhere it appears. The caption and alt text live here too — an
+  // admin who can swap the picture but not the sentence under it can only
+  // half-fix a stale claim.
+  `CREATE TABLE IF NOT EXISTS "feature_shots" (
+    "key" text PRIMARY KEY NOT NULL,
+    "image_url" text,
+    "alt_text" text DEFAULT '' NOT NULL,
+    "caption" text DEFAULT '' NOT NULL,
+    "claim" text DEFAULT '' NOT NULL,
+    "overlay" jsonb DEFAULT '{}'::jsonb,
+    "captured_from" text,
+    "captured_at" timestamp with time zone,
+    "width" integer,
+    "height" integer,
+    "updated_by" text,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+
   `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "provider_key" text`,
   `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "provider_ref" text`,
   `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "collect_url" text`,
@@ -745,7 +765,19 @@ const COLUMN_MIGRATIONS = [
 async function runColumnMigrations(db: DB) {
   for (const stmt of COLUMN_MIGRATIONS) {
     try { await db.execute(dsql.raw(stmt)); }
-    catch (e) { if (!/already exists|does not exist/i.test(String(e))) throw e; }
+    catch (e) {
+      if (!/already exists|does not exist/i.test(String(e))) throw e;
+      // Say which one was skipped, and why.
+      //
+      // Most of these are expected — an ALTER against a table a later statement
+      // creates, run again on the next boot. But the swallow used to be
+      // completely silent, and a CREATE TABLE that quietly failed left a table
+      // missing with no trace anywhere: every query against it errored at
+      // request time, far away from the cause, and the migration list looked
+      // fine because it always looks fine. One line of warning is the
+      // difference between a five-minute diagnosis and an afternoon.
+      console.warn(`[migrate] skipped: ${stmt.slice(0, 70).replace(/\s+/g, " ")}… — ${String(e).slice(0, 120)}`);
+    }
   }
 }
 

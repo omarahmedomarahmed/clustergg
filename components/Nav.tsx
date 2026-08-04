@@ -17,7 +17,7 @@ import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { weekBoard } from "@/lib/profile-week";
 import { parseDrawerLinks } from "@/lib/mobile-nav";
 import { getContent } from "@/lib/cms";
-import { NAV_SETTING_KEY, navShows, parseNav } from "@/lib/site-chrome";
+import { NAV_SETTING_KEY, navBadges, navShows, parseNav } from "@/lib/site-chrome";
 import { getT } from "@/lib/i18n/t-server";
 import { slimImg, optImg } from "@/lib/img";
 
@@ -105,7 +105,7 @@ export default async function Nav() {
     signedIn: !!user,
     me: user ? { id: user.id, slug: user.slug } : null,
   };
-  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode", "mobile.drawer.extra", NAV_SETTING_KEY]);
+  const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode", "mobile.drawer.extra", "brand.nav.marketplaceIcon", "brand.nav.marketplaceLabel", "brand.nav.marketplaceOrder", NAV_SETTING_KEY]);
   // What this audience is allowed to see (Admin → Site chrome). Guests and
   // members are configured separately, because the row a brand needs and the
   // row a gamer needs are different rows.
@@ -115,6 +115,12 @@ export default async function Nav() {
   const planetsIcon = brand["brand.nav.planetsIcon"];
   const navBg = brand["brand.nav.bg"];
   const hidePlanets = brand["brand.nav.hidePlanets"] === "1";
+  // The marketplace badge (B9). Same family as the planets badge, same editor,
+  // same three knobs — art, label, order — so an admin who has learned one has
+  // learned both. Visibility is the `marketplaceBadge` chrome item.
+  const marketIcon = brand["brand.nav.marketplaceIcon"];
+  const marketLabel = brand["brand.nav.marketplaceLabel"] || "Trophy marketplace";
+  const marketFirst = brand["brand.nav.marketplaceOrder"] === "before";
   // The uploaded brand lockup for the mobile drawer (falls back to the mark, then
   // the built-in wordmark text) — mirrors BrandHeader so the drawer never shows
   // the placeholder "CLUSTER" text when a wordmark/logo is uploaded.
@@ -130,7 +136,22 @@ export default async function Nav() {
   const drawerExtra = parseDrawerLinks(brand["mobile.drawer.extra"]);
   const mobileLinks = [
     ...(user ? [{ href: "/feed", label: t("nav.home"), icon: "home" }] : []),
-    ...(hidePlanets ? [] : [{ href: "/planets", label: t("nav.allPlanets"), icon: "planet" }]),
+    // The same two destination badges as the bar, in the same admin-set order,
+    // read from the same helper — so an admin who moves the marketplace ahead of
+    // the planets moves it in both places.
+    //
+    // `show: () => true` on purpose. The per-audience chrome switches govern the
+    // top bar, which is a crowded row on a 390px screen; the drawer is the
+    // reachability surface and has always carried "all planets" regardless. An
+    // explicit "hide the badge" (`hidePlanets`) is a different instruction and is
+    // still honoured, because that one says hide it, not hide it from the bar.
+    ...navBadges({ hidePlanets, show: () => true, planetsIcon, marketIcon, marketLabel, marketFirst })
+      .map((b) => ({
+        href: b.href,
+        label: b.id === "planets" ? t("nav.allPlanets") : b.label,
+        icon: b.glyph,
+        logoUrl: (b.art || null) as string | null,
+      })),
     ...navGames.map((g) => ({ href: planetHref(g), label: g.name, icon: "gamepad", logoUrl: slimImg(g.logoUrl, 300000) as string | null })),
     ...(user ? [{ href: "/messages", label: t("nav.messages"), icon: "message" }] : []),
     // The two commercial doors. On mobile the drawer is the only place they can
@@ -146,12 +167,35 @@ export default async function Nav() {
 
   return (
     <>
-    <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl bg-cover bg-center"
-      style={navBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${optImg(navBg, 1200)})` } : undefined}>
+    <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl">
+      {/* ONE background image for the whole nav group.
+          A background image belongs to a component GROUP, not to each component
+          in it. This art was painted three times — once by the header, once by
+          the collapsed Profile-of-the-Week strip, once by the expanded panel,
+          each with its own veil and its own alignment. Three downloads, three
+          decodes, and three chances for the art to land a pixel differently,
+          which is precisely why there was a visible seam where the bar met the
+          strip.
+          Now: one positioned layer, children transparent over it, and the
+          expanded panel's darker look comes from a scrim rather than a second
+          copy. `--nav-group-h` is measured by WeekBand and grows to cover the
+          panel when it drops, so the image continues into it instead of
+          restarting. */}
+      {navBg && (
+        <div
+          aria-hidden
+          data-nav-backdrop
+          className="pointer-events-none fixed inset-x-0 top-0 z-0 bg-cover bg-center"
+          style={{
+            height: "var(--nav-group-h, var(--nav-h, 96px))",
+            backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${optImg(navBg, 1600)})`,
+          }}
+        />
+      )}
       {/* A tighter gap on phones. Combined with hiding the install button below
           `md` (see below), this is what stopped every page scrolling sideways by
           ~40px on a 390px screen. */}
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 sm:gap-4 px-3 sm:px-4 min-w-0">
+      <div className="relative z-10 mx-auto flex h-16 max-w-6xl items-center gap-2 sm:gap-4 px-3 sm:px-4 min-w-0">
         <Link href={user ? "/feed" : "/"} className="shrink-0" aria-label="Cluster home">
           <BrandHeader placement="nav" />
         </Link>
@@ -166,14 +210,20 @@ export default async function Nav() {
                 className="relative ring-1 ring-violet-400/25 group-hover:ring-cyan-400/60 shadow-lg" />
             </Link>
           ))}
-          {!hidePlanets && show("allPlanets") && (
-            <Link href="/planets" title="All planets"
-              className="shrink-0 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 text-muted hover:text-cyan-300 hover:border-cyan-400/50 transition-colors">
-              {planetsIcon
-                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={planetsIcon} alt="All planets" className="h-full w-full object-cover" />
-                : <Icon name="planet" size={18} />}
-            </Link>
-          )}
+          {/* The two destination badges, in admin-set order. Rendered from one
+              list rather than two hand-written blocks so they cannot drift out
+              of the same visual family — which is the whole point of B9: the
+              marketplace was a bare 18px glyph parked among the right-hand
+              utility icons, so it read as a control rather than as a place. */}
+          {navBadges({ hidePlanets, show, planetsIcon, marketIcon, marketLabel, marketFirst })
+            .map((b) => (
+              <Link key={b.id} href={b.href} title={b.label}
+                className={`shrink-0 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 text-muted transition-colors ${b.hover}`}>
+                {b.art
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={b.art} alt={b.label} className="h-full w-full object-cover" />
+                  : <Icon name={b.glyph} size={18} />}
+              </Link>
+            ))}
         </nav>
 
         {/* One quest card (with a dropdown to switch) fills the nav space (lg+).
@@ -201,14 +251,6 @@ export default async function Nav() {
                   <Icon name="search" size={18} />
                 </Link>
               )}
-              {/* The marketplace, beside search and messages.
-                  CP is only worth playing for if the place it spends is one
-                  click from anywhere — burying it under the profile menu would
-                  make it a feature nobody found. */}
-              <Link href="/marketplace" title="Trophy marketplace"
-                className="text-muted hover:text-amber-200 hidden sm:inline-flex">
-                <Icon name="trophy" size={18} />
-              </Link>
               {show("brandsLink") && <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>}
               {show("serversLink") && <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>}
               {show("alerts") && <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />}
@@ -237,14 +279,6 @@ export default async function Nav() {
                   <Icon name="search" size={18} />
                 </Link>
               )}
-              {/* The marketplace, beside search and messages.
-                  CP is only worth playing for if the place it spends is one
-                  click from anywhere — burying it under the profile menu would
-                  make it a feature nobody found. */}
-              <Link href="/marketplace" title="Trophy marketplace"
-                className="text-muted hover:text-amber-200 hidden sm:inline-flex">
-                <Icon name="trophy" size={18} />
-              </Link>
               {show("brandsLink") && <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>}
               {show("serversLink") && <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>}
               {show("loginLink") && <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>}
@@ -263,6 +297,7 @@ export default async function Nav() {
       </div>
 
       {/* Native-mobile-game HUD strip (level bar + red-dot alerts), members only */}
+      <div className="relative z-10">
       {user && show("mobileHud") && (
         <MobileHud
           displayName={user.displayName}
@@ -283,7 +318,8 @@ export default async function Nav() {
           default and covered Mission Control with a fixed panel that swallowed
           every click underneath it — the card studio was unusable. Admin is a
           workspace, not somewhere anyone votes. */}
-      {show("weekBand") && <WeekBand initial={bandData} bgUrl={navBg ? optImg(navBg, 1200) ?? "" : ""} />}
+      {show("weekBand") && <WeekBand initial={bandData} bgUrl={navBg ? optImg(navBg, 1600) ?? "" : ""} />}
+      </div>
     </header>
     </>
   );

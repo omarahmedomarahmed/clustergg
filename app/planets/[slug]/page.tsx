@@ -126,6 +126,50 @@ export default async function PlanetPage({
     if (arr.length < 5) { arr.push(p); topByChallenge.set(p.challengeId, arr); }
   }
 
+  // ===== Completed challenges, with their final standings (B12) =====
+  //
+  // A finished competition is the only evidence that the scoring is real: who
+  // placed where, on what metric, with what figure. It used to be visible only
+  // while a challenge was RUNNING — which is precisely backwards, because a
+  // live board is a board that can still change and a settled one cannot.
+  //
+  // Its own query rather than a filter over `parts`: that one is scoped to
+  // `status = "active"` participants, which is exactly the set a finished
+  // challenge no longer has.
+  const completedChallenges = challenges.filter((c) => c.status === "completed");
+  const finalIds = completedChallenges.map((c) => c.id);
+  const finals = finalIds.length
+    ? await db.select({
+        challengeId: schema.challengeParticipants.challengeId,
+        points: schema.challengeParticipants.currentPoints,
+        placement: schema.challengeParticipants.finalPlacement,
+        name: schema.users.displayName,
+        slug: schema.users.slug,
+        avatarUrl: schema.users.avatarUrl,
+      })
+      .from(schema.challengeParticipants)
+      .innerJoin(schema.users, eq(schema.challengeParticipants.userId, schema.users.id))
+      .where(inArray(schema.challengeParticipants.challengeId, finalIds))
+      .orderBy(desc(schema.challengeParticipants.currentPoints))
+      .limit(300)
+    : [];
+  const finalByChallenge = new Map<string, typeof finals>();
+  for (const f of finals) {
+    const arr = finalByChallenge.get(f.challengeId) ?? [];
+    arr.push(f);
+    finalByChallenge.set(f.challengeId, arr);
+  }
+  // Placement wins over points where staff recorded one — a podium can be
+  // corrected after the fact, and the correction is the truth.
+  for (const [, arr] of finalByChallenge) {
+    arr.sort((a, b) => {
+      if (a.placement && b.placement) return a.placement - b.placement;
+      if (a.placement) return -1;
+      if (b.placement) return 1;
+      return b.points - a.points;
+    });
+  }
+
   // Interactive planet hero for games that have a skin (falls back to the flat
   // cover hero otherwise). Admin can force the layout per planet.
   const layout = game?.planetLayout ?? "auto";
@@ -237,6 +281,83 @@ export default async function PlanetPage({
 
         <div className="grid gap-10 lg:grid-cols-[1fr_320px]">
           <div className="min-w-0 space-y-12">
+            {/* ===== Settled challenges (B12) =====
+                The hero above carries only what is LIVE. Everything that has
+                finished lands here with its final placements, the metric it was
+                scored on and the figure each placement reached — which is the
+                only public proof that the scoring is real, and which used to be
+                visible only while a challenge was still running. */}
+            <section>
+              <div className="flex items-center justify-between gap-3 mb-1">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Icon name="trophy" size={20} className="text-amber-300" /> Settled challenges
+                </h2>
+                {completedChallenges.length > 0 && (
+                  <span className="text-xs text-muted shrink-0">{completedChallenges.length} finished</span>
+                )}
+              </div>
+              <p className="text-xs text-muted mb-4">
+                Every competition that has ended on this planet, with the standings it ended on. Nothing here can change.
+              </p>
+              {completedChallenges.length === 0 ? (
+                /* An honest empty state, not a gap. A planet whose first
+                   challenge has not finished yet should say so — a blank space
+                   reads as a section that failed to load. */
+                <div className="rounded-2xl border border-dashed border-violet-400/25 p-6 text-center">
+                  <Icon name="trophy" size={22} className="text-violet-300/60 mb-2" />
+                  <div className="text-sm text-muted">
+                    No challenge has finished on this planet yet.
+                    {activeChallenges.length > 0
+                      ? " The one running now will settle here when it ends."
+                      : " When one runs and ends, its final standings land here."}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {completedChallenges.map((c) => {
+                    const standings = finalByChallenge.get(c.id) ?? [];
+                    // What it was scored on, in the words the challenge itself
+                    // used. `pointsEngine` is `{ metric: weight }`, so its keys
+                    // are the metrics that earned points.
+                    const metrics = Object.keys((c.pointsEngine ?? {}) as Record<string, number>);
+                    return (
+                      <div key={c.id} className="rounded-2xl border border-white/10 overflow-hidden">
+                        <div className="flex flex-wrap items-center gap-3 border-b border-white/10 bg-black/20 px-4 py-3">
+                          <Link href={`${path}/challenges/${c.id}`} className="font-bold hover:text-cyan-300 min-w-0 truncate">{c.title}</Link>
+                          <span className="rounded-full border border-white/15 px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted shrink-0">Ended</span>
+                          {metrics.length > 0 && (
+                            <span className="text-[11px] text-muted shrink-0">
+                              Scored on <b className="text-ink">{metrics.map((m) => m.replace(/_/g, " ")).join(" + ")}</b>
+                            </span>
+                          )}
+                          {c.prizeDescription && <span className="text-[11px] text-emerald-300 shrink-0 ml-auto">{c.prizeDescription}</span>}
+                        </div>
+                        {standings.length === 0 ? (
+                          <div className="px-4 py-4 text-xs text-muted">No entrants were recorded for this one.</div>
+                        ) : (
+                          <ol className="divide-y divide-white/5">
+                            {standings.slice(0, 5).map((r, i) => (
+                              <li key={r.slug} className="flex items-center gap-3 px-4 py-2.5">
+                                <span className={`w-6 shrink-0 text-center text-sm font-black ${i === 0 ? "text-amber-300" : i === 1 ? "text-slate-300" : i === 2 ? "text-orange-300" : "text-muted"}`}>
+                                  {r.placement ?? i + 1}
+                                </span>
+                                <Avatar src={r.avatarUrl} name={r.name} size={26} />
+                                <Link href={`/u/${r.slug}`} className="min-w-0 flex-1 truncate text-sm hover:text-cyan-300">{r.name}</Link>
+                                {/* The figure, not a badge. "3rd place" without a
+                                    number is a claim; "3rd, 41 points" is a result. */}
+                                <span className="shrink-0 text-sm font-bold tabular-nums">{r.points.toLocaleString()}</span>
+                                <span className="shrink-0 text-[10px] uppercase tracking-widest text-muted">pts</span>
+                              </li>
+                            ))}
+                          </ol>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+
             {/* Standings (only if this planet has a game) */}
             {/* Leaderboard #1 — connected-account standings for this game */}
             {game && boards.length > 0 && (

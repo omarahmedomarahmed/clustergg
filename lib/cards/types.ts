@@ -73,7 +73,10 @@ export type ProfileCard = {
   accounts: { game: string; logoUrl?: string | null; tag: string; headline?: string | null }[];
   // What they've actually won, and what they're competing in right now. A
   // profile card without these is a stat sheet; with them it's a trophy case.
-  trophies?: { name: string; imageUrl: string }[];
+  // Ordered most valuable first. `value` is the admin-assigned dollar figure
+  // the trophy redeems for — the card prints it, because a trophy nobody can
+  // price reads as a badge rather than as money.
+  trophies?: { name: string; imageUrl: string; value?: number }[];
   trophyCount?: number;           // total won, when more than the card can show
   challenges?: { title: string; live: boolean; points: number; place?: number | null }[];
   theme: CardTheme;

@@ -31,7 +31,7 @@ export type CardRef = {
 
 const loaders: Record<string, (a: Record<string, string>) => Promise<CardData | null>> = {
   profile: (a) => profileCard(a.slug),
-  "game-stats": (a) => gameStatsCard(a.slug, a.game),
+  "game-stats": (a) => gameStatsCard(a.slug, a.game, a.account || null),
   quest: (a) => questCard(a.slug || null, a.quest),
   cp: (a) => cpSummaryCard(a.slug),
   // A challenge id scopes this to that competition's own standings; without

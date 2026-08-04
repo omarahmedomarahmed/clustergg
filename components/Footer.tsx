@@ -3,8 +3,6 @@ import { getContent } from "@/lib/cms";
 import BrandHeader from "@/components/BrandHeader";
 import AddBotButton from "@/components/AddBotButton";
 import AppStoreBadges from "@/components/AppStoreBadges";
-import LocaleToggle from "@/components/LocaleToggle";
-import { getLocale } from "@/lib/i18n/server";
 import { optImg } from "@/lib/img";
 import { FOOTER_SETTING_KEY, parseFooter } from "@/lib/site-chrome";
 
@@ -21,7 +19,6 @@ export default async function Footer() {
   // deploy, which is why the footer had exactly the links somebody happened to
   // think of on the day it was written.
   const columns = parseFooter(c[FOOTER_SETTING_KEY]);
-  const locale = await getLocale();
   return (
     <footer className="relative z-10 mt-20 border-t border-violet-500/15 bg-cover bg-center"
       style={footerBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.86), rgba(4,5,26,0.92)), url(${optImg(footerBg, 1200)})` } : undefined}>
@@ -31,10 +28,16 @@ export default async function Footer() {
           <p className="text-muted leading-relaxed">{c["footer.tagline"]}</p>
           <div className="mt-4"><AddBotButton label="Add ClusterBot to your server" /></div>
           <div className="mt-4"><AppStoreBadges className="items-start" /></div>
-          {/* Moved out of the nav. It was occupying a slot in the busiest row on
-              the site for a control almost nobody uses twice, and on a phone it
-              was one of the things pushing the burger past the edge. */}
-          <div className="mt-5"><LocaleToggle current={locale} /></div>
+          {/* No language switch here (B24 — localization is PARKED, not removed).
+              Offering Arabic while the pages themselves are being consolidated
+              and rewritten means paying for the same copy twice and getting the
+              Arabic wrong both times, so English is the working language until
+              the product stops moving.
+              The machinery is untouched and unused: lib/i18n, the
+              locale-namespaced CMS keys and the per-entity translation columns
+              all still resolve. Restarting is putting this control back, not
+              rebuilding a translation layer — which is exactly why it was a
+              pause rather than a removal. */}
         </div>
         {columns.map((col) => (
           <div key={col.title || col.links[0]?.href}>

@@ -37,6 +37,7 @@ export default function BrandingEditor({
   defaultNavBg, defaultFooterBg, defaultFavicon, defaultFaviconZoom, defaultCpIcon, defaultOrbIcon, defaultOrbColor, defaultQuestRocket,
   defaultLoadingInterval = 3, defaultLoadingAstronaut = "", defaultLoadingBg = "", defaultLoadingWordmark = true, defaultLoadingOrbSize = 80,
   defaultOrbSize = 72, defaultHidePlanets = false,
+  defaultMarketIcon = "", defaultMarketLabel = "", defaultMarketFirst = false,
   defaultDiscordOrbIcon = "", defaultDiscordOrbColor = "#5865f2", defaultDiscordOrbSize = 72,
 }: {
   defaultWordmark: string;
@@ -65,6 +66,9 @@ export default function BrandingEditor({
   defaultDiscordOrbColor?: string;
   defaultDiscordOrbSize?: number;
   defaultHidePlanets?: boolean;
+  defaultMarketIcon?: string;
+  defaultMarketLabel?: string;
+  defaultMarketFirst?: boolean;
 }) {
   const [wordmark, setWordmark] = useState(defaultWordmark);
   const [cpIcon, setCpIcon] = useState(defaultCpIcon);
@@ -77,6 +81,9 @@ export default function BrandingEditor({
   const [questRocket, setQuestRocket] = useState(defaultQuestRocket);
   const [planetsIcon, setPlanetsIcon] = useState(defaultPlanetsIcon);
   const [hidePlanets, setHidePlanets] = useState(!!defaultHidePlanets);
+  const [marketIcon, setMarketIcon] = useState(defaultMarketIcon);
+  const [marketLabel, setMarketLabel] = useState(defaultMarketLabel);
+  const [marketFirst, setMarketFirst] = useState(!!defaultMarketFirst);
   const [navBg, setNavBg] = useState(defaultNavBg);
   const [footerBg, setFooterBg] = useState(defaultFooterBg);
   const [favicon, setFavicon] = useState(defaultFavicon);
@@ -191,6 +198,31 @@ export default function BrandingEditor({
           <label className="mt-3 flex items-center gap-2 text-sm text-muted cursor-pointer">
             <input type="checkbox" name="hidePlanets" checked={hidePlanets} onChange={(e) => setHidePlanets(e.target.checked)} className="accent-cyan-400" />
             Hide the &ldquo;All planets&rdquo; badge from the nav bar
+          </label>
+        </div>
+      </div>
+
+      {/* Nav marketplace badge — deliberately the same three knobs, in the same
+          shape, immediately below the planets badge it sits beside. */}
+      <div>
+        <div className="font-semibold text-sm mb-1">Nav marketplace badge</div>
+        <p className="text-xs text-muted mb-3">
+          The trophy badge beside the &ldquo;all planets&rdquo; badge, linking to the marketplace.
+          Upload an image or leave empty for the default trophy glyph. To hide it entirely,
+          switch off <b>Marketplace badge</b> in Site chrome — visibility is set per audience there.
+        </p>
+        <div className="rounded-2xl border border-violet-400/15 bg-black/20 p-4">
+          <ImageUpload name="marketIcon" value={marketIcon} onChange={setMarketIcon}
+            aspect="1/1" rounded="rounded-xl" maxDim={128} scope="content" hint="Square icon, shown at 40×40 in the nav." />
+          <label className="mt-3 block">
+            <span className="text-xs text-muted">Label (tooltip, and the wording in the mobile drawer)</span>
+            <input name="marketLabel" value={marketLabel} onChange={(e) => setMarketLabel(e.target.value)}
+              placeholder="Trophy marketplace" maxLength={40}
+              className="mt-1 w-full rounded-lg border border-violet-400/20 bg-black/30 px-3 py-2 text-sm" />
+          </label>
+          <label className="mt-3 flex items-center gap-2 text-sm text-muted cursor-pointer">
+            <input type="checkbox" name="marketFirst" checked={marketFirst} onChange={(e) => setMarketFirst(e.target.checked)} className="accent-amber-400" />
+            Put the marketplace badge <b className="text-ink">before</b> the planets badge
           </label>
         </div>
       </div>

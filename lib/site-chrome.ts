@@ -32,6 +32,12 @@ export type NavItemDef = {
 export const NAV_ITEMS: NavItemDef[] = [
   { id: "gameLogos", label: "Game planet logos", note: "The row of game logos next to the wordmark.", audiences: ["guest", "user"], on: { guest: true, user: true } },
   { id: "allPlanets", label: "All planets button", note: "The globe icon at the end of the game logos.", audiences: ["guest", "user"], on: { guest: true, user: true } },
+  // The marketplace badge sits in the same row as the planets badge and is
+  // configured the same way. It is on for both audiences by default: a guest
+  // who can see what points buy has a reason to link an account, and hiding the
+  // shop from everyone who has not signed up yet is how a currency stays
+  // abstract.
+  { id: "marketplaceBadge", label: "Marketplace badge", note: "The trophy badge beside the planets badge. Art, label and order are set in Brand Kit.", audiences: ["guest", "user"], on: { guest: true, user: true } },
   { id: "questCard", label: "Quest card", note: "The live quest tracker that fills the middle of the bar.", audiences: ["user"], on: { user: true } },
   { id: "alerts", label: "Notifications & messages", note: "The bell and the DM icon.", audiences: ["user"], on: { user: true } },
   { id: "profileMenu", label: "Profile menu", note: "The avatar, and everything under it.", audiences: ["user"], on: { user: true } },
@@ -79,6 +85,53 @@ export function navShows(settings: NavSettings, id: string, audience: Audience):
   if (!def || !def.audiences.includes(audience)) return false;
   const set = settings[id]?.[audience];
   return typeof set === "boolean" ? set : def.on[audience] === true;
+}
+
+// ===== The nav destination badges =====
+
+/**
+ * The badges that sit at the end of the game-logo row: all-planets, and the
+ * trophy marketplace.
+ *
+ * This returns data rather than markup, and both the desktop row and the mobile
+ * drawer read it, because the requirement is that they agree on *order* as well
+ * as on which badges exist. Two hand-written blocks in two components is how
+ * "the drawer shows them the other way round" happens, and nobody notices for a
+ * month.
+ */
+export type NavBadge = {
+  id: "planets" | "market";
+  href: string;
+  label: string;
+  /** Admin-uploaded art, or "" to fall back to the glyph. */
+  art: string;
+  glyph: "planet" | "trophy";
+  /** Tailwind hover classes — each badge keeps its own accent. */
+  hover: string;
+};
+
+export function navBadges(opts: {
+  hidePlanets: boolean;
+  show: (id: string) => boolean;
+  planetsIcon: string;
+  marketIcon: string;
+  marketLabel: string;
+  marketFirst: boolean;
+}): NavBadge[] {
+  const planets: NavBadge = {
+    id: "planets", href: "/planets", label: "All planets",
+    art: opts.planetsIcon, glyph: "planet",
+    hover: "hover:text-cyan-300 hover:border-cyan-400/50",
+  };
+  const market: NavBadge = {
+    id: "market", href: "/marketplace", label: opts.marketLabel,
+    art: opts.marketIcon, glyph: "trophy",
+    hover: "hover:text-amber-200 hover:border-amber-400/50",
+  };
+  const out: NavBadge[] = [];
+  if (!opts.hidePlanets && opts.show("allPlanets")) out.push(planets);
+  if (opts.show("marketplaceBadge")) out.push(market);
+  return opts.marketFirst ? out.slice().reverse() : out;
 }
 
 // ===== Footer =====

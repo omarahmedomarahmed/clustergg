@@ -62,11 +62,18 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   }
 
   // ---------- Trophies (challenge prize art) ----------
+  // Values, because a trophy worth $0 is a badge.
+  //
+  // The whole economy rests on these redeeming for real money, and the demo
+  // shipped the entire catalogue at the column default of 0 — so every surface
+  // that prints what a trophy is worth printed nothing, and no one could see
+  // that the ordering ("show the most valuable three") was even implemented.
+  // Ascending by tier, which is also the order the cards sort them in.
   const trophyDefs = [
-    { name: "Champion's Nebula Cup", imageUrl: TROPHY_ART.gold, tier: "gold" },
-    { name: "Silver Star Cup", imageUrl: TROPHY_ART.silver, tier: "silver" },
-    { name: "Bronze Ember Cup", imageUrl: TROPHY_ART.bronze, tier: "bronze" },
-    { name: "Supernova Crystal", imageUrl: TROPHY_ART.legendary, tier: "legendary" },
+    { name: "Champion's Nebula Cup", imageUrl: TROPHY_ART.gold, tier: "gold", value: 25 },
+    { name: "Silver Star Cup", imageUrl: TROPHY_ART.silver, tier: "silver", value: 10 },
+    { name: "Bronze Ember Cup", imageUrl: TROPHY_ART.bronze, tier: "bronze", value: 5 },
+    { name: "Supernova Crystal", imageUrl: TROPHY_ART.legendary, tier: "legendary", value: 50 },
   ];
   const trophyIds: string[] = [];
   for (const t of trophyDefs) {
@@ -234,13 +241,24 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     await db.update(schema.users).set({ discordUsername: username }).where(eq(schema.users.id, userId));
   };
 
-  const mkAccount = async (userId: string, provider: string, providerAccountId: string, inGameName: string) => {
+  const mkAccount = async (
+    userId: string, provider: string, providerAccountId: string, inGameName: string,
+    // `synced` marks an account whose stats are seeded below. Without it the
+    // account is stale (`nextSyncAt: 0`) and every profile view re-attempts a
+    // live provider call that cannot succeed locally — slow, and it would keep
+    // flipping the account into `error` under a demo that is showing off its
+    // stats.
+    opts: { synced?: boolean; region?: string } = {},
+  ) => {
     const id = uid();
     await db.insert(schema.linkedGameAccounts).values({
-      id, userId, provider, providerAccountId, inGameName,
+      id, userId, provider, providerAccountId, inGameName, region: opts.region,
       // Same rule a real link follows: seeding proves the row exists, not that
       // anyone owns it. See lib/account-ownership.ts.
-      verified: false, verifiedMethod: "exists", syncStatus: "pending", nextSyncAt: new Date(0),
+      verified: false, verifiedMethod: "exists",
+      syncStatus: opts.synced ? "ok" : "pending",
+      nextSyncAt: opts.synced ? new Date(Date.now() + 6 * 60 * 60 * 1000) : new Date(0),
+      lastSyncedAt: opts.synced ? new Date() : undefined,
     });
     return id;
   };
@@ -266,6 +284,71 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   await mkAccount(vega, "speedruncom", "kjp4y75j", "Niftski");
   await mkAccount(atlas, "roblox", "156", "builderman");
   const atlasDota = await mkAccount(atlas, "opendota", "87278757", "Puppey");
+
+  // ===== A trophy case worth looking at =====
+  //
+  // The only trophies anyone held came from `awardChallengeTrophies` on the one
+  // completed challenge — one piece each, to three different gamers. So the
+  // "show the three most valuable" rule and the "…and no empty frames when they
+  // hold one" rule had nothing to run against, and a card that silently showed
+  // all of them would have looked correct.
+  //
+  // Nova gets five across four tiers, so the cap is real; Lyra keeps exactly
+  // one, so the single-trophy case is real too. Placement is recorded because a
+  // trophy is evidence of a result, not an item.
+  const award = async (userId: string, trophyId: string, placement: number, daysAgo: number) => {
+    await db.insert(schema.userTrophies).values({
+      id: uid(), userId, trophyId, placement,
+      awardedAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+    }).onConflictDoNothing();
+  };
+  // Deliberately awarded oldest-first-most-valuable: the legendary is the
+  // OLDEST of Nova's five. A shelf sorted by recency would push it off the
+  // card, so this ordering is what makes a regression visible.
+  await award(nova, trophyIds[3], 1, 90);  // Supernova Crystal — $50
+  await award(nova, trophyIds[0], 1, 40);  // Champion's Nebula Cup — $25
+  await award(nova, trophyIds[1], 2, 20);  // Silver Star Cup — $10
+  await award(nova, trophyIds[2], 3, 10);  // Bronze Ember Cup — $5
+  await award(nova, trophyIds[2], 3, 2);   // a second Bronze — duplicates are ordinary
+  await award(lyra, trophyIds[1], 2, 15);  // exactly one, on purpose
+
+  // ===== Synced stats, including two on named ladders =====
+  //
+  // Every other seeded account is `syncStatus: "pending"` and stays that way
+  // without an API key, so a local demo had **no synced stat at all** — which
+  // meant the profile stat grid, the feed dashboard's stat widget and the
+  // leaderboards all rendered empty and none of them could be looked at.
+  //
+  // The two ladder rows are the important ones. A ladder stat stores both faces:
+  // `metricValue` is the sortable position we derive (League's Gold II is 2700
+  // so a leaderboard can order it) and `rankLabel` is what the game itself calls
+  // it. Seeding both is what makes it possible to see that a surface is printing
+  // the wrong one — which is exactly the bug B26 was raised for, and which was
+  // invisible locally because nothing here had a rank to print.
+  const nova_lol = await mkAccount(nova, "riot-lol", "nova-euw-puuid", "NovaStrike#EUW", { synced: true, region: "euw1" });
+  const stat = async (accountId: string, game: string, metricKey: string, metricValue: number, rankLabel?: string) => {
+    await db.insert(schema.statCurrent)
+      .values({ id: uid(), linkedAccountId: accountId, game, metricKey, metricValue, rankLabel: rankLabel ?? null })
+      .onConflictDoNothing();
+  };
+  // Gold II with 43 LP → 3 * 400 + 2 * 100 + 43. Computed by the same function
+  // the adapter uses, so the fixture cannot drift from the real ladder maths.
+  const { lolTierValue } = await import("@/lib/providers/registry");
+  await stat(nova_lol, "League of Legends", "solo_tier", lolTierValue("GOLD", "II", 43), "Gold II");
+  await stat(nova_lol, "League of Legends", "flex_tier", lolTierValue("SILVER", "I", 12), "Silver I");
+  await stat(nova_lol, "League of Legends", "solo_lp", 43);
+  await stat(nova_lol, "League of Legends", "wins", 128);
+  await stat(nova_lol, "League of Legends", "losses", 111);
+  await stat(nova_lol, "League of Legends", "win_rate", 53.6);
+  await stat(nova_lol, "League of Legends", "summoner_level", 312);
+  // Dota's rank_tier carries a label too — the rule is not a League special
+  // case, and a second provider on a ladder is what proves that.
+  await stat(orionDota, "Dota 2", "rank_tier", 75, "Divine 5");
+  await stat(orionDota, "Dota 2", "wins", 8412);
+  // A plain, label-less stat, so the "no ladder → show the number" half of the
+  // rule has something to exercise too.
+  await stat(novaChess, "Chess", "blitz_rating", 3241);
+  await stat(novaChess, "Chess", "games", 19430);
 
   const followPairs: [string, string][] = [
     [nova, lyra], [nova, orion], [lyra, nova], [orion, nova], [orion, vega],
@@ -587,6 +670,20 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { id: uid(), userId: nova, type: "challenge", title: "Blitz Supernova is live!", body: "The weekly wins race has begun. Points sync automatically.", href: "/planets/chess" },
     { id: uid(), userId: nova, type: "follow", title: "Orion started following you", href: "/u/orion" },
   ]);
+
+  // The ACTIVITY layer, last: points earned, ads served and clicked, profiles
+  // viewed and voted for, invoices issued, payouts requested, trophies bought
+  // and cashed out. Everything above this line creates the nouns; that module
+  // creates the verbs, and without it 36 of the 74 tables held no rows and every
+  // screen built to report on activity reported zero.
+  //
+  // Last because it reads what the rest of the seed wrote, and non-fatal because
+  // a demo with no activity is still a usable demo — but it says so out loud
+  // rather than leaving somebody to wonder why every card reads 0 CP.
+  try {
+    const { seedDemoActivity } = await import("@/lib/db/seed-activity");
+    await seedDemoActivity(db);
+  } catch (e) { console.warn("[seed] demo activity layer failed:", e); }
 }
 
 // ================= HOUSE ADS (production + demo) =================

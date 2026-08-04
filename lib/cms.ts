@@ -137,6 +137,13 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.nav.mode": "both",                 // mark | wordmark | both
   "brand.nav.planetsIcon": "",              // custom image for the nav "all planets" button
   "brand.nav.hidePlanets": "",              // "1" hides the "All planets" badge from the nav
+  // The trophy marketplace, as a nav badge in the same family as the planets
+  // badge. It was a bare 18px icon among the right-hand controls, which read as
+  // a utility rather than a destination — CP is only worth playing for if the
+  // place it spends looks like somewhere to go.
+  "brand.nav.marketplaceIcon": "",          // custom image for the marketplace badge (empty = trophy glyph)
+  "brand.nav.marketplaceLabel": "",         // tooltip/drawer label (empty = "Trophy marketplace")
+  "brand.nav.marketplaceOrder": "after",    // "before" | "after" the planets badge
   "brand.footer.mode": "both",
   // Loading screen (rotating circle) — editable color + optional inner logo +
   // a rotating list of phrases (one per line) that cycles every second.

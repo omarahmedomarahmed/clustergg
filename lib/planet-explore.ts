@@ -91,9 +91,19 @@ export async function getPlanetExplore(
     entries: v.rows.sort((x, y) => y.points - x.points).slice(0, 15).map((r, i) => ({ rank: i + 1, ...r })),
   })).sort((x, y) => (y.entries[0]?.points ?? 0) - (x.entries[0]?.points ?? 0));
 
-  // ---- Active/recent challenges + their top standings ----
+  // ---- LIVE challenges + their top standings ----
+  //
+  // Live only. The hero is a "what can I do right now" surface, and a finished
+  // competition in it is an invitation to do nothing — a gamer taps it, finds a
+  // frozen board and no way in, and learns the hero is not to be trusted.
+  //
+  // Completed challenges are not hidden; they moved DOWN to the planet page,
+  // where they get their final standings, the metric each was scored on and the
+  // figure every placement reached. That is the proof the scoring is real, and
+  // it used to be visible only WHILE a challenge was running — which is exactly
+  // backwards, because that is the one time nobody can check it.
   const challengeRows = await db.select().from(schema.challenges)
-    .where(and(eq(schema.challenges.spaceId, space.id), inArray(schema.challenges.status, ["active", "completed"])))
+    .where(and(eq(schema.challenges.spaceId, space.id), eq(schema.challenges.status, "active")))
     .orderBy(desc(schema.challenges.startAt)).limit(6);
   const chIds = challengeRows.map((c) => c.id);
   const parts = chIds.length

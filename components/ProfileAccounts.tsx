@@ -21,6 +21,15 @@ export type AccountCard = {
   coverUrl: string | null;
   avatar: string | null;
   stats: { label: string; value: string }[];
+  /**
+   * The synced summoner level, for the collapsed-row pill.
+   *
+   * Read from our own `stat_current` rather than from the live Riot snapshot,
+   * which is what it used to use: the level would vanish whenever Riot was
+   * unconfigured, rate-limited or simply slow, even though we already hold the
+   * number. Null for every non-League provider.
+   */
+  summonerLevel: number | null;
   standings: { rank: number; total: number; label: string; game: string; metricKey: string }[];
 };
 
@@ -49,7 +58,7 @@ export default function ProfileAccounts({
   const mix = (pct: number) => `color-mix(in srgb, ${c.accent} ${pct}%, transparent)`;
 
   return (
-    <section>
+    <section data-shot="linked-accounts">
       <div className="flex items-center justify-between mb-3 gap-3">
         <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: c.text }}>
           <Icon name="gamepad" size={19} style={{ color: c.accent }} /> {tr("Connected games")}
@@ -77,6 +86,9 @@ export default function ProfileAccounts({
         </div>
       )}
 
+      {/* `data-shot` marks the exact rectangle the capture pass crops to.
+          Without it a screenshot of "every account is verified" is a picture of
+          the whole page with the accounts somewhere in it. */}
       {accounts.length === 0 ? (
         <div className="rounded-2xl p-6 text-center text-sm" style={{ background: mix(6), color: c.muted }}>
           {isOwner ? tr("No games connected yet — connect your first above.") : tr("No games connected yet.")}
@@ -152,7 +164,7 @@ function AccountRow({ account: a, colors: c, active, onToggle }: { account: Acco
           </div>
           <div className="text-xs flex items-center gap-2" style={{ color: c.muted }}>
             {a.providerName}
-            {isLol && snap?.summonerLevel != null && <span>· Lv {snap.summonerLevel}</span>}
+            {isLol && (a.summonerLevel ?? snap?.summonerLevel) != null && <span>· Lv {a.summonerLevel ?? snap?.summonerLevel}</span>}
           </div>
         </div>
         <Icon name={active ? "chevronDown" : "chevronRight"} size={16} style={{ color: c.muted }} />
