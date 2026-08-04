@@ -38,7 +38,7 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     cardBg("bot_profile"),
     // Trophies they hold, newest first. A redeemed trophy still counts as won —
     // cashing out a prize isn't the same as never having earned it.
-    db.select({ name: schema.trophies.name, imageUrl: schema.trophies.imageUrl, awardedAt: schema.userTrophies.awardedAt })
+    db.select({ name: schema.trophies.name, imageUrl: schema.trophies.imageUrl, value: schema.trophies.value, awardedAt: schema.userTrophies.awardedAt })
       .from(schema.userTrophies)
       .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
       .where(eq(schema.userTrophies.userId, user.id)),
@@ -98,9 +98,16 @@ export async function profileCard(slug: string): Promise<CardData | null> {
         headline: s ? (s.rankLabel ?? `${s.metricKey.replace(/_/g, " ")}: ${s.metricValue}`) : game,
       };
     }),
+    // The three most VALUABLE, not the three most recent.
+    //
+    // A trophy case is a brag, and what a gamer brags about is the best thing
+    // they have won, not the last one. Ties break on recency so the order is
+    // stable rather than whatever the query happened to return. The cash value
+    // travels with each one: a trophy nobody can price reads as a badge, and
+    // the entire point of this economy is that these are worth real money.
     trophies: [...won]
-      .sort((a, b) => b.awardedAt.getTime() - a.awardedAt.getTime())
-      .map((t) => ({ name: t.name, imageUrl: t.imageUrl })),
+      .sort((a, b) => (b.value - a.value) || (b.awardedAt.getTime() - a.awardedAt.getTime()))
+      .map((t) => ({ name: t.name, imageUrl: t.imageUrl, value: t.value })),
     trophyCount: won.length,
     challenges,
     theme: {

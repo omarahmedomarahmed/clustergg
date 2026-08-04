@@ -555,12 +555,34 @@ function ProfileBody(d: ProfileCard) {
   const t = d.theme;
   const [pIdentity, pStats, pTrophies, pChallenges, pAccounts] =
     ["identity", "stats", "trophies", "challenges", "accounts"].map((k) => part(t, k));
-  const trophies = pTrophies.hidden ? [] : (d.trophies ?? []).slice(0, 5);
-  const challenges = pChallenges.hidden ? [] : (d.challenges ?? []).slice(0, 3);
-  // With a trophy shelf and live challenges below it, six account tiles no
-  // longer fit. Four keeps every row full-width and readable, and the profile
-  // link on the card is there for the rest.
-  const accounts = d.accounts.slice(0, trophies.length || challenges.length ? 4 : 6);
+  // Three, not five.
+  //
+  // The card is 1200x630 and a fourth tile makes all four unreadable — the name
+  // clamps to nothing and the cash value, which is the whole reason the shelf is
+  // worth looking at, stops fitting under the art. "Up to" three because a gamer
+  // with one trophy should see one trophy, not one and two empty frames.
+  // `trophies` arrives ordered most-valuable-first from `profileCard`.
+  const trophies = pTrophies.hidden ? [] : (d.trophies ?? []).slice(0, 3);
+  // Two arena rows, not three, once there is a shelf above them.
+  //
+  // Challenge titles are long, so three of them wrap to two rows, and those two
+  // rows are what pushed LINKED ACCOUNTS off the bottom of the card. The card is
+  // a summary with a link to the profile on it; the third competition is the
+  // cheapest thing on it to lose, and losing it keeps the accounts visible.
+  const challenges = pChallenges.hidden ? [] : (d.challenges ?? []).slice(0, trophies.length ? 2 : 3);
+  // How many account tiles the remaining space can actually hold.
+  //
+  // Two tiles per row, and the budget is vertical: with BOTH a trophy shelf and
+  // an arena row above them there is one row left, so a second row is drawn
+  // half-cut at the bottom edge — which is worse than not drawing it. With one
+  // of the two, two rows fit. With neither, three.
+  //
+  // Counted rather than guessed, because the alternative is what this card did
+  // before: pick a number that happens to look right for the author's own
+  // profile and clip everyone with more games than them.
+  const accountCap = trophies.length && challenges.length ? 2 : (trophies.length || challenges.length ? 4 : 6);
+  const accounts = d.accounts.slice(0, accountCap);
+  const accountsHidden = Math.max(0, d.accounts.length - accounts.length);
   return (
     <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
       <Section p={pIdentity}>
@@ -590,17 +612,34 @@ function ProfileBody(d: ProfileCard) {
           drawn at full opacity with their real art — there is no placeholder,
           because an empty shelf says the honest thing. */}
       {trophies.length ? (
-        <Section p={pTrophies} style={{ gap: 7, marginTop: 20 }}>
+        <Section p={pTrophies} style={{ gap: 7, marginTop: 14 }}>
           <Head p={pTrophies}>
             {`TROPHY CASE${d.trophyCount && d.trophyCount > trophies.length ? ` · ${nf(d.trophyCount)}` : ""}`}
           </Head>
           <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
             {trophies.map((tr, i) => (
-              <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, width: pTrophies.f(84) }}>
+              // Art beside the text, not above it.
+              //
+              // Stacking art / name / value made each tile ~100px tall, and with
+              // the arena rows underneath that pushed LINKED ACCOUNTS clean off
+              // the 630px card. Laid out horizontally the tile is the height of
+              // its art, the name gets a full line to itself at a readable size,
+              // and the whole shelf costs the card less vertical space than the
+              // five-across version it replaced.
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", borderRadius: 14, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.10)" }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={tr.imageUrl} alt="" width={pTrophies.f(66)} height={pTrophies.f(66)}
-                  style={{ width: pTrophies.f(66), height: pTrophies.f(66), objectFit: "contain" }} />
-                <div style={{ fontSize: pTrophies.f(15), color: MUTED }}>{clamp(tr.name, 12)}</div>
+                <img src={tr.imageUrl} alt="" width={pTrophies.f(52)} height={pTrophies.f(52)}
+                  style={{ width: pTrophies.f(52), height: pTrophies.f(52), objectFit: "contain" }} />
+                {/* No fixed height on either line — a fixed one clips
+                    descenders, which was a real bug on the market card. */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  <div style={{ fontSize: pTrophies.f(18), fontWeight: 700 }}>{clamp(tr.name, 16)}</div>
+                  {/* A valueless trophy prints nothing rather than "$0", which
+                      would read as a promise we did not make. */}
+                  {tr.value && tr.value > 0 ? (
+                    <div style={{ fontSize: pTrophies.f(19), fontWeight: 700, color: "#34d399" }}>{`$${nf(tr.value)}`}</div>
+                  ) : null}
+                </div>
               </div>
             ))}
           </div>
@@ -610,7 +649,7 @@ function ProfileBody(d: ProfileCard) {
       {/* What they're competing in right now — the one thing on this card that
           another gamer can act on. */}
       {challenges.length ? (
-        <Section p={pChallenges} style={{ gap: 6, marginTop: 18 }}>
+        <Section p={pChallenges} style={{ gap: 6, marginTop: 14 }}>
           <Head p={pChallenges}>IN THE ARENA</Head>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
             {challenges.map((c, i) => (
@@ -624,8 +663,12 @@ function ProfileBody(d: ProfileCard) {
         </Section>
       ) : null}
 
-      <Section p={pAccounts} style={{ marginTop: 20, gap: 10, flex: 1 }}>
-        <Head p={pAccounts}>LINKED ACCOUNTS</Head>
+      <Section p={pAccounts} style={{ marginTop: 14, gap: 8, flex: 1 }}>
+        {/* The count belongs in the heading when the card can't show them all —
+            a gamer with six accounts seeing two, with nothing saying so, reads
+            as us having lost four of them. Every account gets its own button
+            underneath the card regardless (see `linkedAccountsOf`). */}
+        <Head p={pAccounts}>{accountsHidden ? `LINKED ACCOUNTS · ${nf(d.accounts.length)}` : "LINKED ACCOUNTS"}</Head>
         {accounts.length === 0 ? (
           <div style={{ display: "flex", fontSize: pAccounts.f(24), color: MUTED }}>No games linked yet — link one to unlock quests.</div>
         ) : (
@@ -1727,8 +1770,10 @@ async function prepareBody(d: CardData): Promise<CardData> {
   switch (d.kind) {
     case "profile": {
       // Only the trophies the card can actually show are fetched — decoding a
-      // shelf of forty to draw five is time this render doesn't have.
-      const shelf = (d.trophies ?? []).slice(0, 5);
+      // shelf of forty to draw three is time this render doesn't have. Kept in
+      // step with the three the profile layout draws; fetching five to draw
+      // three was two wasted image decodes on every profile card.
+      const shelf = (d.trophies ?? []).slice(0, 3);
       const [bgUrl, avatarUrl, ...rest] = await Promise.all([
         bg,
         toEmbeddable(d.avatarUrl, ICON),
