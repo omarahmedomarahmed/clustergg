@@ -31,9 +31,33 @@ and human-run UAT. Part II is SEALED until Part I closes. Do not start it. Do
 not write a suite "just for this one bit" — read §1.1 for why that ordering is
 load-bearing rather than a preference.
 
+FIRST, BEFORE YOU BUILD ANYTHING — double-check three claims
+The plan was written by a previous session working from the code. Three of its
+load-bearing claims are worth verifying yourself before you act on them, because
+everything downstream assumes they are true. Confirm or correct each, and say
+which in your first message:
+
+  1. B33 says lib/discord/announce.ts:105-117 posts to guilds sequentially with
+     an await, called from server actions that declare no maxDuration, so it is
+     killed mid-loop past ~50 servers while the checkpoint records a plausible
+     wrong number. Verify the loop, the call sites, and that no maxDuration
+     applies to them.
+  2. B34 says the current economy is 1,000 CP = $1 (DEFAULT_CP_PER_DOLLAR in
+     lib/marketplace.ts), that ten actions in ACTION_CATALOG carry a defaultCap
+     and nine do not, that the capped ten sum to 1,255 CP/day, and that
+     awardAction credits every quest listening to an action with the cap stored
+     per quest. Verify all four before repricing anything.
+  3. B26 says lib/providers/adapters.ts returns solo_tier/flex_tier as
+     { value, rankLabel } and the cards render value instead of rankLabel, and
+     that a generic `level` metric shadows summoner_level. Verify both.
+
+If any claim is wrong, fix the plan first and say so. Do not build on an
+assumption you did not check.
+
 WHERE TO START — small first, heavy after
-Follow "The suggested order" table under the build ledger. Wave 1 is the quick
-UI wins and they come first:
+Follow "The suggested order" table under the build ledger. Wave 0 is two live
+bugs — read that row and decide whether they apply yet. Wave 1 is the quick UI
+wins:
 
   B9  the nav marketplace badge
   B26 LoL ranks rendering as numbers, and the summoner level appearing twice
@@ -45,12 +69,28 @@ UI wins and they come first:
   B2  the CP coin
   B27 the bot card button sweep
 
-Ship each of these as its own commit, pushed, before moving on. Then wave 2 (the
-CP economics model and everything that spends its numbers), then wave 3.
+Ship each of these as its own commit, pushed, before moving on. Then B32
+(email — wave 1.5, because everything in wave 2 wants to notify through it),
+then wave 2 (the repriced economy and everything that spends its numbers), then
+wave 3.
 
-Read the Wave 0 note first: B1 fixes the bot announcing every account link to
-every server on the network. If the bot is live in real servers today, do B1
-before anything in wave 1. If it is not, leave it for wave 2.
+PART II IS SEALED — WITH ONE EXCEPTION, AND IT IS DELIBERATE
+B33, B34, B35, B36, B37 and B39 carry their test suites with them, written at
+the same time as the code. They are marked in R1 and the reasoning is in §1.1: a
+UI bug found late costs rework, a bug in what we pay out costs cash that has
+already left. Six suites out of forty. Everything else still waits for Part II.
+
+ENVIRONMENT
+The app runs entirely locally with DEMO_DB=1 (in-memory PGlite, seeded) — no
+external service is needed to build or verify anything in wave 1. Build the
+email layer (B32) so that it no-ops without RESEND_API_KEY, exactly as
+lib/blob.ts does without its token; nothing may throw because mail is not
+configured.
+
+If Neon MCP is available to you, treat it as READ-ONLY. Do not run writes,
+migrations or DDL against the production database. Schema changes go through the
+idempotent COLUMN_MIGRATIONS pattern in lib/db/index.ts and reach production by
+deploying, never by hand.
 
 THE SCREENSHOT PLACEHOLDERS
 B7 builds the plumbing only — the feature_shots table, the <FeatureShot>
