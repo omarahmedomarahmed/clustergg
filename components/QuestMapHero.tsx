@@ -16,6 +16,7 @@ import QuestGame from "@/components/QuestGame";
 import { openMissions, type QuestGamePayload } from "@/lib/quest-game";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 import { optImg } from "@/lib/img";
+import Cp from "@/components/Cp";
 
 // A text-free, treasure-map hero for a quest: the map art with the quest's
 // tiers as clickable milestone pins, a "you are here" marker that travels the
@@ -193,12 +194,12 @@ export default function QuestMapHero({
           <p className="text-muted mt-1.5">{q.tagline}</p>
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm">
             <span className="inline-flex items-center gap-1.5 font-semibold text-base" style={{ color: q.accent2 }}>
-              <CpIcon size={22} /> {q.qp.toLocaleString()} CP earned
+              <Cp amount={q.qp} size="lg" /> earned
             </span>
             <span className="text-muted">·</span>
             <span className="text-muted">
               {q.currentTierIndex >= 0 ? `${tiers[q.currentTierIndex].name} unlocked` : "Just starting"}
-              {q.nextTier ? ` — ${(q.nextTier.thresholdQp - q.qp).toLocaleString()} CP to ${q.nextTier.name}` : " — max tier reached!"}
+              {q.nextTier ? ` — ${(q.nextTier.thresholdQp - q.qp).toLocaleString()} Cluster Points to ${q.nextTier.name}` : " — max tier reached!"}
             </span>
           </div>
         </div>
@@ -252,7 +253,7 @@ export default function QuestMapHero({
             const active = sel === i;
             return (
               <button key={t.id} onClick={() => (gameData ? openGame(i) : setSel(active ? null : i))}
-                title={`${t.name} · ${t.thresholdQp} CP`}
+                title={`${t.name} · ${t.thresholdQp} Cluster Points`}
                 className="absolute -translate-x-1/2 -translate-y-1/2 group"
                 style={{ left: `${t.mapX}%`, top: `${t.mapY}%` }}>
                 <span className="flex items-center justify-center rounded-full transition-transform group-hover:scale-110"
@@ -289,7 +290,7 @@ export default function QuestMapHero({
               );
             })()}
             <span className="absolute left-1/2 -translate-x-1/2 top-full mt-1 whitespace-nowrap rounded-full bg-black/75 px-2 py-0.5 text-[10px] font-bold" style={{ color: q.accent2 }}>
-              {q.qp.toLocaleString()} CP
+              <Cp amount={q.qp} />
             </span>
           </div>
           </ZoomPan>
@@ -344,7 +345,7 @@ export default function QuestMapHero({
                 <button onClick={() => setSel(null)} className="text-muted hover:text-ink"><Icon name="x" size={14} /></button>
               </div>
               <div className="text-xs text-muted mt-1">{tiers[sel].description || `Reach ${tiers[sel].thresholdQp.toLocaleString()} Cluster Points.`}</div>
-              <div className="mt-1.5 text-xs"><b style={{ color: q.accent2 }}>{tiers[sel].thresholdQp.toLocaleString()} CP</b> · {tiers[sel].holders.toLocaleString()} reached this step</div>
+              <div className="mt-1.5 text-xs"><b style={{ color: q.accent2 }}><Cp amount={tiers[sel].thresholdQp} /></b> · {tiers[sel].holders.toLocaleString()} reached this step</div>
               {(holders[tiers[sel].id]?.length ?? 0) > 0 && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   {holders[tiers[sel].id].map((g) => (
@@ -363,7 +364,7 @@ export default function QuestMapHero({
           {tiers.map((t) => (
             <span key={t.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold"
               style={{ borderColor: t.earned ? `${t.color || q.color}88` : "rgba(255,255,255,0.12)", color: t.earned ? (t.color || q.color) : "#8b8ba7", background: t.earned ? `${t.color || q.color}14` : "transparent" }}>
-              <Icon name={t.earned ? "check" : "circle"} size={10} className="inline mr-1" />{t.name} · {t.thresholdQp.toLocaleString()} CP
+              <Icon name={t.earned ? "check" : "circle"} size={10} className="inline mr-1" />{t.name} · <Cp amount={t.thresholdQp} />
             </span>
           ))}
         </div>

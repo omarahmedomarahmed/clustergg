@@ -262,7 +262,7 @@ the remaining edits; Part II is the whole platform.
 | # | Build item | Touches | Added | Built |
 |---|---|---|---|---|
 | B1 | The spam audit — announcement audiences, cooldowns, kill switches | `lib/discord/announce.ts`, `lib/link-account.ts`, new `lib/discord/audience.ts`, `/admin/discord` | plan v1 | ☐ |
-| B2 | The CP coin — a currency, not a word | `components/Icon.tsx`, new `components/Cp.tsx`, ~40 call sites, `lib/cards/render.tsx`, the nav | plan v1 | ☐ |
+| B2 | The CP coin — a currency, not a word | `components/Icon.tsx`, new `components/Cp.tsx`, 11 files, `lib/cards/render.tsx`, the nav | plan v1 | ☑ |
 | B3 | Bot cards — install, list cards, flows, landing layout | `lib/discord/onboard.ts`, `screens.ts`, `components.ts`, `app/api/discord/interactions/route.ts`, the card layers | plan v1 | ☐ |
 | B4 | The server portal, inside Discord | new `discord_guild_roles`, `/cluster admin`, six `srv_*` card kinds, `lib/server-portal.ts` (read only) | plan v1 | ☐ |
 | B5 | Gifting — search as you type, web and Discord | `components/TrophyMarket.tsx`, new `/api/gamers/search`, the bot gift flow | plan v1 | ☐ |
@@ -287,7 +287,7 @@ the remaining edits; Part II is the whole platform.
 | B24 | Park localization (keep the machinery, drop the switch) | `components/Footer.tsx` | batch 2 | ☑ |
 | B25 | The gamer's Discord card: trophy case ×3, one button per account | `lib/cards/data.ts`, `lib/cards/render.tsx`, `lib/discord/screens.ts` | batch 3 | ☑ |
 | B26 | LoL stats read as ranks; the level stops appearing twice | new `lib/metric-display.ts`, `app/feed`, `components/LolCard.tsx`, `components/ProfileAccounts.tsx` | batch 3 | ☑ |
-| B27 | Every bot card: data reads well, buttons grouped by meaning and position | every card kind, `lib/discord/components.ts` | batch 3 | ☐ |
+| B27 | Every bot card: buttons grouped by meaning and position | `lib/discord/components.ts` `rows()`, `lib/discord/sponsor.ts` | batch 3 | ☑ (position; colour is B3.0.2) |
 | B28 | The bot preview rebuilt — scoped per section, live renders instead of shots | the preview component, the marketing pages | batch 3 | ☐ |
 | B29 | Everything new is an admin system, staffable by department | `lib/systems.ts`, every new surface | batch 3 | ☐ |
 | B30 | The founding offers: admin console, paused by default, bill discounts | `lib/offers.ts`, `lib/invoices.ts`, new `/admin/offers` | batch 3 | ☐ |

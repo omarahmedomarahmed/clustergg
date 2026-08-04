@@ -11,6 +11,16 @@ const PATHS: Record<string, React.ReactNode> = {
   trophy: <><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" /><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" /><path d="M4 22h16" /><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" /><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" /><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" /></>,
   gamepad: <><line x1="6" x2="10" y1="12" y2="12" /><line x1="8" x2="8" y1="10" y2="14" /><line x1="15" x2="15.01" y1="13" y2="13" /><line x1="18" x2="18.01" y1="11" y2="11" /><rect width="20" height="12" x="2" y="6" rx="6" /></>,
   zap: <path d="M13 2 3 14h8l-1 8 11-14h-9l1-6z" />,
+  // The Cluster Points coin — a currency mark, not a score icon.
+  //
+  // Drawn to survive 12px: one outer rim, one inner rim for depth, and a single
+  // bolt glyph with no text in it. A letter or a "CP" inside would turn to mush
+  // at the size this is mostly used at (beside a number in a nav bar), and a
+  // currency symbol that needs to be read as letters is not a symbol.
+  //
+  // Stroke-based like the rest of the set, so it inherits currentColor and works
+  // on the dark chrome and the light admin surfaces without a second asset.
+  cpCoin: <><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="6.2" /><path d="M12.9 8.2 10 12.4h2.2l-1 3.4 3-4.3h-2.3z" /></>,
   star: <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />,
   shield: <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />,
   crown: <path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.735H5.81a1 1 0 0 1-.957-.735L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z" />,

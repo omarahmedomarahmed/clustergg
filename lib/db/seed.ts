@@ -671,19 +671,6 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { id: uid(), userId: nova, type: "follow", title: "Orion started following you", href: "/u/orion" },
   ]);
 
-  // The ACTIVITY layer, last: points earned, ads served and clicked, profiles
-  // viewed and voted for, invoices issued, payouts requested, trophies bought
-  // and cashed out. Everything above this line creates the nouns; that module
-  // creates the verbs, and without it 36 of the 74 tables held no rows and every
-  // screen built to report on activity reported zero.
-  //
-  // Last because it reads what the rest of the seed wrote, and non-fatal because
-  // a demo with no activity is still a usable demo — but it says so out loud
-  // rather than leaving somebody to wonder why every card reads 0 CP.
-  try {
-    const { seedDemoActivity } = await import("@/lib/db/seed-activity");
-    await seedDemoActivity(db);
-  } catch (e) { console.warn("[seed] demo activity layer failed:", e); }
 }
 
 // ================= HOUSE ADS (production + demo) =================

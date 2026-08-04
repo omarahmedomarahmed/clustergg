@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
+import Cp, { CpMark } from "@/components/Cp";
 import Avatar from "@/components/Avatar";
 import { useTr } from "@/components/LocaleProvider";
 import type { QuestView, QuestGamer } from "@/lib/quests";
@@ -60,7 +61,7 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
         </div>
         <div className="text-right shrink-0">
           <div className="font-bold" style={{ color: q.accent2 }}>{q.qp.toLocaleString()}</div>
-          <div className="text-[10px] text-muted">{tr("CP")} · {earnedCount}/{q.tiers.length}</div>
+          <div className="text-[10px] text-muted">{earnedCount}/{q.tiers.length} {tr("tiers")}</div>
         </div>
       </div>
 
@@ -68,7 +69,7 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
       <div className="mt-4 flex items-end justify-between gap-1.5">
         {q.tiers.map((t, i) => (
           <button key={t.id} onClick={(e) => { stop(e); setSel(sel === i ? null : i); }}
-            className="flex flex-col items-center gap-1 flex-1 min-w-0" title={`${t.name} · ${t.thresholdQp} CP`}>
+            className="flex flex-col items-center gap-1 flex-1 min-w-0" title={`${t.name} · ${t.thresholdQp} Cluster Points`}>
             <div className="flex items-center justify-center rounded-full transition-all"
               style={{ width: 40, height: 40, background: t.earned ? `${(t.color || q.color)}2a` : "rgba(255,255,255,0.04)", border: `2px solid ${sel === i ? "#fff" : t.earned ? (t.color || q.color) : "rgba(255,255,255,0.12)"}`, boxShadow: t.earned ? `0 0 16px -3px ${t.color || q.color}` : "none", opacity: t.earned ? 1 : 0.5 }}>
               {t.iconUrl
@@ -119,7 +120,7 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
         {tab === "progress" ? (
           <div className="text-[11px] text-muted">
             {done ? <span style={{ color: q.color }}><><Icon name="star" size={12} className="inline mr-1" />{tr("Max tier reached — legend status.")}</></span>
-              : <>{into.toLocaleString()} / {span.toLocaleString()} {tr("CP to")} <b style={{ color: q.color }}>{q.nextTier!.name}</b></>}
+              : <><CpMark size={11} /> {into.toLocaleString()} / {span.toLocaleString()} {tr("to")} <b style={{ color: q.color }}>{q.nextTier!.name}</b></>}
           </div>
         ) : (
           <div className="space-y-1">

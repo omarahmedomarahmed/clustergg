@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
+import Cp from "@/components/Cp";
 import { purchaseTrophy, type BuyState } from "@/app/actions/marketplace";
 import type { MarketTrophy, CpWallet } from "@/lib/marketplace";
 
@@ -72,7 +73,7 @@ export default function TrophyMarket({
         </div>
         {/* The wallet, stated as value rather than as a score. */}
         <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/[0.06] px-4 py-2 text-right">
-          <div className="text-lg font-black text-cyan-200">{num(balance)} <span className="text-xs font-bold">CP</span></div>
+          <div className="text-cyan-200"><Cp amount={balance} size="lg" /></div>
           <div className="text-[10px] uppercase tracking-wider text-muted">
             {signedIn ? <>to spend · {num(wallet.earned)} earned all-time</> : "Sign in to see your balance"}
           </div>
@@ -133,7 +134,7 @@ export default function TrophyMarket({
                     {t.value > 0 && <span>· redeems for ${num(t.value)}</span>}
                   </div>
                   <div className={`mt-2 text-sm font-black ${can ? "text-cyan-200" : "text-muted"}`}>
-                    {num(t.cpPrice)} CP
+                    <Cp amount={t.cpPrice} />
                   </div>
 
                   {!signedIn ? (
@@ -145,7 +146,7 @@ export default function TrophyMarket({
                       disabled={!can}
                       className={`mt-2 w-full rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
                         can ? "bg-cyan-500/20 text-cyan-100 hover:bg-cyan-500/30" : "cursor-not-allowed bg-white/5 text-muted"}`}>
-                      {can ? "Get it" : `${num(t.cpPrice - balance)} CP to go`}
+                      {can ? "Get it" : `$<Cp amount={t.cpPrice - balance} /> to go`}
                     </button>
                   ) : (
                     <form action={buy} className="mt-2 space-y-1.5">

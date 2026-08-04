@@ -120,19 +120,19 @@ function connectButton(ctx: ScreenCtx, trail: Frame[]): Button {
   // In Discord, always. A "link your account" button that opens a browser is
   // where most people stop, and the modal is right there.
   return ctx.gamer
-    ? navButton("Connect a game", frame("link", ""), trail, ButtonStyle.Success, "🎮")
-    : linkButton("Continue with Discord", signInUrl(siteUrl(), "/feed"), "🚀");
+    ? navButton("Connect a game", frame("link", ""), trail, ButtonStyle.Success, "🎮", "action")
+    : linkButton("Continue with Discord", signInUrl(siteUrl(), "/feed"), "🚀", "action");
 }
 
 function profileButton(ctx: ScreenCtx, trail: Frame[]): Button | null {
   if (!ctx.gamer) return null;
   // Home IS the profile card — one destination, so there is never a "home" and
   // a "profile" that show different things.
-  return navButton("My profile", frame("home"), trail, ButtonStyle.Secondary, "👤");
+  return navButton("My profile", frame("home"), trail, ButtonStyle.Secondary, "👤", "nav");
 }
 
 function moreButton(trail: Frame[]): Button {
-  return navButton("More", frame("more"), trail, ButtonStyle.Secondary, "🧭");
+  return navButton("More", frame("more"), trail, ButtonStyle.Secondary, "🧭", "nav");
 }
 
 /**
