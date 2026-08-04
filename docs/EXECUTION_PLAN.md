@@ -277,7 +277,7 @@ the remaining edits; Part II is the whole platform.
 | B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
 | B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☐ |
-| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardAction`, quest cards, the CP history | batch 2 | ☐ |
+| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☐ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
 | B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
 | B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
@@ -1187,7 +1187,7 @@ Grounded in `lib/quests.ts` and `lib/marketplace.ts`, not assumed:
 
   Plus an **unbounded tail** from the nine uncapped actions.
 
-- **An action can pay more than once.** `awardAction` credits **every quest
+- **An action can pay more than once.** `awardQuestAction` credits **every quest
   listening to that action**, and the cap is stored per quest. Point two quests
   at `ad_impression` and both the reward and the cap double. This is a feature
   as designed and a multiplier that must appear in the model.
@@ -1253,7 +1253,7 @@ no honest gamer reaches but a script does, and say that in the UI.
 - The multi-quest multiplier is counted: an action on two quests pays twice and
   caps twice.
 - No action in `ACTION_CATALOG` lacks a cap after the defaults are applied.
-- Saving from the calculator changes what `awardAction` actually grants — assert
+- Saving from the calculator changes what `awardQuestAction` actually grants — assert
   through the real award path, not the settings row.
 - The worst-case daily cost at 1M gamers is under the configured ceiling.
 - The audit log records every change.
@@ -1268,7 +1268,7 @@ before we give it" — `/admin/cp-calculator`.
 
 Two halves, and the second is what makes the first humane.
 
-**Enforce:** every action carries a cap (B16.3). `awardAction` already checks
+**Enforce:** every action carries a cap (B16.3). `awardQuestAction` already checks
 one; extend it so no action is uncapped, and so the cap is evaluated across
 quests, not per quest, when the config says so.
 
@@ -1529,33 +1529,82 @@ card" — `/api/card/profile`.
 
 Two defects in the League of Legends surfaces, both visible today.
 
-**Ranks render as numbers instead of ranks.** `lib/providers/adapters.ts` already
-returns `solo_tier` and `flex_tier` as `{ value, rankLabel }`, where `rankLabel`
-is the real thing — *"GOLD II"* — and `value` is the sortable ladder position it
-was derived from. The cards render `value`. A gamer looking at their own LoL
-card sees a score they have never heard of instead of the rank they earned.
+> **Corrected before build.** This section was written from an assumption about
+> where each defect lives. Both defects are real; both were in a different place
+> than described. The corrected diagnosis is below — the original wording, kept
+> for the record, said "the cards render `value`" (most of them do not) and
+> blamed "a generic `level` metric" (no such metric exists on the LoL provider).
+> What follows is what the code actually does, read line by line.
 
-Fix: **wherever a metric carries a `rankLabel`, that label is the display value
-and the number is only for sorting.** Not a LoL special case — Dota's
-`rank_tier` carries one too (`dotaRankLabel`), and every ladder game added later
-will. Make it a rule in the metric renderer, once, and the next game inherits it.
+**Ranks render as numbers instead of ranks — on the feed dashboard, and only
+there.** `lib/providers/adapters.ts:304-305` returns `solo_tier` and `flex_tier`
+as `{ value, rankLabel }`, where `rankLabel` is the real thing — *"Gold II"* —
+and `value` is the sortable ladder position it was derived from.
+
+Most surfaces already get this right and must not be touched:
+`app/u/[slug]/page.tsx:194`, `components/LeaderboardWidget.tsx:72,103` and the
+Discord card data at `lib/cards/data.ts:160,350,517` all read
+`rankLabel ?? fmtNum(value)`.
+
+The one offender is the **feed dashboard**. `app/feed/page.tsx:131` builds
+`dashStats` without selecting `rankLabel` at all, so
+`components/FeedDashboard.tsx:189,197` can only print
+`s.value.toLocaleString()` — a LoL gamer's Solo/Duo rank reads as `2700`. The
+same projection derives its label as `metricKey.replace(/_/g, " ")` → *"solo
+tier"*, rather than the registry's declared `label` → *"Solo/Duo tier"*.
+
+Fix, in the order that makes the next game inherit it:
+
+1. Carry `rankLabel` through the `dashStats` projection and add it to
+   `DashStat` in `components/FeedDashboard.tsx:14`.
+2. Resolve the display label from the provider registry's `capabilities[].label`
+   (`lib/providers/registry.ts`), falling back to the de-underscored key only
+   when the registry has no entry.
+3. **Wherever a metric carries a `rankLabel`, that label is the display value
+   and the number is only for sorting.** Not a LoL special case — Dota's
+   `rank_tier` carries one too (`adapters.ts:128-134`), and every ladder game
+   added later will. Put it in one shared helper rather than a fourth copy of
+   `rankLabel ?? fmtNum(value)`, and have the three existing correct call sites
+   use it so there is one definition to change.
 
 Show **both** LoL ranks as text on the card: **Solo/Duo** and **Flex**.
 
-**The level appears twice.** The LoL stats card lists the summoner level as two
-separate tracked stats — `summoner_level` from the adapter and a generic `level`
-metric that shadows it. One of them must go; keep the named one, and check the
-same collision on every other provider before closing this out (the generic
-`level` mapping near `adapters.ts:614` is shared).
+**The level appears three times, and no metric is at fault.** There is no
+generic `level` metric on the LoL provider — `level` is declared only by Apex
+(`registry.ts:329`) and Mobile Legends (`registry.ts:363`), different providers
+that cannot collide with `summoner_level`. `adapters.ts:614` is the MLBB
+mapping, not a shared one. The duplication is purely in the rendering:
+
+| Where | What it prints |
+|---|---|
+| `LolCard.tsx` `statNumbers` | the `summoner_level` metric tile, labelled "Summoner level" |
+| `LolCard.tsx:167-172` | a **second** "Summoner level" tile, from the rich snapshot |
+| `ProfileAccounts.tsx:155` | a **third**, as `· Lv N` in the account header |
+
+Fix: delete the snapshot tile at `LolCard.tsx:167-172` — the metric tile is the
+tracked, synced, leaderboard-backed one and is the copy to keep. Keep the header
+`· Lv N`: it is a different affordance (an identity pill on a collapsed row, not
+a stat in the stats grid) and it is the only level visible before the card is
+expanded. Leave a comment at the deletion site saying why, so the snapshot tile
+is not helpfully added back.
+
+Then check the same *rendering* collision on every other provider: the rule is
+that a component holding both a metrics list and its own rich snapshot must not
+print a figure the metrics list already carries.
 
 **Verification owed → `tests/db/metrics.mts` + `tests/ui/lol-card.mjs`:**
 - A metric with a `rankLabel` renders the label, never the number, on every
-  surface: profile, planet, leaderboard, and the Discord card.
+  surface: profile, planet, leaderboard, the feed dashboard, and the Discord
+  card. The feed dashboard is the one that was broken — assert it by name.
+- A metric's displayed label comes from the provider registry, so `solo_tier`
+  reads "Solo/Duo tier" and never "solo tier".
 - Sorting still uses the number (assert a leaderboard orders correctly while
   displaying labels).
 - The LoL card shows Solo and Flex, both as text.
-- No stat key appears twice on any account card, for any provider — assert
-  across all of them, not just LoL.
+- No stat label appears twice inside one account card, for any provider —
+  assert across all of them, not just LoL, and count rendered tiles rather than
+  metric keys, because the duplication was a second renderer and not a second
+  metric.
 
 **Shots owed:** `gamer.lol.card` — "Your rank, in the game's own words" — a
 profile's LoL account card.
@@ -1874,8 +1923,15 @@ arrived" — `/admin/email`.
 
 ## B33 — Announcements become a queue
 
+> **Re-verified against the code before building.** The loop, the call sites and
+> the absence of `maxDuration` are all exactly as described. `grep -rn
+> maxDuration app lib` returns only `app/admin/storage/page.tsx`,
+> `app/api/cron/daily`, `app/api/cron/sync` and `app/api/setup` — nothing that
+> covers a server action. The loop body is lines 105–119; the section says
+> 105–117, which is the same loop.
+
 **A verified live bug that gets worse with exactly the growth we are building
-for.** `lib/discord/announce.ts:105–117` posts to guilds **sequentially, awaiting
+for.** `lib/discord/announce.ts:105–119` posts to guilds **sequentially, awaiting
 each call**, and it is invoked from server actions — `app/actions/admin.ts:606`,
 `app/actions/discord.ts:106`, `app/actions/challenge-requests.ts:113`,
 `lib/challenge-series.ts:174`, `lib/welcome-challenge.ts:103`. **None of those
@@ -1922,6 +1978,16 @@ than a slow one.
 **This item supersedes the numbers in B16 and B17. B16 still builds the model
 and the calculator; B17 still builds the enforcement. B34 is the decision about
 what the numbers are.**
+
+> **Re-verified against the code before repricing.** All four load-bearing facts
+> hold: `DEFAULT_CP_PER_DOLLAR = 1000` (`lib/marketplace.ts:40`);
+> `ACTION_CATALOG` carries 19 actions, 10 with a `defaultCap` and 9 without; the
+> capped ten sum to exactly **1,255 CP/day**
+> (75+100+100+60+150+60+100+500+60+50); and the award path credits every active
+> quest whose `actionWeights[actionKey] > 0`, checking `quest.dailyCaps` **per
+> quest**, so one action can pay N times and the cap is per quest rather than
+> per action. One naming correction: the function is **`awardQuestAction`**
+> (`lib/quests.ts:240`), not `awardAction` — corrected throughout this document.
 
 ### B34.0 The decision, and why
 
@@ -1994,7 +2060,7 @@ than twenty numbers that have to be re-summed every time one moves.
 
 ### B34.2 CP is awarded once; progress counts everywhere
 
-`awardAction` currently credits **every quest listening to an action**, with the
+`awardQuestAction` currently credits **every quest listening to an action**, with the
 cap stored per quest — so pointing two quests at `ad_impression` doubles both
 the payout and the ceiling. That is a silent multiplier on cost.
 
@@ -2504,7 +2570,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/bot-guides.mjs` | **B13** | fewer than nine guides; the CP guide's numbers equal `ACTION_CATALOG` | owed |
 | `tests/ui/bot-home.mjs` + `tests/db/bot-home.mts` | **B14** | the home card, both background states, three live + four quests, the empty state | owed |
 | `tests/db/quests.mts` | **B15** | the new actions award on the real code path, deduped, capped | owed |
-| `tests/db/cp-economics.mts` | **B16** | the model against a hand-computed fixture; the multi-quest multiplier; no uncapped action survives; saving changes what `awardAction` grants | owed |
+| `tests/db/cp-economics.mts` | **B16** | the model against a hand-computed fixture; the multi-quest multiplier; no uncapped action survives; saving changes what `awardQuestAction` grants | owed |
 | `tests/db/caps.mts` + `tests/ui/caps.mjs` | **B17** | past the cap the action still succeeds and awards zero, silently; the cap is shown up front; the maxed entry appears in history | owed |
 | `tests/ui/wallet.mjs` + `tests/db/wallet.mts` | **B18** | dollar value correct; the ledger reconciles; no payment field in any state | owed |
 | `tests/ui/bot-wallet.mjs` | **B20** | the card's figures equal `/wallet`'s; redeem completes from Discord | owed |
