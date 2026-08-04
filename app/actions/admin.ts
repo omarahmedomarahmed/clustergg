@@ -70,6 +70,10 @@ export async function saveBranding(_prev: ActionState, formData: FormData): Prom
   await setContent("brand.nav.mode", mode(formData.get("navMode")));
   await setContent("brand.nav.planetsIcon", String(formData.get("planetsIcon") ?? "").trim());
   await setContent("brand.nav.hidePlanets", formData.get("hidePlanets") === "on" ? "1" : "");
+  // The marketplace badge (B9), configured exactly like the planets badge.
+  await setContent("brand.nav.marketplaceIcon", String(formData.get("marketIcon") ?? "").trim());
+  await setContent("brand.nav.marketplaceLabel", String(formData.get("marketLabel") ?? "").trim().slice(0, 40));
+  await setContent("brand.nav.marketplaceOrder", formData.get("marketFirst") === "on" ? "before" : "after");
   await setContent("brand.footer.mode", mode(formData.get("footerMode")));
   await setContent("brand.loading.color", String(formData.get("loadingColor") ?? "#8b5cf6").trim() || "#8b5cf6");
   await setContent("brand.loading.logo", String(formData.get("loadingLogo") ?? "").trim());

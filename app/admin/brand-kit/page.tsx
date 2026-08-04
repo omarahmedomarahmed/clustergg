@@ -13,7 +13,7 @@ const asMode = (v: string | undefined): Mode => (v === "mark" || v === "wordmark
 export default async function BrandKitPage() {
   const c = await getContent([
     "brand.logo", "brand.logo.zoom", "brand.logo.x", "brand.logo.y",
-    "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.nav.hidePlanets", "brand.footer.mode",
+    "brand.wordmark", "brand.wordmark.zoom", "brand.nav.mode", "brand.nav.planetsIcon", "brand.nav.hidePlanets", "brand.nav.marketplaceIcon", "brand.nav.marketplaceLabel", "brand.nav.marketplaceOrder", "brand.footer.mode",
     "brand.loading.color", "brand.loading.logo", "brand.loading.phrases",
     "brand.loading.interval", "brand.loading.astronaut", "brand.loading.bg", "brand.loading.wordmark", "brand.loading.orbSize",
     "brand.nav.bg", "brand.footer.bg", "brand.favicon", "brand.favicon.zoom", "brand.cpIcon", "brand.orb.icon", "brand.orb.color", "brand.orb.size",
@@ -53,6 +53,9 @@ export default async function BrandKitPage() {
           defaultLoadingPhrases={c["brand.loading.phrases"] ?? "Traversing the cluster…"}
           defaultPlanetsIcon={c["brand.nav.planetsIcon"] || ""}
           defaultHidePlanets={c["brand.nav.hidePlanets"] === "1"}
+          defaultMarketIcon={c["brand.nav.marketplaceIcon"] || ""}
+          defaultMarketLabel={c["brand.nav.marketplaceLabel"] || ""}
+          defaultMarketFirst={c["brand.nav.marketplaceOrder"] === "before"}
           defaultNavBg={c["brand.nav.bg"] || ""}
           defaultFooterBg={c["brand.footer.bg"] || ""}
           defaultFavicon={c["brand.favicon"] || ""}

@@ -269,7 +269,7 @@ the remaining edits; Part II is the whole platform.
 | B6 | Redeem and marketplace, step by step, on the web | new `/redeem`, `/marketplace` confirm step | plan v1 | ☐ |
 | B7 | The screenshot system — the plumbing only | new `feature_shots`, `<FeatureShot>`, `/admin/shots` | plan v1 | ☐ |
 | B8 | The claim registry and the copy rewrite | `lib/claims.ts` (new), every marketing page, `lib/cms.ts` EN+AR, deck, data room | plan v1 | ☐ |
-| B9 | Nav: the marketplace badge beside the planets badge | `components/Nav.tsx`, the chrome editor, `lib/mobile-nav.ts` | batch 2 | ☐ |
+| B9 | Nav: the marketplace badge beside the planets badge | `components/Nav.tsx`, `lib/site-chrome.ts`, `components/BrandingEditor.tsx` | batch 2 | ☑ |
 | B10 | One background image behind a component group, not three copies | the nav + Profile-of-the-Week group, then every other bg surface | batch 2 | ☐ |
 | B11 | Nav game badges open the planet in place, not by navigating | `components/Nav.tsx`, the homepage hero world component (reused) | batch 2 | ☐ |
 | B12 | Planet hero: live only; completed challenges + standings on the page | `app/planets/[slug]`, the planet hero, `lib/challenges.ts` | batch 2 | ☐ |
