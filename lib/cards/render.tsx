@@ -563,28 +563,24 @@ function ProfileBody(d: ProfileCard) {
   // with one trophy should see one trophy, not one and two empty frames.
   // `trophies` arrives ordered most-valuable-first from `profileCard`.
   const trophies = pTrophies.hidden ? [] : (d.trophies ?? []).slice(0, 3);
-  // Two arena rows, not three, once there is a shelf above them.
-  //
-  // Challenge titles are long, so three of them wrap to two rows, and those two
-  // rows are what pushed LINKED ACCOUNTS off the bottom of the card. The card is
-  // a summary with a link to the profile on it; the third competition is the
-  // cheapest thing on it to lose, and losing it keeps the accounts visible.
-  const challenges = pChallenges.hidden ? [] : (d.challenges ?? []).slice(0, trophies.length ? 2 : 3);
-  // How many account tiles the remaining space can actually hold.
-  //
-  // Two tiles per row, and the budget is vertical: with BOTH a trophy shelf and
-  // an arena row above them there is one row left, so a second row is drawn
-  // half-cut at the bottom edge — which is worse than not drawing it. With one
-  // of the two, two rows fit. With neither, three.
-  //
-  // Counted rather than guessed, because the alternative is what this card did
-  // before: pick a number that happens to look right for the author's own
-  // profile and clip everyone with more games than them.
-  const accountCap = trophies.length && challenges.length ? 2 : (trophies.length || challenges.length ? 4 : 6);
-  const accounts = d.accounts.slice(0, accountCap);
+  const challenges = pChallenges.hidden ? [] : (d.challenges ?? []).slice(0, 3);
+  // The trophy shelf lives in the RIGHT-HAND COLUMN, under the sponsor box —
+  // not in the text column. Put inline it competed with the arena and the
+  // accounts for the same vertical inches and pushed the accounts off the card;
+  // the right column is otherwise empty below the ad, and three pieces of art
+  // stacked there read as a trophy shelf on a shelf. It costs the text column
+  // nothing, so the arena keeps its three rows and the accounts keep four tiles.
+  const accounts = d.accounts.slice(0, challenges.length ? 4 : 6);
   const accountsHidden = Math.max(0, d.accounts.length - accounts.length);
   return (
-    <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
+    <Frame
+      theme={t}
+      // The trophy shelf, drawn into the free rectangle to the right of the
+      // text — under the sponsor box, above the mark. `box` is computed from the
+      // LIVE layout, so an admin who drags the ad elsewhere moves the shelf with
+      // it rather than leaving it overlapping.
+      side={trophies.length ? (box) => <TrophyShelf trophies={trophies} total={d.trophyCount ?? trophies.length} box={box} p={pTrophies} /> : undefined}
+    >
       <Section p={pIdentity}>
         <Plate theme={t} style={{ gap: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
@@ -598,6 +594,10 @@ function ProfileBody(d: ProfileCard) {
       </Section>
 
       <Section p={pStats} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 22 }}>
+        {/* The level belongs with the other things that describe this gamer —
+            points, views, votes — not floating in the card's top-right corner
+            as an unexplained badge. It reads as a stat because it is one. */}
+        <Pill color={t.accent2} bg={alpha(t.accent2, 0.16, FALLBACK_ACCENT2)} size={pStats.f(21)}>{`LV ${nf(d.level)}`}</Pill>
         <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(21)}>{`${nf(d.totalCp)} CP`}</Pill>
         <Pill size={pStats.f(21)}>{`${nf(d.views)} views`}</Pill>
         <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pStats.f(21)}>
@@ -606,45 +606,6 @@ function ProfileBody(d: ProfileCard) {
         </Pill>
         {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)" size={pStats.f(21)}>{clamp(d.award, 22)}</Pill> : null}
       </Section>
-
-      {/* The trophy shelf. A profile card without it is a stat sheet; the
-          trophies are the part somebody actually screenshots. Won pieces are
-          drawn at full opacity with their real art — there is no placeholder,
-          because an empty shelf says the honest thing. */}
-      {trophies.length ? (
-        <Section p={pTrophies} style={{ gap: 7, marginTop: 14 }}>
-          <Head p={pTrophies}>
-            {`TROPHY CASE${d.trophyCount && d.trophyCount > trophies.length ? ` · ${nf(d.trophyCount)}` : ""}`}
-          </Head>
-          <div style={{ display: "flex", alignItems: "flex-end", gap: 12 }}>
-            {trophies.map((tr, i) => (
-              // Art beside the text, not above it.
-              //
-              // Stacking art / name / value made each tile ~100px tall, and with
-              // the arena rows underneath that pushed LINKED ACCOUNTS clean off
-              // the 630px card. Laid out horizontally the tile is the height of
-              // its art, the name gets a full line to itself at a readable size,
-              // and the whole shelf costs the card less vertical space than the
-              // five-across version it replaced.
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 12px 6px 6px", borderRadius: 14, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.10)" }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={tr.imageUrl} alt="" width={pTrophies.f(52)} height={pTrophies.f(52)}
-                  style={{ width: pTrophies.f(52), height: pTrophies.f(52), objectFit: "contain" }} />
-                {/* No fixed height on either line — a fixed one clips
-                    descenders, which was a real bug on the market card. */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                  <div style={{ fontSize: pTrophies.f(18), fontWeight: 700 }}>{clamp(tr.name, 16)}</div>
-                  {/* A valueless trophy prints nothing rather than "$0", which
-                      would read as a promise we did not make. */}
-                  {tr.value && tr.value > 0 ? (
-                    <div style={{ fontSize: pTrophies.f(19), fontWeight: 700, color: "#34d399" }}>{`$${nf(tr.value)}`}</div>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Section>
-      ) : null}
 
       {/* What they're competing in right now — the one thing on this card that
           another gamer can act on. */}
@@ -1575,6 +1536,55 @@ function WorldBody(d: WorldCard) {
  * there because the Cluster mark is drawn over this panel's bottom-right corner
  * — a 250px logo needs something behind it that isn't a champion's face.
  */
+/**
+ * The trophy shelf, in the card's right-hand column.
+ *
+ * Three pieces of art with their cash value under each, stacked down the free
+ * rectangle the layout leaves beside the text. Three because that is what fits
+ * legibly in a 1200x630 card, and "up to" three because a gamer holding one
+ * should see one piece — not one and two empty frames.
+ *
+ * It lives here rather than inline in the text column because inline it fought
+ * the arena and the linked accounts for the same vertical inches and pushed the
+ * accounts off the bottom edge. The column beside the sponsor box is otherwise
+ * empty on this card, and art stacked in it reads as a shelf.
+ */
+function TrophyShelf({ trophies, total, box, p }: {
+  trophies: { name: string; imageUrl: string; value?: number }[];
+  total: number;
+  box: { left: number; top: number; width: number; height: number };
+  p: PartDraw;
+}) {
+  // The art is square and sized to the column, capped so a wide column does not
+  // blow one trophy up to fill the card.
+  const art = Math.max(44, Math.min(96, Math.round(box.width * 0.42)));
+  return (
+    <div style={{
+      position: "absolute", left: box.left, top: box.top, width: box.width, height: box.height,
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 6,
+    }}>
+      <div style={{ display: "flex", fontSize: 15, letterSpacing: 2, color: MUTED }}>
+        {`TROPHIES${total > trophies.length ? ` · ${nf(total)}` : ""}`}
+      </div>
+      <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", justifyContent: "center", gap: 10 }}>
+        {trophies.map((tr, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: art }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={tr.imageUrl} alt="" width={art} height={art}
+              style={{ width: art, height: art, objectFit: "contain" }} />
+            {/* No fixed height — a fixed one clips descenders, which was a real
+                bug on the market card. A valueless trophy prints nothing rather
+                than "$0", which would read as a promise we did not make. */}
+            {tr.value && tr.value > 0 ? (
+              <div style={{ display: "flex", fontSize: 17, fontWeight: 700, color: "#34d399" }}>{`$${nf(tr.value)}`}</div>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function SplashPanel({ url, logoUrl, caption, box, accent, p }: {
   url: string;
   logoUrl?: string | null;
