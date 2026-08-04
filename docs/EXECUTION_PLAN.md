@@ -1184,6 +1184,10 @@ Grounded in `lib/quests.ts` and `lib/marketplace.ts`, not assumed:
   `top3_challenge`, `win_challenge`, `join_planet`, `follower_gained`,
   `profile_views_25`, `connect_account`, `profile_vote_received`,
   `best_profile_award`.
+> **The table below is the PRE-B34 state, kept because it is the diagnosis.**
+> It is what the code paid when this item was written and it is why B34 exists.
+> The shipped numbers are B34.1's table; do not read this one as current.
+
 - Maximum **capped** earnings, one quest per action, per gamer per day:
 
   | Action | CP | Cap/day | CP/day |
@@ -1263,10 +1267,15 @@ Where an action should not be rationed (winning a challenge), cap it at a level
 no honest gamer reaches but a script does, and say that in the UI.
 
 **Verification owed → `tests/db/cp-economics.mts`:**
-- `maxDailyCp` equals a hand-computed figure for a known config (the table
-  above is the fixture).
-- The multi-quest multiplier is counted: an action on two quests pays twice and
-  caps twice.
+- `maxDailyCp` equals a hand-computed figure for a known config (B34's table is
+  the fixture, not the one above — see the correction below).
+- ~~The multi-quest multiplier is counted: an action on two quests pays twice
+  and caps twice.~~ **Corrected by B34.2.** The multiplier was removed, not
+  modelled: CP is credited once per action and progress goes to every listening
+  quest. The assertion is now the opposite one — an action on two quests pays
+  ONCE and progresses twice — and it is in the suite. A model that counted a
+  multiplier the engine no longer has would overstate our cost by however many
+  quests an admin happened to point at an action.
 - No action in `ACTION_CATALOG` lacks a cap after the defaults are applied.
 - Saving from the calculator changes what `awardQuestAction` actually grants — assert
   through the real award path, not the settings row.
