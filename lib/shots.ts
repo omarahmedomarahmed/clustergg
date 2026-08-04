@@ -92,6 +92,9 @@ export const SHOT_REGISTRY: ShotDef[] = [
   { key: "admin.challenge.rules", group: "admin", claim: "Rules in the game's own ladder", capturedFrom: "/admin/challenges", as: "admin" },
   { key: "admin.payments.providers", group: "admin", claim: "Real payout rails, not promises", capturedFrom: "/admin/payments", as: "admin" },
   { key: "admin.shots.console", group: "admin", claim: "Every screenshot on the site is one row an admin owns", capturedFrom: "/admin/shots", as: "admin" },
+  // Registered, deliberately NOT captured — see the note at the top of this file.
+  // New slots are placed as pages are touched and left empty until V1.R.
+  { key: "admin.email.console", group: "admin", claim: "Every message we send, and whether it arrived", capturedFrom: "/admin/email", as: "admin" },
 
   // ---- The bot ----
   { key: "bot.card.profile", group: "bot", claim: "Your trophies and every account, on one card", capturedFrom: "/api/card/profile?slug=nova", as: "guest" },

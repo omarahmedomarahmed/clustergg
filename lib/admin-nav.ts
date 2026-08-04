@@ -139,6 +139,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     items: [
       { href: "/admin/content", label: "Site content", desc: "Headlines, subtitles and CTAs on every public page." , system: "brand" },
       { href: "/admin/shots", label: "Screenshots", desc: "Every feature screenshot on the site — replace the image, rewrite the caption, and it changes everywhere that component appears.", system: "brand" },
+      { href: "/admin/email", label: "Email", desc: "Every message we tried to send and whether it arrived. A bounce is how you learn a customer never heard from you.", system: "billing" },
       { href: "/admin/language", label: "Language & flags", desc: "Arabic toggle, locale defaults, country flags." , system: "brand" },
       { href: "/admin/translations", label: "Content translations", desc: "Per-entity Arabic for quests, planets, challenges and boards." , system: "brand" },
       { href: "/admin/backgrounds", label: "Page backgrounds", desc: "Background art per page." , system: "brand" },

@@ -1595,3 +1595,40 @@ export const featureShots = pgTable("feature_shots", {
   updatedBy: text("updated_by"),
   updatedAt: now("updated_at"),
 });
+
+// ===== Email delivery log (B32) =====
+//
+// Every message we attempt, whether or not it left the building.
+//
+// A row is written even when mail is UNCONFIGURED — status `skipped` — because
+// the question a human actually asks is "did the brand get told they owe us
+// $1,000", and "we never sent it because nobody set the API key" is an answer.
+// A layer that silently does nothing when it is switched off teaches you to
+// trust it exactly when it is doing the least.
+export const emailLog = pgTable("email_log", {
+  id: id(),
+  /** Who it went to. */
+  toAddress: text("to_address").notNull(),
+  /** Which template — the key in lib/email/templates.ts, never free text. */
+  template: text("template").notNull(),
+  subject: text("subject").notNull(),
+  /** Resend's id, once it has one. Null while skipped or failed before send. */
+  providerId: text("provider_id"),
+  /**
+   * queued | skipped | sent | delivered | bounced | complained | failed
+   *
+   * `skipped` means mail is not configured on this deployment. It is not an
+   * error and must never read as one, but it is not a delivery either.
+   */
+  status: text("status").notNull().default("queued"),
+  /** Why it failed, or why it was skipped. Shown to staff, never to a customer. */
+  error: text("error"),
+  /** What it was about — an invoice id, a payout id — so the console can link out. */
+  refType: text("ref_type"),
+  refId: text("ref_id"),
+  createdAt: now("created_at"),
+  updatedAt: now("updated_at"),
+}, (t) => [
+  index("email_log_created_idx").on(t.createdAt),
+  index("email_log_status_idx").on(t.status),
+]);

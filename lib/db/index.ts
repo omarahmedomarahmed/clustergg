@@ -715,6 +715,26 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "server_payout_line_idx" ON "server_payout_lines" ("payout_id")`,
 
+  // The email delivery log (B32). A row per attempt, including the ones skipped
+  // because mail is not configured — "we never sent it" is an answer a human
+  // needs, and a layer that silently does nothing when switched off teaches you
+  // to trust it exactly when it is doing the least.
+  `CREATE TABLE IF NOT EXISTS "email_log" (
+    "id" text PRIMARY KEY NOT NULL,
+    "to_address" text NOT NULL,
+    "template" text NOT NULL,
+    "subject" text NOT NULL,
+    "provider_id" text,
+    "status" text DEFAULT 'queued' NOT NULL,
+    "error" text,
+    "ref_type" text,
+    "ref_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "email_log_created_idx" ON "email_log" ("created_at")`,
+  `CREATE INDEX IF NOT EXISTS "email_log_status_idx" ON "email_log" ("status")`,
+
   // Feature screenshots (B7). One row per component worth proving; every page
   // claiming that component reads the same row, so one admin edit updates the
   // picture everywhere it appears. The caption and alt text live here too — an
