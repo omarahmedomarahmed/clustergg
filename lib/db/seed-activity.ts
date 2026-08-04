@@ -65,6 +65,8 @@ export async function seedDemoActivity(db: {
   await seedProfileAttention(db, gamers);
   await seedStatHistory(db);
   await seedMarketplace(db, gamers);
+  // AFTER the marketplace, because it has to cover what the seeded orders spend.
+  await seedCarriedBalance(db, gamers);
   await seedAdDelivery(db);
   await seedDemoPortalKeys(db);
   await seedBilling(db);
@@ -84,9 +86,14 @@ export async function seedDemoActivity(db: {
 // production — which also means this data is a live check that the award path
 // still works.
 //
-// Only UNCAPPED actions are used to build a total. A capped action stops at its
-// daily limit no matter how many times it is called, so seeding with them would
-// produce a number that silently depends on the cap rather than on the fixture.
+// **B34 made every action capped**, and added a hard 500 CP/day ceiling. The
+// note that used to sit here — "only uncapped actions are used" — no longer
+// describes anything, because there are none. Every award below is now
+// truncated by the same caps production applies, on the one day the seed runs,
+// which is correct and which is also why the totals it produces are small.
+//
+// See `seedCarriedBalance` beneath it for how the demo gets a gamer who has
+// visibly played for months without simulating months.
 async function seedQuestProgress(db: any, gamers: { id: string; slug: string }[]) {
   const [existing] = await db.select({ c: sql<number>`count(*)` }).from(schema.questEvents);
   if (Number(existing?.c ?? 0) > 0) return;
@@ -120,6 +127,55 @@ async function seedQuestProgress(db: any, gamers: { id: string; slug: string }[]
     await n("profile_views_25", p.views, "seed-views");
     await n("best_profile_award", p.best, "seed-best");
     await n("connect_account", 2, "seed-connect");
+  }
+}
+
+/**
+ * What each demo gamer earned BEFORE the demo window — one row, stated plainly.
+ *
+ * B34 prices a $5 bronze trophy at 50,000 CP, which is a hundred days at the
+ * ceiling. That is the intended economy: a trophy should be far, expensive and
+ * reachable. But it leaves a demo where the richest gamer has three figures and
+ * every shelf item is unaffordable, so the marketplace, the wallet, the gift
+ * flow and the redemption path all show their empty state and none of them can
+ * be looked at.
+ *
+ * Simulating a hundred days of play at boot is thousands of writes for a number
+ * we already know, so this is one backdated event per gamer carrying it. It is
+ * a **demo-data device and not an economy change**: it writes to the ledger
+ * every reader already sums, it is labelled `seed-carried` so it is obvious in
+ * the CP history, and it is dated before the window rather than pretending to
+ * be today's earnings — a carried balance stamped "now" would blow straight
+ * through the ceiling this item exists to enforce.
+ *
+ * The spread is deliberate. Nova can afford a bronze with change; Atlas cannot
+ * afford anything, because a demo where everybody can buy everything cannot
+ * show the one screen that matters most — the gamer who is still saving.
+ *
+ * The numbers below are BALANCES, not credits, so what the seeded orders already
+ * spent is added back on top. Writing them as credits made Nova's wallet read
+ * zero the moment she gifted a $10 trophy — the demo had a gamer whose header
+ * said 62,000 CP and whose every tile said she could not afford anything.
+ */
+async function seedCarriedBalance(db: any, gamers: { id: string; slug: string }[]) {
+  const CARRIED: Record<string, number> = {
+    nova: 62_000, lyra: 41_500, orion: 23_800, vega: 9_400, atlas: 1_200,
+  };
+  const { cpSpent } = await import("@/lib/marketplace");
+  const [quest] = await db.select({ id: schema.quests.id }).from(schema.quests)
+    .where(eq(schema.quests.key, "conquest")).limit(1);
+  if (!quest) return;
+  for (const g of gamers) {
+    const want = CARRIED[g.slug];
+    if (!want) continue;
+    const cp = want + await cpSpent(db, g.id);
+    const at = new Date(Date.now() - 40 * 86400_000);
+    await db.insert(schema.questEvents).values({
+      id: uid(), userId: g.id, questId: quest.id, actionKey: "win_challenge",
+      qpAwarded: 0,          // progress is what the awards above already gave
+      cpAwarded: cp,         // this row is the balance, and nothing else
+      refType: "seed-carried", refId: g.slug, createdAt: at,
+    }).onConflictDoNothing();
   }
 }
 
