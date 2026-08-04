@@ -788,6 +788,15 @@ export const questEvents = pgTable("quest_events", {
   questId: text("quest_id").notNull().references(() => quests.id, { onDelete: "cascade" }),
   actionKey: text("action_key").notNull(),
   qpAwarded: integer("qp_awarded").notNull().default(0),
+  /**
+   * What this event PAID, as opposed to what it progressed (B34).
+   *
+   * One action credits CP once and progresses every listening quest, so a
+   * second listener writes qpAwarded > 0 and cpAwarded = 0. NULL means the row
+   * predates the split, when the two were the same number — readers coalesce to
+   * qpAwarded, which is why this is nullable rather than defaulted.
+   */
+  cpAwarded: integer("cp_awarded"),
   refType: text("ref_type"),
   refId: text("ref_id"),
   createdAt: now("created_at"),

@@ -353,15 +353,77 @@ export async function ensureQuestArt(db: DB) {
 // ===== Award engine =====
 function startOfUtcDay(): Date { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return d; }
 
-// Credit an action to every quest that listens to it. Dedup + daily caps are
-// enforced per (user, quest, action, ref). Unlocks tier badges + notifies.
+/**
+ * The CP a row actually paid.
+ *
+ * `NULL` is a row written before B34, when progress and payment were the same
+ * number — so it coalesces to `qp_awarded`. Every read of "how much CP" goes
+ * through this expression; there is no second definition anywhere.
+ */
+const CP_PAID = sql<number>`COALESCE(${schema.questEvents.cpAwarded}, ${schema.questEvents.qpAwarded})`;
+
+/** The one ceiling, from settings, with the model's default when unset. */
+export async function dailyCpCeiling(db: DB): Promise<number> {
+  try {
+    const [row] = await db.select({ value: schema.platformSettings.value })
+      .from(schema.platformSettings)
+      .where(eq(schema.platformSettings.key, "quests.dailyCpCeiling")).limit(1);
+    const n = Number((row?.value as { cp?: number } | null)?.cp);
+    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_DAILY_CP_CEILING;
+  } catch { return DEFAULT_DAILY_CP_CEILING; }
+}
+
+/** How much CP this gamer has already been credited today (UTC). */
+export async function cpEarnedToday(db: DB, userId: string): Promise<number> {
+  try {
+    const [row] = await db.select({ n: sql<number>`COALESCE(SUM(${CP_PAID}), 0)` })
+      .from(schema.questEvents)
+      .where(and(eq(schema.questEvents.userId, userId), gte(schema.questEvents.createdAt, startOfUtcDay())));
+    return Number(row?.n ?? 0);
+  } catch { return 0; }
+}
+
+/**
+ * Credit an action: **CP once, progress everywhere** (B34.2).
+ *
+ * This used to pay every quest listening to an action, with the daily cap stored
+ * per quest — so pointing two quests at `ad_impression` doubled both the payout
+ * and the ceiling. That is a silent multiplier on cost, and it is one an admin
+ * could switch on by accident from a screen that says nothing about money.
+ *
+ * The two ideas are now separate:
+ *   - **CP is credited once per action**, to the first quest that records it,
+ *     against a single global daily ceiling.
+ *   - **Progress is credited to every listening quest**, so one action can still
+ *     advance two quests — which is the feature the old behaviour was reaching
+ *     for.
+ *
+ * Nothing anybody wanted is lost, and the multiplier is gone.
+ *
+ * The ceiling is checked once, before the loop, and the payment is clamped to
+ * what is left of it — so the last award of the day pays the remainder rather
+ * than being refused outright. Progress keeps counting past the ceiling: it is
+ * already bounded by the per-quest caps, and stopping it would mean a tier badge
+ * silently depends on how much CP somebody happened to earn that morning.
+ *
+ * Dedup + daily caps are still enforced per (user, quest, action, ref).
+ */
 export async function awardQuestAction(
   db: DB, userId: string, actionKey: QuestActionKey, ref?: { refType?: string; refId?: string },
 ): Promise<void> {
   try {
     const activeQuests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true));
-    const listening = activeQuests.filter((q) => Number((q.actionWeights as Record<string, number>)[actionKey] ?? 0) > 0);
+    const listening = activeQuests.filter((q) => Number((q.actionWeights as Record<string, number>)[actionKey] ?? 0) > 0)
+      // Stable order, so "the quest that gets paid" is the same on every run and
+      // in every environment rather than whatever the planner returned.
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id.localeCompare(b.id));
     if (listening.length === 0) return;
+
+    const [ceiling, already] = await Promise.all([dailyCpCeiling(db), cpEarnedToday(db, userId)]);
+    let room = Math.max(0, ceiling - already);
+    // Set the moment any quest records this action, so the second listener pays
+    // nothing however it is ordered.
+    let paid = false;
 
     for (const quest of listening) {
       const weight = Number((quest.actionWeights as Record<string, number>)[actionKey] ?? 0);
@@ -383,8 +445,11 @@ export async function awardQuestAction(
         eq(schema.questEvents.actionKey, actionKey), eq(schema.questEvents.refType, refType), eq(schema.questEvents.refId, refId),
       )).limit(1);
       if (dupe) continue;
+      const cp = paid ? 0 : Math.min(weight, room);
+      paid = true;
+      room -= cp;
       await db.insert(schema.questEvents).values({
-        id: uid(), userId, questId: quest.id, actionKey, qpAwarded: weight, refType, refId,
+        id: uid(), userId, questId: quest.id, actionKey, qpAwarded: weight, cpAwarded: cp, refType, refId,
       }).onConflictDoNothing();
 
       // Bump QP.
@@ -531,8 +596,14 @@ export async function getQuestCompletions(db: DB, userId: string, questId: strin
 // A gamer's TOTAL Cluster Points across all quests (lifetime + current cycles).
 export async function getTotalCp(db: DB, userId: string | null): Promise<number> {
   if (!userId) return 0;
-  const [row] = await db.select({ c: sql<number>`COALESCE(SUM(${schema.userQuestProgress.qp} + ${schema.userQuestProgress.lifetimeQp}), 0)` })
-    .from(schema.userQuestProgress).where(eq(schema.userQuestProgress.userId, userId));
+  // Summed from the EVENT ledger, not from quest progress (B34.2). Progress is
+  // now credited to every listening quest while CP is credited once, so
+  // `qp + lifetimeQp` across quests double-counts by exactly the multiplier this
+  // item removed. The ledger is append-only and its rollover preserves the
+  // total, so before the split the two agreed — this is the same number, read
+  // from the side that stayed true.
+  const [row] = await db.select({ c: sql<number>`COALESCE(SUM(${CP_PAID}), 0)` })
+    .from(schema.questEvents).where(eq(schema.questEvents.userId, userId));
   return Number(row?.c ?? 0);
 }
 
@@ -549,11 +620,15 @@ export async function getCpLedger(db: DB, userId: string | null, opts?: { questI
   if (opts?.questId) wheres.push(eq(schema.questEvents.questId, opts.questId));
   const rows = await db.select({
     id: schema.questEvents.id, questId: schema.questEvents.questId, actionKey: schema.questEvents.actionKey,
-    qp: schema.questEvents.qpAwarded, at: schema.questEvents.createdAt,
+    qp: CP_PAID, at: schema.questEvents.createdAt,
     key: schema.quests.key, name: schema.quests.name, color: schema.quests.color, logoUrl: schema.quests.logoUrl,
   }).from(schema.questEvents).innerJoin(schema.quests, eq(schema.questEvents.questId, schema.quests.id))
     .where(and(...wheres)).orderBy(desc(schema.questEvents.createdAt)).limit(opts?.limit ?? 120);
-  return rows.map((r) => ({
+  // This is the MONEY log, so rows that paid nothing are not in it. A second
+  // quest advancing on the same action is real progress and shows on that
+  // quest's own bar; listing it here as "0 CP" would read as a bug to the one
+  // person most likely to be counting.
+  return rows.filter((r) => Number(r.qp) > 0).map((r) => ({
     id: r.id, questId: r.questId, questKey: r.key, questName: r.name, color: r.color, logoUrl: r.logoUrl,
     actionKey: r.actionKey, label: ACTION_LABEL[r.actionKey] ?? r.actionKey, qp: r.qp, at: r.at.toISOString(),
   }));

@@ -91,6 +91,12 @@ const COLUMN_MIGRATIONS = [
     "ref_id" text,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
+  // B34: what this event PAID, as distinct from what it PROGRESSED. Nullable on
+  // purpose — NULL means "written before B34, when the two were the same
+  // number", and every reader coalesces to qp_awarded. A backfill would have had
+  // to re-run every boot and would then re-credit the new progress-only rows,
+  // which are exactly the rows that must pay nothing.
+  `ALTER TABLE "quest_events" ADD COLUMN IF NOT EXISTS "cp_awarded" integer`,
   `CREATE INDEX IF NOT EXISTS "qe_user_idx" ON "quest_events" ("user_id","created_at")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "qe_dedup_idx" ON "quest_events" ("user_id","quest_id","action_key","ref_type","ref_id")`,
   `CREATE TABLE IF NOT EXISTS "user_quest_tiers" (

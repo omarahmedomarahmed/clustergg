@@ -146,7 +146,7 @@ export default function TrophyMarket({
                       disabled={!can}
                       className={`mt-2 w-full rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
                         can ? "bg-cyan-500/20 text-cyan-100 hover:bg-cyan-500/30" : "cursor-not-allowed bg-white/5 text-muted"}`}>
-                      {can ? "Get it" : `$<Cp amount={t.cpPrice - balance} /> to go`}
+                      {can ? "Get it" : <><Cp amount={t.cpPrice - balance} /> to go</>}
                     </button>
                   ) : (
                     <form action={buy} className="mt-2 space-y-1.5">

@@ -294,7 +294,7 @@ the remaining edits; Part II is the whole platform.
 | B31 | Welcome challenges: auto-drafted, sponsored by Cluster, billed to Cluster | the install path, the server portal, the house brand, billing | batch 3 | ☐ |
 | B32 | Email: Resend, one template system, a delivery console | new `lib/email/`, `email_log`, new `/admin/email`, the webhook | batch 4 | ☑ |
 | B33 | **Announcements become a queue** (live bug — sequential await in a server action) | `lib/discord/announce.ts`, the calling actions, a drain cron | batch 4 | ☐ |
-| B34 | **The repriced economy**: 1,000 CP = $0.10, every action capped, 500/day ceiling | `lib/quests.ts`, `lib/marketplace.ts`, supersedes B16/B17's numbers | batch 4 | ☐ |
+| B34 | **The repriced economy**: 1,000 CP = $0.10, every action capped, 500/day ceiling | `lib/quests.ts`, `lib/marketplace.ts`, supersedes B16/B17's numbers | batch 4 | ☑ |
 | B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | payouts, tier unlocks, signup | batch 4 | ☐ |
 | B36 | Brands prepay: due on issue, live on creation, settled by the first challenge's end | `lib/invoices.ts`, publishing, dunning | batch 4 | ☐ |
 | B37 | The legal framing of the economy | new `/legal/economy`, redemption eligibility gates | batch 4 | ☐ |
@@ -310,6 +310,8 @@ the remaining edits; Part II is the whole platform.
 | S1 | **The demo activity layer** — 36 of 74 tables had no rows, so every screen that reports on activity reported zero | new `lib/db/seed-activity.ts`, `lib/db/seed.ts` | wave 1 | ☑ |
 | S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
 | S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
+| S4 | **A JSX expression rendering as literal text** on every unaffordable trophy tile — a backtick where a fragment belonged, so the marketplace read `$<Cp amount={t.cpPrice - balance} /> to go` | `components/TrophyMarket.tsx` | wave 2 (found by B34) | ☑ |
+| S5 | **Demo balances rescaled for B34's prices**, as balances net of what the seeded orders spend — Nova can afford exactly one trophy, Atlas none | `lib/db/seed-activity.ts` | wave 2 (B34 fallout) | ☑ |
 | B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☑ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
