@@ -82,12 +82,26 @@ async function targets(scope: Scope = {}): Promise<Target[]> {
  * and "sent to 0 servers" reported as success is how a person finds out three
  * days later that nobody ever saw it.
  */
+/** Record what has landed so far. Idempotent, so calling it repeatedly is free. */
+async function checkpoint(scope: Scope, landed: string[]): Promise<void> {
+  if (!scope.ledger) return;
+  const real = landed.filter((g) => !g.startsWith("channel:"));
+  if (!real.length) return;
+  try {
+    const { recordDeliveries } = await import("@/lib/challenge-delivery");
+    await recordDeliveries(scope.ledger.challengeId, real, scope.ledger.kind);
+  } catch { /* the ledger already swallows its own errors */ }
+}
+
 async function announce(payload: Record<string, unknown>, scope: Scope = {}): Promise<number> {
   if (!canAct()) return 0;
   const list = await targets(scope);
   // Sequential on purpose: a burst of parallel posts is the fastest way to get
   // rate-limited across every server at once.
   const landed: string[] = [];
+  // Every N servers, checkpoint the ledger — see the note below `flush`.
+  const CHECKPOINT = 10;
+  let sinceFlush = 0;
   for (const t of list) {
     try {
       // `postMessage` does NOT throw — the REST layer returns {ok:false} for a
@@ -98,7 +112,10 @@ async function announce(payload: Record<string, unknown>, scope: Scope = {}): Pr
       // The guild id is what the ledger records; the testing-override channel
       // has none, so it counts as delivered under its own channel id rather
       // than silently reading as "nothing landed".
-      if (res.ok) landed.push(t.guildId ?? `channel:${t.channelId}`);
+      if (res.ok) {
+        landed.push(t.guildId ?? `channel:${t.channelId}`);
+        if (++sinceFlush >= CHECKPOINT) { sinceFlush = 0; await checkpoint(scope, landed); }
+      }
     } catch { /* never break the caller */ }
   }
 
@@ -110,16 +127,16 @@ async function announce(payload: Record<string, unknown>, scope: Scope = {}): Pr
   // function and an un-awaited insert never happens. Reach is the number the
   // whole business reports on — it cannot be best-effort. One insert of a
   // handful of rows is not worth saving.
-  if (scope.ledger && landed.length) {
-    try {
-      const { recordDeliveries } = await import("@/lib/challenge-delivery");
-      await recordDeliveries(
-        scope.ledger.challengeId,
-        landed.filter((g) => !g.startsWith("channel:")),
-        scope.ledger.kind,
-      );
-    } catch { /* the ledger already swallows its own errors */ }
-  }
+  //
+  // It is also written at the END of a sequential fan-out that makes one HTTP
+  // round-trip per server. Posting to forty servers takes long enough that a
+  // request which returns mid-loop can still be frozen before this runs, and
+  // then the messages are visibly in Discord while the ledger says nobody was
+  // reached — which is exactly what happened, and is worse than no number at
+  // all because it looks like the product lying. `flush` therefore records what
+  // has landed SO FAR at intervals, so a cut-off run loses the tail rather than
+  // everything. The unique index makes the repeats free.
+  await checkpoint(scope, landed);
   return landed.length;
 }
 
@@ -223,18 +240,30 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
 // competition other servers can watch but not enter is the best advertising a
 // server challenge has. What's restricted is the entry key, and this is the one
 // place it's ever delivered: a message to the server the challenge belongs to.
-export async function announceChallengeLaunched(challengeId: string): Promise<void> {
-  if (!canAct()) return;
+/**
+ * Post a challenge to Discord and write down where it landed.
+ *
+ * Returns the number of servers it reached so a caller can SAY so. It used to
+ * return void, which made "announced to 0 servers" and "announced to 40"
+ * indistinguishable to staff pressing the button — and the only way anybody
+ * found out was a brand asking why their reach was zero.
+ *
+ * A draft is never announced. That is what makes the approve → edit → publish
+ * flow safe: the challenge exists, staff can change every word of it, and
+ * nothing has left the building until its status says active.
+ */
+export async function announceChallengeLaunched(challengeId: string): Promise<number> {
+  if (!canAct()) return 0;
   const db = await getDb();
   const [ch] = await db.select().from(schema.challenges)
     .where(eq(schema.challenges.id, challengeId)).limit(1);
-  if (!ch || ch.status !== "active") return;
+  if (!ch || ch.status !== "active") return 0;
 
   const [card, url] = await Promise.all([
     cardRef("challenge", { id: challengeId }),
     challengeUrl(siteUrl(), challengeId),
   ]);
-  if (!card.data || card.data.kind !== "challenge") return;
+  if (!card.data || card.data.kind !== "challenge") return 0;
 
   const embeds = [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }];
   // An announcement is the first thing most people ever see from this bot, so
@@ -263,8 +292,8 @@ export async function announceChallengeLaunched(challengeId: string): Promise<vo
   // announced nowhere rather than falling through to the public path, because
   // "we couldn't work out who owns it" is not a reason to broadcast it.
   if (ch.visibility === "private") {
-    if (!holders.length) return;
-    await announce({
+    if (!holders.length) return 0;
+    const reached = await announce({
       content: [
         `${ch.announceHype ? "@here " : ""}**${ch.title}** is live, and it's yours — this server holds the key.`,
         ch.accessKey
@@ -273,10 +302,10 @@ export async function announceChallengeLaunched(challengeId: string): Promise<vo
       ].join("\n"),
       embeds, components,
     }, { only: holders, sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
-    return;
+    return reached;
   }
 
-  await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components },
+  const reached = await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components },
     { sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
 
   // And into HQ's feed for that game, so our own server carries every game's
@@ -288,6 +317,8 @@ export async function announceChallengeLaunched(challengeId: string): Promise<vo
     body: `${ch.description || "A new challenge just started."}\n\nEnds ${ch.endAt.toLocaleDateString()}.`,
     url,
   }).catch(() => {});
+
+  return reached;
 }
 
 /**

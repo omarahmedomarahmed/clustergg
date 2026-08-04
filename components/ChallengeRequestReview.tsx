@@ -1,16 +1,20 @@
 "use client";
 
+import Link from "next/link";
+
 import { useActionState } from "react";
 import {
   approveChallengeRequest, rejectChallengeRequest, staffSetChallengeState,
   type RequestActionState,
 } from "@/app/actions/challenge-requests";
 
-// Reviewing what a server asked us to run for them.
+// Reviewing what a server or a brand asked us to run.
 //
-// Approve is the load-bearing button on this page: it creates the challenge,
-// mints the entry key, and posts it into their server. So it shows exactly what
-// will go live — the editable name and length — rather than being a bare yes.
+// Approve creates the challenge as a DRAFT and stops. It used to create it live
+// and announce it to every server in the same click, which meant a requester's
+// draft copy went out to the whole network before anybody read it — and a
+// Discord announcement cannot be unsent. So this button now says what it does,
+// and the next step is the editor.
 
 export function RequestCard({ req, server, brand }: {
   req: {
@@ -87,7 +91,7 @@ export function RequestCard({ req, server, brand }: {
               {/* A brand's challenge is public and has no entry key to send —
                   promising one on the button would be a lie about what the
                   click does. */}
-              {approving ? "Approving…" : brand ? "Approve & launch" : "Approve & send key"}
+              {approving ? "Approving…" : "Approve — open in editor"}
             </button>
           </form>
           <form action={reject} className="flex items-end gap-2">
@@ -105,7 +109,17 @@ export function RequestCard({ req, server, brand }: {
         <ChallengeControls challengeId={req.challengeId} />
       ) : null}
 
-      {state?.ok && <p className="mt-3 text-sm text-emerald-300 break-all">{state.ok}</p>}
+      {state?.ok && (
+        <div className="mt-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2.5">
+          <p className="text-sm text-emerald-200">{state.ok}</p>
+          {state.editHref && (
+            <Link href={state.editHref}
+              className="glow-btn pressable mt-2 inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold text-white">
+              Open the editor →
+            </Link>
+          )}
+        </div>
+      )}
       {state?.error && <p className="mt-3 text-sm text-amber-300">{state.error}</p>}
     </div>
   );

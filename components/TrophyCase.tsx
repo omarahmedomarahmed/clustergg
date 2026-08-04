@@ -172,8 +172,7 @@ export default function TrophyCase({
             )}
             {held.length > 0 && (
               <button disabled={selected.length === 0 || pending} onClick={() => setStep("payout")}
-                className="mt-4 w-full pressable rounded-full px-6 py-3 font-bold text-white disabled:opacity-50"
-                style={{ background: "linear-gradient(90deg, #10b981, #22d3ee)", boxShadow: "0 10px 26px -12px #10b981" }}>
+                className="money-btn mt-4 w-full pressable rounded-full px-6 py-3 font-bold text-white disabled:opacity-50">
                 {selected.length === 0 ? tr("Select trophies to redeem") : `${tr("Redeem")} ${selected.length} · $${selectedTotal.toLocaleString()}`}
               </button>
             )}
@@ -210,8 +209,7 @@ export default function TrophyCase({
                           </p>
                           <div className="flex flex-wrap items-center gap-2">
                             <a href={r.collectUrl} target="_blank" rel="noreferrer"
-                              className="pressable inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold text-white"
-                              style={{ background: "linear-gradient(90deg, #06b6d4, #22d3ee)" }}>
+                              className="money-btn pressable inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold text-white">
                               <Icon name="zap" size={12} /> {tr("Collect")} ${r.amount.toLocaleString()}
                             </a>
                             <button onClick={() => act(() => confirmRedeem(r.id))} disabled={pending}
@@ -296,8 +294,7 @@ export default function TrophyCase({
                   : tr("We'll remember this for next time (up to 3 changes).")}
             </p>
             <button onClick={submit} disabled={pending}
-              className="w-full pressable rounded-full px-6 py-3 font-bold text-white disabled:opacity-60"
-              style={{ background: "linear-gradient(90deg, #10b981, #22d3ee)", boxShadow: "0 10px 26px -12px #10b981" }}>
+              className="money-btn w-full pressable rounded-full px-6 py-3 font-bold text-white disabled:opacity-60">
               {pending ? tr("Submitting…") : `${tr("Request payout")} · $${selectedTotal.toLocaleString()} ${currency}`}
             </button>
           </div>

@@ -24,6 +24,18 @@ export type Tier = {
   threshold: number;
   /** Icon name from components/Icon — never an emoji; the site renders SVG. */
   icon: string;
+  /**
+   * The rung's own identity.
+   *
+   * A tier is the thing an owner tells other owners about, so each one is a
+   * LABEL with its own colour and its own two-word rank — not four rows sharing
+   * a gold icon. `rank` is what goes on the badge, `tone` is the colour it
+   * carries everywhere it appears, and `blurb` is the one line that says what
+   * you are once you're there.
+   */
+  rank: string;
+  tone: string;
+  blurb: string;
   unlocks: string;
   detail: string;
   /**
@@ -40,6 +52,9 @@ export const TIERS: Tier[] = [
     name: "Seed Server",
     threshold: 0,
     icon: "spark",
+    rank: "Tier I",
+    tone: "#94a3b8",
+    blurb: "You're on the map.",
     unlocks: "Private challenges for your community",
     detail: "Request challenges, run them for your members, and appear on Cluster with your own logo and invite.",
     ownerPct: ownerPctFor(0),
@@ -49,6 +64,9 @@ export const TIERS: Tier[] = [
     name: "Sponsored Server",
     threshold: 500,
     icon: "diamond",
+    rank: "Tier II",
+    tone: "#22d3ee",
+    blurb: "Brands start paying you.",
     unlocks: "Brand-sponsored challenges, with real prize money",
     detail:
       "Brands sponsoring the games your members play start running their weekly challenges here. Every dollar "
@@ -60,6 +78,9 @@ export const TIERS: Tier[] = [
     name: "Broadcaster",
     threshold: 1000,
     icon: "satellite",
+    rank: "Tier III",
+    tone: "#a78bfa",
+    blurb: "The whole network runs through you.",
     unlocks: "Carry the whole network's challenges",
     detail:
       "Challenges from across the network run in your server, so more of your members are playing for real "
@@ -71,6 +92,9 @@ export const TIERS: Tier[] = [
     name: "Flagship Server",
     threshold: 5000,
     icon: "crown",
+    rank: "Tier IV",
+    tone: "#fbbf24",
+    blurb: "Brands ask for you by name.",
     unlocks: "Brands ask for your community by name",
     detail:
       "Brands buy challenges in your server specifically, and smaller servers carry yours instead of the "
@@ -227,6 +251,32 @@ export type EarningRow = {
   membersWon: number;
 };
 
+/**
+ * One member of this server, on one podium.
+ *
+ * The owner asked what their community got out of running the bot, and a total
+ * is a weak answer to that — "your members won $400" is a number, but "Nova
+ * came first in NebulaTech's Chess week and took $100" is a story they can put
+ * in their own announcements channel.
+ *
+ * None of this is the owner's money. That is stated on the row, not just in a
+ * footnote, because an owner who quietly assumes otherwise finds out at the
+ * worst possible moment.
+ */
+export type MemberWin = {
+  userId: string;
+  name: string;
+  slug: string | null;
+  avatarUrl: string | null;
+  challengeId: string;
+  challengeTitle: string;
+  game: string;
+  brandName: string | null;
+  place: number;
+  amount: number;
+  at: Date;
+};
+
 export type Earnings = {
   ownerPct: number;
   clusterPct: number;
@@ -237,6 +287,10 @@ export type Earnings = {
   pending: number;
   membersWon: number;
   rows: EarningRow[];
+  /** Every podium a member of this server stood on. Never payable to the owner. */
+  memberWins: MemberWin[];
+  /** How many distinct members have won something. */
+  winners: number;
 };
 
 /**
@@ -253,7 +307,7 @@ export async function serverEarnings(guildId: string, linked: number): Promise<E
   const empty: Earnings = {
     ownerPct, clusterPct: clusterPctFor(linked),
     nextPct: next?.ownerPct ?? null, nextAt: next?.threshold ?? null,
-    earned: 0, pending: 0, membersWon: 0, rows: [],
+    earned: 0, pending: 0, membersWon: 0, rows: [], memberWins: [], winners: 0,
   };
   try {
     const db = await getDb();
@@ -299,9 +353,24 @@ export async function serverEarnings(guildId: string, linked: number): Promise<E
       : [];
     const brandName = new Map(brandRows.map((b) => [b.id, b.name]));
 
+    // Who the winners actually are. Looked up once for every podium across
+    // every challenge rather than per row — an owner's page should not fan out
+    // into a query per member.
+    const winnerIds = [...new Set(
+      parts.filter((p) => p.placement && p.placement <= 3 && mine.has(p.userId)).map((p) => p.userId),
+    )];
+    const winnerRows = winnerIds.length
+      ? await db.select({
+          id: schema.users.id, name: schema.users.displayName,
+          slug: schema.users.slug, avatarUrl: schema.users.avatarUrl,
+        }).from(schema.users).where(inArray(schema.users.id, winnerIds))
+      : [];
+    const winnerBy = new Map(winnerRows.map((w) => [w.id, w]));
+
     const cfg = PRICING_DEFAULTS;
     const prizeByPlace = [cfg.prize1, cfg.prize2, cfg.prize3];
     const rows: EarningRow[] = [];
+    const memberWins: MemberWin[] = [];
     for (const c of challenges) {
       const entries = parts.filter((p) => p.challengeId === c.id);
       const ours = entries.filter((p) => mine.has(p.userId));
@@ -317,6 +386,25 @@ export async function serverEarnings(guildId: string, linked: number): Promise<E
         membersWon: ours.reduce((sum, p) => sum + (p.placement && p.placement <= 3 ? prizeByPlace[p.placement - 1] ?? 0 : 0), 0),
         cfg: { ...cfg, challengePrice: c.price || cfg.challengePrice },
       });
+
+      for (const p of ours) {
+        const place = Number(p.placement ?? 0);
+        if (!place || place > 3) continue;
+        const who = winnerBy.get(p.userId);
+        memberWins.push({
+          userId: p.userId,
+          name: who?.name ?? "A member",
+          slug: who?.slug ?? null,
+          avatarUrl: who?.avatarUrl ?? null,
+          challengeId: c.id,
+          challengeTitle: c.title,
+          game: c.game,
+          brandName: c.brandId ? brandName.get(c.brandId) ?? null : null,
+          place,
+          amount: prizeByPlace[place - 1] ?? 0,
+          at: c.endAt,
+        });
+      }
       rows.push({
         challengeId: c.id,
         title: c.title,
@@ -344,6 +432,9 @@ export async function serverEarnings(guildId: string, linked: number): Promise<E
       earned: round2(rows.filter((r) => r.ended).reduce((s, r) => s + r.owner, 0)),
       pending: round2(rows.filter((r) => !r.ended).reduce((s, r) => s + r.owner, 0)),
       membersWon: round2(rows.reduce((s, r) => s + r.membersWon, 0)),
+      // Newest first — the win an owner wants to shout about is the last one.
+      memberWins: memberWins.sort((a, b) => +b.at - +a.at),
+      winners: new Set(memberWins.map((w) => w.userId)).size,
     };
   } catch { return empty; }
 }

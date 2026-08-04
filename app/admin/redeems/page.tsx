@@ -99,7 +99,7 @@ export default async function AdminRedeemsPage() {
           {r.status === "approved" && (
             <>
               <form action={async () => { "use server"; await sendRedeem(r.id); }}>
-                <button className="pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white" style={{ background: "linear-gradient(90deg,#8b5cf6,#22d3ee)" }}>
+                <button className="money-btn pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white">
                   Release {adapter.key === "manual" ? "for manual transfer" : `via ${vendor?.name ?? adapter.key}`}
                 </button>
               </form>
@@ -117,7 +117,7 @@ export default async function AdminRedeemsPage() {
               )}
               <form action={markRedeemPaid.bind(null, r.id)} className="flex flex-wrap items-end gap-3">
                 <ImageUpload name="proofUrl" label="Confirmation (optional)" aspect="16/9" maxDim={1400} scope="misc" previewWidth={110} />
-                <button className="pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white" style={{ background: "linear-gradient(90deg,#10b981,#22d3ee)" }}>
+                <button className="money-btn pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white">
                   Mark paid
                 </button>
               </form>

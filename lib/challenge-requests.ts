@@ -226,7 +226,19 @@ export async function approveRequest(
       accessKey: sponsored ? null : accessKey,
       announceHype: true,
       startAt, endAt,
-      status: "active",
+      // DRAFT, not active.
+      //
+      // Approving used to create the challenge live and announce it to every
+      // server in the same breath, which meant a brand's draft copy — its
+      // title, its description, whatever trophies the auto-podium guessed —
+      // went out to the whole network before any human had read it. There is
+      // no undo for a Discord announcement.
+      //
+      // Approval now means "yes, we'll run this": the challenge is created,
+      // the trophies are picked, the campaign slot is bound, and it waits in
+      // the editor. Publishing is a separate, deliberate click, and that is
+      // what announces.
+      status: "draft",
       cadence: "custom",
       prizes: podium,
       trophyId: podium?.first?.[0] ?? null,
@@ -253,11 +265,8 @@ export async function approveRequest(
       reviewNote: overrides.note ?? null,
     }).where(eq(schema.challengeRequests.id, requestId));
 
-    // Announce it where it belongs, with the key. Never allowed to fail the
-    // approval — staff clicked approve and the challenge exists either way.
-    const { announceChallengeLaunched } = await import("@/lib/discord/announce");
-    void announceChallengeLaunched(challengeId).catch(() => {});
-
+    // Nothing is announced here. The challenge is a draft; publishing it from
+    // the editor is what posts it to Discord and writes the delivery ledger.
     return { ok: true, challengeId, accessKey };
   } catch { return { ok: false, reason: "error" }; }
 }
