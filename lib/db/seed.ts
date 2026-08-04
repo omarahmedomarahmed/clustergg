@@ -1068,7 +1068,13 @@ export async function runBootMaintenance(db: DB) {
   // (migrateGameImagesToBlob is run unconditionally every boot from
   // ensureProvisioned — not gated here — so it self-heals if Blob became
   // available after this version flag was already set.)
-  try { const { seedQuests, ensureQuestArt } = await import("@/lib/quests"); await seedQuests(db); await ensureQuestArt(db); } catch { /* non-fatal */ }
+  // repriceQuests runs AFTER seedQuests so a quest created on this very boot is
+  // already on the B34 table, and it is idempotent so a quest created before it
+  // gets there on the next one. It never overwrites an admin's own number.
+  try {
+    const { seedQuests, ensureQuestArt, repriceQuests } = await import("@/lib/quests");
+    await seedQuests(db); await ensureQuestArt(db); await repriceQuests(db);
+  } catch { /* non-fatal */ }
 
   // Animated quest maps: fill in the generated loop for quests that have none
   // (or still carry a superseded generated loop). 3D terrain meshes likewise.
