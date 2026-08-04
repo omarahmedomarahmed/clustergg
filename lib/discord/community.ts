@@ -104,12 +104,42 @@ export function parseCommunity(raw: unknown): CommunityProfile {
 }
 
 export async function getCommunity(guildId: string): Promise<CommunityProfile> {
+  return (await getProfile(guildId)).profile;
+}
+
+/**
+ * The profile AND the contact email, which is what every caller actually needs
+ * now that completeness spans both. One read rather than two.
+ */
+export async function getProfile(guildId: string): Promise<{
+  profile: CommunityProfile; contactEmail: string | null; complete: boolean; missing: ProfileField[];
+}> {
   try {
     const db = await getDb();
-    const [row] = await db.select({ community: schema.discordGuilds.community })
+    const [row] = await db.select({ community: schema.discordGuilds.community, contactEmail: schema.discordGuilds.contactEmail })
       .from(schema.discordGuilds).where(eq(schema.discordGuilds.guildId, guildId)).limit(1);
-    return parseCommunity(row?.community);
-  } catch { return EMPTY_PROFILE; }
+    const profile = parseCommunity(row?.community);
+    const contactEmail = row?.contactEmail ?? null;
+    const missing = missingFields(profile, contactEmail);
+    return { profile, contactEmail, complete: missing.length === 0, missing };
+  } catch {
+    return { profile: EMPTY_PROFILE, contactEmail: null, complete: false, missing: PROFILE_FIELDS.map((f) => f.key) };
+  }
+}
+
+/** Store the owner's contact address. Validated, because it is a billing path. */
+export async function saveContactEmail(guildId: string, email: string): Promise<{ ok: boolean; error?: string }> {
+  const v = email.trim().slice(0, 200);
+  // Deliberately loose: an over-strict address regex rejects real addresses, and
+  // the cost of a typo here is a bounce we can SEE in /admin/email rather than a
+  // silent failure. What must not get through is something that is not an
+  // address at all.
+  if (!v || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return { ok: false, error: "That does not look like an email address." };
+  try {
+    const db = await getDb();
+    await db.update(schema.discordGuilds).set({ contactEmail: v }).where(eq(schema.discordGuilds.guildId, guildId));
+    return { ok: true };
+  } catch { return { ok: false, error: "Could not save that just now." }; }
 }
 
 /**
@@ -143,10 +173,52 @@ export async function saveCommunity(
   return merged;
 }
 
+// ===== "Complete" has ONE definition (B47) =====
+//
+// Used by the completeness score, the portal banner, the Discord card and the
+// earn gate. Four surfaces disagreeing about what "complete" means is how an
+// owner ends up staring at a green tick and an empty payout.
+//
+// The contact email lives on its own column rather than inside the profile
+// JSONB, so every function here takes it alongside — an operational contact is
+// not audience data, and "every server we cannot reach" has to be a query.
+
+export type ProfileField = "games" | "regions" | "vibes" | "about" | "contactEmail";
+
+export const PROFILE_FIELDS: { key: ProfileField; label: string; why: string }[] = [
+  { key: "games", label: "Games your members play", why: "A brand buys a game. Without this you are not in any of their searches." },
+  { key: "regions", label: "Where your members are", why: "Most sponsorships are bought by region." },
+  { key: "vibes", label: "What kind of community this is", why: "Competitive and casual servers get sold to different brands." },
+  { key: "about", label: "Your audience, in your own words", why: "The one thing we cannot derive. It is what a brand actually reads." },
+  { key: "contactEmail", label: "A contact email", why: "Where your payout notices and challenge approvals go. Without it we cannot reach you at all." },
+];
+
+/** Exactly which required fields are still blank. Empty means complete. */
+export function missingFields(p: CommunityProfile, contactEmail: string | null | undefined): ProfileField[] {
+  const has: Record<ProfileField, boolean> = {
+    games: p.games.length > 0,
+    regions: p.regions.length > 0,
+    vibes: p.vibes.length > 0,
+    about: p.about.trim().length > 0,
+    contactEmail: !!(contactEmail ?? "").trim() && (contactEmail ?? "").includes("@"),
+  };
+  return PROFILE_FIELDS.map((f) => f.key).filter((k) => !has[k]);
+}
+
+/**
+ * Is this server's profile complete?
+ *
+ * The single source of truth for the earn gate. A server that is not complete
+ * does not earn its tier's share — see `earningOwnerPct` in lib/server-earnings.
+ */
+export function profileComplete(p: CommunityProfile, contactEmail: string | null | undefined): boolean {
+  return missingFields(p, contactEmail).length === 0;
+}
+
 /** How much of the profile is filled in, 0–100. Drives the nudge to finish it. */
-export function completeness(p: CommunityProfile): number {
-  const done = [p.games.length > 0, p.regions.length > 0, p.vibes.length > 0, p.about.length > 0];
-  return Math.round((done.filter(Boolean).length / done.length) * 100);
+export function completeness(p: CommunityProfile, contactEmail?: string | null): number {
+  const missing = missingFields(p, contactEmail).length;
+  return Math.round(((PROFILE_FIELDS.length - missing) / PROFILE_FIELDS.length) * 100);
 }
 
 // ===== The other side: what a brand can buy =====

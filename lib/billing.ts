@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing";
-import { challengeEarning, ownerPctFor, clusterPctFor } from "@/lib/server-earnings";
+import { challengeEarning, ownerPctFor, earningOwnerPct, clusterPctFor } from "@/lib/server-earnings";
 
 // The books.
 //
@@ -56,7 +56,11 @@ export type ServerEarningRow = {
   guildId: string;
   name: string;
   linked: number;
+  /** What this server's TIER pays. Shown so the ladder still means something. */
   ownerPct: number;
+  /** What it is actually earning — 0 until the profile is complete (B47). */
+  earningPct: number;
+  profileComplete: boolean;
   clusterPct: number;
   challenges: number;
   owed: number;
@@ -203,6 +207,10 @@ export async function billingSummary(
       db.select({
         guildId: schema.discordGuilds.guildId,
         name: schema.discordGuilds.name,
+        // B47: a server only earns its tier's share once it has described
+        // itself. Read here so the split below can gate on it.
+        community: schema.discordGuilds.community,
+        contactEmail: schema.discordGuilds.contactEmail,
       }).from(schema.discordGuilds).where(eq(schema.discordGuilds.status, "active")),
       db.select({
         guildId: schema.discordGuildMembers.guildId,
@@ -226,6 +234,14 @@ export async function billingSummary(
       totalEntrants.set(e.challengeId, (totalEntrants.get(e.challengeId) ?? 0) + Number(e.n ?? 0));
     }
 
+    // Who has earned the right to be paid (B47). A server we cannot describe is
+    // a server we cannot sell, and a revenue share on something unsellable is
+    // not a share of anything.
+    const { parseCommunity, profileComplete } = await import("@/lib/discord/community");
+    const completeBy = new Map<string, boolean>(
+      guilds.map((g) => [g.guildId, profileComplete(parseCommunity(g.community), g.contactEmail)]),
+    );
+
     const owedBy = new Map<string, { owed: number; challenges: number }>();
     for (const e of entrantsByGuild) {
       const linked = linkedBy.get(e.guildId) ?? 0;
@@ -234,6 +250,7 @@ export async function billingSummary(
         entrants: Number(e.n ?? 0),
         totalEntrants: totalEntrants.get(e.challengeId) ?? 0,
         cfg,
+        profileComplete: completeBy.get(e.guildId) ?? false,
       });
       if (share.owner <= 0) continue;
       const prev = owedBy.get(e.guildId) ?? { owed: 0, challenges: 0 };
@@ -248,7 +265,13 @@ export async function billingSummary(
           guildId: g.guildId,
           name: g.name || g.guildId,
           linked,
+          // The tier's rate, so the table still shows what the server has
+          // reached — and `earning` beside it, which is what it is actually
+          // being paid. Showing only the gated number would read as the tier
+          // having been taken away.
           ownerPct: ownerPctFor(linked),
+          earningPct: earningOwnerPct(linked, completeBy.get(g.guildId) ?? false),
+          profileComplete: completeBy.get(g.guildId) ?? false,
           clusterPct: clusterPctFor(linked),
           challenges: o?.challenges ?? 0,
           owed: o?.owed ?? 0,

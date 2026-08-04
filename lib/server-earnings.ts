@@ -58,6 +58,30 @@ export function ownerPctFor(linked: number): number {
   return pct;
 }
 
+/**
+ * What this server ACTUALLY earns right now (B47).
+ *
+ * The tier decides the percentage; a complete profile decides whether it pays.
+ * `ownerPctFor` above is deliberately untouched — it answers "what does this
+ * tier pay", and the growth ladder has to keep showing an owner what 500 and
+ * 1,000 and 5,000 are worth whether or not they have filled anything in. Hiding
+ * the reward is the wrong way to ask for the form.
+ *
+ * This is the one the MONEY paths use, and the only difference is the gate.
+ *
+ * Why a server has to describe itself before it earns: a brand buys "PUBG
+ * players in MENA". A server with no games named, no audience description and
+ * nobody to email is not inventory, it is a number — and a revenue share on
+ * something we cannot sell is not a share of anything. Three fields in exchange
+ * for a percentage is the minimum that makes the percentage possible to earn.
+ *
+ * Nothing already settled is affected: this decides FUTURE splits, and a payout
+ * that has been calculated stays calculated.
+ */
+export function earningOwnerPct(linked: number, profileComplete: boolean): number {
+  return profileComplete ? ownerPctFor(linked) : 0;
+}
+
 /** What Cluster keeps once the owner has taken theirs. Never negative. */
 export function clusterPctFor(linked: number, cfg: PricingConfig = PRICING_DEFAULTS): number {
   return Math.max(0, platformFeePct(cfg) - ownerPctFor(linked));
@@ -99,9 +123,18 @@ export function challengeEarning(opts: {
   serversCarrying?: number;
   membersWon?: number;
   cfg?: PricingConfig;
+  /**
+   * Has this server described itself? (B47)
+   *
+   * Defaults to TRUE so every projection, ladder and "what you could earn"
+   * calculation keeps showing the real number. Only the paths that decide an
+   * actual split pass the real value — a gate that silently zeroed every
+   * illustration would be telling owners the tier is worthless.
+   */
+  profileComplete?: boolean;
 }): ChallengeEarning {
   const cfg = opts.cfg ?? PRICING_DEFAULTS;
-  const ownerPct = ownerPctFor(opts.linked);
+  const ownerPct = earningOwnerPct(opts.linked, opts.profileComplete !== false);
   const serverShare = opts.totalEntrants > 0
     ? Math.max(0, Math.min(1, opts.entrants / opts.totalEntrants))
     : 1 / Math.max(1, opts.serversCarrying ?? 1);

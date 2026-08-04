@@ -5,7 +5,8 @@ import { hasPortalSession } from "@/lib/portal-auth";
 import { challengesForGuild } from "@/lib/challenges";
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { readThread, unreadCount, markThreadRead } from "@/lib/threads";
-import { getCommunity } from "@/lib/discord/community";
+import { getProfile, PROFILE_FIELDS, REGIONS, VIBES } from "@/lib/discord/community";
+import ServerProfileForm from "@/components/ServerProfileForm";
 import { canAct } from "@/lib/discord/config";
 import ServerMessages from "@/components/ServerMessages";
 import ServerChallengeRequest from "@/components/ServerChallengeRequest";
@@ -77,7 +78,7 @@ export default async function ServerPortalPage({
     // visit still announces itself on the tab they're about to open.
     unreadCount("server", server.guildId, "portal"),
     requestableGames(),
-    getCommunity(server.guildId),
+    getProfile(server.guildId),
     listPayouts({ guildId: server.guildId, limit: 24 }),
     payoutTotals(server.guildId),
     getPayoutAccount("server", server.guildId),
@@ -96,12 +97,51 @@ export default async function ServerPortalPage({
       <PortalHeader server={server} data={data} />
 
       <div className="mx-auto max-w-6xl px-4 pb-20">
+        {/* The gate, stated BEFORE they reach the threshold (B47).
+            An owner who finds out at 500 linked members that they are earning
+            nothing was misled the whole way up, so this sits above the tabs on
+            every visit until the profile is finished. */}
+        {!community.complete && (
+          <div className="mb-6 rounded-2xl border border-amber-400/40 bg-amber-500/5 p-5" data-shot="profile-incomplete">
+            <div className="flex flex-wrap items-center gap-3">
+              <Icon name="alert" size={18} className="text-amber-300 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="font-bold text-amber-100">Your server profile is incomplete</div>
+                <div className="text-sm text-muted mt-0.5">
+                  {community.missing.length} field{community.missing.length === 1 ? "" : "s"} left —{" "}
+                  {PROFILE_FIELDS.filter((f) => community.missing.includes(f.key)).map((f) => f.label).join(", ")}.
+                  {" "}Until it is finished your share of sponsored challenges is <b className="text-ink">0%</b>,
+                  whatever your tier says.
+                </div>
+              </div>
+              <a href="#server-profile" className="glow-btn pressable rounded-full px-4 py-2 text-sm font-semibold text-white shrink-0">
+                Finish it
+              </a>
+            </div>
+          </div>
+        )}
+
         <Tabs tabs={[
           {
             key: "overview", label: "Overview", icon: "chart",
             node: (
               <div className="space-y-6">
                 <TierLadder tiers={TIERS} linked={data.stats.linked} current={data.tier.current.key} />
+                {/* The profile lives on Overview rather than behind a settings
+                    tab, because it is not settings — it is the switch that turns
+                    the revenue share on, and it belongs beside the ladder that
+                    promises the share. */}
+                <ServerProfileForm
+                  guildId={server.guildId}
+                  portalKey=""
+                  games={games.map((g) => ({ value: g.name, label: g.name }))}
+                  regions={REGIONS}
+                  vibes={VIBES}
+                  fields={PROFILE_FIELDS}
+                  profile={community.profile}
+                  contactEmail={community.contactEmail}
+                  missing={community.missing}
+                />
                 <div className="grid md:grid-cols-2 gap-6">
                   <FunnelPanel funnel={data.funnel.totals} />
                   <div className="glass p-6">
