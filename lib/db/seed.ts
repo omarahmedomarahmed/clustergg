@@ -234,13 +234,24 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     await db.update(schema.users).set({ discordUsername: username }).where(eq(schema.users.id, userId));
   };
 
-  const mkAccount = async (userId: string, provider: string, providerAccountId: string, inGameName: string) => {
+  const mkAccount = async (
+    userId: string, provider: string, providerAccountId: string, inGameName: string,
+    // `synced` marks an account whose stats are seeded below. Without it the
+    // account is stale (`nextSyncAt: 0`) and every profile view re-attempts a
+    // live provider call that cannot succeed locally — slow, and it would keep
+    // flipping the account into `error` under a demo that is showing off its
+    // stats.
+    opts: { synced?: boolean; region?: string } = {},
+  ) => {
     const id = uid();
     await db.insert(schema.linkedGameAccounts).values({
-      id, userId, provider, providerAccountId, inGameName,
+      id, userId, provider, providerAccountId, inGameName, region: opts.region,
       // Same rule a real link follows: seeding proves the row exists, not that
       // anyone owns it. See lib/account-ownership.ts.
-      verified: false, verifiedMethod: "exists", syncStatus: "pending", nextSyncAt: new Date(0),
+      verified: false, verifiedMethod: "exists",
+      syncStatus: opts.synced ? "ok" : "pending",
+      nextSyncAt: opts.synced ? new Date(Date.now() + 6 * 60 * 60 * 1000) : new Date(0),
+      lastSyncedAt: opts.synced ? new Date() : undefined,
     });
     return id;
   };
@@ -266,6 +277,44 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   await mkAccount(vega, "speedruncom", "kjp4y75j", "Niftski");
   await mkAccount(atlas, "roblox", "156", "builderman");
   const atlasDota = await mkAccount(atlas, "opendota", "87278757", "Puppey");
+
+  // ===== Synced stats, including two on named ladders =====
+  //
+  // Every other seeded account is `syncStatus: "pending"` and stays that way
+  // without an API key, so a local demo had **no synced stat at all** — which
+  // meant the profile stat grid, the feed dashboard's stat widget and the
+  // leaderboards all rendered empty and none of them could be looked at.
+  //
+  // The two ladder rows are the important ones. A ladder stat stores both faces:
+  // `metricValue` is the sortable position we derive (League's Gold II is 2700
+  // so a leaderboard can order it) and `rankLabel` is what the game itself calls
+  // it. Seeding both is what makes it possible to see that a surface is printing
+  // the wrong one — which is exactly the bug B26 was raised for, and which was
+  // invisible locally because nothing here had a rank to print.
+  const nova_lol = await mkAccount(nova, "riot-lol", "nova-euw-puuid", "NovaStrike#EUW", { synced: true, region: "euw1" });
+  const stat = async (accountId: string, game: string, metricKey: string, metricValue: number, rankLabel?: string) => {
+    await db.insert(schema.statCurrent)
+      .values({ id: uid(), linkedAccountId: accountId, game, metricKey, metricValue, rankLabel: rankLabel ?? null })
+      .onConflictDoNothing();
+  };
+  // Gold II with 43 LP → 3 * 400 + 2 * 100 + 43. Computed by the same function
+  // the adapter uses, so the fixture cannot drift from the real ladder maths.
+  const { lolTierValue } = await import("@/lib/providers/registry");
+  await stat(nova_lol, "League of Legends", "solo_tier", lolTierValue("GOLD", "II", 43), "Gold II");
+  await stat(nova_lol, "League of Legends", "flex_tier", lolTierValue("SILVER", "I", 12), "Silver I");
+  await stat(nova_lol, "League of Legends", "solo_lp", 43);
+  await stat(nova_lol, "League of Legends", "wins", 128);
+  await stat(nova_lol, "League of Legends", "losses", 111);
+  await stat(nova_lol, "League of Legends", "win_rate", 53.6);
+  await stat(nova_lol, "League of Legends", "summoner_level", 312);
+  // Dota's rank_tier carries a label too — the rule is not a League special
+  // case, and a second provider on a ladder is what proves that.
+  await stat(orionDota, "Dota 2", "rank_tier", 75, "Divine 5");
+  await stat(orionDota, "Dota 2", "wins", 8412);
+  // A plain, label-less stat, so the "no ladder → show the number" half of the
+  // rule has something to exercise too.
+  await stat(novaChess, "Chess", "blitz_rating", 3241);
+  await stat(novaChess, "Chess", "games", 19430);
 
   const followPairs: [string, string][] = [
     [nova, lyra], [nova, orion], [lyra, nova], [orion, nova], [orion, vega],
