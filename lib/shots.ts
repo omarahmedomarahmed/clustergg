@@ -17,6 +17,20 @@
 // an admin who replaces that one image has replaced it in all three places.
 // That is the whole design.
 //
+// ⚠ THE IMAGES IN `public/shots/` ARE PROVISIONAL.
+//
+// The capture pass ran in wave 1, which is earlier than the plan's ordering
+// intends (§1.1). Most of these shots are pictures of a product still being
+// changed: B23 rewrites the marketing pages, B41 replaces the homepage, B2 puts
+// the coin on every CP figure, B27 changes every bot card's buttons, B34
+// reprices the currency. A full recapture is owed once Part I closes — see V1.R
+// in docs/EXECUTION_PLAN.md.
+//
+// Do NOT recapture piecemeal in the meantime. A visibly stale shot between now
+// and then is expected, and refreshing one mid-item is the waste the single-pass
+// ordering exists to avoid. Keep placing new slots as pages are touched and
+// leave them EMPTY — a visible placeholder is the component doing its job.
+//
 // Everything here is admin-editable at /admin/shots: the picture, the caption,
 // the alt text. Including keys that have never been captured — those render a
 // visible labelled placeholder rather than a gap, so a missing shot is obvious

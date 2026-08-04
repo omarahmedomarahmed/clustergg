@@ -307,7 +307,16 @@ the remaining edits; Part II is the whole platform.
 | B44 | The promotional campaigns console (amends B30) + funding figure is $100K | `/admin/offers`, `lib/invoices.ts`, the deck | batch 4 | ☐ |
 | B45 | The portal key follows ownership | the guild refresh path, key rotation | batch 4 | ☐ |
 | B46 | Spend limits on storage and rendering | `lib/storage-audit.ts`, the card cache, `/admin/storage` | batch 4 | ☐ |
+| S1 | **The demo activity layer** — 36 of 74 tables had no rows, so every screen that reports on activity reported zero | new `lib/db/seed-activity.ts`, `lib/db/seed.ts` | wave 1 | ☑ |
+| S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
+| S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
+
+**S rows** are work that shipped without being planned — support the build
+needed rather than an instruction that arrived. They are lettered, not numbered,
+so they can never be confused with an instruction from the owner, and they are
+in the ledger because a ledger that only lists what was asked for stops being an
+index of what happened.
 
 **Part I closed on: _______** (fill this in; until then Part II does not start.)
 
@@ -2506,6 +2515,7 @@ the corrections are usually the most important lines in it.
 | B31 | "admin can edit it or delete it… create a challenge type called welcome challenge" | **B43**: the draft is admin-visible from creation regardless of owner onboarding, and a `welcome` challenge type can be created for any server at any time. |
 | §1.1 | "implement your recommendation for all 3 insights" | Money-touching items (B33–B37, B39) now carry their suites; B28 gains a static fallback; wave 1 slot placement avoids the pages B23 rewrites. |
 | the deck | funding is $100K, not $30K | Corrected in **B44**; every stale $30K reference is part of that item. |
+| §1.1, V1 | the capture pass ran in wave 1 | **The 28 screenshots now in `public/shots/` are PROVISIONAL.** The capture was run early, against a wave-1 build, which is a deviation from §1.1's ordering. The reason that rule exists is directly ahead in the queue: **B23** rewrites `/`, `/pricing`, `/servers`, `/discord-bot`, `/brands` and `/blog`, so every full-page shot of those is a picture of copy that will not exist; **B41** replaces the homepage entirely; **B2** puts the coin on every CP figure; **B27** changes the button layout on every bot card; **B34** reprices the currency, so every dollar figure in a shot changes; and **B28** retires the `bot.card.*` rows in favour of live renders. A **full recapture is owed** once Part I closes — see V1.R. Until then the stale shots stay: they are not recaptured piecemeal, and the capture script is not re-run at the end of each wave. |
 | — | *(next amendment here)* | |
 
 ---
@@ -2609,55 +2619,70 @@ One row per component worth proving. The `key` is the primary key of
 **change the row, and every page claiming it updates**, which is the whole
 requirement.
 
-| Shot key | Proves the claim | Captured from |
-|---|---|---|
-| `gamer.linked.verified` | "Every account is verified against the game's own API" | profile → linked accounts, a verified LoL account |
-| `gamer.marketplace.shelf` | "Spend points on real trophies" | `/marketplace`, signed in with a balance |
-| `gamer.redeem.method` | "Cash out without giving us your bank" | `/redeem` step 2 |
-| `gamer.cp.ledger` | "Every point is accounted for" | the CP ledger with real entries |
-| `gamer.quest.map` | "Quests you actually travel" | a quest page mid-progress |
-| `gamer.profile.public` | "A profile worth sharing" | `/u/<slug>` on a decorated profile |
-| `admin.challenge.rules` | "Rules in the game's own ladder" | challenge builder, "At least Diamond I in Flex 5v5" |
-| `admin.payments.providers` | "Real payout rails, not promises" | `/admin/payments` |
-| `brand.reach.perserver` | "Counted reach, not projections" | brand portal → challenge → servers table |
-| `brand.invoice` | "One invoice a month, every line itemised" | brand portal → Billing |
-| `brand.campaign.builder` | "Buy a sponsored challenge like a media placement" | the campaign builder |
-| `brand.analytics.roas` | "See what it returned" | brand portal → Analytics |
-| `server.tier.flagship` | "Owners take 25% at 5,000 linked" | Flagship server portal → Earnings |
-| `server.members.winnings` | "Your members' winnings, paid to them" | server portal → the itemised list |
-| `server.growth.journey` | "A ladder you can see yourself climbing" | server portal → the journey to 5,000 |
-| `server.payout.history` | "Paid, in flight, awaiting — all visible" | server portal → Payouts |
-| `bot.card.welcome` | "The bot opens like a home page" | the welcome card |
-| `bot.card.challenges` | "Cards, not walls of text" | `/api/card/challenges` |
-| `bot.card.srv_earnings` | "Run your server from Discord" | `/api/card/srv_earnings` |
-| `nav.badges` | "One nav, two doors: planets and the marketplace" | the signed-in nav |
-| `nav.potw.expanded` | "One continuous surface" | nav + Profile-of-the-Week expanded |
-| `nav.planet.dropdown` | "Every game, one click from anywhere" | the nav game dropdown |
-| `planet.completed.standings` | "Every challenge settles in public" | a planet page's completed section |
-| `bot.guide.cp` · `bot.guide.challenges` · `bot.guide.trophies` | "The bot teaches in cards" | `/api/card/<kind>` |
-| `bot.home` | "Your whole Cluster, in one card" | `/api/card/home` |
-| `bot.card.wallet` | "Your wallet, in Discord" | `/api/card/wallet` |
-| `gamer.quest.actions` | "Every action, what it pays, what it caps at" | a quest page's action list |
-| `gamer.quest.signal` | "Bring us a server, get paid for it" | the signal quest |
-| `gamer.cp.capped` | "Capped, and told plainly" | the CP history, maxed entry |
-| `gamer.wallet` · `gamer.wallet.ledger` | "Your points, your trophies, what they are worth" | `/wallet` |
-| `gamer.economy.loop` | "Free points → trophies → real money" | the explainer |
-| `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` |
-| `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page |
-| `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` |
-| `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` |
-| `page.home.gamer` | the gamer argument | `/` |
-| `bot.card.profile` | "Your trophies and every account, on one card" | `/api/card/profile` |
-| `gamer.lol.card` | "Your rank, in the game's own words" | a profile's LoL account card |
-| `admin.offers.console` | "Every founding offer, switchable and counted" | `/admin/offers` |
-| `brand.invoice.discount` | "The full price, and what we covered" | a discounted invoice |
-| `server.welcome.draft` | "Your first challenge is already waiting" | the portal's Challenges tab |
-| `admin.welcome.ledger` | "What we spent to grow, on the same bill as everything else" | Cluster's brand invoice |
-| `admin.email.console` | "Every message we send, and whether it arrived" | `/admin/email` |
-| `admin.abuse.review` | "Growth we look at before we pay for it" | the server review page |
-| `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | a challenge invoice |
-| `home.quests.section` · `home.missions` | "Free points, capped and stated" | `/` |
-| `gamer.missions.progress` | "Your first week, one step at a time" | the feed |
+**State, as of wave 1:** every key below marked *captured (provisional)* has a
+real image in `public/shots/`, taken during the early capture pass. Provisional
+means exactly what it says — the shot exists, it is a real screenshot of a real
+screen, and it is **not finished work**. B2, B23, B27, B28, B34 and B41 all
+change what these show. The recapture that settles them is **V1.R**. A key with
+no marker has never been captured and renders a labelled placeholder, which is
+the correct state for it.
+
+| Shot key | Proves the claim | Captured from | State |
+|---|---|---|---|
+| `gamer.linked.verified` | "Every account is verified against the game's own API" | profile → linked accounts, a verified LoL account | **captured (provisional)** → V1.R |
+| `gamer.marketplace.shelf` | "Spend points on real trophies" | `/marketplace`, signed in with a balance | **captured (provisional)** → V1.R |
+| `gamer.redeem.method` | "Cash out without giving us your bank" | `/redeem` step 2 | **captured (provisional)** → V1.R |
+| `gamer.cp.ledger` | "Every point is accounted for" | the CP ledger with real entries | **captured (provisional)** → V1.R |
+| `gamer.quest.map` | "Quests you actually travel" | a quest page mid-progress | **captured (provisional)** → V1.R |
+| `gamer.profile.public` | "A profile worth sharing" | `/u/<slug>` on a decorated profile | **captured (provisional)** → V1.R |
+| `admin.challenge.rules` | "Rules in the game's own ladder" | challenge builder, "At least Diamond I in Flex 5v5" | **captured (provisional)** → V1.R |
+| `admin.payments.providers` | "Real payout rails, not promises" | `/admin/payments` | **captured (provisional)** → V1.R |
+| `brand.reach.perserver` | "Counted reach, not projections" | brand portal → challenge → servers table | **captured (provisional)** → V1.R |
+| `brand.invoice` | "One invoice a month, every line itemised" | brand portal → Billing | **captured (provisional)** → V1.R |
+| `brand.campaign.builder` | "Buy a sponsored challenge like a media placement" | the campaign builder | **captured (provisional)** → V1.R |
+| `brand.analytics.roas` | "See what it returned" | brand portal → Analytics | **captured (provisional)** → V1.R |
+| `server.tier.flagship` | "Owners take 25% at 5,000 linked" | Flagship server portal → Earnings | **captured (provisional)** → V1.R |
+| `server.members.winnings` | "Your members' winnings, paid to them" | server portal → the itemised list | **captured (provisional)** → V1.R |
+| `server.growth.journey` | "A ladder you can see yourself climbing" | server portal → the journey to 5,000 | **captured (provisional)** → V1.R |
+| `server.payout.history` | "Paid, in flight, awaiting — all visible" | server portal → Payouts | **captured (provisional)** → V1.R |
+| `bot.card.welcome` | "The bot opens like a home page" | the welcome card | not captured · retired by B28 → never captured, row is deleted |
+| `bot.card.challenges` | "Cards, not walls of text" | `/api/card/challenges` | not captured · retired by B28 → never captured, row is deleted |
+| `bot.card.srv_earnings` | "Run your server from Discord" | `/api/card/srv_earnings` | not captured · retired by B28 → never captured, row is deleted |
+| `nav.badges` | "One nav, two doors: planets and the marketplace" | the signed-in nav | **captured (provisional)** → V1.R |
+| `nav.potw.expanded` | "One continuous surface" | nav + Profile-of-the-Week expanded | **captured (provisional)** → V1.R |
+| `nav.planet.dropdown` | "Every game, one click from anywhere" | the nav game dropdown | not captured — placeholder |
+| `planet.completed.standings` | "Every challenge settles in public" | a planet page's completed section | **captured (provisional)** → V1.R |
+| `bot.guide.cp` · `bot.guide.challenges` · `bot.guide.trophies` | "The bot teaches in cards" | `/api/card/<kind>` | not captured — placeholder |
+| `bot.home` | "Your whole Cluster, in one card" | `/api/card/home` | not captured — placeholder |
+| `bot.card.wallet` | "Your wallet, in Discord" | `/api/card/wallet` | not captured · retired by B28 → never captured, row is deleted |
+| `gamer.quest.actions` | "Every action, what it pays, what it caps at" | a quest page's action list | not captured — placeholder |
+| `admin.shots.console` | "Every screenshot on the site is one row an admin owns" | `/admin/shots` | **captured (provisional)** → V1.R |
+| `bot.card.challenge` | "A challenge card anyone can join from Discord" | `/api/card/planets` | **captured (provisional)** · retired by B28 → V1.R deletes it |
+| `bot.card.market` | "The marketplace, inside Discord" | `/api/card/market` | **captured (provisional)** · retired by B28 → V1.R deletes it |
+| `gamer.feed.dashboard` | "Build the dashboard you want to look at" | `/feed` | **captured (provisional)** → V1.R |
+| `gamer.leaderboard.rank` | "Ranked against everyone who plays it" | `/leaderboards` | **captured (provisional)** → V1.R |
+| `gamer.planet.page` | "A planet per game, with its own world" | `/planets` | **captured (provisional)** → V1.R |
+| `server.earnings.ledger` | "Every line itemised" | `/servers/demo-guild-nebula-1?key=DEMO-DNEBULA1` | **captured (provisional)** → V1.R |
+| `gamer.quest.signal` | "Bring us a server, get paid for it" | the signal quest | not captured — placeholder |
+| `gamer.cp.capped` | "Capped, and told plainly" | the CP history, maxed entry | not captured — placeholder |
+| `gamer.wallet` · `gamer.wallet.ledger` | "Your points, your trophies, what they are worth" | `/wallet` | not captured — placeholder |
+| `gamer.economy.loop` | "Free points → trophies → real money" | the explainer | not captured — placeholder |
+| `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` | not captured — placeholder |
+| `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page | not captured — placeholder |
+| `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` | not captured — placeholder |
+| `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` | not captured — placeholder |
+| `page.home.gamer` | the gamer argument | `/` | not captured — placeholder |
+| `bot.card.profile` | "Your trophies and every account, on one card" | `/api/card/profile` | **captured (provisional)** · retired by B28 → V1.R deletes it |
+| `gamer.lol.card` | "Your rank, in the game's own words" | a profile's LoL account card | **captured (provisional)** → V1.R |
+| `admin.offers.console` | "Every founding offer, switchable and counted" | `/admin/offers` | not captured — placeholder |
+| `brand.invoice.discount` | "The full price, and what we covered" | a discounted invoice | not captured — placeholder |
+| `server.welcome.draft` | "Your first challenge is already waiting" | the portal's Challenges tab | not captured — placeholder |
+| `admin.welcome.ledger` | "What we spent to grow, on the same bill as everything else" | Cluster's brand invoice | not captured — placeholder |
+| `admin.email.console` | "Every message we send, and whether it arrived" | `/admin/email` | not captured — placeholder |
+| `admin.abuse.review` | "Growth we look at before we pay for it" | the server review page | not captured — placeholder |
+| `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | a challenge invoice | not captured — placeholder |
+| `home.quests.section` · `home.missions` | "Free points, capped and stated" | `/` | not captured — placeholder |
+| `gamer.missions.progress` | "Your first week, one step at a time" | the feed | not captured — placeholder |
 | *(add a row per B47+ item that anyone can see)* | | |
 
 **B28 retires rows**: anywhere a page demonstrates a bot card, the live render
@@ -2816,6 +2841,49 @@ worse than no shot — it is a confident lie about the product.
 
 Then load them: `/admin/shots` bulk-imports the manifest, so the capture run
 and the live site share one source of truth.
+
+### V1.R — The recapture, which is the one that counts
+
+**A capture pass already ran, in wave 1.** It built the machinery
+(`scripts/capture-shots.mjs`, `lib/shots.ts`, `<FeatureShot>`, `/admin/shots`)
+and left 28 images in `public/shots/`. Those images are **provisional**. They
+are pictures of a wave-1 product and most of them are already wrong by the time
+Part I closes.
+
+So V1's real job is a **recapture**, not a first capture:
+
+```bash
+npm run build
+DEMO_DB=1 npx next start -p 3031
+node scripts/capture-shots.mjs          # every key, or name keys to redo some
+```
+
+Three rules for that run, each of which somebody will otherwise get wrong:
+
+1. **Replace every bundled image.** Not the ones that look stale — all of them.
+   Deciding shot-by-shot which copy changed is the judgement call the single
+   pass exists to avoid.
+2. **`bot.card.*` rows are DELETED, not recaptured.** B28 replaces bot-card
+   screenshots with live renders from `/api/card/<kind>`, so `bot.card.profile`,
+   `bot.card.market`, `bot.card.challenge` and any sibling key are removed from
+   `SHOT_REGISTRY`, their rows dropped from `feature_shots`, and their files
+   deleted from `public/shots/`. A live render cannot go stale; a screenshot of
+   one can, which is the entire reason B28 exists.
+3. **An admin's override must survive.** `seedFeatureShots` already skips any
+   row whose `imageUrl` is not the bundled path, because that means somebody
+   replaced it through `/admin/shots` and their version wins. **Do not remove
+   that skip while doing a bulk recapture** — it is the difference between
+   refreshing our own screenshots and overwriting the customer's.
+
+**And do not recapture before then.** Not mid-item when a shot goes visibly
+stale, not at the end of each wave. Capture is a single pass over a settled
+product; running it three times is precisely the waste §1.1's ordering was
+designed to avoid. A stale shot between now and Part I closing is expected, and
+the right response to noticing one is to leave it.
+
+New slots keep being placed as pages are touched in waves 2 and 3 — register the
+key in R2 and leave the image **empty**. The placeholder is doing its job when
+it is visible.
 
 ## V2 — The claim-proof pass
 

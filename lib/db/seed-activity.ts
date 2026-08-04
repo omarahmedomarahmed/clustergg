@@ -563,6 +563,11 @@ async function seedNavArt(db: any) {
 // Idempotent, and deliberately NON-DESTRUCTIVE: a row whose `imageUrl` already
 // points somewhere else was replaced by an admin at /admin/shots, and a re-seed
 // must not undo that. Their upload wins forever.
+//
+// KEEP THAT SKIP through the V1.R recapture. A bulk recapture that removes it
+// refreshes our own screenshots AND overwrites every one the customer replaced,
+// which is a different and much worse operation. The plan says so at V1.R; this
+// is the code it is talking about.
 async function seedFeatureShots(db: any) {
   const { SHOT_REGISTRY } = await import("@/lib/shots");
   const existing = await db.select().from(schema.featureShots);
