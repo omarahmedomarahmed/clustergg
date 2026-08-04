@@ -70,7 +70,25 @@ export function parseId(customId: string): ParsedId | null {
 export type Button = {
   type: 2; style: number; label: string;
   custom_id?: string; url?: string; emoji?: { name: string }; disabled?: boolean;
+  /**
+   * What this button is FOR, which decides which row it lands in (B27).
+   *
+   *   choice — what this card is about: pick a game, a challenge, a trophy
+   *   action — what you can do next: join, link, redeem, buy, share
+   *   nav    — where you can go: Home, Back, More, and links out to the web
+   *
+   * Row order is fixed and `rows()` enforces it, so Back is in the same place on
+   * every card in the product. Before this, position was whatever order a screen
+   * happened to list its buttons in, and it differed screen to screen — which
+   * means muscle memory never forms and every card has to be re-read.
+   *
+   * Not sent to Discord; stripped before the payload goes out.
+   */
+  group?: ButtonGroup;
 };
+
+export type ButtonGroup = "choice" | "action" | "nav";
+const GROUP_RANK: Record<ButtonGroup, number> = { choice: 0, action: 1, nav: 2 };
 
 // Discord validates a button's unicode emoji and rejects the WHOLE message with
 // a 400 if it isn't a real one — every button in it, not just the bad one. That
@@ -91,23 +109,27 @@ function emojiOf(emoji?: string): { emoji: { name: string } } | Record<string, n
   return { emoji: { name: emoji } };
 }
 
-export function button(label: string, customId: string, style: number = ButtonStyle.Secondary, emoji?: string): Button {
-  return { type: ComponentType.Button, style, label: label.slice(0, 80), custom_id: customId, ...emojiOf(emoji) };
+export function button(label: string, customId: string, style: number = ButtonStyle.Secondary, emoji?: string, group: ButtonGroup = "action"): Button {
+  return { type: ComponentType.Button, style, label: label.slice(0, 80), custom_id: customId, group, ...emojiOf(emoji) };
 }
 
-export function linkButton(label: string, url: string, emoji?: string): Button {
-  return { type: ComponentType.Button, style: ButtonStyle.Link, label: label.slice(0, 80), url, ...emojiOf(emoji) };
+// A link always leaves Discord, which makes it navigation whatever it says.
+export function linkButton(label: string, url: string, emoji?: string, group: ButtonGroup = "nav"): Button {
+  return { type: ComponentType.Button, style: ButtonStyle.Link, label: label.slice(0, 80), url, group, ...emojiOf(emoji) };
 }
 
-export function navButton(label: string, target: Frame, trail: Frame[], style: number = ButtonStyle.Secondary, emoji?: string): Button {
-  return button(label, navId(target, trail), style, emoji);
+// Navigating to another screen of this card is a CHOICE by default — picking a
+// game, a challenge, a trophy. The screens that use it for Home/Back/More pass
+// "nav" explicitly.
+export function navButton(label: string, target: Frame, trail: Frame[], style: number = ButtonStyle.Secondary, emoji?: string, group: ButtonGroup = "choice"): Button {
+  return button(label, navId(target, trail), style, emoji, group);
 }
 
 export function backButton(trail: Frame[]): Button | null {
   if (!trail.length) return null;
   const to = trail[0];
   const label = to.screen === "home" ? "Home" : "Back";
-  return button(label, backId(trail), ButtonStyle.Secondary, "◀");
+  return button(label, backId(trail), ButtonStyle.Secondary, "◀", "nav");
 }
 
 // Discord allows 5 buttons per row and 5 rows per message.
@@ -141,26 +163,77 @@ export function rows(buttons: (Button | null)[]): { type: 1; components: Button[
   // mean every card — including the ones added next month. Every message the
   // bot sends, interactive or proactive, builds its components through this
   // function, so this is the one place that can promise it.
-  //
-  // Last, so it can never displace a card's own actions, and deduped below so a
-  // screen that already offers it (the install prompt itself) doesn't show two.
   const all = [...buttons, addToServerButton()];
 
+  // Dedupe. Identity is where the button GOES, not what it says: two labels for
+  // the same destination are still one destination. Screens append a standard
+  // tail on top of their own buttons, and a screen that already offers one of
+  // those would otherwise show it twice — two buttons doing the same thing is
+  // the fastest way to make a card look untrustworthy.
   const seen = new Set<string>();
-  const list: Button[] = [];
+  const kept: Button[] = [];
   for (const b of all) {
     if (!b) continue;
-    // Identity is where the button GOES, not what it says: two labels for the
-    // same destination are still one destination.
     const key = b.custom_id ?? b.url ?? b.label;
     if (seen.has(key)) continue;
     seen.add(key);
-    list.push(b);
-    if (list.length === 25) break;
+    kept.push(b);
   }
-  const out: { type: 1; components: Button[] }[] = [];
-  for (let i = 0; i < list.length; i += 5) out.push({ type: ComponentType.ActionRow, components: list.slice(i, i + 5) });
-  return out;
+
+  // ROW ORDER IS MEANING, NOT CALL ORDER (B27).
+  //
+  //   row 1  what this card is about   — pick a game, a challenge, a trophy
+  //   row 2  what you can do next      — join, link, redeem, buy, share
+  //   row 3  where you can go          — Home, Back, More, and the links out
+  //
+  // Sorted here rather than asked of every screen, because a rule each of
+  // twenty-one screens has to remember is a rule that holds on about fifteen of
+  // them. A stable sort, so the order a screen lists its own choices in is
+  // preserved inside each group — the grouping decides the row, the screen
+  // still decides what comes first within it.
+  const ordered = kept
+    .map((b, i) => ({ b, i, rank: GROUP_RANK[b.group ?? "action"] }))
+    .sort((x, y) => (x.rank - y.rank) || (x.i - y.i))
+    .map((x) => x.b);
+
+  // Discord's ceiling is 5 per row and 5 rows — 25 buttons.
+  //
+  // Truncating from the end would drop NAVIGATION, because navigation sorts
+  // last: a gamer with twenty linked accounts would get a card with no Home, no
+  // Back and no way out of it. So navigation is reserved first and the middle
+  // groups give up their overflow instead. Losing the eleventh choice is a
+  // smaller loss than losing the way back, every time.
+  const MAX = 25;
+  const nav = ordered.filter((b) => (b.group ?? "action") === "nav");
+  const rest = ordered.filter((b) => (b.group ?? "action") !== "nav");
+  const navKept = nav.slice(0, MAX);
+  const restKept = rest.slice(0, Math.max(0, MAX - navKept.length));
+  // Re-sorted so the reserved navigation still lands last on the card rather
+  // than at the front of it.
+  const list = [...ordered].filter((b) => restKept.includes(b) || navKept.includes(b));
+
+  // `group` is ours, not Discord's — it would be rejected as an unknown field.
+  const clean = ({ group: _g, ...b }: Button) => b as Button;
+  const pack = (bs: Button[]) => {
+    const rs: { type: 1; components: Button[] }[] = [];
+    for (let i = 0; i < bs.length; i += 5) rs.push({ type: ComponentType.ActionRow, components: bs.slice(i, i + 5).map(clean) });
+    return rs;
+  };
+
+  // Each group STARTS a row, so a card reads top to bottom as
+  // "what this is about / what you can do / where you can go" — and Back is in
+  // the same place every time, which is the point.
+  const byGroup = (["choice", "action", "nav"] as ButtonGroup[])
+    .map((g) => list.filter((b) => (b.group ?? "action") === g))
+    .filter((bs) => bs.length);
+  const grouped = byGroup.flatMap(pack);
+
+  // Discord allows five rows. A card with a lot of choices — twenty linked
+  // accounts, twelve planets — can exceed that once each group is given its own
+  // row, and a message Discord rejects is worse than one whose rows are packed
+  // tight. So the grouped layout is the intent and continuous packing is the
+  // fallback; the ORDER is identical either way, only the row breaks differ.
+  return grouped.length <= 5 ? grouped : pack(list);
 }
 
 /**

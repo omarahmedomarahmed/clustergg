@@ -38,15 +38,35 @@ export function withSponsorRow<T extends { components?: unknown }>(
   // name, in somebody else's community.
   if (!url) return payload;
 
-  const existing = Array.isArray(payload.components) ? [...(payload.components as unknown[])] : [];
-  // Discord allows five action rows per message and rejects the whole message —
-  // every button in it — if there are six. The sponsor gets its own row, and a
-  // full message drops its LAST row to make space: rows are built
-  // most-important-first, so the tail is the cheapest thing to lose.
-  if (existing.length >= 5) existing.pop();
-  existing.push({
-    type: ComponentType.ActionRow,
-    components: [linkButton(sponsorButtonLabel(ad), url)],
-  });
+  type Row = { type: number; components: unknown[] };
+  const existing = (Array.isArray(payload.components) ? [...(payload.components as Row[])] : [])
+    .map((r) => ({ ...r, components: [...(r.components ?? [])] }));
+  const btn = linkButton(sponsorButtonLabel(ad), url);
+
+  // Discord allows five action rows and rejects the WHOLE message if there are
+  // six, so an ad on a full card has to displace something. What it displaces
+  // matters now in a way it did not before.
+  //
+  // This used to pop the LAST row, on the reasoning that rows were built
+  // most-important-first and the tail was the cheapest thing to lose. B27 made
+  // that false: rows are now ordered by meaning, and the last row is
+  // NAVIGATION — Home, Back, More. Popping it left a gamer with twenty-four
+  // linked accounts holding a card with no way off it, which is a far worse
+  // outcome than a missing ad and was caused by selling one.
+  //
+  // So, in order of preference: sit in the last row if it has a seat (a link
+  // out belongs beside Home anyway); take a new row if there is one; and only
+  // if the card is at Discord's absolute ceiling, drop the LAST button of the
+  // navigation row — which by B27's ordering is the least important one there
+  // (support, then vote), never Home or Back.
+  const last = existing[existing.length - 1];
+  if (last && last.components.length < 5) {
+    last.components.push(btn);
+  } else if (existing.length < 5) {
+    existing.push({ type: ComponentType.ActionRow, components: [btn] });
+  } else if (last) {
+    last.components.pop();
+    last.components.push(btn);
+  }
   return { ...payload, components: existing };
 }
