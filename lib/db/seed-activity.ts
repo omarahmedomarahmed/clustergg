@@ -121,9 +121,16 @@ async function seedProfileAttention(db: any, gamers: { id: string; slug: string 
   const [existing] = await db.select({ c: sql<number>`count(*)` }).from(schema.profileVotes);
   if (Number(existing?.c ?? 0) > 0) return;
 
-  const { currentWeek } = await import("@/lib/profile-week");
-  const { previousWeek } = await import("@/lib/week");
-  const week = await currentWeek();
+  // `lib/week` and NOT `lib/profile-week`.
+  //
+  // `profile-week` resolves the admin-set competition timezone, which reaches
+  // the CMS and from there `next/headers` — and dragging that into the seed's
+  // module graph broke the production build outright, because the seed is
+  // imported from the database bootstrap. The seed has no request to read a
+  // cookie from anyway, so the default timezone is the correct answer here as
+  // well as the only compilable one.
+  const { weekAt, previousWeek, DEFAULT_WEEK_TZ } = await import("@/lib/week");
+  const week = weekAt(new Date(), DEFAULT_WEEK_TZ);
   const weekKey = week.key;
   const rand = rng(20260804);
 
