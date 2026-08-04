@@ -277,7 +277,7 @@ the remaining edits; Part II is the whole platform.
 | B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
 | B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
-| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☐ |
+| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☑ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
 | B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
 | B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
@@ -313,6 +313,7 @@ the remaining edits; Part II is the whole platform.
 | S4 | **A JSX expression rendering as literal text** on every unaffordable trophy tile — a backtick where a fragment belonged, so the marketplace read `$<Cp amount={t.cpPrice - balance} /> to go` | `components/TrophyMarket.tsx` | wave 2 (found by B34) | ☑ |
 | S5 | **Demo balances rescaled for B34's prices**, as balances net of what the seeded orders spend — Nova can afford exactly one trophy, Atlas none | `lib/db/seed-activity.ts` | wave 2 (B34 fallout) | ☑ |
 | B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☑ |
+| B48 | **The marketplace says how you get the points** — quest cards on the shelf, a clickable balance, the redemption value promoted | `/marketplace`, `components/TrophyMarket.tsx`, `components/QuestCard.tsx` | wave 2 (after B35) | ☐ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **S rows** are work that shipped without being planned — support the build
@@ -2623,6 +2624,60 @@ correction goes in the amendments table below with a one-line note saying which
 item it amended. A plan that quietly overwrites itself cannot be audited, and
 the corrections are usually the most important lines in it.
 
+## B48 — The marketplace has to say how you get the points
+
+> "show navigation cards and buttons of quests in the trophy marketplace page so
+> gamers know how to get it, and make the balance of CP clickable from the
+> marketplace page, make the text where it says redeems for dollar amount
+> bigger, glorify the look of it, and make it show the quests"
+
+**Why it was asked for, which is the part that decides the edge cases.** B34
+repriced a $5 trophy to 50,000 CP. That is a hundred days at the ceiling — far,
+expensive and reachable, exactly as intended — but it turns the marketplace into
+a shelf a new gamer cannot reach, and the page currently gives them nowhere to
+go about it. A price with no visible path to affording it does not read as
+aspiration, it reads as a wall. The shelf and the way to earn have to be on the
+same screen, or the repricing lands as a product that took something away.
+
+The redemption value is the second half of the same problem. "redeems for $50"
+is set in the smallest text on the tile, under the CP price, so the number that
+justifies the price is the least visible thing on the card. It is what makes a
+trophy an asset rather than a sticker and it should read that way.
+
+**What changes:**
+
+- **The quests come to the marketplace.** Quest navigation cards on `/marketplace`
+  — one per quest, with its art, what it pays and a button into it — so the
+  answer to "how do I afford this?" is on the page that asked the question.
+  Reuses the existing quest card rather than inventing a second one: two
+  divergent renderings of the same quest is how the two screens end up
+  disagreeing about what a quest pays.
+- **The balance becomes a link** into `/quests`, wherever it appears on the page.
+  It is the single most-looked-at number on the screen and it currently does
+  nothing.
+- **The redemption value is promoted** on every tile: larger, and styled as the
+  claim it is, above the CP price rather than beneath it.
+- **The "to go" figure earns its place** — a gamer who is short should see how
+  short and where to close the gap, not only that they cannot buy.
+
+Must not break: the CP price and the dollar value are two views of one number
+(`priceOf` at the platform rate) and must keep agreeing on every tile — that
+agreement is why `seedMarketplace` derives one from the other. `<Cp>` stays the
+only renderer of a CP figure (B2). Nothing here changes what anything costs.
+
+**Verification owed → `tests/ui/marketplace.mjs`:**
+- Every quest with scoring actions is reachable from `/marketplace` by a link.
+- The balance is an anchor to `/quests`, not a bare number.
+- Every tile's dollar value and CP price agree at the platform rate.
+- The redemption value renders larger than the CP price on the same tile.
+- A gamer who cannot afford a trophy still sees the shortfall and a way to earn.
+
+**Shots owed:** `gamer.marketplace.earn` — "The shelf, and how to reach it" —
+`/marketplace`.
+**New routes:** none.
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -2636,6 +2691,7 @@ the corrections are usually the most important lines in it.
 | §1.1 | "implement your recommendation for all 3 insights" | Money-touching items (B33–B37, B39) now carry their suites; B28 gains a static fallback; wave 1 slot placement avoids the pages B23 rewrites. |
 | the deck | funding is $100K, not $30K | Corrected in **B44**; every stale $30K reference is part of that item. |
 | §1.1, V1 | the capture pass ran in wave 1 | **The 28 screenshots now in `public/shots/` are PROVISIONAL.** The capture was run early, against a wave-1 build, which is a deviation from §1.1's ordering. The reason that rule exists is directly ahead in the queue: **B23** rewrites `/`, `/pricing`, `/servers`, `/discord-bot`, `/brands` and `/blog`, so every full-page shot of those is a picture of copy that will not exist; **B41** replaces the homepage entirely; **B2** puts the coin on every CP figure; **B27** changes the button layout on every bot card; **B34** reprices the currency, so every dollar figure in a shot changes; and **B28** retires the `bot.card.*` rows in favour of live renders. A **full recapture is owed** once Part I closes — see V1.R. Until then the stale shots stay: they are not recaptured piecemeal, and the capture script is not re-run at the end of each wave. |
+| B34, B18 | "make the marketplace show the quests… make the balance clickable" | **B48.** The repricing made the shelf unreachable for a new gamer and the page offered no path off it. The quests, the balance link and the promoted redemption value are that path. |
 | — | *(next amendment here)* | |
 
 ---
@@ -2703,8 +2759,8 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/bot-guides.mjs` | **B13** | fewer than nine guides; the CP guide's numbers equal `ACTION_CATALOG` | owed |
 | `tests/ui/bot-home.mjs` + `tests/db/bot-home.mts` | **B14** | the home card, both background states, three live + four quests, the empty state | owed |
 | `tests/db/quests.mts` | **B15** | the new actions award on the real code path, deduped, capped | owed |
-| `tests/db/cp-economics.mts` | **B16** | the model against a hand-computed fixture; the multi-quest multiplier; no uncapped action survives; saving changes what `awardQuestAction` grants | owed |
-| `tests/db/caps.mts` + `tests/ui/caps.mjs` | **B17** | past the cap the action still succeeds and awards zero, silently; the cap is shown up front; the maxed entry appears in history | owed |
+| `tests/db/cp-economics.mts` | **B16**, **B34** | the model against a hand-computed fixture; ~~the multi-quest multiplier~~ **the absence of one, per B34.2**; no uncapped action survives; what the calculator writes is what the engine pays | **written — 57 assertions** |
+| `tests/db/caps.mts` | **B17** | past the cap the action still succeeds and awards zero, silently; the cap is shown up front; the maxed entry appears in history with its figure and its reset | **written — 18 assertions** (the UI half is covered in-browser; a `tests/ui/caps.mjs` is still owed for CI) |
 | `tests/ui/wallet.mjs` + `tests/db/wallet.mts` | **B18** | dollar value correct; the ledger reconciles; no payment field in any state | owed |
 | `tests/ui/bot-wallet.mjs` | **B20** | the card's figures equal `/wallet`'s; redeem completes from Discord | owed |
 | `tests/ui/economy-copy.mjs` | **B21** | the loop stated in one order everywhere; every earning claim states its cap | owed |
@@ -2717,6 +2773,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/offers.mts` | **B30** | off by default; the discount is its own line; totals equal lines; admin edits survive recalculation | owed |
 | `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
 | `tests/db/email.mts` + `tests/ui/admin-email.mjs` | **B32** | no key = no-op, never throws; every template fills; webhooks update status; no key or payment detail in a subject | owed |
+| `tests/ui/marketplace.mjs` | **B48** | every quest reachable from the shelf; the balance is a link; dollar value and CP price agree on every tile; the redemption value outsizes the price | owed |
 | `tests/db/server-profile.mts` | **B47** | the gate at 500 linked; completeness has one definition; the missing-field list; nothing clawed back; manual mail logged and refused without an address | **write with the item — it decides who gets paid, see §1.1** |
 | `tests/db/announce-queue.mts` | **B33** | publishing enqueues and returns; draining is idempotent; 429 reschedules; nothing fans out inline from a server action | **write with the item — money-adjacent, see §1.1** |
 | `tests/db/cp-economics.mts` | **B34** | no uncapped action; the 624 fixture; the 500 ceiling holds absolutely; award once, progress twice; $5 bronze = 50,000 CP; CP per impression under the CPM | **write with the item** |
@@ -2792,6 +2849,8 @@ the correct state for it.
 | `gamer.wallet` · `gamer.wallet.ledger` | "Your points, your trophies, what they are worth" | `/wallet` | not captured — placeholder |
 | `gamer.economy.loop` | "Free points → trophies → real money" | the explainer | not captured — placeholder |
 | `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` | not captured — placeholder |
+| `gamer.cp.capped` | "Capped, and told plainly" | `/quests`, today’s limits above the history | not captured — placeholder |
+| `gamer.marketplace.earn` | "The shelf, and how to reach it" | `/marketplace` with the quest cards | not captured — placeholder |
 | `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page | not captured — placeholder |
 | `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` | not captured — placeholder |
 | `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` | not captured — placeholder |

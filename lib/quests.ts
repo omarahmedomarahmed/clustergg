@@ -607,6 +607,71 @@ export async function getTotalCp(db: DB, userId: string | null): Promise<number>
   return Number(row?.c ?? 0);
 }
 
+/**
+ * What is capped out today, stated plainly (B17).
+ *
+ * B17's rule is **no interruption, full disclosure**. Nothing blocks and nothing
+ * warns when a cap is reached — the post still posts, the ad still counts as an
+ * impression for the brand, it simply stops earning. A gamer who is told they
+ * have hit a limit feels metered; one who is not told feels nothing and comes
+ * back tomorrow.
+ *
+ * But it is never hidden either. This is what the disclosure reads from: how
+ * many times each action paid today, against its cap, plus the global ceiling
+ * and when the whole thing resets. Somebody who goes looking finds the exact
+ * figure and the reset; somebody who does not is never interrupted.
+ */
+export type CapStatus = {
+  key: string; label: string; questName: string; color: string;
+  used: number; cap: number; maxed: boolean;
+};
+export type CapsToday = {
+  actions: CapStatus[];
+  earned: number;
+  ceiling: number;
+  ceilingHit: boolean;
+  /** UTC midnight, when every count below goes back to zero. */
+  resetsAt: string;
+};
+
+export async function capsToday(db: DB, userId: string | null): Promise<CapsToday> {
+  const reset = startOfUtcDay();
+  reset.setUTCDate(reset.getUTCDate() + 1);
+  const empty: CapsToday = { actions: [], earned: 0, ceiling: DEFAULT_DAILY_CP_CEILING, ceilingHit: false, resetsAt: reset.toISOString() };
+  if (!userId) return empty;
+  try {
+    const [ceiling, earned] = await Promise.all([dailyCpCeiling(db), cpEarnedToday(db, userId)]);
+    // One grouped read rather than one per action.
+    const counts = await db.select({
+      questId: schema.questEvents.questId,
+      actionKey: schema.questEvents.actionKey,
+      n: sql<number>`COUNT(*)`,
+    }).from(schema.questEvents)
+      .where(and(eq(schema.questEvents.userId, userId), gte(schema.questEvents.createdAt, startOfUtcDay())))
+      .groupBy(schema.questEvents.questId, schema.questEvents.actionKey);
+    if (counts.length === 0) return { ...empty, ceiling, earned, ceilingHit: ceiling > 0 && earned >= ceiling };
+
+    const quests = await db.select().from(schema.quests)
+      .where(inArray(schema.quests.id, [...new Set(counts.map((c) => c.questId))]));
+    const byId = new Map(quests.map((q) => [q.id, q]));
+    const actions: CapStatus[] = [];
+    for (const c of counts) {
+      const q = byId.get(c.questId);
+      if (!q) continue;
+      const cap = Number((q.dailyCaps as Record<string, number>)[c.actionKey] ?? 0);
+      if (cap <= 0) continue;   // uncapped: there is no figure to disclose
+      const used = Number(c.n);
+      actions.push({
+        key: c.actionKey, label: ACTION_LABEL[c.actionKey] ?? c.actionKey,
+        questName: q.name, color: q.color, used, cap, maxed: used >= cap,
+      });
+    }
+    // Maxed first — the whole reason somebody opens this.
+    actions.sort((a, b) => Number(b.maxed) - Number(a.maxed) || b.used / b.cap - a.used / a.cap);
+    return { actions, earned, ceiling, ceilingHit: ceiling > 0 && earned >= ceiling, resetsAt: reset.toISOString() };
+  } catch { return empty; }
+}
+
 // ===== CP ledger (history log) =====
 export type CpLedgerEntry = {
   id: string; questId: string; questKey: string; questName: string; color: string; logoUrl: string | null;
