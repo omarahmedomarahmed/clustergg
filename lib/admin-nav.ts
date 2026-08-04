@@ -138,6 +138,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     blurb: "Every word, colour and image the site shows.",
     items: [
       { href: "/admin/content", label: "Site content", desc: "Headlines, subtitles and CTAs on every public page." , system: "brand" },
+      { href: "/admin/shots", label: "Screenshots", desc: "Every feature screenshot on the site — replace the image, rewrite the caption, and it changes everywhere that component appears.", system: "brand" },
       { href: "/admin/language", label: "Language & flags", desc: "Arabic toggle, locale defaults, country flags." , system: "brand" },
       { href: "/admin/translations", label: "Content translations", desc: "Per-entity Arabic for quests, planets, challenges and boards." , system: "brand" },
       { href: "/admin/backgrounds", label: "Page backgrounds", desc: "Background art per page." , system: "brand" },
