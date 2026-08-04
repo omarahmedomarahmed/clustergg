@@ -285,7 +285,7 @@ the remaining edits; Part II is the whole platform.
 | B22 | Track the bot install, and pay for it | `app/api/discord/installed/route.ts`, the signal quest | batch 2 | ☐ |
 | B23 | Page consolidation, the footer, and the copy rewrite | `/servers`+`/discord-bot`→one, new `/for-brands`, `/brands`→`/contact`, `/pricing`, `/`, `/blog`, the footer | batch 2 | ☐ |
 | B24 | Park localization (keep the machinery, drop the switch) | the footer, the AR copy workflow | batch 2 | ☐ |
-| B25 | The gamer's Discord card: trophy case ×3, one button per account | the profile card kind, `lib/discord/screens.ts` | batch 3 | ☐ |
+| B25 | The gamer's Discord card: trophy case ×3, one button per account | `lib/cards/data.ts`, `lib/cards/render.tsx`, `lib/discord/screens.ts` | batch 3 | ☑ |
 | B26 | LoL stats read as ranks; the level stops appearing twice | new `lib/metric-display.ts`, `app/feed`, `components/LolCard.tsx`, `components/ProfileAccounts.tsx` | batch 3 | ☑ |
 | B27 | Every bot card: data reads well, buttons grouped by meaning and position | every card kind, `lib/discord/components.ts` | batch 3 | ☐ |
 | B28 | The bot preview rebuilt — scoped per section, live renders instead of shots | the preview component, the marketing pages | batch 3 | ☐ |

@@ -45,7 +45,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ kind: strin
         if (slug) data = await profileCard(slug);
         break;
       case "game-stats":
-        if (slug && game) data = await gameStatsCard(slug, game);
+        // `account` disambiguates two accounts on one game; without it the
+        // gamer's first account on that game is used, as before.
+        if (slug && game) data = await gameStatsCard(slug, game, q.get("account"));
         break;
       case "quest":
         data = await questCard(slug, q.get("quest") ?? fx?.questKey ?? "");

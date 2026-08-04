@@ -133,12 +133,20 @@ export async function profileCard(slug: string): Promise<CardData | null> {
 
 // One linked game's stats for a gamer — the same snapshot the public profile
 // shows: rank and metrics, who they main, and how the last few games went.
-export async function gameStatsCard(slug: string, game: string): Promise<CardData | null> {
+export async function gameStatsCard(slug: string, game: string, accountId?: string | null): Promise<CardData | null> {
   const db = await getDb();
   const [user] = await db.select().from(schema.users).where(eq(schema.users.slug, slug)).limit(1);
   if (!user) return null;
   const accounts = await db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id));
-  const acc = accounts.find((a) => (getProvider(a.provider)?.game ?? "").toLowerCase() === game.toLowerCase());
+  const ofGame = accounts.filter((a) => (getProvider(a.provider)?.game ?? "").toLowerCase() === game.toLowerCase());
+  // WHICH account, when a gamer has two on one game.
+  //
+  // A main and a smurf, or one per region, is ordinary — and this used to take
+  // whichever row the query returned first, so the second account was
+  // unreachable and the card silently showed the wrong player's stats. The id
+  // is checked against this user's own accounts, so a guessed or stale id
+  // cannot read somebody else's.
+  const acc = (accountId ? ofGame.find((a) => a.id === accountId) : null) ?? ofGame[0];
   if (!acc) return null;
 
   const p = getProvider(acc.provider);

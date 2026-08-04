@@ -212,22 +212,37 @@ async function signInPrompt(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
 async function homeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!ctx.gamer) return welcomeScreen(ctx, trail);
   const here = frame("home");
-  const [{ url, data }, games] = await Promise.all([
+  const [{ url, data }, accounts] = await Promise.all([
     cardRef("profile", { slug: ctx.gamer.slug }),
-    linkedGamesOf(ctx.gamer.userId),
+    linkedAccountsOf(ctx.gamer.userId),
   ]);
   const accent = data && "theme" in data ? data.theme.accent : null;
   return {
     embeds: [embed(url, {
       title: `${ctx.gamer.displayName} on Cluster`,
       color: accent,
-      footer: games.length
-        ? "Tap a game for your live stats. Everything below edits this message — no channel spam."
-        : "Everything below edits this message — no channel spam.",
+      // When there are more accounts than buttons, say so. Silent truncation
+      // reads as "Cluster lost four of my accounts".
+      footer: accounts.length > ACCOUNT_BUTTONS
+        ? `Showing ${ACCOUNT_BUTTONS} of your ${accounts.length} accounts — the rest are on your profile. Everything below edits this message — no channel spam.`
+        : accounts.length
+          ? "Tap an account for its live stats. Everything below edits this message — no channel spam."
+          : "Everything below edits this message — no channel spam.",
     })],
     components: rows([
-      // Your games first — they're the reason to look at your own card.
-      ...games.slice(0, 5).map((g) => navButton(g.game.slice(0, 24), frame("show", `game:${g.game}`), [here, ...trail], gameStyle(g.game), "🎮")),
+      // Your accounts first — they're the reason to look at your own card.
+      //
+      // One button EACH, named after the account. Two accounts on the same game
+      // are two buttons opening two different stats cards; the account id rides
+      // in the frame so they cannot resolve to the same one.
+      //
+      // Twelve is the ceiling — six games with a main and a smurf on each, which
+      // is the realistic worst case. It is not Discord's limit (25) because
+      // `rows()` truncates from the END, so accounts allowed to fill the message
+      // would push Home, More and Back off it and strand whoever pressed one.
+      // Twelve leaves the whole tail room to survive.
+      ...accounts.slice(0, ACCOUNT_BUTTONS).map((a) =>
+        navButton(accountButtonLabel(a), frame("show", `game:${a.game}`, a.id), [here, ...trail], gameStyle(a.game), "🎮")),
       button("Share my profile", actionId("share", [], [here]), ButtonStyle.Success, "📣"),
       navButton("Cluster Points", frame("show", "cp"), [here, ...trail], ButtonStyle.Primary, "⚡"),
       ...tail(ctx, here, [here, ...trail].slice(1)),
@@ -333,26 +348,62 @@ async function welcomeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayl
   };
 }
 
-// The games a gamer has actually linked. A profile card can only LIST them;
+// The accounts a gamer has actually linked. A profile card can only LIST them;
 // these are what turn each one into a button you can press to see the real
 // stats behind it.
-async function linkedGamesOf(userId: string): Promise<{ game: string; tag: string }[]> {
+//
+// ONE ROW PER ACCOUNT, not per game. This used to collapse on `p.game` and keep
+// the first account it saw, which meant a gamer with two accounts on one game —
+// a main and a smurf, or one per region, which is ordinary — got a single button
+// that always opened one of them and left the other unreachable. That is exactly
+// the case where a gamer most needs to choose.
+//
+// Each row carries its account id so the button can name the account it opens
+// rather than the game it belongs to: "NovaStrike#EUW", not "VALORANT".
+async function linkedAccountsOf(userId: string): Promise<{ id: string; game: string; tag: string }[]> {
   try {
     const db = await getDb();
     const accounts = await db.select({
+      id: schema.linkedGameAccounts.id,
       provider: schema.linkedGameAccounts.provider,
       inGameName: schema.linkedGameAccounts.inGameName,
     }).from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, userId));
-    const seen = new Set<string>();
-    const out: { game: string; tag: string }[] = [];
+    const out: { id: string; game: string; tag: string }[] = [];
     for (const a of accounts) {
       const p = getProvider(a.provider);
-      if (!p || p.identityOnly || seen.has(p.game)) continue;
-      seen.add(p.game);
-      out.push({ game: p.game, tag: a.inGameName });
+      // `identityOnly` providers (Discord, Epic, Battle.net) carry no stats, so
+      // a button for one would open an empty card.
+      if (!p || p.identityOnly) continue;
+      out.push({ id: a.id, game: p.game, tag: a.inGameName });
     }
     return out;
   } catch { return []; }
+}
+
+/**
+ * The label for one account's button.
+ *
+ * The account's own name is what a gamer recognises — they have two VALORANT
+ * accounts and only one of them is theirs-for-ranked. The game name is appended
+ * only when it fits, because with six games linked the tag alone stops saying
+ * which game it belongs to.
+ *
+ * Discord caps a button label at 80 characters, but a button that long wrecks
+ * the row layout long before Discord objects, so this stays inside 24.
+ */
+/**
+ * How many account buttons one card carries.
+ *
+ * Six games with a main and a smurf on each — the realistic worst case, and the
+ * number B25 sizes for. Deliberately well under Discord's 25: `rows()`
+ * truncates from the end, so accounts allowed to fill the message would push
+ * Home, More and Back off it.
+ */
+const ACCOUNT_BUTTONS = 12;
+
+function accountButtonLabel(a: { game: string; tag: string }): string {
+  const tag = a.tag?.trim() || a.game;
+  return tag.length <= 24 ? tag : `${tag.slice(0, 23)}…`;
 }
 
 // Someone else's snapshot — the whole point of `/cluster show <game> <tag>`.
@@ -401,26 +452,26 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
     : { slug: found.slug };
   const { url, data } = await cardRef(kind, args);
 
-  const [voted, games] = await Promise.all([
+  const [voted, accounts] = await Promise.all([
     hasVoted(found.userId, ctx.gamer?.userId ?? null, ctx.discordId),
-    linkedGamesOf(found.userId),
+    linkedAccountsOf(found.userId),
   ]);
   const here = frame("gamer", what, gamer);
 
   // One button per game they've linked. A profile card can only LIST the games;
   // seeing someone's actual rank, champions and recent matches is the reason
   // you looked them up, and it shouldn't need a second command.
-  const gameButtons = games
-    .filter((g) => !wantsGame || g.game.toLowerCase() !== (found.game ?? "").toLowerCase())
-    .slice(0, 5)
-    .map((g) => navButton(g.game.slice(0, 24), frame("gamer", `game:${g.game}`, g.tag), [here, ...trail], gameStyle(g.game), "🎮"));
+  const gameButtons = accounts
+    .filter((a) => !wantsGame || a.game.toLowerCase() !== (found.game ?? "").toLowerCase())
+    .slice(0, 8)
+    .map((a) => navButton(accountButtonLabel(a), frame("gamer", `game:${a.game}`, a.tag), [here, ...trail], gameStyle(a.game), "🎮"));
 
   return {
     embeds: [embed(url, {
       title: wantsGame ? `${found.inGameName ?? gamer} · ${found.game}` : found.displayName,
       description: wantsGame ? `${found.displayName} on Cluster` : undefined,
       color: data && "theme" in data ? data.theme.accent : null,
-      footer: games.length && !wantsGame ? "Tap a game to see their real stats." : undefined,
+      footer: accounts.length && !wantsGame ? "Tap an account to see their real stats." : undefined,
     })],
     components: rows([
       ...gameButtons,
@@ -436,7 +487,13 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
   };
 }
 
-async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+/**
+ * `accountArg` is the linked-account id, present only when the button that led
+ * here was a per-account button (`show ~ game:VALORANT ~ <accountId>`). It is
+ * what lets two accounts on one game open two different cards; a typed
+ * `/cluster show <game>` has none and gets the gamer's first account, unchanged.
+ */
+async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[], accountArg = ""): Promise<ScreenPayload> {
   const target = what || "profile";
 
   // `show profile` and Home are the same destination, on purpose — one profile
@@ -464,11 +521,16 @@ async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[]): Promise
   if (target.startsWith("game:")) {
     if (!ctx.gamer) return signInPrompt(ctx, trail);
     const game = target.slice(5);
-    const { url, data } = await cardRef("game-stats", { slug: ctx.gamer.slug, game });
+    // The account id, when the button came from a per-account button. Without
+    // one this is the gamer's first account on that game, which is what a typed
+    // `/cluster show <game>` means.
+    const { url, data } = await cardRef("game-stats", { slug: ctx.gamer.slug, game, ...(accountArg ? { account: accountArg } : {}) });
     const linked = !!data;
     return {
       embeds: [embed(url, {
-        title: `${game} — ${ctx.gamer.displayName}`,
+        // The account's own name in the title, because with two accounts on
+        // one game "VALORANT — Nova" is the same heading twice.
+        title: (data && "tag" in data && data.tag ? `${data.tag} · ${game}` : `${game} — ${ctx.gamer.displayName}`).slice(0, 250),
         description: linked ? undefined : `You haven't linked a ${game} account yet.`,
         color: data && "theme" in data ? data.theme.accent : null,
       })],
@@ -481,7 +543,9 @@ async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[]): Promise
         linked || !linkableProvider(game)
           ? null
           : button(`Link my ${game} account`.slice(0, 40), `open-link|${game}`, ButtonStyle.Success, "🔗"),
-        ...tail(ctx, frame("show", target), trail),
+        // The account id rides in this frame too, so Back returns to THIS
+        // account's card rather than to whichever one happens to be first.
+        ...tail(ctx, frame("show", target, accountArg), trail),
       ]),
     };
   }
@@ -491,7 +555,7 @@ async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[]): Promise
   // A bare game or quest name typed by hand rather than picked from autocomplete.
   const c = await catalog();
   const g = c.games.find((x) => x.value.toLowerCase() === target.toLowerCase());
-  if (g) return showScreen(`game:${g.value}`, ctx, trail);
+  if (g) return showScreen(`game:${g.value}`, ctx, trail, accountArg);
   const q = c.quests.find((x) => x.value.toLowerCase() === target.toLowerCase() || x.name.toLowerCase() === target.toLowerCase());
   if (q) return questScreen(q.value, ctx, trail);
 
@@ -1574,7 +1638,7 @@ async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promi
     case "more": return moreScreen(ctx, trail);
     case "market": return marketScreen(ctx, trail);
     case "help": return helpScreen(ctx, trail);
-    case "show": return showScreen(a, ctx, trail);
+    case "show": return showScreen(a, ctx, trail, f.args[1] ?? "");
     case "gamer": return otherGamerScreen(a, f.args[1] ?? "", ctx, trail);
     case "quest": return questScreen(a, ctx, trail);
     case "quests": return questsScreen(ctx, trail);
