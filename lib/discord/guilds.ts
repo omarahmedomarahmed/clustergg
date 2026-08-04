@@ -121,6 +121,18 @@ export async function markMemberLinked(userId: string): Promise<void> {
       ));
     // A newly linked gamer may be the one that tips a server over the line.
     for (const r of pending) void checkUnlock(r.guildId).catch(() => {});
+    // …and may be the one that crosses a PAYING tier, which starts the payout
+    // holding clock (B35). Separate from the ad unlock above: that is a
+    // different threshold and a different consequence.
+    void (async () => {
+      const { linkedCounts, markTierUnlocked } = await import("@/lib/abuse");
+      const { EARN_TIERS } = await import("@/lib/server-earnings");
+      const first = Math.min(...EARN_TIERS.map((t) => t.threshold));
+      const counts = await linkedCounts(db, pending.map((r) => r.guildId));
+      for (const [guildId, c] of counts) {
+        if (c.qualified >= first) await markTierUnlocked(db, guildId);
+      }
+    })().catch(() => {});
   } catch { /* non-fatal */ }
 }
 

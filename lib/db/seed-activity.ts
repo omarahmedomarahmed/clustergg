@@ -73,6 +73,7 @@ export async function seedDemoActivity(db: {
   await seedServerPayouts(db);
   await seedChallengeRequests(db);
   await seedPayoutAccounts(db, gamers);
+  await seedServerScale(db);
   await seedNavArt(db);
   await seedFeatureShots(db);
   if (admin) await seedAuditTrail(db, admin.id);
@@ -177,6 +178,59 @@ async function seedCarriedBalance(db: any, gamers: { id: string; slug: string }[
       refType: "seed-carried", refId: g.slug, createdAt: at,
     }).onConflictDoNothing();
   }
+}
+
+/**
+ * A demo server big enough to be on a tier, and honest about who counts (B35).
+ *
+ * Demo-only, like everything in this file. Without it every demo server has two
+ * linked members, so the tier ladder, the qualified/raw split, the payout
+ * holding period and the growth-review queue are all correct and all invisible —
+ * a feature nobody can look at is a feature nobody can check.
+ *
+ * The numbers are chosen to sit on the interesting side of the rule rather than
+ * the comfortable one: **520 linked members, of which 180 qualify.** That is a
+ * server which has visibly crossed 500 and is NOT being paid a tier for it,
+ * which is exactly the state B35 exists to produce and the one an owner most
+ * needs explained. A demo where everything qualifies would demonstrate nothing.
+ */
+async function seedServerScale(db: any) {
+  const [guild] = await db.select().from(schema.discordGuilds).limit(1);
+  if (!guild) return;
+  const [existing] = await db.select({ c: sql<number>`count(*)` })
+    .from(schema.discordGuildMembers).where(eq(schema.discordGuildMembers.guildId, guild.guildId));
+  if (Number(existing?.c ?? 0) > 100) return;   // idempotent
+
+  const TOTAL = 520, QUALIFIED = 180;
+  const users: Record<string, unknown>[] = [];
+  const members: Record<string, unknown>[] = [];
+  const accounts: Record<string, unknown>[] = [];
+  for (let i = 0; i < TOTAL; i++) {
+    const id = `demo-m-${String(i).padStart(4, "0")}`;
+    const qualifies = i < QUALIFIED;
+    users.push({
+      id, slug: `member-${i}`, displayName: `Member ${i}`,
+      email: `${id}@demo.gg`, passwordHash: "x",
+    });
+    members.push({
+      guildId: guild.guildId, userId: id,
+      // The qualifying ones linked long ago; the rest arrived this week, which
+      // is also what makes the growth-review queue show something real.
+      firstLinkedAt: new Date(Date.now() - (qualifies ? 60 : 3) * 86400_000),
+    });
+    accounts.push({
+      id: `demo-a-${String(i).padStart(4, "0")}`, userId: id,
+      provider: "chesscom", providerAccountId: `demo-acct-${i}`,
+      inGameName: `member${i}`,
+      // `verified` means ownership PROVEN, not "the provider answered".
+      verified: qualifies, verifiedMethod: qualifies ? "oauth" : "claimed",
+      verifiedAt: qualifies ? new Date(Date.now() - 60 * 86400_000) : null,
+    });
+  }
+  const chunk = <T,>(a: T[], n: number) => Array.from({ length: Math.ceil(a.length / n) }, (_, i) => a.slice(i * n, i * n + n));
+  for (const c of chunk(users, 100)) await db.insert(schema.users).values(c).onConflictDoNothing();
+  for (const c of chunk(members, 100)) await db.insert(schema.discordGuildMembers).values(c).onConflictDoNothing();
+  for (const c of chunk(accounts, 100)) await db.insert(schema.linkedGameAccounts).values(c).onConflictDoNothing();
 }
 
 // ===== Views and votes =====
