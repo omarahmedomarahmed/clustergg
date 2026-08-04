@@ -81,6 +81,8 @@ export const SHOT_REGISTRY: ShotDef[] = [
   { key: "server.members.winnings", group: "server", claim: "Your members' winnings, paid to them", capturedFrom: "/servers/demo-guild-nebula-2?key=DEMO-DNEBULA2", as: "server", openText: "Server board" },
   { key: "server.growth.journey", group: "server", claim: "A ladder you can see yourself climbing", capturedFrom: "/servers/demo-guild-nebula-3?key=DEMO-DNEBULA3", as: "server" },
   { key: "server.payout.history", group: "server", claim: "Paid, in flight, awaiting — all visible", capturedFrom: "/servers/demo-guild-nebula-1?key=DEMO-DNEBULA1", as: "server", openText: "Earnings" },
+  // B47. Registered and left empty until V1.R, like every slot placed from here.
+  { key: "server.profile.incomplete", group: "server", claim: "A server we cannot describe is a server we cannot sell", capturedFrom: "/servers/demo-guild-nebula-1?key=DEMO-DNEBULA1", as: "server", selector: "#server-profile" },
 
   // ---- The brand ----
   { key: "brand.reach.perserver", group: "brand", claim: "Counted reach, not projections", capturedFrom: "/brands/nebulatech?key=DEMO-NEBULATECH", as: "brand", openText: "Challenges" },
@@ -95,6 +97,7 @@ export const SHOT_REGISTRY: ShotDef[] = [
   // Registered, deliberately NOT captured — see the note at the top of this file.
   // New slots are placed as pages are touched and left empty until V1.R.
   { key: "admin.email.console", group: "admin", claim: "Every message we send, and whether it arrived", capturedFrom: "/admin/email", as: "admin" },
+  { key: "admin.email.compose", group: "admin", claim: "Email any gamer, brand or server owner", capturedFrom: "/admin/email", as: "admin", openText: "Write to someone" },
 
   // ---- The bot ----
   { key: "bot.card.profile", group: "bot", claim: "Your trophies and every account, on one card", capturedFrom: "/api/card/profile?slug=nova", as: "guest" },

@@ -7,7 +7,7 @@ import {
 } from "@/lib/discord/types";
 import { parseId, frame, rows, button, navButton, linkButton, actionId, type Frame } from "@/lib/discord/components";
 import { openChoices } from "@/lib/discord/catalog";
-import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal, aboutModal, contactModal } from "@/lib/discord/screens";
+import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal, aboutModal, contactEmailModal, contactModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
@@ -115,6 +115,7 @@ function modalSubmit(i: Interaction) {
   if (kind === "link") return linkSubmit(i, who, arg, fields);
   if (kind === "req") return requestSubmit(i, who, arg, fields);
   if (kind === "about") return aboutSubmit(i, arg, (fields.get("about") ?? "").trim());
+  if (kind === "contactemail") return contactEmailSubmit(i, arg, (fields.get("email") ?? "").trim());
   if (kind === "msg") return contactSubmit(i, who, arg, (fields.get("body") ?? "").trim());
   return json({ type: InteractionResponseType.DeferredUpdateMessage });
 }
@@ -443,6 +444,14 @@ function componentPress(i: Interaction) {
     });
     return json({ type: InteractionResponseType.DeferredUpdateMessage });
   }
+  // The contact email (B47). Same rule: a modal must be the immediate answer to
+  // a fresh interaction, so authority is re-checked on submit where there is
+  // time for a database read.
+  if (customId.startsWith("open-email|")) {
+    const guildId = customId.slice("open-email|".length);
+    if (!guildId) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    return json(contactEmailModal(guildId));
+  }
   // The one free-text box in that profile. A modal has to be the immediate
   // answer to a fresh interaction, so no database work happens here.
   if (customId.startsWith("open-about|")) {
@@ -533,6 +542,40 @@ function contactSubmit(i: Interaction, who: Who, guildId: string, body: string) 
         ? "Sent. We answer here in your DMs and on your server dashboard — usually the same day."
         : "Couldn't send that. Try again, or write from your dashboard.",
     });
+  });
+  return json({
+    type: InteractionResponseType.DeferredChannelMessageWithSource,
+    data: { flags: MessageFlags.Ephemeral },
+  });
+}
+
+/**
+ * The owner's contact email, submitted from Discord (B47).
+ *
+ * The reply says whether that COMPLETED the profile, because completing it is
+ * what switches the revenue share on — and an owner should learn that at the
+ * moment it happens, not by noticing a number change weeks later.
+ */
+function contactEmailSubmit(i: Interaction, guildId: string, email: string) {
+  after(async () => {
+    if (!(await maySetup(i, guildId))) {
+      await editOriginal(i.token, { content: "Only this server's admins can change that." });
+      return;
+    }
+    let note = "Saved.";
+    try {
+      const { saveContactEmail, getProfile, PROFILE_FIELDS } = await import("@/lib/discord/community");
+      const r = await saveContactEmail(guildId, email);
+      if (!r.ok) {
+        note = r.error ?? "That does not look like an email address.";
+      } else {
+        const after_ = await getProfile(guildId);
+        note = after_.complete
+          ? "Saved — your profile is complete, so your share of sponsored challenges is now active."
+          : `Saved. Still needed before your share pays out: ${PROFILE_FIELDS.filter((f) => after_.missing.includes(f.key)).map((f) => f.label).join(", ")}.`;
+      }
+    } catch { note = "Could not save that just now."; }
+    await rerender(i, frame("setup", guildId), [frame("admin", "")], { content: note, ephemeral: true });
   });
   return json({
     type: InteractionResponseType.DeferredChannelMessageWithSource,

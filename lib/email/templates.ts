@@ -42,6 +42,15 @@ export type TemplateData = {
   "challenge.welcome.drafted": { serverName: string; title: string; url: string };
   "offer.applied": { brand: string; offer: string; savedThisMonth: Money; url: string };
   "account.deleted": { name: string; balanceCp: number; balanceValue: Money };
+  /**
+   * A message an admin typed (B47).
+   *
+   * Deliberately a template like every other, so it goes through the same
+   * layout, the same log and the same degradation. The body is PLAIN TEXT — the
+   * composer accepts no HTML, because free-text HTML from a console is a
+   * phishing vector wearing our brand.
+   */
+  "admin.message": { subject: string; body: string };
 };
 
 export type TemplateKey = keyof TemplateData;
@@ -140,6 +149,13 @@ const TEMPLATES: { [K in TemplateKey]: (d: TemplateData[K]) => Built } = {
     heading: d.offer,
     lines: [`Applied to ${d.brand}. It saves you ${money(d.savedThisMonth)} this month, shown as its own line on the invoice.`],
     cta: { label: "See your billing", url: d.url },
+  }),
+  "admin.message": (d) => ({
+    subject: d.subject,
+    heading: d.subject,
+    // Split on blank lines so an admin can write paragraphs; each becomes its
+    // own <p> and every one is escaped by the layout.
+    lines: d.body.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean),
   }),
   "account.deleted": (d) => ({
     subject: "Your Cluster account has been deleted",

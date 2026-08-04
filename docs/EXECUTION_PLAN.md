@@ -310,7 +310,7 @@ the remaining edits; Part II is the whole platform.
 | S1 | **The demo activity layer** — 36 of 74 tables had no rows, so every screen that reports on activity reported zero | new `lib/db/seed-activity.ts`, `lib/db/seed.ts` | wave 1 | ☑ |
 | S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
 | S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
-| B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☐ |
+| B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☑ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **S rows** are work that shipped without being planned — support the build
@@ -2796,6 +2796,8 @@ the correct state for it.
 | `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | a challenge invoice | not captured — placeholder |
 | `home.quests.section` · `home.missions` | "Free points, capped and stated" | `/` | not captured — placeholder |
 | `gamer.missions.progress` | "Your first week, one step at a time" | the feed | not captured — placeholder |
+| `server.profile.incomplete` | "A server we cannot describe is a server we cannot sell" | the portal's profile form, incomplete | not captured — placeholder |
+| `admin.email.compose` | "Email any gamer, brand or server owner" | `/admin/email`, composer open | not captured — placeholder |
 | *(add a row per B47+ item that anyone can see)* | | |
 
 **B28 retires rows**: anywhere a page demonstrates a bot card, the live render

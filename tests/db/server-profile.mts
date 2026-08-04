@@ -72,6 +72,44 @@ eq("…and its ownerPct reads 0, not the tier rate", incomplete.ownerPct, 0);
 eq("omitting the flag defaults to complete, so projections are unaffected",
   challengeEarning(args).owner, complete.owner);
 
+// ---- The manual mail (B47.4) ----
+//
+// The composer's one dangerous property is that its body is typed by a human
+// and rendered into HTML we send under our own brand. So: escaped, and refused
+// when it would render an unfilled slot.
+console.log("\n== admin.message ==");
+const { renderEmail } = await import("../../lib/email/templates.ts");
+const msg = renderEmail("admin.message", {
+  subject: "A note", body: "First line.\n\nSecond <b>paragraph</b> & more.",
+});
+eq("the subject is the admin's own", msg.subject, "A note");
+ok("a blank line becomes a second paragraph", msg.html.split("<p style=\"margin:0 0 14px").length === 3);
+ok("markup the admin typed is escaped, not rendered",
+  msg.html.includes("&lt;b&gt;") && !msg.html.includes("<b>paragraph"),
+  msg.html.slice(msg.html.indexOf("Second") - 40, msg.html.indexOf("Second") + 60));
+ok("an ampersand survives as an entity", msg.html.includes("&amp; more"));
+ok("the plain-text alternative carries the body", msg.text.includes("First line."));
+
+// The exact condition the console refuses on: no address, nowhere to send.
+console.log("\n== nowhere to send ==");
+const { getProfile: gp } = await import("../../lib/discord/community.ts");
+const { getDb, schema } = await import("../../lib/db/index.ts");
+const { eq: sqlEq } = await import("drizzle-orm");
+const tdb = await getDb();
+const [anyGuild] = await tdb.select().from(schema.discordGuilds).limit(1);
+if (anyGuild) {
+  const prior = anyGuild.contactEmail;
+  await tdb.update(schema.discordGuilds).set({ contactEmail: null })
+    .where(sqlEq(schema.discordGuilds.guildId, anyGuild.guildId));
+  const blank = await gp(anyGuild.guildId);
+  eq("a server with no contact email has no address to mail", blank.contactEmail, null);
+  ok("…and is therefore incomplete, so it earns nothing", !blank.complete);
+  await tdb.update(schema.discordGuilds).set({ contactEmail: prior })
+    .where(sqlEq(schema.discordGuilds.guildId, anyGuild.guildId));
+} else {
+  ok("a guild exists to check", false, "no demo guild seeded");
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);
