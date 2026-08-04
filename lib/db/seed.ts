@@ -62,11 +62,18 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   }
 
   // ---------- Trophies (challenge prize art) ----------
+  // Values, because a trophy worth $0 is a badge.
+  //
+  // The whole economy rests on these redeeming for real money, and the demo
+  // shipped the entire catalogue at the column default of 0 — so every surface
+  // that prints what a trophy is worth printed nothing, and no one could see
+  // that the ordering ("show the most valuable three") was even implemented.
+  // Ascending by tier, which is also the order the cards sort them in.
   const trophyDefs = [
-    { name: "Champion's Nebula Cup", imageUrl: TROPHY_ART.gold, tier: "gold" },
-    { name: "Silver Star Cup", imageUrl: TROPHY_ART.silver, tier: "silver" },
-    { name: "Bronze Ember Cup", imageUrl: TROPHY_ART.bronze, tier: "bronze" },
-    { name: "Supernova Crystal", imageUrl: TROPHY_ART.legendary, tier: "legendary" },
+    { name: "Champion's Nebula Cup", imageUrl: TROPHY_ART.gold, tier: "gold", value: 25 },
+    { name: "Silver Star Cup", imageUrl: TROPHY_ART.silver, tier: "silver", value: 10 },
+    { name: "Bronze Ember Cup", imageUrl: TROPHY_ART.bronze, tier: "bronze", value: 5 },
+    { name: "Supernova Crystal", imageUrl: TROPHY_ART.legendary, tier: "legendary", value: 50 },
   ];
   const trophyIds: string[] = [];
   for (const t of trophyDefs) {
@@ -277,6 +284,33 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   await mkAccount(vega, "speedruncom", "kjp4y75j", "Niftski");
   await mkAccount(atlas, "roblox", "156", "builderman");
   const atlasDota = await mkAccount(atlas, "opendota", "87278757", "Puppey");
+
+  // ===== A trophy case worth looking at =====
+  //
+  // The only trophies anyone held came from `awardChallengeTrophies` on the one
+  // completed challenge — one piece each, to three different gamers. So the
+  // "show the three most valuable" rule and the "…and no empty frames when they
+  // hold one" rule had nothing to run against, and a card that silently showed
+  // all of them would have looked correct.
+  //
+  // Nova gets five across four tiers, so the cap is real; Lyra keeps exactly
+  // one, so the single-trophy case is real too. Placement is recorded because a
+  // trophy is evidence of a result, not an item.
+  const award = async (userId: string, trophyId: string, placement: number, daysAgo: number) => {
+    await db.insert(schema.userTrophies).values({
+      id: uid(), userId, trophyId, placement,
+      awardedAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+    }).onConflictDoNothing();
+  };
+  // Deliberately awarded oldest-first-most-valuable: the legendary is the
+  // OLDEST of Nova's five. A shelf sorted by recency would push it off the
+  // card, so this ordering is what makes a regression visible.
+  await award(nova, trophyIds[3], 1, 90);  // Supernova Crystal — $50
+  await award(nova, trophyIds[0], 1, 40);  // Champion's Nebula Cup — $25
+  await award(nova, trophyIds[1], 2, 20);  // Silver Star Cup — $10
+  await award(nova, trophyIds[2], 3, 10);  // Bronze Ember Cup — $5
+  await award(nova, trophyIds[2], 3, 2);   // a second Bronze — duplicates are ordinary
+  await award(lyra, trophyIds[1], 2, 15);  // exactly one, on purpose
 
   // ===== Synced stats, including two on named ladders =====
   //
