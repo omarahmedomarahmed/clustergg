@@ -167,12 +167,35 @@ export default async function Nav() {
 
   return (
     <>
-    <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl bg-cover bg-center"
-      style={navBg ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${optImg(navBg, 1200)})` } : undefined}>
+    <header className="sticky top-0 z-40 border-b border-violet-500/15 bg-[#04051a]/80 backdrop-blur-xl">
+      {/* ONE background image for the whole nav group.
+          A background image belongs to a component GROUP, not to each component
+          in it. This art was painted three times — once by the header, once by
+          the collapsed Profile-of-the-Week strip, once by the expanded panel,
+          each with its own veil and its own alignment. Three downloads, three
+          decodes, and three chances for the art to land a pixel differently,
+          which is precisely why there was a visible seam where the bar met the
+          strip.
+          Now: one positioned layer, children transparent over it, and the
+          expanded panel's darker look comes from a scrim rather than a second
+          copy. `--nav-group-h` is measured by WeekBand and grows to cover the
+          panel when it drops, so the image continues into it instead of
+          restarting. */}
+      {navBg && (
+        <div
+          aria-hidden
+          data-nav-backdrop
+          className="pointer-events-none fixed inset-x-0 top-0 z-0 bg-cover bg-center"
+          style={{
+            height: "var(--nav-group-h, var(--nav-h, 96px))",
+            backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${optImg(navBg, 1600)})`,
+          }}
+        />
+      )}
       {/* A tighter gap on phones. Combined with hiding the install button below
           `md` (see below), this is what stopped every page scrolling sideways by
           ~40px on a 390px screen. */}
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 sm:gap-4 px-3 sm:px-4 min-w-0">
+      <div className="relative z-10 mx-auto flex h-16 max-w-6xl items-center gap-2 sm:gap-4 px-3 sm:px-4 min-w-0">
         <Link href={user ? "/feed" : "/"} className="shrink-0" aria-label="Cluster home">
           <BrandHeader placement="nav" />
         </Link>
@@ -274,6 +297,7 @@ export default async function Nav() {
       </div>
 
       {/* Native-mobile-game HUD strip (level bar + red-dot alerts), members only */}
+      <div className="relative z-10">
       {user && show("mobileHud") && (
         <MobileHud
           displayName={user.displayName}
@@ -294,7 +318,8 @@ export default async function Nav() {
           default and covered Mission Control with a fixed panel that swallowed
           every click underneath it — the card studio was unusable. Admin is a
           workspace, not somewhere anyone votes. */}
-      {show("weekBand") && <WeekBand initial={bandData} bgUrl={navBg ? optImg(navBg, 1200) ?? "" : ""} />}
+      {show("weekBand") && <WeekBand initial={bandData} bgUrl={navBg ? optImg(navBg, 1600) ?? "" : ""} />}
+      </div>
     </header>
     </>
   );

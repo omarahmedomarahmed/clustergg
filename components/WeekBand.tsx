@@ -146,14 +146,26 @@ export default function WeekBand({ initial, bgUrl = "" }: {
     const header = document.querySelector("header");
     if (!header) return;
     const apply = () => {
-      document.documentElement.style.setProperty("--nav-h", `${Math.round(header.getBoundingClientRect().height)}px`);
+      const navH = Math.round(header.getBoundingClientRect().height);
+      document.documentElement.style.setProperty("--nav-h", `${navH}px`);
+      // How tall the whole nav GROUP is — the bar, the strip, and the expanded
+      // panel when it is down. One shared background layer is sized from this
+      // (see NavBackdrop), which is what lets the nav, the strip and the panel
+      // sit on one continuous image instead of three copies of it.
+      const panel = document.querySelector("[data-week-panel]");
+      const panelH = panel ? Math.round(panel.getBoundingClientRect().height) : 0;
+      document.documentElement.style.setProperty("--nav-group-h", `${navH + panelH}px`);
     };
     apply();
     const ro = new ResizeObserver(apply);
     ro.observe(header);
+    const panel = document.querySelector("[data-week-panel]");
+    if (panel) ro.observe(panel);
     window.addEventListener("resize", apply);
     return () => { ro.disconnect(); window.removeEventListener("resize", apply); };
-  }, []);
+    // Re-run when the panel opens or closes: it is what changes the group height,
+    // and the observer above can only watch a node that already exists.
+  }, [open]);
 
   // Escape closes it, like every other overlay on the site.
   useEffect(() => {
@@ -205,11 +217,12 @@ export default function WeekBand({ initial, bgUrl = "" }: {
   return (
     <>
       {/* ===== The strip — always in the sticky header ===== */}
-      <div
-        className={`border-t border-white/10 ${bgUrl ? "bg-cover bg-center" : "bg-[#04051a]/70"}`}
-        style={bgUrl ? {
-          backgroundImage: `linear-gradient(rgba(4,5,26,0.82), rgba(4,5,26,0.82)), url(${bgUrl})`,
-        } : undefined}>
+      {/* Transparent over the group's shared background layer.
+          This used to paint the nav art a SECOND time with its own veil, and the
+          nav painted it a third — three downloads, three decodes, and three
+          chances for the art to land a pixel differently, which is exactly why
+          there was a visible seam between the bar and the strip. */}
+      <div className={`border-t border-white/10 ${bgUrl ? "" : "bg-[#04051a]/70"}`}>
         <div className="mx-auto flex h-11 max-w-6xl items-center gap-3 px-4">
           <button
             type="button"
@@ -274,11 +287,19 @@ export default function WeekBand({ initial, bgUrl = "" }: {
             style={{ top: "var(--nav-h, 96px)" }}
           />
           <section
-            className={`fixed inset-x-0 z-[61] max-h-[calc(100dvh-var(--nav-h,96px))] overflow-y-auto overscroll-contain border-b border-white/10 backdrop-blur-xl shadow-2xl ${bgUrl ? "bg-cover bg-center bg-fixed" : "bg-[#04051a]/95"}`}
+            data-week-panel
+            className={`fixed inset-x-0 z-[61] max-h-[calc(100dvh-var(--nav-h,96px))] overflow-y-auto overscroll-contain border-b border-white/10 backdrop-blur-xl shadow-2xl ${bgUrl ? "" : "bg-[#04051a]/95"}`}
             style={{
               top: "var(--nav-h, 96px)",
-              // A heavier veil than the strip: this one has body copy over it.
-              ...(bgUrl ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.94), rgba(4,5,26,0.97)), url(${bgUrl})` } : {}),
+              // A VEIL over the group's shared image, not a second copy of it.
+              //
+              // This panel used to repaint the same art with `bg-fixed` so it
+              // would line up with the bar above — which it never quite did,
+              // because the bar was `bg-center` and not fixed. The darker look
+              // this needs (it has body copy over it) is a flat scrim; the image
+              // underneath is the same element the nav is sitting on, so the two
+              // cannot fall out of alignment.
+              ...(bgUrl ? { background: "rgba(4,5,26,0.90)" } : {}),
             }}
             role="region"
             aria-label="Profile of the Week"

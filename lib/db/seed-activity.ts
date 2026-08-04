@@ -62,6 +62,7 @@ export async function seedDemoActivity(db: {
   await seedServerPayouts(db);
   await seedChallengeRequests(db);
   await seedPayoutAccounts(db, gamers);
+  await seedNavArt(db);
   await seedFeatureShots(db);
   if (admin) await seedAuditTrail(db, admin.id);
 }
@@ -521,6 +522,30 @@ async function seedPayoutAccounts(db: any, gamers: { id: string; slug: string }[
       status: "active",
     }).onConflictDoNothing();
   }
+}
+
+// ===== Chrome art the demo can actually be judged on =====
+//
+// `brand.nav.bg` shipped empty, so the demo's nav was a flat panel and the whole
+// nav-group background treatment — one shared image under the bar, the
+// Profile-of-the-Week strip and the expanded panel — was invisible and
+// untestable. An admin sets this in Brand Kit; the demo needs a default so the
+// chrome it is meant to be showing off is actually on.
+//
+// Only fills when unset, so an admin's own upload is never clobbered.
+// Written straight to `platform_settings`, which is where `setContent` puts it.
+// NOT through `lib/cms`: that module resolves the request locale and so reaches
+// `next/headers`, and pulling that into the seed's module graph breaks the
+// production build outright — the seed is imported by the database bootstrap.
+// Same trap the week-key lookup fell into; the fix is the same shape.
+async function seedNavArt(db: any) {
+  const [existing] = await db.select().from(schema.platformSettings)
+    .where(eq(schema.platformSettings.key, "brand.nav.bg")).limit(1);
+  if (existing?.value) return;
+  const { BANNER_ART } = await import("@/lib/assets");
+  await db.insert(schema.platformSettings)
+    .values({ key: "brand.nav.bg", value: BANNER_ART.profileDefault, updatedAt: new Date() })
+    .onConflictDoNothing();
 }
 
 // ===== The captured screenshots =====
