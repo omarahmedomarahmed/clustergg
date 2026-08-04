@@ -3,11 +3,11 @@
 import { useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
-import CpIcon from "@/components/CpIcon";
 import { markQuestsSeen } from "@/app/actions/social";
 import type { NavQuest } from "@/lib/quests";
 import Img from "@/components/Img";
 import { optImg } from "@/lib/img";
+import Cp from "@/components/Cp";
 
 // The quest control in the nav.
 //
@@ -55,14 +55,17 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
           {anyEarned && <span className="absolute left-1.5 top-1 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-[#04051a] animate-pulse" />}
         </button>
 
-        {/* Total Cluster Points — the one number worth carrying in the nav. */}
+        {/* The balance, carried in the nav the way a game carries currency.
+            This is what makes Cluster Points feel like money rather than a
+            score: it is visible from every page, and it is one click from the
+            ledger that says where every one of them came from. */}
         {totalCp !== undefined && (
           <Link
             href="/quests"
-            title="Your total Cluster Points"
-            className="relative flex shrink-0 items-center gap-1 border-l border-white/10 px-2.5 text-[11px] font-bold text-cyan-200 hover:bg-white/5"
+            title="Your Cluster Points — tap for the ledger"
+            className="relative flex shrink-0 items-center gap-1 border-l border-white/10 px-2.5 text-cyan-200 hover:bg-white/5"
           >
-            <CpIcon size={15} /> {totalCp.toLocaleString()}
+            <Cp amount={totalCp} size="sm" />
           </Link>
         )}
       </div>
@@ -95,7 +98,7 @@ export default function NavQuestCard({ quests, totalCp }: { quests: NavQuest[]; 
               onClick={() => setOpen(false)}
               className="mt-1 flex items-center justify-between rounded-lg px-2 py-2 text-xs font-semibold text-cyan-300 hover:bg-white/5"
             >
-              All quests {totalCp !== undefined && <span className="inline-flex items-center gap-1"><CpIcon size={14} /> {totalCp.toLocaleString()}</span>}
+              All quests {totalCp !== undefined && <Cp amount={totalCp} size="sm" />}
             </Link>
           </div>
         </>

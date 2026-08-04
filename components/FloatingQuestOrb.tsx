@@ -5,6 +5,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import CpIcon from "@/components/CpIcon";
 import { optImg } from "@/lib/img";
+import Cp from "@/components/Cp";
 
 export type OrbQuest = {
   key: string; name: string; color: string; accent2: string; icon: string;
@@ -58,7 +59,7 @@ export default function FloatingQuestOrb({ quests, icon, color = "#8b5cf6", size
                   <div className="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${q.pct}%`, background: `linear-gradient(90deg, ${q.color}, ${q.accent2})` }} />
                   </div>
-                  <div className="mt-1 flex items-center gap-1 text-[10px] text-muted"><CpIcon size={11} /> {q.qp.toLocaleString()} CP{q.nextTierName ? ` · next: ${q.nextTierName}` : " · maxed"}</div>
+                  <div className="mt-1 flex items-center gap-1 text-[10px] text-muted"><Cp amount={q.qp} size="xs" />{q.nextTierName ? ` · next: ${q.nextTierName}` : " · maxed"}</div>
                 </div>
               </Link>
             ))}

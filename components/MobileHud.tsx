@@ -1,6 +1,6 @@
 import Link from "next/link";
 import Avatar from "@/components/Avatar";
-import CpIcon from "@/components/CpIcon";
+import Cp from "@/components/Cp";
 import { levelFromCp } from "@/lib/level";
 
 // The native-mobile-game HUD strip, shown on mobile only (md:hidden) directly
@@ -32,7 +32,7 @@ export default function MobileHud({
         <Link href="/quests" className="min-w-0 flex-1">
           <div className="flex items-center justify-between text-[10px] leading-none mb-1">
             <span className="font-bold text-cyan-200">LV {lv.level}</span>
-            <span className="inline-flex items-center gap-1 text-muted"><CpIcon size={11} /> {cp.toLocaleString()}</span>
+            <Cp amount={cp} size="xs" muted />
           </div>
           <div className="h-2 rounded-full bg-black/50 overflow-hidden ring-1 ring-white/10">
             <div className="h-full rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-400 to-cyan-400 transition-[width] duration-500"

@@ -8,6 +8,7 @@ import GameLogo from "@/components/GameLogo";
 import { saveFeedPrefs } from "@/app/actions/social";
 import LolCard from "@/components/LolCard";
 import { useTr } from "@/components/LocaleProvider";
+import Cp from "@/components/Cp";
 
 export type DashQuest = { key: string; name: string; color: string; logoUrl: string | null; qp: number; totalCp: number; pct: number; tierName: string };
 export type DashLeaderboard = { game: string; metricKey: string; title: string; slug: string | null; logoUrl: string | null; coverUrl: string | null };
@@ -25,7 +26,7 @@ const LOL_COLORS = { accent: "#22d3ee", accent2: "#a78bfa", text: "#e8eaf6", mut
 
 const TYPES: { type: Widget["type"]; label: string; icon: string }[] = [
   { type: "quest", label: "Quest tracker", icon: "trophy" },
-  { type: "cp", label: "CP total / quest", icon: "spark" },
+  { type: "cp", label: "Cluster Points", icon: "spark" },
   { type: "stat", label: "Game stat", icon: "gamepad" },
   { type: "leaderboard", label: "Leaderboard", icon: "chart" },
   { type: "lolaccount", label: "League account", icon: "gamepad" },
@@ -136,13 +137,13 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
               <div className="min-w-0"><div className="text-sm font-bold truncate">{q.name}</div><div className="text-[10px] text-muted">{q.tierName}</div></div>
             </div>
             <div className="mt-2 h-1.5 rounded-full bg-black/40 overflow-hidden"><div className="h-full rounded-full" style={{ width: `${q.pct}%`, background: q.color }} /></div>
-            <div className="mt-1.5 flex items-center gap-1 text-xs font-bold" style={{ color: q.color }}><CpIcon size={12} /> {q.qp.toLocaleString()} CP</div>
+            <div className="mt-1.5 flex items-center gap-1 text-xs font-bold" style={{ color: q.color }}><Cp amount={q.qp} size="sm" /></div>
           </>
         ),
         expanded: (
           <div className="text-xs text-muted space-y-1">
             <div>Current tier: <b className="text-ink">{q.tierName}</b></div>
-            <div className="flex items-center gap-1">Total earned: <CpIcon size={11} /> <b className="text-ink">{q.totalCp.toLocaleString()} CP</b></div>
+            <div className="flex items-center gap-1">Total earned: <CpIcon size={11} /> <b className="text-ink"><Cp amount={q.totalCp} /></b></div>
             <div>Progress to next tier: <b className="text-ink">{q.pct}%</b></div>
           </div>
         ),
@@ -157,7 +158,7 @@ function WidgetCard({ widget, sources, editing, onWidth, onCfg, onRemove }: {
         compact: (
           <div className="text-center py-1">
             <div className="flex items-center justify-center gap-2"><CpIcon size={26} /><span className="text-3xl font-bold grad-text">{val.toLocaleString()}</span></div>
-            <div className="text-[10px] uppercase tracking-widest text-muted mt-1">{isTotal ? "Total Cluster Points" : `${q?.name ?? "Quest"} CP`}</div>
+            <div className="text-[10px] uppercase tracking-widest text-muted mt-1">{isTotal ? "Total Cluster Points" : `${q?.name ?? "Quest"} Cluster Points`}</div>
           </div>
         ),
         expanded: isTotal ? (
@@ -263,8 +264,8 @@ function WidgetConfig({ widget, sources, onCfg }: { widget: Widget; sources: Sou
   );
   if (widget.type === "cp") return (
     <select value={c.scope ?? "total"} onChange={(e) => onCfg({ scope: e.target.value })} className={sel}>
-      <option value="total">{tr("Total CP")}</option>
-      {sources.quests.map((q) => <option key={q.key} value={q.key}>{q.name} {tr("CP")}</option>)}
+      <option value="total">{tr("All Cluster Points")}</option>
+      {sources.quests.map((q) => <option key={q.key} value={q.key}>{q.name}</option>)}
     </select>
   );
   if (widget.type === "stat") return (

@@ -14,6 +14,7 @@ import Icon from "@/components/Icon";
 import { getT } from "@/lib/i18n/t-server";
 import { localizeQuest } from "@/lib/i18n/entities";
 import { cardMeta } from "@/lib/og";
+import Cp from "@/components/Cp";
 
 export const dynamic = "force-dynamic";
 
@@ -87,7 +88,7 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
                       </div>
                       <div className="mt-2 font-bold text-sm truncate max-w-full">{g.name}</div>
                       {t && <div className="text-[11px] font-semibold" style={{ color: t.color || quest.color }}>{t.name}</div>}
-                      <div className="mt-0.5 inline-flex items-center gap-1 text-sm font-bold" style={{ color: quest.accent2 }}>{(g.qp ?? 0).toLocaleString()} CP</div>
+                      <div className="mt-0.5 inline-flex items-center gap-1 text-sm font-bold" style={{ color: quest.accent2 }}><Cp amount={(g.qp ?? 0)} /></div>
                     </Link>
                   );
                 })}
@@ -107,7 +108,7 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
                           <span className="block truncate font-semibold text-sm">{g.name}{mine && <span className="text-cyan-300"> · {tr("you")}</span>}</span>
                           {t && <span className="block text-[11px]" style={{ color: t.color || quest.color }}>{tr("Reached")} {t.name}</span>}
                         </span>
-                        <span className="text-sm shrink-0 font-bold" style={{ color: quest.accent2 }}>{(g.qp ?? 0).toLocaleString()} CP</span>
+                        <span className="text-sm shrink-0 font-bold" style={{ color: quest.accent2 }}><Cp amount={(g.qp ?? 0)} /></span>
                       </Link>
                     );
                   })}

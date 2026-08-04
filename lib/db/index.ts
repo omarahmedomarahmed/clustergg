@@ -851,6 +851,22 @@ async function createDb(): Promise<DB> {
   // Demo mode must run the same boot maintenance as production (planet skins,
   // logos/covers, house ads) so globes + connect art show here too.
   try { await runBootMaintenance(db); await ensureBlogAdPlacements(db); await ensureBrandKeys(db); } catch { /* non-fatal */ }
+
+  // The demo ACTIVITY layer runs LAST — after boot maintenance, not inside
+  // `seed()`.
+  //
+  // It has to. Cluster Points are awarded through `awardQuestAction`, which
+  // credits every ACTIVE QUEST listening to an action — and the quests
+  // themselves are created by `seedQuests`, which `runBootMaintenance` calls.
+  // Run from inside `seed()` this happened before any quest existed, so every
+  // award found nothing to credit and returned silently (that path swallows its
+  // own errors by design, because gamification must never block the action that
+  // triggered it). The result was a demo where votes, ads, invoices and payouts
+  // all seeded correctly and the CP totals were quietly zero.
+  try {
+    const { seedDemoActivity } = await import("./seed-activity");
+    await seedDemoActivity(db);
+  } catch (e) { console.warn("[seed] demo activity layer failed:", e); }
   return db;
 }
 

@@ -598,7 +598,7 @@ function ProfileBody(d: ProfileCard) {
             points, views, votes — not floating in the card's top-right corner
             as an unexplained badge. It reads as a stat because it is one. */}
         <Pill color={t.accent2} bg={alpha(t.accent2, 0.16, FALLBACK_ACCENT2)} size={pStats.f(21)}>{`LV ${nf(d.level)}`}</Pill>
-        <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(21)}>{`${nf(d.totalCp)} CP`}</Pill>
+        <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(21)}><CpCoin size={pStats.f(18)} />{nf(d.totalCp)}</Pill>
         <Pill size={pStats.f(21)}>{`${nf(d.views)} views`}</Pill>
         <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pStats.f(21)}>
           <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#fbbf24" }} />
@@ -796,7 +796,7 @@ function QuestBody(d: QuestCard) {
               <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, padding: "16px 8px", borderRadius: 20, background: tier.earned ? alpha(t.accent, 0.12) : "rgba(0,0,0,0.42)", border: `1px solid ${tier.earned ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.10)"}` }}>
                 <div style={{ display: "flex", width: 20, height: 20, borderRadius: 10, background: tier.earned ? t.accent : "transparent", border: `3px solid ${tier.earned ? t.accent : "rgba(255,255,255,0.32)"}` }} />
                 <div style={{ fontSize: p.f(19), fontWeight: 700, color: tier.earned ? t.accent : MUTED }}>{clamp(tier.name, 10)}</div>
-                <div style={{ fontSize: p.f(16), color: MUTED }}>{`${nf(tier.threshold)} CP`}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: p.f(16), color: MUTED }}><CpCoin size={p.f(14)} />{nf(tier.threshold)}</div>
               </div>
             ))}
           </Section>
@@ -1155,8 +1155,8 @@ function MarketBody(d: MarketCard) {
           a single in-flow element lands underneath them. */}
       <Section p={pBal} style={{ marginTop: 4 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-          <span style={{ display: "flex", fontSize: pBal.f(40), fontWeight: 900, color: t.accent2 }}>
-            {d.balance.toLocaleString()} CP
+          <span style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, fontSize: pBal.f(40), fontWeight: 900, color: t.accent2 }}>
+            <CpCoin size={pBal.f(24)} />{d.balance.toLocaleString()}
           </span>
           <span style={{ display: "flex", fontSize: pBal.f(19), fontWeight: 700, color: MUTED }}>
             {pBal.say(`to spend · ${d.earned.toLocaleString()} earned all-time`)}
@@ -1214,8 +1214,8 @@ function MarketBody(d: MarketCard) {
                 {/* BOTH numbers. The CP price alone reads as a game currency;
                     the dollar beside it is what says the free points are money. */}
                 <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: "auto" }}>
-                  <span style={{ display: "flex", fontSize: 23, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED }}>
-                    {x.cpPrice.toLocaleString()} CP
+                  <span style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 5, fontSize: 23, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED }}>
+                    <CpCoin size={17} />{x.cpPrice.toLocaleString()}
                   </span>
                   <span style={{ display: "flex", fontSize: 18, fontWeight: 800, color: "#34d399" }}>
                     = ${x.value.toLocaleString()}
@@ -1549,6 +1549,35 @@ function WorldBody(d: WorldCard) {
  * accounts off the bottom edge. The column beside the sponsor box is otherwise
  * empty on this card, and art stacked in it reads as a shelf.
  */
+
+/**
+ * The Cluster Points coin, for a rendered card.
+ *
+ * Drawn from divs rather than the inline SVG the web uses. Satori's SVG support
+ * is limited enough that fighting it costs more than redrawing the mark, and an
+ * external PNG is worse again — the card renderer would then depend on a CDN
+ * fetch succeeding for a currency symbol, and a card that silently loses its
+ * money mark when a CDN is slow is not a card anybody should ship.
+ *
+ * Two rings and a bolt, matching `cpCoin` in components/Icon.tsx closely enough
+ * that the web and the cards read as the same currency.
+ */
+function CpCoin({ size = 20 }: { size?: number }) {
+  const ring = Math.max(1, Math.round(size * 0.08));
+  return (
+    <div style={{
+      display: "flex", alignItems: "center", justifyContent: "center",
+      width: size, height: size, borderRadius: size,
+      border: `${ring}px solid #fbbf24`, background: "rgba(251,191,36,0.14)",
+    }}>
+      <div style={{
+        display: "flex", width: Math.round(size * 0.16), height: Math.round(size * 0.46),
+        background: "#fbbf24", transform: "skewX(-18deg)",
+      }} />
+    </div>
+  );
+}
+
 function TrophyShelf({ trophies, total, box, p }: {
   trophies: { name: string; imageUrl: string; value?: number }[];
   total: number;

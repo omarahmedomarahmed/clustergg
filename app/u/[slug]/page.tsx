@@ -36,6 +36,7 @@ import { levelFromCp } from "@/lib/level";
 import { metricLabel, metricText, metricUnit } from "@/lib/metric-display";
 import { startConversation } from "@/app/actions/social";
 import { fmtNum, timeAgo } from "@/lib/utils";
+import Cp from "@/components/Cp";
 
 export const dynamic = "force-dynamic";
 
@@ -416,7 +417,7 @@ export default async function ProfilePage({ params }: Props) {
             <div className="mt-2.5 max-w-xs mx-auto sm:mx-0">
               <div className="flex items-center justify-between text-[10px] font-bold mb-1">
                 <span style={{ color: theme.accent2 }}>{tr("Level")} {plvl.level}</span>
-                <span className="p-muted">{plvl.into.toLocaleString()} / {plvl.span.toLocaleString()} CP</span>
+                <span className="p-muted">{plvl.into.toLocaleString()} / <Cp amount={plvl.span} /></span>
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.10)" }}>
                 <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${Math.max(5, plvl.pct)}%`, background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />

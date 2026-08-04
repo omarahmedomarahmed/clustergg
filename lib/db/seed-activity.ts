@@ -25,6 +25,15 @@
 // 2. **Idempotent.** Every write is `onConflictDoNothing` or guarded by a count,
 //    so running it twice against the same database is a no-op rather than a
 //    second month of invoices.
+//
+// CALLED FROM THE BOOTSTRAP, AFTER `runBootMaintenance` — not from inside
+// `seed()`. Points go through `awardQuestAction`, which credits every active
+// quest listening to an action, and the quests are created by `seedQuests`,
+// which boot maintenance calls. Run any earlier and every award finds no quest
+// to credit and returns silently, because that path swallows its own errors by
+// design (gamification must never block the action that triggered it). That is
+// exactly what happened: everything else seeded correctly and the CP totals were
+// quietly zero.
 
 import { eq, sql } from "drizzle-orm";
 import * as schema from "@/lib/db/schema";
@@ -235,10 +244,21 @@ async function seedMarketplace(db: any, gamers: { id: string; slug: string }[]) 
   // on every marketplace tile — CP to buy, dollars to redeem — agree with each
   // other instead of being two unrelated made-up figures.
   const { DEFAULT_CP_PER_DOLLAR } = await import("@/lib/marketplace");
+  // Price by TIER where a trophy has no dollar value yet.
+  //
+  // Boot maintenance adds a second set of trophies with a flat cpPrice and no
+  // value at all, so the marketplace card printed "= $0" beside a real CP price
+  // — a shelf where everything is free, which is the opposite of the claim the
+  // card is making. The tier is the only signal those rows carry, so it decides
+  // the money, and the CP price is then derived from it at the platform rate so
+  // the two numbers on every tile agree.
+  const byTier: Record<string, number> = { legendary: 50, gold: 25, silver: 10, bronze: 5 };
   for (const t of trophies) {
-    if (t.cpPrice > 0) continue;
+    const value = (t.value as number) > 0 ? (t.value as number) : (byTier[t.tier as string] ?? 5);
+    const cpPrice = Math.round(value * DEFAULT_CP_PER_DOLLAR);
+    if (t.value === value && t.cpPrice === cpPrice) continue;
     await db.update(schema.trophies)
-      .set({ cpPrice: Math.round((t.value as number) * DEFAULT_CP_PER_DOLLAR), inMarketplace: true })
+      .set({ value, cpPrice, inMarketplace: true })
       .where(eq(schema.trophies.id, t.id));
   }
 

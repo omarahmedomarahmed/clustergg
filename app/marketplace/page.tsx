@@ -4,6 +4,7 @@ import { marketplaceCatalog } from "@/lib/marketplace";
 import TrophyMarket from "@/components/TrophyMarket";
 import AdSlot from "@/components/AdSlot";
 import Icon from "@/components/Icon";
+import Cp from "@/components/Cp";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -29,7 +30,7 @@ export default async function MarketplacePage() {
         <div className="mt-4 flex flex-wrap gap-3 text-xs">
           <span className="rounded-full border border-white/12 px-3 py-1.5">
             <Icon name="spark" size={12} className="mr-1 inline text-amber-300" />
-            {rate.toLocaleString()} CP = $1 of trophy
+            <Cp amount={rate} /> = $1 of trophy
           </span>
           <span className="rounded-full border border-white/12 px-3 py-1.5">
             <Icon name="check" size={12} className="mr-1 inline text-emerald-300" />

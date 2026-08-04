@@ -14,6 +14,7 @@ import { smoothPathD, sampleCurve, pointAtLength, nearestLength, type Pt } from 
 import { DEFAULT_MISSIONS, missionDone, type QuestGamePayload, type QuestGameUi } from "@/lib/quest-game";
 import type { QuestView, QuestGamer } from "@/lib/quests";
 import { optImg } from "@/lib/img";
+import Cp from "@/components/Cp";
 
 // The playable space-game experience for a quest: a full-screen overlay where
 // the map art is the game world, the astronaut is your character that WALKS the
@@ -296,7 +297,7 @@ export default function QuestGame({
               <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${quest.color}, ${quest.accent2})` }} />
             </div>
             <span className="text-[10px] text-muted font-semibold whitespace-nowrap">
-              {to ? `${(to.thresholdQp - quest.qp).toLocaleString()} CP → ${to.name}` : tr("Max tier reached!")}
+              {to ? `${(to.thresholdQp - quest.qp).toLocaleString()} Cluster Points → ${to.name}` : tr("Max tier reached!")}
             </span>
           </div>
         </div>
@@ -393,7 +394,7 @@ export default function QuestGame({
                   </span>
                 )}
                 <span className="absolute left-1/2 -translate-x-1/2 top-full mt-0.5 whitespace-nowrap rounded-full bg-black/75 px-1.5 py-0.5 text-[9px] font-bold" style={{ color: quest.accent2 }}>
-                  {quest.qp.toLocaleString()} CP
+                  <Cp amount={quest.qp} />
                 </span>
               </div>
             </ZoomPan>
@@ -422,10 +423,10 @@ export default function QuestGame({
               </div>
               <button onClick={() => setSel(null)} className="text-muted hover:text-ink p-1"><Icon name="x" size={15} /></button>
             </div>
-            <div className="text-xs text-muted mt-1.5">{tiers[sel].description || `${tr("Reach")} ${tiers[sel].thresholdQp.toLocaleString()} CP.`}</div>
+            <div className="text-xs text-muted mt-1.5">{tiers[sel].description || `${tr("Reach")} $<Cp amount={tiers[sel].thresholdQp} />.`}</div>
             <div className="mt-2 text-xs flex items-center gap-3">
-              <span className="inline-flex items-center gap-1 font-bold" style={{ color: quest.accent2 }}><CpIcon size={13} /> {tiers[sel].thresholdQp.toLocaleString()} CP</span>
-              {!tiers[sel].earned && <span className="text-amber-300 font-semibold">{(tiers[sel].thresholdQp - quest.qp).toLocaleString()} {tr("CP to go")}</span>}
+              <span className="inline-flex items-center gap-1 font-bold" style={{ color: quest.accent2 }}><Cp amount={tiers[sel].thresholdQp} size="sm" /></span>
+              {!tiers[sel].earned && <span className="text-amber-300 font-semibold"><Cp amount={tiers[sel].thresholdQp - quest.qp} size="sm" /> {tr("to go")}</span>}
               <span className="text-muted">{tiers[sel].holders.toLocaleString()} {tr("reached this step")}</span>
             </div>
             {(holders[tiers[sel].id]?.length ?? 0) > 0 && (
@@ -511,7 +512,7 @@ export default function QuestGame({
                     {g.entries.map((e) => (
                       <div key={e.id} className="flex items-center justify-between px-3 py-1.5 text-[11px]">
                         <span className="text-muted">{fmt(e.at)}</span>
-                        <span className="font-bold" style={{ color: quest.accent2 }}>+{e.qp} CP</span>
+                        <span className="font-bold" style={{ color: quest.accent2 }}><Cp amount={e.qp} signed /></span>
                       </div>
                     ))}
                   </div>
@@ -576,7 +577,7 @@ export default function QuestGame({
               </div>
             ))}
             <div className="flex items-center gap-2 text-xs text-muted pt-1">
-              <CpIcon size={15} /> {tr("Total across all quests:")} <b className="text-ink">{totalCp.toLocaleString()} CP</b>
+              <CpIcon size={15} /> {tr("Total across all quests:")} <b className="text-ink"><Cp amount={totalCp} /></b>
             </div>
           </div>
         </div>
