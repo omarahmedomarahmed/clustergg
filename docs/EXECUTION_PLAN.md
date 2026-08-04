@@ -526,10 +526,18 @@ permissions, which ones are Cluster admins, when it was last synced.
 At install, the owner's DM asks them to pick which of their roles may use
 `/cluster admin`. Also reachable any time from the admin settings card.
 
-Until they designate anything, the fallback is: **the guild owner, plus anyone
-with Discord's Administrator permission.** A fresh server must never be locked
-out of its own admin commands, and `member.permissions` on the interaction
-tells us this for free.
+Designation *adds* people; it never takes anyone away. **Two grants are
+permanent and cannot be designated away: the guild owner, and anyone holding
+Discord's Administrator permission.** A fresh server must never be locked out of
+its own admin commands, and a server that has designated roles must not be able
+to lock out its own administrators either — including by accident, which is the
+likelier case. `member.permissions` on the interaction tells us this for free.
+
+The rule stated plainly, because it is easy to get backwards: **Administrator
+always wins.** Before designation, after designation, whatever roles exist. If
+Discord trusts you with the whole server, Cluster is not the thing that argues.
+Designated roles exist so an owner can hand `/cluster admin` to a community
+manager who is *not* an administrator — that is the entire job of the feature.
 
 ### 3B.3 Gating `/cluster admin`
 
@@ -537,10 +545,16 @@ Every admin subcommand and every button on an admin card checks, in one shared
 guard:
 
 ```
-allowed =  member.user.id === guild.owner_id
+allowed =  member.user.id === guild.owner_id          -- always
+        || member.permissions has ADMINISTRATOR       -- always
         || member.roles ∩ designatedClusterAdminRoles ≠ ∅
-        || member.permissions has ADMINISTRATOR
 ```
+
+Three independent grants, OR'd. None of them is conditional on the others, and
+in particular **no branch of this guard may ever read "…and no roles are
+designated."** The first two lines are unconditional by construction; a future
+change that makes them conditional is a regression, and the tests below exist to
+catch exactly that.
 
 Refusal is a polite ephemeral card, not silence: *"Only this server's Cluster
 admins can open this. Ask an admin to add your role in /cluster admin →
@@ -589,9 +603,12 @@ If the owner wants to delegate the portal, they hand over the key deliberately
 - A member with a designated role passes the guard; the same member without it
   fails.
 - The guild owner always passes, even with no designation.
-- A member with Discord Administrator passes when nothing is designated, and
-  **stops passing once the owner has designated specific roles** (otherwise
-  designation is decorative).
+- **A member with Discord Administrator passes in every case** — asserted twice
+  over: once with nothing designated, and again on the same guild *after* the
+  owner has designated a role that this member does not hold. Administrator
+  always wins; designation only ever adds people.
+- Designating roles never removes an existing grant: assert the owner and an
+  administrator both still pass immediately after a designation is saved.
 - A managed (bot) role can never be designated.
 - **The portal key is delivered to `owner_id` and to no other id** — assert on
   the recipient argument, for every path that sends a key: install, resend from
