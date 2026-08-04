@@ -61,6 +61,56 @@ the Cluster HQ server — set its id and a permanent invite in
 **Admin → Discord → HQ**. Gamers who signed in before that scope existed join
 the next time they sign in.
 
+## Email (B32)
+
+Mail is **off until you set a key**, and off is a safe, complete state: every
+send is recorded at `/admin/email` as `skipped` with the reason, nothing throws,
+and no code path changes behaviour. So the order below is the order to do it in,
+and you can stop after any step.
+
+### 1. Send — Resend
+
+| Variable | Required | What it is |
+|---|---|---|
+| `RESEND_API_KEY` | to send at all | From resend.com → API Keys. Without it the layer no-ops. |
+| `EMAIL_FROM` | strongly | `Cluster <billing@yourdomain.com>`. Defaults to Resend's shared `onboarding@resend.dev`, which is fine for a first test and wrong for anything real. |
+| `EMAIL_REPLY_TO` | optional | Where a human reply should land — usually the forwarding address from step 2. |
+| `RESEND_WEBHOOK_SECRET` | for delivery status | Any long random string. Set the same value in Resend's webhook config. Without it the webhook endpoint returns 503 and refuses everything, which is deliberate. |
+
+**Verify the domain in Resend before sending anything real.** It walks you
+through SPF, DKIM and DMARC records. This is not optional polish: billing mail
+that lands in spam is worse than no billing mail, because you believe it was
+delivered.
+
+Webhook URL to paste into Resend (events: `email.delivered`, `email.bounced`,
+`email.complained`):
+
+```
+https://yourdomain.com/api/email/webhook?secret=<RESEND_WEBHOOK_SECRET>
+```
+
+### 2. Receive — Resend does not give you a mailbox
+
+Resend sends. To *receive* at the domain you need one of:
+
+| Option | Cost | When it is right |
+|---|---|---|
+| **Cloudflare Email Routing** | **free** | Forwards `hello@`, `support@`, `billing@` into a mailbox you already own. Needs the domain's DNS on Cloudflare. Pair it with Resend as a "send mail as" relay in Gmail and you can reply from the domain too. Correct answer for one or two people. |
+| **Zoho Mail** | ~$1/user/mo | Real mailboxes when forwarding stops being enough. |
+| **Google Workspace** | ~$7/user/mo | Once there is a team and shared inboxes. |
+
+Start on Cloudflare. Moving later is a DNS change, not a migration — a cheap
+decision to get wrong.
+
+### 3. Check it
+
+- `/admin/email` should say **Sending is live** and show the From address.
+- Trigger something real (approve a redeem) and watch the row go
+  `sent` → `delivered` as the webhook lands.
+- A row stuck on `sent` means the webhook is not reaching you; a `bounced` row
+  is the moment you learn a customer never heard from you, which is the whole
+  reason that screen exists.
+
 ## Crons
 
 Declared in `vercel.json`. Both are `GET` and authenticate with `CRON_SECRET`.

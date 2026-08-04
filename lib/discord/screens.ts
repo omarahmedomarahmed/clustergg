@@ -14,7 +14,7 @@ import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { hqInviteUrl } from "@/lib/discord/hq";
 import { clusterPctFor, nextEarnTier, ownerPctFor } from "@/lib/server-earnings";
-import { REGIONS, VIBES, completeness, getCommunity, regionLabel, vibeLabel } from "@/lib/discord/community";
+import { PROFILE_FIELDS, REGIONS, VIBES, completeness, getProfile, regionLabel, vibeLabel } from "@/lib/discord/community";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
 import { getProvider, linkableGames, linkableProvider, PROVIDERS } from "@/lib/providers/registry";
@@ -1086,6 +1086,33 @@ export function requestModal(game: string) {
  * sentence is what makes a sponsor pick this server over an identical one, so
  * there is exactly one box for it and nothing else.
  */
+/**
+ * The contact email, asked for in Discord (B47).
+ *
+ * A modal rather than a select menu because it is free text, and asked here as
+ * well as on the portal because an owner who installed the bot from Discord may
+ * never open the portal — and without an address we cannot tell them their
+ * challenge was approved or their payout is ready.
+ *
+ * Never inferred. The bot cannot read an owner's email, and constructing one
+ * from a Discord username would put a made-up address on a billing path.
+ */
+export function contactEmailModal(guildId: string) {
+  return {
+    type: InteractionResponseType.Modal,
+    data: {
+      custom_id: `contactemail|${guildId}`.slice(0, 100),
+      title: "Where should we reach you?",
+      components: [
+        textRow(
+          "email", "Contact email", 1, true,
+          "you@yourdomain.com — payout notices and challenge approvals go here", 200,
+        ),
+      ],
+    },
+  };
+}
+
 export function aboutModal(guildId: string) {
   return {
     type: InteractionResponseType.Modal,
@@ -1315,12 +1342,15 @@ async function communityScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Pro
     return notYet("Only this server's admins can describe the community.", trail, [], ctx);
   }
   const here = frame("setup", guildId);
-  const [profile, cat, portal] = await Promise.all([
-    getCommunity(guildId),
+  const [full, cat, portal] = await Promise.all([
+    // The profile AND the contact email, because completeness now spans both
+    // (B47) and this card is where an owner is told what is still missing.
+    getProfile(guildId),
     catalog(),
     ensurePortal(guildId),
   ]);
-  const done = completeness(profile);
+  const profile = { ...full.profile, contactEmail: full.contactEmail };
+  const done = completeness(full.profile, full.contactEmail);
 
   const said = (label: string, values: string[]) =>
     values.length ? `**${label}:** ${values.join(", ")}` : `**${label}:** —`;
@@ -1366,6 +1396,10 @@ async function communityScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Pro
       )),
       ...rows([
         button("Say it in your own words", `open-about|${guildId}`, ButtonStyle.Secondary, "✍"),
+        // The one field that decides whether the revenue share pays out, so it
+        // is offered right here rather than only on a portal this owner may
+        // never open.
+        button(profile.contactEmail ? "Change contact email" : "Add contact email", `open-email|${guildId}`, ButtonStyle.Success, "✉"),
         portal ? linkButton("Your server portal", `${siteUrl()}/servers/${portal.slug}`, "🛰") : null,
         ...tail(ctx, here, trail),
       ]),

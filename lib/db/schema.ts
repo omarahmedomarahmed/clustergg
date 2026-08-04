@@ -788,6 +788,15 @@ export const questEvents = pgTable("quest_events", {
   questId: text("quest_id").notNull().references(() => quests.id, { onDelete: "cascade" }),
   actionKey: text("action_key").notNull(),
   qpAwarded: integer("qp_awarded").notNull().default(0),
+  /**
+   * What this event PAID, as opposed to what it progressed (B34).
+   *
+   * One action credits CP once and progresses every listening quest, so a
+   * second listener writes qpAwarded > 0 and cpAwarded = 0. NULL means the row
+   * predates the split, when the two were the same number — readers coalesce to
+   * qpAwarded, which is why this is nullable rather than defaulted.
+   */
+  cpAwarded: integer("cp_awarded"),
   refType: text("ref_type"),
   refId: text("ref_id"),
   createdAt: now("created_at"),
@@ -934,6 +943,15 @@ export const discordGuilds = pgTable("discord_guilds", {
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
   installedAt: now("installed_at"),
   removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
+  /**
+   * Where we reach the person running this server (B47).
+   *
+   * A column rather than a field inside `community`: it is an operational
+   * contact, not audience data, and "every server we cannot reach" has to be a
+   * query. Never inferred from Discord — the bot cannot read an owner's email,
+   * and guessing one from a username puts a made-up address on a billing path.
+   */
+  contactEmail: text("contact_email"),
 });
 
 // The attribution ledger: which Cluster gamers came from which server.
@@ -1595,3 +1613,40 @@ export const featureShots = pgTable("feature_shots", {
   updatedBy: text("updated_by"),
   updatedAt: now("updated_at"),
 });
+
+// ===== Email delivery log (B32) =====
+//
+// Every message we attempt, whether or not it left the building.
+//
+// A row is written even when mail is UNCONFIGURED — status `skipped` — because
+// the question a human actually asks is "did the brand get told they owe us
+// $1,000", and "we never sent it because nobody set the API key" is an answer.
+// A layer that silently does nothing when it is switched off teaches you to
+// trust it exactly when it is doing the least.
+export const emailLog = pgTable("email_log", {
+  id: id(),
+  /** Who it went to. */
+  toAddress: text("to_address").notNull(),
+  /** Which template — the key in lib/email/templates.ts, never free text. */
+  template: text("template").notNull(),
+  subject: text("subject").notNull(),
+  /** Resend's id, once it has one. Null while skipped or failed before send. */
+  providerId: text("provider_id"),
+  /**
+   * queued | skipped | sent | delivered | bounced | complained | failed
+   *
+   * `skipped` means mail is not configured on this deployment. It is not an
+   * error and must never read as one, but it is not a delivery either.
+   */
+  status: text("status").notNull().default("queued"),
+  /** Why it failed, or why it was skipped. Shown to staff, never to a customer. */
+  error: text("error"),
+  /** What it was about — an invoice id, a payout id — so the console can link out. */
+  refType: text("ref_type"),
+  refId: text("ref_id"),
+  createdAt: now("created_at"),
+  updatedAt: now("updated_at"),
+}, (t) => [
+  index("email_log_created_idx").on(t.createdAt),
+  index("email_log_status_idx").on(t.status),
+]);

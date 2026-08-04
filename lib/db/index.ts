@@ -91,6 +91,12 @@ const COLUMN_MIGRATIONS = [
     "ref_id" text,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
+  // B34: what this event PAID, as distinct from what it PROGRESSED. Nullable on
+  // purpose — NULL means "written before B34, when the two were the same
+  // number", and every reader coalesces to qp_awarded. A backfill would have had
+  // to re-run every boot and would then re-credit the new progress-only rows,
+  // which are exactly the rows that must pay nothing.
+  `ALTER TABLE "quest_events" ADD COLUMN IF NOT EXISTS "cp_awarded" integer`,
   `CREATE INDEX IF NOT EXISTS "qe_user_idx" ON "quest_events" ("user_id","created_at")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "qe_dedup_idx" ON "quest_events" ("user_id","quest_id","action_key","ref_type","ref_id")`,
   `CREATE TABLE IF NOT EXISTS "user_quest_tiers" (
@@ -714,6 +720,30 @@ const COLUMN_MIGRATIONS = [
     "amount" double precision NOT NULL DEFAULT 0
   )`,
   `CREATE INDEX IF NOT EXISTS "server_payout_line_idx" ON "server_payout_lines" ("payout_id")`,
+
+  // Where we reach a server owner (B47). Required for the profile to count as
+  // complete, and therefore for the revenue share to pay out.
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "contact_email" text`,
+
+  // The email delivery log (B32). A row per attempt, including the ones skipped
+  // because mail is not configured — "we never sent it" is an answer a human
+  // needs, and a layer that silently does nothing when switched off teaches you
+  // to trust it exactly when it is doing the least.
+  `CREATE TABLE IF NOT EXISTS "email_log" (
+    "id" text PRIMARY KEY NOT NULL,
+    "to_address" text NOT NULL,
+    "template" text NOT NULL,
+    "subject" text NOT NULL,
+    "provider_id" text,
+    "status" text DEFAULT 'queued' NOT NULL,
+    "error" text,
+    "ref_type" text,
+    "ref_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "email_log_created_idx" ON "email_log" ("created_at")`,
+  `CREATE INDEX IF NOT EXISTS "email_log_status_idx" ON "email_log" ("status")`,
 
   // Feature screenshots (B7). One row per component worth proving; every page
   // claiming that component reads the same row, so one admin edit updates the

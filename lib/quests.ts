@@ -15,25 +15,48 @@ export type QuestActionKey =
   | "connect_account" | "stat_levelup"
   | "ad_impression" | "ad_click"
   | "profile_vote_received" | "best_profile_award"
-  | "botlist_vote";
+  | "botlist_vote" | "bot_added" | "redeem_trophy" | "gift_sent" | "gift_received";
 
-export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string; defaultWeight: number; defaultCap?: number }[] = [
-  { key: "join_challenge",   label: "Join a challenge",        group: "conquest",  defaultWeight: 15, defaultCap: 5 },
-  { key: "finish_challenge", label: "Finish a challenge",      group: "conquest",  defaultWeight: 25 },
-  { key: "top3_challenge",   label: "Place top 3",             group: "conquest",  defaultWeight: 150 },
-  { key: "win_challenge",    label: "Win a challenge (1st)",   group: "conquest",  defaultWeight: 400 },
-  { key: "join_planet",      label: "Join a planet",           group: "orbit",     defaultWeight: 20 },
-  { key: "write_post",       label: "Write a post",            group: "orbit",     defaultWeight: 10, defaultCap: 10 },
-  { key: "write_comment",    label: "Write a comment",         group: "orbit",     defaultWeight: 5, defaultCap: 20 },
-  { key: "reaction_given",   label: "React to a post",         group: "orbit",     defaultWeight: 2, defaultCap: 30 },
-  { key: "reaction_received",label: "Get a reaction",          group: "orbit",     defaultWeight: 3, defaultCap: 50 },
-  { key: "follower_gained",  label: "Gain a follower",         group: "orbit",     defaultWeight: 8 },
-  { key: "message_new",      label: "Message a new gamer",     group: "orbit",     defaultWeight: 4, defaultCap: 15 },
-  { key: "profile_views_25", label: "Every 25 profile views",  group: "orbit",     defaultWeight: 10 },
+/**
+ * What every action pays, and how often it can pay (B34).
+ *
+ * **Every action has a cap.** Nine of these used to have none, which meant the
+ * cost of a gamer was unbounded by construction — the only reason it looked
+ * survivable was that nobody had tried. An uncapped action is not a generous
+ * action, it is an unpriced one.
+ *
+ * The shape of the table is deliberate: rare and hard things pay more and cap
+ * at one; grindable things pay little. Winning a challenge is worth a hundred
+ * times a comment because it is a hundred times harder, not because a comment
+ * is worthless.
+ *
+ * At 10,000 CP = $1 (see `DEFAULT_CP_PER_DOLLAR`) the per-action caps sum to
+ * 624 CP/day and the global ceiling (`DEFAULT_DAILY_CP_CEILING`) allows 500 —
+ * **five cents a day** for a gamer doing everything we want at the maximum. Our
+ * worst case and our best case are the same event, which is the property this
+ * table exists to have.
+ */
+export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string; defaultWeight: number; defaultCap: number }[] = [
+  { key: "join_challenge",   label: "Join a challenge",        group: "conquest",  defaultWeight: 10, defaultCap: 2 },
+  { key: "finish_challenge", label: "Finish a challenge",      group: "conquest",  defaultWeight: 25, defaultCap: 2 },
+  { key: "top3_challenge",   label: "Place top 3",             group: "conquest",  defaultWeight: 50, defaultCap: 1 },
+  { key: "win_challenge",    label: "Win a challenge (1st)",   group: "conquest",  defaultWeight: 100, defaultCap: 1 },
+  { key: "join_planet",      label: "Join a planet",           group: "orbit",     defaultWeight: 10, defaultCap: 1 },
+  { key: "write_post",       label: "Write a post",            group: "orbit",     defaultWeight: 3, defaultCap: 3 },
+  { key: "write_comment",    label: "Write a comment",         group: "orbit",     defaultWeight: 1, defaultCap: 5 },
+  { key: "reaction_given",   label: "React to a post",         group: "orbit",     defaultWeight: 1, defaultCap: 5 },
+  { key: "reaction_received",label: "Get a reaction",          group: "orbit",     defaultWeight: 1, defaultCap: 10 },
+  { key: "follower_gained",  label: "Gain a follower",         group: "orbit",     defaultWeight: 2, defaultCap: 5 },
+  { key: "message_new",      label: "Message a new gamer",     group: "orbit",     defaultWeight: 1, defaultCap: 5 },
+  { key: "profile_views_25", label: "Every 25 profile views",  group: "orbit",     defaultWeight: 2, defaultCap: 5 },
   // Identity: being voted for is the purest form of "other gamers orbit you",
   // which is exactly what this quest measures.
-  { key: "profile_vote_received", label: "Someone votes for your profile", group: "orbit", defaultWeight: 15 },
-  { key: "best_profile_award",    label: "Place in Best Profile",          group: "orbit", defaultWeight: 250 },
+  { key: "profile_vote_received", label: "Someone votes for your profile", group: "orbit", defaultWeight: 3, defaultCap: 5 },
+  { key: "best_profile_award",    label: "Place in Best Profile",          group: "orbit", defaultWeight: 100, defaultCap: 1 },
+  // Giving and receiving are priced the same and capped at one a day, because
+  // any gap between them is an arbitrage a pair of accounts can farm.
+  { key: "gift_sent",        label: "Send a gift",             group: "orbit",     defaultWeight: 10, defaultCap: 1 },
+  { key: "gift_received",    label: "Receive a gift",          group: "orbit",     defaultWeight: 10, defaultCap: 1 },
   // Voting for Cluster on a bot list.
   //
   // This is the one action here that grows the PLATFORM rather than the gamer's
@@ -41,12 +64,36 @@ export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string
   // a person vote every twelve hours. Rewarding it in CP puts the ask inside a
   // currency they already care about instead of inventing a parallel one, and
   // the twice-a-day cap is the vote cooldown rather than a number we picked.
-  { key: "botlist_vote",     label: "Vote for Cluster on a bot list", group: "signal", defaultWeight: 50, defaultCap: 2 },
-  { key: "connect_account",  label: "Connect a game account",  group: "ascension", defaultWeight: 120 },
-  { key: "stat_levelup",     label: "A tracked stat rises",    group: "ascension", defaultWeight: 25, defaultCap: 20 },
-  { key: "ad_impression",    label: "See an ad (impression)",  group: "signal",    defaultWeight: 1, defaultCap: 60 },
-  { key: "ad_click",         label: "Click an ad",             group: "signal",    defaultWeight: 5, defaultCap: 10 },
+  { key: "botlist_vote",     label: "Vote for Cluster on a bot list", group: "signal", defaultWeight: 15, defaultCap: 2 },
+  { key: "bot_added",        label: "Add the bot to a server", group: "signal",    defaultWeight: 50, defaultCap: 1 },
+  { key: "connect_account",  label: "Connect a game account",  group: "ascension", defaultWeight: 50, defaultCap: 1 },
+  { key: "stat_levelup",     label: "A tracked stat rises",    group: "ascension", defaultWeight: 5, defaultCap: 4 },
+  { key: "redeem_trophy",    label: "Redeem a trophy",         group: "ascension", defaultWeight: 25, defaultCap: 1 },
+  { key: "ad_impression",    label: "See an ad (impression)",  group: "signal",    defaultWeight: 1, defaultCap: 20 },
+  { key: "ad_click",         label: "Click an ad",             group: "signal",    defaultWeight: 2, defaultCap: 5 },
 ];
+
+/**
+ * The sum of every per-action cap — what the table would pay if one person did
+ * literally everything, every day.
+ *
+ * It is a *fixture*, asserted in `tests/db/cp-economics.mts`, so that moving a
+ * weight is a deliberate act with a visible diff rather than something that
+ * quietly drifts. It is deliberately HIGHER than the ceiling: the caps shape
+ * behaviour, the ceiling is the guarantee, and the guarantee must not depend on
+ * nobody happening to win a challenge and take Best Profile on the same day.
+ */
+export const ACTION_CAP_SUM = ACTION_CATALOG.reduce((s, a) => s + a.defaultWeight * a.defaultCap, 0);
+
+/**
+ * The hard ceiling: no gamer is credited more than this in a UTC day, across
+ * every action and every quest.
+ *
+ * One number, not twenty. That is what makes the policy auditable — a per-action
+ * table has to be re-summed every time somebody moves a weight, and this does
+ * not. Editable in settings under `quests.dailyCpCeiling`.
+ */
+export const DEFAULT_DAILY_CP_CEILING = 500;
 
 export const ACTION_LABEL: Record<string, string> = Object.fromEntries(ACTION_CATALOG.map((a) => [a.key, a.label]));
 
@@ -165,7 +212,78 @@ function weightsFor(questKey: string): Record<string, number> {
   return Object.fromEntries(ACTION_CATALOG.filter((a) => a.group === questKey).map((a) => [a.key, a.defaultWeight]));
 }
 function capsFor(questKey: string): Record<string, number> {
-  return Object.fromEntries(ACTION_CATALOG.filter((a) => a.group === questKey && a.defaultCap).map((a) => [a.key, a.defaultCap!]));
+  return Object.fromEntries(ACTION_CATALOG.filter((a) => a.group === questKey).map((a) => [a.key, a.defaultCap]));
+}
+
+/**
+ * What the table paid BEFORE B34, frozen.
+ *
+ * A quest's weights and caps live in its own row, so the catalog above only
+ * seeds them — repricing the catalog alone would change nothing that already
+ * exists. This is the ensureQuestArt pattern: rewrite a stored value only when
+ * it still equals the old default, so an admin who deliberately set a number
+ * keeps it. Nine of these had no cap at all, which is why the second map is
+ * sparse.
+ */
+const PRE_B34_WEIGHTS: Record<string, number> = {
+  join_challenge: 15, finish_challenge: 25, top3_challenge: 150, win_challenge: 400,
+  join_planet: 20, write_post: 10, write_comment: 5, reaction_given: 2, reaction_received: 3,
+  follower_gained: 8, message_new: 4, profile_views_25: 10,
+  profile_vote_received: 15, best_profile_award: 250, botlist_vote: 50,
+  connect_account: 120, stat_levelup: 25, ad_impression: 1, ad_click: 5,
+};
+const PRE_B34_CAPS: Record<string, number> = {
+  join_challenge: 5, write_post: 10, write_comment: 20, reaction_given: 30,
+  reaction_received: 50, message_new: 15, botlist_vote: 2, stat_levelup: 20,
+  ad_impression: 60, ad_click: 10,
+};
+
+/**
+ * Bring existing quests onto the B34 table (idempotent, runs every boot).
+ *
+ * Three things happen per quest, and each is conditional:
+ *   - a weight still at its pre-B34 default is repriced;
+ *   - an action with NO cap gets one, because "uncapped" was never a choice
+ *     somebody made — it was the absence of one, and it is the whole reason
+ *     this item exists;
+ *   - a cap still at its pre-B34 default is retightened.
+ *
+ * An admin's own number is never touched. If they set `ad_impression` to 4 CP,
+ * that survives — the point of the ceiling is that it does not have to be
+ * defended one weight at a time.
+ */
+export async function repriceQuests(db: DB) {
+  const quests = await db.select().from(schema.quests);
+  for (const q of quests) {
+    const weights = { ...(q.actionWeights ?? {}) as Record<string, number> };
+    const caps = { ...(q.dailyCaps ?? {}) as Record<string, number> };
+    let touched = false;
+    for (const a of ACTION_CATALOG) {
+      const w = weights[a.key];
+      if (w !== undefined && w === PRE_B34_WEIGHTS[a.key] && w !== a.defaultWeight) {
+        weights[a.key] = a.defaultWeight; touched = true;
+      }
+      // An action the catalog gained after this quest was created (bot_added,
+      // redeem_trophy, gift_sent, gift_received) is seeded onto its own quest.
+      // Without this, a database that predates B34 would carry the four new keys
+      // in the catalog and in no quest, so nothing would ever pay them.
+      if (weights[a.key] === undefined && a.group === q.key && PRE_B34_WEIGHTS[a.key] === undefined) {
+        weights[a.key] = a.defaultWeight; touched = true;
+      }
+      // Otherwise only quests that actually listen get a cap — adding one to an
+      // action a quest ignores would put a number in the admin's face for a row
+      // that pays nothing.
+      if (weights[a.key] === undefined) continue;
+      const c = caps[a.key];
+      if (c === undefined || (c === PRE_B34_CAPS[a.key] && c !== a.defaultCap)) {
+        caps[a.key] = a.defaultCap; touched = true;
+      }
+    }
+    if (touched) {
+      await db.update(schema.quests).set({ actionWeights: weights, dailyCaps: caps })
+        .where(eq(schema.quests.id, q.id));
+    }
+  }
 }
 
 // Idempotent seed — creates any missing default quest + its tiers by key.
@@ -235,15 +353,77 @@ export async function ensureQuestArt(db: DB) {
 // ===== Award engine =====
 function startOfUtcDay(): Date { const d = new Date(); d.setUTCHours(0, 0, 0, 0); return d; }
 
-// Credit an action to every quest that listens to it. Dedup + daily caps are
-// enforced per (user, quest, action, ref). Unlocks tier badges + notifies.
+/**
+ * The CP a row actually paid.
+ *
+ * `NULL` is a row written before B34, when progress and payment were the same
+ * number — so it coalesces to `qp_awarded`. Every read of "how much CP" goes
+ * through this expression; there is no second definition anywhere.
+ */
+const CP_PAID = sql<number>`COALESCE(${schema.questEvents.cpAwarded}, ${schema.questEvents.qpAwarded})`;
+
+/** The one ceiling, from settings, with the model's default when unset. */
+export async function dailyCpCeiling(db: DB): Promise<number> {
+  try {
+    const [row] = await db.select({ value: schema.platformSettings.value })
+      .from(schema.platformSettings)
+      .where(eq(schema.platformSettings.key, "quests.dailyCpCeiling")).limit(1);
+    const n = Number((row?.value as { cp?: number } | null)?.cp);
+    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_DAILY_CP_CEILING;
+  } catch { return DEFAULT_DAILY_CP_CEILING; }
+}
+
+/** How much CP this gamer has already been credited today (UTC). */
+export async function cpEarnedToday(db: DB, userId: string): Promise<number> {
+  try {
+    const [row] = await db.select({ n: sql<number>`COALESCE(SUM(${CP_PAID}), 0)` })
+      .from(schema.questEvents)
+      .where(and(eq(schema.questEvents.userId, userId), gte(schema.questEvents.createdAt, startOfUtcDay())));
+    return Number(row?.n ?? 0);
+  } catch { return 0; }
+}
+
+/**
+ * Credit an action: **CP once, progress everywhere** (B34.2).
+ *
+ * This used to pay every quest listening to an action, with the daily cap stored
+ * per quest — so pointing two quests at `ad_impression` doubled both the payout
+ * and the ceiling. That is a silent multiplier on cost, and it is one an admin
+ * could switch on by accident from a screen that says nothing about money.
+ *
+ * The two ideas are now separate:
+ *   - **CP is credited once per action**, to the first quest that records it,
+ *     against a single global daily ceiling.
+ *   - **Progress is credited to every listening quest**, so one action can still
+ *     advance two quests — which is the feature the old behaviour was reaching
+ *     for.
+ *
+ * Nothing anybody wanted is lost, and the multiplier is gone.
+ *
+ * The ceiling is checked once, before the loop, and the payment is clamped to
+ * what is left of it — so the last award of the day pays the remainder rather
+ * than being refused outright. Progress keeps counting past the ceiling: it is
+ * already bounded by the per-quest caps, and stopping it would mean a tier badge
+ * silently depends on how much CP somebody happened to earn that morning.
+ *
+ * Dedup + daily caps are still enforced per (user, quest, action, ref).
+ */
 export async function awardQuestAction(
   db: DB, userId: string, actionKey: QuestActionKey, ref?: { refType?: string; refId?: string },
 ): Promise<void> {
   try {
     const activeQuests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true));
-    const listening = activeQuests.filter((q) => Number((q.actionWeights as Record<string, number>)[actionKey] ?? 0) > 0);
+    const listening = activeQuests.filter((q) => Number((q.actionWeights as Record<string, number>)[actionKey] ?? 0) > 0)
+      // Stable order, so "the quest that gets paid" is the same on every run and
+      // in every environment rather than whatever the planner returned.
+      .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.id.localeCompare(b.id));
     if (listening.length === 0) return;
+
+    const [ceiling, already] = await Promise.all([dailyCpCeiling(db), cpEarnedToday(db, userId)]);
+    let room = Math.max(0, ceiling - already);
+    // Set the moment any quest records this action, so the second listener pays
+    // nothing however it is ordered.
+    let paid = false;
 
     for (const quest of listening) {
       const weight = Number((quest.actionWeights as Record<string, number>)[actionKey] ?? 0);
@@ -265,8 +445,11 @@ export async function awardQuestAction(
         eq(schema.questEvents.actionKey, actionKey), eq(schema.questEvents.refType, refType), eq(schema.questEvents.refId, refId),
       )).limit(1);
       if (dupe) continue;
+      const cp = paid ? 0 : Math.min(weight, room);
+      paid = true;
+      room -= cp;
       await db.insert(schema.questEvents).values({
-        id: uid(), userId, questId: quest.id, actionKey, qpAwarded: weight, refType, refId,
+        id: uid(), userId, questId: quest.id, actionKey, qpAwarded: weight, cpAwarded: cp, refType, refId,
       }).onConflictDoNothing();
 
       // Bump QP.
@@ -413,8 +596,14 @@ export async function getQuestCompletions(db: DB, userId: string, questId: strin
 // A gamer's TOTAL Cluster Points across all quests (lifetime + current cycles).
 export async function getTotalCp(db: DB, userId: string | null): Promise<number> {
   if (!userId) return 0;
-  const [row] = await db.select({ c: sql<number>`COALESCE(SUM(${schema.userQuestProgress.qp} + ${schema.userQuestProgress.lifetimeQp}), 0)` })
-    .from(schema.userQuestProgress).where(eq(schema.userQuestProgress.userId, userId));
+  // Summed from the EVENT ledger, not from quest progress (B34.2). Progress is
+  // now credited to every listening quest while CP is credited once, so
+  // `qp + lifetimeQp` across quests double-counts by exactly the multiplier this
+  // item removed. The ledger is append-only and its rollover preserves the
+  // total, so before the split the two agreed — this is the same number, read
+  // from the side that stayed true.
+  const [row] = await db.select({ c: sql<number>`COALESCE(SUM(${CP_PAID}), 0)` })
+    .from(schema.questEvents).where(eq(schema.questEvents.userId, userId));
   return Number(row?.c ?? 0);
 }
 
@@ -431,11 +620,15 @@ export async function getCpLedger(db: DB, userId: string | null, opts?: { questI
   if (opts?.questId) wheres.push(eq(schema.questEvents.questId, opts.questId));
   const rows = await db.select({
     id: schema.questEvents.id, questId: schema.questEvents.questId, actionKey: schema.questEvents.actionKey,
-    qp: schema.questEvents.qpAwarded, at: schema.questEvents.createdAt,
+    qp: CP_PAID, at: schema.questEvents.createdAt,
     key: schema.quests.key, name: schema.quests.name, color: schema.quests.color, logoUrl: schema.quests.logoUrl,
   }).from(schema.questEvents).innerJoin(schema.quests, eq(schema.questEvents.questId, schema.quests.id))
     .where(and(...wheres)).orderBy(desc(schema.questEvents.createdAt)).limit(opts?.limit ?? 120);
-  return rows.map((r) => ({
+  // This is the MONEY log, so rows that paid nothing are not in it. A second
+  // quest advancing on the same action is real progress and shows on that
+  // quest's own bar; listing it here as "0 CP" would read as a bug to the one
+  // person most likely to be counting.
+  return rows.filter((r) => Number(r.qp) > 0).map((r) => ({
     id: r.id, questId: r.questId, questKey: r.key, questName: r.name, color: r.color, logoUrl: r.logoUrl,
     actionKey: r.actionKey, label: ACTION_LABEL[r.actionKey] ?? r.actionKey, qp: r.qp, at: r.at.toISOString(),
   }));

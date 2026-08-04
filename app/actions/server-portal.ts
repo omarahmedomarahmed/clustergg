@@ -114,7 +114,27 @@ export async function portalSaveCommunity(
       vibes: formData.getAll("vibes").map(String),
       about: String(formData.get("about") ?? ""),
     });
+    // The contact email lives on its own column, so it saves separately — and
+    // its validation failure must not silently discard the rest of the form.
+    const email = String(formData.get("contactEmail") ?? "").trim();
+    let emailError: string | undefined;
+    if (email) {
+      const { saveContactEmail } = await import("@/lib/discord/community");
+      const r = await saveContactEmail(guildId, email);
+      if (!r.ok) emailError = r.error;
+    }
     revalidatePath(`/servers/${server.slug ?? guildId}`);
-    return { ok: "Saved. Brands targeting these games and regions can now find you." };
+    if (emailError) return { error: `Saved everything except the email — ${emailError}` };
+
+    // Say whether that COMPLETED the profile, because completing it is what
+    // switches the revenue share on and an owner should learn that at the
+    // moment it happens rather than by noticing a number change later.
+    const { getProfile } = await import("@/lib/discord/community");
+    const after = await getProfile(guildId);
+    return {
+      ok: after.complete
+        ? "Profile complete — your share of sponsored challenges is now active."
+        : `Saved. ${after.missing.length} field${after.missing.length === 1 ? "" : "s"} still needed before your share can pay out.`,
+    };
   } catch { return { error: "Couldn't save that. Try again." }; }
 }

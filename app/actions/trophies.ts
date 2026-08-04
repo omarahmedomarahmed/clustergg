@@ -7,6 +7,7 @@ import { getCurrentUser, requireStaff } from "@/lib/auth";
 import { payer } from "@/lib/payments";
 import { METHOD_OPTIONS, savePayoutPreference } from "@/lib/payouts";
 import { uid } from "@/lib/utils";
+import { emailUser } from "@/lib/email";
 
 // Cashing out a trophy.
 //
@@ -171,6 +172,14 @@ export async function approveRedeem(redeemId: string) {
     "Trophy redeem approved",
     `Your $${Number(r.amount).toLocaleString()} ${r.currency} payout is approved. We'll send it shortly — you'll get a link to choose exactly how you want the money.`,
     "/profile");
+  // And by email, because an in-app notification only reaches somebody who
+  // comes back. This is money; it should find them.
+  //
+  // AWAITED, not fired and forgotten: a floating promise in a server action is
+  // frozen the moment the request returns, and an un-awaited send is a receipt
+  // nobody gets. `sendEmail` never throws, so awaiting it costs a round trip and
+  // risks nothing.
+  await emailUser(db, r.userId, "redeem.approved", (name: string) => ({ name, amount: { amount: Number(r.amount), currency: r.currency } }), { type: "redeem", id: r.id });
   revalidateTrophyPages();
 }
 
@@ -219,6 +228,16 @@ export async function sendRedeem(redeemId: string): Promise<{ ok?: true; error?:
       ? `Open your trophy case to collect $${Number(r.amount).toLocaleString()} ${r.currency} — you choose how you want it: bank transfer, PayPal, a prepaid card or a gift card in your own currency.`
       : `$${Number(r.amount).toLocaleString()} ${r.currency} is being sent by ${methodLabel(r.method).toLowerCase()}. We'll confirm when it lands.`,
     "/profile");
+
+  // The email that matters most in the product: money is waiting and it needs a
+  // click. Only sent when there IS a link — a "collect it" mail with nothing to
+  // collect is worse than silence, and the no-link path is the manual-transfer
+  // workflow where staff move the money themselves.
+  if (res.link) {
+    await emailUser(db, r.userId, "redeem.ready",
+      (name: string) => ({ name, amount: { amount: Number(r.amount), currency: r.currency }, collectUrl: res.link! }),
+      { type: "redeem", id: r.id });
+  }
   revalidateTrophyPages();
   return { ok: true, link: res.link ?? null };
 }

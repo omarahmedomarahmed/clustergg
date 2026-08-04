@@ -28,16 +28,31 @@ import { getTotalCp } from "@/lib/quests";
 /**
  * How many Cluster Points buy one dollar of trophy.
  *
- * Derived, not guessed. A gamer earning steadily through quests makes on the
- * order of 300–600 CP in an active week (quest actions are capped daily, which
- * is what stops this from being farmable). At 1,000 CP per dollar a $5 trophy
- * is roughly two months of real play — expensive enough that trophies stay
- * meaningful and that we are never paying out faster than the same gamer earns
- * us in impressions, and near enough to reach that it is worth playing for.
+ * Derived, not guessed — and repriced deliberately in B34 from 1,000 to 10,000.
+ *
+ * At the old rate, a gamer doing everything the product asks, every day, cost
+ * **$1.26 a day**, with an unbounded tail from nine uncapped actions. At a
+ * million gamers that is $1.26M/day. The number was never survivable; it only
+ * looked survivable because nobody had multiplied it out.
+ *
+ * At 10,000 CP = $1, with every action capped and a hard 500 CP/day ceiling
+ * (`DEFAULT_DAILY_CP_CEILING`), the same maximal gamer costs **$0.05 a day**.
+ * A hundred consecutive days of that is $5 for a hundred-day retention streak,
+ * which is a trade any gaming company would take. Our worst case and our best
+ * case became the same event.
+ *
+ * The sanity check in the other direction, because a currency that costs
+ * nothing is also worth nothing: 20 ad impressions pay 20 CP = $0.002, while at
+ * even a $0.50 CPM those same impressions earn more than $0.01. **CP paid for
+ * attention stays roughly 5× covered by the revenue that attention generates**
+ * — the test this comment set originally, and the only one that matters.
+ *
+ * A $5 bronze trophy is 50,000 CP at this rate. That is a hundred days at the
+ * ceiling: far, expensive, and reachable, which is what a trophy should be.
  *
  * Admin can move it: `platform_settings` key `marketplace.cpPerDollar`.
  */
-export const DEFAULT_CP_PER_DOLLAR = 1000;
+export const DEFAULT_CP_PER_DOLLAR = 10000;
 
 /**
  * Scarcity premium by tier.
