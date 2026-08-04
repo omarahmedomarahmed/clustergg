@@ -137,6 +137,20 @@ export default function QuestCard({ quest, top = [], href }: { quest: QuestView;
           </div>
         )}
       </div>
+
+      {/* A real link, always visible (B48).
+          The card as a whole is role="link" with a router.push, which works for
+          a mouse and for Enter and for nothing else — it is not an anchor, so it
+          cannot be middle-clicked, copied, or followed by anything that reads
+          the page rather than clicking it. The only <Link> in here used to live
+          on the leaderboard tab, which is not the default, so on a normal render
+          this card contained no navigation at all. */}
+      <Link href={link} onClick={stop}
+        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-full px-3 py-2 text-[11px] font-bold transition-colors"
+        style={{ background: `${q.color}22`, color: q.color }}>
+        {done ? tr("Open the map") : tr("Earn Cluster Points here")}
+        <Icon name="chevronRight" size={12} />
+      </Link>
     </div>
   );
 }

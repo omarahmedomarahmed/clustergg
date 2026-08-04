@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useMemo, useState } from "react";
+import Link from "next/link";
 import Icon from "@/components/Icon";
 import Cp from "@/components/Cp";
 import { purchaseTrophy, type BuyState } from "@/app/actions/marketplace";
@@ -71,13 +72,19 @@ export default function TrophyMarket({
             Keep it on your profile or cash it out — a bought trophy redeems exactly like a won one.
           </p>
         </div>
-        {/* The wallet, stated as value rather than as a score. */}
-        <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/[0.06] px-4 py-2 text-right">
+        {/* The wallet, stated as value rather than as a score — and a LINK (B48).
+            It is the most-looked-at number on this screen and it used to do
+            nothing, on a page whose whole question is "how do I get more?". */}
+        <Link href="/quests"
+          className="group rounded-2xl border border-cyan-400/25 bg-cyan-500/[0.06] px-4 py-2 text-right transition hover:border-cyan-400/60 hover:bg-cyan-500/[0.12]">
           <div className="text-cyan-200"><Cp amount={balance} size="lg" /></div>
           <div className="text-[10px] uppercase tracking-wider text-muted">
             {signedIn ? <>to spend · {num(wallet.earned)} earned all-time</> : "Sign in to see your balance"}
           </div>
-        </div>
+          <div className="text-[10px] font-semibold text-cyan-300/70 group-hover:text-cyan-200">
+            Earn more <Icon name="chevronRight" size={10} className="inline" />
+          </div>
+        </Link>
       </div>
 
       {/* Spending never costs a level. Worth saying where it is decided. */}
@@ -129,11 +136,21 @@ export default function TrophyMarket({
                 </div>
                 <div className="p-3">
                   <div className="truncate text-sm font-bold">{t.name}</div>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted">
-                    <span className="uppercase tracking-wider">{t.tier}</span>
-                    {t.value > 0 && <span>· redeems for ${num(t.value)}</span>}
-                  </div>
-                  <div className={`mt-2 text-sm font-black ${can ? "text-cyan-200" : "text-muted"}`}>
+                  <div className="mt-0.5 text-[10px] uppercase tracking-wider text-muted">{t.tier}</div>
+
+                  {/* The redemption value, promoted (B48).
+                      This is what makes a trophy an asset rather than a sticker,
+                      and it used to be the smallest text on the card, set under
+                      the price it justifies. The two numbers are two views of
+                      ONE number — priceOf at the platform rate — so they are
+                      shown together and must never be allowed to disagree. */}
+                  {t.value > 0 && (
+                    <div className="mt-2 flex items-baseline gap-1.5">
+                      <span className="text-2xl font-black leading-none text-amber-200">${num(t.value)}</span>
+                      <span className="text-[10px] uppercase tracking-wider text-amber-300/70">redeems for cash</span>
+                    </div>
+                  )}
+                  <div className={`mt-1.5 text-sm font-black ${can ? "text-cyan-200" : "text-muted"}`}>
                     <Cp amount={t.cpPrice} />
                   </div>
 
