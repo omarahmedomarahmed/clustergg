@@ -154,6 +154,96 @@ await db.insert(schema.questEvents).values({
 eq("a pre-B34 row still counts for what it awarded", await getTotalCp(db, veteran), 250);
 eq("…and appears in the money log", (await getCpLedger(db, veteran)).length, 1);
 
+// ---- The model (B16) ----
+//
+// Pure arithmetic, so these are hand-computable. Every one of them is a number
+// somebody will quote in a meeting.
+console.log("\n== the model ==");
+const { defaultConfig, maxDailyCp, maxDailyCost, expectedDailyCost, exposure,
+  abuseSurface, minutesPerDollar, actionMaxDaily, DEFAULT_ASSUMPTIONS } =
+  await import("../../lib/cp-economics.ts");
+
+const cfg = defaultConfig();
+eq("the model ships with the shipped table", cfg.actions.length, ACTION_CATALOG.length);
+eq("…and the shipped rate", cfg.cpPerDollar, 10000);
+eq("…and the shipped ceiling", cfg.ceiling, 500);
+
+const max = maxDailyCp(cfg);
+eq("the per-action table sums to 624", max.table, 624);
+eq("the ceiling is what a gamer can actually be credited", max.capped, 500);
+ok("nothing is uncapped", !max.uncapped);
+ok("the ceiling is doing work — it is below the table", exposure(cfg).ceilingHolds);
+eq("no open liabilities", exposure(cfg).uncapped, []);
+
+// The numbers this item exists to produce.
+eq("worst case at 1,000 gamers is $50/day", maxDailyCost(cfg, 1_000), 50);
+eq("…at 100,000, $5,000/day", maxDailyCost(cfg, 100_000), 5_000);
+eq("…at 1,000,000, $50,000/day", maxDailyCost(cfg, 1_000_000), 50_000);
+// For contrast, the state B34 found: 1,255 CP/day at 1,000 CP = $1.
+ok("the old rate would have cost 10× the new one at the same table",
+  maxDailyCost({ ...cfg, cpPerDollar: 1000 }, 1_000_000) === maxDailyCost(cfg, 1_000_000) * 10);
+
+// Worst case and forecast must never be the same number.
+const expected = expectedDailyCost(cfg, 1_000_000, DEFAULT_ASSUMPTIONS);
+ok("the forecast is well under the worst case", expected < maxDailyCost(cfg, 1_000_000),
+  `expected=${expected}`);
+eq("…and is exactly dailyActive × capReach of it",
+  Math.round(expected), Math.round(50_000 * DEFAULT_ASSUMPTIONS.dailyActive * DEFAULT_ASSUMPTIONS.capReach));
+
+console.log("\n== the model refuses to hide an open liability ==");
+const holed = { ...cfg, actions: cfg.actions.map((a) => a.key === "write_comment" ? { ...a, cap: 0 } : a) };
+const holedMax = maxDailyCp(holed);
+ok("an uncapped action makes the table unbounded", holedMax.uncapped && holedMax.table === Infinity);
+eq("…but the ceiling still bounds what a gamer gets", holedMax.capped, 500);
+eq("…and it is named as a liability", exposure(holed).uncapped.map((l) => l.key), ["write_comment"]);
+ok("…with a reason that says it can eat the whole day",
+  /whole day/.test(exposure(holed).uncapped[0].why));
+const noCeiling = { ...holed, ceiling: 0 };
+eq("with no ceiling either, the worst case is honestly infinite",
+  maxDailyCost(noCeiling, 1_000_000), Infinity);
+ok("…and the reason says so", /unbounded/.test(exposure(noCeiling).uncapped[0].why));
+
+// The B34.2 correction, asserted in the MODEL as well as the engine: an action
+// on two quests must not multiply the cost.
+console.log("\n== the model does not resurrect the multiplier ==");
+const twoQuests = { ...cfg, actions: cfg.actions.map((a) =>
+  a.key === "ad_impression" ? { ...a, quests: ["signal", "orbit"] } : a) };
+eq("listing an action on two quests does not double the table",
+  maxDailyCp(twoQuests).table, maxDailyCp(cfg).table);
+eq("…nor what that one action pays",
+  actionMaxDaily(twoQuests.actions.find((a) => a.key === "ad_impression")!), 20);
+
+console.log("\n== the abuse surface ==");
+const surface = abuseSurface(cfg);
+ok("the free surface is ranked by CP per minute",
+  surface.every((r, i) => i === 0 || surface[i - 1].cpPerMinute >= r.cpPerMinute));
+ok("winning a challenge is NOT on the free surface — it needs a game and a result",
+  !surface.some((r) => r.key === "win_challenge"));
+ok("writing a comment IS", surface.some((r) => r.key === "write_comment"));
+const mpd = minutesPerDollar(cfg)!;
+ok("a determined faker needs hours per dollar, not minutes", mpd > 60, `${mpd.toFixed(0)} min/$`);
+console.log(`       (cheapest path: ${surface[0].label} at ${surface[0].cpPerMinute.toFixed(1)} CP/min → ${(mpd / 60).toFixed(1)} hours per dollar)`);
+
+// The plan's load-bearing bullet for B16.2: "assert through the real award
+// path, not the settings row." A calculator that writes somewhere the engine
+// does not read is the most dangerous kind of admin page, because it looks like
+// it worked.
+console.log("\n== what the calculator writes is what the engine pays ==");
+const [conquest] = await db.select().from(schema.quests).where(sqlEq(schema.quests.key, "conquest")).limit(1);
+const conqW = { ...(conquest.actionWeights as Record<string, number>) };
+const conqC = { ...(conquest.dailyCaps as Record<string, number>) };
+// Exactly the write saveCpConfig performs: the quest's own maps.
+await db.update(schema.quests)
+  .set({ actionWeights: { ...conqW, join_challenge: 7 }, dailyCaps: { ...conqC, join_challenge: 3 } })
+  .where(sqlEq(schema.quests.id, conquest.id));
+const retuned = await newGamer("retuned");
+await awardQuestAction(db, retuned, "join_challenge", { refType: "ch", refId: "a" });
+eq("a weight written to the quest is the weight the engine pays", await cpToday(retuned), 7);
+for (const r of ["b", "c", "d"]) await awardQuestAction(db, retuned, "join_challenge", { refType: "ch", refId: r });
+eq("…and the cap written beside it is the cap it enforces", await cpToday(retuned), 21);
+await db.update(schema.quests).set({ actionWeights: conqW, dailyCaps: conqC })
+  .where(sqlEq(schema.quests.id, conquest.id));
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);

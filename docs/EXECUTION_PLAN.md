@@ -276,7 +276,7 @@ the remaining edits; Part II is the whole platform.
 | B13 | The bot guides, rebuilt — fewer than nine, redesigned | `lib/cards/*`, `lib/discord/onboard.ts`, `/cluster guide` | batch 2 | ☐ |
 | B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
 | B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
-| B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☐ |
+| B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
 | B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☐ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
 | B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
@@ -1184,6 +1184,10 @@ Grounded in `lib/quests.ts` and `lib/marketplace.ts`, not assumed:
   `top3_challenge`, `win_challenge`, `join_planet`, `follower_gained`,
   `profile_views_25`, `connect_account`, `profile_vote_received`,
   `best_profile_award`.
+> **The table below is the PRE-B34 state, kept because it is the diagnosis.**
+> It is what the code paid when this item was written and it is why B34 exists.
+> The shipped numbers are B34.1's table; do not read this one as current.
+
 - Maximum **capped** earnings, one quest per action, per gamer per day:
 
   | Action | CP | Cap/day | CP/day |
@@ -1263,10 +1267,15 @@ Where an action should not be rationed (winning a challenge), cap it at a level
 no honest gamer reaches but a script does, and say that in the UI.
 
 **Verification owed → `tests/db/cp-economics.mts`:**
-- `maxDailyCp` equals a hand-computed figure for a known config (the table
-  above is the fixture).
-- The multi-quest multiplier is counted: an action on two quests pays twice and
-  caps twice.
+- `maxDailyCp` equals a hand-computed figure for a known config (B34's table is
+  the fixture, not the one above — see the correction below).
+- ~~The multi-quest multiplier is counted: an action on two quests pays twice
+  and caps twice.~~ **Corrected by B34.2.** The multiplier was removed, not
+  modelled: CP is credited once per action and progress goes to every listening
+  quest. The assertion is now the opposite one — an action on two quests pays
+  ONCE and progresses twice — and it is in the suite. A model that counted a
+  multiplier the engine no longer has would overstate our cost by however many
+  quests an admin happened to point at an action.
 - No action in `ACTION_CATALOG` lacks a cap after the defaults are applied.
 - Saving from the calculator changes what `awardQuestAction` actually grants — assert
   through the real award path, not the settings row.
@@ -2800,6 +2809,7 @@ the correct state for it.
 | `gamer.missions.progress` | "Your first week, one step at a time" | the feed | not captured — placeholder |
 | `server.profile.incomplete` | "A server we cannot describe is a server we cannot sell" | the portal's profile form, incomplete | not captured — placeholder |
 | `admin.email.compose` | "Email any gamer, brand or server owner" | `/admin/email`, composer open | not captured — placeholder |
+| `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` | not captured — placeholder |
 | *(add a row per B47+ item that anyone can see)* | | |
 
 **B28 retires rows**: anywhere a page demonstrates a bot card, the live render
