@@ -125,8 +125,7 @@ export default function PayoutSetup({
         {providerConnected ? (
           <>
             <button onClick={onboard} disabled={pending}
-              className="pressable inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold text-white disabled:opacity-50"
-              style={{ background: "linear-gradient(90deg,#8b5cf6,#22d3ee)" }}>
+              className="money-btn pressable inline-flex items-center gap-2 rounded-full px-5 py-2 text-sm font-bold text-white disabled:opacity-50">
               <Icon name="link" size={14} /> {status === "ready" ? `Update your details with ${providerName}` : `Enter your details with ${providerName}`}
             </button>
             {frame && (

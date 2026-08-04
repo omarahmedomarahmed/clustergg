@@ -88,6 +88,26 @@ html { zoom: 0.9; }
 .brand-btn:hover { background: #6d28d9; box-shadow: 0 0 42px -6px rgba(167,139,250,.85); filter: brightness(1.06); transform: translateY(-1px); }
 .brand-btn:active { transform: translateY(0); }
 
+/* The money button.
+ *
+ * Deep cyan, not the neon `--color-cyan`. That bright cyan is a highlight
+ * colour — it is the tone links, chips and live numbers are picked out in — and
+ * a large filled surface in it reads as a glowing sticker rather than as
+ * something you press. It also fails contrast against white text, which is
+ * exactly the wrong property for the one button in the product that moves
+ * money.
+ *
+ * Used for: paying an invoice, releasing a payout, marking one paid, collecting
+ * a trophy redemption. Anywhere a click has a number attached. */
+.money-btn {
+  background: #0e7490;
+  color: #fff;
+  box-shadow: 0 0 24px -8px rgba(14,116,144,.7), inset 0 1px 0 rgba(255,255,255,.14);
+  transition: box-shadow .25s, transform .15s, filter .2s, background .2s;
+}
+.money-btn:hover { background: #155e75; box-shadow: 0 0 40px -8px rgba(34,211,238,.5); filter: brightness(1.06); transform: translateY(-1px); }
+.money-btn:active { transform: translateY(0); }
+
 .ghost-btn {
   border: 1px solid rgba(139,92,246,.4);
   background: rgba(139,92,246,.08);

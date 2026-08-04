@@ -12,7 +12,7 @@ import ServerChallengeRequest from "@/components/ServerChallengeRequest";
 import Tabs from "@/components/Tabs";
 import Icon from "@/components/Icon";
 import PortalKeyHandoff from "@/components/PortalKeyHandoff";
-import { ServerBoard, TierLadder, FunnelPanel, ChallengeRow, CommandFeed, EarningsPanel } from "@/components/ServerPortal";
+import { ServerBoard, TierLadder, TierBadge, FunnelPanel, ChallengeRow, CommandFeed, EarningsPanel, EarningGuide } from "@/components/ServerPortal";
 import PayoutSetup from "@/components/PayoutSetup";
 import { listPayouts, payoutTotals, getPayoutAccount, METHOD_OPTIONS } from "@/lib/payouts";
 import { payer } from "@/lib/payments";
@@ -139,8 +139,15 @@ export default async function ServerPortalPage({
             icon: "diamond",
             node: (
               <div className="space-y-6">
+              <EarningGuide
+                tiers={TIERS}
+                linked={data.stats.linked}
+                currentKey={data.tier.current.key}
+                inviteUrl={server.inviteUrl}
+                slug={server.slug ?? server.guildId}
+              />
               <EarningsPanel
-                tierName={data.tier.current.name}
+                tier={data.tier.current}
                 ownerPct={data.earnings.ownerPct}
                 clusterPct={data.earnings.clusterPct}
                 nextPct={data.earnings.nextPct}
@@ -149,6 +156,12 @@ export default async function ServerPortalPage({
                 earned={data.earnings.earned}
                 pending={data.earnings.pending}
                 membersWon={data.earnings.membersWon}
+                winners={data.earnings.winners}
+                memberWins={data.earnings.memberWins.map((w) => ({
+                  userId: w.userId, name: w.name, slug: w.slug, avatarUrl: w.avatarUrl,
+                  challengeId: w.challengeId, challengeTitle: w.challengeTitle, game: w.game,
+                  brandName: w.brandName, place: w.place, amount: w.amount, at: w.at.toISOString(),
+                }))}
                 paidOut={payoutSums.paid}
                 inFlight={payoutSums.open}
                 payoutMethod={METHOD_OPTIONS.find((m) => m.key === account?.methodPreference)?.label.toLowerCase() ?? null}
@@ -408,9 +421,7 @@ function PortalHeader({ server, data, publicView }: {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-3xl font-black">{server.name}</h1>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-400/50 bg-amber-500/10 px-3 py-1 text-xs font-bold text-amber-100">
-              <Icon name={data.tier.current.icon} size={13} />{data.tier.current.name}
-            </span>
+            <TierBadge tier={data.tier.current} />
           </div>
           <p className="text-sm text-muted mt-1">
             <b className="text-cyan-300">{data.stats.linked.toLocaleString()}</b> gamers brought to Cluster

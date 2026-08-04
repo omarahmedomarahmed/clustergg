@@ -125,9 +125,11 @@ export function PayBlock({ invoice }: { invoice: Invoice }) {
       <div className="text-xs uppercase tracking-widest text-muted">Amount due</div>
       <div className="my-1 text-3xl font-black text-cyan-200">{money(invoice.total, invoice.currency)}</div>
       <div className="mb-3 text-xs"><DueLine invoice={invoice} /></div>
+      {/* `brand-btn`, the purple one — the codebase's existing convention for
+          anything a BRAND clicks (pricing, enquiry, the portal), and this is
+          the most consequential click a brand makes. */}
       <a href={invoice.payLinkUrl} target="_blank" rel="noreferrer"
-        className="pressable inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold text-white"
-        style={{ background: "linear-gradient(90deg,#06b6d4,#22d3ee)", boxShadow: "0 10px 26px -12px #06b6d4" }}>
+        className="brand-btn pressable inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-bold text-white">
         <Icon name="zap" size={14} /> Pay invoice {invoice.number}
       </a>
       <p className="mt-3 text-[11px] text-muted">

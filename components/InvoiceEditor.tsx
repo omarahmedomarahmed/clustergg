@@ -200,8 +200,7 @@ export default function InvoiceEditor({ invoice, payHint }: { invoice: Invoice; 
             <form action={(fd) => run(() => markInvoicePaid(invoice.id, fd))} className="flex flex-wrap items-end gap-2">
               <input name="paidVia" placeholder="paid via (bank, Payoneer…)" className={`${field} w-48`} />
               <input name="paidRef" placeholder="reference" className={`${field} w-40`} />
-              <button disabled={pending} className="pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white"
-                style={{ background: "linear-gradient(90deg,#10b981,#22d3ee)" }}>Mark paid</button>
+              <button disabled={pending} className="money-btn pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white">Mark paid</button>
             </form>
             <button onClick={() => run(() => setInvoiceStatus(invoice.id, "void"))} disabled={pending}
               className="rounded-full border border-white/15 px-4 py-1.5 text-sm text-muted hover:text-ink">Void</button>

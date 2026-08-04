@@ -103,8 +103,20 @@ export async function announceChallenge(_prev: BotActionState, formData: FormDat
   if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
   const id = String(formData.get("challengeId") ?? "").trim();
   if (!id) return { error: "Missing challenge." };
-  await announceChallengeLaunched(id);
-  return { ok: "Announced. A server challenge also sends its entry key to the server it belongs to." };
+  const reached = await announceChallengeLaunched(id);
+  if (reached === 0) {
+    // Not an error, but never silently a success either. Zero here has real
+    // causes staff can act on — the challenge is still a draft, it's private
+    // with no server attached, or the bot has no channel it can post in.
+    return {
+      error: "Nothing was sent. A draft is never announced — publish it first. If it's already live, check "
+        + "it belongs to a server the bot can post in.",
+    };
+  }
+  return {
+    ok: `Announced to ${reached} ${reached === 1 ? "server" : "servers"}. `
+      + "A server challenge also sends its entry key to the server it belongs to.",
+  };
 }
 
 /**

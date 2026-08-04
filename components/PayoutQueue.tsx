@@ -152,8 +152,7 @@ export default function PayoutQueue({ payouts, guilds, providerLabel, manual }: 
             {(p.status === "requested" || p.status === "failed") && (
               <>
                 <button onClick={() => run(() => releasePayout(p.id))} disabled={pending}
-                  className="pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white"
-                  style={{ background: "linear-gradient(90deg,#8b5cf6,#22d3ee)" }}>
+                  className="money-btn pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white">
                   {manual ? "Approve for manual transfer" : `Release via ${providerLabel}`}
                 </button>
                 <button onClick={() => run(() => cancelPayout(p.id))} disabled={pending}
@@ -169,8 +168,7 @@ export default function PayoutQueue({ payouts, guilds, providerLabel, manual }: 
                 )}
                 <form action={(fd) => run(() => confirmPayoutPaid(p.id, fd))} className="flex flex-wrap items-end gap-2">
                   <input name="ref" placeholder="transfer reference" className={`${field} w-44`} />
-                  <button disabled={pending} className="pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white"
-                    style={{ background: "linear-gradient(90deg,#10b981,#22d3ee)" }}>Mark paid</button>
+                  <button disabled={pending} className="money-btn pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white">Mark paid</button>
                 </form>
               </>
             )}
