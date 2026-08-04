@@ -715,6 +715,10 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "server_payout_line_idx" ON "server_payout_lines" ("payout_id")`,
 
+  // Where we reach a server owner (B47). Required for the profile to count as
+  // complete, and therefore for the revenue share to pay out.
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "contact_email" text`,
+
   // The email delivery log (B32). A row per attempt, including the ones skipped
   // because mail is not configured — "we never sent it" is an answer a human
   // needs, and a layer that silently does nothing when switched off teaches you

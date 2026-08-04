@@ -934,6 +934,15 @@ export const discordGuilds = pgTable("discord_guilds", {
   settings: jsonb("settings").$type<Record<string, unknown>>().notNull().default({}),
   installedAt: now("installed_at"),
   removedAt: timestamp("removed_at", { withTimezone: true, mode: "date" }),
+  /**
+   * Where we reach the person running this server (B47).
+   *
+   * A column rather than a field inside `community`: it is an operational
+   * contact, not audience data, and "every server we cannot reach" has to be a
+   * query. Never inferred from Discord — the bot cannot read an owner's email,
+   * and guessing one from a username puts a made-up address on a billing path.
+   */
+  contactEmail: text("contact_email"),
 });
 
 // The attribution ledger: which Cluster gamers came from which server.
