@@ -58,7 +58,7 @@ export default function ProfileAccounts({
   const mix = (pct: number) => `color-mix(in srgb, ${c.accent} ${pct}%, transparent)`;
 
   return (
-    <section>
+    <section data-shot="linked-accounts">
       <div className="flex items-center justify-between mb-3 gap-3">
         <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: c.text }}>
           <Icon name="gamepad" size={19} style={{ color: c.accent }} /> {tr("Connected games")}
@@ -86,6 +86,9 @@ export default function ProfileAccounts({
         </div>
       )}
 
+      {/* `data-shot` marks the exact rectangle the capture pass crops to.
+          Without it a screenshot of "every account is verified" is a picture of
+          the whole page with the accounts somewhere in it. */}
       {accounts.length === 0 ? (
         <div className="rounded-2xl p-6 text-center text-sm" style={{ background: mix(6), color: c.muted }}>
           {isOwner ? tr("No games connected yet — connect your first above.") : tr("No games connected yet.")}

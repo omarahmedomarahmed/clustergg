@@ -36,6 +36,15 @@ export type ShotDef = {
   as?: "guest" | "gamer" | "admin" | "server" | "brand";
   /** A CSS selector to crop to. Absent means the whole viewport. */
   selector?: string;
+  /**
+   * Text on the control that has to be clicked before `selector` exists.
+   *
+   * Some evidence lives behind an accordion — the League rank grid is inside a
+   * collapsed account row. Naming the control beats having the capture script
+   * click every button on the page hoping one of them opens the right thing,
+   * which is what it did first and which closed the row it had just opened.
+   */
+  openText?: string;
 };
 
 // Ordered by group, then by how early a visitor meets it.
@@ -43,7 +52,7 @@ export const SHOT_REGISTRY: ShotDef[] = [
   // ---- The gamer ----
   { key: "gamer.profile.public", group: "gamer", claim: "A profile worth sharing", capturedFrom: "/u/nova", as: "guest" },
   { key: "gamer.linked.verified", group: "gamer", claim: "Every account is verified against the game's own API", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='linked-accounts']" },
-  { key: "gamer.lol.card", group: "gamer", claim: "Your rank, in the game's own words", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='lol-card']" },
+  { key: "gamer.lol.card", group: "gamer", claim: "Your rank, in the game's own words", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='lol-card']", openText: "League of Legends" },
   { key: "gamer.cp.ledger", group: "gamer", claim: "Every point is accounted for", capturedFrom: "/quests", as: "gamer" },
   { key: "gamer.quest.map", group: "gamer", claim: "Quests you actually travel", capturedFrom: "/quests", as: "gamer" },
   { key: "gamer.marketplace.shelf", group: "gamer", claim: "Spend points on real trophies", capturedFrom: "/marketplace", as: "gamer" },
@@ -54,16 +63,16 @@ export const SHOT_REGISTRY: ShotDef[] = [
 
   // ---- The server owner ----
   { key: "server.tier.flagship", group: "server", claim: "Owners take 25% at 5,000 linked", capturedFrom: "/servers", as: "guest" },
-  { key: "server.earnings.ledger", group: "server", claim: "Every line itemised", capturedFrom: "/servers", as: "server" },
-  { key: "server.members.winnings", group: "server", claim: "Your members' winnings, paid to them", capturedFrom: "/servers", as: "server" },
-  { key: "server.growth.journey", group: "server", claim: "A ladder you can see yourself climbing", capturedFrom: "/servers", as: "server" },
-  { key: "server.payout.history", group: "server", claim: "Paid, in flight, awaiting — all visible", capturedFrom: "/servers", as: "server" },
+  { key: "server.earnings.ledger", group: "server", claim: "Every line itemised", capturedFrom: "/servers/demo-guild-nebula-1?key=DEMO-DNEBULA1", as: "server", openText: "Earnings" },
+  { key: "server.members.winnings", group: "server", claim: "Your members' winnings, paid to them", capturedFrom: "/servers/demo-guild-nebula-2?key=DEMO-DNEBULA2", as: "server", openText: "Server board" },
+  { key: "server.growth.journey", group: "server", claim: "A ladder you can see yourself climbing", capturedFrom: "/servers/demo-guild-nebula-3?key=DEMO-DNEBULA3", as: "server" },
+  { key: "server.payout.history", group: "server", claim: "Paid, in flight, awaiting — all visible", capturedFrom: "/servers/demo-guild-nebula-1?key=DEMO-DNEBULA1", as: "server", openText: "Earnings" },
 
   // ---- The brand ----
-  { key: "brand.reach.perserver", group: "brand", claim: "Counted reach, not projections", capturedFrom: "/pricing", as: "brand" },
-  { key: "brand.invoice", group: "brand", claim: "One invoice a month, every line itemised", capturedFrom: "/pricing", as: "brand" },
-  { key: "brand.campaign.builder", group: "brand", claim: "Buy a sponsored challenge like a media placement", capturedFrom: "/pricing", as: "brand" },
-  { key: "brand.analytics.roas", group: "brand", claim: "See what it returned", capturedFrom: "/pricing", as: "brand" },
+  { key: "brand.reach.perserver", group: "brand", claim: "Counted reach, not projections", capturedFrom: "/brands/nebulatech?key=DEMO-NEBULATECH", as: "brand", openText: "Challenges" },
+  { key: "brand.invoice", group: "brand", claim: "One invoice a month, every line itemised", capturedFrom: "/brands/nebulatech?key=DEMO-NEBULATECH", as: "brand", openText: "Billing" },
+  { key: "brand.campaign.builder", group: "brand", claim: "Buy a sponsored challenge like a media placement", capturedFrom: "/brands/astrofuel?key=DEMO-ASTROFUEL", as: "brand" },
+  { key: "brand.analytics.roas", group: "brand", claim: "See what it returned", capturedFrom: "/brands/nebulatech?key=DEMO-NEBULATECH", as: "brand", openText: "Analytics" },
 
   // ---- Admin ----
   { key: "admin.challenge.rules", group: "admin", claim: "Rules in the game's own ladder", capturedFrom: "/admin/challenges", as: "admin" },

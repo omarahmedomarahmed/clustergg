@@ -60,7 +60,9 @@ export default function LolCard({
   // land, a gamer's Solo/Duo and Flex ranks were invisible — data we already
   // hold, hidden behind somebody else's API. Rank first, live extras after.
   const rankGrid = statNumbers.length > 0 ? (
-    <div>
+    // `data-shot` is the crop target for the "your rank, in the game's own
+    // words" screenshot — the grid itself, not the page around it.
+    <div data-shot="lol-card">
       <div className="text-[11px] uppercase tracking-widest mb-1.5" style={{ color: c.muted }}>Ranked &amp; profile</div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
         {statNumbers.map((s, i) => (

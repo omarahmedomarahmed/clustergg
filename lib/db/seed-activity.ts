@@ -57,10 +57,12 @@ export async function seedDemoActivity(db: {
   await seedStatHistory(db);
   await seedMarketplace(db, gamers);
   await seedAdDelivery(db);
+  await seedDemoPortalKeys(db);
   await seedBilling(db);
   await seedServerPayouts(db);
   await seedChallengeRequests(db);
   await seedPayoutAccounts(db, gamers);
+  await seedFeatureShots(db);
   if (admin) await seedAuditTrail(db, admin.id);
 }
 
@@ -347,6 +349,28 @@ function routeForPlacement(key: string): string {
   return "/";
 }
 
+// ===== Portal keys a demo can actually open =====
+//
+// Production mints a random access key per brand and DMs a random portal key to
+// each server owner; staff are deliberately never shown either. That is correct
+// there and useless here: a demo where the entire brand portal and the entire
+// server portal sit behind secrets nobody holds is a demo of the lock rather
+// than of the product, and neither surface can be screenshotted or tested.
+//
+// So demo brands get a stable, obviously-fake key. Demo only — this runs inside
+// the `demo` branch of the seed and never touches a production row, and the key
+// is derived from the slug so it is guessable ON PURPOSE. A real brand's key is
+// still `newAccessKey()`.
+async function seedDemoPortalKeys(db: any) {
+  const brands = await db.select().from(schema.brands);
+  for (const b of brands) {
+    if (!b.slug || /^DEMO-/.test(b.accessKey ?? "")) continue;
+    await db.update(schema.brands)
+      .set({ accessKey: `DEMO-${b.slug.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)}` })
+      .where(eq(schema.brands.id, b.id));
+  }
+}
+
 // ===== Brand billing =====
 //
 // Invoices are built with `draftLines`, the same function the admin console
@@ -496,6 +520,57 @@ async function seedPayoutAccounts(db: any, gamers: { id: string; slug: string }[
       methodPreference: prefs[i], country: ["EG", "GB", "AE"][i], currency: "USD",
       status: "active",
     }).onConflictDoNothing();
+  }
+}
+
+// ===== The captured screenshots =====
+//
+// `scripts/capture-shots.mjs` drives a production build with a browser and
+// writes `public/shots/<key>.png` for every entry in SHOT_REGISTRY. Those PNGs
+// are committed, so this only has to point each `feature_shots` row at its file
+// and fill in the words.
+//
+// Files rather than an upload on purpose: a screenshot of the product is part of
+// the product's source. Committed, the same picture ships to every environment,
+// a diff shows when one changed, and an install with no Blob store configured
+// still has real evidence behind its claims instead of placeholders.
+//
+// Idempotent, and deliberately NON-DESTRUCTIVE: a row whose `imageUrl` already
+// points somewhere else was replaced by an admin at /admin/shots, and a re-seed
+// must not undo that. Their upload wins forever.
+async function seedFeatureShots(db: any) {
+  const { SHOT_REGISTRY } = await import("@/lib/shots");
+  const existing = await db.select().from(schema.featureShots);
+  const byKey = new Map(existing.map((r: { key: string }) => [r.key, r]));
+
+  for (const def of SHOT_REGISTRY) {
+    const row = byKey.get(def.key) as { imageUrl?: string | null } | undefined;
+    // Page captures are JPEG, card renders are PNG — see scripts/capture-shots.
+    // Twenty-eight full-page PNGs at 2x weighed 28MB; as JPEG they weigh 3.7MB
+    // and look identical at display size. Cards stay PNG because they are copied
+    // byte-for-byte from the render endpoint rather than re-encoded.
+    const bundled = `/shots/${def.key}.${def.capturedFrom.startsWith("/api/card/") ? "png" : "jpg"}`;
+    // An admin's replacement is anything that is not the bundled path.
+    if (row?.imageUrl && row.imageUrl !== bundled) continue;
+    await db.insert(schema.featureShots).values({
+      key: def.key,
+      imageUrl: bundled,
+      // Sensible starting words, all of them editable. The claim is what the
+      // shot is evidence FOR, so it makes an honest first caption and an honest
+      // first alt text — and an admin rewriting either is one field on one page.
+      caption: def.claim,
+      altText: `${def.claim} — a screenshot of the real screen on Cluster.`,
+      claim: def.claim,
+      capturedFrom: def.capturedFrom,
+      capturedAt: new Date(),
+      // 1440x900 at deviceScaleFactor 1.5, which is what the capture script uses.
+      // Recorded so <FeatureShot> can reserve the right box and the page never
+      // shifts as the image lands.
+      width: 2160, height: 1350,
+    }).onConflictDoUpdate({
+      target: schema.featureShots.key,
+      set: { imageUrl: bundled, capturedFrom: def.capturedFrom, capturedAt: new Date(), updatedAt: new Date() },
+    });
   }
 }
 
