@@ -310,6 +310,7 @@ the remaining edits; Part II is the whole platform.
 | S1 | **The demo activity layer** — 36 of 74 tables had no rows, so every screen that reports on activity reported zero | new `lib/db/seed-activity.ts`, `lib/db/seed.ts` | wave 1 | ☑ |
 | S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
 | S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
+| B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☐ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **S rows** are work that shipped without being planned — support the build
@@ -2474,6 +2475,114 @@ link an account or their challenges change.
 
 ---
 
+## B47 — The server profile becomes mandatory, and it gates the earn
+
+**In the owner's words:** *"allow admin to email anyone manually through Resend
+— either a gamer or brand or server owner. Ask owners for a contact email in
+onboarding in Discord and on the portal. Make their server onboarding mandatory
+for them to fill all fields to complete their server profile… a server with no
+contact email shows their profile incomplete… they link 500 members, they can't
+earn 5% from sponsored challenges unless they complete their profile by adding
+full audience description and games played by their members and contact email."*
+
+### B47.0 Why this is a money item, not an onboarding item
+
+The tier table says 5% at 500 linked. This adds a second condition: **and a
+complete profile.** That makes profile completeness a thing that decides whether
+somebody gets paid, which puts it in the same category as B34–B37 — so it
+carries its suite with it (§1.1's exception), and the reasoning is the same. A
+gate that wrongly pays is cash that has already left; a gate that wrongly
+withholds is a server owner who was promised 5%, hit 500 members, and got
+nothing, with no explanation. Both are worse than a UI bug.
+
+The commercial argument for the gate, which is the thing that must be true for
+it to be fair: **a server we cannot describe is a server we cannot sell.** A
+brand buys "PUBG players in MENA". A server with no games named, no audience
+description and nobody to email is not inventory — it is a number. Asking for
+three fields in exchange for a revenue share is not a hoop; it is the minimum
+that makes the share possible to earn.
+
+### B47.1 A contact email, asked for twice
+
+`discord_guilds.contact_email`, a column rather than a field inside the
+`community` JSONB: it is an operational contact, not audience data, and it needs
+to be queryable ("every server we cannot reach").
+
+Asked in **both** places an owner already is:
+
+- **Discord**, in the setup card, as a modal — a text input cannot be a select
+  menu, and `open-about|` already establishes the pattern.
+- **The portal**, in the community profile editor.
+
+Never inferred from Discord. The bot cannot read an owner's email, and guessing
+one from a username would be a made-up address on a billing path.
+
+### B47.2 "Complete" has one definition
+
+A profile is complete when **all five** are answered: games, regions, vibes,
+audience description, contact email. One definition, in
+`lib/discord/community.ts`, used by the badge, the portal, the Discord card and
+the earn gate — four surfaces disagreeing about what "complete" means is how an
+owner ends up staring at a green tick and an empty payout.
+
+`completeness()` already scores four of them and must now include the email.
+Incomplete servers say **which** field is missing, everywhere they say they are
+incomplete. "Profile incomplete" with no list is a dead end.
+
+### B47.3 The gate
+
+`ownerPctFor(linked)` stays exactly as it is — it answers "what does this tier
+pay", and the growth ladder must keep showing an owner what 500 and 1,000 and
+5,000 are worth whether or not they have filled anything in. Hiding the reward
+is the wrong way to ask for the form.
+
+A **new** `earningOwnerPct(linked, profileComplete)` answers "what do they
+actually earn right now", returning 0 when the profile is incomplete. Only the
+money paths use it: the billing split and what the portal says they are owed.
+
+Consequences that must be true, or the gate is a trap:
+
+- The portal states it **before** they hit 500, not after. An owner who finds
+  out at the finish line was misled the whole way.
+- The ladder shows the tier they have reached AND that it is not paying yet,
+  with the missing fields listed and a link to fill them.
+- Nothing already earned is clawed back. The gate decides future splits.
+
+### B47.4 Admin can email anyone
+
+`/admin/email` gains a compose form: pick a gamer, a brand or a server owner,
+write a subject and a body, send. Through the same `sendEmail` path as every
+templated message, so it is logged, it degrades identically without a key, and
+it appears in the same console.
+
+The recipient picker reads real addresses — a gamer's `users.email`, a brand's
+`contactEmail`, a server's new `contact_email` — and a server with no email
+**is offered but disabled, with the reason**, because "I can't email them" is
+exactly the fact this screen exists to surface.
+
+Admin-only (the `billing` system, like the rest of the console). Free-text mail
+from an admin console is a phishing vector if it is loose, so: no HTML from the
+composer, plain text through the standard layout, and every send logged with the
+admin's id.
+
+**Verification owed → `tests/db/server-profile.mts`** (money-adjacent, written
+with the item):
+- A complete profile at 500 linked earns 5%; the same server with any one field
+  blanked earns 0%.
+- `ownerPctFor` is unchanged by completeness — the ladder still shows the reward.
+- Removing the contact email alone flips a complete profile to incomplete.
+- The missing-field list names exactly the blank fields, no more.
+- Already-settled earnings are not recalculated by a later gate change.
+- A manual admin email is logged with its recipient kind and the admin id.
+- No manual email can be sent to a server with no contact email.
+
+**Shots owed:** `server.profile.incomplete` — "A server we cannot describe is a
+server we cannot sell" — the portal's incomplete banner. `admin.email.compose` —
+"Email any gamer, brand or server owner" — `/admin/email`.
+**New routes:** none (both live on existing pages).
+
+---
+
 ## B47+ — Everything added from here
 
 This section is deliberately empty and deliberately last. Each new instruction
@@ -2597,6 +2706,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/offers.mts` | **B30** | off by default; the discount is its own line; totals equal lines; admin edits survive recalculation | owed |
 | `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
 | `tests/db/email.mts` + `tests/ui/admin-email.mjs` | **B32** | no key = no-op, never throws; every template fills; webhooks update status; no key or payment detail in a subject | owed |
+| `tests/db/server-profile.mts` | **B47** | the gate at 500 linked; completeness has one definition; the missing-field list; nothing clawed back; manual mail logged and refused without an address | **write with the item — it decides who gets paid, see §1.1** |
 | `tests/db/announce-queue.mts` | **B33** | publishing enqueues and returns; draining is idempotent; 429 reschedules; nothing fans out inline from a server action | **write with the item — money-adjacent, see §1.1** |
 | `tests/db/cp-economics.mts` | **B34** | no uncapped action; the 624 fixture; the 500 ceiling holds absolutely; award once, progress twice; $5 bronze = 50,000 CP; CP per impression under the CPM | **write with the item** |
 | `tests/db/abuse.mts` | **B35** | holding period blocks then releases; qualified count drives tiers; velocity limits bite | **write with the item** |
@@ -2658,6 +2768,8 @@ the correct state for it.
 | `gamer.quest.actions` | "Every action, what it pays, what it caps at" | a quest page's action list | not captured — placeholder |
 | `admin.shots.console` | "Every screenshot on the site is one row an admin owns" | `/admin/shots` | **captured (provisional)** → V1.R |
 | `admin.email.console` | "Every message we send, and whether it arrived" | `/admin/email` | not captured — placeholder |
+| `admin.email.compose` | "Email any gamer, brand or server owner" | `/admin/email` | not captured — placeholder |
+| `server.profile.incomplete` | "A server we cannot describe is a server we cannot sell" | the server portal's incomplete banner | not captured — placeholder |
 | `bot.card.challenge` | "A challenge card anyone can join from Discord" | `/api/card/planets` | **captured (provisional)** · retired by B28 → V1.R deletes it |
 | `bot.card.market` | "The marketplace, inside Discord" | `/api/card/market` | **captured (provisional)** · retired by B28 → V1.R deletes it |
 | `gamer.feed.dashboard` | "Build the dashboard you want to look at" | `/feed` | **captured (provisional)** → V1.R |
