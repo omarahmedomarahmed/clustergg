@@ -94,7 +94,8 @@ than they found it. **Do not start a phase before the previous one is pushed.**
 | 0 | Test infrastructure + showcase seed | Everything downstream needs committed tests and rich demo data to screenshot |
 | 1 | Spam audit + announcement policy | A live bug annoying real servers right now |
 | 2 | The CP coin — a currency, not a word | Touches every surface; do it before screenshots are taken |
-| 3 | Bot cards: lists, flows, landing layout | The biggest functional gap in the product |
+| 3 | Bot: install, list cards, flows, landing layout | The biggest functional gap in the product |
+| 3B | The server portal inside Discord | Needs the roles/permissions groundwork; independent of 4–5 |
 | 4 | Gifting: search as you type, web + Discord | Self-contained |
 | 5 | Redeem + marketplace, step by step | Self-contained |
 | 6 | The screenshot system | Needs 0–5 finished so the shots show the real thing |
@@ -328,6 +329,76 @@ with the coin (fetch the PNG, assert 200 and a plausible byte size).
 
 This is the largest phase and the biggest functional gap.
 
+### 3.0 Install: stop the guide dump
+
+`lib/discord/onboard.ts` → `postGuides(channel.id)` posts **~9 guide cards**
+into `#clustergg` and pins them. That is a wall of PNGs in a channel nobody has
+opened yet, and it is the first impression the product makes.
+
+**Post exactly three cards, pin those three, delete the rest of the flow:**
+
+1. **Welcome to Cluster** — the landing-page grid from 3.3 below.
+2. **The four quests** — a 2×2 box grid, each quest with its own **map art**,
+   and inside each box, in large type, **how you earn CP on it**. The coin, not
+   the word (phase 2), left of every number.
+3. **The game planets** — the six live games, what each one tracks, one box
+   each.
+
+All three carry the same three buttons: **START HERE** · **Add to your
+server** · **Link a game account**.
+
+**Any button on any of the three creates the account if it doesn't exist**, and
+lands the person straight on something useful — their profile, the link modal,
+or a challenge to join. Nobody should have to sign up on the website first;
+the click is the signup.
+
+The old guide cards are not deleted from the codebase — they stay reachable
+from `/cluster guide`, so somebody who wants the how-to can ask for it. What
+changes is that we stop pushing nine of them at a server that has said nothing
+yet.
+
+### 3.0.1 The ephemeral rule — the one that is currently broken
+
+**A button on a public message must never edit that message.**
+
+Today `START HERE` responds with `UPDATE_MESSAGE`, which edits the message the
+button sits on. On a **pinned public welcome card** that means the first
+person to press it rewrites the pin for the entire server, and the next person
+arrives at somebody else's profile.
+
+The rule, implemented once in `app/api/discord/interactions/route.ts` and
+never decided per-screen again:
+
+```
+if the message the button is on is PUBLIC (its flags do not include EPHEMERAL):
+    respond with CHANNEL_MESSAGE_WITH_SOURCE (type 4) + flags: 64
+    → a new, private message, visible only to the clicker.
+      The public message is untouched.
+
+if the message is ALREADY EPHEMERAL (this person's own private thread):
+    respond with UPDATE_MESSAGE (type 7)
+    → edits in place, which is what makes Back and navigation feel right
+      without filling their DMs with cards.
+```
+
+So: **public → open a private copy. Private → navigate in place.** Every
+screen inherits this; no screen implements it.
+
+### 3.0.2 Button colours, unified by meaning
+
+Discord gives five styles. Assign them by *what the button does*, once, in
+`lib/discord/components.ts`, so it cannot drift card to card:
+
+| Style | Used for |
+|---|---|
+| **Secondary** (grey) | The card's own options and choices — pick a game, pick a challenge, pick a trophy |
+| **Success** (green) | **Add to your server**, and every sponsored / ad button |
+| **Primary** (blurple) | **Home** and **Back** — navigation, distinct from choices |
+| **Danger** (red) | Anything destructive — cancel a redeem, end a challenge |
+| **Link** | Anything that leaves Discord — the portal, the website, a payout page |
+
+A lint-style test asserts no screen uses a style outside its category.
+
 ### 3.1 List cards — the reported gap
 
 Today `/cluster challenge` opens **one** challenge with buttons to switch. It
@@ -406,6 +477,133 @@ plausible size from `/api/card/<kind>`; the list cards show more than one item;
 the welcome card is a grid; each screen's button set is non-empty and within
 Discord's limits. Plus `tests/db/bot-flows.mts` for the redeem and buy state
 machines, driven through the interaction handler with synthetic payloads.
+
+---
+
+## PHASE 3B — The server portal, inside Discord
+
+A server owner should be able to run their community from Discord without
+opening a browser — except for the one thing that moves money.
+
+### 3B.0 What Discord actually gives us (verified, not assumed)
+
+Answering this before designing, because the design depends on it:
+
+| Question | Answer |
+|---|---|
+| Can the bot read a server's roles? | **Yes.** `GET /guilds/{id}/roles` with the bot token returns every role with `id`, `name`, `color`, `position`, `managed`, and a **`permissions` bitfield string**. **No privileged intent required.** |
+| Can it read each role's permissions? | **Yes** — that `permissions` bitfield, decodable to the named flags (`"8"` = Administrator). |
+| Can it store them on our side? | Yes. Nothing stops it; see the table below. |
+| How do we know a *clicker's* roles? | **The interaction payload already carries them.** Every guild interaction includes `member.roles` (role ids) and `member.permissions` (computed bitfield). **Zero extra API calls, zero intents.** The roles API is only needed to show the owner a list to choose from. |
+| Can it list every member? | **No, not without the GUILD_MEMBERS privileged intent**, which we deliberately do not enable (it forces Discord verification at 75+ servers). We never need it for any of this. |
+| Who is the "server owner"? | `GET /guilds/{id}` → `owner_id`. **Discord has no concept of "original creator"** — a transfer overwrites `owner_id` and the old value is gone. Operationally, owner = current `owner_id`. |
+| Can the bot DM the key to a moderator instead? | **Technically yes** — a DM is `POST /users/@me/channels` with any user id sharing a guild with the bot. Nothing in Discord prevents the wrong recipient. **Today the code does the right thing** (`onboardGuild` is passed `guild.owner_id`, not the installer) — but that is a habit, not a guarantee, so it becomes a tested rule below. |
+| What if DMs are closed? | `dmUser` gets a **403**. Must be handled: post in `#clustergg` telling the owner to open DMs and run a command, and surface "key undelivered" in mission control so staff can resend. |
+
+### 3B.1 Store the roles
+
+```
+discord_guild_roles
+  guildId, roleId          (composite PK)
+  name, color, position
+  permissions              text   -- the raw bitfield, decoded on read
+  managed                  bool   -- bot/integration roles, never selectable
+  isClusterAdmin           bool   -- the owner designated this one
+  syncedAt                 timestamptz
+```
+
+`refreshGuildRoles(guildId)` calls the roles endpoint and upserts. Called at
+install, when the owner opens the admin settings card, and from mission
+control on demand. Roles that vanished from Discord are marked gone, not
+deleted — an audit trail of "this role used to be a Cluster admin" is worth
+keeping.
+
+Surface it in mission control (`/admin/discord/<guildId>`): every role, its
+permissions, which ones are Cluster admins, when it was last synced.
+
+### 3B.2 Designating Cluster admins
+
+At install, the owner's DM asks them to pick which of their roles may use
+`/cluster admin`. Also reachable any time from the admin settings card.
+
+Until they designate anything, the fallback is: **the guild owner, plus anyone
+with Discord's Administrator permission.** A fresh server must never be locked
+out of its own admin commands, and `member.permissions` on the interaction
+tells us this for free.
+
+### 3B.3 Gating `/cluster admin`
+
+Every admin subcommand and every button on an admin card checks, in one shared
+guard:
+
+```
+allowed =  member.user.id === guild.owner_id
+        || member.roles ∩ designatedClusterAdminRoles ≠ ∅
+        || member.permissions has ADMINISTRATOR
+```
+
+Refusal is a polite ephemeral card, not silence: *"Only this server's Cluster
+admins can open this. Ask an admin to add your role in /cluster admin →
+Settings."*
+
+**All server-owner surfaces move to `/cluster admin`.** Nothing owner-facing
+stays on `/cluster show`, which is the gamer command and is open to everyone.
+
+### 3B.4 The portal, as cards
+
+New card kinds mirroring the web portal, each with the same numbers, read from
+the same functions (`lib/server-portal.ts` — do not write second
+implementations):
+
+| Card | Shows |
+|---|---|
+| `srv_overview` | Members · on Cluster · linked · left · tier badge · progress to the next rung |
+| `srv_earnings` | Sponsored share, members' winnings **stated as not payable**, paid / in flight / awaiting |
+| `srv_growth` | The journey to 5,000 — the same four gates as the web portal |
+| `srv_challenges` | Their challenges: live, requested, finished, with entry keys for their own |
+| `srv_members` | Who linked, who won, recent joins |
+| `srv_payouts` | **Read only.** What is owed, what was paid, and a Link button to the portal |
+
+### 3B.5 Money is web-only, and the key is the owner's
+
+Two rules, and the second is the reason for the first:
+
+1. **A payout request can only be made in the web portal.** The bot displays
+   what is owed and links out. It never initiates money movement.
+2. **The portal key is DM'd to `owner_id` and to nobody else, ever.** Not the
+   installer, not a moderator, not the person who ran a command.
+
+Why they go together: a server owner may well have a moderator add the bot.
+That moderator can be given a Cluster-admin role and run `/cluster admin` — see
+earnings, request challenges, read growth. **They still cannot open the portal,
+because they do not have the key, and they cannot ask for a payout, because the
+bot cannot ask for one.** The key is the proof of ownership, and it lives in
+one inbox.
+
+If the owner wants to delegate the portal, they hand over the key deliberately
+— which is a decision they made, not one the software made for them.
+
+**Tests → `tests/db/bot-admin.mts`:**
+- Roles sync from a mocked Discord response and land in the table with their
+  permissions.
+- A member with a designated role passes the guard; the same member without it
+  fails.
+- The guild owner always passes, even with no designation.
+- A member with Discord Administrator passes when nothing is designated, and
+  **stops passing once the owner has designated specific roles** (otherwise
+  designation is decorative).
+- A managed (bot) role can never be designated.
+- **The portal key is delivered to `owner_id` and to no other id** — assert on
+  the recipient argument, for every path that sends a key: install, resend from
+  mission control, rotate.
+- `/cluster admin` on a server where the caller has no role produces a refusal
+  card, not data.
+- No admin card exposes a payout action.
+
+**Tests → `tests/ui/bot-admin-cards.mjs`:** every `srv_*` card renders 200 from
+`/api/card/<kind>`; the numbers on `srv_earnings` equal the numbers the web
+portal shows for the same guild (this is the assertion that stops the two
+implementations drifting).
 
 ---
 
