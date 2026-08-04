@@ -112,6 +112,22 @@ exists. Verifying in the middle means verifying the same surface three or four
 times and publishing whichever version happened to be photographed last.
 Verifying at the end means verifying once, against what actually shipped.
 
+### The one exception: money-touching items are tested when they are built
+
+**B33, B34, B35, B36, B37 and B39 get their suites written alongside them, not
+in Part II.** They are marked in R1.
+
+The reasoning, because this is a deliberate hole in an otherwise firm rule: a UI
+bug found late costs rework. A bug in what we pay out costs cash that has already
+left. The CP model decides money; the caps decide money; the prepay policy
+decides who we extend credit to; eligibility decides whether a payout is legal;
+the stuck-money states decide whether a prize is ever paid twice. Six suites out
+of forty-plus does not reopen the ordering argument, and it is the difference
+between a wrong number caught in an afternoon and one caught after a month of
+paying out.
+
+Everything else — every screen, every card, every page — still waits.
+
 The cost of this ordering, stated honestly so nobody is surprised by it: bugs
 that a suite would have caught in week one are found in the verification pass
 instead. That is the trade being made deliberately. It is paid down by B1.4-
@@ -176,6 +192,51 @@ reopens Part I as the next `B<n>`, goes through the same four steps, and Part II
 restarts from the registry rows it touches. That is cheaper than it sounds,
 because the registries say exactly which rows those are.
 
+### 1.5 Universal rule — commit and push every small chunk
+
+**Every chunk of work that stands on its own gets its own commit and its own
+push, the moment it works.** Not at the end of the item, not at the end of the
+day. A build item is usually three to eight commits, not one.
+
+A chunk is "standing on its own" when it typechecks, builds, and leaves the app
+in a state you would be willing to hand over. That is the only bar.
+
+Why this is a rule rather than a preference, in this project specifically:
+
+- The session that does the work is **ephemeral**. The container is reclaimed;
+  anything not pushed is gone. Unpushed work is not slow progress, it is *no*
+  progress.
+- A twelve-file commit that broke something is a bisect. A one-concern commit
+  that broke something is a revert.
+- The push is the only durable record that a decision was made. The plan says
+  what we intend; the commit says what we did.
+
+Write the *reason* in the commit message, not the diff — the diff is already in
+the commit. The next person needs to know why, and they will read the log before
+they read the code.
+
+### 1.6 Universal rule — the order is reorderable
+
+The ledger's numbering is a **build order, not a priority order**. B9 is not
+more important than B20; it arrived first.
+
+**Before starting a work session, re-read the ledger and pick what to build
+next.** Priorities can be reordered at any time, and near the end they should
+be — by then it is clear which items are load-bearing and which were nice ideas.
+Reordering is a first-class action, not a deviation:
+
+- **Never renumber.** B14 stays B14 wherever it sits in the queue. Renumbering
+  breaks every registry reference and every commit message that named it.
+- Reorder by editing the ledger's `Built` column and, if it helps, adding a
+  `Priority` column. The section stays where it is in the document.
+- If an item is dropped, say so in the ledger with one line on why, and delete
+  its registry rows. A dropped item that leaves orphan rows in R1 means Part II
+  hunts for a suite that has nothing to test.
+- **Dependencies are the only hard constraint on order**, and there are few:
+  B16 must precede B17 (caps need the model that sets them), B7 must precede
+  B23's slot placement, B13/B14 share card infrastructure. Everything else can
+  move.
+
 ---
 
 # PART I — THE BUILD
@@ -208,9 +269,67 @@ the remaining edits; Part II is the whole platform.
 | B6 | Redeem and marketplace, step by step, on the web | new `/redeem`, `/marketplace` confirm step | plan v1 | ☐ |
 | B7 | The screenshot system — the plumbing only | new `feature_shots`, `<FeatureShot>`, `/admin/shots` | plan v1 | ☐ |
 | B8 | The claim registry and the copy rewrite | `lib/claims.ts` (new), every marketing page, `lib/cms.ts` EN+AR, deck, data room | plan v1 | ☐ |
-| B9+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
+| B9 | Nav: the marketplace badge beside the planets badge | `components/Nav.tsx`, the chrome editor, `lib/mobile-nav.ts` | batch 2 | ☐ |
+| B10 | One background image behind a component group, not three copies | the nav + Profile-of-the-Week group, then every other bg surface | batch 2 | ☐ |
+| B11 | Nav game badges open the planet in place, not by navigating | `components/Nav.tsx`, the homepage hero world component (reused) | batch 2 | ☐ |
+| B12 | Planet hero: live only; completed challenges + standings on the page | `app/planets/[slug]`, the planet hero, `lib/challenges.ts` | batch 2 | ☐ |
+| B13 | The bot guides, rebuilt — fewer than nine, redesigned | `lib/cards/*`, `lib/discord/onboard.ts`, `/cluster guide` | batch 2 | ☐ |
+| B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
+| B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
+| B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☐ |
+| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardAction`, quest cards, the CP history | batch 2 | ☐ |
+| B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
+| B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
+| B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
+| B21 | The economy, explained in visuals, everywhere | bot guides, quests, wallet, homepage, deck | batch 2 | ☐ |
+| B22 | Track the bot install, and pay for it | `app/api/discord/installed/route.ts`, the signal quest | batch 2 | ☐ |
+| B23 | Page consolidation, the footer, and the copy rewrite | `/servers`+`/discord-bot`→one, new `/for-brands`, `/brands`→`/contact`, `/pricing`, `/`, `/blog`, the footer | batch 2 | ☐ |
+| B24 | Park localization (keep the machinery, drop the switch) | the footer, the AR copy workflow | batch 2 | ☐ |
+| B25 | The gamer's Discord card: trophy case ×3, one button per account | the profile card kind, `lib/discord/screens.ts` | batch 3 | ☐ |
+| B26 | LoL stats read as ranks; the level stops appearing twice | `lib/providers/adapters.ts` consumers, every metric renderer | batch 3 | ☐ |
+| B27 | Every bot card: data reads well, buttons grouped by meaning and position | every card kind, `lib/discord/components.ts` | batch 3 | ☐ |
+| B28 | The bot preview rebuilt — scoped per section, live renders instead of shots | the preview component, the marketing pages | batch 3 | ☐ |
+| B29 | Everything new is an admin system, staffable by department | `lib/systems.ts`, every new surface | batch 3 | ☐ |
+| B30 | The founding offers: admin console, paused by default, bill discounts | `lib/offers.ts`, `lib/invoices.ts`, new `/admin/offers` | batch 3 | ☐ |
+| B31 | Welcome challenges: auto-drafted, sponsored by Cluster, billed to Cluster | the install path, the server portal, the house brand, billing | batch 3 | ☐ |
+| B32 | Email: Resend, one template system, a delivery console | new `lib/email/`, `email_log`, new `/admin/email` | batch 4 | ☐ |
+| B33 | **Announcements become a queue** (live bug — sequential await in a server action) | `lib/discord/announce.ts`, the calling actions, a drain cron | batch 4 | ☐ |
+| B34 | **The repriced economy**: 1,000 CP = $0.10, every action capped, 500/day ceiling | `lib/quests.ts`, `lib/marketplace.ts`, supersedes B16/B17's numbers | batch 4 | ☐ |
+| B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | payouts, tier unlocks, signup | batch 4 | ☐ |
+| B36 | Brands prepay: due on issue, live on creation, settled by the first challenge's end | `lib/invoices.ts`, publishing, dunning | batch 4 | ☐ |
+| B37 | The legal framing of the economy | new `/legal/economy`, redemption eligibility gates | batch 4 | ☐ |
+| B38 | One gamer, one account, one challenge | challenge entry rules | batch 4 | ☐ |
+| B39 | Stuck money: every state where a prize has nowhere to go | challenges, redeems, an admin view | batch 4 | ☐ |
+| B40 | Deleting an account with a balance | `app/settings/account` | batch 4 | ☐ |
+| B41 | The gamer homepage: hero, challenges, quests, missions, Discord | `app/page.tsx` | batch 4 | ☐ |
+| B42 | Missions: the guided first week, on homepage, quests page and feed | `lib/quest-game.ts` `StarterMissions` | batch 4 | ☐ |
+| B43 | Welcome challenges under admin control (amends B31) | admin challenges, the welcome type | batch 4 | ☐ |
+| B44 | The promotional campaigns console (amends B30) + funding figure is $100K | `/admin/offers`, `lib/invoices.ts`, the deck | batch 4 | ☐ |
+| B45 | The portal key follows ownership | the guild refresh path, key rotation | batch 4 | ☐ |
+| B46 | Spend limits on storage and rendering | `lib/storage-audit.ts`, the card cache, `/admin/storage` | batch 4 | ☐ |
+| B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **Part I closed on: _______** (fill this in; until then Part II does not start.)
+
+**Reordering:** the numbers are arrival order, not priority — see §1.6. Reorder
+freely, never renumber.
+
+### The suggested order — small first, heavy after
+
+Ship the quick wins before the hard items. Not because they matter more, but
+because each one is a commit that stands on its own, they are the fastest way to
+make the product visibly better, and they leave a working app behind at every
+point. The heavy items take days and are more pleasant to start once the small
+irritations are gone.
+
+| Wave | Items | Why here |
+|---|---|---|
+| **0 — the live bugs, before anything else** | **B33** the announcement queue · **B1** the spam audit | **B33 is a verified live bug that corrupts data rather than erroring** — the fan-out is a sequential await inside a server action with no `maxDuration`, so past ~50 servers it is killed mid-loop and records a plausible, wrong reach. B1 announces every account link to *every* server on the network. Neither is a UI nicety. If no real servers carry the bot yet, both can wait for wave 2 — but they get worse with exactly the growth being built for. |
+| **1 — quick wins and UI** | **B9** nav badge · **B26** LoL ranks + the duplicated level · **B25** bot profile card · **B10** one background image · **B12** live-only planet hero · **B24** park localization (delete the language switch) · **B7** the shot plumbing · **B2** the CP coin · **B27** bot card buttons | Small, independent, each shippable in its own commit. **B7 belongs here, early**, so `<FeatureShot>` slots can be dropped into every page as it is touched — visibly empty, filled by V1 much later. Placing a slot costs a line; retrofitting them all at the end costs a day. **But do not carpet the pages B23 will rewrite** — on `/`, `/pricing`, `/servers`, `/discord-bot`, `/brands` and `/blog`, place slots only where you are confident the section survives consolidation. Everywhere else, place freely. |
+| **1.5 — email, because everything else notifies through it** | **B32** | Small, self-contained, and every money item in wave 2 wants to send something. Doing it before them means the notifications go in as those features are built rather than being retrofitted. |
+| **2 — the economy and the money** | **B34** the repriced economy · **B16** the model + calculator · **B17** caps · **B35** anti-abuse · **B36** brands prepay · **B37** legal framing · **B38** entry rules · **B39** stuck money · **B40** deletion with a balance · **B15** new CP actions · **B22** install attribution · **B18** the wallet · **B6** redeem/marketplace steppers · **B19** marketplace · **B20** the bot wallet card · **B5** gifting · **B44** the promo console · **B30** offers · **B31**/**B43** welcome challenges | **B34 first — it decides the numbers everything else spends.** Then B16/B17 build the machinery around them. These six carry their suites with them (§1.1's exception): B33, B34, B35, B36, B37, B39. |
+| **3 — surfaces and story** | **B41** the gamer homepage · **B42** missions · **B11** nav planet dropdown · **B13** the guides · **B14** the Home card · **B3** bot list cards and flows · **B4** the server portal in Discord · **B21** the visual explainer · **B28** the bot preview · **B23** page consolidation and copy · **B8** the claim registry · **B45** key rotation · **B46** spend limits | The expensive, high-surface work. **B23 and B8 last** — they consume everything the earlier waves produce, and doing them before the product settles means writing the copy twice. |
+| **continuous** | **B29** | Not a wave. Every item in every wave registers its surface as an admin system before it is called done. |
 
 ---
 
@@ -816,14 +935,1475 @@ is checkable); no broken images anywhere.
 
 ---
 
-## B9+ — Everything added from here
+## B9 — Nav: the marketplace badge
 
-This section is deliberately empty and deliberately last. Each new instruction
-becomes the next numbered heading below — `## B9 — <what it is>` — written to
-the same shape as B1–B8:
+The trophy marketplace is an icon in the nav. It becomes a **badge, beside the
+planets badge**, in the same visual family — and **admin-editable** the same way
+the planets badge is (art, label, visibility, order), through the existing
+chrome editor rather than a new one.
+
+Files: `components/Nav.tsx`, `lib/admin-nav.ts` / the chrome CMS keys,
+`lib/mobile-nav.ts` for the mobile equivalent.
+
+**Verification owed → `tests/ui/nav.mjs`:**
+- The marketplace badge renders beside the planets badge, not as a bare icon.
+- An admin change to its art/label shows on the next render.
+- It appears in the mobile drawer too, in the same order.
+
+**Shots owed:** `nav.badges` — "One nav, two doors: your planets and the
+marketplace" — the signed-in nav.
+**New routes:** none.
+
+---
+
+## B10 — One background image behind a component group, not three copies
+
+The nav art is painted **three times**: once behind the nav, once behind the
+collapsed Profile-of-the-Week band, once behind the expanded band (darker). It
+should be **one image, one element, overflowing** — the nav sits on it, the
+collapsed band continues it, and when the band expands the same image continues
+into the expanded panel.
+
+The general rule, which is the part that outlives this instance: **a background
+image belongs to a component *group*, not to each component in it.** One
+positioned layer at the group root, children transparent over it, the darker
+expanded state achieved with a veil over the shared image rather than a second
+copy of the image.
+
+Why this matters beyond looks: three copies means three downloads, three
+decodes, and three chances for the art to align a pixel differently — which is
+exactly why the seam is visible today.
+
+Apply to the nav + Profile-of-the-Week group first, then **audit every other
+background-art surface for the same pattern** (`lib/card-bg.ts` consumers, the
+page-background editor, the feed cards) and collapse any other duplicates found.
+Record what was found in the commit message.
+
+**Verification owed → `tests/ui/backgrounds.mjs`:**
+- Exactly one element carries the nav background art URL (count nodes whose
+  computed `background-image` resolves to it).
+- The collapsed band and the nav share one continuous image (assert the layer is
+  a common ancestor of both).
+- Expanding the band does not add a second copy; the darker look comes from an
+  overlay.
+- No other component group paints the same URL more than once.
+
+**Shots owed:** `nav.potw.expanded` — "One continuous surface" — nav with the
+Profile-of-the-Week band expanded.
+**New routes:** none.
+
+---
+
+## B11 — Nav game badges open the planet, in place
+
+Clicking a game logo in the nav navigates to that game's planet page. It should
+instead **expand a dropdown**, exactly like the Profile-of-the-Week dropdown:
+full-width, the hero globe art, the game world, everything the planet page shows
+— and clicking a **different** game logo swaps the world in place rather than
+closing and reopening.
+
+This is the same interaction the homepage hero already implements (game logos
+expand a world; clicking another game changes it). **Reuse that component. Do
+not write a second one** — two implementations of the game-world hero will
+diverge inside a month, and the homepage one is the one that has been tuned.
+
+The dropdown ends with a **"Open the planet"** button to the full page, because
+the dropdown is a preview surface, not a replacement for the page.
+
+Files: `components/Nav.tsx`, the homepage hero world component, `lib/hero-layout.ts`.
+
+**Verification owed → `tests/ui/nav-planet.mjs`:**
+- Clicking a game badge expands a panel and does **not** navigate.
+- The globe art and the game world render inside it with real data.
+- Clicking a second game swaps the content without collapsing the panel.
+- The "Open the planet" button navigates to `/planets/<slug>`.
+- Escape and outside-click close it (the existing dropdown behaviour).
+
+**Shots owed:** `nav.planet.dropdown` — "Every game, one click from anywhere" —
+the nav dropdown with a game world open.
+**New routes:** none.
+
+---
+
+## B12 — Planet hero shows live challenges only; completed ones live on the page
+
+The planet hero globe currently lists challenges regardless of state. Split it:
+
+- **Hero: live challenges only.** A hero is a "what can I do right now" surface,
+  and an ended challenge in it is an invitation to do nothing.
+- **Planet page: a Completed section.** Every finished challenge for that game,
+  with its **final standings, the scoring, and the numbers** — who placed where,
+  on what metric, with what figure. This is the proof the scoring is real, and
+  it is currently only visible while a challenge is running, which is precisely
+  backwards.
+
+Files: `app/planets/[slug]/page.tsx`, the planet hero components, `lib/challenges.ts`.
+
+**Verification owed → `tests/ui/planet.mjs`:**
+- The hero lists only challenges whose state is live.
+- A completed challenge appears in the Completed section on the page.
+- Its standings render with real placements and metric figures.
+- A game with no completed challenges shows an honest empty state, not a gap.
+
+**Shots owed:** `planet.completed.standings` — "Every challenge settles in
+public" — a planet page's completed section with standings.
+**New routes:** none.
+
+---
+
+## B13 — The bot guides, rebuilt
+
+Fewer than nine cards, redesigned from scratch, each one a *thing a gamer needs
+to understand* rather than a step in a manual:
+
+1. **Challenges and scoring** — how you enter, how you are scored, what the
+   game's own ladder has to do with it, what happens when it ends.
+2. **Trophies and redeem** — what a trophy is, that it holds a cash value, how
+   you cash it out, and that we never ask for your bank details.
+3. **Cluster Points** — the overview: every action that earns, what each is
+   worth, the daily cap on each, and what points turn into.
+
+Plus the three install cards (B14), which are also reachable from Home.
+
+Design bar: these are the product's teaching surface and they currently read
+like documentation. Every one is a **visual** — boxes, icons, numbers — not a
+paragraph. The coin (B2) beside every figure.
+
+**Verification owed → `tests/ui/bot-guides.mjs`:**
+- Fewer than nine guide kinds are registered.
+- Each renders 200 from `/api/card/<kind>` at a plausible byte size.
+- The CP guide lists every earning action with its weight and its daily cap,
+  and those numbers equal `ACTION_CATALOG` (assert against the source, so the
+  card cannot drift from the engine).
+- Every guide is reachable from Home and from `/cluster guide`.
+
+**Shots owed:** `bot.guide.cp`, `bot.guide.challenges`, `bot.guide.trophies` —
+"The bot teaches in cards" — `/api/card/<kind>`.
+**New routes:** none.
+
+---
+
+## B14 — The Home card: a Cluster home page, in Discord
+
+`Home` gets a new card kind, `home`, which is the gamer's actual home page:
+
+**Background:** their own profile customization if they have one, otherwise the
+admin-set card background — so a decorated profile is visibly rewarded and an
+undecorated one still looks deliberate.
+
+**Top left:** their Discord display name, their avatar, and beneath the name
+**the logos only** of the games they have linked. No labels — the logos are the
+statement.
+
+**Row 1 — three live challenges**, side by side, each glorified with the
+challenge cover and the game logo on it, plus a **More challenges** button →
+an all-challenges card, filterable by game, showing **active challenges only**.
+
+**Row 2 — the four quests**, side by side, plus a **Quests** button → all
+quests. Opening a quest shows the gamer's progress, their CP (with the coin),
+and a clear, organised list of **the actions that earn CP on that quest** —
+each with its value and its daily cap (B17).
+
+The three install cards (B13) are reachable from here too, so a gamer who
+arrives late still gets the introduction.
+
+**Verification owed → `tests/ui/bot-home.mjs` + `tests/db/bot-home.mts`:**
+- The card renders for a gamer with a customized profile and for one without.
+- Linked-game logos match that gamer's linked accounts exactly.
+- Row 1 holds three challenges, all live.
+- Row 2 holds four quests with the gamer's real progress.
+- The game filter on the all-challenges card returns only that game's active
+  challenges.
+- A gamer with zero linked games and zero progress still gets a card that
+  renders (the empty state is the most common first impression).
+
+**Shots owed:** `bot.home` — "Your whole Cluster, in one card" —
+`/api/card/home`.
+**New routes:** none.
+
+---
+
+## B15 — The new CP actions, wired into the quests that already exist
+
+`ACTION_CATALOG` in `lib/quests.ts` has 20 actions. The features shipped since
+it was written earn nothing:
+
+| New action | Quest | Why there |
+|---|---|---|
+| `redeem_trophy` | ascension | Cashing out is the end of the loop and should be celebrated, not silent |
+| `gift_sent` | orbit | Giving is the most social act in the product |
+| `gift_received` | orbit | And receiving pulls the recipient back in |
+| `bot_added` | signal | See B22 — this one grows the platform |
+
+Weights and caps are set by B16's calculator, not picked here.
+
+**Glorify the actions themselves.** Quests can now earn real money — a gamer
+who tops up their CP is topping up something redeemable — and the whole site
+still talks about them as if they were a score. Every quest surface should make
+the action feel like the opportunity it is.
+
+**Verification owed → `tests/db/quests.mts`:**
+- Each new action awards on the real code path (redeem, gift send, gift receive,
+  bot add), not a test-only shim.
+- Each is deduped by `(quest, action, ref)` like every existing action.
+- Each respects its daily cap.
+
+**Shots owed:** `gamer.quest.actions` — "Every action, what it pays, what it
+caps at" — a quest page's action list.
+**New routes:** none.
+
+---
+
+## B16 — The CP economics model and the admin calculator
+
+**This is the most important item in Part I, and the only one where getting it
+wrong costs money rather than time.**
+
+### B16.0 What the code says today
+
+Grounded in `lib/quests.ts` and `lib/marketplace.ts`, not assumed:
+
+- **1,000 CP = $1** (`DEFAULT_CP_PER_DOLLAR`), admin-movable via
+  `platform_settings["marketplace.cpPerDollar"]`.
+- Ten actions carry a `defaultCap`. **Nine do not** — `finish_challenge`,
+  `top3_challenge`, `win_challenge`, `join_planet`, `follower_gained`,
+  `profile_views_25`, `connect_account`, `profile_vote_received`,
+  `best_profile_award`.
+- Maximum **capped** earnings, one quest per action, per gamer per day:
+
+  | Action | CP | Cap/day | CP/day |
+  |---|---|---|---|
+  | `stat_levelup` | 25 | 20 | 500 |
+  | `reaction_received` | 3 | 50 | 150 |
+  | `write_post` | 10 | 10 | 100 |
+  | `write_comment` | 5 | 20 | 100 |
+  | `botlist_vote` | 50 | 2 | 100 |
+  | `join_challenge` | 15 | 5 | 75 |
+  | `reaction_given` | 2 | 30 | 60 |
+  | `message_new` | 4 | 15 | 60 |
+  | `ad_impression` | 1 | 60 | 60 |
+  | `ad_click` | 5 | 10 | 50 |
+  | **Total** | | | **1,255 CP/day = $1.26/gamer/day** |
+
+  Plus an **unbounded tail** from the nine uncapped actions.
+
+- **An action can pay more than once.** `awardAction` credits **every quest
+  listening to that action**, and the cap is stored per quest. Point two quests
+  at `ad_impression` and both the reward and the cap double. This is a feature
+  as designed and a multiplier that must appear in the model.
+
+At $1.26/day the worst case is **$1,255/day at 1,000 gamers, $125,500/day at
+100,000, $1.26M/day at 1,000,000** — before the uncapped tail. That is the
+number this item exists to bring under control.
+
+### B16.1 The model
+
+`lib/cp-economics.ts` — pure functions, no I/O, so it can be tested and reused
+by the calculator, the admin dashboards and the financial model:
 
 ```
-## B9 — <the instruction, in the owner's own words where possible>
+maxDailyCp(config)            → per gamer, with the multi-quest multiplier applied
+maxDailyCost(config, gamers)  → dollars, at any population
+exposure(config)              → { capped, uncapped[], worstCase, realistic }
+abuseSurface(config)          → every action reachable without spending money
+                                 or playing a game, ranked by CP per minute
+```
+
+Every uncapped action is listed by `exposure()` as an open liability with the
+reason it is open — some genuinely should be (winning a challenge should not be
+rationed) and the model must say so rather than silently zeroing them.
+
+### B16.2 The calculator
+
+`/admin/cp-calculator`, staff-visible, admin-editable:
+
+- Every action, its CP weight, its daily cap, which quests listen to it, and its
+  resulting **CP/day and $/day per gamer** — recomputed live as you drag.
+- **Population sliders**: 1k / 10k / 100k / 1M, and a free entry.
+- **Participation assumptions**, because "every gamer maxes every action" is the
+  worst case, not the forecast: what share are daily-active, what share of the
+  cap an active gamer actually reaches. Both editable, both shown beside the
+  worst case so the two numbers are never confused.
+- **Offsetting revenue** on the same screen — ad revenue per impression, brand
+  spend per challenge — so the question is answered as *margin*, not as cost.
+- **Save**: writes the weights and caps back to the quests and to
+  `platform_settings`, platform-wide, in one transaction, with an audit-log
+  entry recording who changed what from what to what. **Money settings are the
+  one place where "who changed this" is not optional.**
+
+### B16.3 Defaults that keep us safe
+
+> **Superseded by B34.** The numbers were decided after this item was written:
+> 1,000 CP = $0.10, every action capped, and a hard ceiling of 500 CP per gamer
+> per day. B16 still builds the model and the calculator — B34 is what they are
+> initialised with, and B34.0 explains why. Read B34 before touching a weight.
+
+
+Propose and apply a default cap for **every** action, including the nine open
+ones, chosen so that **maximum CP per gamer per day lands under a stated ceiling
+in dollars** — the ceiling itself being an admin setting, so the policy is one
+number rather than twenty.
+
+Where an action should not be rationed (winning a challenge), cap it at a level
+no honest gamer reaches but a script does, and say that in the UI.
+
+**Verification owed → `tests/db/cp-economics.mts`:**
+- `maxDailyCp` equals a hand-computed figure for a known config (the table
+  above is the fixture).
+- The multi-quest multiplier is counted: an action on two quests pays twice and
+  caps twice.
+- No action in `ACTION_CATALOG` lacks a cap after the defaults are applied.
+- Saving from the calculator changes what `awardAction` actually grants — assert
+  through the real award path, not the settings row.
+- The worst-case daily cost at 1M gamers is under the configured ceiling.
+- The audit log records every change.
+
+**Shots owed:** `admin.cp.calculator` — "Every point we give away, modelled
+before we give it" — `/admin/cp-calculator`.
+**New routes:** `/admin/cp-calculator`.
+
+---
+
+## B17 — Daily caps on every action, enforced silently and shown honestly
+
+Two halves, and the second is what makes the first humane.
+
+**Enforce:** every action carries a cap (B16.3). `awardAction` already checks
+one; extend it so no action is uncapped, and so the cap is evaluated across
+quests, not per quest, when the config says so.
+
+**Say nothing when it is reached.** No error, no toast, no "you've hit your
+limit", no disabled button. The action still works — the post posts, the ad
+still counts as an impression for the brand — it simply stops earning. A gamer
+who is told they have hit a limit feels metered; a gamer who is not told feels
+nothing, and comes back tomorrow.
+
+**But never hide it.** The cap for every action is stated **up front** on the
+quest card and in the CP guide, and when today's cap is reached the CP history
+shows the entry — *"Ad views — daily maximum reached (60/60)"* — so anyone who
+looks can see exactly what happened and when it resets. The rule is **no
+interruption, full disclosure**: nothing blocks, nothing surprises.
+
+**Verification owed → `tests/db/caps.mts` + `tests/ui/caps.mjs`:**
+- Past the cap, the underlying action still succeeds and awards zero.
+- No error is returned, thrown or rendered, and no control is disabled.
+- The cap resets at UTC midnight (the boundary `startOfUtcDay()` already uses).
+- Every quest card renders the cap next to every action.
+- The CP history shows a maxed entry with the figure and the reset.
+
+**Shots owed:** `gamer.cp.capped` — "Capped, and told plainly" — the CP history
+showing a maxed action.
+**New routes:** none.
+
+---
+
+## B18 — The wallet
+
+A new gamer page, `/wallet`, which is the gamer's financial statement.
+
+**Centre of the page: Cluster Points, with the dollar value beside them, always.**
+A currency whose worth is a mystery is a score. Below it, the **trophy case**:
+each trophy with its own cash value, the total, and a redeem action on each.
+
+Below that, **the ledger** — one list, in and out, like a bank statement:
+
+| | |
+|---|---|
+| Earned 120 CP — Connected a game account | `+` |
+| Bought *Nebula Cup* — 5,000 CP | `−` |
+| Trophy received — *Nebula Cup*, worth $5.00 | `+` trophy in |
+| Redeemed *Nebula Cup* — $5.00 | `−` trophy out |
+| Gift received — *Comet Shard*, worth $2.00 | `+` trophy in |
+
+Every CP movement with what it was for; every trophy movement in or out with
+what it was worth. A gamer should be able to answer "where did my points go and
+what do I have" without asking anyone.
+
+The **marketplace is embedded here too** — buying is a wallet action, and making
+someone navigate elsewhere to spend the balance they are looking at is a
+self-inflicted drop-off.
+
+**Verification owed → `tests/ui/wallet.mjs` + `tests/db/wallet.mts`:**
+- CP balance and its dollar value both render, and the dollar value equals
+  `balance / cpPerDollar`.
+- Trophy case totals equal the sum of the individual values.
+- The ledger contains an entry for every CP movement and every trophy movement,
+  signed correctly, and reconciles: balance = earned − spent.
+- Redeeming from the wallet reaches the same server function as the trophy case.
+- No payment detail appears on the page, in any state.
+
+**Shots owed:** `gamer.wallet` — "Your points, your trophies, what they are
+worth" — `/wallet`; `gamer.wallet.ledger` — "Every point accounted for".
+**New routes:** `/wallet`.
+
+---
+
+## B19 — Marketplace, revamped
+
+`/marketplace` and the marketplace section on the quests page, rebuilt to match
+the wallet: every trophy with its CP price **and its dollar value**, what your
+balance buys right now, and the confirm step from B6.
+
+**Verification owed → `tests/ui/marketplace.mjs`** (extend the existing suite):
+- Every trophy shows CP price and dollar value.
+- Affordability is computed against the real balance.
+- The quests-page section and the page itself show the same prices.
+
+**Shots owed:** `gamer.marketplace.shelf` (already registered — recapture).
+**New routes:** none.
+
+---
+
+## B20 — The wallet card, in Discord
+
+The bot's wallet card, working properly: CP with its dollar value, the trophy
+case with its dollar value, **recent transactions**, and a **redeem** flow that
+completes inside Discord (B3.4's stepper, reached from here).
+
+Same numbers as `/wallet`, from the same functions — assert it, because two
+implementations of a balance is how a support ticket starts.
+
+**Verification owed → `tests/ui/bot-wallet.mjs`:**
+- The card renders with balance, dollar value, trophy case and recent movements.
+- Its figures equal `/wallet`'s for the same gamer.
+- Redeem completes from Discord and shows in the web ledger.
+
+**Shots owed:** `bot.card.wallet` — "Your wallet, in Discord" —
+`/api/card/wallet`.
+**New routes:** none.
+
+---
+
+## B21 — The economy, explained in visuals
+
+The loop, told everywhere it matters, in pictures rather than paragraphs:
+
+> **You earn points for free, by doing things. Points buy trophies. Trophies
+> redeem for real money.**
+>
+> Enter a challenge for a chance at a trophy. **Lose, and you still earn** — for
+> entering, for linking an account, for showing up. You can earn as little as
+> watching an ad or clicking one. Every action has a daily maximum, and it is
+> written next to the action.
+
+This runs through the bot guides (B13), the quest pages, the wallet (B18), the
+homepage (B23) and the pitch deck. Same loop, same order, same visual language
+everywhere — a gamer who learns it in Discord should recognise it on the site.
+
+**Verification owed → `tests/ui/economy-copy.mjs`:**
+- Every surface in the list states the loop in the same order.
+- Every surface that mentions earning also states the cap.
+- No surface promises an amount the caps make unreachable.
+
+**Shots owed:** `gamer.economy.loop` — "Free points → trophies → real money".
+**New routes:** none.
+
+---
+
+## B22 — Track the bot install, and pay for it
+
+Anyone who clicks **Add the bot to your server** and completes the install
+should earn CP on the **signal** quest — a Cluster member who brings us a server
+has done the single most valuable thing a gamer can do for us.
+
+- Attribute the click: a signed state parameter through the OAuth install URL
+  back to `app/api/discord/installed/route.ts`, which already receives
+  `guild_id`. Attribute to the signed-in Cluster user, if there is one.
+- Award once per guild, not once per click — the dedup key is the guild id.
+- **Default 500 CP, adjustable** in the calculator (B16) like every other
+  weight. Ad impression and ad click likewise become adjustable there rather
+  than living as constants.
+
+**Verification owed → `tests/db/bot-attribution.mts`:**
+- A completed install by a signed-in gamer awards signal CP once.
+- A second install of the same guild awards nothing.
+- An install by somebody with no Cluster account awards nothing and does not
+  error.
+- The award respects the daily cap and the configured weight.
+
+**Shots owed:** `gamer.quest.signal` — "Bring us a server, get paid for it".
+**New routes:** none.
+
+---
+
+## B23 — The page consolidation, the footer, and the copy
+
+The public site says the same things in several places with different words. One
+page per audience, and each one carries the screenshots that prove it.
+
+| Page | Becomes |
+|---|---|
+| `/servers` + `/discord-bot` | **One server-owner page.** The pitch, the portal screenshot, the three tiers glorified. One hero, one argument. |
+| *(new)* `/for-brands` | **The brand page.** Same shape as the server-owner page, different colour treatment, the brand-portal screenshot, the three pricing tiers. |
+| `/brands` | It is a contact form, so it becomes **`/contact`**, linked from the footer. |
+| `/pricing` | **One element only**: the tier switcher — *brands pay* ⇄ *owners earn* — with links to the two pages above. Nothing else. |
+| `/` (guest **and** signed-in) | **The gamers page.** The homepage is the for-gamers page, in both states, fully rewritten and reordered. |
+| `/blog` | Revamped to the same structure and rhythm as the rest. |
+| Footer | Rebuilt: structured, clean, one system across every page. **Remove the language switch** (B24). |
+
+Every section on every one of these pages carries **the screenshot that belongs
+to that section** — `<FeatureShot>` slots placed during this item, filled by V1.
+
+Copy: rewritten end to end. The positioning holds — *the media-buying and
+monetization layer for gaming communities* — but each page now argues to one
+audience instead of three, and every section is **claim → proof**.
+
+**Verification owed → `tests/ui/pages.mjs`:**
+- Each consolidated page renders, with its hero, its tiers and its shot slots.
+- `/servers` and `/discord-bot` resolve to the one page (redirect, not a
+  duplicate).
+- `/brands` redirects to `/contact` and the old URL does not 404 for anyone who
+  bookmarked it.
+- `/pricing` contains the switcher and no second pitch.
+- The homepage renders the gamers page signed in and signed out.
+- The footer is identical across pages and carries no language switch.
+- Every nav and footer link resolves (crawl, do not assume).
+
+**Shots owed:** `page.servers.hero`, `server.tiers.three`, `page.brands.hero`,
+`brand.tiers.three`, `page.pricing.switch`, `page.home.gamer` — one per page,
+plus the per-section slots.
+**New routes:** `/for-brands`, `/contact` (and redirects from `/servers`,
+`/discord-bot`, `/brands`).
+
+---
+
+## B24 — Park localization
+
+Translation is out of scope until the product stops moving. Rewriting copy twice
+in two languages while the pages themselves are being consolidated is paying for
+the same work twice and getting the Arabic wrong both times.
+
+- **Remove the language switch from the footer.**
+- Stop maintaining AR alongside every copy change; English is the working
+  language for the whole of Part I.
+- **Keep the machinery.** `lib/i18n`, the locale-namespaced CMS keys, the
+  per-entity translation columns all stay exactly where they are, unused. This
+  is a pause, not a removal, and ripping the plumbing out would make resuming
+  cost more than the pause saved.
+- Add a line to the V4 report saying localization is parked and what it will
+  take to restart.
+
+**Verification owed → `tests/ui/pages.mjs`** (same suite as B23):
+- No language switch renders in the footer.
+- Setting a locale does not break a page (the machinery still resolves).
+
+**Shots owed:** none.
+**New routes:** none.
+
+---
+
+## B25 — The gamer's Discord card: the trophy case, and one button per account
+
+Two additions to the gamer/profile card:
+
+**Trophy case, up to three.** The three most valuable trophies they hold,
+rendered on the card — cover, name, cash value. Three because a card is 1200×630
+and a fourth makes all four unreadable; "up to" because a gamer with one trophy
+should see one, not two empty frames.
+
+**One button per linked account, labelled with the account's own name.** Not
+"Valorant" — *"NovaStrike#EUW"*. And when a gamer has **two accounts on the same
+game**, that is **two buttons**, one per account, each opening that account's
+stats. The current card collapses them, which is exactly the case where a gamer
+most needs to choose.
+
+Button budget: 5 per row, 25 total. Six games × two accounts is 12 buttons,
+which fits, but the layout must not assume one row.
+
+**Verification owed → `tests/ui/bot-profile-card.mjs`:**
+- A gamer with 5 trophies shows exactly 3, the most valuable ones.
+- A gamer with 1 trophy shows 1 and no placeholders.
+- A gamer with 0 trophies renders without an empty shelf.
+- Each linked account produces its own button, labelled with the in-game name.
+- Two accounts on one game produce two distinct buttons that open different
+  stats screens.
+- A gamer with 12 linked accounts stays inside Discord's component limits.
+
+**Shots owed:** `bot.card.profile` — "Your trophies and every account, on one
+card" — `/api/card/profile`.
+**New routes:** none.
+
+---
+
+## B26 — LoL stats read as ranks, and the level stops appearing twice
+
+Two defects in the League of Legends surfaces, both visible today.
+
+**Ranks render as numbers instead of ranks.** `lib/providers/adapters.ts` already
+returns `solo_tier` and `flex_tier` as `{ value, rankLabel }`, where `rankLabel`
+is the real thing — *"GOLD II"* — and `value` is the sortable ladder position it
+was derived from. The cards render `value`. A gamer looking at their own LoL
+card sees a score they have never heard of instead of the rank they earned.
+
+Fix: **wherever a metric carries a `rankLabel`, that label is the display value
+and the number is only for sorting.** Not a LoL special case — Dota's
+`rank_tier` carries one too (`dotaRankLabel`), and every ladder game added later
+will. Make it a rule in the metric renderer, once, and the next game inherits it.
+
+Show **both** LoL ranks as text on the card: **Solo/Duo** and **Flex**.
+
+**The level appears twice.** The LoL stats card lists the summoner level as two
+separate tracked stats — `summoner_level` from the adapter and a generic `level`
+metric that shadows it. One of them must go; keep the named one, and check the
+same collision on every other provider before closing this out (the generic
+`level` mapping near `adapters.ts:614` is shared).
+
+**Verification owed → `tests/db/metrics.mts` + `tests/ui/lol-card.mjs`:**
+- A metric with a `rankLabel` renders the label, never the number, on every
+  surface: profile, planet, leaderboard, and the Discord card.
+- Sorting still uses the number (assert a leaderboard orders correctly while
+  displaying labels).
+- The LoL card shows Solo and Flex, both as text.
+- No stat key appears twice on any account card, for any provider — assert
+  across all of them, not just LoL.
+
+**Shots owed:** `gamer.lol.card` — "Your rank, in the game's own words" — a
+profile's LoL account card.
+**New routes:** none.
+
+---
+
+## B27 — Every bot card: the data reads well, the buttons are grouped
+
+A sweep across **every** card kind and every screen, not a fix to one:
+
+**The cards.** Each kind gets read as a *page*: is the hierarchy right, does the
+most important number dominate, is anything clipped, does an empty state look
+deliberate. The list cards established the working conventions (`TILE_W = 218`,
+three across, no fixed text height because it clips descenders, `clamp()` on
+names, numbered badges matching numbered buttons) — apply them everywhere and
+record any kind that cannot follow them, with the reason.
+
+**The buttons.** Group them by meaning, in a fixed row order, so muscle memory
+works across screens:
+
+```
+row 1 — what this card is about   (the choices: pick a game, a challenge, a trophy)
+row 2 — what you can do next      (join, link, redeem, buy)
+row 3 — where you can go          (Home, Back, and the link out to the web)
+```
+
+Colours by category are already decided (B3.0.2); this adds *position* to
+*colour*. Back is always in the same place, on every card, which is the single
+biggest usability change in this item.
+
+**Verification owed → `tests/ui/bot-cards.mjs`** (extend):
+- Every registered card kind renders 200 at a plausible size.
+- No card kind has an empty button set.
+- Row order matches the grouping above on every screen.
+- Back and Home sit in the same position on every card that has them.
+- No screen exceeds 5 per row or 25 total.
+
+**Shots owed:** none new — the existing bot card shots recapture.
+**New routes:** none.
+
+---
+
+## B28 — The bot preview, rebuilt — and used instead of screenshots
+
+The live bot preview exists and is not doing its job. Rebuild it:
+
+- **Better sidebar navigation**, grouped by what a person is trying to
+  understand rather than by card kind.
+- **Scoped**: a preview embedded in a page section shows **only the cards
+  relevant to that section**. The challenges section shows challenge cards; the
+  quests section shows quest cards; the trophies section shows trophy and redeem
+  cards; the server-owner section shows the `srv_*` portal cards; the gamer
+  section shows the gamer's own cards.
+- **Every card type, what it does, and how to ask for it** — the command or
+  button that produces it, beside it. A preview that shows the output without
+  the input teaches nothing.
+
+**And then use it instead of screenshots.** Where a page demonstrates the bot,
+embed the **real rendered card**, not a `<FeatureShot>` of one. The card renderer
+is live, public and cached (`/api/card/<kind>`) — a screenshot of it would be a
+photograph of something we can just show. `<FeatureShot>` stays for everything
+the renderer cannot produce: portals, admin consoles, web pages.
+
+This is a real saving in V1 as well: every bot claim proves itself at request
+time and never goes stale.
+
+**The coupling this creates, and the mitigation.** A marketing page that embeds
+live renders is a marketing page that depends on the card renderer being up and
+fast. Every embed therefore needs a **static fallback** — the last successfully
+rendered card, served from cache, with the live render as an upgrade rather than
+a requirement. The homepage must never be slow or broken because
+`/api/card/` is. This slightly reduces the "no screenshots needed" saving and is
+worth it.
+
+**Verification owed → `tests/ui/bot-preview.mjs`:**
+- The preview renders on the server-owner page, the homepage and the gamer page.
+- Each embedded instance shows only its section's card kinds.
+- Every card in the sidebar renders and states the command that produces it.
+- The embeds are live renders, not images (assert the source is `/api/card/`).
+- A card kind that fails to render degrades visibly, never to a blank frame.
+
+**Shots owed:** none — this item *removes* shots. Record which R2 rows it
+retires.
+**New routes:** none.
+
+---
+
+## B29 — Everything new is an admin system, staffable by department
+
+A standing rule, applied to every item in this plan and every one after it:
+
+**Nothing ships without an owner in the admin taxonomy.** If admin cannot see
+it, edit it, and delegate it, it is not finished. `lib/systems.ts` already makes
+admin sections drive departments — every new surface registers there, gets its
+actions, and becomes assignable to a department exactly like everything before
+it. No parallel permission logic, no page that only works because you happen to
+be an admin.
+
+Applies to, at minimum: the CP calculator (B16), caps configuration (B17), the
+wallet (B18), the shot console (B7), the bot preview (B28), the offers console
+(B30), welcome challenges (B31), and every card kind's content and background.
+
+**The two standing exceptions hold and are re-asserted here**: `/admin/users`
+and `/admin/linked-accounts` are **admin-only** — no department reaches the gamer
+directory or the linked-account list. `/admin/payments` likewise. B29 makes new
+things delegable; it does not widen those two.
+
+**Verification owed → `tests/db/taxonomy.mts`** (extend):
+- Every admin route resolves to a registered system with actions.
+- A department granted a system reaches its pages and no others.
+- The two admin-only paths refuse every department, including one granted
+  everything.
+- No new page checks permissions on its own instead of through `pathAllowedFor`.
+
+**Shots owed:** none.
+**New routes:** none.
+
+---
+
+## B30 — The founding offers: admin-controlled, paused, and measured
+
+`lib/offers.ts` already models both founding offers — 1,000 servers with a
+welcome challenge, and the brand acquisition offer — from pricing and CMS keys.
+What it lacks is a switch, an audit and a bill.
+
+### B30.1 The console
+
+`/admin/offers`, a first-class admin system (B29):
+
+- **On/off per offer, off by default.** Both are **paused now** and turned on
+  when we decide, not when the code deploys.
+- **Every number editable**: the cap (30 brands, 1,000 servers), the value
+  ($1,000 per brand, $25 per server), and — the one that decides the money —
+  **the discount percentage applied to a brand's bill**.
+- **Analytics**: who has received each offer, when, what it was worth, and what
+  it has produced. Brands and servers in one table, filterable, because the
+  question "what did the founding offers cost us and what did they return" has
+  one answer, not two.
+
+### B30.2 The brand bill
+
+When the brand offer is on and a brand buys a month of challenges, the invoice
+shows **the full price and then the discount as its own line**:
+
+```
+Sponsored challenges — 4 × $250                      $1,000.00
+Founding brand offer — 100% covered by Cluster        −$1,000.00
+                                                    ───────────
+Due                                                       $0.00
+```
+
+Never a quietly reduced unit price. This is the same rule the base-reduction
+discount already follows in `lib/invoices.ts`, and it exists because a bill
+whose numbers cannot be traced is a bill somebody will dispute. The gross figure
+is also what tells us what the offer actually cost.
+
+- The discount is applied **automatically** while the offer is on, at the
+  configured percentage.
+- **Admin can edit both the bill and the discount** on any individual invoice —
+  the automatic behaviour is a default, not a cage.
+- Admin sees **which brands got what discount**, per invoice, in one list.
+
+**Verification owed → `tests/db/offers.mts`:**
+- Both offers are off by default.
+- With the brand offer off, a challenge month bills at full price and no
+  discount line exists.
+- With it on, the discount line appears at the configured percentage, and the
+  invoice total still equals the sum of its lines (totals are never stored — the
+  standing rule).
+- Changing the percentage changes the next invoice and never a sent one.
+- An admin edit to a bill survives a recalculation.
+- The analytics table counts each recipient once, and its totals equal the sum
+  of the discount lines actually issued.
+
+**Shots owed:** `admin.offers.console` — "Every founding offer, switchable and
+counted" — `/admin/offers`; `brand.invoice.discount` — "The full price, and what
+we covered" — a discounted invoice.
+**New routes:** `/admin/offers`.
+
+---
+
+## B31 — Welcome challenges: auto-drafted, sponsored by Cluster, billed to Cluster
+
+The server side of B30, and the more involved half.
+
+### B31.1 The draft appears on its own
+
+While the server offer is on, **a new server installing the bot gets a draft
+welcome challenge created on its portal automatically.** Not an email, not an
+offer to claim — a draft already sitting in their Challenges tab.
+
+The owner's path, and the order matters:
+
+1. Sign in to the portal with the key (already built).
+2. **Complete onboarding** — audience details, description, the games their
+   community plays. The existing server community profile.
+3. **Challenges tab** → the draft is there → **choose the game** for it, from
+   the games they just told us they play.
+4. The **prize pool shows the trophy value admin set** for welcome challenges.
+5. Submit. From there it is a normal challenge request in the admin queue —
+   approve makes a **draft** and staff edit it before it publishes (the standing
+   rule from B1-era work; a welcome challenge does not get to skip it).
+
+Onboarding first is deliberate: a challenge aimed at an audience we know nothing
+about is a challenge that does not fill.
+
+### B31.2 Cluster is the brand, and Cluster gets the bill
+
+The welcome challenge is **sponsored by the Cluster house brand** and **billed to
+Cluster exactly like any other brand's sponsored challenge** — same invoice
+machinery, same line items, same statuses.
+
+This is the whole point, and it is worth being explicit about why: a giveaway
+that skips the billing system is a giveaway nobody can add up. Running it
+through the same invoice as a paying brand means the cost of the server offer
+appears in the same ledger, in the same units, as the revenue it is meant to
+produce. When somebody asks what customer acquisition cost, the answer is a
+query, not an estimate.
+
+- The house brand is a real brand record, marked as ours.
+- Every auto-created welcome challenge appears on **Cluster's own bill**, line
+  item *"Welcome challenge — <server name>"*.
+- **Admin sets the prize pool per challenge** — the offer default is a default.
+- Admin sees, in one place, every welcome challenge: which server, which game,
+  what it cost, whether it ran, and what it produced in linked accounts.
+
+**Verification owed → `tests/db/welcome-challenge.mts`:**
+- Offer on + install → exactly one draft welcome challenge for that guild.
+- Offer off + install → none.
+- Two installs of the same guild → still one.
+- The draft is invisible to members until it publishes.
+- Submitting it enters the normal request queue, and approving it produces a
+  draft, not a live challenge.
+- It bills to the house brand, as its own line, at the admin-set value.
+- Cluster's invoice total equals the sum of its welcome-challenge lines.
+- Changing the default prize pool does not alter a challenge already drafted.
+
+**Shots owed:** `server.welcome.draft` — "Your first challenge is already
+waiting" — the portal's Challenges tab with the draft; `admin.welcome.ledger` —
+"What we spent to grow, on the same bill as everything else" — Cluster's brand
+invoice.
+**New routes:** none (the portal tab and `/admin/offers` already exist).
+
+---
+
+## B32 — Email: Resend, one template system, and a delivery console
+
+**Verified gap:** `package.json` has **no mail dependency of any kind**. Every
+money event in this product currently depends on somebody opening Discord or
+happening to log in. A brand that was never told it owes $1,000 does not pay it.
+
+### B32.1 Outbound — Resend
+
+`lib/email/` with the same graceful-degradation pattern as `lib/blob.ts`:
+without `RESEND_API_KEY` the whole layer no-ops, logs the intent, and the app
+behaves exactly as it does today. **Nothing may throw because mail is not
+configured** — that is what makes it safe to build before the key exists.
+
+DNS, which decides whether any of this arrives: **SPF, DKIM and DMARC** on the
+sending domain. Billing mail that lands in spam is worse than no billing mail,
+because you believe it was delivered.
+
+### B32.2 Inbound — the recommendation
+
+Resend sends; it is not a mailbox. To *receive* at the domain:
+
+| Option | Cost | When it is right |
+|---|---|---|
+| **Cloudflare Email Routing** ← recommended now | **Free** | Forwards `hello@`, `support@`, `billing@` into an inbox you already own. Requires the domain's DNS on Cloudflare. Pair with Resend SMTP as a "send mail as" relay and you can reply from the domain. This is the correct answer for a pre-revenue company with one or two people. |
+| **Zoho Mail** | ~$1/user/mo | Real mailboxes, cheap, when forwarding stops being enough. |
+| **Google Workspace** | ~$7/user/mo | When you have staff, shared inboxes and want zero surprises. The default answer once there is a team. |
+
+Start on Cloudflare. Moving to Workspace later is a DNS change, not a migration,
+so this is a cheap decision to get wrong.
+
+### B32.3 One template, many messages
+
+A single layout — header, brand mark, body slot, footer, unsubscribe where the
+law requires one — and **one content template per event**, never a hand-built
+HTML string at a call site. Every message inherits the layout, so a design change
+is one file.
+
+The messages, at minimum: invoice issued · invoice due · invoice paid · payout
+released · payout paid · redeem approved · redeem ready to collect · portal key
+(and key rotated — B45) · challenge approved · challenge published · challenge
+ended with results · welcome challenge drafted · a brand's offer applied ·
+account deletion confirmation (B40).
+
+**Every one of them is plain, short and states the number.** These are receipts,
+not marketing.
+
+### B32.4 The delivery console
+
+`email_log` — recipient, template key, subject, provider id, status, timestamps,
+error. Subscribe to **Resend's webhooks** (delivered, bounced, complained) and
+write the status back.
+
+`/admin/email` shows every message sent, its status, and a filter for failures.
+Registered as an admin system, assignable to a department (B29). **A bounced
+invoice email must be visible to a human**, because a bounce is the moment you
+learn a customer never heard from you.
+
+**Verification owed → `tests/db/email.mts` + `tests/ui/admin-email.mjs`:**
+- With no API key, every send no-ops and nothing throws.
+- Every template renders with real data and contains no unfilled placeholder.
+- A webhook marks the log row delivered / bounced.
+- The console lists sends, filters failures, and is department-assignable.
+- No email contains a payment detail or a portal key in the subject line.
+
+**Shots owed:** `admin.email.console` — "Every message we send, and whether it
+arrived" — `/admin/email`.
+**New routes:** `/admin/email`, the Resend webhook endpoint.
+
+---
+
+## B33 — Announcements become a queue
+
+**A verified live bug that gets worse with exactly the growth we are building
+for.** `lib/discord/announce.ts:105–117` posts to guilds **sequentially, awaiting
+each call**, and it is invoked from server actions — `app/actions/admin.ts:606`,
+`app/actions/discord.ts:106`, `app/actions/challenge-requests.ts:113`,
+`lib/challenge-series.ts:174`, `lib/welcome-challenge.ts:103`. **None of those
+declare `maxDuration`**; only the cron routes do (`sync` 300s, `daily` 60s).
+
+At ~200ms per Discord call, 100 servers is 20 seconds and 1,000 servers is over
+three minutes, inside a request that is killed long before. The failure is
+**silent and partial**: the checkpoint flushes every 10 servers, so the ledger
+records a plausible-looking number and stops. You would read it as "reach was
+lower than expected", not as "the process was killed".
+
+**The fix:** the server action **enqueues**; a cron drains.
+
+- `discord_post_queue` — one row per (scope, guild), with attempts, last error
+  and status. The unit of retry is one server, not one announcement.
+- The server action writes the rows and returns immediately, reporting *queued*,
+  not *reached*. **The UI must stop claiming a number it cannot know yet** —
+  reach becomes a figure that fills in over the next minutes.
+- A cron route with a real `maxDuration` drains a bounded batch per run, honours
+  Discord's rate limits (429 → respect `retry_after`, do not spin), and marks
+  each row done or failed with the reason.
+- Failures are visible in `/admin/discord`, per server, with a retry.
+
+**Do not simply parallelise the loop.** 1,000 concurrent posts hits Discord's
+global rate limit and gets the bot temporarily banned, which is a worse failure
+than a slow one.
+
+**Verification owed → `tests/db/announce-queue.mts`:**
+- Publishing enqueues one row per target and returns without posting.
+- Draining posts, marks done, and is idempotent across two drains.
+- A 429 reschedules rather than dropping.
+- A permanently failing guild stops after N attempts and surfaces the reason.
+- The reach ledger counts only what actually landed.
+- Nothing calls the fan-out inline from a server action any more (source-level
+  assertion — this bug class has now appeared three times).
+
+**Shots owed:** none.
+**New routes:** the drain cron.
+
+---
+
+## B34 — The repriced economy: 1,000 CP = $0.10, every action capped, 500 a day
+
+**This item supersedes the numbers in B16 and B17. B16 still builds the model
+and the calculator; B17 still builds the enforcement. B34 is the decision about
+what the numbers are.**
+
+### B34.0 The decision, and why
+
+Three changes, taken together:
+
+1. **1,000 CP = $0.10.** `DEFAULT_CP_PER_DOLLAR` goes from `1000` to `10000`.
+2. **Every action is capped**, including the nine that never were.
+3. **A hard ceiling of 500 CP per gamer per day**, across every action and every
+   quest.
+
+The result is that a gamer who does *everything we want, every day, at the
+maximum* costs us **$0.05 a day**. A hundred days of that is $5 — and a hundred
+consecutive days of maximum engagement is a retention outcome any gaming company
+would take. The point of this pricing is that our worst case and our best case
+are the same event.
+
+Compare with where it stands today: 1,255 CP/day at 1,000 CP = $1 is **$1.26 per
+gamer per day**, or $1.26M/day at a million gamers, plus an unbounded tail from
+the uncapped actions. The repricing takes the worst case down by **25×** and
+removes the tail entirely.
+
+Sanity check in the other direction, because a currency that costs nothing is
+also worth nothing: 20 ad impressions pay 20 CP = **$0.002**. At even a $0.50
+CPM those impressions earn more than $0.01. **CP paid for attention is roughly
+5× covered by the revenue that attention generates**, which is the test the
+original `cpPerDollar` comment set and the only one that matters.
+
+### B34.1 The table
+
+Every action capped. Weights reduced. Rare and hard actions pay more and cap at
+one; grindable actions pay little.
+
+| Action | CP | Cap/day | Max/day | Quest |
+|---|---|---|---|---|
+| `win_challenge` | 100 | 1 | 100 | conquest |
+| `best_profile_award` | 100 | 1 | 100 | orbit |
+| `top3_challenge` | 50 | 1 | 50 | conquest |
+| `connect_account` | 50 | 1 | 50 | ascension |
+| `bot_added` | 50 | 1 | 50 | signal |
+| `finish_challenge` | 25 | 2 | 50 | conquest |
+| `redeem_trophy` | 25 | 1 | 25 | ascension |
+| `botlist_vote` | 15 | 2 | 30 | signal |
+| `join_challenge` | 10 | 2 | 20 | conquest |
+| `stat_levelup` | 5 | 4 | 20 | ascension |
+| `ad_impression` | 1 | 20 | 20 | signal |
+| `profile_vote_received` | 3 | 5 | 15 | orbit |
+| `join_planet` | 10 | 1 | 10 | orbit |
+| `gift_sent` | 10 | 1 | 10 | orbit |
+| `gift_received` | 10 | 1 | 10 | orbit |
+| `follower_gained` | 2 | 5 | 10 | orbit |
+| `profile_views_25` | 2 | 5 | 10 | orbit |
+| `reaction_received` | 1 | 10 | 10 | orbit |
+| `ad_click` | 2 | 5 | 10 | signal |
+| `write_post` | 3 | 3 | 9 | orbit |
+| `write_comment` | 1 | 5 | 5 | orbit |
+| `reaction_given` | 1 | 5 | 5 | orbit |
+| `message_new` | 1 | 5 | 5 | orbit |
+| | | | **624** | |
+
+**624 is the sum of the per-action caps; 500 is what anybody can actually be
+credited.** Both numbers are true and they mean different things. The per-action
+caps shape *behaviour* — what is worth doing, and how often. The 500 ceiling is
+the *guarantee*, and it holds no matter what the per-action numbers are set to
+later. Nobody wins a challenge, places top three and takes Best Profile on the
+same day, so the gap is theoretical — but the guarantee must not depend on that.
+
+Every number here is editable in B16's calculator. **The ceiling is editable
+too, and it is one number**, which is what makes the policy auditable rather
+than twenty numbers that have to be re-summed every time one moves.
+
+### B34.2 CP is awarded once; progress counts everywhere
+
+`awardAction` currently credits **every quest listening to an action**, with the
+cap stored per quest — so pointing two quests at `ad_impression` doubles both
+the payout and the ceiling. That is a silent multiplier on cost.
+
+**Split the two ideas:**
+- **CP is awarded once per action**, against the global daily ceiling.
+- **Progress is credited to every listening quest**, so one action can still
+  advance two quests — which is the feature that behaviour was trying to be.
+
+This kills the multiplier without losing anything anybody wanted.
+
+### B34.3 The rebase question — decide it, do not discover it
+
+Multiplying `cpPerDollar` by ten divides every existing balance's worth by ten.
+**Default: do not rebase — this is pre-launch and the balances are demo data.**
+
+If there are real balances by the time this runs, rebase them ×10 at the same
+moment the rate changes, in one transaction, and say so in the CP history.
+Silently devaluing somebody's balance by 10× is the kind of thing people
+screenshot.
+
+**Verification owed → `tests/db/cp-economics.mts`** (extend):
+- No action lacks a cap.
+- The per-action sum equals 624 for the shipped table (fixture — change it
+  deliberately, not accidentally).
+- A gamer credited to the ceiling gets exactly 500 and no more, whatever they do
+  next.
+- An action listened to by two quests pays once and progresses twice.
+- `priceOf` at the new rate makes a $5 bronze trophy 50,000 CP.
+- The ad economics assertion: CP paid per impression × 1,000 is less than the
+  configured CPM.
+
+---
+
+## B35 — Anti-abuse: the caps do not stop a second account
+
+Per-gamer caps are meaningless if gamers are free to create. One person with 50
+accounts is 50 capped gamers. At the B34 numbers that is $2.50/day rather than
+$63/day — **the repricing already removed most of the incentive** — but the
+server-owner side is untouched by it and is where the real money is.
+
+**Server-owner tier fraud is the one that costs.** Owners are paid 5% at 500
+linked, 10% at 1,000, 25% at 5,000. That is a standing incentive to manufacture
+linked members, and fake Discord accounts are cheap while a tier is worth a
+share of brand spend forever.
+
+Three defences, in order of value:
+
+1. **A payout holding period.** No server's first payout releases until N days
+   after the tier unlocks. Money that has left through Tremendous cannot be
+   clawed back; a delay is the only reversal mechanism that exists.
+2. **Linked-account quality, not count.** A linked account with no match
+   history, no rank and a creation date inside the last week is not a member —
+   it is a row. Count *qualified* linked accounts toward tiers, define qualified
+   in one place, and show owners both numbers so the rule is not a secret.
+3. **Account-creation velocity limits** — per IP, per Discord account age, per
+   email domain. Not a wall, a friction: enough that fifty accounts is work.
+
+Plus an admin view: servers whose linked-member growth is anomalous, so a human
+can look before a payout goes out.
+
+**Verification owed → `tests/db/abuse.mts`:**
+- A payout cannot release inside the holding period, and can after it.
+- An unqualified linked account raises the raw count and not the qualified one.
+- Tier unlocks read the qualified count.
+- Velocity limits refuse the eleventh account from one source and not the first.
+- An owner sees both numbers and the rule.
+
+**Shots owed:** `admin.abuse.review` — "Growth we look at before we pay for it".
+**New routes:** an admin review page (or a tab on the existing servers page).
+
+---
+
+## B36 — Brands prepay: due on issue, live on creation, settled by the end
+
+Today a brand can have a challenge run, gamers win, trophies redeem into real
+cash — and then not pay. The money went out; it never came in.
+
+**The decided policy:**
+
+- The invoice is **due on the day it is issued**. `dueDateFrom(issued, 30)`
+  becomes `dueDateFrom(issued, 0)` for challenge invoices.
+- **The challenge still goes live immediately.** We are not holding a
+  community's competition hostage over a payment term, and the first campaign is
+  the one where trust is being built.
+- The brand has **until the end of the first challenge** to settle. That is the
+  grace period, and it is stated on the invoice, not implied.
+- **Unpaid at the end of the first challenge → no further challenges are
+  published for that brand** until it clears. Existing ones finish; new ones
+  queue. Prizes already won are always honoured — a gamer must never lose a
+  prize because a brand was late.
+
+This gives a brand a real window and gives us a hard stop before a *second*
+campaign's prizes are exposed. The most we can ever lose to one bad brand is one
+campaign.
+
+Plus: an **overdue state** the brand can see in its own portal, with the amount
+and the consequence, and a dunning schedule over email (B32) — issued, due,
+overdue, blocked.
+
+**Verification owed → `tests/db/prepay.mts`:**
+- A challenge invoice is due on its issue date.
+- The challenge publishes regardless.
+- Past the first challenge's end with the invoice unpaid, publishing a new
+  challenge for that brand is refused with a stated reason.
+- Prizes owed from an unpaid campaign still pay out.
+- Clearing the invoice unblocks publishing immediately.
+- Each dunning stage sends exactly once.
+
+**Shots owed:** `brand.invoice.due` — "Due when it is issued, and you have the
+first challenge to settle it".
+
+---
+
+## B37 — The legal framing of the economy
+
+Free points → trophies → real money, paid worldwide, is a prize and promotion
+scheme. It needs to be written down before the first real payout, not after.
+
+Not legal advice and not a substitute for it — this item produces the pages and
+the enforcement points, and flags what a lawyer must review before launch:
+
+- **Economy terms**, separate from the site terms: what CP is (not property, not
+  transferable outside the platform, no cash value except through redemption),
+  what a trophy is, how redemption works, and that we may change rates —
+  including what happens to balances if we do (B34.3).
+- **Eligibility**: a minimum age, stated. Countries we cannot pay into —
+  sanctioned jurisdictions are a hard block, and the payout provider will refuse
+  them anyway, so refusing earlier is kinder than a failed redemption.
+- **Tax**: at redemption we are paying people. Thresholds vary; the US
+  $600/year 1099 line is the one that arrives first. What we need is a
+  per-recipient annual total, available on demand, and a stated position on who
+  reports what.
+- **Enforcement points in code**, not just prose: country and age captured
+  before the first redemption, blocked jurisdictions refused at redemption with
+  a clear reason, and the annual per-recipient total queryable.
+- **A stated anti-abuse clause** — accounts may be suspended and balances
+  voided for manipulation — which is what makes B35 enforceable rather than
+  arbitrary.
+
+**Verification owed → `tests/db/eligibility.mts` + `tests/ui/legal.mjs`:**
+- Redemption is refused without an age and a country on file, with a reason.
+- A blocked country is refused before any provider call.
+- The annual per-recipient total is correct across a year boundary.
+- The economy terms page renders and is linked from redeem, wallet and signup.
+
+**New routes:** `/legal/economy`.
+
+---
+
+## B38 — One gamer, one account, one challenge
+
+**The decided rule:** a gamer with two accounts on the same game may enter a
+challenge with **one of them only**. They choose which. They may use the other
+account on a **different** challenge. Never two accounts belonging to the same
+gamer in the same challenge.
+
+Why it matters: without it, one person occupies several podium places and takes
+prizes that were meant to spread. With it, multiple accounts stay a convenience
+rather than an advantage.
+
+Two people who happen to share a household are a different matter and are not
+something we can see or should try to police — this rule is about **one Cluster
+account**, which is the only identity we actually know.
+
+Implementation: at entry, if the gamer already has an entry in this challenge on
+another account, refuse with a message naming the account already entered and
+offering to switch **before the challenge starts** (and not after, or the switch
+becomes a way to shop for the better score).
+
+**Verification owed → `tests/db/entry-rules.mts`:**
+- A second account of the same gamer is refused entry to the same challenge.
+- The refusal names the account already entered.
+- The same gamer may enter a *different* challenge with the other account.
+- Switching is allowed before the start and refused after it.
+- Two different gamers on the same game are unaffected.
+
+---
+
+## B39 — Stuck money: the states where a prize has nowhere to go
+
+Every one of these ends with money in limbo and no screen that explains it.
+Decide each, build the state, and make it visible to admin:
+
+| State | Decision |
+|---|---|
+| Fewer entrants than podium places | Unfilled places are not paid. The prize pool returns to the sponsor's next challenge as credit, and the challenge card says so up front so nobody feels cheated. |
+| A tie on the metric | The earlier submission wins. Stated in the rules before entry, because a tie-break invented afterwards is always disputed. |
+| A winner deletes their account before collecting | The prize is held for a stated period, then forfeited. Deletion warns about pending prizes (B40). |
+| A winner has no payout preference | The trophy is awarded and holds its value indefinitely; it simply cannot be redeemed until they set one. Nothing expires silently. |
+| A redemption fails at the provider | It returns to `approved`, not to nothing, with the provider's reason visible to admin and a plain-language message to the gamer. |
+| A challenge is cancelled after entries | Everyone who entered keeps their entry CP. No prize. Stated at cancellation. |
+
+Every one of these gets an **admin view showing what is stuck, why, and the
+action that unsticks it.** Money with no owner and no screen is how a support
+queue becomes a spreadsheet.
+
+**Verification owed → `tests/db/stuck-money.mts`:** one assertion per row, plus:
+nothing is ever paid twice, and every terminal state is reachable from the admin
+view.
+
+---
+
+## B40 — Deleting an account with a balance
+
+Deletion exists (`app/settings/account`). A balance with no owner is a liability
+whose owner has been erased.
+
+**Before deletion completes, the gamer is shown, plainly:**
+- their CP balance **and what it is worth in dollars**,
+- their trophy case and its total value,
+- any **pending prizes or in-flight redemptions**,
+- and that all of it is forfeited on deletion.
+
+With one obvious alternative offered: **redeem first, then delete.** Most people
+who see the number will take it, which is the point.
+
+Legal position stated in the economy terms (B37): CP is forfeited on deletion.
+Data deletion still proceeds — this is about telling somebody what they are
+giving up, not about keeping their data.
+
+**Verification owed → `tests/ui/delete-account.mjs`:**
+- The confirmation shows balance, dollar value, trophies and pending items.
+- A gamer with an in-flight redemption is warned specifically about it.
+- Deletion proceeds if confirmed and the balance is zeroed with a ledger entry.
+- A gamer with nothing to lose is not shown a scary empty warning.
+
+---
+
+## B41 — The gamer homepage
+
+`/` signed out **and** signed in is the gamers page (B23), and this is what is
+on it:
+
+1. **A gamer hero** — what this is, in their language: play the games you
+   already play, earn points for free, win real money.
+2. **Live challenges, every game**, with a **filter by game logo** — the same
+   logo row used elsewhere, so it is recognisable rather than new.
+3. **The quests section, glorified.** Every quest with its own art as the
+   section background, a switcher between the four, and for the selected quest:
+   every action that earns, **what each is worth, and its daily cap**, plus a
+   button through to the quest itself. The caps are not fine print — they are
+   part of the pitch, because "capped" is what makes "free money" credible.
+4. **Missions** (B42) — the guided first week, as glorified milestone steps.
+5. **Cluster on Discord** — a live preview of the bot (B28, scoped to this
+   section) and a CTA to **invite Cluster to your server and earn CP** for it
+   (B22).
+
+**Verification owed → `tests/ui/home-gamer.mjs`:**
+- Renders signed out and signed in, with the signed-in version showing progress.
+- The game filter narrows the challenge list and shows only live challenges.
+- Switching quests changes the action list, the caps and the art.
+- Every CP figure uses the coin (B2) and every action shows its cap.
+- The Discord preview renders live cards, not images.
+
+**Shots owed:** `page.home.gamer`, `home.quests.section`, `home.missions`.
+
+---
+
+## B42 — Missions: the guided first week
+
+`lib/quest-game.ts` already has a `StarterMissions` type — this builds on it
+rather than inventing a parallel system.
+
+**Missions are the first action of each quest, glorified into a step.** They are
+one-time, ordered, and they exist because a new gamer facing four quests and
+twenty-three actions does not know what to do first.
+
+The starting set, at least one from each quest:
+
+| Mission | Quest |
+|---|---|
+| Sign in with Discord | signal |
+| Link your first game account | ascension |
+| Join a challenge | conquest |
+| See an ad | signal |
+| Click an ad | signal |
+| Invite Cluster to your server | signal |
+| Win a challenge | conquest |
+| Redeem a trophy | ascension |
+
+Each pays CP (inside the B34 ceiling — a big first day is still capped at 500,
+which is the correct behaviour and should be visible, not hidden).
+
+**Shown in three places, with the same component:**
+- the **homepage** (B41), for a gamer who has not started;
+- the **quests page**, in a Missions section beside that quest's action list, so
+  the relationship between "the guided step" and "the ongoing action" is obvious;
+- the **feed**, showing their own progress.
+
+**Verification owed → `tests/db/missions.mts` + `tests/ui/missions.mjs`:**
+- Each mission completes on the real action, once, and never re-awards.
+- Every quest has at least one mission.
+- Progress is identical on homepage, quests page and feed (one read model).
+- A gamer who completed a mission before it existed is credited retroactively —
+  or explicitly is not, decided once and asserted, because the half-state is
+  what generates support tickets.
+- Mission CP respects the daily ceiling.
+
+**Shots owed:** `gamer.missions.progress`.
+
+---
+
+## B43 — Welcome challenges, under admin control
+
+Amends **B31**. Two changes, both because the owner may never finish onboarding:
+
+1. **The draft is always visible on the admin side**, from the moment it is
+   created, whether or not the owner has logged into the portal. Admin can
+   **complete it** (pick the game themselves), **edit it**, or **cancel/delete
+   it**.
+2. **A `welcome` challenge type** — a private, server-scoped challenge admin can
+   create **at any time**, for any server. So a draft cancelled because we never
+   learned which games the community plays can be recreated later, when we do.
+
+The rest of B31 holds: sponsored by the house brand, billed to Cluster like any
+paying brand, prize pool per challenge set by admin, and approval still produces
+a **draft** that staff edit before it publishes.
+
+**Verification owed → `tests/db/welcome-challenge.mts`** (extend):
+- An incomplete draft appears in the admin list with its state.
+- Admin completing it produces the same challenge the owner's path would.
+- Cancelling removes it from the portal and leaves an audit trail.
+- Admin can create a welcome challenge for a server that has no draft.
+- A welcome challenge is private to its server in every surface.
+
+---
+
+## B44 — The promotional campaigns console
+
+Amends **B30**. The offers are **promotional campaigns we switch on and off**,
+not permanent product behaviour.
+
+- **Both off by default.** They turn on when we have raised or decided to spend,
+  not when the code deploys.
+- The brand offer is expressed as **a percentage of the bill**, not a fixed
+  $1,000. $1,000 happens to be 100% of four weekly challenges; expressing it as
+  a percentage is what lets admin dial it to 50% or 25% without redesigning the
+  offer. **Placements are still billed** — the offer covers the challenge lines.
+- **Admin can edit any auto-generated invoice**: the discount, the lines, the
+  amounts, anything. The automation is a default, never a cage. Every edit is
+  audit-logged with who and what.
+- Analytics: who received which campaign, when, what it was worth, what it
+  produced — brands and servers in one table.
+
+**Funding figure:** the deck and financial model say **$100K**, not $30K. Where
+any document still says $30K it is stale and gets corrected in this item — the
+offer sizing argument depends on it.
+
+**Verification owed → `tests/db/offers.mts`** (extend):
+- Both campaigns off by default.
+- The discount is a percentage of the challenge lines, applied as its own line,
+  with placements still charged.
+- Changing the percentage affects the next invoice and never a sent one.
+- An admin edit survives recalculation and is audit-logged.
+- No document states a funding figure other than $100K.
+
+---
+
+## B45 — The portal key follows ownership
+
+Discord overwrites `owner_id` when a server is transferred. The old key keeps
+working, which means the previous owner keeps access to earnings and payout
+requests for a community that is no longer theirs.
+
+**On detected ownership change: rotate the key, DM the new key to the new
+`owner_id`, invalidate the old one immediately, and notify admin.** Detection
+happens wherever we already read the guild — the interaction path and the
+refresh job.
+
+The rule from B4 holds and is the reason this matters: **the key goes to
+`owner_id` and to nobody else, ever.** If ownership moves, so does the key.
+
+**Verification owed → `tests/db/portal-key.mts`:**
+- A changed `owner_id` rotates the key exactly once.
+- The old key is refused afterwards.
+- The new key is delivered to the new owner and to no other id.
+- A DM failure surfaces "key undelivered" to admin rather than failing silently.
+
+---
+
+## B46 — Spend limits on storage and rendering
+
+Vercel Pro raises the ceiling; it does not remove it, and B14's home card is
+cached **per gamer, per state** — a cache key that invalidates whenever they
+link an account or their challenges change.
+
+- **A TTL and a cap on card renders**, with least-recently-used eviction. The
+  existing `lib/storage-audit.ts` already deletes stale blobs; make it run on a
+  budget rather than on demand.
+- **A per-day render ceiling**, so a bug that busts the cache cannot bill us
+  overnight. When it trips, serve the last good card rather than rendering.
+- **A storage dashboard** on `/admin/storage` (which exists) showing what is
+  held, by kind, and what the trend is.
+
+**Verification owed → `tests/db/storage-budget.mts`:**
+- Eviction removes the least recently used first and never an in-use card.
+- The daily ceiling stops rendering and serves stale rather than failing.
+- The audit reports by kind and the totals reconcile.
+
+---
+
+## B47+ — Everything added from here
+
+This section is deliberately empty and deliberately last. Each new instruction
+becomes the next numbered heading below — `## B47 — <what it is>` — written to
+the same shape as B1–B46:
+
+```
+## B47 — <the instruction, in the owner's own words where possible>
 
 <what changes, and why — including the reason it was asked for, because that
  is the thing that gets lost and the thing that decides the edge cases>
@@ -850,6 +2430,13 @@ the corrections are usually the most important lines in it.
 | Amends | The instruction | What changed |
 |---|---|---|
 | B4.2, B4.3 | "keep administrator always win" | The Administrator permission was a pre-designation fallback that stopped applying once the owner designated specific roles. It is now an unconditional grant: designation only ever adds people. The guard's first two branches are permanent by construction, and `tests/db/bot-admin.mts` asserts an administrator passes both before and after a designation they do not hold. |
+| B7, B8 | "placeholder for the screenshot images everywhere empty till it's done later" | The shot plumbing moves to wave 1 and slots are placed as pages are touched, visibly empty. Capture still happens once, in V1, after Part I closes. |
+| B23 | "remove the content translation task for now" | Localization parked as B24; the machinery stays, the footer switch goes. |
+| B16, B17 | "make the caps aggressive… total of 500 per gamer per day… 1,000 CP worth $0.10" | Superseded by **B34**, which carries the decided table, the global ceiling and the reasoning. B16/B17 still build the model and the enforcement. |
+| B30 | "admin can reduce this number… as percent of the bill… by default they're off" | **B44**: the offers become promotional campaigns expressed as a percentage of the challenge lines, off by default, with every auto-generated invoice fully editable. |
+| B31 | "admin can edit it or delete it… create a challenge type called welcome challenge" | **B43**: the draft is admin-visible from creation regardless of owner onboarding, and a `welcome` challenge type can be created for any server at any time. |
+| §1.1 | "implement your recommendation for all 3 insights" | Money-touching items (B33–B37, B39) now carry their suites; B28 gains a static fallback; wave 1 slot placement avoids the pages B23 rewrites. |
+| the deck | funding is $100K, not $30K | Corrected in **B44**; every stale $30K reference is part of that item. |
 | — | *(next amendment here)* | |
 
 ---
@@ -864,7 +2451,12 @@ during Part I and executed after it.
 Order of execution once Part I closes: **V0** (infrastructure and the showcase
 seed) → **V1** (capture every shot) → **V2** (prove every claim, delete the
 unprovable ones) → **V3** (the E2E matrix, every operation for every user type)
-→ **V4** (the report).
+→ **V5** (user acceptance testing — human-run, two rounds per role) → **V4**
+(the report, written last because V5 feeds it).
+
+V3 and V5 are not alternatives. V3 proves the software does what the code says;
+V5 proves it does what the person who asked for it meant. They fail in different
+places, which is the reason for having both.
 
 ---
 
@@ -905,7 +2497,41 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/redeem-flow.mjs` | **B6** | every step; back; refresh mid-flow; totals; **no bank field on any step** | owed |
 | `tests/ui/shots.mjs` | **B7** | the component renders, falls back visibly, admin-replaceable, propagates everywhere | owed |
 | `tests/ui/claims.mjs` | **B8** | every claim resolves to a shot; no page carries an unproven claim | owed |
+| `tests/ui/nav.mjs` | **B9** | the marketplace badge, admin-editable, mobile too | owed |
+| `tests/ui/backgrounds.mjs` | **B10** | one element per background image; no duplicate paints anywhere | owed |
+| `tests/ui/nav-planet.mjs` | **B11** | the badge expands instead of navigating; swapping games; open-the-planet | owed |
+| `tests/ui/planet.mjs` | **B12** | live-only hero; completed section with real standings | owed |
+| `tests/ui/bot-guides.mjs` | **B13** | fewer than nine guides; the CP guide's numbers equal `ACTION_CATALOG` | owed |
+| `tests/ui/bot-home.mjs` + `tests/db/bot-home.mts` | **B14** | the home card, both background states, three live + four quests, the empty state | owed |
+| `tests/db/quests.mts` | **B15** | the new actions award on the real code path, deduped, capped | owed |
+| `tests/db/cp-economics.mts` | **B16** | the model against a hand-computed fixture; the multi-quest multiplier; no uncapped action survives; saving changes what `awardAction` grants | owed |
+| `tests/db/caps.mts` + `tests/ui/caps.mjs` | **B17** | past the cap the action still succeeds and awards zero, silently; the cap is shown up front; the maxed entry appears in history | owed |
+| `tests/ui/wallet.mjs` + `tests/db/wallet.mts` | **B18** | dollar value correct; the ledger reconciles; no payment field in any state | owed |
+| `tests/ui/bot-wallet.mjs` | **B20** | the card's figures equal `/wallet`'s; redeem completes from Discord | owed |
+| `tests/ui/economy-copy.mjs` | **B21** | the loop stated in one order everywhere; every earning claim states its cap | owed |
+| `tests/db/bot-attribution.mts` | **B22** | one award per guild; no account, no error | owed |
+| `tests/ui/pages.mjs` | **B23**, **B24** | every consolidated page; the redirects; one footer; no language switch; every link resolves | owed |
+| `tests/ui/bot-profile-card.mjs` | **B25** | three trophies max, one button per account, two accounts on one game | owed |
+| `tests/db/metrics.mts` + `tests/ui/lol-card.mjs` | **B26** | a `rankLabel` always displays over its number; sorting still uses the number; no duplicate stat key on any provider | owed |
+| `tests/ui/bot-preview.mjs` | **B28** | scoped per section; live renders not images; every card states its command | owed |
+| `tests/db/taxonomy.mts` | **B29** | every admin route is a registered system; departments reach only what they are granted; the two admin-only paths refuse everyone | owed |
+| `tests/db/offers.mts` | **B30** | off by default; the discount is its own line; totals equal lines; admin edits survive recalculation | owed |
+| `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
+| `tests/db/email.mts` + `tests/ui/admin-email.mjs` | **B32** | no key = no-op, never throws; every template fills; webhooks update status; no key or payment detail in a subject | owed |
+| `tests/db/announce-queue.mts` | **B33** | publishing enqueues and returns; draining is idempotent; 429 reschedules; nothing fans out inline from a server action | **write with the item — money-adjacent, see §1.1** |
+| `tests/db/cp-economics.mts` | **B34** | no uncapped action; the 624 fixture; the 500 ceiling holds absolutely; award once, progress twice; $5 bronze = 50,000 CP; CP per impression under the CPM | **write with the item** |
+| `tests/db/abuse.mts` | **B35** | holding period blocks then releases; qualified count drives tiers; velocity limits bite | **write with the item** |
+| `tests/db/prepay.mts` | **B36** | due on issue; publishes anyway; blocked after the grace window; prizes still honoured; dunning sends once | **write with the item** |
+| `tests/db/eligibility.mts` + `tests/ui/legal.mjs` | **B37** | no age/country = no redemption; blocked country refused before the provider; annual totals correct | **write with the item** |
+| `tests/db/entry-rules.mts` | **B38** | one account per gamer per challenge; switch before the start only | owed |
+| `tests/db/stuck-money.mts` | **B39** | one assertion per stuck state; nothing pays twice | **write with the item** |
+| `tests/ui/delete-account.mjs` | **B40** | the balance, its dollar value and pending items are shown before deletion | owed |
+| `tests/ui/home-gamer.mjs` | **B41** | renders both states; the game filter; quest switching with caps shown | owed |
+| `tests/db/missions.mts` + `tests/ui/missions.mjs` | **B42** | one-time, per quest, identical progress in three places, capped | owed |
+| `tests/db/portal-key.mts` | **B45** | rotates once on owner change; old key refused; delivered only to the new owner | owed |
+| `tests/db/storage-budget.mts` | **B46** | LRU eviction; the daily ceiling serves stale rather than failing | owed |
 | `tests/ui/e2e-*.mjs`, `tests/db/e2e-*.mts` | **V3** | the full matrix, per user type | owed |
+| `docs/UAT/*.md` | **V5** | human acceptance, two rounds per role — not automatable, by design | owed |
 
 ### R2 — The shot registry
 
@@ -935,7 +2561,40 @@ requirement.
 | `bot.card.welcome` | "The bot opens like a home page" | the welcome card |
 | `bot.card.challenges` | "Cards, not walls of text" | `/api/card/challenges` |
 | `bot.card.srv_earnings` | "Run your server from Discord" | `/api/card/srv_earnings` |
-| *(add a row per B9+ item that anyone can see)* | | |
+| `nav.badges` | "One nav, two doors: planets and the marketplace" | the signed-in nav |
+| `nav.potw.expanded` | "One continuous surface" | nav + Profile-of-the-Week expanded |
+| `nav.planet.dropdown` | "Every game, one click from anywhere" | the nav game dropdown |
+| `planet.completed.standings` | "Every challenge settles in public" | a planet page's completed section |
+| `bot.guide.cp` · `bot.guide.challenges` · `bot.guide.trophies` | "The bot teaches in cards" | `/api/card/<kind>` |
+| `bot.home` | "Your whole Cluster, in one card" | `/api/card/home` |
+| `bot.card.wallet` | "Your wallet, in Discord" | `/api/card/wallet` |
+| `gamer.quest.actions` | "Every action, what it pays, what it caps at" | a quest page's action list |
+| `gamer.quest.signal` | "Bring us a server, get paid for it" | the signal quest |
+| `gamer.cp.capped` | "Capped, and told plainly" | the CP history, maxed entry |
+| `gamer.wallet` · `gamer.wallet.ledger` | "Your points, your trophies, what they are worth" | `/wallet` |
+| `gamer.economy.loop` | "Free points → trophies → real money" | the explainer |
+| `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` |
+| `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page |
+| `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` |
+| `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` |
+| `page.home.gamer` | the gamer argument | `/` |
+| `bot.card.profile` | "Your trophies and every account, on one card" | `/api/card/profile` |
+| `gamer.lol.card` | "Your rank, in the game's own words" | a profile's LoL account card |
+| `admin.offers.console` | "Every founding offer, switchable and counted" | `/admin/offers` |
+| `brand.invoice.discount` | "The full price, and what we covered" | a discounted invoice |
+| `server.welcome.draft` | "Your first challenge is already waiting" | the portal's Challenges tab |
+| `admin.welcome.ledger` | "What we spent to grow, on the same bill as everything else" | Cluster's brand invoice |
+| `admin.email.console` | "Every message we send, and whether it arrived" | `/admin/email` |
+| `admin.abuse.review` | "Growth we look at before we pay for it" | the server review page |
+| `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | a challenge invoice |
+| `home.quests.section` · `home.missions` | "Free points, capped and stated" | `/` |
+| `gamer.missions.progress` | "Your first week, one step at a time" | the feed |
+| *(add a row per B47+ item that anyone can see)* | | |
+
+**B28 retires rows**: anywhere a page demonstrates a bot card, the live render
+from `/api/card/<kind>` replaces the shot. Delete those rows when B28 lands and
+say which in its commit — a shot registry with entries nothing uses is how V1
+ends up capturing images no page shows.
 
 ### R3 — The surface registry
 
@@ -946,7 +2605,12 @@ this by hand** — generate it, so a page added in B9 cannot be forgotten:
 find app -name page.tsx | sed 's|^app||; s|/page.tsx$||; s|^$|/|' | sort
 ```
 
-106 routes today. The registry is that list plus, per route, three facts kept
+106 routes today, plus what Part I adds: `/wallet`, `/for-brands`, `/contact`,
+`/admin/cp-calculator`, `/admin/offers`, and the redirects standing in for
+`/servers`, `/discord-bot` and `/brands`. Regenerate rather than edit — that is the point of
+generating it.
+
+The registry is that list plus, per route, three facts kept
 in `tests/lib/surfaces.mjs`: **who can reach it** (visitor / gamer / owner /
 brand / staff / admin), **whether it makes a claim** (→ needs a shot), and
 **whether it is dynamic** (needs a seeded id from the showcase seed).
@@ -1204,10 +2868,104 @@ table) · every migration is idempotent (boot twice, compare).
   prevents it.
 - Every screenshot captured, its key, and where it appears on the site.
 - Every claim on the website, and the shot that proves it.
+- **Every UAT round: who ran it, what failed, what each fail became.** The
+  misunderstandings are the most useful rows in the document — they are the
+  places the product was right and could not say so.
+- Localization is parked (B24) and what restarting it costs.
 - **What is still not covered, and why.** The most useful section in the
   document, and the one there is most temptation to leave out. Anything that
   needs live Discord credentials, a real payment provider, or a real game API
   key belongs here, stated plainly.
+
+---
+
+---
+
+## V5 — User acceptance testing
+
+The automated suites in V3 prove the software does what the *code* says. UAT
+proves it does what the *person who asked for it* meant. They fail differently,
+which is the whole reason for having both: a suite asserts the payout page
+renders and the total is right; UAT catches that a server owner looked at it and
+could not tell whether they had been paid.
+
+**Be clear about what this is: UAT is run by a human, not by me.** A model
+writing and then "passing" its own acceptance test has proved nothing — it is
+the same judgement that built the thing, marking its own work. What I can build
+is everything around it: the scripts, the seeded environment, the recording of
+results, and the fixes. The sign-off is yours.
+
+### V5.1 The scripts
+
+`docs/UAT/` — one script per user type, committed, in plain language, written so
+somebody who has never seen the code can run it:
+
+```
+docs/UAT/
+  README.md            ← how to run a session, what to record, how to report a fail
+  gamer.md
+  server-owner.md
+  brand.md
+  staff.md
+  admin.md
+  discord.md           ← run inside Discord, not a browser
+  mobile.md            ← the same journeys at 390px
+```
+
+Every step is written as **do this → you should see this**, with a checkbox and
+a notes column. Never "verify the payout page works" — that is not a test, it is
+a wish. Instead:
+
+> **12.** From the portal, open **Payouts**.
+> **You should see:** what you have been paid, what is in flight, and what is
+> still being counted — as three separate numbers, each with a date.
+> ☐ Pass ☐ Fail — Notes: ______
+
+Each script ends with three questions that catch what checkboxes cannot:
+
+1. Was there any point where you did not know what to do next?
+2. Was there anything you expected to find and could not?
+3. Would you trust this with your money?
+
+Question 3 is the one that matters, and it is the one that only a human can
+answer.
+
+### V5.2 The environment
+
+UAT runs against the **showcase seed** (V0.2), on a deployed preview — not a
+local server, because "it works on the machine that built it" is exactly the
+failure UAT exists to catch. Credentials for each role are listed in
+`docs/UAT/README.md`, and every account is fictional by construction.
+
+### V5.3 Recording results
+
+`docs/UAT/results/<date>-<role>.md`, committed — the filled-in script, with a
+line per fail: **what was expected, what happened, and where.** Nothing else,
+because a fail report that argues about the cause is a fail report nobody can
+act on.
+
+Each fail becomes one of:
+
+| | |
+|---|---|
+| **A bug** | Fixed, with a regression assertion added to the suite that should have caught it. The suite missing it is itself a finding — record why it was missed. |
+| **A misunderstanding** | The product is right and the person could not tell. That is a copy or design fix, not a shrug. |
+| **A new build item** | It works as specified and the specification was wrong. New `B<n>`, full intake protocol (§1.2). |
+
+### V5.4 The rounds
+
+UAT is not one pass. Round one finds a pile; round two, after the fixes, finds
+the things round one's confusion was hiding. **Two rounds minimum per role**,
+and a role is signed off when a full script runs with no fails and question 3
+answers yes.
+
+Sign-off goes in the ledger, dated. That signature — not a green suite — is what
+"done" means for a user-facing product.
+
+**Verification owed:** UAT *is* the verification. What is owed here is that
+every script exists, every role has been run twice, every fail is resolved into
+one of the three buckets above, and every resolution is linked from
+`docs/VERIFICATION_REPORT.md` (V4).
 
 ---
 
@@ -1240,7 +2998,17 @@ stops them being decided badly at 2am.
    the ordering dies: one suite written early becomes three suites rewritten
    later, and the plan quietly reverts to testing-as-you-go against a product
    that keeps moving.
-10. **A registry row is written in the same sitting as the instruction.** Not
+10. **Mobile: if it would break, do not ship it on mobile.** Some things do not
+    belong on a 390px screen — B11's full-width expanding game world is the
+    obvious one. Degrade to the existing behaviour (navigate to the planet page)
+    rather than building a second interaction that has to be maintained. Do not
+    spend a day making something work badly on a screen it was never for; say
+    so in the commit and move on.
+11. **B34's numbers are decisions, not suggestions.** The weights, the caps, the
+    500/day ceiling and the 1,000 CP = $0.10 rate were chosen deliberately with
+    the reasoning written in B34.0. Change them through the calculator, not by
+    editing constants, and never without re-reading why they are what they are.
+12. **A registry row is written in the same sitting as the instruction.** Not
     "when I get to it" — the reasoning that makes an assertion sharp is
     available for about an hour after the instruction arrives, and then it is
     gone.
@@ -1268,5 +3036,8 @@ stops them being decided badly at 2am.
 - Every marketing claim has a shot behind it, or is gone (V2).
 - An admin can change any shot from `/admin/shots` and see it change on every
   page that uses it.
+- **Every UAT script has been run twice by a human, every fail resolved, and
+  every role signed off and dated in the ledger** (V5). A green suite is not a
+  sign-off.
 - `docs/VERIFICATION_REPORT.md` is written and honest — including the section
   on what is still not covered.
