@@ -4,9 +4,10 @@ import { marketplaceCatalog } from "@/lib/marketplace";
 import TrophyMarket from "@/components/TrophyMarket";
 import { getT } from "@/lib/i18n/t-server";
 import { localizeQuest } from "@/lib/i18n/entities";
-import { getUserQuests, getQuestTops, getCpLedger } from "@/lib/quests";
+import { getUserQuests, getQuestTops, getCpLedger, capsToday } from "@/lib/quests";
 import QuestCard from "@/components/QuestCard";
 import CpLedger from "@/components/CpLedger";
+import CapsToday from "@/components/CapsToday";
 import CpIcon from "@/components/CpIcon";
 import AdSlot from "@/components/AdSlot";
 import OAuthButtons from "@/components/OAuthButtons";
@@ -21,9 +22,10 @@ export default async function QuestsPage() {
   // The shelf, for the section below the quests.
   const market = await marketplaceCatalog(db, { userId: user?.id ?? null });
   const questsRaw = await getUserQuests(db, user?.id ?? null);
-  const [tops, ledger] = await Promise.all([
+  const [tops, ledger, caps] = await Promise.all([
     getQuestTops(db, questsRaw.map((q) => q.id), 8),
     getCpLedger(db, user?.id ?? null, { limit: 200 }),
+    capsToday(db, user?.id ?? null),
   ]);
   const totalCp = questsRaw.reduce((s, q) => s + q.totalCp, 0);
   const { tr, te } = await getT(user?.locale);
@@ -81,6 +83,14 @@ export default async function QuestsPage() {
       )}
 
       {/* Full CP history log across every quest, with filters */}
+      {/* What is capped today, directly above the history — the one place
+          somebody asks "why did that give me nothing?" (B17). */}
+      {user && (
+        <div className="mt-8">
+          <CapsToday caps={caps} />
+        </div>
+      )}
+
       {user && ledger.length > 0 && (
         <div className="mt-8">
           <CpLedger entries={ledger} quests={quests.map((q) => ({ key: q.key, name: q.name, color: q.color }))} title={tr("Your complete CP history")} />

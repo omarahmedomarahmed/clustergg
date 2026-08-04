@@ -65,6 +65,8 @@ export type ShotDef = {
 export const SHOT_REGISTRY: ShotDef[] = [
   // ---- The gamer ----
   { key: "gamer.profile.public", group: "gamer", claim: "A profile worth sharing", capturedFrom: "/u/nova", as: "guest" },
+  // B17. Registered and left empty until V1.R.
+  { key: "gamer.cp.capped", group: "gamer", claim: "Capped, and told plainly", capturedFrom: "/quests", as: "gamer" },
   { key: "gamer.linked.verified", group: "gamer", claim: "Every account is verified against the game's own API", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='linked-accounts']" },
   { key: "gamer.lol.card", group: "gamer", claim: "Your rank, in the game's own words", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='lol-card']", openText: "League of Legends" },
   { key: "gamer.cp.ledger", group: "gamer", claim: "Every point is accounted for", capturedFrom: "/quests", as: "gamer" },

@@ -277,7 +277,7 @@ the remaining edits; Part II is the whole platform.
 | B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
 | B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
-| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☐ |
+| B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☑ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
 | B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
 | B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
@@ -2792,6 +2792,7 @@ the correct state for it.
 | `gamer.wallet` · `gamer.wallet.ledger` | "Your points, your trophies, what they are worth" | `/wallet` | not captured — placeholder |
 | `gamer.economy.loop` | "Free points → trophies → real money" | the explainer | not captured — placeholder |
 | `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` | not captured — placeholder |
+| `gamer.cp.capped` | "Capped, and told plainly" | `/quests`, today’s limits above the history | not captured — placeholder |
 | `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page | not captured — placeholder |
 | `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` | not captured — placeholder |
 | `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` | not captured — placeholder |
