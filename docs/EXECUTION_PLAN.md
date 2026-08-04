@@ -292,7 +292,7 @@ the remaining edits; Part II is the whole platform.
 | B29 | Everything new is an admin system, staffable by department | `lib/systems.ts`, every new surface | batch 3 | ☐ |
 | B30 | The founding offers: admin console, paused by default, bill discounts | `lib/offers.ts`, `lib/invoices.ts`, new `/admin/offers` | batch 3 | ☐ |
 | B31 | Welcome challenges: auto-drafted, sponsored by Cluster, billed to Cluster | the install path, the server portal, the house brand, billing | batch 3 | ☐ |
-| B32 | Email: Resend, one template system, a delivery console | new `lib/email/`, `email_log`, new `/admin/email` | batch 4 | ☐ |
+| B32 | Email: Resend, one template system, a delivery console | new `lib/email/`, `email_log`, new `/admin/email`, the webhook | batch 4 | ☑ |
 | B33 | **Announcements become a queue** (live bug — sequential await in a server action) | `lib/discord/announce.ts`, the calling actions, a drain cron | batch 4 | ☐ |
 | B34 | **The repriced economy**: 1,000 CP = $0.10, every action capped, 500/day ceiling | `lib/quests.ts`, `lib/marketplace.ts`, supersedes B16/B17's numbers | batch 4 | ☐ |
 | B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | payouts, tier unlocks, signup | batch 4 | ☐ |
@@ -2657,6 +2657,7 @@ the correct state for it.
 | `bot.card.wallet` | "Your wallet, in Discord" | `/api/card/wallet` | not captured · retired by B28 → never captured, row is deleted |
 | `gamer.quest.actions` | "Every action, what it pays, what it caps at" | a quest page's action list | not captured — placeholder |
 | `admin.shots.console` | "Every screenshot on the site is one row an admin owns" | `/admin/shots` | **captured (provisional)** → V1.R |
+| `admin.email.console` | "Every message we send, and whether it arrived" | `/admin/email` | not captured — placeholder |
 | `bot.card.challenge` | "A challenge card anyone can join from Discord" | `/api/card/planets` | **captured (provisional)** · retired by B28 → V1.R deletes it |
 | `bot.card.market` | "The marketplace, inside Discord" | `/api/card/market` | **captured (provisional)** · retired by B28 → V1.R deletes it |
 | `gamer.feed.dashboard` | "Build the dashboard you want to look at" | `/feed` | **captured (provisional)** → V1.R |
