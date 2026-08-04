@@ -269,12 +269,35 @@ the remaining edits; Part II is the whole platform.
 | B22 | Track the bot install, and pay for it | `app/api/discord/installed/route.ts`, the signal quest | batch 2 | ☐ |
 | B23 | Page consolidation, the footer, and the copy rewrite | `/servers`+`/discord-bot`→one, new `/for-brands`, `/brands`→`/contact`, `/pricing`, `/`, `/blog`, the footer | batch 2 | ☐ |
 | B24 | Park localization (keep the machinery, drop the switch) | the footer, the AR copy workflow | batch 2 | ☐ |
-| B25+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
+| B25 | The gamer's Discord card: trophy case ×3, one button per account | the profile card kind, `lib/discord/screens.ts` | batch 3 | ☐ |
+| B26 | LoL stats read as ranks; the level stops appearing twice | `lib/providers/adapters.ts` consumers, every metric renderer | batch 3 | ☐ |
+| B27 | Every bot card: data reads well, buttons grouped by meaning and position | every card kind, `lib/discord/components.ts` | batch 3 | ☐ |
+| B28 | The bot preview rebuilt — scoped per section, live renders instead of shots | the preview component, the marketing pages | batch 3 | ☐ |
+| B29 | Everything new is an admin system, staffable by department | `lib/systems.ts`, every new surface | batch 3 | ☐ |
+| B30 | The founding offers: admin console, paused by default, bill discounts | `lib/offers.ts`, `lib/invoices.ts`, new `/admin/offers` | batch 3 | ☐ |
+| B31 | Welcome challenges: auto-drafted, sponsored by Cluster, billed to Cluster | the install path, the server portal, the house brand, billing | batch 3 | ☐ |
+| B32+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **Part I closed on: _______** (fill this in; until then Part II does not start.)
 
 **Reordering:** the numbers are arrival order, not priority — see §1.6. Reorder
 freely, never renumber.
+
+### The suggested order — small first, heavy after
+
+Ship the quick wins before the hard items. Not because they matter more, but
+because each one is a commit that stands on its own, they are the fastest way to
+make the product visibly better, and they leave a working app behind at every
+point. The heavy items take days and are more pleasant to start once the small
+irritations are gone.
+
+| Wave | Items | Why here |
+|---|---|---|
+| **0 — now, if the bot is live in real servers** | **B1** | It announces every account link to *every* server on the network. It is not a UI nicety, it is the fastest way to get the bot removed. If no real servers carry the bot yet, it can wait for wave 2. |
+| **1 — quick wins and UI** | **B9** nav badge · **B26** LoL ranks + the duplicated level · **B25** bot profile card · **B10** one background image · **B12** live-only planet hero · **B24** park localization (delete the language switch) · **B7** the shot plumbing · **B2** the CP coin · **B27** bot card buttons | Small, independent, each shippable in its own commit. **B7 belongs here, early**, so `<FeatureShot>` slots can be dropped into every page as it is touched — visibly empty, filled by V1 much later. Placing a slot costs a line; retrofitting them all at the end costs a day. |
+| **2 — the economy and the money** | **B16** the CP model + calculator · **B17** caps · **B15** new CP actions · **B22** install attribution · **B18** the wallet · **B6** redeem/marketplace steppers · **B19** marketplace · **B20** the bot wallet card · **B5** gifting · **B30** the offers console · **B31** welcome challenges | B16 first in this wave — every other item here spends numbers it decides. |
+| **3 — surfaces and story** | **B11** nav planet dropdown · **B13** the guides · **B14** the Home card · **B3** bot list cards and flows · **B4** the server portal in Discord · **B21** the visual explainer · **B28** the bot preview · **B23** page consolidation and copy · **B8** the claim registry | The expensive, high-surface work. **B23 and B8 last** — they consume everything the earlier waves produce, and doing them before the product settles means writing the copy twice. |
+| **continuous** | **B29** | Not a wave. Every item in every wave registers its surface as an admin system before it is called done. |
 
 ---
 
@@ -1431,14 +1454,316 @@ the same work twice and getting the Arabic wrong both times.
 
 ---
 
-## B25+ — Everything added from here
+## B25 — The gamer's Discord card: the trophy case, and one button per account
 
-This section is deliberately empty and deliberately last. Each new instruction
-becomes the next numbered heading below — `## B25 — <what it is>` — written to
-the same shape as B1–B24:
+Two additions to the gamer/profile card:
+
+**Trophy case, up to three.** The three most valuable trophies they hold,
+rendered on the card — cover, name, cash value. Three because a card is 1200×630
+and a fourth makes all four unreadable; "up to" because a gamer with one trophy
+should see one, not two empty frames.
+
+**One button per linked account, labelled with the account's own name.** Not
+"Valorant" — *"NovaStrike#EUW"*. And when a gamer has **two accounts on the same
+game**, that is **two buttons**, one per account, each opening that account's
+stats. The current card collapses them, which is exactly the case where a gamer
+most needs to choose.
+
+Button budget: 5 per row, 25 total. Six games × two accounts is 12 buttons,
+which fits, but the layout must not assume one row.
+
+**Verification owed → `tests/ui/bot-profile-card.mjs`:**
+- A gamer with 5 trophies shows exactly 3, the most valuable ones.
+- A gamer with 1 trophy shows 1 and no placeholders.
+- A gamer with 0 trophies renders without an empty shelf.
+- Each linked account produces its own button, labelled with the in-game name.
+- Two accounts on one game produce two distinct buttons that open different
+  stats screens.
+- A gamer with 12 linked accounts stays inside Discord's component limits.
+
+**Shots owed:** `bot.card.profile` — "Your trophies and every account, on one
+card" — `/api/card/profile`.
+**New routes:** none.
+
+---
+
+## B26 — LoL stats read as ranks, and the level stops appearing twice
+
+Two defects in the League of Legends surfaces, both visible today.
+
+**Ranks render as numbers instead of ranks.** `lib/providers/adapters.ts` already
+returns `solo_tier` and `flex_tier` as `{ value, rankLabel }`, where `rankLabel`
+is the real thing — *"GOLD II"* — and `value` is the sortable ladder position it
+was derived from. The cards render `value`. A gamer looking at their own LoL
+card sees a score they have never heard of instead of the rank they earned.
+
+Fix: **wherever a metric carries a `rankLabel`, that label is the display value
+and the number is only for sorting.** Not a LoL special case — Dota's
+`rank_tier` carries one too (`dotaRankLabel`), and every ladder game added later
+will. Make it a rule in the metric renderer, once, and the next game inherits it.
+
+Show **both** LoL ranks as text on the card: **Solo/Duo** and **Flex**.
+
+**The level appears twice.** The LoL stats card lists the summoner level as two
+separate tracked stats — `summoner_level` from the adapter and a generic `level`
+metric that shadows it. One of them must go; keep the named one, and check the
+same collision on every other provider before closing this out (the generic
+`level` mapping near `adapters.ts:614` is shared).
+
+**Verification owed → `tests/db/metrics.mts` + `tests/ui/lol-card.mjs`:**
+- A metric with a `rankLabel` renders the label, never the number, on every
+  surface: profile, planet, leaderboard, and the Discord card.
+- Sorting still uses the number (assert a leaderboard orders correctly while
+  displaying labels).
+- The LoL card shows Solo and Flex, both as text.
+- No stat key appears twice on any account card, for any provider — assert
+  across all of them, not just LoL.
+
+**Shots owed:** `gamer.lol.card` — "Your rank, in the game's own words" — a
+profile's LoL account card.
+**New routes:** none.
+
+---
+
+## B27 — Every bot card: the data reads well, the buttons are grouped
+
+A sweep across **every** card kind and every screen, not a fix to one:
+
+**The cards.** Each kind gets read as a *page*: is the hierarchy right, does the
+most important number dominate, is anything clipped, does an empty state look
+deliberate. The list cards established the working conventions (`TILE_W = 218`,
+three across, no fixed text height because it clips descenders, `clamp()` on
+names, numbered badges matching numbered buttons) — apply them everywhere and
+record any kind that cannot follow them, with the reason.
+
+**The buttons.** Group them by meaning, in a fixed row order, so muscle memory
+works across screens:
 
 ```
-## B25 — <the instruction, in the owner's own words where possible>
+row 1 — what this card is about   (the choices: pick a game, a challenge, a trophy)
+row 2 — what you can do next      (join, link, redeem, buy)
+row 3 — where you can go          (Home, Back, and the link out to the web)
+```
+
+Colours by category are already decided (B3.0.2); this adds *position* to
+*colour*. Back is always in the same place, on every card, which is the single
+biggest usability change in this item.
+
+**Verification owed → `tests/ui/bot-cards.mjs`** (extend):
+- Every registered card kind renders 200 at a plausible size.
+- No card kind has an empty button set.
+- Row order matches the grouping above on every screen.
+- Back and Home sit in the same position on every card that has them.
+- No screen exceeds 5 per row or 25 total.
+
+**Shots owed:** none new — the existing bot card shots recapture.
+**New routes:** none.
+
+---
+
+## B28 — The bot preview, rebuilt — and used instead of screenshots
+
+The live bot preview exists and is not doing its job. Rebuild it:
+
+- **Better sidebar navigation**, grouped by what a person is trying to
+  understand rather than by card kind.
+- **Scoped**: a preview embedded in a page section shows **only the cards
+  relevant to that section**. The challenges section shows challenge cards; the
+  quests section shows quest cards; the trophies section shows trophy and redeem
+  cards; the server-owner section shows the `srv_*` portal cards; the gamer
+  section shows the gamer's own cards.
+- **Every card type, what it does, and how to ask for it** — the command or
+  button that produces it, beside it. A preview that shows the output without
+  the input teaches nothing.
+
+**And then use it instead of screenshots.** Where a page demonstrates the bot,
+embed the **real rendered card**, not a `<FeatureShot>` of one. The card renderer
+is live, public and cached (`/api/card/<kind>`) — a screenshot of it would be a
+photograph of something we can just show. `<FeatureShot>` stays for everything
+the renderer cannot produce: portals, admin consoles, web pages.
+
+This is a real saving in V1 as well: every bot claim proves itself at request
+time and never goes stale.
+
+**Verification owed → `tests/ui/bot-preview.mjs`:**
+- The preview renders on the server-owner page, the homepage and the gamer page.
+- Each embedded instance shows only its section's card kinds.
+- Every card in the sidebar renders and states the command that produces it.
+- The embeds are live renders, not images (assert the source is `/api/card/`).
+- A card kind that fails to render degrades visibly, never to a blank frame.
+
+**Shots owed:** none — this item *removes* shots. Record which R2 rows it
+retires.
+**New routes:** none.
+
+---
+
+## B29 — Everything new is an admin system, staffable by department
+
+A standing rule, applied to every item in this plan and every one after it:
+
+**Nothing ships without an owner in the admin taxonomy.** If admin cannot see
+it, edit it, and delegate it, it is not finished. `lib/systems.ts` already makes
+admin sections drive departments — every new surface registers there, gets its
+actions, and becomes assignable to a department exactly like everything before
+it. No parallel permission logic, no page that only works because you happen to
+be an admin.
+
+Applies to, at minimum: the CP calculator (B16), caps configuration (B17), the
+wallet (B18), the shot console (B7), the bot preview (B28), the offers console
+(B30), welcome challenges (B31), and every card kind's content and background.
+
+**The two standing exceptions hold and are re-asserted here**: `/admin/users`
+and `/admin/linked-accounts` are **admin-only** — no department reaches the gamer
+directory or the linked-account list. `/admin/payments` likewise. B29 makes new
+things delegable; it does not widen those two.
+
+**Verification owed → `tests/db/taxonomy.mts`** (extend):
+- Every admin route resolves to a registered system with actions.
+- A department granted a system reaches its pages and no others.
+- The two admin-only paths refuse every department, including one granted
+  everything.
+- No new page checks permissions on its own instead of through `pathAllowedFor`.
+
+**Shots owed:** none.
+**New routes:** none.
+
+---
+
+## B30 — The founding offers: admin-controlled, paused, and measured
+
+`lib/offers.ts` already models both founding offers — 1,000 servers with a
+welcome challenge, and the brand acquisition offer — from pricing and CMS keys.
+What it lacks is a switch, an audit and a bill.
+
+### B30.1 The console
+
+`/admin/offers`, a first-class admin system (B29):
+
+- **On/off per offer, off by default.** Both are **paused now** and turned on
+  when we decide, not when the code deploys.
+- **Every number editable**: the cap (30 brands, 1,000 servers), the value
+  ($1,000 per brand, $25 per server), and — the one that decides the money —
+  **the discount percentage applied to a brand's bill**.
+- **Analytics**: who has received each offer, when, what it was worth, and what
+  it has produced. Brands and servers in one table, filterable, because the
+  question "what did the founding offers cost us and what did they return" has
+  one answer, not two.
+
+### B30.2 The brand bill
+
+When the brand offer is on and a brand buys a month of challenges, the invoice
+shows **the full price and then the discount as its own line**:
+
+```
+Sponsored challenges — 4 × $250                      $1,000.00
+Founding brand offer — 100% covered by Cluster        −$1,000.00
+                                                    ───────────
+Due                                                       $0.00
+```
+
+Never a quietly reduced unit price. This is the same rule the base-reduction
+discount already follows in `lib/invoices.ts`, and it exists because a bill
+whose numbers cannot be traced is a bill somebody will dispute. The gross figure
+is also what tells us what the offer actually cost.
+
+- The discount is applied **automatically** while the offer is on, at the
+  configured percentage.
+- **Admin can edit both the bill and the discount** on any individual invoice —
+  the automatic behaviour is a default, not a cage.
+- Admin sees **which brands got what discount**, per invoice, in one list.
+
+**Verification owed → `tests/db/offers.mts`:**
+- Both offers are off by default.
+- With the brand offer off, a challenge month bills at full price and no
+  discount line exists.
+- With it on, the discount line appears at the configured percentage, and the
+  invoice total still equals the sum of its lines (totals are never stored — the
+  standing rule).
+- Changing the percentage changes the next invoice and never a sent one.
+- An admin edit to a bill survives a recalculation.
+- The analytics table counts each recipient once, and its totals equal the sum
+  of the discount lines actually issued.
+
+**Shots owed:** `admin.offers.console` — "Every founding offer, switchable and
+counted" — `/admin/offers`; `brand.invoice.discount` — "The full price, and what
+we covered" — a discounted invoice.
+**New routes:** `/admin/offers`.
+
+---
+
+## B31 — Welcome challenges: auto-drafted, sponsored by Cluster, billed to Cluster
+
+The server side of B30, and the more involved half.
+
+### B31.1 The draft appears on its own
+
+While the server offer is on, **a new server installing the bot gets a draft
+welcome challenge created on its portal automatically.** Not an email, not an
+offer to claim — a draft already sitting in their Challenges tab.
+
+The owner's path, and the order matters:
+
+1. Sign in to the portal with the key (already built).
+2. **Complete onboarding** — audience details, description, the games their
+   community plays. The existing server community profile.
+3. **Challenges tab** → the draft is there → **choose the game** for it, from
+   the games they just told us they play.
+4. The **prize pool shows the trophy value admin set** for welcome challenges.
+5. Submit. From there it is a normal challenge request in the admin queue —
+   approve makes a **draft** and staff edit it before it publishes (the standing
+   rule from B1-era work; a welcome challenge does not get to skip it).
+
+Onboarding first is deliberate: a challenge aimed at an audience we know nothing
+about is a challenge that does not fill.
+
+### B31.2 Cluster is the brand, and Cluster gets the bill
+
+The welcome challenge is **sponsored by the Cluster house brand** and **billed to
+Cluster exactly like any other brand's sponsored challenge** — same invoice
+machinery, same line items, same statuses.
+
+This is the whole point, and it is worth being explicit about why: a giveaway
+that skips the billing system is a giveaway nobody can add up. Running it
+through the same invoice as a paying brand means the cost of the server offer
+appears in the same ledger, in the same units, as the revenue it is meant to
+produce. When somebody asks what customer acquisition cost, the answer is a
+query, not an estimate.
+
+- The house brand is a real brand record, marked as ours.
+- Every auto-created welcome challenge appears on **Cluster's own bill**, line
+  item *"Welcome challenge — <server name>"*.
+- **Admin sets the prize pool per challenge** — the offer default is a default.
+- Admin sees, in one place, every welcome challenge: which server, which game,
+  what it cost, whether it ran, and what it produced in linked accounts.
+
+**Verification owed → `tests/db/welcome-challenge.mts`:**
+- Offer on + install → exactly one draft welcome challenge for that guild.
+- Offer off + install → none.
+- Two installs of the same guild → still one.
+- The draft is invisible to members until it publishes.
+- Submitting it enters the normal request queue, and approving it produces a
+  draft, not a live challenge.
+- It bills to the house brand, as its own line, at the admin-set value.
+- Cluster's invoice total equals the sum of its welcome-challenge lines.
+- Changing the default prize pool does not alter a challenge already drafted.
+
+**Shots owed:** `server.welcome.draft` — "Your first challenge is already
+waiting" — the portal's Challenges tab with the draft; `admin.welcome.ledger` —
+"What we spent to grow, on the same bill as everything else" — Cluster's brand
+invoice.
+**New routes:** none (the portal tab and `/admin/offers` already exist).
+
+---
+
+## B32+ — Everything added from here
+
+This section is deliberately empty and deliberately last. Each new instruction
+becomes the next numbered heading below — `## B32 — <what it is>` — written to
+the same shape as B1–B31:
+
+```
+## B32 — <the instruction, in the owner's own words where possible>
 
 <what changes, and why — including the reason it was asked for, because that
  is the thing that gets lost and the thing that decides the edge cases>
@@ -1465,6 +1790,8 @@ the corrections are usually the most important lines in it.
 | Amends | The instruction | What changed |
 |---|---|---|
 | B4.2, B4.3 | "keep administrator always win" | The Administrator permission was a pre-designation fallback that stopped applying once the owner designated specific roles. It is now an unconditional grant: designation only ever adds people. The guard's first two branches are permanent by construction, and `tests/db/bot-admin.mts` asserts an administrator passes both before and after a designation they do not hold. |
+| B7, B8 | "placeholder for the screenshot images everywhere empty till it's done later" | The shot plumbing moves to wave 1 and slots are placed as pages are touched, visibly empty. Capture still happens once, in V1, after Part I closes. |
+| B23 | "remove the content translation task for now" | Localization parked as B24; the machinery stays, the footer switch goes. |
 | — | *(next amendment here)* | |
 
 ---
@@ -1539,6 +1866,12 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/economy-copy.mjs` | **B21** | the loop stated in one order everywhere; every earning claim states its cap | owed |
 | `tests/db/bot-attribution.mts` | **B22** | one award per guild; no account, no error | owed |
 | `tests/ui/pages.mjs` | **B23**, **B24** | every consolidated page; the redirects; one footer; no language switch; every link resolves | owed |
+| `tests/ui/bot-profile-card.mjs` | **B25** | three trophies max, one button per account, two accounts on one game | owed |
+| `tests/db/metrics.mts` + `tests/ui/lol-card.mjs` | **B26** | a `rankLabel` always displays over its number; sorting still uses the number; no duplicate stat key on any provider | owed |
+| `tests/ui/bot-preview.mjs` | **B28** | scoped per section; live renders not images; every card states its command | owed |
+| `tests/db/taxonomy.mts` | **B29** | every admin route is a registered system; departments reach only what they are granted; the two admin-only paths refuse everyone | owed |
+| `tests/db/offers.mts` | **B30** | off by default; the discount is its own line; totals equal lines; admin edits survive recalculation | owed |
+| `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
 | `tests/ui/e2e-*.mjs`, `tests/db/e2e-*.mts` | **V3** | the full matrix, per user type | owed |
 | `docs/UAT/*.md` | **V5** | human acceptance, two rounds per role — not automatable, by design | owed |
 
@@ -1587,7 +1920,18 @@ requirement.
 | `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` |
 | `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` |
 | `page.home.gamer` | the gamer argument | `/` |
-| *(add a row per B25+ item that anyone can see)* | | |
+| `bot.card.profile` | "Your trophies and every account, on one card" | `/api/card/profile` |
+| `gamer.lol.card` | "Your rank, in the game's own words" | a profile's LoL account card |
+| `admin.offers.console` | "Every founding offer, switchable and counted" | `/admin/offers` |
+| `brand.invoice.discount` | "The full price, and what we covered" | a discounted invoice |
+| `server.welcome.draft` | "Your first challenge is already waiting" | the portal's Challenges tab |
+| `admin.welcome.ledger` | "What we spent to grow, on the same bill as everything else" | Cluster's brand invoice |
+| *(add a row per B32+ item that anyone can see)* | | |
+
+**B28 retires rows**: anywhere a page demonstrates a bot card, the live render
+from `/api/card/<kind>` replaces the shot. Delete those rows when B28 lands and
+say which in its commit — a shot registry with entries nothing uses is how V1
+ends up capturing images no page shows.
 
 ### R3 — The surface registry
 
@@ -1599,8 +1943,8 @@ find app -name page.tsx | sed 's|^app||; s|/page.tsx$||; s|^$|/|' | sort
 ```
 
 106 routes today, plus what Part I adds: `/wallet`, `/for-brands`, `/contact`,
-`/admin/cp-calculator`, and the redirects standing in for `/servers`,
-`/discord-bot` and `/brands`. Regenerate rather than edit — that is the point of
+`/admin/cp-calculator`, `/admin/offers`, and the redirects standing in for
+`/servers`, `/discord-bot` and `/brands`. Regenerate rather than edit — that is the point of
 generating it.
 
 The registry is that list plus, per route, three facts kept
