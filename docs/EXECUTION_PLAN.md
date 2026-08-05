@@ -294,7 +294,7 @@ the remaining edits; Part II is the whole platform.
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
 | B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☑ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `lib/wallet.ts`, new `/wallet`, `components/FeatureShot.tsx` | batch 2 | ☑ |
-| B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ **folded into B49** |
+| B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☑ **folded into B49** |
 | B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
 | B21 | The economy, explained in visuals, everywhere | bot guides, quests, wallet, homepage, deck | batch 2 | ☐ |
 | B22 | Track the bot install, and pay for it | `app/api/discord/installed/route.ts`, the signal quest | batch 2 | ☑ |
@@ -334,7 +334,7 @@ the remaining edits; Part II is the whole platform.
 | S5 | **Demo balances rescaled for B34's prices**, as balances net of what the seeded orders spend — Nova can afford exactly one trophy, Atlas none | `lib/db/seed-activity.ts` | wave 2 (B34 fallout) | ☑ |
 | B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☑ |
 | B48 | **The marketplace says how you get the points** — quest cards on the shelf, a clickable balance, the redemption value promoted | `/marketplace`, `components/TrophyMarket.tsx`, `components/QuestCard.tsx` | wave 2 (after B35) | ☑ |
-| B49 | **The marketplace purchase and gift experience** — checkout modal, gift search, confirm-the-person, gift-sent receipt. **Absorbs B5, B6, B19** | `components/TrophyMarket.tsx`, new `/api/gamers/search`, `app/actions/marketplace.ts` | wave 2 band | ☐ |
+| B49 | **The marketplace purchase and gift experience** — checkout modal, gift search, confirm-the-person, gift-sent receipt. **Absorbs B5, B6, B19** | `components/TrophyMarket.tsx`, new `/api/gamers/search`, `app/actions/marketplace.ts` | wave 2 band | ☑ |
 | B50 | **The quest page as a how-to-play guide** — every action, its CP and its cap, as the pitch | `components/QuestGame.tsx`, `lib/quests.ts` (read `rules`, do not restate) | wave 2 | ☐ |
 | B51 | **The Profile of the Week band** — nav art behind it, top 3 only, a trophy per place, smaller cards, click-out collapses, profiles open in a new tab | `components/WeekBand.tsx`, `lib/profile-week.ts`, `/admin/profile-week` | wave 2 | ☐ |
 | B52 | **Planet explore shows game identities** — in-game name, one row per account | `lib/planet-explore.ts`, `app/planets/[slug]/page.tsx` | wave 2 | ☐ |
@@ -3159,8 +3159,8 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/bot-flows.mts` | **B3** | the redeem and buy state machines, driven through the interaction handler | owed |
 | `tests/db/bot-admin.mts` | **B4** | role sync, the three-way guard, Administrator always wins, the key goes only to `owner_id` | owed |
 | `tests/ui/bot-admin-cards.mjs` | **B4** | every `srv_*` card renders and its numbers equal the web portal's | owed |
-| `tests/ui/gifting.mjs` | **B5** | type-ahead resolves; a misspelling never reaches the server action | owed |
-| `tests/db/gifting.mts` | **B5** | resolve by slug, name, Discord username; ambiguity; self-gift; the giver is charged | owed |
+| `tests/db/gifting.mts` + `tests/ui/checkout.mjs` | **B5** | resolve by name, @profile and Discord handle; who is not enumerable; a private profile is still giftable by exact slug; the confirm custom_id never clips the slug | ☑ 53 + 34 |
+| `tests/ui/checkout.mjs` | **B49** + **B19** | no purchase completes without a confirm; the confirm states price, balance before and after; the gift confirm shows the recipient's avatar and name; the shelf prices a trophy identically on /marketplace and /quests | ☑ 34 |
 | `tests/ui/redeem-flow.mjs` | **B6** | every step; browser AND in-page back; refresh mid-flow; totals; a stale link degrades; **no bank field on any step** | ☑ 27 |
 | `tests/ui/shots.mjs` | **B7** | the component renders, falls back visibly, admin-replaceable, propagates everywhere | owed |
 | `tests/ui/claims.mjs` | **B8** | every claim resolves to a shot; no page carries an unproven claim | owed |

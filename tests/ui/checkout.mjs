@@ -121,6 +121,53 @@ try {
   ok("results carry no email field", shape.every((r) => !("email" in r)), JSON.stringify(shape[0] ?? {}));
   ok("…and no id", shape.every((r) => !("id" in r) && !("userId" in r)));
   await signedOut.close();
+  console.log("\n== B19: the shelf prices the same trophy the same way everywhere ==");
+  // Two surfaces read `marketplaceCatalog`, and the two numbers on every tile —
+  // CP to buy, dollars to redeem — are two views of ONE number at the platform
+  // rate. If they can disagree between the marketplace page and the quests-page
+  // section, one of them is lying to somebody about what their points are worth.
+  const priceMap = async (url) => {
+    await page.goto(url, { waitUntil: "networkidle" });
+    return page.evaluate(() => {
+      const out = {};
+      for (const card of document.querySelectorAll("[data-trophy]")) {
+        const t = card.textContent || "";
+        const usd = t.match(/\$([\d,]+(?:\.\d+)?)/)?.[1] ?? null;
+        // The CP figure is rendered by <Cp>, which can span a line break in raw
+        // text — normalise the whitespace before matching (§0, trap 2).
+        const cp = t.replace(/\s+/g, " ").match(/([\d,]{3,})\s*(?:CP)?/)?.[1] ?? null;
+        out[card.getAttribute("data-trophy")] = { usd, cp };
+      }
+      return out;
+    });
+  };
+  const onMarket = await priceMap(`${BASE}/marketplace`);
+  const onQuest = await priceMap(`${BASE}/quests/orbit`);
+  const ids = Object.keys(onMarket);
+  ok("the marketplace lists trophies", ids.length > 0, `${ids.length}`);
+  ok("every one shows a dollar value", ids.every((id) => onMarket[id].usd !== null),
+    JSON.stringify(Object.entries(onMarket).slice(0, 2)));
+  ok("…and a CP price", ids.every((id) => onMarket[id].cp !== null));
+
+  const shared = ids.filter((id) => id in onQuest);
+  ok("the quests page carries the same shelf", shared.length > 0, `${shared.length} in common`);
+  const disagree = shared.filter((id) =>
+    onMarket[id].usd !== onQuest[id].usd || onMarket[id].cp !== onQuest[id].cp);
+  ok("…priced identically on both", disagree.length === 0,
+    JSON.stringify(disagree.slice(0, 2).map((id) => [id, onMarket[id], onQuest[id]])));
+
+  console.log("\n== affordability is computed against the real balance ==");
+  await page.goto(`${BASE}/marketplace`, { waitUntil: "networkidle" });
+  const reach = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll("[data-trophy]")];
+    return cards.map((c) => {
+      const t = (c.textContent || "").replace(/\s+/g, " ");
+      return { toGo: /to go/.test(t), getIt: /Get it/.test(t) };
+    });
+  });
+  ok("every tile says either what it costs to reach or that it can be bought",
+    reach.every((r) => r.toGo || r.getIt), JSON.stringify(reach.slice(0, 3)));
+  ok("…and not both at once", reach.every((r) => !(r.toGo && r.getIt)));
 } finally {
   await browser.close();
 }
