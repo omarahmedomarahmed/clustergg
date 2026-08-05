@@ -49,6 +49,8 @@ export type BandEntry = {
 };
 
 export type BandData = {
+  /** What 1st, 2nd and 3rd are playing for right now (B51). */
+  prizes: ({ id: string; name: string; imageUrl: string; tier: string; value: number } | null)[];
   week: { key: string; startsAt: string; votingEndsAt: string; endsAt: string; phase: "voting" | "announcement"; timezone: string };
   entries: BandEntry[];
   votingOpen: boolean;
@@ -313,16 +315,37 @@ export default function WeekBand({ initial, bgUrl = "" }: {
 
             {data.result && <Called result={data.result} me={data.me} />}
 
-            {podium.length > 0 && <Podium entries={podium} onOpen={setOpenSlug} data={data} note={note} setNote={setNote} onVoted={refresh} />}
+            {podium.length > 0 && <Podium entries={podium} prizes={data.prizes} onOpen={setOpenSlug} data={data} note={note} setNote={setNote} onVoted={refresh} />}
 
-            <Rows
-              entries={data.entries.slice(podium.length)}
-              data={data}
-              onOpen={setOpenSlug}
-              note={note}
-              setNote={setNote}
-              onVoted={refresh}
-            />
+            {/* Top three, and nothing else (B51).
+                The whole platform in a band is a leaderboard nobody reads;
+                three is a podium. The rest are one click away, on a page built
+                to hold them, rather than 700px of rows dropped over whatever
+                page somebody actually opened. */}
+            {data.entries.length > podium.length && (
+              <Link href="/vote" data-see-all
+                className="group mt-1 flex items-center justify-between gap-3 rounded-2xl border border-white/12 bg-white/[0.03] px-4 py-3 transition hover:border-cyan-400/50 hover:bg-cyan-500/[0.07]">
+                <span className="flex items-center gap-3">
+                  <span className="flex -space-x-2">
+                    {data.entries.slice(podium.length, podium.length + 4).map((e) => (
+                      <Avatar key={e.userId} name={e.displayName} src={e.avatarUrl} size={26}
+                        className="ring-2 ring-[#04051a]" />
+                    ))}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-bold">
+                      {data.entries.length - podium.length} more in the running
+                    </span>
+                    <span className="block text-[11px] text-muted">
+                      Every profile on Cluster is in it — there is nothing to enter.
+                    </span>
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs font-black text-cyan-300 group-hover:text-cyan-200">
+                  See the full board <Icon name="chevronRight" size={11} className="inline" />
+                </span>
+              </Link>
+            )}
 
             <p className="mt-5 text-[11px] text-muted">
               Voting runs Monday to Saturday in {data.week.timezone}. Sunday the board freezes and the winners are
@@ -536,9 +559,10 @@ function Called({ result, me }: { result: NonNullable<BandData["result"]>; me: B
           const medal = MEDAL[pos] ?? "#94a3b8";
           const first = pos === 0;
           return (
-            <Link
+            <a
               key={p.userId}
               href={`/u/${p.slug}`}
+              target="_blank" rel="noopener noreferrer"
               className={`group relative flex flex-col items-center gap-2 rounded-2xl border px-4 text-center transition hover:-translate-y-0.5 ${first ? "py-7" : "py-5"} ${podiumOrder(pos, total)}`}
               style={{
                 borderColor: first ? medal : `${medal}55`,
@@ -562,7 +586,7 @@ function Called({ result, me }: { result: NonNullable<BandData["result"]>; me: B
                   <Icon name="trophy" size={10} /> trophy awarded
                 </span>
               )}
-            </Link>
+            </a>
           );
         })}
       </div>
@@ -577,6 +601,7 @@ function Called({ result, me }: { result: NonNullable<BandData["result"]>; me: B
           </span>
           <Link
             href={`/u/${me?.slug ?? ""}#trophies`}
+            target="_blank" rel="noopener noreferrer"
             className="pressable ml-auto inline-flex items-center gap-1.5 rounded-full bg-amber-400 px-5 py-2 text-sm font-black text-[#04051a] hover:bg-amber-300"
           >
             <Icon name="trophy" size={14} /> {trophy ? "Redeem your trophy" : "Open your trophy case"}
@@ -593,8 +618,9 @@ function Called({ result, me }: { result: NonNullable<BandData["result"]>; me: B
 // before anyone checks the number on it. First is taller, wider on desktop,
 // crowned and lit; the other two are deliberately quieter. A podium where the
 // places look the same isn't a podium, it's a list with medals on it.
-function Podium({ entries, data, onOpen, note, setNote, onVoted }: {
+function Podium({ entries, prizes, data, onOpen, note, setNote, onVoted }: {
   entries: BandEntry[];
+  prizes: BandData["prizes"];
   data: BandData;
   onOpen: (slug: string) => void;
   note: { slug: string; text: string } | null;
@@ -608,6 +634,7 @@ function Podium({ entries, data, onOpen, note, setNote, onVoted }: {
           <PodiumCard
             entry={e}
             place={pos}
+            prize={prizes[pos] ?? null}
             data={data}
             onOpen={onOpen}
             note={note}
@@ -648,9 +675,10 @@ const COLS: Record<number, string> = {
   3: "sm:grid-cols-[1fr_1.24fr_1fr]",
 };
 
-function PodiumCard({ entry: e, place, data, onOpen, note, setNote, onVoted }: {
+function PodiumCard({ entry: e, place, prize, data, onOpen, note, setNote, onVoted }: {
   entry: BandEntry;
   place: number;
+  prize: BandData["prizes"][number];
   data: BandData;
   onOpen: (slug: string) => void;
   note: { slug: string; text: string } | null;
@@ -672,7 +700,9 @@ function PodiumCard({ entry: e, place, data, onOpen, note, setNote, onVoted }: {
     >
       {/* Their art, as the card. This is a contest about whose profile is best,
           so the entry has to look like the thing being judged. */}
-      <div className={`group relative ${first ? "h-56 sm:h-64" : "h-44 sm:h-48"}`}>
+      {/* Smaller than they were (B51): expanding the band should not cover the
+          page it dropped over. h-56/h-44 → h-44/h-36. */}
+      <div className={`group relative ${first ? "h-44 sm:h-48" : "h-36 sm:h-40"}`}>
         {art
           ? <span aria-hidden className="absolute inset-0 bg-cover bg-center transition duration-700 group-hover:scale-105" style={{ backgroundImage: `url(${optImg(art, 1200)})` }} />
           : <span aria-hidden className="absolute inset-0" style={{ background: `linear-gradient(150deg, ${e.accent}, ${e.accent2})`, opacity: 0.5 }} />}
@@ -681,12 +711,23 @@ function PodiumCard({ entry: e, place, data, onOpen, note, setNote, onVoted }: {
           <span aria-hidden className="absolute inset-x-0 top-0 h-24" style={{ background: `linear-gradient(180deg, ${medal}2e, transparent)` }} />
         )}
 
-        {/* The trophy. */}
+        {/* The trophy this place would win (B51).
+            A generic crown says "you are first". The actual object says what
+            first is WORTH, which is the thing a contender is deciding whether
+            to chase. Framed "if the week ended now" below — it must not read as
+            already won, or Sunday's result feels like something being taken
+            away. Falls back to the medal icon when staff have configured no
+            trophy for the place, rather than showing an empty circle. */}
         <span
-          className={`absolute left-1/2 -translate-x-1/2 grid place-items-center rounded-full ${first ? "top-4 h-16 w-16" : "top-3 h-12 w-12"}`}
+          data-prize={prize?.id ?? ""}
+          title={prize ? `${prize.name} — if the week ended now` : undefined}
+          className={`absolute left-1/2 -translate-x-1/2 grid place-items-center rounded-full ${first ? "top-3 h-14 w-14" : "top-2.5 h-11 w-11"}`}
           style={{ background: `${medal}22`, boxShadow: `0 0 34px -6px ${medal}`, border: `2px solid ${medal}` }}
         >
-          <Icon name={first ? "crown" : place === 1 ? "medal" : "trophy"} size={first ? 30 : 22} style={{ color: medal }} />
+          {prize
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={prize.imageUrl} alt={prize.name} className={first ? "h-10 w-10 object-contain" : "h-8 w-8 object-contain"} />
+            : <Icon name={first ? "crown" : place === 1 ? "medal" : "trophy"} size={first ? 26 : 20} style={{ color: medal }} />}
         </span>
         <span
           className={`absolute left-1/2 -translate-x-1/2 rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest text-[#04051a] ${first ? "top-[4.6rem]" : "top-[3.6rem]"}`}
@@ -697,10 +738,10 @@ function PodiumCard({ entry: e, place, data, onOpen, note, setNote, onVoted }: {
 
         <button type="button" onClick={() => onOpen(e.slug)} className="absolute inset-0 flex flex-col justify-end p-4 text-left">
           <span className="flex items-center gap-2.5">
-            <Avatar name={e.displayName} src={e.avatarUrl} size={first ? 52 : 40} />
+            <Avatar name={e.displayName} src={e.avatarUrl} size={first ? 44 : 34} />
             <span className="min-w-0">
               <span className="flex items-center gap-1.5">
-                <span className={`truncate font-black ${first ? "text-2xl" : "text-lg"}`}>{e.displayName}</span>
+                <span className={`truncate font-black ${first ? "text-xl" : "text-base"}`}>{e.displayName}</span>
                 {mine && <span className="shrink-0 rounded-full bg-cyan-500/25 px-1.5 py-px text-[9px] font-black uppercase tracking-widest text-cyan-100">You</span>}
               </span>
               {e.title && <span className="block truncate text-[11px] text-muted">{e.title}</span>}
@@ -709,7 +750,7 @@ function PodiumCard({ entry: e, place, data, onOpen, note, setNote, onVoted }: {
 
           <span className="mt-3 flex items-end gap-5">
             <span>
-              <span className={`block font-black leading-none tabular-nums ${first ? "text-5xl" : "text-4xl"}`} style={{ color: medal }}>
+              <span className={`block font-black leading-none tabular-nums ${first ? "text-4xl" : "text-3xl"}`} style={{ color: medal }}>
                 {nf(e.weekVotes)}
               </span>
               <span className="mt-1 block text-[10px] uppercase tracking-widest text-muted">votes this week</span>
@@ -722,11 +763,24 @@ function PodiumCard({ entry: e, place, data, onOpen, note, setNote, onVoted }: {
         </button>
       </div>
 
+      {/* What this place wins, and the tense it is said in (B51). */}
+      {prize && (
+        <div className="relative flex items-center gap-2 border-t border-white/10 bg-[#04051a]/60 px-4 py-1.5 text-[10px]">
+          <span className="truncate font-bold" style={{ color: medal }}>{prize.name}</span>
+          {prize.value > 0 && <span className="shrink-0 font-black text-amber-200">${prize.value.toLocaleString()}</span>}
+          <span className="ml-auto shrink-0 text-muted">if the week ended now</span>
+        </div>
+      )}
+
       <div className="relative flex items-center gap-2 border-t border-white/10 bg-[#04051a]/70 px-4 py-3">
         <VoteButton entry={e} data={data} note={note} setNote={setNote} onVoted={onVoted} />
-        <Link href={`/u/${e.slug}`} className="ghost-btn pressable inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold">
+        {/* A NEW TAB, always (B51). The band is a floating panel over whatever
+            page you were on; navigating inside it throws away where you were
+            and, worse, opens a profile underneath a board that is still open. */}
+        <a href={`/u/${e.slug}`} target="_blank" rel="noopener noreferrer"
+          className="ghost-btn pressable inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold">
           Profile <Icon name="arrowRight" size={11} />
-        </Link>
+        </a>
       </div>
     </div>
   );
@@ -797,9 +851,10 @@ function EntryCard({ entry: e, data, onOpen, note, setNote, onVoted }: {
 
       <div className="relative flex items-center gap-2 px-3 pb-3">
         <VoteButton entry={e} data={data} note={note} setNote={setNote} onVoted={onVoted} />
-        <Link href={`/u/${e.slug}`} className="ghost-btn pressable inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold">
+        <a href={`/u/${e.slug}`} target="_blank" rel="noopener noreferrer"
+          className="ghost-btn pressable inline-flex shrink-0 items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-semibold">
           Profile <Icon name="arrowRight" size={11} />
-        </Link>
+        </a>
       </div>
     </div>
   );
@@ -912,9 +967,10 @@ function Snapshot({ slug, data, onClose, onVoted, note, setNote }: {
           <div className="hidden w-44 sm:block">
             <VoteButton entry={entry} data={data} note={note} setNote={setNote} onVoted={onVoted} />
           </div>
-          <Link href={`/u/${entry.slug}`} className="ghost-btn pressable shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold">
+          <a href={`/u/${entry.slug}`} target="_blank" rel="noopener noreferrer"
+            className="ghost-btn pressable shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold">
             Open profile
-          </Link>
+          </a>
           <button type="button" onClick={onClose} aria-label="Close" className="shrink-0 p-1 text-muted hover:text-ink">
             <Icon name="x" size={17} />
           </button>

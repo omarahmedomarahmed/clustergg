@@ -709,6 +709,16 @@ export const trophyRedeems = pgTable("trophy_redeems", {
   details: jsonb("details").$type<Record<string, string>>().notNull().default({}),
   /** pending | approved | sent | paid | rejected | cancelled */
   status: text("status").notNull().default("pending"),
+  /**
+   * Why the last send attempt failed, from the provider (B39).
+   *
+   * `sendRedeem` returned the provider's error to whoever pressed the button and
+   * recorded NOTHING — the row stayed `approved`, which is the right state, but
+   * the reason lived in a toast that closed. The next person saw an approved
+   * payout that had simply never gone, with no way to know it had been tried.
+   * Cleared on a successful send.
+   */
+  failedReason: text("failed_reason"),
   /** Which provider was used, and its id for this payment. */
   providerKey: text("provider_key"),
   providerRef: text("provider_ref"),
@@ -935,6 +945,16 @@ export const discordGuilds = pgTable("discord_guilds", {
    * not record.
    */
   tierUnlockedAt: timestamp("tier_unlocked_at", { withTimezone: true, mode: "date" }),
+  /**
+   * The gamer who brought us this server (B22).
+   *
+   * Deliberately NOT a foreign key: the credit is a historical fact about how
+   * this server arrived, and it should survive the gamer deleting their account
+   * rather than cascading away and rewriting how we got here. Null is the
+   * ordinary case — Discord's own "Add App" button carries no state, and most
+   * installers have no Cluster account at all.
+   */
+  installedByUserId: text("installed_by_user_id"),
   /**
    * When this server's funded welcome challenge was created.
    *

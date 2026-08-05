@@ -29,10 +29,11 @@ const ZONES = [
   "America/New_York", "America/Chicago", "America/Los_Angeles", "America/Sao_Paulo",
 ];
 
-export function WeekSettings({ timezone, frozen, trophyId, trophies }: {
+export function WeekSettings({ timezone, frozen, prizeIds, trophies }: {
   timezone: string;
   frozen: boolean;
-  trophyId: string;
+  /** One trophy id per place, 1st → 3rd. Empty string means "no prize". */
+  prizeIds: string[];
   trophies: { id: string; name: string; tier: string; value: number }[];
 }) {
   const [state, action, pending] = useActionState<WeekAdminState, FormData>(saveWeekSettings, undefined);
@@ -52,16 +53,31 @@ export function WeekSettings({ timezone, frozen, trophyId, trophies }: {
           <span className="mt-1 block">One clock for everyone. Monday 00:00 here starts the week.</span>
         </label>
 
-        <label className="text-xs text-muted">
-          <span className="mb-1 block font-semibold text-white">Podium trophy</span>
-          <select name="trophyId" defaultValue={trophyId} className="input-cosmic w-full">
-            <option value="">No trophy — result only</option>
-            {trophies.map((t) => (
-              <option key={t.id} value={t.id}>{t.name} · {t.tier} · ${t.value.toLocaleString()}</option>
+        {/* One trophy PER PLACE (B51).
+            There used to be one for the whole podium, so all three winners got
+            the same object — which is not a podium, it is three copies of a
+            participation prize. Each is optional: a place with nothing set
+            awards nothing rather than falling back to first place's. */}
+        <div className="text-xs text-muted md:col-span-1">
+          <span className="mb-1 block font-semibold text-white">Podium trophies</span>
+          <div className="space-y-1.5">
+            {["1st", "2nd", "3rd"].map((label, i) => (
+              <label key={label} className="flex items-center gap-2">
+                <span className="w-7 shrink-0 font-black text-white">{label}</span>
+                <select name={i === 0 ? "trophyId" : `trophyId${i + 1}`} defaultValue={prizeIds[i] ?? ""}
+                  className="input-cosmic w-full !py-1.5 text-xs">
+                  <option value="">No trophy</option>
+                  {trophies.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name} · {t.tier} · ${t.value.toLocaleString()}</option>
+                  ))}
+                </select>
+              </label>
             ))}
-          </select>
-          <span className="mt-1 block">Awarded to the top three when a week is called. Redeemable like any other.</span>
-        </label>
+          </div>
+          <span className="mt-1 block">
+            Shown on the band all week as &ldquo;if the week ended now&rdquo;, and awarded when the week is called.
+          </span>
+        </div>
 
         <label className="flex cursor-pointer flex-col text-xs text-muted">
           <span className="mb-1 block font-semibold text-white">Announcement day</span>

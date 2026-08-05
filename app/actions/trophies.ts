@@ -8,6 +8,7 @@ import { payer } from "@/lib/payments";
 import { METHOD_OPTIONS, savePayoutPreference } from "@/lib/payouts";
 import { uid } from "@/lib/utils";
 import { emailUser } from "@/lib/email";
+import { awardQuestAction } from "@/lib/quests";
 
 // Cashing out a trophy.
 //
@@ -136,11 +137,21 @@ export async function requestRedeem(input: {
   const amount = awards.reduce((s, a) => s + Number(a.value ?? 0), 0);
   if (amount <= 0) return { error: "These trophies have no redeemable value yet." };
 
+  const redeemId = uid();
   await db.insert(schema.trophyRedeems).values({
-    id: uid(), userId: user.id, awardIds: ids, amount,
+    id: redeemId, userId: user.id, awardIds: ids, amount,
     currency, method: input.method, status: "pending",
   });
   await db.update(schema.userTrophies).set({ status: "pending" }).where(inArray(schema.userTrophies.id, ids));
+
+  // Cashing out earns on the ascension quest (B15).
+  //
+  // Awarded at REQUEST, not at payment. The alternative — award when staff mark
+  // it paid — makes a gamer's points depend on how quickly a human got to a
+  // queue, which is not something they did. The dedup key is the redemption, so
+  // the same request cannot pay twice however often this runs, and the daily cap
+  // in the catalogue stops somebody redeeming one trophy at a time for points.
+  await awardQuestAction(db, user.id, "redeem_trophy", { refType: "redeem", refId: redeemId });
   await notifyAdmins(db, "Trophy redeem request", `${user.displayName} (@${user.slug}) requested $${amount.toLocaleString()} ${currency} for ${ids.length} ${ids.length === 1 ? "trophy" : "trophies"} — prefers ${methodLabel(input.method).toLowerCase()}.`);
   revalidateTrophyPages();
   return { ok: true };
@@ -244,10 +255,23 @@ export async function sendRedeem(redeemId: string): Promise<{ ok?: true; error?:
     amount: { amount: Number(r.amount), currency: r.currency },
     memo: `Cluster trophy payout — ${(r.awardIds ?? []).length} ${((r.awardIds ?? []).length === 1 ? "trophy" : "trophies")}`,
   });
-  if (!res.ok) return { error: res.error };
+  // A failed send stays APPROVED and records WHY (B39).
+  //
+  // It used to return the provider's error to whoever pressed the button and
+  // write nothing. The state was right — approved, not lost — but the reason
+  // lived in a toast that closed, so the next person saw an approved payout that
+  // had simply never gone out and no way to know it had been tried.
+  if (!res.ok) {
+    await db.update(schema.trophyRedeems)
+      .set({ failedReason: res.error ?? "The payout provider refused it and gave no reason." })
+      .where(eq(schema.trophyRedeems.id, r.id));
+    return { error: res.error };
+  }
 
   await db.update(schema.trophyRedeems).set({
     status: "sent",
+    // Cleared: this one went.
+    failedReason: null,
     sentAt: new Date(),
     providerKey: adapter.key,
     providerRef: res.ref || null,

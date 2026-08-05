@@ -3,7 +3,7 @@ import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { getContent } from "@/lib/cms";
 import {
-  DEFAULT_WEEK_TZ, WEEK_TZ_KEY, weekAt, weekFromKey, previousWeek, type Week,
+  DEFAULT_WEEK_TZ, WEEK_TZ_KEY, PODIUM_TROPHY_KEYS, weekAt, weekFromKey, previousWeek, type Week,
 } from "@/lib/week";
 
 // Profile of the Week — the competition itself.
@@ -22,7 +22,39 @@ import {
 export const STREAM_URL_KEY = "vote.week.stream.url";
 export const STREAM_LIVE_KEY = "vote.week.stream.live";
 export const FREEZE_KEY = "vote.week.freeze";
-export const PODIUM_TROPHY_KEY = "vote.week.trophy";
+/**
+ * The podium's prizes (B51).
+ *
+ * One key per place. Before this there was ONE trophy for the whole podium and
+ * all three winners got the same object, which is not a podium — it is three
+ * copies of a participation prize. `PODIUM_TROPHY_KEY` survives as the FIRST
+ * place key so no admin's existing choice is silently dropped when this ships.
+ */
+export const PODIUM_TROPHY_KEY = PODIUM_TROPHY_KEYS[0];
+export { PODIUM_TROPHY_KEYS };
+
+/**
+ * The three trophies, in place order, with nulls where staff chose nothing.
+ *
+ * Read for the BAND as well as the close, because B51's whole point is that a
+ * contender sees the object they are competing for while the week is still
+ * running — "if the week ended now", never "won".
+ */
+export async function podiumTrophies(db: Awaited<ReturnType<typeof getDb>>): Promise<WeekTrophy[]> {
+  try {
+    const c = await getContent([...PODIUM_TROPHY_KEYS]);
+    const ids = PODIUM_TROPHY_KEYS.map((k) => c[k]?.trim() || null);
+    const wanted = ids.filter((x): x is string => !!x);
+    if (!wanted.length) return [null, null, null];
+    const rows = await db.select({
+      id: schema.trophies.id, name: schema.trophies.name, imageUrl: schema.trophies.imageUrl,
+      tier: schema.trophies.tier, value: schema.trophies.value,
+    }).from(schema.trophies).where(inArray(schema.trophies.id, wanted));
+    const by = new Map<string, NonNullable<WeekTrophy>>(
+      rows.map((t) => [t.id, { ...t, value: Number(t.value) }]));
+    return ids.map((id) => (id ? by.get(id) ?? null : null));
+  } catch { return [null, null, null]; }
+}
 
 export type WeekEntry = {
   rank: number;
@@ -53,6 +85,14 @@ export type WeekTrophy = { id: string; name: string; imageUrl: string; tier: str
 
 export type WeekBoard = {
   week: Week;
+  /**
+   * What 1st, 2nd and 3rd are playing for RIGHT NOW (B51).
+   *
+   * Present during voting, not only after the close, because the whole point is
+   * that a contender sees the object while there is still time to catch it. The
+   * band frames it "if the week ended now" — never "won".
+   */
+  prizes: WeekTrophy[];
   entries: WeekEntry[];
   /** Can a vote be cast right now? */
   votingOpen: boolean;
@@ -151,7 +191,7 @@ export async function weekBoard(opts: {
   const limit = Math.max(3, Math.min(100, opts.limit ?? 25));
 
   const empty: WeekBoard = {
-    week, entries: [], votingOpen: false, closedReason: null,
+    week, prizes: [null, null, null], entries: [], votingOpen: false, closedReason: null,
     stream: { url: null, live: false }, result: null, takenAt: new Date().toISOString(),
   };
 
@@ -268,6 +308,10 @@ export async function weekBoard(opts: {
 
     return {
       week,
+      // What each place is playing FOR, while the week is still running (B51).
+      // Shown as "if the week ended now" — a contender seeing the object is the
+      // point, and it must never read as already won.
+      prizes: await podiumTrophies(db),
       entries: entries.slice(0, limit),
       votingOpen: win.open,
       closedReason: win.closedReason,
@@ -418,30 +462,29 @@ export async function closeWeek(weekKey: string, actorId?: string | null): Promi
       .map((e) => ({ userId: e.userId, slug: e.slug, displayName: e.displayName, votes: e.weekVotes }));
     if (!podium.length) return { ok: false, reason: "no_entries" };
 
-    // The trophy staff picked for the podium, if any. Without one the week
-    // still closes — the result is the point, the trophy is a bonus.
-    let trophyId: string | null = null;
-    try {
-      const c = await getContent([PODIUM_TROPHY_KEY]);
-      trophyId = c[PODIUM_TROPHY_KEY]?.trim() || null;
-    } catch { /* no trophy configured */ }
+    // The trophies staff picked, ONE PER PLACE (B51). Without any the week
+    // still closes — the result is the point, the trophy is a bonus. A place
+    // with no trophy configured simply awards nothing rather than falling back
+    // to first place's, which would hand second place the winner's object.
+    const prizes = await podiumTrophies(db);
+    const trophyIdFor = (i: number) => prizes[i]?.id ?? null;
 
     let trophies = 0;
-    if (trophyId) {
-      for (const [i, p] of podium.entries()) {
-        try {
-          await db.insert(schema.userTrophies).values({
-            id: uid(),
-            userId: p.userId,
-            trophyId,
-            // Filed under the week, so a second close finds the same row and
-            // the same gamer can win again in a later week.
-            challengeId: `week:${weekKey}`,
-            placement: i + 1,
-          }).onConflictDoNothing();
-          trophies++;
-        } catch { /* a missing trophy row shouldn't stop the announcement */ }
-      }
+    for (const [i, p] of podium.entries()) {
+      const trophyId = trophyIdFor(i);
+      if (!trophyId) continue;
+      try {
+        await db.insert(schema.userTrophies).values({
+          id: uid(),
+          userId: p.userId,
+          trophyId,
+          // Filed under the week, so a second close finds the same row and
+          // the same gamer can win again in a later week.
+          challengeId: `week:${weekKey}`,
+          placement: i + 1,
+        }).onConflictDoNothing();
+        trophies++;
+      } catch { /* a missing trophy row shouldn't stop the announcement */ }
     }
 
     for (const [i, p] of podium.entries()) {
@@ -451,8 +494,8 @@ export async function closeWeek(weekKey: string, actorId?: string | null): Promi
           userId: p.userId,
           type: "badge",
           title: i === 0 ? "You are Profile of the Week" : `You finished #${i + 1} this week`,
-          body: trophyId
-            ? `${p.votes.toLocaleString()} votes. Your trophy is in your trophy case — open it to redeem.`
+          body: trophyIdFor(i)
+            ? `${p.votes.toLocaleString()} votes. ${prizes[i]!.name} is in your trophy case — open it to redeem.`
             : `${p.votes.toLocaleString()} votes.`,
           href: "/profile",
         }).onConflictDoNothing();
@@ -461,10 +504,10 @@ export async function closeWeek(weekKey: string, actorId?: string | null): Promi
 
     const now = new Date();
     await db.insert(schema.voteWeeks)
-      .values({ weekKey, podium: podium.map((p, i) => ({ ...p, trophyId: i < 3 ? trophyId : null })), announcedAt: now, closedAt: now })
+      .values({ weekKey, podium: podium.map((p, i) => ({ ...p, trophyId: trophyIdFor(i) })), announcedAt: now, closedAt: now })
       .onConflictDoUpdate({
         target: schema.voteWeeks.weekKey,
-        set: { podium: podium.map((p, i) => ({ ...p, trophyId: i < 3 ? trophyId : null })), announcedAt: now, closedAt: now },
+        set: { podium: podium.map((p, i) => ({ ...p, trophyId: trophyIdFor(i) })), announcedAt: now, closedAt: now },
       });
 
     if (actorId) {

@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireStaff } from "@/lib/auth";
 import { setContent } from "@/lib/cms";
 import {
-  FREEZE_KEY, PODIUM_TROPHY_KEY, STREAM_LIVE_KEY, STREAM_URL_KEY,
+  FREEZE_KEY, PODIUM_TROPHY_KEYS, STREAM_LIVE_KEY, STREAM_URL_KEY,
   closeWeek, recordWeekAction, reopenWeek, setWeekStream,
 } from "@/lib/profile-week";
 import { announceWeekWinners, postWeekUpdate } from "@/lib/discord/week-feed";
@@ -209,19 +209,26 @@ export async function saveWeekSettings(_prev: WeekAdminState, fd: FormData): Pro
     catch { return fail(`"${tz}" isn't a timezone. Use an IANA name like Africa/Cairo.`); }
   }
 
-  const trophyId = String(fd.get("trophyId") ?? "").trim();
-  if (trophyId) {
+  // One trophy per place (B51). Validated before ANY of them is written, so a
+  // typo in third place cannot leave first and second saved and third not —
+  // half-saved podium settings are the kind of thing nobody notices until a
+  // week closes wrong.
+  const prizeIds = ["trophyId", "trophyId2", "trophyId3"].map((k) => String(fd.get(k) ?? "").trim());
+  const wanted = prizeIds.filter(Boolean);
+  if (wanted.length) {
     const db = await getDb();
-    const [t] = await db.select({ id: schema.trophies.id }).from(schema.trophies)
-      .where(eq(schema.trophies.id, trophyId)).limit(1);
-    if (!t) return fail("That trophy no longer exists.");
+    const rows = await db.select({ id: schema.trophies.id }).from(schema.trophies)
+      .where(inArray(schema.trophies.id, wanted));
+    const known = new Set(rows.map((r) => r.id));
+    const missing = wanted.find((id) => !known.has(id));
+    if (missing) return fail("One of those trophies no longer exists.");
   }
 
   const frozen = fd.get("freeze") === "on" || fd.get("freeze") === "1";
   try {
     await setContent(WEEK_TZ_KEY, tz);
     await setContent(FREEZE_KEY, frozen ? "1" : "0");
-    await setContent(PODIUM_TROPHY_KEY, trophyId);
+    for (const [i, key] of PODIUM_TROPHY_KEYS.entries()) await setContent(key, prizeIds[i] ?? "");
   } catch { return fail("Couldn't save the settings."); }
 
   refresh();

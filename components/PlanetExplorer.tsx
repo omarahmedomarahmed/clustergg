@@ -24,7 +24,10 @@ import type { EntityLite, EntityDetail } from "@/lib/game-entities";
 
 const COL = { accent: "#22d3ee", accent2: "#a78bfa", text: "#e8eaf6", muted: "#9aa0c3", panel: "#0b0d26" };
 
-type GamerSel = { slug: string; name: string; avatar: string | null; accountId: string | null; provider: string | null; sub?: string; challengeId?: string; challengeTitle?: string };
+// `name` is the Cluster profile; `ign` is the tag that game knows them by (B52).
+// The row shows the ign and the reveal shows both, which is the whole item: a
+// ladder speaks the game's language, and one tap tells you who that actually is.
+type GamerSel = { slug: string; name: string; ign?: string | null; avatar: string | null; accountId: string | null; provider: string | null; sub?: string; challengeId?: string; challengeTitle?: string };
 type Sel =
   | { kind: "board"; metricKey: string }
   | { kind: "champ"; championId: number }
@@ -414,10 +417,19 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
     const g = sel.g;
     return (
       <div>
-        <div className="flex items-center gap-3 mb-3">
-          <Avatar name={g.name} src={g.avatar} size={44} />
+        {/* The reveal (B52). The ladder spoke the game's language; this is where
+            it says who that is on Cluster — the in-game tag on top because that
+            is what was clicked, the profile name under it because that is the
+            answer, and a link through to them. */}
+        <div className="flex items-center gap-3 mb-3" data-gamer-reveal={g.slug}>
+          <Avatar name={g.ign || g.name} src={g.avatar} size={44} />
           <div className="min-w-0">
-            <div className="font-bold truncate">{g.name}</div>
+            <div className="font-bold truncate">{g.ign || g.name}</div>
+            {g.ign && g.ign !== g.name && (
+              <div className="truncate text-xs text-cyan-200/90" data-cluster-name>
+                {g.name} <span className="text-muted">@{g.slug}</span>
+              </div>
+            )}
             {g.sub && <div className="text-xs text-muted truncate">{g.sub}</div>}
           </div>
           <Link href={`/u/${g.slug}`} className="ml-auto text-[11px] text-cyan-300 hover:underline shrink-0 inline-flex items-center gap-1">{tr("Profile")} <Icon name="arrowRight" size={11} /></Link>
@@ -458,13 +470,14 @@ function Stage({ sel, data, game, onGamer, onOpenEntity, onBack }: {
             <img src={c.iconUrl} alt="" className="h-12 w-12 rounded-lg border border-white/20" />
             <div><div className="font-bold">{c.name}</div><div className="text-[11px] text-muted">{tr("Mastery leaderboard")} · {c.entries.length} {tr(c.entries.length === 1 ? "gamer" : "gamers")}</div></div>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1" data-explore-board>
             {c.entries.map((e) => (
-              <button key={e.slug} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: e.accountId, provider: "riot-lol", sub: `Mastery ${e.level} · ${e.points.toLocaleString()} pts` })}
+              <button key={e.accountId} data-explore-row={e.accountId}
+                onClick={() => onGamer({ slug: e.slug, name: e.name, ign: e.ign, avatar: e.avatar, accountId: e.accountId, provider: "riot-lol", sub: `Mastery ${e.level} · ${e.points.toLocaleString()} pts` })}
                 className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
                 <span className="w-5 text-center text-xs font-bold text-muted">{e.rank}</span>
-                <Avatar name={e.name} src={e.avatar} size={26} />
-                <span className="flex-1 truncate text-sm">{e.name} <Flag code={e.country} className="text-xs" /></span>
+                <Avatar name={e.ign || e.name} src={e.avatar} size={26} />
+                <span className="flex-1 truncate text-sm">{e.ign || e.name} <Flag code={e.country} className="text-xs" /></span>
                 <span className="text-xs font-bold text-cyan-200">{e.points.toLocaleString()}</span>
               </button>
             ))}
@@ -552,13 +565,19 @@ function EntryList({ entries, unit, onGamer }: { entries: ExploreEntry[]; unit: 
   const tr = useTr();
   if (entries.length === 0) return <div className="text-xs text-muted">{tr("No ranked gamers yet.")}</div>;
   return (
-    <div className="space-y-1">
+    // Marked as a board so uniqueness can be asserted where it actually holds:
+    // one account appears once PER BOARD, and legitimately on several boards —
+    // rank and win-rate are two ladders, not a duplicate.
+    <div className="space-y-1" data-explore-board>
       {entries.map((e) => (
-        <button key={`${e.slug}-${e.rank}`} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: e.accountId, provider: e.provider, sub: e.rankLabel ?? undefined })}
+        // Keyed on the ACCOUNT, not the gamer: one person with two accounts on
+        // this game is two rows here, deliberately (B52).
+        <button key={e.accountId ?? `${e.slug}-${e.rank}`} data-explore-row={e.accountId ?? ""}
+          onClick={() => onGamer({ slug: e.slug, name: e.name, ign: e.ign, avatar: e.avatar, accountId: e.accountId, provider: e.provider, sub: e.rankLabel ?? undefined })}
           className="w-full flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white/5 text-left">
           <span className="w-5 text-center text-xs font-bold text-muted">{e.rank}</span>
-          <Avatar name={e.name} src={e.avatar} size={26} />
-          <span className="flex-1 truncate text-sm">{e.name} <Flag code={e.country} className="text-xs" /></span>
+          <Avatar name={e.ign || e.name} src={e.avatar} size={26} />
+          <span className="flex-1 truncate text-sm">{e.ign || e.name} <Flag code={e.country} className="text-xs" /></span>
           <span className="text-xs font-bold text-cyan-200">{e.rankLabel ?? e.value.toLocaleString()}{unit && !e.rankLabel ? ` ${unit}` : ""}</span>
         </button>
       ))}
@@ -568,17 +587,18 @@ function EntryList({ entries, unit, onGamer }: { entries: ExploreEntry[]; unit: 
 
 function BoardMini({ board, onTitle, onGamer }: { board: ExploreBoard; onTitle: () => void; onGamer: (g: GamerSel) => void }) {
   return (
-    <div className="mb-2 rounded-xl border border-white/8 p-2">
+    <div className="mb-2 rounded-xl border border-white/8 p-2" data-explore-board>
       <button onClick={onTitle} className="w-full flex items-center justify-between text-left mb-1">
         <span className="text-xs font-bold truncate">{shortTitle(board.title)}</span>
         <Icon name="arrowRight" size={12} className="text-muted shrink-0" />
       </button>
       {board.entries.slice(0, 3).map((e) => (
-        <button key={`${e.slug}-${e.rank}`} onClick={() => onGamer({ slug: e.slug, name: e.name, avatar: e.avatar, accountId: e.accountId, provider: e.provider, sub: e.rankLabel ?? undefined })}
+        <button key={e.accountId ?? `${e.slug}-${e.rank}`} data-explore-row={e.accountId ?? ""}
+          onClick={() => onGamer({ slug: e.slug, name: e.name, ign: e.ign, avatar: e.avatar, accountId: e.accountId, provider: e.provider, sub: e.rankLabel ?? undefined })}
           className="w-full flex items-center gap-2 rounded-md px-1 py-1 hover:bg-white/5 text-left">
           <span className="w-4 text-center text-[10px] font-bold text-muted">{e.rank}</span>
-          <Avatar name={e.name} src={e.avatar} size={22} />
-          <span className="flex-1 truncate text-[12px]">{e.name} <Flag code={e.country} className="text-[11px]" /></span>
+          <Avatar name={e.ign || e.name} src={e.avatar} size={22} />
+          <span className="flex-1 truncate text-[12px]">{e.ign || e.name} <Flag code={e.country} className="text-[11px]" /></span>
           <span className="text-[11px] font-bold text-cyan-200">{e.rankLabel ?? e.value.toLocaleString()}</span>
         </button>
       ))}

@@ -11,7 +11,7 @@ import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { pricingLive } from "@/lib/pricing-live";
 import { money, lines, pairs, quote, perGame } from "@/lib/pricing";
-import { installUrl } from "@/lib/discord/config";
+import { installHref } from "@/lib/discord/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -46,7 +46,7 @@ export default async function PricingPage() {
     getContent(cardBgCmsKeys),
   ]);
   const bg = buildCardBgMap(bgContent);
-  const install = installUrl();
+  const install = installHref();
 
   const nf = (n: number) => n.toLocaleString();
   const entry = quote(cfg, { games: 1 });

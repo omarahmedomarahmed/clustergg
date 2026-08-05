@@ -8,6 +8,7 @@ import { getUserQuests, getQuestTops, getCpLedger, capsToday } from "@/lib/quest
 import QuestCard from "@/components/QuestCard";
 import CpLedger from "@/components/CpLedger";
 import CapsToday from "@/components/CapsToday";
+import QuestGuide from "@/components/QuestGuide";
 import CpIcon from "@/components/CpIcon";
 import AdSlot from "@/components/AdSlot";
 import OAuthButtons from "@/components/OAuthButtons";
@@ -81,6 +82,22 @@ export default async function QuestsPage() {
       ) : (
         <div className="glass p-10 text-center text-muted">{tr("Quests are being forged — check back shortly.")}</div>
       )}
+
+      {/* How to play, before the history of having played (B50).
+          The action list existed only inside the quest game's rules panel —
+          behind a map, behind a tap — which is the last place somebody asking
+          "is any of this worth my time" would look. */}
+      <div className="mt-8">
+        <QuestGuide
+          quests={quests.map((q) => ({
+            id: q.id, key: q.key, name: q.name, color: q.color, accent2: q.accent2,
+            logoUrl: q.logoUrl, rules: q.rules,
+          }))}
+          caps={user ? caps : null}
+          cpPerDollar={market.rate}
+          signedIn={!!user}
+        />
+      </div>
 
       {/* Full CP history log across every quest, with filters */}
       {/* What is capped today, directly above the history — the one place

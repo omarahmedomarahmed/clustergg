@@ -61,17 +61,78 @@ export type ShotDef = {
   openText?: string;
 };
 
+/**
+ * The keys that actually have a file in `public/shots/` (B18, found the hard way).
+ *
+ * `seedFeatureShots` wrote `/shots/<key>.jpg` for EVERY registry key regardless
+ * of whether the file existed, so a registered-but-uncaptured slot rendered a
+ * BROKEN IMAGE — a full-height box showing alt text — instead of the labelled
+ * placeholder it was designed to show. Eight slots were in that state: every one
+ * placed since B47, which is precisely the set the "place slots and leave them
+ * EMPTY" rule created.
+ *
+ * A list rather than a filesystem check: `public/` is not reliably readable from
+ * a serverless function, and this has to be right in production, not only
+ * locally. **V1.R adds every key it captures to this list** — a shot that is not
+ * here renders as a placeholder, which is the correct and visible default.
+ */
+export const CAPTURED_SHOT_KEYS = new Set<string>([
+  "admin.challenge.rules",
+  "admin.payments.providers",
+  "admin.shots.console",
+  "bot.card.challenge",
+  "bot.card.market",
+  "bot.card.profile",
+  "brand.analytics.roas",
+  "brand.campaign.builder",
+  "brand.invoice",
+  "brand.reach.perserver",
+  "gamer.cp.ledger",
+  "gamer.feed.dashboard",
+  "gamer.leaderboard.rank",
+  "gamer.linked.verified",
+  "gamer.lol.card",
+  "gamer.marketplace.checkout",
+  "gamer.marketplace.gift",
+  "gamer.marketplace.shelf",
+  "gamer.planet.page",
+  "gamer.profile.public",
+  "gamer.quest.guide",
+  "gamer.quest.map",
+  "gamer.redeem.method",
+  "nav.badges",
+  "nav.potw.expanded",
+  "planet.completed.standings",
+  "server.earnings.ledger",
+  "server.growth.journey",
+  "server.members.winnings",
+  "server.payout.history",
+  "server.tier.flagship",
+]);
+
 // Ordered by group, then by how early a visitor meets it.
 export const SHOT_REGISTRY: ShotDef[] = [
   // ---- The gamer ----
   { key: "gamer.profile.public", group: "gamer", claim: "A profile worth sharing", capturedFrom: "/u/nova", as: "guest" },
   // B17. Registered and left empty until V1.R.
   { key: "gamer.cp.capped", group: "gamer", claim: "Capped, and told plainly", capturedFrom: "/quests", as: "gamer" },
+  // B18. Registered and left empty until V1.R.
+  { key: "gamer.wallet", group: "gamer", claim: "Your points, your trophies, what they are worth", capturedFrom: "/wallet", as: "gamer" },
+  { key: "gamer.wallet.ledger", group: "gamer", claim: "Every point accounted for", capturedFrom: "/wallet", as: "gamer" },
   { key: "gamer.linked.verified", group: "gamer", claim: "Every account is verified against the game's own API", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='linked-accounts']" },
   { key: "gamer.lol.card", group: "gamer", claim: "Your rank, in the game's own words", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='lol-card']", openText: "League of Legends" },
   { key: "gamer.cp.ledger", group: "gamer", claim: "Every point is accounted for", capturedFrom: "/quests", as: "gamer" },
   { key: "gamer.quest.map", group: "gamer", claim: "Quests you actually travel", capturedFrom: "/quests", as: "gamer" },
+  // B50. Signed IN, because the half that makes it a guide rather than a rate
+  // card is today's progress sitting on the action it belongs to.
+  { key: "gamer.quest.guide", group: "gamer", claim: "What to do, what it pays, and how often", capturedFrom: "/quests", as: "gamer", selector: "[data-quest-guide]" },
   { key: "gamer.marketplace.shelf", group: "gamer", claim: "Spend points on real trophies", capturedFrom: "/marketplace", as: "gamer" },
+  // Both are MODAL states (B49). The capture pass has to open the checkout —
+  // click "Get it", then "Gift it" and pick somebody — before it can shoot
+  // `[data-checkout]`. Registered now so V1.R has the claim and the selector;
+  // deliberately uncaptured, like every other slot placed this wave.
+  { key: "gamer.marketplace.checkout", group: "gamer", claim: "One confirm, and what it costs", capturedFrom: "/marketplace", as: "gamer", selector: "[data-checkout]", openText: "Get it" },
+  { key: "gamer.marketplace.gift", group: "gamer", claim: "Confirm the person before the points move", capturedFrom: "/marketplace", as: "gamer", selector: "[data-checkout]", openText: "Gift it" },
   { key: "gamer.redeem.method", group: "gamer", claim: "Cash out without giving us your bank", capturedFrom: "/feed", as: "gamer" },
   { key: "gamer.feed.dashboard", group: "gamer", claim: "Build the dashboard you want to look at", capturedFrom: "/feed", as: "gamer" },
   { key: "gamer.leaderboard.rank", group: "gamer", claim: "Ranked against everyone who plays it", capturedFrom: "/leaderboards", as: "guest" },
@@ -102,6 +163,7 @@ export const SHOT_REGISTRY: ShotDef[] = [
   { key: "admin.email.compose", group: "admin", claim: "Email any gamer, brand or server owner", capturedFrom: "/admin/email", as: "admin", openText: "Write to someone" },
   { key: "admin.cp.calculator", group: "admin", claim: "Every point we give away, modelled before we give it", capturedFrom: "/admin/cp-calculator", as: "admin" },
   { key: "admin.abuse.review", group: "admin", claim: "Growth we look at before we pay for it", capturedFrom: "/admin/growth-review", as: "admin" },
+  { key: "admin.stuck.money", group: "admin", claim: "Every prize has somewhere to go, or a reason it does not", capturedFrom: "/admin/stuck", as: "admin" },
 
   // ---- The bot ----
   { key: "bot.card.profile", group: "bot", claim: "Your trophies and every account, on one card", capturedFrom: "/api/card/profile?slug=nova", as: "guest" },

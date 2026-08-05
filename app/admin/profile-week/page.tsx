@@ -5,7 +5,7 @@ import Icon from "@/components/Icon";
 import { EntryAdmin, WeekBroadcast, WeekSettings, WeekStream } from "@/components/WeekAdmin";
 import { announcingGuilds } from "@/lib/discord/guilds";
 import {
-  FREEZE_KEY, PODIUM_TROPHY_KEY, closedWeeks, weekActions, weekBoard, weekTimezone,
+  FREEZE_KEY, PODIUM_TROPHY_KEYS, closedWeeks, weekActions, weekBoard, weekTimezone,
 } from "@/lib/profile-week";
 import { weekAt, weekFromKey, previousWeek, untilLabel } from "@/lib/week";
 
@@ -42,7 +42,7 @@ export default async function AdminProfileWeekPage({ searchParams }: {
     weekBoard({ weekKey: week.key, limit: 100 }),
     weekActions(week.key),
     closedWeeks(12),
-    getContent([FREEZE_KEY, PODIUM_TROPHY_KEY]).catch(() => ({} as Record<string, string>)),
+    getContent([FREEZE_KEY, ...PODIUM_TROPHY_KEYS]).catch(() => ({} as Record<string, string>)),
     db.select({ id: schema.trophies.id, name: schema.trophies.name, tier: schema.trophies.tier, value: schema.trophies.value })
       .from(schema.trophies).orderBy(desc(schema.trophies.value)).limit(200),
     announcingGuilds().catch(() => []),
@@ -126,7 +126,7 @@ export default async function AdminProfileWeekPage({ searchParams }: {
         <WeekSettings
           timezone={tz}
           frozen={settings[FREEZE_KEY] !== "0"}
-          trophyId={settings[PODIUM_TROPHY_KEY] ?? ""}
+          prizeIds={PODIUM_TROPHY_KEYS.map((k: string) => settings[k] ?? "")}
           trophies={trophies.map((t) => ({ ...t, value: Number(t.value) }))}
         />
       </div>

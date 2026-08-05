@@ -313,6 +313,11 @@ async function marketScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
     x.affordable ? ButtonStyle.Success : ButtonStyle.Secondary,
   ));
 
+  // One gift door rather than six. Six more buttons would not fit inside
+  // Discord's five rows, and the modal has to ask WHICH tile anyway because the
+  // card is a picture.
+  const giftable = six.slice(0, 3).map((x) => x.id);
+
   return {
     embeds: [embed(url, {
       title: "Trophy marketplace",
@@ -323,6 +328,9 @@ async function marketScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
     })],
     components: rows([
       ...buys,
+      ctx.gamer && giftable.length
+        ? button("🎁 Gift one", `open-gift|${giftable.join(",")}`.slice(0, 100), ButtonStyle.Primary)
+        : null,
       ctx.gamer ? null : linkButton("Continue with Discord", signInUrl(site, "/marketplace"), "🔗"),
       linkButton("Open the marketplace", `${site}/marketplace`, "🏆"),
       ...tail(ctx, here, trail),
@@ -883,6 +891,59 @@ async function standingsScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Prom
       navButton("Back to the challenge", frame("challenge", id), trail, ButtonStyle.Primary, "🏆"),
       ...tail(ctx, here, trail),
     ]),
+  };
+}
+
+/**
+ * Gifting a trophy from inside Discord (B5.2).
+ *
+ * Two fields, because the card is a PICTURE: the only thing tying a tile to a
+ * trophy is the number printed on both, so the gift box asks for that number
+ * rather than pretending it knows which tile was tapped.
+ *
+ * The recipient is asked for as a **Discord username** first. That is the
+ * identifier a gamer actually knows here — they know their friend's handle, not
+ * their Cluster slug — and `users.discord_username` is populated at OAuth. An
+ * @profile still works, for the person whose friend told them their link.
+ *
+ * Nothing is charged by this modal. It resolves, and then asks again with a
+ * face attached, for the same reason the website does: a gift has no refund
+ * path and should not have one.
+ */
+export function giftModal(trophyIds: string[]) {
+  return {
+    type: InteractionResponseType.Modal,
+    data: {
+      // The ids ride in the custom_id because a modal submit arrives with no
+      // memory of the message it came from. Capped at three so the whole thing
+      // stays inside Discord's 100-character limit — the modal says so.
+      custom_id: `gift|${trophyIds.slice(0, 3).join(",")}`.slice(0, 100),
+      title: "Send a trophy to somebody",
+      components: [
+        {
+          type: ComponentType.ActionRow,
+          components: [{
+            type: ComponentType.TextInput, custom_id: "pick", style: 1, required: true,
+            label: "Which one? (the number on the tile)", max_length: 2, placeholder: "1",
+          }],
+        },
+        {
+          type: ComponentType.ActionRow,
+          components: [{
+            type: ComponentType.TextInput, custom_id: "who", style: 1, required: true,
+            label: "Their Discord username, or their @profile", max_length: 64,
+            placeholder: "nova  ·  @nova",
+          }],
+        },
+        {
+          type: ComponentType.ActionRow,
+          components: [{
+            type: ComponentType.TextInput, custom_id: "note", style: 1, required: false,
+            label: "Say something (optional)", max_length: 200,
+          }],
+        },
+      ],
+    },
   };
 }
 

@@ -27,6 +27,10 @@ export type OfferActionState = { ok?: string; error?: string } | undefined;
  */
 export async function sweepServerWelcome(_prev: OfferActionState): Promise<OfferActionState> {
   await requireSystemFor("/admin/discord");
+  const state = await offers();
+  if (!state.campaign.server.enabled) {
+    return { error: "The server welcome campaign is switched off. Turn it on in Admin → Founding offers first." };
+  }
   const res = await sweepWelcomeChallenges(100);
   const bits: string[] = [];
   if (res.granted) bits.push(`${res.granted} welcome challenge${res.granted === 1 ? "" : "s"} created and announced`);
@@ -46,6 +50,10 @@ export async function sweepServerWelcome(_prev: OfferActionState): Promise<Offer
 /** One server, by hand — for the ones the sweep reported. */
 export async function grantOneWelcome(_prev: OfferActionState, fd: FormData): Promise<OfferActionState> {
   await requireSystemFor("/admin/discord");
+  const state = await offers();
+  if (!state.campaign.server.enabled) {
+    return { error: "The server welcome campaign is switched off. Turn it on in Admin → Founding offers first." };
+  }
   const guildId = String(fd.get("guildId") ?? "");
   if (!guildId) return { error: "No server named." };
   const res = await grantWelcomeChallenge(guildId);
@@ -103,6 +111,12 @@ export async function grantFounderCredit(_prev: OfferActionState): Promise<Offer
   await requireSystemFor("/admin/ads");
   const db = await getDb();
   const state = await offers();
+  // OFF means off (B44). The counters keep counting — switching a campaign off
+  // does not un-give what was already given — but nothing new is granted while
+  // it is off, and staff are told which of the two reasons applies.
+  if (!state.campaign.brand.enabled) {
+    return { error: "The founding brand campaign is switched off. Turn it on in Admin → Founding offers first." };
+  }
   if (state.brands.claimed >= FOUNDER_BRAND_CAP) {
     return { error: `The founding offer is closed — all ${FOUNDER_BRAND_CAP} taken.` };
   }
@@ -135,6 +149,9 @@ export async function grantOneFounderCredit(_prev: OfferActionState, fd: FormDat
   if (!brandId) return { error: "No brand named." };
   const db = await getDb();
   const state = await offers();
+  if (!state.campaign.brand.enabled) {
+    return { error: "The founding brand campaign is switched off. Turn it on in Admin → Founding offers first." };
+  }
   const [brand] = await db.select().from(schema.brands).where(eq(schema.brands.id, brandId)).limit(1);
   if (!brand) return { error: "No such brand." };
   if (brand.founderCreditAt) return { ok: `${brand.name} already has its founding credit.` };
@@ -144,4 +161,59 @@ export async function grantOneFounderCredit(_prev: OfferActionState, fd: FormDat
     .where(eq(schema.brands.id, brandId));
   revalidatePath("/admin/brands");
   return { ok: `$${state.founderCredit.toLocaleString()} of challenge credit granted to ${brand.name}.` };
+}
+
+/**
+ * The switch and the rate (B44).
+ *
+ * The only place either campaign turns on. Audit-logged with the before and the
+ * after, because "when did we start giving this away and at what percentage" is
+ * a question with a real answer and the answer is money.
+ */
+export async function saveCampaigns(_prev: OfferActionState, fd: FormData): Promise<OfferActionState> {
+  const access = await requireSystemFor("/admin/offers");
+  const { setContent } = await import("@/lib/cms");
+  const { CAMPAIGN_KEYS, clampPct } = await import("@/lib/campaigns");
+  const before = await offers();
+
+  const pct = clampPct(Number(fd.get("brandPct") ?? 0));
+  const brandOn = fd.get("brandEnabled") === "on";
+  const serverOn = fd.get("serverEnabled") === "on";
+  const serverValue = Math.max(0, Number(fd.get("serverValue") ?? 0) || 0);
+  const brandCap = Math.max(0, Math.floor(Number(fd.get("brandCap") ?? 0) || 0));
+  const serverCap = Math.max(0, Math.floor(Number(fd.get("serverCap") ?? 0) || 0));
+
+  try {
+    await setContent(CAMPAIGN_KEYS.brandEnabled, brandOn ? "1" : "0");
+    await setContent(CAMPAIGN_KEYS.brandPct, String(pct));
+    await setContent(CAMPAIGN_KEYS.brandCap, String(brandCap));
+    await setContent(CAMPAIGN_KEYS.serverEnabled, serverOn ? "1" : "0");
+    await setContent(CAMPAIGN_KEYS.serverValue, String(serverValue));
+    await setContent(CAMPAIGN_KEYS.serverCap, String(serverCap));
+  } catch {
+    return { error: "Couldn't save. Nothing changed." };
+  }
+
+  try {
+    const { uid } = await import("@/lib/utils");
+    const db = await getDb();
+    await db.insert(schema.auditLog).values({
+      id: uid(), adminId: access.user.id, action: "campaign.save",
+      targetType: "campaign", targetId: "founding-offers",
+      meta: {
+        from: { brand: before.campaign.brand, server: before.campaign.server },
+        to: { brand: { enabled: brandOn, pct, cap: brandCap },
+              server: { enabled: serverOn, value: serverValue, cap: serverCap } },
+      },
+    });
+  } catch { /* the setting saved; a missing log entry must not undo it */ }
+
+  revalidatePath("/admin/offers");
+  revalidatePath("/admin/billing");
+  // Said as spend, because that is what it is.
+  return {
+    ok: brandOn
+      ? `Saved. The brand campaign is ON, covering ${pct}% of sponsored challenges on every new invoice.`
+      : "Saved. The brand campaign is OFF — new invoices bill at full price.",
+  };
 }

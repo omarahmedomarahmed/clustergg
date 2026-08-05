@@ -80,7 +80,18 @@ export async function createInvoice(formData: FormData): Promise<Res> {
     payToken: payToken(),
   });
 
-  const lines = draftLines({ games: games.length, addon, cfg, gameNames: games });
+  // The campaigns are read at DRAFT time, so an invoice carries the rate that
+  // was live when it was raised. Changing the percentage later must never
+  // rewrite a bill that has already been issued (B44).
+  const { campaigns } = await import("@/lib/campaigns-read");
+  const { offers } = await import("@/lib/offers");
+  const o = await offers();
+  const promo = await campaigns({
+    serverValue: o.finance.welcomeChallengeCost,
+    serverCap: o.finance.targetServers,
+    brandCap: o.brands.cap,
+  });
+  const lines = draftLines({ games: games.length, addon, cfg, gameNames: games, campaigns: promo });
   for (const [i, l] of lines.entries()) {
     await db.insert(schema.invoiceLines).values({
       id: uid(), invoiceId: id, kind: l.kind, label: l.label,
@@ -89,7 +100,13 @@ export async function createInvoice(formData: FormData): Promise<Res> {
     });
   }
 
-  await audit(admin.id, "invoice.create", id, { brandId, games: games.length });
+  await audit(admin.id, "invoice.create", id, {
+    brandId, games: games.length,
+    // What the campaign was set to when this bill was raised, so "why is this
+    // invoice discounted and that one not" has an answer in the log rather than
+    // in somebody's memory.
+    campaign: promo.brand.enabled ? { pct: promo.brand.pct } : null,
+  });
   refresh(brand.slug);
   return { ok: true, id, message: `Draft opened for ${brand.name}.` };
 }

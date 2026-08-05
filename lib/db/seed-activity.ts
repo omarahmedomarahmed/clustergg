@@ -74,8 +74,12 @@ export async function seedDemoActivity(db: {
   await seedChallengeRequests(db);
   await seedPayoutAccounts(db, gamers);
   await seedCampaignInvoices(db);
+  // AFTER the marketplace, because it needs a redeem row to break and a trophy
+  // to strand.
+  await seedStuckMoney(db);
   await seedServerScale(db);
   await seedNavArt(db);
+  await seedPodiumPrizes(db);
   await seedFeatureShots(db);
   if (admin) await seedAuditTrail(db, admin.id);
 }
@@ -443,6 +447,66 @@ async function seedMarketplace(db: any, gamers: { id: string; slug: string }[]) 
   }
 }
 
+// ===== Money with nowhere to go =====
+//
+// B39 shipped the stuck-money console with a gap I stated rather than hid: the
+// demo reached three of its five states and not the other two, so the screen was
+// correct but not demonstrable. Two of the five — a failed payout and a prize
+// whose owner is gone — are exactly the ones that need a decision and that carry
+// a dollar figure, which makes them the ones worth being able to see.
+//
+// Both are seeded as states, not as new nouns: the failed payout is one of the
+// redeems `seedMarketplace` already created, pushed back to `approved` with the
+// provider's reason on it, which is precisely what the failure path does. The
+// departed winner is a separate user, because a real one leaving would take the
+// demo's own data with them.
+async function seedStuckMoney(db: any) {
+  // ---- a redemption the provider refused ----
+  //
+  // Not a new row: the real failure path sets `status` back to `approved` and
+  // records `failedReason`, so the demo has to arrive at the same state the
+  // same way, or the console would be reading something production never writes.
+  const [alreadyFailed] = await db.select({ c: sql<number>`count(*)` })
+    .from(schema.trophyRedeems).where(sql`${schema.trophyRedeems.failedReason} is not null`);
+  if (!Number(alreadyFailed?.c ?? 0)) {
+    const [sent] = await db.select().from(schema.trophyRedeems)
+      .where(eq(schema.trophyRedeems.status, "sent")).limit(1);
+    if (sent) {
+      await db.update(schema.trophyRedeems).set({
+        status: "approved",
+        failedReason: "Provider rejected: the recipient's country is not supported for this method.",
+      }).where(eq(schema.trophyRedeems.id, sent.id));
+    }
+  }
+
+  // ---- a prize whose owner is gone ----
+  //
+  // Awarded past the 90-day hold, so the console shows the row in the state that
+  // actually asks something of an admin ("forfeit it") rather than the one that
+  // asks nothing ("held in case they come back"). Status `deleted` keeps them
+  // out of every leaderboard and directory, all of which filter on `active`.
+  const ghostSlug = "departed-winner";
+  const [ghost] = await db.select({ id: schema.users.id }).from(schema.users)
+    .where(eq(schema.users.slug, ghostSlug)).limit(1);
+  if (!ghost) {
+    const id = uid();
+    await db.insert(schema.users).values({
+      id, slug: ghostSlug, displayName: "Departed Winner",
+      email: `${ghostSlug}@demo.invalid`, passwordHash: "x",
+      status: "deleted", profileVisibility: "private",
+      createdAt: ago(400),
+    }).onConflictDoNothing();
+    const [prize] = await db.select().from(schema.trophies)
+      .where(eq(schema.trophies.tier, "gold")).limit(1);
+    if (prize) {
+      await db.insert(schema.userTrophies).values({
+        id: uid(), userId: id, trophyId: prize.id, placement: 1,
+        status: "held", awardedAt: ago(120),
+      }).onConflictDoNothing();
+    }
+  }
+}
+
 // ===== Ads actually served =====
 //
 // Every brand-facing number — impressions, clicks, CTR, the analytics chart,
@@ -691,6 +755,32 @@ async function seedPayoutAccounts(db: any, gamers: { id: string; slug: string }[
 // `next/headers`, and pulling that into the seed's module graph breaks the
 // production build outright — the seed is imported by the database bootstrap.
 // Same trap the week-key lookup fell into; the fix is the same shape.
+// ===== What the Profile-of-the-Week podium is playing for =====
+//
+// B51 gives each place its own trophy, and an unconfigured podium renders the
+// old generic crown — correct, and indistinguishable from the feature not
+// existing. Three tiers, descending, so the demo shows the thing the item is
+// actually about: that first place is worth more than third and a contender can
+// see by how much.
+async function seedPodiumPrizes(db: any) {
+  // From `lib/week`, not `lib/profile-week`: the latter reaches `next/headers`
+  // and importing it here fails the build rather than the typecheck.
+  const { PODIUM_TROPHY_KEYS } = await import("@/lib/week");
+  const existing = await db.select().from(schema.platformSettings)
+    .where(eq(schema.platformSettings.key, PODIUM_TROPHY_KEYS[0]));
+  if (existing.length && existing[0]?.value) return;
+  const wanted = ["legendary", "gold", "silver"];
+  const all = await db.select().from(schema.trophies);
+  if (!all.length) return;
+  for (const [i, tier] of wanted.entries()) {
+    const t = all.find((x: { tier: string }) => x.tier === tier) ?? all[i] ?? all[0];
+    if (!t) continue;
+    await db.insert(schema.platformSettings)
+      .values({ key: PODIUM_TROPHY_KEYS[i], value: t.id })
+      .onConflictDoNothing();
+  }
+}
+
 async function seedNavArt(db: any) {
   const [existing] = await db.select().from(schema.platformSettings)
     .where(eq(schema.platformSettings.key, "brand.nav.bg")).limit(1);
@@ -722,7 +812,7 @@ async function seedNavArt(db: any) {
 // which is a different and much worse operation. The plan says so at V1.R; this
 // is the code it is talking about.
 async function seedFeatureShots(db: any) {
-  const { SHOT_REGISTRY } = await import("@/lib/shots");
+  const { SHOT_REGISTRY, CAPTURED_SHOT_KEYS } = await import("@/lib/shots");
   const existing = await db.select().from(schema.featureShots);
   const byKey = new Map(existing.map((r: { key: string }) => [r.key, r]));
 
@@ -732,9 +822,21 @@ async function seedFeatureShots(db: any) {
     // Twenty-eight full-page PNGs at 2x weighed 28MB; as JPEG they weigh 3.7MB
     // and look identical at display size. Cards stay PNG because they are copied
     // byte-for-byte from the render endpoint rather than re-encoded.
-    const bundled = `/shots/${def.key}.${def.capturedFrom.startsWith("/api/card/") ? "png" : "jpg"}`;
-    // An admin's replacement is anything that is not the bundled path.
-    if (row?.imageUrl && row.imageUrl !== bundled) continue;
+    // NULL when nothing was ever captured for this key.
+    //
+    // This wrote the bundled path unconditionally, so a registered-but-
+    // uncaptured slot pointed at a file that does not exist and rendered a
+    // BROKEN IMAGE — a full-height box of alt text — rather than the labelled
+    // placeholder. Every slot placed since B47 was in that state, which is
+    // exactly the set the "place them and leave them EMPTY" rule creates.
+    const captured = CAPTURED_SHOT_KEYS.has(def.key);
+    const bundled = captured
+      ? `/shots/${def.key}.${def.capturedFrom.startsWith("/api/card/") ? "png" : "jpg"}`
+      : null;
+    // An admin's replacement is anything that is not the bundled path. A row
+    // pointing at a bundled file we no longer ship is OURS, not theirs, so it is
+    // cleared rather than preserved.
+    if (row?.imageUrl && row.imageUrl !== bundled && !row.imageUrl.startsWith("/shots/")) continue;
     await db.insert(schema.featureShots).values({
       key: def.key,
       imageUrl: bundled,

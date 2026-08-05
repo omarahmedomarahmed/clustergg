@@ -53,7 +53,17 @@ export default function QuestGame({
   useEffect(() => setMounted(true), []);
 
   const tiers = quest.tiers;
-  const { rules, log, totalCp, art, missions } = game;
+  const { rules, log, totalCp, art, missions, cpPerDollar } = game;
+
+  // What a full day on this quest is worth (B15).
+  //
+  // Only actions with a cap can be totalled — an uncapped one has no maximum, so
+  // it is left out of the sum rather than guessed at, and B34 means there are
+  // none in practice. Shown in dollars because that is what changed: these
+  // points buy a trophy that redeems for cash, and a panel that says "+50" and
+  // nothing else is still describing a score.
+  const dailyMax = rules.reduce((s, r) => s + (r.cap ? r.points * r.cap : 0), 0);
+  const dailyMaxUsd = cpPerDollar && cpPerDollar > 0 ? dailyMax / cpPerDollar : 0;
 
   // ===== Stage sizing — the world keeps the hero's aspect (pins line up with
   // the art) and is fitted as large as possible into the free screen area. =====
@@ -469,6 +479,28 @@ export default function QuestGame({
               ))}
               {rules.length === 0 && <div className="text-xs text-muted">{tr("This quest has no scoring actions configured yet.")}</div>}
             </div>
+
+            {/* The caps are the pitch, not the fine print (B15). A gamer asked to
+                believe "free money" believes it faster when the ceiling is
+                stated up front than when it is discovered later. */}
+            {dailyMax > 0 && (
+              <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/[0.06] px-3 py-2.5">
+                <div className="text-[10px] uppercase tracking-widest text-muted">{tr("Everything above, every day")}</div>
+                <div className="mt-0.5 flex items-baseline gap-2">
+                  <span className="inline-flex items-center gap-1 text-base font-black" style={{ color: quest.color }}>
+                    {dailyMax.toLocaleString()} <CpIcon size={14} />
+                  </span>
+                  {dailyMaxUsd > 0 && (
+                    <span className="text-base font-black text-emerald-300">
+                      = ${dailyMaxUsd.toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 text-[11px] text-muted">
+                  {tr("Redeemable for real money once it buys a trophy. Every action is capped — that is what makes the number real.")}
+                </div>
+              </div>
+            )}
             <div className="pt-1">
               <div className="text-[10px] uppercase tracking-widest text-muted mb-1.5">{tr("Milestones")}</div>
               <div className="flex flex-wrap gap-1.5">

@@ -4,7 +4,7 @@ import { cookies, headers } from "next/headers";
 import { after } from "next/server";
 import { getDoc, getSections, getPeople, liveData, recordDocView } from "@/lib/dataroom";
 import { botShowcaseSteps } from "@/lib/bot-showcase";
-import { installUrl } from "@/lib/discord/config";
+import { installHref } from "@/lib/discord/config";
 import { DocShell } from "@/components/dataroom/DocShell";
 import { DetailProvider } from "@/components/dataroom/DetailModal";
 import { SectionBand } from "@/components/dataroom/Sections";
@@ -70,7 +70,7 @@ export default async function DataroomDocPage({ params, searchParams }: {
   }));
 
   const nav = sections.map((s) => ({ anchor: s.anchor, label: s.navLabel }));
-  const install = installUrl();
+  const install = installHref();
 
   return (
     <DetailProvider accent={doc.accent}>

@@ -203,10 +203,56 @@ export async function updateNotificationPrefs(formData: FormData) {
   revalidatePath("/settings/notifications");
 }
 
-export async function deleteAccount() {
+/**
+ * Delete the account (B40).
+ *
+ * Three things happen here that did not before, and the first is the one that
+ * mattered most: **this took one click, with no confirmation and no mention of
+ * the money.** `db.delete(users)` cascades, so a gamer holding trophies worth
+ * real money could lose them by misclicking a button on a settings page.
+ *
+ *   1. A typed confirmation is required. Not a modal — a modal is something you
+ *      dismiss; typing the word is something you decide.
+ *   2. Deletion is REFUSED while a payout is in flight. Everything else is
+ *      forfeited by a choice made with the number in front of them, which is
+ *      their right; a payment already handed to a provider is not.
+ *   3. They are emailed what they gave up, before the row disappears — because
+ *      afterwards there is nobody to tell and no record to tell them from.
+ *
+ * Data deletion still proceeds in full. This is about telling somebody what
+ * they are giving up, not about keeping their data.
+ */
+export async function deleteAccount(formData?: FormData): Promise<{ error?: string }> {
   const me = await requireUser();
   const db = await getDb();
+
+  const typed = String(formData?.get("confirm") ?? "").trim().toUpperCase();
+  if (typed !== "DELETE") {
+    return { error: 'Type DELETE to confirm. Nothing has been deleted.' };
+  }
+
+  const { deletionImpact, deletionAllowed } = await import("@/lib/account-deletion");
+  const impact = await deletionImpact(db, me.id);
+  const guard = deletionAllowed(impact);
+  if (!guard.ok) return { error: guard.reason };
+
+  // Told BEFORE the row goes. Afterwards there is nobody to tell, and no record
+  // to tell them from — the email itself needs the numbers this reads.
+  if (impact.anythingAtStake) {
+    try {
+      const { emailUser } = await import("@/lib/email");
+      await emailUser(db, me.id, "account.deleted",
+        (name: string) => ({
+          name,
+          balanceCp: impact.balance,
+          balanceValue: { amount: impact.totalUsd, currency: "USD" },
+        }),
+        { type: "account", id: me.id });
+    } catch { /* a failed email must never block somebody leaving */ }
+  }
+
   await db.delete(schema.users).where(eq(schema.users.id, me.id));
   const { destroySession } = await import("@/lib/auth");
   await destroySession();
+  return {};
 }

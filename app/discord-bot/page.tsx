@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n/t-server";
 import { getContent } from "@/lib/cms";
-import { installUrl, discordConfigured, CLUSTER_CHANNEL } from "@/lib/discord/config";
+import { installHref, discordConfigured, CLUSTER_CHANNEL } from "@/lib/discord/config";
 import { networkStats, publicServers } from "@/lib/network";
 import { botShowcaseSteps } from "@/lib/bot-showcase";
 import ServerEarnCards from "@/components/ServerEarnCards";
@@ -39,7 +39,7 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const user = await getCurrentUser();
   const { tr } = await getT(user?.locale);
-  const url = installUrl();
+  const url = installHref();
   const ready = discordConfigured() && !!url;
 
   const [c, network, servers, steps] = await Promise.all([

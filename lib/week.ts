@@ -140,3 +140,18 @@ export function untilLabel(target: Date, from: Date = new Date()): string {
   if (h > 0) return `${h}h ${String(mi).padStart(2, "0")}m`;
   return `${mi}m`;
 }
+
+/**
+ * The podium's prizes — one CMS key per place (B51).
+ *
+ * These live HERE, in a leaf module with no imports, rather than in
+ * `lib/profile-week.ts` where they are used. That module reaches `lib/cms`,
+ * which reaches `next/headers`, so anything importing it for a couple of string
+ * constants — the demo seed, for instance — drags a server-only dependency into
+ * a context that cannot have one and fails the BUILD, not the typecheck.
+ *
+ * `vote.week.trophy` is unsuffixed because it predates the split and was the
+ * single podium-wide trophy; it is first place now, so no admin's existing
+ * choice is dropped.
+ */
+export const PODIUM_TROPHY_KEYS = ["vote.week.trophy", "vote.week.trophy.2", "vote.week.trophy.3"] as const;

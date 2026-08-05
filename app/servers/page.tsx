@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { networkStats, publicServers } from "@/lib/network";
 import { tierFor } from "@/lib/server-portal";
-import { installUrl } from "@/lib/discord/config";
+import { installHref } from "@/lib/discord/config";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { buildPricing, money, perGame, prizeSharePct, PRICING_NUMBER_KEYS } from "@/lib/pricing";
@@ -28,7 +28,7 @@ export default async function ServersDirectoryPage() {
     publicServers(),
     getContent([...PRICING_NUMBER_KEYS, ...cardBgCmsKeys]),
   ]);
-  const install = installUrl();
+  const install = installHref();
   const cfg = buildPricing(content);
   const bg = buildCardBgMap(content);
   const nf = (n: number) => n.toLocaleString();

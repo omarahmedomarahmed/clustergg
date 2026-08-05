@@ -599,6 +599,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "in_marketplace" boolean NOT NULL DEFAULT true`,
   `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "title" text`,
   `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "description" text`,
+  `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "failed_reason" text`,
   `CREATE TABLE IF NOT EXISTS "marketplace_orders" (
     "id" text PRIMARY KEY NOT NULL,
     "buyer_id" text NOT NULL,
@@ -745,6 +746,11 @@ const COLUMN_MIGRATIONS = [
   // complete, and therefore for the revenue share to pay out.
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "contact_email" text`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "tier_unlocked_at" timestamptz`,
+  // Who brought us this server (B22). The gamer who clicked "add the bot" and
+  // completed the install, when there was a signed-in one — null when the
+  // install came from Discord's own App Directory button or from somebody with
+  // no Cluster account, which is the common case and not a failure.
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "installed_by_user_id" text`,
 
   // The email delivery log (B32). A row per attempt, including the ones skipped
   // because mail is not configured — "we never sent it" is an answer a human
