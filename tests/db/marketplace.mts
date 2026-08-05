@@ -38,19 +38,41 @@ const mkUser = async (name: string) => {
 };
 
 /** Give a gamer CP the way the platform does: quest progress. */
-const grantCp = async (userId: string, qp: number) => {
+/**
+ * Put CP in a gamer's wallet.
+ *
+ * **Writes to the EVENT LEDGER, not to quest progress.** This helper used to
+ * set `userQuestProgress.qp`, which was the source of truth when it was
+ * written. B34.2 split the two: CP is credited once per action and recorded on
+ * `quest_events`, while progress is credited to every listening quest — so
+ * `getTotalCp` now sums `COALESCE(cp_awarded, qp_awarded)` from events and no
+ * longer reads progress at all.
+ *
+ * The helper was therefore writing to the side that stopped being read, the
+ * wallet returned zero, and sixteen purchase assertions failed behind one
+ * broken fixture. Fixed HERE rather than by relaxing the assertions: they were
+ * right, and a fixture that lies is worse than a test that fails.
+ */
+const grantCp = async (userId: string, cp: number) => {
   const [q] = await db.select({ id: schema.quests.id }).from(schema.quests).limit(1);
-  await db.insert(schema.userQuestProgress).values({ userId, questId: q.id, qp })
-    .onConflictDoUpdate({
-      target: [schema.userQuestProgress.userId, schema.userQuestProgress.questId],
-      set: { qp },
-    });
+  await db.insert(schema.questEvents).values({
+    id: `grant-${userId}-${cp}-${Math.random().toString(36).slice(2, 10)}`,
+    userId, questId: q.id, actionKey: "win_challenge",
+    qpAwarded: 0,          // progress is not what this fixture is about
+    cpAwarded: cp,         // the wallet reads this
+    refType: "test-grant", refId: `${cp}`,
+  } as never);
 };
 
 try {
   console.log("\n== The price is a model, not a guess ==");
+  // Derived, not hardcoded. This read `=== 5000` when the rate was 1,000 CP to
+  // the dollar; B34 repriced it to 10,000 and the same trophy is 50,000. An
+  // assertion that restates a number the calculator can move is one that fails
+  // the first time somebody moves it, for no reason anybody cares about.
   ok("a $5 bronze costs thousands, not hundreds",
-    priceOf({ value: 5, tier: "bronze" }) === 5000, String(priceOf({ value: 5, tier: "bronze" })));
+    priceOf({ value: 5, tier: "bronze" }) === 5 * DEFAULT_CP_PER_DOLLAR,
+    String(priceOf({ value: 5, tier: "bronze" })));
   ok("rarity costs more at the same cash value",
     priceOf({ value: 5, tier: "legendary" }) > priceOf({ value: 5, tier: "bronze" }),
     `${priceOf({ value: 5, tier: "legendary" })} vs ${priceOf({ value: 5, tier: "bronze" })}`);
@@ -64,7 +86,7 @@ try {
   ok("an admin price overrides the model",
     priceOf({ value: 100, tier: "legendary", cpPrice: 750 }) === 750);
   ok("a zero override does NOT override — it means 'let the model price it'",
-    priceOf({ value: 5, tier: "bronze", cpPrice: 0 }) === 5000);
+    priceOf({ value: 5, tier: "bronze", cpPrice: 0 }) === 5 * DEFAULT_CP_PER_DOLLAR);
 
   console.log("\n== The shelf ==");
   const [trophy] = await db.select().from(schema.trophies).limit(1);
@@ -140,7 +162,11 @@ try {
   console.log("\n== Gifting ==");
   const giver = await mkUser("Giver");
   const friend = await mkUser("Friend");
-  await grantCp(giver.id, 200000);
+  // Derived from what the trophy actually costs, not a fixed 200,000 — that
+  // figure came from the pre-B34 rate and is now less than half the price. Same
+  // class of drift as the hardcoded 5,000 above: a fixture that restates a
+  // number the calculator owns.
+  await grantCp(giver.id, priced.cpPrice);
   const gift = await buyTrophy(giver.id, priced.id, { recipientSlug: friend.slug, message: "gg" });
   ok("a gift succeeds", gift.ok, gift.ok ? "" : gift.error);
   ok("and names who it went to", gift.ok && gift.gifted === "Friend", gift.ok ? String(gift.gifted) : "");

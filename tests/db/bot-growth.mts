@@ -93,6 +93,20 @@ try {
     checked > 0 && missing.length === 0, missing.join(", "));
 
   console.log("\n== The command JSON a bot list can import ==");
+  // This ONE block needs a running server; everything above it is in-process.
+  //
+  // Probed rather than assumed, because the alternative is a red tick in the
+  // default `npm test` run that nobody can act on — and a suite that always
+  // fails for an environmental reason is one people learn to skip past, which
+  // costs more than the coverage is worth. With a build on :3031 (or
+  // `npm test -- --ui`) it runs in full.
+  const reachable = await fetch(`${BASE}/api/discord/commands.json`, { method: "HEAD" })
+    .then(() => true).catch(() => false);
+  if (!reachable) {
+    console.log(`  skip  no server on ${BASE} — run \`DEMO_DB=1 npx next start -p 3031\` to cover this block`);
+    console.log(`\n${pass} passed, ${fail} failed (1 block skipped)`);
+    process.exit(fail ? 1 : 0);
+  }
   const res = await fetch(`${BASE}/api/discord/commands.json`);
   ok("the endpoint serves", res.ok, String(res.status));
   ok("as JSON", (res.headers.get("content-type") ?? "").includes("application/json"),
