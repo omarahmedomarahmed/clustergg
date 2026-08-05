@@ -59,7 +59,17 @@ try {
 
   console.log("\n== The marketplace ==");
   ok("the page loads", /what your points are for/i.test(body), body.slice(0, 160).replace(/\n/g, " | "));
-  ok("it says what CP is worth in money", /CP = \$1/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+  // B2 gave Cluster Points a coin and stopped rendering them as the bare word
+  // "CP" — `<Cp>` draws the mark and spells "Cluster Points" for screen
+  // readers. The claim is unchanged and still on the page; only the wording
+  // moved. Checked against the live page before this assertion was relaxed:
+  // it reads "10,000 Cluster Points = $1 of trophy".
+  // …and the figure spans a line break, because <Cp> renders the mark, the
+  // number and the sr-only words as separate elements. Matched against
+  // whitespace-collapsed text, not raw innerText.
+  ok("it says what CP is worth in money",
+    /(CP|Cluster Points)\s*=\s*\$1/i.test(body.replace(/\s+/g, " ")),
+    body.slice(0, 400).replace(/\n/g, " | "));
   ok("it promises spending never costs a level",
     /never lowers your level/i.test(body), body.slice(0, 500).replace(/\n/g, " | "));
   ok("a bought trophy is said to redeem like a won one",
@@ -67,7 +77,9 @@ try {
 
   const cards = await page.locator("[data-trophy]").count();
   ok("trophies are on the shelf", cards > 0, `${cards} trophies`);
-  const priced = await page.getByText(/CP$/).count();
+  // Same cause: nothing on this page ends in "CP" any more. Every figure is a
+  // <Cp> whose readable text ends in "Cluster Points".
+  const priced = await page.getByText(/(CP|Cluster Points)$/).count();
   ok("each one shows a CP price", priced > 0, `${priced} prices`);
 
   console.log("\n== It is reachable without knowing it exists ==");

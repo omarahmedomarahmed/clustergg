@@ -81,6 +81,21 @@ Demo credentials: admin `admin@clustergg.com` / `cluster-admin`; staff
 7. **A static property on a client component is `undefined` on the server
    side.** `Comp.Sub = Sub` renders as undefined from a server component —
    what crosses the boundary is a reference proxy. Use named exports.
+8. **A process sweep that greps its own command line kills nothing.**
+   `pgrep -f next-server`, or `case "$c" in *next-server*)` over
+   `/proc/*/cmdline`, MATCHES THE SHELL DOING THE SEARCHING. It reports a hit,
+   feels like it worked, and leaves the real server running — which is how five
+   stuck production servers accumulated in one session, each holding its port
+   against the next run. Anchor on the start of the cmdline and skip your own
+   pid:
+   ```js
+   if (pid === String(process.pid)) continue;
+   if (/^(next-server|next start|sh -c next start)/.test(cmd)) kill(pid);
+   ```
+   Better still, do not hand-start one: `npm test -- --ui` and
+   `scripts/with-server.sh PORT CMD` both stand a server up and take it down on
+   exit, SIGINT, SIGTERM and a crash. `next start` never exits on its own, so
+   anything that starts one owes a `trap`.
 
 ### Workflow, non-negotiable
 
