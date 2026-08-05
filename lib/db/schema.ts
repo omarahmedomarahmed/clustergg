@@ -359,6 +359,15 @@ export const challenges = pgTable("challenges", {
   // Cluster. None of that arithmetic can be done without knowing which brand
   // paid and how much, so it is recorded on the challenge itself rather than
   // inferred from a campaign later.
+  /**
+   * What kind of challenge this is (B43.2).
+   *
+   * `welcome` is the funded one a server gets on install — private to its
+   * guild, sponsored by the house brand, billed to Cluster. Admin can create
+   * one for any server at any time, which is what lets a draft cancelled for
+   * want of a game be recreated once we know the game.
+   */
+  kind: text("kind").notNull().default("standard"), // standard | welcome
   sponsorBrandId: text("sponsor_brand_id"),
   /** The ad campaign this challenge was bought under, when there is one. */
   sponsorCampaignId: text("sponsor_campaign_id"),
@@ -414,6 +423,17 @@ export const brands = pgTable("brands", {
    * going to make the brands who backed us first pay to watch new ones get a
    * better deal.
    */
+  /**
+   * Our own brand record (B31.2).
+   *
+   * Welcome challenges are sponsored by Cluster and BILLED to Cluster, through
+   * the same invoice machinery a paying brand uses. That is the whole point: a
+   * giveaway that skips billing is a giveaway nobody can add up, and when
+   * somebody asks what customer acquisition cost, the answer should be a query
+   * rather than an estimate. This flag is what keeps the house brand out of
+   * every list that means "customers".
+   */
+  isHouse: boolean("is_house").notNull().default(false),
   founderCreditAt: timestamp("founder_credit_at", { withTimezone: true, mode: "date" }),
   /** What was granted, in dollars, so the ledger is not inferred from a date. */
   founderCreditValue: doublePrecision("founder_credit_value").notNull().default(0),

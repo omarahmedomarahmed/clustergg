@@ -4,7 +4,6 @@ import { uid } from "@/lib/utils";
 import { buildFinance, FINANCE_CMS_KEYS } from "@/lib/finance";
 import { getContent } from "@/lib/cms";
 import { providerForGame } from "@/lib/challenge-requests";
-import { announceChallengeLaunched } from "@/lib/discord/announce";
 import { dmUser } from "@/lib/discord/rest";
 import { siteUrl } from "@/lib/discord/config";
 
@@ -61,6 +60,9 @@ export async function grantWelcomeChallenge(guildId: string): Promise<WelcomeRes
 
   const content = await getContent(FINANCE_CMS_KEYS).catch(() => ({} as Record<string, string>));
   const fin = buildFinance(content);
+  // Cluster sponsors it and Cluster gets the bill (B31.2).
+  const { houseBrand, billWelcomeChallenge } = await import("@/lib/house-brand");
+  const brand = await houseBrand();
 
   const id = uid();
   // A key nobody has to be told twice: short, unambiguous, all caps.
@@ -85,7 +87,19 @@ export async function grantWelcomeChallenge(guildId: string): Promise<WelcomeRes
       announceHype: true,
       startAt: new Date(),
       endAt: new Date(Date.now() + 7 * 86400_000),
-      status: "active",
+      // A DRAFT, not a live challenge (B31.1/B43).
+      //
+      // It used to go straight to `active` and announce itself. That skips the
+      // two things this offer depends on: the owner choosing the game for their
+      // own community, and staff seeing it before it publishes. The standing
+      // rule is that approval produces a draft which staff edit — a welcome
+      // challenge does not get to skip it just because we are paying for it.
+      status: "draft",
+      kind: "welcome",
+      sponsorBrandId: brand?.id ?? null,
+      // Per challenge, so changing the default later never rewrites a draft
+      // already made.
+      sponsorPrice: fin.welcomeChallengeCost,
       prizeDescription: `$${fin.welcomeChallengeCost} prize pool, funded by Cluster`,
       createdBy: null,
     } as never);
@@ -97,22 +111,25 @@ export async function grantWelcomeChallenge(guildId: string): Promise<WelcomeRes
     return { ok: false, reason: "failed" };
   }
 
-  // Announce it where it belongs, and tell the owner. Neither can fail the
-  // grant: the challenge exists either way, and a silent announcement is a
-  // support ticket rather than a lost competition.
-  try { await announceChallengeLaunched(id); } catch { /* the challenge is live regardless */ }
+  // On Cluster's own bill, in the same units as the revenue it is meant to
+  // produce. Never fails the grant: a challenge that exists and is not yet
+  // billed is a reconciliation job; one that was never created because billing
+  // was down is a server that never got its offer.
+  try { await billWelcomeChallenge(id, guild.name || guildId, fin.welcomeChallengeCost); }
+  catch { /* reconcilable */ }
+
+  // NOT announced — it is a draft. Announcing a competition nobody has chosen
+  // a game for is how a server's first impression becomes a correction.
   if (guild.ownerDiscordId) {
     await dmUser(guild.ownerDiscordId, {
       embeds: [{
-        title: "Your welcome challenge is live",
+        title: "Your welcome challenge is waiting",
         description: [
-          `**${guild.name || "Your server"}** now has its own ${game.name} competition running, and Cluster is paying the prize.`,
+          `**${guild.name || "Your server"}** has a ${game.name} competition drafted and paid for — Cluster is funding the prize.`,
           "",
-          `Entry key for your members: **\`${key}\`**`,
+          "It is not live yet, and that is on purpose: open your server portal, finish your community profile, and pick the game you want it run on.",
           "",
-          "Anyone can watch it. Only your members can enter — that key is the door, and it is yours to post.",
-          "",
-          `Everything it does: ${siteUrl()}/servers`,
+          `Your portal: ${siteUrl()}/servers`,
         ].join("\n"),
         color: 0x34d399,
       }],
@@ -173,6 +190,9 @@ export async function askForGames(guildId: string): Promise<boolean> {
   if (!guild?.ownerDiscordId) return false;
   const content = await getContent(FINANCE_CMS_KEYS).catch(() => ({} as Record<string, string>));
   const fin = buildFinance(content);
+  // Cluster sponsors it and Cluster gets the bill (B31.2).
+  const { houseBrand, billWelcomeChallenge } = await import("@/lib/house-brand");
+  const brand = await houseBrand();
   return dmUser(guild.ownerDiscordId, {
     embeds: [{
       title: "We owe your server a competition",
