@@ -151,7 +151,12 @@ export type ChallengeCard = {
   startsAt?: string | null;     // ISO — so the card can show the full window
   // Live standings. A challenge card without them is a poster; with them it's a
   // scoreboard people come back to.
-  standings?: { place: number; name: string; points: number; you?: boolean }[];
+  /**
+   * `name` is the IN-GAME name — that game's challenge, scored on that game's
+   * account, so the game identity is the subject (B54, matching B52). `alt` is
+   * the Cluster display name, present only when it differs.
+   */
+  standings?: { place: number; name: string; alt?: string | null; points: number; you?: boolean }[];
   /**
    * Who can enter, in the game's own words — "Gold or above in Solo/Duo".
    *

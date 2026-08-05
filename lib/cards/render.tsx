@@ -1007,7 +1007,20 @@ function ChallengeBody(d: ChallengeCard) {
           (d.standings ?? []).slice(0, 4).map((s) => (
             <div key={s.place} style={{ display: "flex", alignItems: "center", flexShrink: 0, gap: 12, padding: "6px 14px", borderRadius: 12, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ fontSize: pStand.f(19), fontWeight: 700, width: pStand.f(38), color: ["#fbbf24", "#cbd5e1", "#b45309"][s.place - 1] ?? MUTED }}>{`#${s.place}`}</div>
-              <div style={{ fontSize: pStand.f(20), fontWeight: 700, flex: 1 }}>{clamp(s.name, 18)}</div>
+              {/* The in-game name leads; the Cluster name is the quiet second
+                  line, and only when the two differ (B54/B52). No fixed height
+                  on either — a box sized to hold one line is what cut the
+                  descenders off every name with a p or a y in it. */}
+              <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", fontSize: pStand.f(20), fontWeight: 700, lineHeight: 1.35 }}>
+                  {clamp(s.name, 18)}
+                </div>
+                {s.alt ? (
+                  <div style={{ display: "flex", fontSize: pStand.f(13), color: MUTED, lineHeight: 1.35 }}>
+                    {clamp(s.alt, 22)}
+                  </div>
+                ) : null}
+              </div>
               <div style={{ fontSize: pStand.f(20), fontWeight: 700, color: t.accent2 }}>{`${nf(s.points)} pts`}</div>
             </div>
           ))
@@ -1208,7 +1221,11 @@ function MarketBody(d: MarketCard) {
                 <div style={{ display: "flex", fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>
                   {clamp(x.name, 17)}
                 </div>
-                <div style={{ display: "flex", height: 15, fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1 }}>
+                {/* No fixed height here either. It held today because the tier
+                    words are uppercase and have no descenders — which is a
+                    property of the copy, not of the layout, and the first
+                    lower-case tier somebody adds would have clipped. */}
+                <div style={{ display: "flex", fontSize: 12, lineHeight: 1.35, color: MUTED, textTransform: "uppercase", letterSpacing: 1 }}>
                   {x.tier}
                 </div>
                 {/* BOTH numbers. The CP price alone reads as a game currency;

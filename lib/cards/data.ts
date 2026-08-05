@@ -486,7 +486,19 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
     prize: ch.prizeDescription || null,
     isPrivate: ch.visibility === "private" && !!ch.accessKey,
     serverName,
-    standings: standings.map((s) => ({ place: s.place, name: s.displayName, points: s.points })),
+    // The IN-GAME name leads (B54, consistent with B52).
+    //
+    // `challengeStandings` has returned `inGameName` all along and this line
+    // threw it away. It is that game's challenge, scored on that game's
+    // account, so the game identity is the subject — a gamer looking for
+    // themselves on a card is looking for the tag they play under. The Cluster
+    // name rides along as the secondary line.
+    standings: standings.map((s) => ({
+      place: s.place,
+      name: s.inGameName || s.displayName,
+      alt: s.inGameName && s.inGameName !== s.displayName ? s.displayName : null,
+      points: s.points,
+    })),
     trophies,
     theme: {
       accent: g?.accent || BRAND.accent,
@@ -588,9 +600,13 @@ export async function challengeStandingsCard(challengeId: string): Promise<CardD
       : "Nobody has scored yet — first point leads",
     rows: live.map((r, i) => ({
       rank: i + 1,
-      // The ACCOUNT that is competing, next to the person. With two accounts on
-      // one game these are different names, and only one of them is entered.
-      name: r.account && r.account !== r.name ? `${r.name} · ${r.account}` : r.name,
+      // The ACCOUNT leads (B54, matching B52).
+      //
+      // This read `${r.name} · ${r.account}` — the Cluster name first. It is
+      // that game's challenge, scored on that game's account, and with two
+      // accounts on one game only one of them is entered: the entered one is
+      // the subject. The person rides along second.
+      name: r.account && r.account !== r.name ? `${r.account} · ${r.name}` : (r.account || r.name),
       value: `${r.points} pts`,
       avatarUrl: r.avatarUrl,
     })),
