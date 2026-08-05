@@ -44,8 +44,17 @@ async function notify(db: Awaited<ReturnType<typeof getDb>>, userId: string, tit
   await db.insert(schema.notifications).values({ id: uid(), userId, type: "trophy", title, body, href });
 }
 
+/**
+ * Tell the people who can act on it.
+ *
+ * `role = "admin"` matched NOBODY. Every account in this codebase is
+ * `superadmin`, `staff` or `user` — so every "payout preference locked" notice
+ * this has ever raised went to zero people, silently, since it was written.
+ * Found while building B45, which copied the same query.
+ */
 async function notifyAdmins(db: Awaited<ReturnType<typeof getDb>>, title: string, body: string) {
-  const admins = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.role, "admin")).limit(10);
+  const admins = await db.select({ id: schema.users.id }).from(schema.users)
+    .where(inArray(schema.users.role, ["admin", "superadmin"])).limit(10);
   for (const a of admins) await notify(db, a.id, title, body, "/admin/redeems");
 }
 
