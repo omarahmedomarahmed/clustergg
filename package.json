@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push"
+    "db:push": "drizzle-kit push",
+    "test": "node tests/run-all.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.3.4",

@@ -265,8 +265,8 @@ the remaining edits; Part II is the whole platform.
 | B2 | The CP coin — a currency, not a word | `components/Icon.tsx`, new `components/Cp.tsx`, 11 files, `lib/cards/render.tsx`, the nav | plan v1 | ☑ |
 | B3 | Bot cards — install, list cards, flows, landing layout | `lib/discord/onboard.ts`, `screens.ts`, `components.ts`, `app/api/discord/interactions/route.ts`, the card layers | plan v1 | ☐ |
 | B4 | The server portal, inside Discord | new `discord_guild_roles`, `/cluster admin`, six `srv_*` card kinds, `lib/server-portal.ts` (read only) | plan v1 | ☐ |
-| B5 | Gifting — search as you type, web and Discord | `components/TrophyMarket.tsx`, new `/api/gamers/search`, the bot gift flow | plan v1 | ☐ |
-| B6 | Redeem and marketplace, step by step, on the web | new `/redeem`, `/marketplace` confirm step | plan v1 | ☐ |
+| B5 | Gifting — search as you type, web and Discord | `components/TrophyMarket.tsx`, new `/api/gamers/search`, the bot gift flow | plan v1 | ☐ **folded into B49** |
+| B6 | Redeem and marketplace, step by step, on the web | new `/redeem`, `/marketplace` confirm step | plan v1 | ☐ **folded into B49** |
 | B7 | The screenshot system — plumbing **and** an admin who can replace any image | new `feature_shots`, `lib/shots.ts`, `<FeatureShot>`, `/admin/shots` | plan v1 | ☑ |
 | B8 | The claim registry and the copy rewrite | `lib/claims.ts` (new), every marketing page, `lib/cms.ts` EN+AR, deck, data room | plan v1 | ☐ |
 | B9 | Nav: the marketplace badge beside the planets badge | `components/Nav.tsx`, `lib/site-chrome.ts`, `components/BrandingEditor.tsx` | batch 2 | ☑ |
@@ -279,7 +279,7 @@ the remaining edits; Part II is the whole platform.
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
 | B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☑ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
-| B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
+| B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ **folded into B49** |
 | B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
 | B21 | The economy, explained in visuals, everywhere | bot guides, quests, wallet, homepage, deck | batch 2 | ☐ |
 | B22 | Track the bot install, and pay for it | `app/api/discord/installed/route.ts`, the signal quest | batch 2 | ☐ |
@@ -317,6 +317,12 @@ the remaining edits; Part II is the whole platform.
 | S5 | **Demo balances rescaled for B34's prices**, as balances net of what the seeded orders spend — Nova can afford exactly one trophy, Atlas none | `lib/db/seed-activity.ts` | wave 2 (B34 fallout) | ☑ |
 | B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☑ |
 | B48 | **The marketplace says how you get the points** — quest cards on the shelf, a clickable balance, the redemption value promoted | `/marketplace`, `components/TrophyMarket.tsx`, `components/QuestCard.tsx` | wave 2 (after B35) | ☑ |
+| B49 | **The marketplace purchase and gift experience** — checkout modal, gift search, confirm-the-person, gift-sent receipt. **Absorbs B5, B6, B19** | `components/TrophyMarket.tsx`, new `/api/gamers/search`, `app/actions/marketplace.ts` | wave 2 band | ☐ |
+| B50 | **The quest page as a how-to-play guide** — every action, its CP and its cap, as the pitch | `components/QuestGame.tsx`, `lib/quests.ts` (read `rules`, do not restate) | wave 2 | ☐ |
+| B51 | **The Profile of the Week band** — nav art behind it, top 3 only, a trophy per place, smaller cards, click-out collapses, profiles open in a new tab | `components/WeekBand.tsx`, `lib/profile-week.ts`, `/admin/profile-week` | wave 2 | ☐ |
+| B52 | **Planet explore shows game identities** — in-game name, one row per account | `lib/planet-explore.ts`, `app/planets/[slug]/page.tsx` | wave 2 | ☐ |
+| B53 | **Admin owns every trophy, including the ones already held** | `/admin/trophies`, `app/actions/trophies.ts`, `lib/marketplace.ts` | wave 2 (**money-touching**) | ☐ |
+| B54 | **The bot card design overhaul** — a card is a web page, not a poster. **Leads the Discord band: B3, B13, B14, B20, B27, B28 follow it** | `lib/cards/render.tsx`, `lib/cards/part-content.ts`, `lib/cards/data.ts` | wave 3 | ☐ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **S rows** are work that shipped without being planned — support the build
@@ -2707,6 +2713,229 @@ only renderer of a CP figure (B2). Nothing here changes what anything costs.
 
 ---
 
+## B49 — The marketplace purchase and gift experience
+
+> "a proper modal flow, not a click that just happens… confirm the person —
+> their avatar, display name and cover art — before any CP moves"
+
+**This item ABSORBS B5, B6 and B19.** All four are the same screen: B5 is the
+gift search, B6 is the redeem/marketplace stepper, B19 is the marketplace
+revamp, and B49 is the checkout and gift flow. Built separately, that screen
+gets redesigned four times and three of those redesigns are thrown away. They
+are one band, built once. B5/B6/B19 keep their numbers and their rows — nothing
+is renumbered — and each is marked "folded into B49".
+
+**What changes:**
+
+- **A checkout modal for buying for yourself.** What you are buying, what it
+  costs, your balance before and after, one confirm. No silent purchases: today
+  a click spends points with no step in between, and the first time a gamer
+  notices is when the balance is different.
+- **A gift flow that confirms the PERSON.** Search as you type, select, and then
+  see their avatar, display name and cover art before any CP moves. Buying the
+  wrong person a trophy is unrecoverable — there is no refund path and there
+  should not be one, because the trophy is already on their profile.
+- **A gift-sent confirmation** that names and shows who it went to.
+- **It has to look like the platform**, not like a browser dialog.
+
+**Verification owed → `tests/ui/marketplace.mjs` (extend) + `tests/db/marketplace.mts`:**
+- No purchase completes without a confirm step.
+- The confirm states the price, the balance before, and the balance after.
+- The gift confirm shows the recipient's avatar and display name.
+- Searching returns no private/blocked accounts.
+- A gift lands on the recipient's profile and the sender's ledger, once.
+- Balance is checked at CONFIRM, not only at open — a second tab must not let
+  the same points be spent twice.
+
+**Shots owed:** `gamer.marketplace.checkout` — "One confirm, and what it costs" —
+the checkout modal. `gamer.marketplace.gift` — "Confirm the person before the
+points move" — the gift confirm.
+**New routes:** `/api/gamers/search`.
+
+---
+
+## B50 — The quest page as a how-to-play guide
+
+> "glorify the actions and their points as a guide to playing, not a table…
+> a button reveals every action with its CP value and its daily cap"
+
+The quest page already renders `rules` — action, points, and `max N/day` — as a
+plain list. This makes it the pitch: what to do, what it pays, and how often it
+pays, presented as a guide rather than a schedule.
+
+**The caps are part of the pitch, not the small print.** "Free points" is a
+claim nobody believes; "free points, capped, and here is the cap" is one they
+can check. B17 already computes both the cap and today's usage — **read them,
+do not restate them.** A second copy of a number that B34's calculator can move
+is a number that will be wrong the first time somebody moves it.
+
+**Verification owed → `tests/ui/quests.mjs`:**
+- Every action a quest listens to appears with its CP value and its daily cap.
+- The figures equal what `getUserQuests` returns — no hardcoded numbers.
+- An action with no cap is not shown with an invented one.
+
+**Shots owed:** `gamer.quest.guide` — "What to do, what it pays, and how often".
+**New routes:** none.
+
+---
+
+## B51 — The Profile of the Week band
+
+Six changes to one component:
+
+- **The expanded band renders the nav's background image** with a dark overlay.
+  It is blank behind the winners today. **One image, shared with the nav** —
+  the same rule and the same group as B10, which is why it is not a second copy.
+- **Top 3 only**, with a glorified "See all" for the rest. The whole platform in
+  a band is a leaderboard nobody reads; three is a podium.
+- **A trophy per place, set by admin** (1st/2nd/3rd). Each top-3 profile shows
+  the trophy it *would* win, replacing the generic crown and medal icons.
+  Framed as **"if the week ended now"** — it must not read as already won, or
+  the Sunday result reads as something being taken away.
+- **Smaller cards**, so expanding does not cover the page.
+- **Clicking below the band collapses it.**
+- **A profile opens in a NEW TAB** (`target="_blank" rel="noopener"`). Profiles
+  must never open inside the band.
+
+**Verification owed → `tests/ui/week-band.mjs`:**
+- Exactly one element paints the nav art (the B10 assertion, extended to the band).
+- Three profiles, not more.
+- Each shows the trophy for its place, and the copy says "if the week ended now".
+- A profile link carries `target="_blank"` and `rel` containing `noopener`.
+- A click below the band collapses it.
+
+**Shots owed:** `home.week.band` — "The podium, if the week ended now".
+**New routes:** none.
+
+---
+
+## B52 — Planet explore shows game identities
+
+The explore list on a planet hero shows the **in-game account name**, not the
+Cluster profile name. A gamer with two accounts on that game **appears twice**,
+and that is correct: these are accounts, not people. Clicking one reveals their
+Cluster or Discord name and links through to the profile.
+
+**The rule, decided and written down now so it is not re-litigated:**
+
+> **Leaderboards are per-ACCOUNT. Challenge entry is per-GAMER.**
+>
+> A ladder ranks accounts because that is what the game ranks — two accounts of
+> one person are two positions on that game's ladder, and hiding one would make
+> our board disagree with the game's own. A challenge is a prize pool, and a
+> prize pool ranks people, because one person taking two podium places takes a
+> prize meant to spread (B38).
+>
+> Different questions, different right answers. Neither is a bug in the other.
+
+**Verification owed → `tests/db/planet-explore.mts` + `tests/ui/planet.mjs`:**
+- A gamer with two accounts on a game appears twice in explore.
+- Each row shows the in-game name, not the display name.
+- The reveal names the Cluster profile and links to it.
+- The same gamer still holds exactly one entry in a challenge on that game.
+
+**Shots owed:** `planet.explore.accounts` — "That game's ladder, by that game's names".
+**New routes:** none.
+
+---
+
+## B53 — Admin owns every trophy, including the ones already held
+
+- Edit image, name, title, description — **the change propagates to every gamer
+  holding that trophy.**
+- Assign or change its dollar value — it becomes worth that to every holder.
+- Per trophy, always visible: **who holds it, how many hold it, how many have
+  redeemed it.**
+- Hide-from-marketplace toggle.
+- **A trophy held by at least one gamer cannot be deleted.** Everything else
+  about it stays editable.
+
+### B53.0 The hazard, located correctly
+
+> **Corrected from the instruction.** It named `trophy_awards` snapshotting "the
+> trophy's cash value at purchase time" at `schema.ts:644`. Checked before
+> building: **line 644 is `marketplaceOrders`**, and **`userTrophies`
+> (`schema.ts:666`) has no value column at all** — a holding carries
+> `trophyId`, `placement`, `status`, and nothing about money. Value is read LIVE
+> from `trophies.value` by join.
+>
+> So half the requirement is already free: unredeemed holdings track the trophy's
+> value automatically, because they never stored one.
+>
+> The freeze happens somewhere else. `app/actions/trophies.ts:136` —
+> `const amount = awards.reduce((s, a) => s + Number(a.value ?? 0), 0)` — writes
+> `trophyRedeems.amount` at REQUEST time. That row is the money.
+
+**The rule, therefore:**
+
+- Editing `trophies.value` **changes what every unredeemed holding is worth.**
+  That is the feature.
+- It **must never move `trophyRedeems.amount`** on a row that is pending,
+  approved, sent or paid. A payout whose value changes after it left is a
+  reconciliation failure with a real person on the other end, and a *pending*
+  request is a number a gamer has already been shown.
+
+**Verification owed → `tests/db/trophy-admin.mts`** (money-touching, written
+with the item):
+- Editing name/image/description changes what every holder sees.
+- Raising the value raises what an unredeemed holding is worth.
+- A pending redemption's amount is unchanged by a later value edit.
+- So is an approved, a sent, and a paid one — all four states.
+- Lowering the value does not reduce an already-requested amount either.
+- A trophy with at least one holder cannot be deleted, and the refusal says why.
+- A trophy with no holders can be.
+- The holder count, and the redeemed count, are correct.
+
+**Shots owed:** `admin.trophy.holders` — "Who holds it, and what it is worth to
+them".
+**New routes:** none.
+
+---
+
+## B54 — The bot card design overhaul
+
+A complete redesign of how every card renders. Same content, far better
+display. **A card is a web page, not a poster.**
+
+- **A fixed top strip**: branding top-RIGHT, card title or gamer identity
+  top-LEFT.
+- **Everything below is free space** for the body, laid out to render what a
+  gamer sees on the platform.
+- **Challenge and planet cards get their background image.** They are basic
+  lists today. Game account cards likewise.
+- **The game logo moves into the top strip, semi-transparent.** The mascot
+  likewise. Both are decoration: draw over them freely, and if a card reads
+  better without either, leave them out.
+- **Text flow is cut off on most cards today. Fix it properly** — no fixed text
+  heights (that clips descenders, and it is a known bug), clamp names, let the
+  body size itself.
+- **Every leaderboard and standings shows the IN-GAME NAME first**, Cluster name
+  secondary. It is that game's ladder and that game's challenge; the game
+  identity is the subject. (Consistent with B52.)
+- **Design each card around its body content**, not around a template.
+
+### B54.0 Sequencing, and this one matters
+
+**B54 leads the Discord band. B3, B13, B14, B20, B27 and B28 follow it.**
+
+If the guides or the Home card are rebuilt before the layout system is
+redefined, they get built twice — once against the current template and once
+against B54's. B27 is already ☑ for button *position*; its card *rendering* is
+downstream of this.
+
+**Verification owed → `tests/ui/cards.mjs` + `tests/db/cards.mts`:**
+- No card clips its text at a fixed height (rendered height ≥ content height).
+- Every card has the top strip, with branding right and identity left.
+- Challenge and planet cards carry a background image.
+- Every standings row leads with the in-game name.
+- A long display name clamps rather than overflowing.
+- Satori renders every card kind without throwing (the marks are divs, not SVG).
+
+**Shots owed:** retired, not added — B28 replaces `bot.card.*` with live renders.
+**New routes:** none.
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -2723,6 +2952,11 @@ only renderer of a CP figure (B2). Nothing here changes what anything costs.
 | B34, B18 | "make the marketplace show the quests… make the balance clickable" | **B48.** The repricing made the shelf unreachable for a new gamer and the page offered no path off it. The quests, the balance link and the promoted redemption value are that path. |
 | B36 | — (found while building) | `buyCampaign` never created an invoice, so a campaign could run and pay out prizes and never be billed unless a human remembered. B36 now issues the invoice at purchase; the "retermed challenge invoice" it described did not exist. |
 | B38 | — (found while building) | The uniqueness was ALREADY enforced: `cp_challenge_user_idx` is unique on (challenge, user), so a second account never could enter. What was missing was the telling and the switch — the web join action discarded its result entirely, so a gamer who picked their smurf got silence and a standing on the other account. B38 is now the disclosure and the before-the-start switch, not the constraint. |
+| B5, B6, B19 | "a proper modal flow, not a click that just happens" | **Folded into B49.** All four are the same screen; built separately it would be redesigned four times. Numbers and rows kept, nothing renumbered. |
+| B53 | the hazard was mislocated | The instruction named `trophy_awards` snapshotting value at `schema.ts:644`. Line 644 is `marketplaceOrders`; `userTrophies` (`:666`) has **no value column** and reads `trophies.value` live. The real freeze is `trophyRedeems.amount`, written at `app/actions/trophies.ts:136`. B53.0 carries the corrected rule. |
+| B3, B13, B14, B20, B27, B28 | "B54 must lead the Discord band" | **B54 is now first in wave 3** and the rest follow it. Rebuilding a card before the layout system is redefined builds it twice. |
+| B29 | rescoped | Already honoured in practice: `/admin/shots`, `/admin/email`, `/admin/cp-calculator` and `/admin/growth-review` all carry a `system:` key in `lib/admin-nav.ts`. What remains is the AUDIT and the assertion, not a retrofit. |
+| V0.1 | ".scratch holds twelve legacy suites, ~390 assertions" | **Checked: they are not there.** `.scratch/` holds 72 files; none of the twelve named exist, and the 33 scripts present carry **zero** `ok()`/`eq()` assertions — they are `console.log` probes named after build items. Nothing was at risk. `tests/run-all.mjs` + `npm test` added over the seven real suites instead. |
 | — | *(next amendment here)* | |
 
 ---
@@ -2804,6 +3038,12 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/offers.mts` | **B30** | off by default; the discount is its own line; totals equal lines; admin edits survive recalculation | owed |
 | `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
 | `tests/db/email.mts` + `tests/ui/admin-email.mjs` | **B32** | no key = no-op, never throws; every template fills; webhooks update status; no key or payment detail in a subject | owed |
+| `tests/db/marketplace.mts` + `tests/ui/marketplace.mjs` (extend) | **B49** (absorbs B5/B6/B19) | no purchase without a confirm; the confirm states price and balance before/after; the gift confirm shows the recipient; balance re-checked at confirm, not only at open | owed |
+| `tests/ui/quests.mjs` | **B50** | every action shows its CP and its cap, read from `getUserQuests` rather than restated | owed |
+| `tests/ui/week-band.mjs` | **B51** | exactly one element paints the nav art; three profiles; the trophy per place reads "if the week ended now"; profiles open in a new tab with rel=noopener | owed |
+| `tests/db/planet-explore.mts` + `tests/ui/planet.mjs` | **B52** | two accounts of one gamer appear twice; rows lead with the in-game name; challenge entry stays one-per-gamer | owed |
+| `tests/db/trophy-admin.mts` | **B53** | edits propagate to holders; raising the value raises unredeemed holdings; a pending/approved/sent/paid redemption's amount NEVER moves; a held trophy cannot be deleted | **write with the item — it changes what a payout is worth, see §1.1** |
+| `tests/ui/cards.mjs` + `tests/db/cards.mts` | **B54** | no card clips text at a fixed height; the top strip is present; challenge and planet cards carry a background; standings lead with the in-game name; every card kind renders through Satori | owed |
 | `tests/db/entry-rules.mts` | **B38** | a second account makes no second entry and the response names the one entered; the other account is free on a different challenge; switching allowed before the start and refused after, with the reason; the score is re-baselined; two different gamers unaffected | **written — 24 assertions** |
 | `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |
 | `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
@@ -2888,6 +3128,12 @@ the correct state for it.
 | `gamer.marketplace.earn` | "The shelf, and how to reach it" | `/marketplace` with the quest cards | not captured — placeholder |
 | `admin.abuse.review` | "Growth we look at before we pay for it" | `/admin/growth-review` | not captured — placeholder |
 | `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | the brand portal, blocked banner | not captured — placeholder |
+| `gamer.marketplace.checkout` | "One confirm, and what it costs" | the checkout modal | not captured — placeholder |
+| `gamer.marketplace.gift` | "Confirm the person before the points move" | the gift confirm | not captured — placeholder |
+| `gamer.quest.guide` | "What to do, what it pays, and how often" | a quest page, actions revealed | not captured — placeholder |
+| `home.week.band` | "The podium, if the week ended now" | `/`, band expanded | not captured — placeholder |
+| `planet.explore.accounts` | "That game's ladder, by that game's names" | a planet hero | not captured — placeholder |
+| `admin.trophy.holders` | "Who holds it, and what it is worth to them" | `/admin/trophies` | not captured — placeholder |
 | `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page | not captured — placeholder |
 | `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` | not captured — placeholder |
 | `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` | not captured — placeholder |
