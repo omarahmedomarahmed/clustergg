@@ -2,7 +2,6 @@ import { and, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { canAct, siteUrl } from "@/lib/discord/config";
 import { announcingGuilds } from "@/lib/discord/guilds";
-import { postMessage } from "@/lib/discord/rest";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
@@ -82,62 +81,44 @@ async function targets(scope: Scope = {}): Promise<Target[]> {
  * and "sent to 0 servers" reported as success is how a person finds out three
  * days later that nobody ever saw it.
  */
-/** Record what has landed so far. Idempotent, so calling it repeatedly is free. */
-async function checkpoint(scope: Scope, landed: string[]): Promise<void> {
-  if (!scope.ledger) return;
-  const real = landed.filter((g) => !g.startsWith("channel:"));
-  if (!real.length) return;
-  try {
-    const { recordDeliveries } = await import("@/lib/challenge-delivery");
-    await recordDeliveries(scope.ledger.challengeId, real, scope.ledger.kind);
-  } catch { /* the ledger already swallows its own errors */ }
-}
-
+/**
+ * Fan an announcement out to every target in scope — by QUEUEING it (B33).
+ *
+ * **Returns how many servers it was QUEUED for, not how many it reached.** That
+ * distinction is the whole item. This function used to post to every guild
+ * sequentially, awaiting each call, from inside server actions that declare no
+ * `maxDuration`: 20 seconds at 100 servers, three minutes at 1,000, inside a
+ * request killed long before. Worse, the failure was silent and partial — the
+ * delivery ledger checkpointed every ten servers, so a killed run left a
+ * plausible number behind that read as "reach was lower than expected" rather
+ * than "the process was killed".
+ *
+ * The awaits were never the bug. Sequential is correct: a burst of parallel
+ * posts is the fastest way to get rate-limited across every server at once, and
+ * parallelising would trade a slow failure for a temporary ban. There were
+ * simply too many of them in one request.
+ *
+ * The loop still exists — it moved to `drainPostQueue`, inside a cron route that
+ * declares how long it may take, resumable, with per-server retry.
+ *
+ * The per-recipient payload is built HERE rather than at drain time, because the
+ * sponsor row under an announcement is minted per recipient and rebuilding it
+ * later would attribute a click to the wrong server.
+ */
 async function announce(payload: Record<string, unknown>, scope: Scope = {}): Promise<number> {
   if (!canAct()) return 0;
   const list = await targets(scope);
-  // Sequential on purpose: a burst of parallel posts is the fastest way to get
-  // rate-limited across every server at once.
-  const landed: string[] = [];
-  // Every N servers, checkpoint the ledger — see the note below `flush`.
-  const CHECKPOINT = 10;
-  let sinceFlush = 0;
-  for (const t of list) {
-    try {
-      // `postMessage` does NOT throw — the REST layer returns {ok:false} for a
-      // 403, a deleted channel or a missing token. Counting a try/catch as
-      // success therefore counted every server we merely ATTEMPTED, which is
-      // the opposite of what a delivery ledger is for. Check the result.
-      const res = await postMessage(t.channelId, withSponsorRow(payload, scope.sponsor, t.guildId));
-      // The guild id is what the ledger records; the testing-override channel
-      // has none, so it counts as delivered under its own channel id rather
-      // than silently reading as "nothing landed".
-      if (res.ok) {
-        landed.push(t.guildId ?? `channel:${t.channelId}`);
-        if (++sinceFlush >= CHECKPOINT) { sinceFlush = 0; await checkpoint(scope, landed); }
-      }
-    } catch { /* never break the caller */ }
-  }
-
-  // Write down where it actually landed, and AWAIT it.
-  //
-  // This was a floating promise, which is why a brand whose challenge reached
-  // seven servers saw zero. Announcements run inside a server action or a cron
-  // request; the moment that request returns, the runtime is free to freeze the
-  // function and an un-awaited insert never happens. Reach is the number the
-  // whole business reports on — it cannot be best-effort. One insert of a
-  // handful of rows is not worth saving.
-  //
-  // It is also written at the END of a sequential fan-out that makes one HTTP
-  // round-trip per server. Posting to forty servers takes long enough that a
-  // request which returns mid-loop can still be frozen before this runs, and
-  // then the messages are visibly in Discord while the ledger says nobody was
-  // reached — which is exactly what happened, and is worse than no number at
-  // all because it looks like the product lying. `flush` therefore records what
-  // has landed SO FAR at intervals, so a cut-off run loses the tail rather than
-  // everything. The unique index makes the repeats free.
-  await checkpoint(scope, landed);
-  return landed.length;
+  if (!list.length) return 0;
+  const { enqueuePosts } = await import("@/lib/discord/post-queue");
+  const { queued } = await enqueuePosts(
+    list.map((t) => ({
+      channelId: t.channelId,
+      guildId: t.guildId,
+      payload: withSponsorRow(payload, scope.sponsor, t.guildId) as Record<string, unknown>,
+    })),
+    scope.ledger,
+  );
+  return queued;
 }
 
 // Nothing to announce into? Then skip the (expensive) card rendering entirely.
@@ -146,32 +127,43 @@ async function anyTarget(): Promise<boolean> {
   return (await targets()).length > 0;
 }
 
-// Staff broadcast: one message to every server with the bot, or to chosen ones.
-// Returns real counts so the admin UI can say what actually happened rather
-// than claiming success.
+/**
+ * Staff broadcast: one message to every server with the bot, or to chosen ones.
+ *
+ * QUEUED, like every other fan-out (B33). This carried the identical bug to
+ * `announce()` — a sequential per-guild loop awaited inside a server action
+ * (`app/actions/discord.ts:91`) that declares no `maxDuration` — and it was
+ * caught by the source-level assertion in `tests/db/announce-queue.mts` rather
+ * than by anybody noticing, which is why that assertion exists. A broadcast is
+ * the WORST case for it: staff send those to everybody by definition.
+ *
+ * Returns what was queued. `sent` is no longer knowable at this point and
+ * saying otherwise would be the same lie the ledger used to tell.
+ */
 export async function broadcastToGuilds(
   message: string,
   onlyGuildIds?: string[],
-): Promise<{ targets: number; sent: number }> {
-  if (!canAct()) return { targets: 0, sent: 0 };
+): Promise<{ targets: number; queued: number }> {
+  if (!canAct()) return { targets: 0, queued: 0 };
 
   const guilds = await announcingGuilds();
   const wanted = onlyGuildIds?.length
     ? guilds.filter((g) => onlyGuildIds.includes(g.guildId))
     : guilds;
-  const channels = wanted.map((g) => g.channelId).filter((c): c is string => !!c);
-
-  let sent = 0;
-  for (const channel of channels) {
-    try {
-      const res = await postMessage(channel, {
+  const targetsOut = wanted
+    .filter((g): g is typeof g & { channelId: string } => !!g.channelId)
+    .map((g) => ({
+      channelId: g.channelId,
+      guildId: g.guildId,
+      payload: {
         content: message.slice(0, 1900),
         components: rows([linkButton("Open Cluster", siteUrl(), "🚀")]),
-      });
-      if (res.ok) sent++;
-    } catch { /* keep going — one bad server shouldn't stop the rest */ }
-  }
-  return { targets: channels.length, sent };
+      } as Record<string, unknown>,
+    }));
+
+  const { enqueuePosts } = await import("@/lib/discord/post-queue");
+  const { queued } = await enqueuePosts(targetsOut);
+  return { targets: targetsOut.length, queued };
 }
 
 /**

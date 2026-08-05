@@ -89,10 +89,16 @@ export async function broadcast(_prev: BotActionState, formData: FormData): Prom
     .split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
   const res = await broadcastToGuilds(message, only.length ? only : undefined);
-  if (!res.sent) {
-    return { error: res.targets === 0 ? "No servers to send to yet." : "Couldn't deliver to any server — check the bot can post in their channels." };
+  if (!res.queued) {
+    return { error: res.targets === 0 ? "No servers to send to yet." : "Couldn't queue it — check the bot can post in their channels." };
   }
-  return { ok: `Sent to ${res.sent} of ${res.targets} server${res.targets === 1 ? "" : "s"}.` };
+  // Queued, not sent (B33). A broadcast is the worst case for the old inline
+  // loop — staff send those to everybody by definition — and claiming delivery
+  // at the moment of the click is a number we cannot have yet.
+  return {
+    ok: `Queued for ${res.queued} of ${res.targets} server${res.targets === 1 ? "" : "s"}. `
+      + "Delivery runs in the background; anything that fails shows above with the reason.",
+  };
 }
 
 // Announce a challenge to Discord on demand. This is also how a server-gated
@@ -103,19 +109,25 @@ export async function announceChallenge(_prev: BotActionState, formData: FormDat
   if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
   const id = String(formData.get("challengeId") ?? "").trim();
   if (!id) return { error: "Missing challenge." };
-  const reached = await announceChallengeLaunched(id);
-  if (reached === 0) {
+  // QUEUED, not reached (B33). The number this returns is how many servers the
+  // announcement was queued for; delivery happens on /api/cron/announce over the
+  // next few minutes. Saying "announced to 40 servers" the instant a button is
+  // pressed is a claim we cannot possibly know yet, and it is exactly the claim
+  // that made a killed fan-out look like a low-reach week.
+  const queued = await announceChallengeLaunched(id);
+  if (queued === 0) {
     // Not an error, but never silently a success either. Zero here has real
     // causes staff can act on — the challenge is still a draft, it's private
     // with no server attached, or the bot has no channel it can post in.
     return {
-      error: "Nothing was sent. A draft is never announced — publish it first. If it's already live, check "
+      error: "Nothing was queued. A draft is never announced — publish it first. If it's already live, check "
         + "it belongs to a server the bot can post in.",
     };
   }
   return {
-    ok: `Announced to ${reached} ${reached === 1 ? "server" : "servers"}. `
-      + "A server challenge also sends its entry key to the server it belongs to.",
+    ok: `Queued for ${queued} ${queued === 1 ? "server" : "servers"}. `
+      + "Delivery runs in the background — reach fills in over the next few minutes, and anything that fails "
+      + "shows on this page with the reason. A server challenge also sends its entry key to the server it belongs to.",
   };
 }
 

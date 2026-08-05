@@ -425,6 +425,23 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "vote_count" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_views" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "birth_date" timestamptz`,
+  `CREATE TABLE IF NOT EXISTS "discord_post_queue" (
+    "id" text PRIMARY KEY,
+    "batch_id" text NOT NULL,
+    "channel_id" text NOT NULL,
+    "guild_id" text,
+    "payload" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "ledger_challenge_id" text,
+    "ledger_kind" text,
+    "status" text NOT NULL DEFAULT 'pending',
+    "attempts" integer NOT NULL DEFAULT 0,
+    "last_error" text,
+    "next_attempt_at" timestamptz NOT NULL DEFAULT now(),
+    "posted_at" timestamptz,
+    "created_at" timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS "dpq_drain_idx" ON "discord_post_queue" ("status","next_attempt_at")`,
+  `CREATE INDEX IF NOT EXISTS "dpq_batch_idx" ON "discord_post_queue" ("batch_id")`,
   `CREATE TABLE IF NOT EXISTS "profile_votes" (
     "profile_user_id" text NOT NULL,
     "voter_user_id" text,

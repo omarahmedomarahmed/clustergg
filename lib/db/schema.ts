@@ -1644,6 +1644,54 @@ export const featureShots = pgTable("feature_shots", {
 // $1,000", and "we never sent it because nobody set the API key" is an answer.
 // A layer that silently does nothing when it is switched off teaches you to
 // trust it exactly when it is doing the least.
+/**
+ * One row per (announcement, server) waiting to be posted (B33).
+ *
+ * The unit of retry is ONE SERVER, not one announcement. A fan-out where the
+ * fortieth guild has revoked the channel must not re-post to the first
+ * thirty-nine, and a rate limit on one server must not stall the rest.
+ *
+ * Why a queue at all: `announce()` posted to every guild sequentially, awaiting
+ * each call, from inside server actions that declare no `maxDuration`. At ~200ms
+ * a call that is 20 seconds at 100 servers and three minutes at 1,000, inside a
+ * request killed long before — and the failure was SILENT and PARTIAL, because
+ * the ledger checkpoints every ten servers and therefore recorded a
+ * plausible-looking number and stopped. It read as "reach was lower than
+ * expected" rather than "the process was killed".
+ *
+ * Parallelising instead would have traded a slow failure for a rate-limit ban,
+ * which is worse.
+ */
+export const discordPostQueue = pgTable("discord_post_queue", {
+  id: id(),
+  /** Groups every row of one fan-out, so a batch can be reported on. */
+  batchId: text("batch_id").notNull(),
+  channelId: text("channel_id").notNull(),
+  guildId: text("guild_id"),
+  /**
+   * The finished message for THIS server.
+   *
+   * Built at enqueue rather than at drain, because the sponsor row under an
+   * announcement is minted per recipient — rebuilding it later would attribute
+   * a click to the wrong server.
+   */
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  /** Set when this fan-out counts toward a challenge's reach. */
+  ledgerChallengeId: text("ledger_challenge_id"),
+  ledgerKind: text("ledger_kind"),
+  /** pending | done | failed */
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  /** Backoff, and how a 429 reschedules instead of dropping. */
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  postedAt: timestamp("posted_at", { withTimezone: true, mode: "date" }),
+  createdAt: now("created_at"),
+}, (t) => [
+  index("dpq_drain_idx").on(t.status, t.nextAttemptAt),
+  index("dpq_batch_idx").on(t.batchId),
+]);
+
 export const emailLog = pgTable("email_log", {
   id: id(),
   /** Who it went to. */

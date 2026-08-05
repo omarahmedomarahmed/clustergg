@@ -37,12 +37,15 @@ export default async function AdminDiscordPage() {
   const ready = discordConfigured();
   const install = installUrl();
 
-  const [guilds, pending, hq, offerState, listValues] = await Promise.all([
+  // B33: what is waiting to be delivered, and what we gave up on.
+  const { queueStatus } = await import("@/lib/discord/post-queue");
+  const [guilds, pending, hq, offerState, listValues, queue] = await Promise.all([
     listGuilds(), countPendingRequests(), hqStatus(), offers(),
     getContent([
       ...BOT_LIST_CMS_KEYS,
       ...BOT_LISTS.filter((l) => l.votes).map((l) => `botlist.${l.id}.webhook`),
     ]).catch(() => ({} as Record<string, string>)),
+    queueStatus(),
   ]);
 
   const checks: { label: string; ok: boolean; detail: string }[] = [
@@ -81,6 +84,42 @@ export default async function AdminDiscordPage() {
 
   return (
     <div>
+      {/* The announcement queue (B33).
+          An announcement is queued the moment staff press publish and delivered
+          by /api/cron/announce over the following minutes. This is the only
+          place the difference is visible, and it has to be: "queued" and
+          "delivered" are different claims, and a server we gave up on is
+          something a human has to go and fix. */}
+      {(queue.pending > 0 || queue.failed > 0) && (
+        <div className={`glass mb-6 p-5 ${queue.failed > 0 ? "border border-rose-400/30" : ""}`}>
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <span className="font-bold">Announcement queue</span>
+            {queue.pending > 0 && (
+              <span className="rounded-full bg-cyan-500/15 px-2.5 py-0.5 text-xs font-semibold text-cyan-300">
+                {queue.pending.toLocaleString()} waiting to send
+              </span>
+            )}
+            {queue.failed > 0 && (
+              <span className="rounded-full bg-rose-500/15 px-2.5 py-0.5 text-xs font-semibold text-rose-300">
+                {queue.failed.toLocaleString()} gave up
+              </span>
+            )}
+            <span className="text-xs text-muted">{queue.done.toLocaleString()} delivered</span>
+            <span className="ml-auto text-xs text-muted">Drains every 5 minutes.</span>
+          </div>
+          {queue.failures.length > 0 && (
+            <ul className="mt-3 space-y-1">
+              {queue.failures.slice(0, 10).map((f, i) => (
+                <li key={i} className="text-xs text-muted">
+                  <b className="text-ink">{f.guildId ?? f.channelId}</b> — {f.error ?? "no reason recorded"}{" "}
+                  <span className="opacity-60">({f.attempts} attempts)</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+
       <AdminHeader
         title="Servers & bot status"
         subtitle="Every Discord community running ClusterBot, what it's worth, and the state of the bot itself."
