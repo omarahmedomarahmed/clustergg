@@ -152,6 +152,39 @@ eq("…and nothing was charged",
   (await db.select().from(schema.marketplaceOrders)
     .where(sqlEq(schema.marketplaceOrders.buyerId, rich.id))).length, 0);
 
+console.log("\n== in the bot: a Discord handle is what a gamer actually knows (B5.2) ==");
+// `users.discord_username` is populated at OAuth, and it is the identifier
+// somebody has for their friend — they do not know their Cluster slug.
+const { findByDiscordName } = await import("../../lib/gamer-lookup.ts");
+const found = await findByDiscordName(`zephyr_disc_${tag}`);
+eq("a Discord handle resolves to the person", found?.slug, zeph2.slug);
+eq("…and then to a giftable recipient", (await giftRecipient(found!.slug))?.slug, zeph2.slug);
+eq("a handle nobody has resolves to nothing", await findByDiscordName(`nope_${tag}`), null);
+
+console.log("\n== the confirm button can never name the wrong person ==");
+// Discord truncates a custom_id at 100 characters SILENTLY. The id carries the
+// trophy, the recipient and the note in that order, so a naive slice clips the
+// note — harmless — until a long slug pushes the boundary left and it starts
+// clipping the SLUG. At that point the press that exists to make gifting safe
+// is the thing that sends a trophy to somebody else.
+const { giftConfirmId, parseGiftConfirmId, MAX_CUSTOM_ID } = await import("../../lib/discord/gift-id.ts");
+const tid = uid();
+const longNote = "x".repeat(300);
+const built = giftConfirmId(tid, zeph2.slug, longNote)!;
+ok("it fits inside Discord's limit", built.length <= MAX_CUSTOM_ID, `${built.length}`);
+const back = parseGiftConfirmId(built)!;
+eq("the trophy survives intact", back.trophyId, tid);
+eq("THE SLUG SURVIVES INTACT", back.slug, zeph2.slug);
+ok("…and the note is what gave way", back.note.length < longNote.length);
+// A note containing the separator must not be read as extra fields.
+const piped = parseGiftConfirmId(giftConfirmId(tid, zeph2.slug, "a|b|c")!)!;
+eq("a note with separators in it does not shift the fields", [piped.trophyId, piped.slug], [tid, zeph2.slug]);
+eq("…and the note comes back whole", piped.note, "a|b|c");
+// The honest refusal: ids that cannot fit produce no button at all.
+eq("an impossible id is null, not a truncated one", giftConfirmId(tid, "s".repeat(120)), null);
+eq("a missing recipient is null", giftConfirmId(tid, ""), null);
+eq("something that is not ours parses to nothing", parseGiftConfirmId("buy|abc|def"), null);
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);
