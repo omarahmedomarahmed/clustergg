@@ -1,5 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { campaignDiscountLine, type CampaignConfig } from "@/lib/campaigns";
 import { PRICING_DEFAULTS, perGame, quote, type PricingConfig } from "@/lib/pricing";
 import { uid } from "@/lib/utils";
 
@@ -221,6 +222,11 @@ export function draftLines(opts: {
   addon?: boolean;
   cfg?: PricingConfig;
   gameNames?: string[];
+  /**
+   * The promotional campaigns (B44). Omitted means none — a caller that does
+   * not know about campaigns bills full price, which is the safe direction.
+   */
+  campaigns?: CampaignConfig;
 }): { kind: string; label: string; quantity: number; unitAmount: number; sourceType?: string; sourceId?: string }[] {
   const cfg = opts.cfg ?? PRICING_DEFAULTS;
   const q = quote(cfg, { games: opts.games, addon: opts.addon });
@@ -269,6 +275,18 @@ export function draftLines(opts: {
 
   if (opts.addon) {
     out.push({ kind: "addon", label: "Sunday Broadcast — presenting sponsor", quantity: 1, unitAmount: cfg.streamAddon });
+  }
+
+  // The founding brand campaign, LAST and as its own line (B44).
+  //
+  // Last, so it reads as a deduction from a stated price rather than as part of
+  // the price. Its own line, never a reduced unit rate, because the gross
+  // figure is what tells us what the campaign cost — and because a bill whose
+  // numbers cannot be traced is a bill somebody disputes. It covers the
+  // challenge lines only; the placements base above is still charged.
+  if (opts.campaigns) {
+    const promo = campaignDiscountLine(out, opts.campaigns);
+    if (promo) out.push(promo);
   }
 
   return out;

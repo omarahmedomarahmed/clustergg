@@ -198,6 +198,7 @@ export const ADMIN_NAV: AdminGroup[] = [
     blurb: "Offline sales, run through the platform.",
     items: [
       { href: "/admin/billing", label: "Billing & revenue", desc: "Brand invoices, what came in, what we owe gamers and servers, and what's left." , system: "billing" },
+      { href: "/admin/offers", label: "Founding offers", desc: "The two promotional campaigns — off by default. Switch them on, set what percentage of a bill they cover, and see what they have cost and returned.", system: "billing" },
       { href: "/admin/payouts", label: "Payouts", desc: "What server owners earned, and releasing it to them." , system: "billing" },
       { href: "/admin/payments", label: "Payment providers", desc: "Who collects from brands and who pays owners and gamers.", area: "settings" },
       { href: "/admin/brand-enquiries", label: "Enquiries", desc: "Brands who asked to buy, with the plan they configured.", metric: "brandEnquiries" , system: "billing" },

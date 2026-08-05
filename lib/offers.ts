@@ -3,6 +3,8 @@ import { getDb, schema } from "@/lib/db";
 import { PRICING_DEFAULTS, buildPricing, PRICING_NUMBER_KEYS, type PricingConfig } from "@/lib/pricing";
 import { buildFinance, FINANCE_CMS_KEYS, type FinanceConfig } from "@/lib/finance";
 import { getContent } from "@/lib/cms";
+import { campaigns } from "@/lib/campaigns-read";
+import type { CampaignConfig } from "@/lib/campaigns";
 
 // The two founding offers, as one place that decides who gets them.
 //
@@ -41,6 +43,15 @@ export type OfferState = {
 export type Offers = {
   servers: OfferState;
   brands: OfferState;
+  /**
+   * The switch, the rate and the caps (B44).
+   *
+   * `OfferState` above is a set of COUNTERS — who has had it, who is owed it.
+   * This is the decision: is it running at all, and at what percentage. They
+   * are kept apart because the counters are facts about the past and the
+   * campaign is a choice about the present.
+   */
+  campaign: CampaignConfig;
   pricing: PricingConfig;
   finance: FinanceConfig;
   /** The discounted base for the first hundred brands. */
@@ -63,6 +74,11 @@ export async function offers(): Promise<Offers> {
   ]);
   const pricing = buildPricing(priceContent);
   const finance = buildFinance(financeContent);
+  const campaign = await campaigns({
+    serverValue: finance.welcomeChallengeCost,
+    serverCap: finance.targetServers,
+    brandCap: FOUNDER_BRAND_CAP,
+  });
 
   const empty: OfferState = { claimed: 0, cap: 0, remaining: 0, waiting: 0, value: 0, open: false };
   let servers = { ...empty, cap: finance.targetServers, value: finance.welcomeChallengeCost };
@@ -94,9 +110,16 @@ export async function offers(): Promise<Offers> {
   servers = { ...servers, remaining: Math.max(0, servers.cap - servers.claimed), open: servers.claimed < servers.cap };
   brands = { ...brands, remaining: Math.max(0, brands.cap - brands.claimed), open: brands.claimed < brands.cap };
 
+  // An offer that is switched OFF is not open, however many remain. The
+  // counters keep counting — turning a campaign off does not un-give what was
+  // already given — but nothing new is granted while it is off.
+  servers.open = servers.open && campaign.server.enabled;
+  brands.open = brands.open && campaign.brand.enabled;
+
   return {
     servers,
     brands,
+    campaign,
     pricing,
     finance,
     founderBase: FOUNDER_BASE,
