@@ -754,6 +754,18 @@ const COLUMN_MIGRATIONS = [
   // Our own brand, so welcome challenges bill to Cluster through the same
   // invoice machinery a paying brand uses (B31.2).
   `ALTER TABLE "brands" ADD COLUMN IF NOT EXISTS "is_house" boolean NOT NULL DEFAULT false`,
+  // The per-server, per-kind cooldown (B1.3). Correctly scoped is not the same
+  // as bearable.
+  `CREATE TABLE IF NOT EXISTS "discord_post_log" (
+     "id" text PRIMARY KEY,
+     "guild_id" text NOT NULL,
+     "kind" text NOT NULL,
+     "window_key" text NOT NULL,
+     "suppressed" integer NOT NULL DEFAULT 0,
+     "names" jsonb NOT NULL DEFAULT '[]'::jsonb,
+     "created_at" timestamptz NOT NULL DEFAULT now()
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "dpl_guild_window_idx" ON "discord_post_log" ("guild_id", "window_key")`,
   // The welcome challenge type (B43.2) — a private, server-scoped challenge
   // admin can create for any server at any time, so a draft cancelled because
   // we never learned which games a community plays can be recreated later.

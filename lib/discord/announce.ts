@@ -215,6 +215,10 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
     slugFor(userId), cardRef("challenge", { id: challengeId }), challengeUrl(siteUrl(), challengeId),
   ]);
   if (!who || !card.data || card.data.kind !== "challenge") return;
+  // THEIR_SERVERS, hourly per server (B1.3).
+  const { applyCooldown } = await import("@/lib/discord/audience");
+  const gate = await applyCooldown("challenge_joined", mine, who.name);
+  if (!gate.allowed.length) return;
   await announce({
     content: `**${who.name}** just joined **${card.data.title}**.`,
     embeds: [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }],
@@ -223,7 +227,7 @@ export async function announceChallengeJoined(userId: string, challengeId: strin
       navButton("START HERE", frame("planets"), [frame("home")], ButtonStyle.Primary, "🚀"),
       linkButton("See standings", url, "📊"),
     ]),
-  }, { only: mine, sponsor: card.ad });
+  }, { only: gate.allowed, sponsor: card.ad });
 }
 
 // A new challenge is live.
@@ -443,6 +447,10 @@ export async function announceQuestTier(userId: string, questKey: string, tierNa
   if (!mine.length) return;
   const who = await slugFor(userId);
   if (!who) return;
+  // THEIR_SERVERS, hourly per server (B1.3).
+  const { applyCooldown } = await import("@/lib/discord/audience");
+  const gate = await applyCooldown("quest_tier", mine, who.name);
+  if (!gate.allowed.length) return;
   const card = await cardRef("quest", { slug: who.slug, quest: questKey });
   await announce({
     content: `**${who.name}** reached **${tierName}**.`,
@@ -451,7 +459,7 @@ export async function announceQuestTier(userId: string, questKey: string, tierNa
       navButton("My progress", frame("show", `quest:${questKey}`), [frame("home")], ButtonStyle.Primary, "🗺"),
       linkButton("Play the quest map", `${siteUrl()}/quests/${questKey}`, "🎮"),
     ]),
-  }, { only: mine, sponsor: card.ad });
+  }, { only: gate.allowed, sponsor: card.ad });
 }
 
 // A new game account was linked — a good moment to nudge profile customization,
@@ -462,6 +470,15 @@ export async function announceAccountLinked(userId: string, game: string): Promi
   if (!mine.length) return;
   const who = await slugFor(userId);
   if (!who) return;
+  // THEIR_SERVERS, and at most one an hour per server (B1.2/B1.3).
+  //
+  // Scoping alone is not enough: a server with 200 members linking on launch
+  // day gets 200 correctly-scoped messages, and the owner removes the bot on
+  // the same reasoning as if they had been wrong. The rest are counted and
+  // said once, together.
+  const { applyCooldown } = await import("@/lib/discord/audience");
+  const gate = await applyCooldown("account_linked", mine, who.name);
+  if (!gate.allowed.length) return;
   const card = await cardRef("profile", { slug: who.slug });
   await announce({
     content: `**${who.name}** linked a **${game}** account.`,
@@ -470,5 +487,5 @@ export async function announceAccountLinked(userId: string, game: string): Promi
       linkButton("Customize your profile", `${siteUrl()}/profile`, "✨"),
       navButton("Link yours", frame("link"), [frame("home")], ButtonStyle.Primary, "🔗"),
     ]),
-  }, { only: mine, sponsor: card.ad });
+  }, { only: gate.allowed, sponsor: card.ad });
 }
