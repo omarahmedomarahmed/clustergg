@@ -32,14 +32,24 @@ const COMMON: Region[] = [
     note: "A gradient strip in the card's accent colours. Art behind it is never visible.",
   },
   {
+    key: "strip", label: "Top strip", kind: "brand",
+    x: 0, y: 0, w: 100, h: 14.6,
+    note: "The one band every card keeps free (B54): the card's own identity on the left, our mark on the right, and everything below it is the body's. Held dark by a scrim, so art here reads as texture rather than subject.",
+  },
+  {
+    key: "game-mark", label: "Game logo", kind: "art",
+    x: 1.9, y: 0, w: 8.7, h: 16.5,
+    note: "The GAME's logo, faint, under the identity line. Decoration — the text is drawn straight over it. Hidden automatically when the badge is already showing the same logo.",
+  },
+  {
     key: "mascot", label: "Astronaut", kind: "art",
-    x: 0.8, y: 68, w: 19, h: 32,
-    note: "The mascot stands here on every card, behind the content. Keep this corner of your art simple — a busy patch fights the figure.",
+    x: 51, y: 0, w: 9, h: 17.1,
+    note: "The mascot rides in the strip, semi-transparent. It stood bottom-left at 200px until B54, which put it behind the last lines of every card's body — the cards with the most to say read the worst.",
   },
   {
     key: "logo", label: "Cluster logo", kind: "brand",
-    x: 77, y: 57.6, w: 21, h: 39.7,
-    note: "250px, bottom-right, on every card without exception. Drawn last and nothing may cover it — this is the one corner art must not compete with.",
+    x: 86, y: 0, w: 11, h: 21,
+    note: "Top-right, in the strip, on every card without exception. Drawn last and nothing may cover it — with a sponsor box in the corner it slides LEFT to clear the creative rather than being buried under it.",
   },
   {
     key: "ad", label: "Sponsor box", kind: "brand",

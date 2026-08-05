@@ -52,7 +52,7 @@ function readLayout(fd: FormData): CardLayout {
   // moved, the preview faded, and saving threw the number away — the classic
   // shape of a control that appears to work. A field the editor can change has
   // to be a field the save can see.
-  const spot = (k: "mascot" | "mark" | "badge" | "ad") => ({
+  const spot = (k: "mascot" | "gameMark" | "mark" | "badge" | "ad") => ({
     x: n(`${k}.x`, d[k].x),
     y: n(`${k}.y`, d[k].y),
     size: n(`${k}.size`, d[k].size),
@@ -61,6 +61,7 @@ function readLayout(fd: FormData): CardLayout {
   });
   return parseLayout(JSON.stringify({
     mascot: spot("mascot"),
+    gameMark: spot("gameMark"),
     mark: spot("mark"),
     badge: spot("badge"),
     ad: spot("ad"),
@@ -124,7 +125,7 @@ export async function applyFurnitureEverywhere(_prev: CardActionState, fd: FormD
   const from = String(fd.get("kind") ?? "");
   if (!LAYOUT_KINDS.includes(from as never)) return { error: "Unknown card kind." };
 
-  const FURNITURE = ["mascot", "mark", "badge", "ad"] as const;
+  const FURNITURE = ["mascot", "gameMark", "mark", "badge", "ad"] as const;
   type Furniture = (typeof FURNITURE)[number];
   const asked = String(fd.get("only") ?? "");
   const which: Furniture[] = FURNITURE.includes(asked as Furniture) ? [asked as Furniture] : [...FURNITURE];
@@ -154,9 +155,9 @@ export async function applyFurnitureEverywhere(_prev: CardActionState, fd: FormD
   for (const kind of LAYOUT_KINDS) dropped += await invalidateCards(kind);
 
   const NAMES: Record<Furniture, string> = {
-    mascot: "Astronaut", mark: "Logo", badge: "Badge", ad: "Sponsor box",
+    mascot: "Astronaut", gameMark: "Game logo", mark: "Logo", badge: "Badge", ad: "Sponsor box",
   };
-  const label = which.length === 1 ? NAMES[which[0]] : "Astronaut, logo, badge and sponsor box";
+  const label = which.length === 1 ? NAMES[which[0]] : "Astronaut, game logo, logo, badge and sponsor box";
   revalidatePath("/admin/cards/guide");
   return {
     ok: `${label} copied to ${changed} card kind${changed === 1 ? "" : "s"}.`

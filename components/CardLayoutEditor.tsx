@@ -6,7 +6,7 @@ import { saveCardLayout, resetCardLayout, applyFurnitureEverywhere, type CardAct
 import ImageUpload from "@/components/ImageUpload";
 import {
   DEFAULT_LAYOUT, BG_SOURCES, ASSET_SOURCES, BADGE_SHOWS, AD_RATIO,
-  assetBoxPct, assetWidthPct, assetWidthPx, badgeTopFor, partBoxes,
+  assetBoxPct, assetWidthPct, assetWidthPx, badgeTopFor, markLeftFor, partBoxes,
   type CardLayout, type CardAsset, type ContentBox, type PartStyle, type Spot,
 } from "@/lib/cards/layout";
 import { assetPicture } from "@/lib/cards/asset-source";
@@ -35,7 +35,7 @@ export type EditorArt = {
 };
 
 // `asset:<id>` is a handle too — one pointer path for everything on the canvas.
-type Handle = "mascot" | "mark" | "badge" | "ad" | "content" | `asset:${string}` | `part:${string}`;
+type Handle = "mascot" | "gameMark" | "mark" | "badge" | "ad" | "content" | `asset:${string}` | `part:${string}`;
 
 const ASPECT = 1200 / 630;
 
@@ -165,7 +165,7 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
   const patchPart = (key: string, patch: Partial<PartStyle>) =>
     setL((c) => ({ ...c, parts: { ...(c.parts ?? {}), [key]: { ...(c.parts?.[key] ?? {}), ...patch } } }));
 
-  const setSpot = (key: "mascot" | "mark" | "badge" | "ad", patch: Partial<Spot>) =>
+  const setSpot = (key: "mascot" | "gameMark" | "mark" | "badge" | "ad", patch: Partial<Spot>) =>
     setL((cur) => ({ ...cur, [key]: { ...cur[key], ...patch } }));
   const setContent = (patch: Partial<ContentBox>) =>
     setL((cur) => ({ ...cur, content: { ...cur.content, ...patch } }));
@@ -369,6 +369,19 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
                 tint="rgba(139,92,246,0.35)"
               />
             )}
+            {!l.gameMark.hidden && (
+              <Grab
+                label="Game logo"
+                spot={l.gameMark}
+                active={drag === "gameMark"}
+                onGrab={() => setDrag("gameMark")}
+                // No picture: this one is a different logo on every card the
+                // kind renders, so the editor would have to pick one game's to
+                // stand for all of them. The box is the honest thing to draw.
+                img={null}
+                tint="rgba(56,189,248,0.32)"
+              />
+            )}
             {!l.badge.hidden && (
               <Grab
                 label="Badge"
@@ -398,6 +411,11 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
               <Grab
                 label="Logo"
                 spot={l.mark}
+                // Where it will actually be drawn: with a sponsor box in the
+                // corner the mark slides left to clear it, and an editor that
+                // ignored that would be lying about the card — the same reason
+                // the badge is drawn at its pushed-down position.
+                centerX={((markLeftFor(l, true) + l.mark.size / 2) / 1200) * 100}
                 active={drag === "mark"}
                 onGrab={() => setDrag("mark")}
                 img={art.markUrl}
@@ -421,6 +439,10 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
           <input type="hidden" name="bgSources" value={JSON.stringify(l.bgSources ?? [])} />
 
           <SpotFields label="Mascot" prefix="mascot" spot={l.mascot} onChange={(p) => setSpot("mascot", p)} />
+          <SpotFields
+            label="Game logo" prefix="gameMark" spot={l.gameMark} onChange={(p) => setSpot("gameMark", p)}
+            hint="The GAME's logo, faint, in the top strip. Decoration — the identity line is drawn over it. Hidden automatically when the badge is already showing the same logo."
+          />
           <SpotFields label="Logo" prefix="mark" spot={l.mark} onChange={(p) => setSpot("mark", p)} />
           <SpotFields
             label="Top-right badge" prefix="badge" spot={l.badge} onChange={(p) => setSpot("badge", p)}
@@ -486,6 +508,7 @@ export default function CardLayoutEditor({ kind, name, initial, art, parts = [],
             <div className="grid grid-cols-2 gap-1.5">
               {([
                 ["mascot", "Astronaut"],
+                ["gameMark", "Game logo"],
                 ["mark", "Logo"],
                 ["badge", "Badge"],
                 ["ad", "Sponsor box"],
@@ -929,13 +952,16 @@ function sampleUrl(base: string, sample: CardSample | null, nonce: number): stri
 
 // ===== Canvas pieces =====
 
-function Grab({ label, spot, active, onGrab, img, tint, ratio = 1, centerY }: {
+function Grab({ label, spot, active, onGrab, img, tint, ratio = 1, centerY, centerX }: {
   label: string; spot: Spot; active: boolean; onGrab: () => void; img: string | null; tint: string;
   /** height / width of this element's art. The ad box is a banner, not a square. */
   ratio?: number;
   /** Overrides the spot's own Y — used for the badge, which the renderer pushes
    *  below the ad box. The editor has to show where it ACTUALLY lands. */
   centerY?: number;
+  /** Overrides the spot's own X — used for the logo mark, which the renderer
+   *  slides LEFT of the ad box for the same reason. */
+  centerX?: number;
 }) {
   // Size is in canvas pixels; the canvas is 1200 wide however many CSS pixels
   // it occupies, so a percentage width keeps the handle to scale.
@@ -949,7 +975,7 @@ function Grab({ label, spot, active, onGrab, img, tint, ratio = 1, centerY }: {
         active ? "border-cyan-300" : "border-white/45 hover:border-white/80"
       }`}
       style={{
-        left: `${spot.x}%`, top: `${centerY ?? spot.y}%`, width: `${w}%`, height: `${h}%`,
+        left: `${centerX ?? spot.x}%`, top: `${centerY ?? spot.y}%`, width: `${w}%`, height: `${h}%`,
         transform: "translate(-50%, -50%)",
         background: img ? "transparent" : tint,
       }}

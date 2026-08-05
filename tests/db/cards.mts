@@ -39,6 +39,9 @@ const { readFile } = await import("node:fs/promises");
 const db = await getDb();
 const tag = uid().slice(0, 6);
 
+/** The strip's height in canvas pixels — the band every card keeps free. */
+const STRIP = 92;
+
 console.log("== no card clips its text at a fixed height ==");
 // The failure: `height: 15` on a text box holds today because the copy in it
 // happens to be uppercase, and clips the first time somebody writes a lower-case
@@ -173,6 +176,79 @@ ok("…and the body starts under it", contentY >= 14, String(contentY));
 const contentW = Number(/content: \{ x: [\d.]+, y: [\d.]+, w: ([\d.]+)/.exec(layout)?.[1] ?? "0");
 // Moving the mark out of the bottom-right left a dead half on the first render.
 ok("…using the width the mark gave up", contentW > 70, String(contentW));
+
+console.log("\n== the strip's three tenants do not sit on top of each other ==");
+// All three of these were found by rendering a SOLD card and looking at it.
+// None of them is visible in an unsold render, and the demo fixtures are
+// unsold, which is how all three shipped in the first pass.
+{
+  const {
+    DEFAULT_LAYOUT, adBox, spotBox, markLeftFor, mascotYields,
+  } = await import("../../lib/cards/layout.ts");
+  const L = DEFAULT_LAYOUT;
+  const ad = adBox(L.ad);
+  const mark = spotBox(L.mark, 1);
+
+  // 1. The default sponsor box covers the default mark completely. That is the
+  //    bug, stated as arithmetic: 1032..1164 across sits inside 780..1180.
+  ok("the sponsor box would bury the mark where it sits",
+    mark.left > ad.left && mark.left < ad.left + ad.width,
+    `mark ${mark.left}, ad ${ad.left}..${ad.left + ad.width}`);
+  const slid = markLeftFor(L, true);
+  ok("…so a SOLD card slides it clear", slid + mark.width <= ad.left,
+    `${slid} + ${mark.width} vs ${ad.left}`);
+  eq("…and an unsold card is untouched", markLeftFor(L, false), mark.left);
+  ok("…and it never goes off the left edge", slid >= 0, String(slid));
+
+  // 2. The slid mark lands where the mascot stands, so the mascot yields —
+  //    a grey shoulder behind the logo is worse than no mascot.
+  ok("the mascot yields on a sold card", mascotYields(L, true));
+  ok("…and stands on an unsold one", !mascotYields(L, false));
+  // Not a blanket rule: moved out of the way, it stays on every card.
+  ok("…and a mascot placed clear of both keeps its place",
+    !mascotYields({ ...L, mascot: { ...L.mascot, x: 20, y: 80 } }, true));
+
+  // 3. Both branding elements are in the strip band, and the body is under it.
+  ok("the mascot rides in the strip", spotBox(L.mascot, 1).top < STRIP,
+    String(spotBox(L.mascot, 1).top));
+  ok("the game logo does too", spotBox(L.gameMark, 1).top < STRIP,
+    String(spotBox(L.gameMark, 1).top));
+  ok("…on the LEFT, where the identity is", L.gameMark.x < 20, String(L.gameMark.x));
+}
+
+console.log("\n== the game's logo is drawn once, not twice ==");
+// The first render of the strip printed the game's mark twice: faint at
+// top-left AND crisp in the corner, one under the other. Six card bodies
+// proposed it as their corner badge because until B54 it was the only game
+// identity a card carried.
+ok("the corner steps aside when the strip has it",
+  /cornerIsGameLogo && stripHasGameLogo \? undefined : proposed/.test(render));
+ok("…only on \"auto\", so an explicit choice still wins",
+  /if \(show === "auto"\) return cornerIsGameLogo/.test(render));
+ok("…and the strip stands down when the badge is set to the game's logo",
+  /badgeShow \?\? "auto"\) === "game" \|\| l\.gameMark\.hidden/.test(render));
+ok("the challenge card no longer heads its trophy stack with it",
+  /It is in the strip now/.test(render));
+ok("…and the bodies that propose it say so", (render.match(/cornerIsGameLogo/g) ?? []).length >= 7,
+  String((render.match(/cornerIsGameLogo/g) ?? []).length));
+
+console.log("\n== the clamps follow the column, they do not stay where they were ==");
+// Widening the content column from 58.5% to 78% left fifty character counts
+// tuned for the narrow one: the leaderboard title read "Blitz Supernova —
+// Weekly…" with 470 empty pixels to the right of the ellipsis. Only a render
+// shows that; the type checker is perfectly happy with a number.
+{
+  const { DEFAULT_LAYOUT } = await import("../../lib/cards/layout.ts");
+  ok("the column really did get wider", DEFAULT_LAYOUT.content.w > 58.5, String(DEFAULT_LAYOUT.content.w));
+  ok("there is one scale, from the live layout", /function clampFor\(t: CardTheme\)/.test(render));
+  ok("…taken from the content width", /t\.layout\?\.content\.w \?\? DEFAULT_LAYOUT\.content\.w/.test(render));
+  ok("…and bounded, so a hand-set column cannot make a card unreadable",
+    /Math\.max\(0\.6, Math\.min\(1\.8/.test(render));
+  // Applied by shadowing, so a body that was missed keeps exactly what it drew.
+  const shadowed = (render.match(/const clamp = clampFor\(t\);/g) ?? []).length;
+  ok("every card body takes the scaled clamp", shadowed >= 12, String(shadowed));
+  eq("…once per body", shadowed, (render.match(/^  const t = d\.theme;$/gm) ?? []).length);
+}
 
 console.log("\n== a challenge with no cover falls back to its GAME's art ==");
 ok("the chain reaches the game", /g\?\.planetBgUrl \|\| g\?\.coverUrl \|\| bg\.bgUrl/.test(

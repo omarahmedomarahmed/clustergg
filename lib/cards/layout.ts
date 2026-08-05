@@ -143,6 +143,18 @@ export type CardAsset = {
 export type CardLayout = {
   /** The astronaut mascot. */
   mascot: Spot;
+  /**
+   * The GAME's logo, drawn faint in the top strip (B54).
+   *
+   * Decoration, not furniture: it says which game this card is about at a
+   * glance, behind the identity line rather than beside it, so the strip reads
+   * as that game's card without spending a slot the content needs. Drawn under
+   * everything, at `opacity` — the house default is faint on purpose.
+   *
+   * Skipped when the badge is already showing the same logo, because two of one
+   * mark in one band is a mistake rather than a design.
+   */
+  gameMark: Spot;
   /** The Cluster logo mark. */
   mark: Spot;
   /** Top-right furniture: game logo, level pill, or the challenge trophy stack. */
@@ -222,7 +234,21 @@ export const AD_RATIO = 0.3125;
 export const AD_LABEL_H = 22;
 
 export const DEFAULT_LAYOUT: CardLayout = {
-  mascot: { x: 9, y: 84, size: 200 },
+  // INTO THE STRIP (B54), and smaller for it.
+  //
+  // It stood at x:9, y:84 — bottom-left, 200px, which is inside the content
+  // column (x 4.7..82.7%, y 15..91%). So the one figure every card carries was
+  // drawn behind the last two lines of every card's body, and the cards that
+  // read worst were the ones with the most to say. In the strip it is
+  // decoration in a band that is kept free by construction, which is the only
+  // place on the card where a decorative figure costs the body nothing.
+  //
+  // Left of the sponsor box's left edge (780px) on purpose: half an astronaut
+  // sticking out from behind a paid creative is worse than no astronaut.
+  mascot: { x: 55.5, y: 8.7, size: 108 },
+  // The GAME's logo, faint, under the identity line on the left. Says whose
+  // card this is before a word of it is read.
+  gameMark: { x: 6.2, y: 7.6, size: 88 },
   // Bottom-right at 250, on every card, without exception.
   //
   // It was 104px and it read as a favicon somebody forgot to remove. These
@@ -442,6 +468,7 @@ export function parseLayout(raw: string | null | undefined): CardLayout {
   const c = (o.content ?? {}) as Partial<ContentBox>;
   return {
     mascot: spot(o.mascot, DEFAULT_LAYOUT.mascot),
+    gameMark: spot(o.gameMark, DEFAULT_LAYOUT.gameMark),
     mark: spot(o.mark, DEFAULT_LAYOUT.mark),
     badge: spot(o.badge, DEFAULT_LAYOUT.badge),
     ad: spot(o.ad, DEFAULT_LAYOUT.ad),
@@ -770,6 +797,58 @@ export function badgeTopFor(l: CardLayout, hasAd: boolean, badgeRatio = 1): numb
   // Never push the badge off the bottom edge; a clipped trophy stack is worse
   // than one that overlaps by a few pixels.
   return Math.min(ad.bottom + 16, CANVAS_H - badge.height - 8);
+}
+
+/**
+ * Where our own mark actually hangs once a sponsor box is on the card.
+ *
+ * B54 moved the mark to the top-right strip (x 91.5, y 8.5 → 1032..1164 across,
+ * -12..119 down). The default sponsor box is x 81.7, y 12.8, 400 wide, which
+ * `adBox` puts at 780..1180 across and -24..208 down — so on every SOLD card the
+ * ad was drawn last, over the top, and our mark was gone. Unsold cards looked
+ * right, which is exactly the sort of thing that ships.
+ *
+ * Same treatment `badgeTopFor` gives the badge, in the other axis: the mark
+ * slides LEFT to clear the creative rather than down, because the strip is the
+ * band it belongs in and dropping it out of the strip is a different card. An
+ * admin who has hand-placed either keeps their placement whenever the two do
+ * not actually collide, and a card with no ad is untouched.
+ */
+export function markLeftFor(l: CardLayout, hasAd: boolean): number {
+  const mark = spotBox(l.mark, 1);
+  if (!hasAd || l.ad.hidden || l.mark.hidden) return mark.left;
+  const ad = adBox(l.ad);
+  const overlapsX = mark.left < ad.left + ad.width && ad.left < mark.left + mark.width;
+  const overlapsY = mark.top < ad.bottom && ad.top < mark.top + mark.height;
+  if (!overlapsX || !overlapsY) return mark.left;
+  // Never push it off the left edge: a mark half off the canvas is worse than
+  // one that shares a few pixels with the creative.
+  return Math.max(8, ad.left - mark.width - 16);
+}
+
+const overlap = (a: { left: number; top: number; width: number; height: number },
+  b: { left: number; top: number; width: number; height: number }) =>
+  a.left < b.left + b.width && b.left < a.left + a.width
+  && a.top < b.top + b.height && b.top < a.top + a.height;
+
+/**
+ * Does the mascot have to stand down on this card?
+ *
+ * The strip has three tenants and only two of them are load-bearing. On a SOLD
+ * card the creative takes the right end and `markLeftFor` slides our mark left
+ * to clear it — straight into where the mascot stands. The first render of that
+ * was a grey shoulder poking out from behind the logo, which is worse than no
+ * mascot at all.
+ *
+ * So it yields, and only when it actually collides: an unsold card keeps it, and
+ * an admin who has dragged it somewhere the mark never reaches keeps it on every
+ * card. Decoration gives way to the two things that are not.
+ */
+export function mascotYields(l: CardLayout, hasAd: boolean): boolean {
+  if (l.mascot.hidden || l.mark.hidden || !hasAd || l.ad.hidden) return false;
+  const mascot = spotBox(l.mascot, 1);
+  const mark = { ...spotBox(l.mark, 1), left: markLeftFor(l, true) };
+  return overlap(mascot, mark) || overlap(mascot, adBox(l.ad));
 }
 
 /**

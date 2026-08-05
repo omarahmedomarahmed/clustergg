@@ -3,7 +3,7 @@ import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import {
-  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, opacityOf,
+  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, markLeftFor, mascotYields, opacityOf,
   partOf, plateBg, sideBox, sideBoxFits, spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset, PartDraw } from "@/lib/cards/layout";
@@ -127,9 +127,24 @@ function safeTheme(theme: CardTheme): CardTheme {
 function badgeContent(
   theme: CardTheme,
   proposed: React.ReactNode,
+  /**
+   * True when the proposal IS the game's logo — and therefore the same picture
+   * the strip is now drawing as a watermark (B54).
+   *
+   * Six card bodies propose the game's logo in the corner, because until B54 it
+   * was the only game identity a card carried. The strip carries it now, so on
+   * "auto" the corner steps aside rather than printing the mark twice — which is
+   * exactly what the first render of this did, one under the other, and the only
+   * way to see it was to look at the picture.
+   *
+   * Only on "auto": an admin who explicitly chose "the game's logo" gets the
+   * crisp corner badge they asked for, and the watermark stands down instead.
+   */
+  cornerIsGameLogo = false,
+  stripHasGameLogo = false,
 ): React.ReactNode {
   const show = theme.layout?.badgeShow ?? "auto";
-  if (show === "auto") return proposed;
+  if (show === "auto") return cornerIsGameLogo && stripHasGameLogo ? undefined : proposed;
   if (show === "none") return undefined;
   const b = theme.badge ?? {};
   if (show === "game" && b.gameLogoUrl) {
@@ -148,10 +163,12 @@ function badgeContent(
   return undefined;
 }
 
-function Frame({ theme, children, corner: proposedCorner, side }: {
+function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side }: {
   theme: CardTheme;
   children: React.ReactNode;
   corner?: React.ReactNode;
+  /** The corner proposal is the game's logo — see `badgeContent`. */
+  cornerIsGameLogo?: boolean;
   /**
    * The right-hand column, between the sponsor and the logo.
    *
@@ -162,9 +179,15 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
    */
   side?: (box: { left: number; top: number; width: number; height: number }) => React.ReactNode;
 }) {
-  const corner = badgeContent(theme, proposedCorner);
   const l = theme.layout ?? DEFAULT_LAYOUT;
   const mascot = spotBox(l.mascot, 1);
+  const gameMark = spotBox(l.gameMark, 1);
+  // Drawn only when the badge is not already showing the very same logo at
+  // full strength, which is the one case where a faint copy of it is noise.
+  const gameMarkUrl = (theme.layout?.badgeShow ?? "auto") === "game" || l.gameMark.hidden
+    ? null
+    : theme.badge?.gameLogoUrl ?? null;
+  const corner = badgeContent(theme, proposedCorner, cornerIsGameLogo, !!gameMarkUrl);
   const mark = spotBox(l.mark, 1);
   const badge = spotBox(l.badge, 1);
   const content = contentBox(l.content);
@@ -174,6 +197,10 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
   const ad = theme.ad && !l.ad.hidden ? theme.ad : null;
   const adB = adBox(l.ad);
   const badgeTop = badgeTopFor(l, !!ad, 1);
+  // …and the mark slid clear of it the same way. Without this the default
+  // sponsor box covers the strip's right end entirely and a sold card ships
+  // with no Cluster mark on it at all.
+  const markLeft = markLeftFor(l, !!ad);
   // The free rectangle to the right of the content: starts where the text
   // column ends, stops at the canvas edge, and begins under whichever of the
   // sponsor box and the badge hangs lowest. Computed from the LIVE layout, so
@@ -240,6 +267,27 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
         position: "absolute", top: 0, left: 0, right: 0, height: STRIP_H, display: "flex",
         background: "linear-gradient(180deg, rgba(4,5,26,0.82) 0%, rgba(4,5,26,0.34) 70%, rgba(4,5,26,0) 100%)",
       }} />
+      {/* The GAME's logo, faint, in the strip (B54).
+          It says whose card this is before a word of it is read — and it is
+          decoration, so it goes UNDER the identity line rather than beside it
+          and costs the body nothing.
+
+          Skipped when the badge is already drawing the same logo at full
+          strength: two of one mark in one band is a mistake, not a design. The
+          bytes are already inline — `badge.gameLogoUrl` is filled from the
+          PREPARED body (see `withTheme`), so this never sends Satori after a
+          remote host mid-render. */}
+      {gameMarkUrl && !l.gameMark.hidden ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={gameMarkUrl} alt="" width={gameMark.width} height={gameMark.height}
+          style={{
+            position: "absolute", left: gameMark.left, top: gameMark.top,
+            width: gameMark.width, height: gameMark.height, objectFit: "contain",
+            // Faint by house default; an explicit setting wins.
+            opacity: opacityOf(l.gameMark.opacity) ?? 0.18,
+            ...styleOf({ ...l.gameMark, opacity: undefined }),
+          }} />
+      ) : null}
       {l.bar ? (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
       ) : null}
@@ -249,14 +297,17 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
       {(l.assets ?? []).filter((a) => !a.front).map((a) => <Asset key={a.id} a={a} />)}
 
       {/* The astronaut, behind the content. */}
-      {theme.astronautUrl && !l.mascot.hidden ? (
+      {theme.astronautUrl && !l.mascot.hidden && !mascotYields(l, !!ad) ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={theme.astronautUrl} alt="" width={mascot.width} height={mascot.height}
           style={{
             position: "absolute", left: mascot.left, top: mascot.top,
             width: mascot.width, height: mascot.height, objectFit: "contain",
-            // 0.85 is the house default; an explicit setting overrides it.
-            opacity: opacityOf(l.mascot.opacity) ?? 0.85,
+            // Semi-transparent by house default (B54): in the strip it is
+            // decoration sharing a band with the identity line and the mark,
+            // and at the 0.85 it carried in the bottom-left corner it competed
+            // with both. An explicit setting overrides it.
+            opacity: opacityOf(l.mascot.opacity) ?? 0.55,
             ...styleOf({ ...l.mascot, opacity: undefined }),
           }} />
       ) : null}
@@ -273,7 +324,7 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
           unbranded. */}
       {!l.mark.hidden ? (
         <div style={{
-          position: "absolute", left: mark.left, top: mark.top, width: mark.width, height: mark.height,
+          position: "absolute", left: markLeft, top: mark.top, width: mark.width, height: mark.height,
           display: "flex", alignItems: "center", justifyContent: "center", ...styleOf(l.mark),
         }}>
           {theme.markUrl ? (
@@ -564,6 +615,31 @@ const nf = (n: number) => n.toLocaleString("en-US");
 
 // Truncate on a word boundary. A hard slice reads as a bug ("…from the Che"),
 // and these strings are admin-written, so they can be any length.
+/**
+ * The same clamp, scaled to the column this card's layout actually gives it.
+ *
+ * Every character count in this file was chosen against a 58.5%-wide content
+ * column — the number that was right when the logo sat bottom-right and the
+ * text had to end before it. B54 moved the branding into the strip and widened
+ * the column to 78%, and every one of those counts stayed where it was: the
+ * first render after the redesign clipped "Blitz Supernova — Weekly…" with 470
+ * empty pixels to the right of the ellipsis. Fifty magic numbers, all wrong by
+ * the same ratio.
+ *
+ * So the ratio is applied once, here, from the LIVE layout — which also means
+ * an admin narrowing the column narrows the text with it rather than getting
+ * overflow, and widening it gets the words back.
+ *
+ * Used by shadowing: `const clamp = clampFor(t)` at the top of a card body. A
+ * body that hasn't been converted keeps the unscaled module function, which is
+ * exactly what it drew before.
+ */
+function clampFor(t: CardTheme) {
+  const w = t.layout?.content.w ?? DEFAULT_LAYOUT.content.w;
+  const k = Math.max(0.6, Math.min(1.8, w / 58.5));
+  return (s: string | null | undefined, max: number) => clamp(s, Math.round(max * k));
+}
+
 function clamp(s: string | null | undefined, max: number): string | undefined {
   if (!s) return undefined;
   const text = s.trim();
@@ -577,6 +653,8 @@ function clamp(s: string | null | undefined, max: number): string | undefined {
 
 function ProfileBody(d: ProfileCard) {
   const t = d.theme;
+  // Scaled to the column this layout gives the card — see `clampFor`.
+  const clamp = clampFor(t);
   const [pIdentity, pStats, pTrophies, pChallenges, pAccounts] =
     ["identity", "stats", "trophies", "challenges", "accounts"].map((k) => part(t, k));
   // Three, not five.
@@ -682,6 +760,7 @@ function ProfileBody(d: ProfileCard) {
 
 function GameStatsBody(d: GameStatsCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pId, pLive, pStats, pChamps, pMatches, pRank, pEmpty] =
     ["identity", "live", "stats", "champions", "matches", "rank", "empty"].map((k) => part(t, k));
   const champs = pChamps.hidden ? [] : (d.champions ?? []);
@@ -692,7 +771,7 @@ function GameStatsBody(d: GameStatsCard) {
   const statCount = hasRich ? 2 : 6;
 
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
+    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
     ) : undefined}>
@@ -788,10 +867,11 @@ function GameStatsBody(d: GameStatsCard) {
 
 function QuestBody(d: QuestCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const next = d.nextThreshold ?? 0;
   const pct = next > 0 ? (d.cp / next) * 100 : 100;
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
+    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain" }} />
     ) : undefined}>
@@ -832,6 +912,7 @@ function QuestBody(d: QuestCard) {
 
 function CpSummaryBody(d: CpSummaryCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const p = part(t, "quests");
   return (
     <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
@@ -856,10 +937,11 @@ function CpSummaryBody(d: CpSummaryCard) {
 
 function LeaderboardBody(d: LeaderboardCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pRows, pEmpty] = ["rows", "empty"].map((k) => part(t, k));
   const medal = ["#fbbf24", "#cbd5e1", "#b45309"];
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
+    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
     ) : undefined}>
@@ -891,6 +973,7 @@ function LeaderboardBody(d: LeaderboardCard) {
 
 function ChallengeBody(d: ChallengeCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pStatus, pMeta, pTime, pStand, pTro, pEmpty, pRules] =
     ["status", "meta", "timeline", "standings", "trophies", "empty", "rules"].map((k) => part(t, k));
   const ends = new Date(d.endsAt);
@@ -906,10 +989,12 @@ function ChallengeBody(d: ChallengeCard) {
       // height, and the prize is the reason to enter, so it cannot be the thing
       // that gets covered.
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-        {d.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={d.logoUrl} alt="" width={58} height={58} style={{ width: 58, height: 58, borderRadius: 14, objectFit: "cover" }} />
-        ) : null}
+        {/* The game's logo used to head this stack. It is in the strip now
+            (B54), and the first render of the redesign printed both — the
+            watermark top-left and a crisp copy of the same mark in the corner,
+            one under the other. The prize is what this corner is for. An admin
+            who wants the logo back here sets the badge to "the game's logo",
+            and the watermark stands down for it. */}
         {trophies.length ? (
           // A PODIUM, not a row.
           //
@@ -1077,11 +1162,12 @@ function dayLabel(iso: string): string {
 // gamers.
 function PlanetBody(d: PlanetCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pCh, pBo] = ["challenges", "boards"].map((k) => part(t, k));
   const challenges = d.challenges ?? [];
   const boards = d.boards ?? [];
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
+    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={80} height={80} style={{ width: 80, height: 80, borderRadius: 20, objectFit: "cover" }} />
     ) : undefined}>
@@ -1177,6 +1263,7 @@ function Empty({ children, p }: { children: React.ReactNode; p?: PartDraw }) {
  */
 function MarketBody(d: MarketCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pBal, pTiles, pPills, pEmpty] = ["balance", "tiles", "pills", "empty"].map((k) => part(t, k));
   // Six, in two rows of three. The tile is sized to the CONTENT column, not to
   // the canvas: the ad slot owns the top-right, so a tile wide enough to look
@@ -1286,6 +1373,7 @@ function MarketBody(d: MarketCard) {
 
 function WeekBody(d: WeekCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pRows, pPills, pEmpty] = ["rows", "pills", "empty"].map((k) => part(t, k));
   const medal = ["#fbbf24", "#cbd5e1", "#d08a4a"];
   const result = d.mode === "result";
@@ -1384,6 +1472,7 @@ function WeekBody(d: WeekCard) {
 
 function PlanetsBody(d: PlanetsCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const p = part(t, "tiles");
   return (
     <Frame theme={t}>
@@ -1424,8 +1513,9 @@ const GUIDE_SCALE: Record<number, { num: number; title: number; body: number; ro
 
 function GuideBody(d: GuideCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
+    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
       <img src={d.logoUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
     ) : undefined}>
@@ -1495,6 +1585,7 @@ function GuideBody(d: GuideCard) {
 // at ten thousand times — was rendered as a line of text.
 function WorldBody(d: WorldCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pStatus, pLore, pAb, pArt, pMeta] =
     ["status", "lore", "abilities", "art", "meta"].map((k) => part(t, k));
   // Four abilities, not three: every one of these games ships a passive and
@@ -1508,6 +1599,7 @@ function WorldBody(d: WorldCard) {
       // where it reads as a caption rather than as a third thing competing for
       // the same corner as the sponsor.
       side={art ? (box) => <SplashPanel url={art} logoUrl={d.logoUrl} caption={d.skinName ?? d.name} box={box} accent={t.accent} p={pArt} /> : undefined}
+      cornerIsGameLogo
       corner={!art && d.logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
@@ -1707,6 +1799,7 @@ function SplashPanel({ url, logoUrl, caption, box, accent, p }: {
 // thing — one hit renders that hit, and none says so in words.
 function SearchBody(d: SearchCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const p = part(t, "rows");
   return (
     <Frame theme={t}>
