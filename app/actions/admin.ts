@@ -1126,11 +1126,23 @@ export async function saveTrophy(formData: FormData) {
     // takes it off the shelf without touching the challenges that award it.
     cpPrice: Math.max(0, Math.round(Number(formData.get("cpPrice")) || 0)),
     inMarketplace: formData.get("inMarketplace") !== null,
+    // B53: the line under the name and the story behind it. Both propagate to
+    // every holder, because a holding stores only `trophyId` — there is nothing
+    // per-gamer to go stale.
+    title: String(formData.get("title") ?? "").trim() || null,
+    description: String(formData.get("description") ?? "").trim() || null,
   };
   if (!values.name || !values.imageUrl) return;
   if (trophyId) {
+    // A value change revalues every UNREDEEMED holding (they read
+    // `trophies.value` live) and moves nothing that has been requested —
+    // `trophy_redeems.amount` is written once, at request time. Audited with
+    // the before and after, because this is the one edit here that is money.
+    const [was] = await db.select({ value: schema.trophies.value })
+      .from(schema.trophies).where(eq(schema.trophies.id, trophyId)).limit(1);
     await db.update(schema.trophies).set(values).where(eq(schema.trophies.id, trophyId));
-    await audit(admin.id, "trophy.update", "trophy", trophyId);
+    await audit(admin.id, "trophy.update", "trophy", trophyId,
+      was && was.value !== values.value ? { valueFrom: was.value, valueTo: values.value } : undefined);
   } else {
     await db.insert(schema.trophies).values({ id: uid(), ...values });
     await audit(admin.id, "trophy.create", "trophy", values.name);
@@ -1138,12 +1150,32 @@ export async function saveTrophy(formData: FormData) {
   revalidatePath("/admin/trophies");
 }
 
-export async function deleteTrophy(trophyId: string) {
+/**
+ * Delete a trophy — REFUSED if anybody holds it (B53).
+ *
+ * This was unconditional, and `user_trophies.trophyId` is `onDelete: "cascade"`
+ * (`lib/db/schema.ts:669`): deleting a trophy took every gamer's holding of it
+ * with no notice, no event and nothing to point at. A winner would open their
+ * profile and a trophy they won would simply be gone.
+ *
+ * `marketplace_orders.trophyId` is `onDelete: "restrict"` (`:649`), so a trophy
+ * that was ever BOUGHT was already refused by the database — the gap was
+ * exactly "won, never bought", which is most trophies.
+ */
+export async function deleteTrophy(trophyId: string): Promise<{ ok?: true; error?: string }> {
   const admin = await requireStaff();
   const db = await getDb();
+  const { canDeleteTrophy } = await import("@/lib/trophy-admin");
+  const check = await canDeleteTrophy(db, trophyId);
+  if (!check.ok) {
+    await audit(admin.id, "trophy.delete_refused", "trophy", trophyId, { holders: check.holders });
+    revalidatePath("/admin/trophies");
+    return { error: check.reason };
+  }
   await db.delete(schema.trophies).where(eq(schema.trophies.id, trophyId));
   await audit(admin.id, "trophy.delete", "trophy", trophyId);
   revalidatePath("/admin/trophies");
+  return { ok: true };
 }
 
 // ---------- Site content (CMS) ----------

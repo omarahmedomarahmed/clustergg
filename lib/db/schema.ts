@@ -629,6 +629,15 @@ export const trophies = pgTable("trophies", {
    */
   cpPrice: integer("cp_price").notNull().default(0),
   inMarketplace: boolean("in_marketplace").notNull().default(true),
+  /**
+   * The line under the name, and the story behind it (B53).
+   *
+   * Both propagate to everyone already holding the trophy, because a trophy is
+   * one object shown in many places — a holding stores only `trophyId`, so
+   * there is nothing per-gamer to go stale.
+   */
+  title: text("title"),
+  description: text("description"),
 });
 
 /**

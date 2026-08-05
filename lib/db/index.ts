@@ -597,6 +597,8 @@ const COLUMN_MIGRATIONS = [
   // ----- Trophy marketplace -----
   `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "cp_price" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "in_marketplace" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "title" text`,
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "description" text`,
   `CREATE TABLE IF NOT EXISTS "marketplace_orders" (
     "id" text PRIMARY KEY NOT NULL,
     "buyer_id" text NOT NULL,

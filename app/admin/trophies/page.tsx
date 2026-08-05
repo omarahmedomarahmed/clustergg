@@ -8,10 +8,15 @@ export const metadata = { title: "Admin · Trophies" };
 
 export default async function AdminTrophiesPage() {
   const db = await getDb();
-  const [trophies, brands] = await Promise.all([
+  // B53: who holds what, always visible. An admin editing a trophy has to be
+  // able to see that four hundred people are wearing it BEFORE they change it,
+  // not after somebody notices.
+  const { trophyHoldings } = await import("@/lib/trophy-admin");
+  const [trophies, brands, holdings] = await Promise.all([
     db.select().from(schema.trophies),
     db.select({ id: schema.brands.id, name: schema.brands.name, logoUrl: schema.brands.logoUrl })
       .from(schema.brands).orderBy(asc(schema.brands.name)),
+    trophyHoldings(db),
   ]);
   const brandName = new Map(brands.map((b) => [b.id, b.name]));
 
@@ -73,12 +78,12 @@ export default async function AdminTrophiesPage() {
               {list.length < 3 && " — the set isn't complete"}
             </span>
           </div>
-          <Grid trophies={list} brands={brands} brandName={brandName} />
+          <Grid trophies={list} brands={brands} brandName={brandName} holdings={holdings} />
         </section>
       ))}
 
       {branded.length > 0 && <h2 className="font-bold mb-3">General catalogue</h2>}
-      <Grid trophies={general} brands={brands} brandName={brandName} />
+      <Grid trophies={general} brands={brands} brandName={brandName} holdings={holdings} />
     </div>
   );
 }
@@ -86,11 +91,12 @@ export default async function AdminTrophiesPage() {
 type Trophy = typeof schema.trophies.$inferSelect;
 
 function Grid({
-  trophies, brands, brandName,
+  trophies, brands, brandName, holdings,
 }: {
   trophies: Trophy[];
   brands: { id: string; name: string }[];
   brandName: Map<string, string>;
+  holdings: Map<string, { holders: number; redeemed: number; bought: number }>;
 }) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -107,10 +113,36 @@ function Grid({
           )}
           {/* One form for both edits a trophy actually needs after it exists:
               what it's worth, and whose logo it carries. */}
+          {/* Who holds it, how many, and how many cashed out (B53).
+              Always on, not behind a disclosure: this is the fact that decides
+              whether an edit is safe. */}
+          {(() => {
+            const h = holdings.get(t.id);
+            return (
+              <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5 text-[10px]">
+                <span className={`rounded-full px-2 py-0.5 font-semibold ${h?.holders ? "bg-cyan-500/15 text-cyan-300" : "bg-white/5 text-muted"}`}>
+                  {h?.holders ?? 0} held
+                </span>
+                {!!h?.redeemed && (
+                  <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300">
+                    {h.redeemed} redeemed
+                  </span>
+                )}
+                {!!h?.bought && (
+                  <span className="rounded-full bg-violet-500/15 px-2 py-0.5 font-semibold text-violet-200">
+                    {h.bought} bought
+                  </span>
+                )}
+              </div>
+            );
+          })()}
           <form action={saveTrophy} className="mt-2 space-y-1.5">
             <input type="hidden" name="trophyId" value={t.id} />
-            <input type="hidden" name="name" value={t.name} />
-            <input type="hidden" name="imageUrl" value={t.imageUrl} />
+            <input name="name" defaultValue={t.name} className="input-cosmic !py-1 !px-2 text-xs w-full" placeholder="Name" title="Name — changes for every holder" />
+            <input name="imageUrl" defaultValue={t.imageUrl} className="input-cosmic !py-1 !px-2 text-[10px] w-full" placeholder="Image URL" title="Image — changes for every holder" />
+            <input name="title" defaultValue={t.title ?? ""} className="input-cosmic !py-1 !px-2 text-[11px] w-full" placeholder="Title (optional)" />
+            <textarea name="description" defaultValue={t.description ?? ""} rows={2}
+              className="input-cosmic !py-1 !px-2 text-[11px] w-full" placeholder="Description (optional)" />
             <input type="hidden" name="tier" value={t.tier} />
             <input type="hidden" name="game" value={t.game ?? ""} />
             <div className="flex items-center justify-center gap-1.5">
@@ -128,9 +160,20 @@ function Grid({
             </select>
             <button className="ghost-btn rounded-full px-2.5 py-1 text-[11px]">Save</button>
           </form>
-          <form action={deleteTrophy.bind(null, t.id)} className="mt-2">
-            <button className="text-xs text-rose-300 hover:underline">Delete</button>
-          </form>
+          {/* Delete, or the reason it is refused (B53).
+              A held trophy cannot be deleted: `user_trophies.trophyId` cascades,
+              so deleting one takes it off every winner's profile with no notice.
+              Everything else about it stays editable, which is the point — the
+              answer to "this trophy is wrong" is to fix it. */}
+          {holdings.get(t.id)?.holders ? (
+            <p className="mt-2 text-[10px] leading-relaxed text-muted">
+              Held by {holdings.get(t.id)!.holders} — cannot be deleted. Edit it instead; every holder sees the change.
+            </p>
+          ) : (
+            <form action={deleteTrophy.bind(null, t.id) as unknown as (fd: FormData) => Promise<void>} className="mt-2">
+              <button className="text-xs text-rose-300 hover:underline">Delete</button>
+            </form>
+          )}
         </div>
       ))}
     </div>
