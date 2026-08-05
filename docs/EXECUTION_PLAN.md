@@ -339,6 +339,7 @@ the remaining edits; Part II is the whole platform.
 | B52 | **Planet explore shows game identities** — in-game name, one row per account | `lib/planet-explore.ts`, `app/planets/[slug]/page.tsx` | wave 2 | ☐ |
 | B53 | **Admin owns every trophy, including the ones already held** | new `lib/trophy-admin.ts`, `/admin/trophies`, `app/actions/admin.ts`, `lib/db/schema.ts` | wave 2 (**money-touching**) | ☑ |
 | B54 | **The bot card design overhaul** — a card is a web page, not a poster. **Leads the Discord band: B3, B13, B14, B20, B27, B28 follow it** | `lib/cards/render.tsx`, `lib/cards/part-content.ts`, `lib/cards/data.ts` | wave 3 | ☐ |
+| B55 | **The platform is slow** — a live, structural performance defect on every surface | `app/admin/layout.tsx`, `lib/threads.ts`, `lib/cms.ts`, `lib/departments.ts`, `lib/planet-explore.ts`, `lib/providers/riot-lol-rich.ts` | **wave 2, ahead of everything** | ☐ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **S rows** are work that shipped without being planned — support the build
@@ -2952,6 +2953,125 @@ downstream of this.
 
 ---
 
+## B55 — The platform is slow, and it always has been
+
+Not a regression: it has been like this since day one, so it is structural.
+Everyone feels it — gamers, mods in the console, server owners, brands — and
+admin is the worst.
+
+**Seven causes. All seven were checked against the file before this was written,
+and two of them were not quite what the report said.** Both corrections are
+recorded here rather than discovered mid-fix.
+
+### B55.1 A badge that scans the whole message table — CONFIRMED, and worse
+
+`app/admin/layout.tsx:40-44` calls `adminInbox()` to compute ONE number: how
+many threads have anything unread. `adminInbox` (`lib/threads.ts:153`) fans out
+to two queries:
+
+- `serverThreads` → `lib/server-messages.ts:171` `inbox()`, which selects
+  **every column including `body`** with `.limit(2000)` and groups in JS;
+- `brandThreads` (`lib/threads.ts:175`) — **no limit at all**, joined to
+  `brands`, also selecting bodies.
+
+Megabytes over the wire, on every admin page load, to render a number. Two
+`count(distinct …)` queries replace it. This is the single biggest win and it
+gets worse every day the tables grow.
+
+### B55.2 Nothing in the chrome is per-request cached except the user — CONFIRMED
+
+`getCurrentUser` and `getSession` correctly use React `cache()`
+(`lib/auth.ts:84`, `:37`). These do not: `getContent` (`lib/cms.ts:227`),
+`currentAccess` (`lib/departments.ts:118`), `getStaffGrants`
+(`lib/permissions.ts:12`), `countPendingRequests`
+(`lib/challenge-requests.ts:145`), `adminInbox` (`lib/threads.ts:153`).
+
+`getContent` alone runs **five times per render** — `app/layout.tsx:37`,
+`app/layout.tsx:86`, `components/Nav.tsx:108`, `components/Footer.tsx:16`,
+`components/FloatingOrbs.tsx:23` — five separate reads of the same
+`platform_settings` table.
+
+### B55.3 Every query is its own HTTPS round trip — CONFIRMED
+
+`lib/db/index.ts:884` uses `drizzle-orm/neon-http`: no pooling, no pipelining.
+Each query is a fresh HTTPS request. **This is not fixed by swapping the
+driver** — it is fixed by making fewer queries, which is what B55.1 and B55.2
+do. Anything still sequential that could be `Promise.all` goes with them.
+
+### B55.4 The admin layout re-runs on every tab — CORRECTED
+
+The report says `headers()` at `app/admin/layout.tsx:72` forces the layout
+dynamic, and that removing it makes tab switching instant.
+
+**`headers()` is not the only thing making it dynamic.** Line 21 calls
+`getCurrentUser()`, which reads `cookies()` — and an admin layout must know who
+you are, so it cannot stop. Removing `headers()` alone therefore does **not**
+make this layout static or cacheable.
+
+So the fix is measured, not assumed: instrument first, establish whether a
+sibling navigation actually re-runs the layout, and only then decide whether
+moving the check is worth it. **The guard does not weaken either way** —
+`/admin/users` and `/admin/linked-accounts` stay admin-only and no department
+reaches them, which `tests/db/taxonomy.mts` already asserts and which must still
+pass afterwards.
+
+### B55.5 The badges block the nav — CONFIRMED
+
+Both counts are awaited before the rail renders. Behind `<Suspense>`, the nav
+paints and the numbers arrive.
+
+### B55.6 Planet explore pulls unbounded rows — CONFIRMED
+
+`lib/planet-explore.ts:45` selects **every** `linked_game_accounts` row for the
+game joined to `users`, with no limit; `:65` selects **every** `stat_current`
+row for the game across every tracked metric, also unlimited. Both are grouped
+in JS to render a short list. `app/api/planet/gamer/route.ts` limits to 60; the
+page path does not.
+
+### B55.7 Riot: ~9 uncached external calls per view — CONFIRMED, cause corrected
+
+`rj()` (`lib/providers/riot-lol-rich.ts:9`) sets `cache: "no-store"`, so nothing
+uses Next's fetch cache. One snapshot is: summoner + mastery + match-ids
+(`:106-108`, parallel) + **five match details** (`:126`) + spectator = **nine
+calls**, each with a 7–8s timeout.
+
+**The "cached 6h" comment is not a lie, it is pointing at a different function.**
+`matchCache` (`:88`, 6h, used at `:205`/`:240`) belongs to
+`getLolMatchDetail` — the click-through view. The card path calls
+`matchSummaryFor` (`:157`) → `getMatchRaw` (`:195`) **directly, with no cache
+lookup at all**. There is also a `snapCache` (`:87`) at 5 minutes.
+
+And both are **in-process `Map`s**, which do not survive between serverless
+invocations. On Vercel a cold lambda has an empty cache, so most views pay all
+nine calls.
+
+This is external latency: no database change touches it. Serve the stored
+`statCurrent` snapshot immediately and refresh in the background (the sync cron
+exists), or put the rich card behind `<Suspense>` so the profile paints without
+waiting on Riot. **A gamer must never stare at a blank card while we talk to
+Riot nine times.**
+
+### B55.8 Measurement is part of the item
+
+A performance fix with no before/after is a claim, not a result. Query count and
+wall time are recorded for a representative page on every surface — public,
+feed, admin, brand portal, server portal — before and after, and the numbers go
+in the commit message. **B55.6 and B55.7 are measured separately from the
+page-render fixes**, because they have different causes and it must be visible
+which change bought which improvement.
+
+**Verification owed → `tests/db/perf.mts` + the existing suites:**
+- The unread badge issues a bounded number of queries and reads no message body.
+- `getContent` called five times in one render issues one query.
+- Planet explore is bounded however many accounts exist.
+- **`tests/db/taxonomy.mts` still passes** — caching is exactly the kind of
+  change that builds cleanly and breaks an authorization boundary.
+
+**Shots owed:** none.
+**New routes:** none.
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -2974,6 +3094,8 @@ downstream of this.
 | B29 | rescoped | Already honoured in practice: `/admin/shots`, `/admin/email`, `/admin/cp-calculator` and `/admin/growth-review` all carry a `system:` key in `lib/admin-nav.ts`. What remains is the AUDIT and the assertion, not a retrofit. |
 | V0.1 | ".scratch holds twelve legacy suites, ~390 assertions" | **Checked: they are not there.** `.scratch/` holds 72 files; none of the twelve named exist, and the 33 scripts present carry **zero** `ok()`/`eq()` assertions — they are `console.log` probes named after build items. Nothing was at risk. `tests/run-all.mjs` + `npm test` added over the seven real suites instead. |
 | B34, V0.1 | the twelve legacy suites arrived from the other container | **Correction to my own earlier finding.** `.scratch/` is gitignored, so the suites lived only in the OTHER session's container and were never in this clone — my report ("only my own probes here") was true of this machine and not of the work. Commit `1e08929` moved all twelve in: 12 new files, zero modifications (`git show --diff-filter=M` empty). Two needed fixing and neither was a product defect: `marketplace.mts`'s `grantCp` wrote `userQuestProgress.qp`, which **B34.2 stopped being the source of truth** — CP moved to the `quest_events` ledger and `getTotalCp` sums `CP_PAID` — so the wallet read zero and sixteen assertions failed behind one broken fixture. Fixed the FIXTURE, not the assertions. Three more hardcoded pre-B34 CP figures (5,000 and 200,000) now derive from `DEFAULT_CP_PER_DOLLAR`. `bot-growth.mts` needs a running server for one block; it probes and skips rather than failing. |
+| B55.4 | "reading headers() forces the layout dynamic" | **Corrected before building.** True but not sufficient: `app/admin/layout.tsx:21` calls `getCurrentUser()`, which reads `cookies()`, so the layout is dynamic regardless. Removing `headers()` alone does not make it static. Measured rather than assumed. |
+| B55.7 | "the comments claim matches are cached 6h — check whether that caching actually happens" | **Checked: it happens, in a function the card never calls.** `matchCache` (6h) is used only by `getLolMatchDetail`, the click-through. The card path goes `matchSummaryFor` → `getMatchRaw` with no cache lookup. Both caches are in-process `Map`s and do not survive a cold lambda. |
 | — | *(next amendment here)* | |
 
 ---
