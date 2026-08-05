@@ -217,3 +217,85 @@ export async function saveCampaigns(_prev: OfferActionState, fd: FormData): Prom
       : "Saved. The brand campaign is OFF — new invoices bill at full price.",
   };
 }
+
+// ===== The admin side of the welcome challenge (B43) =====
+//
+// Every one of these is audit-logged with who and what, because they move
+// money: completing one commits a prize pool already on Cluster's bill, and
+// cancelling one voids a line on an invoice somebody will later reconcile.
+
+async function logWelcome(adminId: string, action: string, challengeId: string, meta: Record<string, unknown>) {
+  try {
+    const db = await getDb();
+    const { uid } = await import("@/lib/utils");
+    await db.insert(schema.auditLog).values({
+      id: uid(), adminId, action, targetType: "challenge", targetId: challengeId, meta,
+    } as never);
+  } catch { /* the action succeeded; a missing log entry must not undo it */ }
+}
+
+/** Admin picks the game a stuck draft runs on. Still a draft afterwards. */
+export async function adminCompleteWelcome(_prev: OfferActionState, fd: FormData): Promise<OfferActionState> {
+  const access = await requireSystemFor("/admin/offers");
+  const challengeId = String(fd.get("challengeId") ?? "");
+  const game = String(fd.get("game") ?? "").trim();
+  if (!challengeId || !game) return { error: "Pick a game." };
+
+  const { completeWelcome } = await import("@/lib/welcome-admin");
+  const res = await completeWelcome(challengeId, game);
+  if (!res.ok) {
+    return { error: res.reason === "no_provider"
+      ? `We cannot verify scores on ${game}, so a competition on it would not have a leaderboard.`
+      : res.reason === "no_planet" ? `There is no planet for ${game} yet.`
+      : res.reason === "not_a_draft" ? "That one is not a draft any more."
+      : "Couldn't complete it." };
+  }
+  await logWelcome(access.user.id, "welcome.complete", challengeId, { game });
+  revalidatePath("/admin/offers");
+  revalidatePath("/admin/challenges");
+  return { ok: `Set to ${game}. It is still a draft — publish it from Challenges when it reads right.` };
+}
+
+/** Cancel a draft nobody is going to finish. The invoice line is voided. */
+export async function adminCancelWelcome(_prev: OfferActionState, fd: FormData): Promise<OfferActionState> {
+  const access = await requireSystemFor("/admin/offers");
+  const challengeId = String(fd.get("challengeId") ?? "");
+  const reason = String(fd.get("reason") ?? "").trim() || "no game we could run it on";
+  if (!challengeId) return { error: "No challenge named." };
+
+  const { cancelWelcome } = await import("@/lib/welcome-admin");
+  const res = await cancelWelcome(challengeId, reason);
+  if (!res.ok) {
+    return { error: res.reason === "already_ran"
+      ? "That one has already run — cancelling it would rewrite history."
+      : "Couldn't cancel it." };
+  }
+  await logWelcome(access.user.id, "welcome.cancel", challengeId, { reason });
+  revalidatePath("/admin/offers");
+  return { ok: "Cancelled. Its invoice line is voided, not deleted, and the server can be offered one again." };
+}
+
+/** Create one for any server, at any time (B43.2). */
+export async function adminCreateWelcome(_prev: OfferActionState, fd: FormData): Promise<OfferActionState> {
+  const access = await requireSystemFor("/admin/offers");
+  const guildId = String(fd.get("guildId") ?? "").trim();
+  const game = String(fd.get("game") ?? "").trim();
+  if (!guildId || !game) return { error: "Pick a server and a game." };
+
+  const state = await offers();
+  const value = Number(fd.get("value") ?? 0) || state.campaign.server.value;
+
+  const { createWelcomeFor } = await import("@/lib/welcome-admin");
+  const res = await createWelcomeFor(guildId, game, value);
+  if (!res.ok) {
+    return { error: res.reason === "already_has_one"
+      ? "That server already has a welcome challenge. Cancel it first if it is stuck."
+      : res.reason === "no_provider" ? `We cannot verify scores on ${game}.`
+      : res.reason === "no_planet" ? `There is no planet for ${game} yet.`
+      : res.reason === "no_guild" ? "No such server."
+      : "Couldn't create it." };
+  }
+  await logWelcome(access.user.id, "welcome.create", res.challengeId, { guildId, game, value });
+  revalidatePath("/admin/offers");
+  return { ok: `Drafted a ${game} welcome challenge, billed to Cluster at $${value}.` };
+}

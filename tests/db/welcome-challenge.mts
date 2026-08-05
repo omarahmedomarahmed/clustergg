@@ -183,6 +183,99 @@ ok("…and the owner DM says it is waiting, not live",
 ok("billing can never fail the grant",
   /catch \{ \/\* reconcilable/.test(src));
 
+console.log("\n== B43: the draft is on the ADMIN side from the moment it exists ==");
+// B31 assumed the owner would log in and pick a game. Many never will, and a
+// draft only its owner can finish is a cost already booked against a
+// competition that never runs.
+const { welcomeChallenges, completeWelcome, cancelWelcome, createWelcomeFor } =
+  await import("../../lib/welcome-admin.ts");
+const queue = await welcomeChallenges();
+const mine = queue.find((w) => w.challengeId === ch.id);
+ok("it is in the admin list", !!mine, JSON.stringify(queue.map((w) => w.challengeId)));
+eq("…named by its server", mine?.serverName, `Draftable ${tag}`);
+eq("…with its state", mine?.state, "ready");
+eq("…and shown as billed", mine?.billed, true);
+ok("every row says what it is worth", queue.every((w) => typeof w.value === "number"));
+
+console.log("\n== a draft nobody can run says WHY, not nothing ==");
+// The difference between a work queue and an inventory.
+const stuckGuild = await mkGuild([game], `Stuck ${tag}`);
+const stuckRes = await grantWelcomeChallenge(stuckGuild);
+ok("it is drafted", stuckRes.ok, JSON.stringify(stuckRes));
+// Break it the way reality does: a game we cannot verify scores on.
+await db.update(schema.challenges).set({ game: "A Game We Cannot Read" })
+  .where(sqlEq(schema.challenges.id, stuckRes.ok ? stuckRes.challengeId : ""));
+const q2 = await welcomeChallenges();
+const broken = q2.find((w) => w.challengeId === (stuckRes.ok ? stuckRes.challengeId : ""));
+eq("its state is needs_game", broken?.state, "needs_game");
+ok("…and the blocker names the problem", (broken?.blocker ?? "").length > 20, broken?.blocker ?? "");
+ok("…and says whether the owner ever told us anything",
+  typeof broken?.ownerOnboarded === "boolean");
+
+console.log("\n== admin completing it produces the SAME challenge, still a draft ==");
+const completed = await completeWelcome(broken!.challengeId, game);
+ok("it completes", completed.ok, JSON.stringify(completed));
+const [after] = await db.select().from(schema.challenges)
+  .where(sqlEq(schema.challenges.id, broken!.challengeId)).limit(1);
+eq("the game is set", after.game, game);
+eq("…on the SAME challenge, not a second one", after.id, broken!.challengeId);
+eq("…and it is STILL a draft", after.status, "draft");
+eq("…so a welcome challenge does not skip approval", after.kind, "welcome");
+// A game we cannot verify is refused rather than accepted and left broken.
+eq("an unverifiable game is refused",
+  (await completeWelcome(broken!.challengeId, "Nonsense Game")).ok, false);
+
+console.log("\n== cancelling VOIDS the line, never deletes it ==");
+// A bill that quietly loses a row is a bill that stops reconciling.
+const lineBefore = await db.select().from(schema.invoiceLines)
+  .where(sqlEq(schema.invoiceLines.sourceId, broken!.challengeId));
+eq("it had a line", lineBefore.length, 1);
+const cancelled = await cancelWelcome(broken!.challengeId, "they never told us what they play");
+ok("it cancels", cancelled.ok, JSON.stringify(cancelled));
+const [cch] = await db.select().from(schema.challenges)
+  .where(sqlEq(schema.challenges.id, broken!.challengeId)).limit(1);
+eq("the challenge is cancelled", cch.status, "cancelled");
+ok("…and says why, on the record", /never told us what they play/.test(cch.description ?? ""), cch.description ?? "");
+const voided = await db.select().from(schema.invoiceLines)
+  .where(sqlEq(schema.invoiceLines.sourceId, broken!.challengeId));
+eq("THE LINE STILL EXISTS", voided.length, 1);
+eq("…at zero", Number(voided[0].unitAmount), 0);
+ok("…and labelled as cancelled", /cancelled/i.test(voided[0].label), voided[0].label);
+// The server can be offered one again — that is what B43.2 is for.
+const [freed] = await db.select().from(schema.discordGuilds)
+  .where(sqlEq(schema.discordGuilds.guildId, stuckGuild)).limit(1);
+eq("the server is free to receive another", freed.welcomeChallengeId, null);
+
+console.log("\n== a challenge that already RAN cannot be cancelled ==");
+await db.update(schema.challenges).set({ status: "active" }).where(sqlEq(schema.challenges.id, ch.id));
+eq("cancelling a running one is refused",
+  await cancelWelcome(ch.id, "changed my mind"), { ok: false, reason: "already_ran" });
+await db.update(schema.challenges).set({ status: "draft" }).where(sqlEq(schema.challenges.id, ch.id));
+
+console.log("\n== B43.2: admin can create one for a server with no draft ==");
+const recreated = await createWelcomeFor(stuckGuild, game, 30);
+ok("it is created", recreated.ok, JSON.stringify(recreated));
+const [made] = await db.select().from(schema.challenges)
+  .where(sqlEq(schema.challenges.id, recreated.ok ? recreated.challengeId : "")).limit(1);
+eq("…as a draft", made.status, "draft");
+eq("…of the welcome kind", made.kind, "welcome");
+eq("…private to that server", [made.visibility, made.guildId], ["private", stuckGuild]);
+eq("…at the value admin chose, not the default", Number(made.sponsorPrice), 30);
+const madeLine = await db.select().from(schema.invoiceLines)
+  .where(sqlEq(schema.invoiceLines.sourceId, made.id));
+eq("…and billed exactly like the automatic one", madeLine.length, 1);
+eq("…at that value", Number(madeLine[0].unitAmount), 30);
+// One at a time: a second would be billed as a second.
+eq("a server that already has one is refused",
+  (await createWelcomeFor(stuckGuild, game, 30)), { ok: false, reason: "already_has_one" });
+
+console.log("\n== a welcome challenge is private in every surface ==");
+const everyWelcome = await db.select().from(schema.challenges)
+  .where(sqlEq(schema.challenges.kind, "welcome"));
+ok("every one is private", everyWelcome.every((c) => c.visibility === "private"),
+  JSON.stringify(everyWelcome.filter((c) => c.visibility !== "private").map((c) => c.id)));
+ok("…and scoped to a guild", everyWelcome.every((c) => !!c.guildId));
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);
