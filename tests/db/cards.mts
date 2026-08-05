@@ -291,6 +291,22 @@ console.log("\n== the clamps follow the column, they do not stay where they were
   eq("…once per body", shadowed, (render.match(/^  const t = d\.theme;$/gm) ?? []).length);
 }
 
+console.log("\n== a FIXED-WIDTH box does not clamp by the column ==");
+// The scaled clamp caused a regression the moment it landed, and only a render
+// showed it: a market tile is 218px wide whatever the content column is doing,
+// so widening its name limit from 17 to 23 let "Champion's Nebula Cup" through,
+// wrap to two lines, and land on top of the GOLD label under it.
+ok("there is an unscaled clamp", /function clampAt\(s: string \| null \| undefined/.test(render));
+ok("…and the scaled one is built on it", /=> clampAt\(s, Math\.round\(max \* k\)\)/.test(render));
+ok("the market tile uses the unscaled one", /\{clampAt\(x\.name, 17\)\}/.test(render));
+ok("…and says why", /this tile is 218px/.test(render));
+// The shelf itself was `TILE_W * 3 + 24` — three because three fitted the
+// column it was written against, leaving 460 empty pixels once it widened.
+ok("the shelf counts the columns that fit", /const COLS = Math\.max\(2, Math\.min\(4/.test(render));
+ok("…from the EFFECTIVE column, so a sold card narrows the shelf too",
+  /contentBoxFor\(t\.layout \?\? DEFAULT_LAYOUT, !!t\.ad\)\.width/.test(render));
+ok("…and shows a whole number of rows", /slice\(0, COLS \* 2\)/.test(render));
+
 console.log("\n== a challenge with no cover falls back to its GAME's art ==");
 ok("the chain reaches the game", /g\?\.planetBgUrl \|\| g\?\.coverUrl \|\| bg\.bgUrl/.test(
   await readFile(new URL("../../lib/cards/data.ts", import.meta.url), "utf8")));

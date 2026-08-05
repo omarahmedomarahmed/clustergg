@@ -635,6 +635,9 @@ const nf = (n: number) => n.toLocaleString("en-US");
  * body that hasn't been converted keeps the unscaled module function, which is
  * exactly what it drew before.
  */
+/** The column-scaled clamp is the default; `clampAt` is the unscaled one. */
+const clamp = clampAt;
+
 function clampFor(t: CardTheme) {
   const l = t.layout ?? DEFAULT_LAYOUT;
   // The EFFECTIVE width, not the stored one: a sold card's column is narrowed
@@ -642,10 +645,19 @@ function clampFor(t: CardTheme) {
   // every line a third more characters than the column can hold.
   const w = (contentBoxFor(l, !!t.ad).width / CANVAS_W) * 100;
   const k = Math.max(0.6, Math.min(1.8, w / 58.5));
-  return (s: string | null | undefined, max: number) => clamp(s, Math.round(max * k));
+  return (s: string | null | undefined, max: number) => clampAt(s, Math.round(max * k));
 }
 
-function clamp(s: string | null | undefined, max: number): string | undefined {
+/**
+ * The raw clamp, in characters, with no column scaling.
+ *
+ * Use this inside a FIXED-WIDTH box — a market tile is 218px whatever the
+ * content column is doing, and scaling its name clamp with the column is how
+ * "Champion's Nebula Cup" came back: 21 characters passed a limit that had been
+ * widened from 17 to 23 for a column the tile does not live in, wrapped to two
+ * lines, and landed on top of the tier label under it.
+ */
+function clampAt(s: string | null | undefined, max: number): string | undefined {
   if (!s) return undefined;
   const text = s.trim();
   if (text.length <= max) return text;
@@ -1274,9 +1286,17 @@ function MarketBody(d: MarketCard) {
   // the canvas: the ad slot owns the top-right, so a tile wide enough to look
   // right against 1200px wraps to two-per-row and pushes the second row off the
   // bottom — which is exactly what the first draft did.
-  const shown = (d.trophies ?? []).slice(0, 6);
   const TILE_W = 218;
   const TILE_H = 138;
+  const GAP = 12;
+  // How many fit, rather than three because three fitted once. The row was
+  // `TILE_W * 3 + 24` — right for the 703px column it was written against, and
+  // 460 empty pixels on the right once B54 widened it to 936. Taken from the
+  // EFFECTIVE column, so a sold card drops to two per row instead of running
+  // its shelf under the creative.
+  const columnW = contentBoxFor(t.layout ?? DEFAULT_LAYOUT, !!t.ad).width;
+  const COLS = Math.max(2, Math.min(4, Math.floor((columnW + GAP) / (TILE_W + GAP))));
+  const shown = (d.trophies ?? []).slice(0, COLS * 2);
 
   return (
     <Frame theme={t}>
@@ -1305,7 +1325,7 @@ function MarketBody(d: MarketCard) {
         </Section>
       ) : (
         <Section p={pTiles}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, width: TILE_W * 3 + 24 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: GAP, width: TILE_W * COLS + GAP * (COLS - 1) }}>
             {shown.map((x, i) => (
               <div key={x.id} style={{
                 display: "flex", flexDirection: "column", width: TILE_W, height: TILE_H,
@@ -1338,8 +1358,10 @@ function MarketBody(d: MarketCard) {
                 {/* No fixed height: clipping a box to hold one line cut the
                     descenders off every name with a p or a y in it. The clamp
                     keeps it to one line instead, which is the actual goal. */}
+                {/* `clampAt`, not the column-scaled clamp: this tile is 218px
+                    wide whatever the content column is doing. */}
                 <div style={{ display: "flex", fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>
-                  {clamp(x.name, 17)}
+                  {clampAt(x.name, 17)}
                 </div>
                 {/* No fixed height here either. It held today because the tier
                     words are uppercase and have no descenders — which is a
