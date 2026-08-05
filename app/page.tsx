@@ -25,7 +25,7 @@ import { timeAgo } from "@/lib/utils";
 import { networkStats, publicServers } from "@/lib/network";
 import { DiscordSection } from "@/components/DiscordSection";
 import { botShowcaseSteps } from "@/lib/bot-showcase";
-import { installUrl } from "@/lib/discord/config";
+import { installHref } from "@/lib/discord/config";
 import { OrganizationSchema, WebSiteSchema, BotSchema, FaqSchema, SEARCH_FAQ } from "@/components/StructuredData";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export default async function LandingPage() {
   const [network, topServers, botSteps, pricing] = await Promise.all([
     networkStats(), publicServers(6), botShowcaseSteps(), pricingLive(),
   ]);
-  const install = installUrl();
+  const install = installHref();
   const c = await getContent([
     "discord.badge", "discord.title", "discord.subtitle",
     "discord.cta.primary", "discord.cta.secondary",

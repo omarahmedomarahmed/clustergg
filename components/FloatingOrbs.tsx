@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getUserQuests } from "@/lib/quests";
 import { getContent } from "@/lib/cms";
-import { installUrl } from "@/lib/discord/config";
+import { installHref } from "@/lib/discord/config";
 import { networkStats } from "@/lib/network";
 import FloatingQuestOrb, { type OrbQuest } from "@/components/FloatingQuestOrb";
 import OrbRail from "@/components/OrbRail";
@@ -35,7 +35,7 @@ export default async function FloatingOrbs() {
 
   const questSize = clamp(c["brand.orb.size"], 44, 140, 72);
   const discordSize = clamp(c["brand.discordOrb.size"], 44, 140, 72);
-  const install = installUrl();
+  const install = installHref();
 
   // The quest orb needs a signed-in gamer with quests; the Discord orb needs an
   // install URL. Either can be absent without affecting the other.

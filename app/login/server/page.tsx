@@ -2,7 +2,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import PortalLogin from "@/components/PortalLogin";
 import { MAX_FAILURES } from "@/lib/portal-auth";
-import { installUrl } from "@/lib/discord/config";
+import { installHref } from "@/lib/discord/config";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -19,7 +19,7 @@ export default async function ServerLoginPage({
   searchParams,
 }: { searchParams: Promise<{ slug?: string; name?: string }> }) {
   const { slug = "", name = "" } = await searchParams;
-  const install = installUrl();
+  const install = installHref();
   return (
     <div className="mx-auto max-w-md px-4 py-16 sm:py-20">
       <div className="glass p-6 sm:p-8">

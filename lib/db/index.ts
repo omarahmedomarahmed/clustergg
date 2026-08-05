@@ -746,6 +746,11 @@ const COLUMN_MIGRATIONS = [
   // complete, and therefore for the revenue share to pay out.
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "contact_email" text`,
   `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "tier_unlocked_at" timestamptz`,
+  // Who brought us this server (B22). The gamer who clicked "add the bot" and
+  // completed the install, when there was a signed-in one — null when the
+  // install came from Discord's own App Directory button or from somebody with
+  // no Cluster account, which is the common case and not a failure.
+  `ALTER TABLE "discord_guilds" ADD COLUMN IF NOT EXISTS "installed_by_user_id" text`,
 
   // The email delivery log (B32). A row per attempt, including the ones skipped
   // because mail is not configured — "we never sent it" is an answer a human

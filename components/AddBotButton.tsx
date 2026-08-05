@@ -1,5 +1,5 @@
 import BrandGlyph from "@/components/BrandGlyph";
-import { installUrl } from "@/lib/discord/config";
+import { installHref } from "@/lib/discord/config";
 
 // "Add ClusterBot to your server".
 //
@@ -12,7 +12,7 @@ import { installUrl } from "@/lib/discord/config";
 export default function AddBotButton({
   size = "md", className = "", label,
 }: { size?: "sm" | "md" | "lg"; className?: string; label?: string }) {
-  const href = installUrl() ?? "/discord-bot";
+  const href = installHref() ?? "/discord-bot";
   const pad = size === "sm" ? "px-3.5 py-1.5 text-xs" : size === "lg" ? "px-7 py-3 text-base" : "px-5 py-2.5 text-sm";
   const glyph = size === "sm" ? 15 : size === "lg" ? 22 : 18;
 

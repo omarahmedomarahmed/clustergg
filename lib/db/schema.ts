@@ -946,6 +946,16 @@ export const discordGuilds = pgTable("discord_guilds", {
    */
   tierUnlockedAt: timestamp("tier_unlocked_at", { withTimezone: true, mode: "date" }),
   /**
+   * The gamer who brought us this server (B22).
+   *
+   * Deliberately NOT a foreign key: the credit is a historical fact about how
+   * this server arrived, and it should survive the gamer deleting their account
+   * rather than cascading away and rewriting how we got here. Null is the
+   * ordinary case — Discord's own "Add App" button carries no state, and most
+   * installers have no Cluster account at all.
+   */
+  installedByUserId: text("installed_by_user_id"),
+  /**
    * When this server's funded welcome challenge was created.
    *
    * Null means it is owed one — including for every server that installed the

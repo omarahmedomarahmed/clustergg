@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { getContent } from "@/lib/cms";
-import { appId, installUrl } from "@/lib/discord/config";
+import { appId, installHref } from "@/lib/discord/config";
 import { BOT_LISTS, BOT_LIST_CMS_KEYS, VOTE_COOLDOWN_HOURS, voteLinks } from "@/lib/botlists";
 import { ACTION_CATALOG } from "@/lib/quests";
 
@@ -80,8 +80,8 @@ export default async function VotePage() {
           <p className="mt-3 text-sm leading-relaxed text-muted">
             The thing that helps most in the meantime is the bot being in more servers.
           </p>
-          {installUrl() && (
-            <a href={installUrl()!} className="cta-btn pressable mt-4 inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold">
+          {installHref() && (
+            <a href={installHref()!} className="cta-btn pressable mt-4 inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-sm font-semibold">
               <Icon name="rocket" size={15} /> Add Cluster to your server
             </a>
           )}

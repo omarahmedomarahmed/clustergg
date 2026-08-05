@@ -25,11 +25,23 @@ export async function GET(req: NextRequest) {
   // Creating a channel and pinning ~9 guide PNGs takes longer than a browser
   // redirect should, so the owner lands on the site immediately and the setup
   // finishes behind them.
+  // Credit the gamer who brought us this server (B22). Read here, in the
+  // request, because `state` lives on the URL and `after` runs without it.
+  const state = q.get("state");
+
   after(async () => {
     try {
       const summary = await guildSummary(guildId);
       await onboardGuild(guildId, summary?.guild.owner_id);
     } catch { /* the owner can re-run /cluster show:admin to retry */ }
+    // AFTER onboarding, so the guild row exists and the credit lands on it
+    // rather than on a stub. `creditInstall` never throws and never blocks —
+    // an install that onboarded and failed to pay is a support ticket; an
+    // install that failed because the payment threw is a lost server.
+    try {
+      const { creditInstall } = await import("@/lib/discord/install-credit");
+      await creditInstall(guildId, state);
+    } catch { /* non-fatal, by construction */ }
   });
 
   return NextResponse.redirect(`${site}/discord-bot?installed=1&guild=${encodeURIComponent(guildId)}`);

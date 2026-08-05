@@ -83,7 +83,14 @@ export function siteUrl(): string {
 //   Send in Threads   2^38
 export const BOT_PERMISSIONS = "277025647696";
 
-export function installUrl(): string | null {
+/**
+ * @param state Optional signed attribution token (B22). Discord returns `state`
+ * untouched on the redirect, which is the only way to know WHICH gamer brought
+ * us a server — an OAuth callback has no session of its own. Omitted for the
+ * links rendered into public pages, which are cached and must not carry one
+ * gamer's token to the next visitor; `/api/discord/install` mints it per click.
+ */
+export function installUrl(state?: string | null): string | null {
   const id = appId();
   if (!id) return null;
   const redirect = `${siteUrl()}/api/discord/installed`;
@@ -94,7 +101,24 @@ export function installUrl(): string | null {
     response_type: "code",
     redirect_uri: redirect,
   });
+  if (state) q.set("state", state);
   return `https://discord.com/oauth2/authorize?${q}`;
+}
+
+/**
+ * The link every BUTTON on the site should point at (B22).
+ *
+ * Not the Discord URL — our own route, which mints a per-click attribution
+ * token for whoever is signed in and then redirects. Public pages are cached,
+ * so a Discord URL rendered into one would freeze the first visitor's token
+ * into the HTML and credit them for every install after it. A route cannot be
+ * frozen that way.
+ *
+ * `installUrl()` stays for the two places that need the literal OAuth URL: the
+ * admin page that shows it for the Discord portal, and this route itself.
+ */
+export function installHref(): string | null {
+  return appId() ? "/api/discord/install" : null;
 }
 
 // Shared secret for server-to-server bot endpoints, mirroring the CRON_SECRET
