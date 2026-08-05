@@ -21,6 +21,15 @@ export const users = pgTable("users", {
   bannerUrl: text("banner_url"),
   bio: text("bio"),
   country: text("country"),           // ISO-3166 alpha-2 (e.g. "EG") → flag shown next to the name everywhere
+  /**
+   * Date of birth, asked for ONCE and only when it is needed (B37).
+   *
+   * Not collected at signup: playing has no age gate here, being PAID does, and
+   * a birthday field on a signup form is a field most people lie in and all of
+   * them resent. It is asked for at the first redemption, where the reason for
+   * asking is self-evident.
+   */
+  birthDate: timestamp("birth_date", { withTimezone: true, mode: "date" }),
   locale: text("locale").notNull().default("en"), // "en" | "ar" — the gamer's chosen site language
   title: text("title"), // flex title shown under the name (e.g. "Blitz Grandmaster")
   role: text("role").notNull().default("user"), // user | admin | superadmin | brand
@@ -620,6 +629,15 @@ export const trophies = pgTable("trophies", {
    */
   cpPrice: integer("cp_price").notNull().default(0),
   inMarketplace: boolean("in_marketplace").notNull().default(true),
+  /**
+   * The line under the name, and the story behind it (B53).
+   *
+   * Both propagate to everyone already holding the trophy, because a trophy is
+   * one object shown in many places — a holding stores only `trophyId`, so
+   * there is nothing per-gamer to go stale.
+   */
+  title: text("title"),
+  description: text("description"),
 });
 
 /**
@@ -1635,6 +1653,54 @@ export const featureShots = pgTable("feature_shots", {
 // $1,000", and "we never sent it because nobody set the API key" is an answer.
 // A layer that silently does nothing when it is switched off teaches you to
 // trust it exactly when it is doing the least.
+/**
+ * One row per (announcement, server) waiting to be posted (B33).
+ *
+ * The unit of retry is ONE SERVER, not one announcement. A fan-out where the
+ * fortieth guild has revoked the channel must not re-post to the first
+ * thirty-nine, and a rate limit on one server must not stall the rest.
+ *
+ * Why a queue at all: `announce()` posted to every guild sequentially, awaiting
+ * each call, from inside server actions that declare no `maxDuration`. At ~200ms
+ * a call that is 20 seconds at 100 servers and three minutes at 1,000, inside a
+ * request killed long before — and the failure was SILENT and PARTIAL, because
+ * the ledger checkpoints every ten servers and therefore recorded a
+ * plausible-looking number and stopped. It read as "reach was lower than
+ * expected" rather than "the process was killed".
+ *
+ * Parallelising instead would have traded a slow failure for a rate-limit ban,
+ * which is worse.
+ */
+export const discordPostQueue = pgTable("discord_post_queue", {
+  id: id(),
+  /** Groups every row of one fan-out, so a batch can be reported on. */
+  batchId: text("batch_id").notNull(),
+  channelId: text("channel_id").notNull(),
+  guildId: text("guild_id"),
+  /**
+   * The finished message for THIS server.
+   *
+   * Built at enqueue rather than at drain, because the sponsor row under an
+   * announcement is minted per recipient — rebuilding it later would attribute
+   * a click to the wrong server.
+   */
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  /** Set when this fan-out counts toward a challenge's reach. */
+  ledgerChallengeId: text("ledger_challenge_id"),
+  ledgerKind: text("ledger_kind"),
+  /** pending | done | failed */
+  status: text("status").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  /** Backoff, and how a 429 reschedules instead of dropping. */
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  postedAt: timestamp("posted_at", { withTimezone: true, mode: "date" }),
+  createdAt: now("created_at"),
+}, (t) => [
+  index("dpq_drain_idx").on(t.status, t.nextAttemptAt),
+  index("dpq_batch_idx").on(t.batchId),
+]);
+
 export const emailLog = pgTable("email_log", {
   id: id(),
   /** Who it went to. */

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { BANNER_ART } from "@/lib/assets";
@@ -224,6 +225,32 @@ const TEXT_VALUE = {
 // falls back to English → the site is never blank while translation is ongoing).
 // The locale is auto-resolved from the request cookie so callers don't change;
 // pass `localeOverride` to force one (e.g. the admin translation editor).
+/**
+ * Every setting, once per request (B55.2).
+ *
+ * `getContent` was five separate queries on an ordinary page render —
+ * `app/layout.tsx` twice, plus Nav, Footer and FloatingOrbs — and measurement
+ * put `platform_settings` at the top of every surface: 30 reads on `/admin`,
+ * **61 on the brand portal**, more than any other table by a wide margin.
+ *
+ * Wrapping `getContent` itself in `cache()` would have fixed almost nothing.
+ * React's `cache()` keys on the ARGUMENTS, and every caller passes a different
+ * list of keys — five calls, five key arrays, five cache entries, five queries.
+ * The dedupe has to happen one level down, on a call that takes no arguments.
+ *
+ * So: read the whole table once and slice from it. `platform_settings` is site
+ * chrome — branding, toggles, a few ids — measured at well under a thousand
+ * rows, which is far cheaper to fetch once than to query five times over
+ * `neon-http`, where every query is its own HTTPS round trip.
+ */
+const allSettings = cache(async (): Promise<Map<string, string>> => {
+  try {
+    const db = await getDb();
+    const rows = await db.select(TEXT_VALUE).from(schema.platformSettings);
+    return new Map(rows.map((r) => [r.key, r.text ?? ""]));
+  } catch { return new Map(); }
+});
+
 export async function getContent(keys: string[], localeOverride?: "en" | "ar"): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   for (const k of keys) out[k] = CONTENT_DEFAULTS[k] ?? "";
@@ -231,12 +258,8 @@ export async function getContent(keys: string[], localeOverride?: "en" | "ar"): 
   if (!localeOverride) {
     try { const { getLocale } = await import("@/lib/i18n/server"); locale = await getLocale(); } catch { /* default en */ }
   }
-  const fetchKeys = locale === "ar" ? [...keys, ...keys.map((k) => `${k}@ar`)] : keys;
   try {
-    const db = await getDb();
-    const rows = await db.select(TEXT_VALUE).from(schema.platformSettings)
-      .where(inArray(schema.platformSettings.key, fetchKeys));
-    const map = new Map(rows.map((r) => [r.key, r.text ?? ""]));
+    const map = await allSettings();
     for (const k of keys) {
       const base = map.get(k);
       if (typeof base === "string" && base) out[k] = base;

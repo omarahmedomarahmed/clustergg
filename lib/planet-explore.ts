@@ -5,6 +5,23 @@ import { PROVIDERS } from "@/lib/providers/registry";
 import { gameAvatarOf, championsOf } from "@/lib/game-identity";
 import { toRegion, REGIONS } from "@/lib/regions";
 
+/**
+ * How many rows the explore hero can possibly show (B55.6).
+ *
+ * Every board renders `slice(0, 15)`. Both selects below were UNBOUNDED — every
+ * linked account for the game joined to `users`, and every `stat_current` row
+ * across every tracked metric — grouped in JS to render fifteen names. Fine at
+ * hundreds of gamers, ruinous at ten thousand, and the failure mode is a page
+ * that gets slower every week with nothing in the diff to blame.
+ *
+ * The bound is generous on purpose: the stat rows are ordered by value so the
+ * top fifteen of any metric are inside it, and the account rows are the join
+ * that gives those fifteen their names. `app/api/planet/gamer/route.ts` already
+ * limits to 60; this is the path that did not.
+ */
+const EXPLORE_ACCOUNT_CAP = 2000;
+const EXPLORE_STAT_CAP = 4000;
+
 // Everything the planet-explorer hero needs for one planet, in one call:
 // game leaderboards (with entries), auto-derived champion mastery boards,
 // active challenges + their top standings, and players bucketed by region —
@@ -40,6 +57,7 @@ export async function getPlanetExplore(
   const [gameRow] = game ? await db.select({ heroLayout: schema.games.heroLayout, planetBgUrl: schema.games.planetBgUrl, coverUrl: schema.games.coverUrl }).from(schema.games).where(eq(schema.games.name, game)).limit(1) : [];
   const providerIds = game ? PROVIDERS.filter((p) => p.game === game).map((p) => p.id) : [];
 
+
   // All connected accounts for this game (base for avatars, regions, champions).
   const accounts = providerIds.length
     ? await db.select({
@@ -52,6 +70,7 @@ export async function getPlanetExplore(
         .from(schema.linkedGameAccounts)
         .innerJoin(schema.users, eq(schema.linkedGameAccounts.userId, schema.users.id))
         .where(and(inArray(schema.linkedGameAccounts.provider, providerIds), eq(schema.users.status, "active")))
+        .limit(EXPLORE_ACCOUNT_CAP)
     : [];
   const accById = new Map(accounts.map((a) => [a.id, a]));
   const gameAvatar = (a: typeof accounts[number]) => gameAvatarOf(a.providerData) ?? a.avatarUrl ?? null;
@@ -64,7 +83,11 @@ export async function getPlanetExplore(
   const statRows = game && metricKeys.length
     ? await db.select({ accountId: schema.statCurrent.linkedAccountId, metricKey: schema.statCurrent.metricKey, value: schema.statCurrent.metricValue, rankLabel: schema.statCurrent.rankLabel })
         .from(schema.statCurrent)
+        // Ordered by value, so the fifteen each board displays are inside the
+        // cap however many rows exist behind it.
         .where(and(eq(schema.statCurrent.game, game), inArray(schema.statCurrent.metricKey, metricKeys)))
+        .orderBy(desc(schema.statCurrent.metricValue))
+        .limit(EXPLORE_STAT_CAP)
     : [];
   const byMetric = new Map<string, typeof statRows>();
   for (const r of statRows) { if (!byMetric.has(r.metricKey)) byMetric.set(r.metricKey, []); byMetric.get(r.metricKey)!.push(r); }

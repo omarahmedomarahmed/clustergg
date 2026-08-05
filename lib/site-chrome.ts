@@ -178,6 +178,11 @@ export const FOOTER_DEFAULT: FooterColumn[] = [
     links: [
       { label: "Privacy", href: "/legal/privacy" },
       { label: "Terms", href: "/legal/terms" },
+      // B37: the money terms are their own link, not a clause inside the site
+      // terms. Somebody reading this is usually about to be paid or has just
+      // been refused, and burying that in clause 14 is how a support ticket
+      // becomes a complaint.
+      { label: "Economy & payouts", href: "/legal/economy" },
       { label: "Cookies", href: "/legal/cookies" },
     ],
   },

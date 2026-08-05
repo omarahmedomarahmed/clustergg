@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { getCurrentUser, isAdmin, isStaff, type CurrentUser } from "@/lib/auth";
 import { getContent, setContent } from "@/lib/cms";
 import { GRANTABLE_AREAS, type AreaKey } from "@/lib/areas";
@@ -9,10 +10,11 @@ export { GRANTABLE_AREAS, NEVER_GRANTABLE, areaAllowed, type AreaKey } from "@/l
 
 const STAFF_ACCESS_KEY = "staff.access"; // CMS: comma-separated granted area keys
 
-export async function getStaffGrants(): Promise<string[]> {
+/** The staff member's area grants — once per request (B55.2). */
+export const getStaffGrants = cache(async (): Promise<string[]> => {
   const { [STAFF_ACCESS_KEY]: raw } = await getContent([STAFF_ACCESS_KEY]);
   return raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
-}
+});
 
 export async function setStaffGrants(areas: string[]): Promise<void> {
   const allowed = new Set(GRANTABLE_AREAS.map((a) => a.key as string));

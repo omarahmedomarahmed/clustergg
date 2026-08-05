@@ -12,7 +12,19 @@ import { announceChallengeJoined, announceChallengeEnded } from "@/lib/discord/a
 // or a Discord join would quietly be worth more or less than a web join.
 
 export type JoinResult =
-  | { ok: true; already: boolean; game: string; title: string; account: string }
+  | {
+    ok: true; already: boolean; game: string; title: string; account: string;
+    /**
+     * They asked for a DIFFERENT account than the one already entered (B38).
+     *
+     * Reported rather than silently ignored: a gamer who picked their second
+     * account and got a bland "you're in" would reasonably believe that is the
+     * account being scored, and only find out at the standings.
+     */
+    otherAccountRequested?: boolean;
+    /** Whether a switch is still open — see `switchChallengeAccount`. */
+    switchable?: boolean;
+  }
   | {
     ok: false;
     reason: "not_found" | "not_active" | "no_account" | "gated" | "locked" | "bad_key" | "requirements";
@@ -64,6 +76,78 @@ export async function entryAccounts(userId: string, challengeId: string): Promis
     region: a.region ?? null,
     entered: entered.has(a.id),
   }));
+}
+
+/**
+ * Is the account switch still open? (B38)
+ *
+ * Only before the challenge STARTS. After that a switch is a way to shop for
+ * the better score: play a week on both accounts, then move your entry to
+ * whichever one did better. Before the start there is nothing to shop for,
+ * because nothing has been scored yet — so the window is exactly the period in
+ * which changing your mind is honest.
+ */
+export function switchOpen(challenge: { startAt: Date | string }, now = new Date()): boolean {
+  const start = new Date(challenge.startAt);
+  return !Number.isNaN(start.getTime()) && now < start;
+}
+
+export type SwitchResult =
+  | { ok: true; account: string }
+  | { ok: false; reason: "not_found" | "not_entered" | "started" | "no_account" | "same_account"; message: string };
+
+/**
+ * Move an entry to another of the gamer's accounts, before the start.
+ *
+ * The baseline is re-snapshotted from the new account, because a baseline taken
+ * from the old one would score the new account's whole history as if it had
+ * happened during the challenge.
+ */
+export async function switchChallengeAccount(
+  userId: string, challengeId: string, linkedAccountId: string,
+): Promise<SwitchResult> {
+  const db = await getDb();
+  const [challenge] = await db.select().from(schema.challenges)
+    .where(eq(schema.challenges.id, challengeId)).limit(1);
+  if (!challenge) return { ok: false, reason: "not_found", message: "That challenge no longer exists." };
+
+  const [entry] = await db.select({ id: schema.challengeParticipants.id, linkedAccountId: schema.challengeParticipants.linkedAccountId })
+    .from(schema.challengeParticipants)
+    .where(and(
+      eq(schema.challengeParticipants.challengeId, challengeId),
+      eq(schema.challengeParticipants.userId, userId),
+    )).limit(1);
+  if (!entry) return { ok: false, reason: "not_entered", message: "You have not entered this challenge yet." };
+
+  if (!switchOpen(challenge)) {
+    return {
+      ok: false, reason: "started",
+      message: "This challenge has already started, so the account entered is locked in. Switching after the start would let anyone play on two accounts and keep the better score.",
+    };
+  }
+
+  const [account] = await db.select().from(schema.linkedGameAccounts)
+    .where(and(
+      eq(schema.linkedGameAccounts.id, linkedAccountId),
+      eq(schema.linkedGameAccounts.userId, userId),
+      eq(schema.linkedGameAccounts.provider, challenge.provider),
+    )).limit(1);
+  if (!account) return { ok: false, reason: "no_account", message: "That is not one of your accounts for this game." };
+  if (entry.linkedAccountId === account.id) {
+    return { ok: false, reason: "same_account", message: `You are already entered as ${account.inGameName}.` };
+  }
+
+  // Re-baseline from the NEW account. Carrying the old baseline over would
+  // score the new account's entire history as if it happened this week.
+  const stats = await db.select().from(schema.statCurrent)
+    .where(eq(schema.statCurrent.linkedAccountId, account.id));
+  const baseline: Record<string, number> = {};
+  for (const st of stats) baseline[st.metricKey] = st.metricValue;
+
+  await db.update(schema.challengeParticipants)
+    .set({ linkedAccountId: account.id, baseline, currentPoints: 0 })
+    .where(eq(schema.challengeParticipants.id, entry.id));
+  return { ok: true, account: account.inGameName };
 }
 
 export async function joinChallengeFor(
@@ -131,11 +215,22 @@ export async function joinChallengeFor(
       eq(schema.challengeParticipants.userId, userId),
     )).limit(1);
   if (existing) {
+    // B38: one gamer, one account, one challenge.
+    //
+    // The uniqueness itself is structural — `cp_challenge_user_idx` is unique on
+    // (challenge, user) — so a second account cannot be entered whatever this
+    // code does. What this branch decides is whether the gamer is TOLD, and the
+    // answer has to be yes when they asked for a different account: multiple
+    // accounts are meant to be a convenience, and a convenience that quietly
+    // scores the wrong one is not one.
+    const otherAccountRequested = existing.linkedAccountId !== account.id;
     return {
       ok: true, already: true, game: challenge.game, title: challenge.title,
       // The account that actually carries their standing, which is not
       // necessarily the one they just pressed — worth saying so.
       account: accounts.find((a) => a.id === existing.linkedAccountId)?.inGameName ?? account.inGameName,
+      otherAccountRequested,
+      switchable: switchOpen(challenge),
     };
   }
 

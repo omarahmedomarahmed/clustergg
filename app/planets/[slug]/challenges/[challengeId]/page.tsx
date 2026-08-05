@@ -15,7 +15,7 @@ import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
 import Countdown from "@/components/Countdown";
 import LiveChallengeBoard from "@/components/LiveChallengeBoard";
-import { joinChallenge } from "@/app/actions/social";
+import { joinChallenge, switchEntryAccount } from "@/app/actions/social";
 import { joinLocked, unmetEntryRules } from "@/lib/challenges";
 import { recordServerEvent } from "@/lib/server-portal";
 import { getQuestCompletions } from "@/lib/quests";
@@ -271,6 +271,31 @@ export default async function ChallengePage({
                     </span>
                   )}
                 </div>
+              ) : null}
+
+              {/* Changing your mind, before the start only (B38).
+                  A gamer with a main and a smurf may enter with ONE of them.
+                  Offering the switch only until the challenge starts is what
+                  keeps that a convenience rather than an advantage: afterwards
+                  it would be a way to play on both and keep the better score. */}
+              {joined && myAccounts.length > 1 && new Date() < new Date(challenge.startAt) ? (
+                <form action={switchEntryAccount.bind(null, challenge.id, path)} className="mt-3 rounded-2xl border border-white/12 p-3">
+                  <div className="text-[11px] uppercase tracking-wider text-muted mb-1.5">
+                    {tr("Entered with the wrong account?")}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {myAccounts.filter((a) => a.id !== enteredWith?.id).map((a) => (
+                      <label key={a.id} className="cursor-pointer rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-sm hover:border-cyan-400/60 has-[:checked]:border-cyan-400 has-[:checked]:bg-cyan-400/10">
+                        <input type="radio" name="linkedAccountId" value={a.id} className="accent-cyan-500 mr-2" />
+                        <b>{a.inGameName}</b>
+                      </label>
+                    ))}
+                    <button className="ghost-btn rounded-full px-4 py-1.5 text-xs font-semibold">{tr("Switch")}</button>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    {tr("Only until this challenge starts. After that the account is locked in — otherwise anyone could play on two and keep the better score.")}
+                  </p>
+                </form>
               ) : myAccounts.length === 0 ? (
                 <div className="text-sm text-muted inline-flex items-center gap-2">
                   <Icon name="link" size={15} />

@@ -106,13 +106,14 @@ export async function staffSetChallengeState(
   }
   await audit(admin.id, `challenge.${next}`, "challenge", id);
 
-  let reached = 0;
+  // B33: QUEUED, not reached. Delivery is the drain cron's job.
+  let queued = 0;
   if (launching) {
     // Awaited. The announcement is what writes the delivery ledger, and the
     // ledger is where every reach number a brand sees comes from.
     try {
       const { announceChallengeLaunched } = await import("@/lib/discord/announce");
-      reached = await announceChallengeLaunched(id);
+      queued = await announceChallengeLaunched(id);
     } catch { /* it is live either way; staff can re-announce */ }
   }
   revalidatePath("/admin/challenges");
@@ -126,7 +127,7 @@ export async function staffSetChallengeState(
         : launching
           // Say the number. "Published" with no count is how a fan-out that
           // reached nobody passes for a success for three days.
-          ? `${res.title} is live — announced to ${reached} ${reached === 1 ? "server" : "servers"}.`
+          ? `${res.title} is live — queued for ${queued} ${queued === 1 ? "server" : "servers"}. Delivery runs in the background.`
           : `Resumed ${res.title}.`,
   };
 }

@@ -424,6 +424,24 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "department_id" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "vote_count" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_views" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "birth_date" timestamptz`,
+  `CREATE TABLE IF NOT EXISTS "discord_post_queue" (
+    "id" text PRIMARY KEY,
+    "batch_id" text NOT NULL,
+    "channel_id" text NOT NULL,
+    "guild_id" text,
+    "payload" jsonb NOT NULL DEFAULT '{}'::jsonb,
+    "ledger_challenge_id" text,
+    "ledger_kind" text,
+    "status" text NOT NULL DEFAULT 'pending',
+    "attempts" integer NOT NULL DEFAULT 0,
+    "last_error" text,
+    "next_attempt_at" timestamptz NOT NULL DEFAULT now(),
+    "posted_at" timestamptz,
+    "created_at" timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS "dpq_drain_idx" ON "discord_post_queue" ("status","next_attempt_at")`,
+  `CREATE INDEX IF NOT EXISTS "dpq_batch_idx" ON "discord_post_queue" ("batch_id")`,
   `CREATE TABLE IF NOT EXISTS "profile_votes" (
     "profile_user_id" text NOT NULL,
     "voter_user_id" text,
@@ -579,6 +597,8 @@ const COLUMN_MIGRATIONS = [
   // ----- Trophy marketplace -----
   `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "cp_price" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "in_marketplace" boolean NOT NULL DEFAULT true`,
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "title" text`,
+  `ALTER TABLE "trophies" ADD COLUMN IF NOT EXISTS "description" text`,
   `CREATE TABLE IF NOT EXISTS "marketplace_orders" (
     "id" text PRIMARY KEY NOT NULL,
     "buyer_id" text NOT NULL,
@@ -863,7 +883,9 @@ async function createDb(): Promise<DB> {
     const { neon } = await import("@neondatabase/serverless");
     const { drizzle } = await import("drizzle-orm/neon-http");
     const client = neon(process.env.DATABASE_URL);
-    const db = drizzle(client, { schema }) as DB;
+    // B55.8: query counting, off unless PERF_COUNT=1.
+    const { perfLogger, perfEnabled } = await import("./perf");
+    const db = drizzle(client, { schema, ...(perfEnabled() ? { logger: perfLogger } : {}) }) as DB;
     await ensureProvisioned(db);
     return db;
   }
@@ -871,7 +893,8 @@ async function createDb(): Promise<DB> {
   const { PGlite } = await import("@electric-sql/pglite");
   const { drizzle } = await import("drizzle-orm/pglite");
   const client = new PGlite();
-  const db = drizzle(client, { schema }) as DB;
+  const { perfLogger, perfEnabled } = await import("./perf");
+  const db = drizzle(client, { schema, ...(perfEnabled() ? { logger: perfLogger } : {}) }) as DB;
   const { DDL } = await import("./ddl");
   await client.exec(DDL);
   // Apply the same idempotent column back-fills so demo mode matches the schema

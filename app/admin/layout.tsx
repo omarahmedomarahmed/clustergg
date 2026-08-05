@@ -9,7 +9,7 @@ import { currentAccess } from "@/lib/departments";
 import { pathAllowedFor, systemBy } from "@/lib/systems";
 import { ADMIN_PATH_HEADER } from "@/middleware";
 import { countPendingRequests } from "@/lib/challenge-requests";
-import { adminInbox } from "@/lib/threads";
+import { unreadThreadCount } from "@/lib/threads";
 
 // The chrome only. Which pages exist and what they do live in lib/admin-nav.ts;
 // who may open them lives in lib/systems.ts and a person's department.
@@ -40,7 +40,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const [pendingRequests, waitingMessages] = await Promise.all([
     admin || systems.includes("challenges") ? countPendingRequests() : 0,
     admin || systems.includes("bot") || systems.includes("brand")
-      ? adminInbox().then((rows) => rows.filter((r) => r.unread > 0).length).catch(() => 0)
+      // B55.1: a count(distinct), not a scan of every message body.
+      ? unreadThreadCount().catch(() => 0)
       : 0,
   ]);
 

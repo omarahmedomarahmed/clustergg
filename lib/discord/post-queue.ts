@@ -1,0 +1,219 @@
+// Announcements are queued, and a cron drains them (B33).
+//
+// **The bug this closes was live and got worse with exactly the growth we are
+// building for.** `announce()` posted to every guild sequentially, awaiting each
+// call, from server actions that declare no `maxDuration`
+// (`app/actions/discord.ts:106`, `app/actions/admin.ts:610`,
+// `app/actions/challenge-requests.ts:115`, `lib/challenge-series.ts:174`,
+// `lib/welcome-challenge.ts:103`). At ~200ms per Discord call that is 20 seconds
+// at 100 servers and over three minutes at 1,000 — inside a request killed long
+// before.
+//
+// The awaits were never the problem. Sequential is correct: a burst of parallel
+// posts is the fastest way to get rate-limited across every server at once, and
+// **parallelising would trade a slow failure for a temporary ban**, which is
+// worse. There were simply too many of them in one request.
+//
+// The failure was also silent and PARTIAL. The delivery ledger checkpoints every
+// ten servers, so a killed run left a plausible-looking number behind. Anyone
+// reading it would conclude "reach was lower than expected", not "the process
+// was killed" — a wrong number that looks right is worse than no number.
+//
+// So: the action enqueues and returns immediately, reporting **queued**, not
+// **reached**. A cron with a real `maxDuration` drains a bounded batch.
+
+import { and, asc, eq, lte, sql } from "drizzle-orm";
+import { getDb, schema } from "@/lib/db";
+import { postMessage } from "@/lib/discord/rest";
+import { uid } from "@/lib/utils";
+
+/** How many rows one drain run will attempt. Bounded by the cron's maxDuration. */
+export const DRAIN_BATCH = 120;
+
+/**
+ * How many times one server is retried before it is given up on.
+ *
+ * A guild that has deleted the channel or revoked the bot fails identically
+ * every time; retrying it forever would mean a permanently non-empty queue that
+ * nobody trusts. Four attempts with backoff spans hours, which covers an outage
+ * and does not cover a deletion.
+ */
+export const MAX_ATTEMPTS = 4;
+
+/** Backoff per attempt, in minutes. Index is the attempt just completed. */
+const BACKOFF_MINUTES = [1, 5, 20, 60];
+
+export type Enqueued = { batchId: string; queued: number };
+
+export type QueueLedger = { challengeId: string; kind: "launch" | "ending" | "result" };
+
+/**
+ * Write one row per target and return. Nothing is posted here.
+ *
+ * The payload is per-target and finished — the sponsor row under an
+ * announcement is minted per recipient, so rebuilding it at drain time would
+ * attribute a click to the wrong server.
+ */
+export async function enqueuePosts(
+  targets: { channelId: string; guildId: string | null; payload: Record<string, unknown> }[],
+  ledger?: QueueLedger,
+): Promise<Enqueued> {
+  const batchId = uid();
+  if (!targets.length) return { batchId, queued: 0 };
+  try {
+    const db = await getDb();
+    const rows = targets.map((t) => ({
+      id: uid(), batchId, channelId: t.channelId, guildId: t.guildId,
+      payload: t.payload,
+      ledgerChallengeId: ledger?.challengeId ?? null,
+      ledgerKind: ledger?.kind ?? null,
+    }));
+    // Chunked: one insert of a thousand rows is a statement some drivers refuse,
+    // and this path must not fail for a server that has grown.
+    for (let i = 0; i < rows.length; i += 200) {
+      await db.insert(schema.discordPostQueue).values(rows.slice(i, i + 200));
+    }
+    return { batchId, queued: rows.length };
+  } catch { return { batchId, queued: 0 }; }
+}
+
+export type DrainResult = {
+  attempted: number; posted: number; rescheduled: number; failed: number;
+  /** True when more rows are waiting — the caller can run again sooner. */
+  more: boolean;
+};
+
+/**
+ * Post a bounded batch. Called by cron, and by the admin "drain now" button.
+ *
+ * Still sequential, and still deliberately so. What changed is that the loop is
+ * now inside a request that declares how long it may take, and one that can stop
+ * and be resumed rather than being killed mid-way with no record of where it got
+ * to.
+ */
+export async function drainPostQueue(limit = DRAIN_BATCH): Promise<DrainResult> {
+  const out: DrainResult = { attempted: 0, posted: 0, rescheduled: 0, failed: 0, more: false };
+  try {
+    const db = await getDb();
+    const now = new Date();
+    const due = await db.select().from(schema.discordPostQueue)
+      .where(and(
+        eq(schema.discordPostQueue.status, "pending"),
+        lte(schema.discordPostQueue.nextAttemptAt, now),
+      ))
+      .orderBy(asc(schema.discordPostQueue.nextAttemptAt))
+      .limit(limit);
+
+    // Deliveries are recorded per challenge, in one write at the end, rather
+    // than one per row. The ledger's own unique index makes repeats free.
+    const landedBy = new Map<string, { kind: string; guilds: string[] }>();
+
+    for (const row of due) {
+      out.attempted++;
+      const res = await postMessage(row.channelId, row.payload as never);
+      if (res.ok) {
+        await db.update(schema.discordPostQueue)
+          .set({ status: "done", postedAt: new Date(), lastError: null })
+          .where(eq(schema.discordPostQueue.id, row.id));
+        out.posted++;
+        if (row.ledgerChallengeId && row.guildId) {
+          const key = `${row.ledgerChallengeId}:${row.ledgerKind ?? "launch"}`;
+          const cur = landedBy.get(key) ?? { kind: row.ledgerKind ?? "launch", guilds: [] };
+          cur.guilds.push(row.guildId);
+          landedBy.set(key, cur);
+        }
+        continue;
+      }
+
+      const attempts = row.attempts + 1;
+      // A 429 that survived the REST layer's own retry is a real rate limit, not
+      // a broken channel. It reschedules and does NOT count toward the
+      // give-up budget — giving up on a server because Discord was busy would
+      // drop a message nobody ever knew was missing.
+      const rateLimited = res.status === 429;
+      const giveUp = !rateLimited && attempts >= MAX_ATTEMPTS;
+      if (giveUp) {
+        await db.update(schema.discordPostQueue)
+          .set({ status: "failed", attempts, lastError: `${res.status}: ${res.error}` })
+          .where(eq(schema.discordPostQueue.id, row.id));
+        out.failed++;
+      } else {
+        const mins = BACKOFF_MINUTES[Math.min(attempts - 1, BACKOFF_MINUTES.length - 1)];
+        await db.update(schema.discordPostQueue)
+          .set({
+            attempts: rateLimited ? row.attempts : attempts,
+            lastError: `${res.status}: ${res.error}`,
+            nextAttemptAt: new Date(Date.now() + mins * 60_000),
+          })
+          .where(eq(schema.discordPostQueue.id, row.id));
+        out.rescheduled++;
+      }
+    }
+
+    for (const [key, v] of landedBy) {
+      const challengeId = key.slice(0, key.lastIndexOf(":"));
+      try {
+        const { recordDeliveries } = await import("@/lib/challenge-delivery");
+        await recordDeliveries(challengeId, v.guilds, v.kind as never);
+      } catch { /* the ledger swallows its own errors */ }
+    }
+
+    const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(schema.discordPostQueue)
+      .where(and(
+        eq(schema.discordPostQueue.status, "pending"),
+        lte(schema.discordPostQueue.nextAttemptAt, new Date()),
+      ));
+    out.more = Number(n ?? 0) > 0;
+  } catch { /* a drain that throws must not take the cron route down */ }
+  return out;
+}
+
+export type QueueStatus = {
+  pending: number; failed: number; done: number;
+  /** The servers we have given up on, with why — this is the actionable list. */
+  failures: { guildId: string | null; channelId: string; error: string | null; attempts: number }[];
+};
+
+/** What the admin console shows: what is waiting, and what we gave up on. */
+export async function queueStatus(limit = 50): Promise<QueueStatus> {
+  const empty: QueueStatus = { pending: 0, failed: 0, done: 0, failures: [] };
+  try {
+    const db = await getDb();
+    const counts = await db.select({
+      status: schema.discordPostQueue.status,
+      n: sql<number>`count(*)`,
+    }).from(schema.discordPostQueue).groupBy(schema.discordPostQueue.status);
+    const by = new Map(counts.map((c) => [c.status, Number(c.n ?? 0)]));
+    const failures = await db.select({
+      guildId: schema.discordPostQueue.guildId,
+      channelId: schema.discordPostQueue.channelId,
+      error: schema.discordPostQueue.lastError,
+      attempts: schema.discordPostQueue.attempts,
+    }).from(schema.discordPostQueue)
+      .where(eq(schema.discordPostQueue.status, "failed"))
+      .orderBy(asc(schema.discordPostQueue.createdAt))
+      .limit(limit);
+    return {
+      pending: by.get("pending") ?? 0,
+      failed: by.get("failed") ?? 0,
+      done: by.get("done") ?? 0,
+      failures,
+    };
+  } catch { return empty; }
+}
+
+/** Put a failed row back in the queue, from the admin console. */
+export async function retryFailed(): Promise<number> {
+  try {
+    const db = await getDb();
+    // Counted before the update: `.returning()` is not available on every
+    // driver this runs against, and a retry button that reports the wrong
+    // number is a button nobody believes twice.
+    const [{ n }] = await db.select({ n: sql<number>`count(*)` }).from(schema.discordPostQueue)
+      .where(eq(schema.discordPostQueue.status, "failed"));
+    await db.update(schema.discordPostQueue)
+      .set({ status: "pending", attempts: 0, nextAttemptAt: new Date(), lastError: null })
+      .where(eq(schema.discordPostQueue.status, "failed"));
+    return Number(n ?? 0);
+  } catch { return 0; }
+}

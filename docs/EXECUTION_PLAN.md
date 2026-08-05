@@ -81,6 +81,21 @@ Demo credentials: admin `admin@clustergg.com` / `cluster-admin`; staff
 7. **A static property on a client component is `undefined` on the server
    side.** `Comp.Sub = Sub` renders as undefined from a server component —
    what crosses the boundary is a reference proxy. Use named exports.
+8. **A process sweep that greps its own command line kills nothing.**
+   `pgrep -f next-server`, or `case "$c" in *next-server*)` over
+   `/proc/*/cmdline`, MATCHES THE SHELL DOING THE SEARCHING. It reports a hit,
+   feels like it worked, and leaves the real server running — which is how five
+   stuck production servers accumulated in one session, each holding its port
+   against the next run. Anchor on the start of the cmdline and skip your own
+   pid:
+   ```js
+   if (pid === String(process.pid)) continue;
+   if (/^(next-server|next start|sh -c next start)/.test(cmd)) kill(pid);
+   ```
+   Better still, do not hand-start one: `npm test -- --ui` and
+   `scripts/with-server.sh PORT CMD` both stand a server up and take it down on
+   exit, SIGINT, SIGTERM and a crash. `next start` never exits on its own, so
+   anything that starts one owes a `trap`.
 
 ### Workflow, non-negotiable
 
@@ -265,8 +280,8 @@ the remaining edits; Part II is the whole platform.
 | B2 | The CP coin — a currency, not a word | `components/Icon.tsx`, new `components/Cp.tsx`, 11 files, `lib/cards/render.tsx`, the nav | plan v1 | ☑ |
 | B3 | Bot cards — install, list cards, flows, landing layout | `lib/discord/onboard.ts`, `screens.ts`, `components.ts`, `app/api/discord/interactions/route.ts`, the card layers | plan v1 | ☐ |
 | B4 | The server portal, inside Discord | new `discord_guild_roles`, `/cluster admin`, six `srv_*` card kinds, `lib/server-portal.ts` (read only) | plan v1 | ☐ |
-| B5 | Gifting — search as you type, web and Discord | `components/TrophyMarket.tsx`, new `/api/gamers/search`, the bot gift flow | plan v1 | ☐ |
-| B6 | Redeem and marketplace, step by step, on the web | new `/redeem`, `/marketplace` confirm step | plan v1 | ☐ |
+| B5 | Gifting — search as you type, web and Discord | `components/TrophyMarket.tsx`, new `/api/gamers/search`, the bot gift flow | plan v1 | ☐ **folded into B49** |
+| B6 | Redeem and marketplace, step by step, on the web | new `/redeem`, `/marketplace` confirm step | plan v1 | ☐ **folded into B49** |
 | B7 | The screenshot system — plumbing **and** an admin who can replace any image | new `feature_shots`, `lib/shots.ts`, `<FeatureShot>`, `/admin/shots` | plan v1 | ☑ |
 | B8 | The claim registry and the copy rewrite | `lib/claims.ts` (new), every marketing page, `lib/cms.ts` EN+AR, deck, data room | plan v1 | ☐ |
 | B9 | Nav: the marketplace badge beside the planets badge | `components/Nav.tsx`, `lib/site-chrome.ts`, `components/BrandingEditor.tsx` | batch 2 | ☑ |
@@ -279,7 +294,7 @@ the remaining edits; Part II is the whole platform.
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
 | B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☑ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
-| B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ |
+| B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ **folded into B49** |
 | B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
 | B21 | The economy, explained in visuals, everywhere | bot guides, quests, wallet, homepage, deck | batch 2 | ☐ |
 | B22 | Track the bot install, and pay for it | `app/api/discord/installed/route.ts`, the signal quest | batch 2 | ☐ |
@@ -297,8 +312,8 @@ the remaining edits; Part II is the whole platform.
 | B34 | **The repriced economy**: 1,000 CP = $0.10, every action capped, 500/day ceiling | `lib/quests.ts`, `lib/marketplace.ts`, supersedes B16/B17's numbers | batch 4 | ☑ |
 | B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | new `lib/abuse.ts`, payouts, tier unlocks, new `/admin/growth-review` | batch 4 | ☑ (defences 1–2 + the review queue; **velocity limits still owed** — see below) |
 | B36 | Brands prepay: due on issue, live on creation, settled by the first challenge's end | new `lib/prepay.ts`, `lib/sponsored-campaigns.ts`, `lib/challenge-requests.ts`, the brand portal | batch 4 | ☑ |
-| B37 | The legal framing of the economy | new `/legal/economy`, redemption eligibility gates | batch 4 | ☐ |
-| B38 | One gamer, one account, one challenge | challenge entry rules | batch 4 | ☐ |
+| B37 | The legal framing of the economy | new `lib/eligibility.ts`, new `/legal/economy`, `app/actions/trophies.ts`, `/admin/redeems` | batch 4 | ☑ (**every threshold is a placeholder for counsel** — flagged in the code and on the page) |
+| B38 | One gamer, one account, one challenge | `lib/challenges.ts`, `app/actions/social.ts`, the challenge page | batch 4 | ☑ |
 | B39 | Stuck money: every state where a prize has nowhere to go | challenges, redeems, an admin view | batch 4 | ☐ |
 | B40 | Deleting an account with a balance | `app/settings/account` | batch 4 | ☐ |
 | B41 | The gamer homepage: hero, challenges, quests, missions, Discord | `app/page.tsx` | batch 4 | ☐ |
@@ -311,12 +326,20 @@ the remaining edits; Part II is the whole platform.
 | S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
 | S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
 | S4 | **A JSX expression rendering as literal text** on every unaffordable trophy tile — a backtick where a fragment belonged, so the marketplace read `$<Cp amount={t.cpPrice - balance} /> to go` | `components/TrophyMarket.tsx` | wave 2 (found by B34) | ☑ |
+| S9 | **Deleting a trophy silently deleted every holder's copy of it** — `user_trophies.trophyId` is `onDelete: "cascade"` (`schema.ts:669`) while `marketplace_orders.trophyId` is `onDelete: "restrict"` (`:649`), so a trophy that was ever BOUGHT was refused by the database and one that was only ever WON cascaded away. The gap was "won, never bought" — most trophies | `app/actions/admin.ts`, `lib/trophy-admin.ts` | wave 2 (found by B53) | ☑ |
 | S8 | **Demo campaign invoices** — the overdue banner, the dunning schedule and the publish block were all built, correct, and invisible, because the demo's campaigns predated invoicing and nothing owed anything | `lib/db/seed-activity.ts` | wave 2 (B36 fallout) | ☑ |
 | S7 | **A quest card contained no link on its default tab** — `role="link"` with a `router.push`, so it worked for a mouse and Enter and nothing else; the only `<Link>` lived on the non-default leaderboard tab | `components/QuestCard.tsx` | wave 2 (found by B48) | ☑ |
 | S6 | **A demo server at tier scale** — 522 linked, 180 qualified — because the tier ladder, the qualified split, the holding period and the review queue were all correct and all invisible at two members a server | `lib/db/seed-activity.ts` | wave 2 (B35 fallout) | ☑ |
 | S5 | **Demo balances rescaled for B34's prices**, as balances net of what the seeded orders spend — Nova can afford exactly one trophy, Atlas none | `lib/db/seed-activity.ts` | wave 2 (B34 fallout) | ☑ |
 | B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☑ |
 | B48 | **The marketplace says how you get the points** — quest cards on the shelf, a clickable balance, the redemption value promoted | `/marketplace`, `components/TrophyMarket.tsx`, `components/QuestCard.tsx` | wave 2 (after B35) | ☑ |
+| B49 | **The marketplace purchase and gift experience** — checkout modal, gift search, confirm-the-person, gift-sent receipt. **Absorbs B5, B6, B19** | `components/TrophyMarket.tsx`, new `/api/gamers/search`, `app/actions/marketplace.ts` | wave 2 band | ☐ |
+| B50 | **The quest page as a how-to-play guide** — every action, its CP and its cap, as the pitch | `components/QuestGame.tsx`, `lib/quests.ts` (read `rules`, do not restate) | wave 2 | ☐ |
+| B51 | **The Profile of the Week band** — nav art behind it, top 3 only, a trophy per place, smaller cards, click-out collapses, profiles open in a new tab | `components/WeekBand.tsx`, `lib/profile-week.ts`, `/admin/profile-week` | wave 2 | ☐ |
+| B52 | **Planet explore shows game identities** — in-game name, one row per account | `lib/planet-explore.ts`, `app/planets/[slug]/page.tsx` | wave 2 | ☐ |
+| B53 | **Admin owns every trophy, including the ones already held** | new `lib/trophy-admin.ts`, `/admin/trophies`, `app/actions/admin.ts`, `lib/db/schema.ts` | wave 2 (**money-touching**) | ☑ |
+| B54 | **The bot card design overhaul** — a card is a web page, not a poster. **Leads the Discord band: B3, B13, B14, B20, B27, B28 follow it** | `lib/cards/render.tsx`, `lib/cards/part-content.ts`, `lib/cards/data.ts` | wave 3 | ☐ |
+| B55 | **The platform is slow** — a live, structural performance defect on every surface | `app/admin/layout.tsx`, `lib/threads.ts`, `lib/cms.ts`, `lib/departments.ts`, `lib/planet-explore.ts`, `lib/providers/riot-lol-rich.ts` | **wave 2, ahead of everything** | ☐ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **S rows** are work that shipped without being planned — support the build
@@ -2707,6 +2730,348 @@ only renderer of a CP figure (B2). Nothing here changes what anything costs.
 
 ---
 
+## B49 — The marketplace purchase and gift experience
+
+> "a proper modal flow, not a click that just happens… confirm the person —
+> their avatar, display name and cover art — before any CP moves"
+
+**This item ABSORBS B5, B6 and B19.** All four are the same screen: B5 is the
+gift search, B6 is the redeem/marketplace stepper, B19 is the marketplace
+revamp, and B49 is the checkout and gift flow. Built separately, that screen
+gets redesigned four times and three of those redesigns are thrown away. They
+are one band, built once. B5/B6/B19 keep their numbers and their rows — nothing
+is renumbered — and each is marked "folded into B49".
+
+**What changes:**
+
+- **A checkout modal for buying for yourself.** What you are buying, what it
+  costs, your balance before and after, one confirm. No silent purchases: today
+  a click spends points with no step in between, and the first time a gamer
+  notices is when the balance is different.
+- **A gift flow that confirms the PERSON.** Search as you type, select, and then
+  see their avatar, display name and cover art before any CP moves. Buying the
+  wrong person a trophy is unrecoverable — there is no refund path and there
+  should not be one, because the trophy is already on their profile.
+- **A gift-sent confirmation** that names and shows who it went to.
+- **It has to look like the platform**, not like a browser dialog.
+
+**Verification owed → `tests/ui/marketplace.mjs` (extend) + `tests/db/marketplace.mts`:**
+- No purchase completes without a confirm step.
+- The confirm states the price, the balance before, and the balance after.
+- The gift confirm shows the recipient's avatar and display name.
+- Searching returns no private/blocked accounts.
+- A gift lands on the recipient's profile and the sender's ledger, once.
+- Balance is checked at CONFIRM, not only at open — a second tab must not let
+  the same points be spent twice.
+
+**Shots owed:** `gamer.marketplace.checkout` — "One confirm, and what it costs" —
+the checkout modal. `gamer.marketplace.gift` — "Confirm the person before the
+points move" — the gift confirm.
+**New routes:** `/api/gamers/search`.
+
+---
+
+## B50 — The quest page as a how-to-play guide
+
+> "glorify the actions and their points as a guide to playing, not a table…
+> a button reveals every action with its CP value and its daily cap"
+
+The quest page already renders `rules` — action, points, and `max N/day` — as a
+plain list. This makes it the pitch: what to do, what it pays, and how often it
+pays, presented as a guide rather than a schedule.
+
+**The caps are part of the pitch, not the small print.** "Free points" is a
+claim nobody believes; "free points, capped, and here is the cap" is one they
+can check. B17 already computes both the cap and today's usage — **read them,
+do not restate them.** A second copy of a number that B34's calculator can move
+is a number that will be wrong the first time somebody moves it.
+
+**Verification owed → `tests/ui/quests.mjs`:**
+- Every action a quest listens to appears with its CP value and its daily cap.
+- The figures equal what `getUserQuests` returns — no hardcoded numbers.
+- An action with no cap is not shown with an invented one.
+
+**Shots owed:** `gamer.quest.guide` — "What to do, what it pays, and how often".
+**New routes:** none.
+
+---
+
+## B51 — The Profile of the Week band
+
+Six changes to one component:
+
+- **The expanded band renders the nav's background image** with a dark overlay.
+  It is blank behind the winners today. **One image, shared with the nav** —
+  the same rule and the same group as B10, which is why it is not a second copy.
+- **Top 3 only**, with a glorified "See all" for the rest. The whole platform in
+  a band is a leaderboard nobody reads; three is a podium.
+- **A trophy per place, set by admin** (1st/2nd/3rd). Each top-3 profile shows
+  the trophy it *would* win, replacing the generic crown and medal icons.
+  Framed as **"if the week ended now"** — it must not read as already won, or
+  the Sunday result reads as something being taken away.
+- **Smaller cards**, so expanding does not cover the page.
+- **Clicking below the band collapses it.**
+- **A profile opens in a NEW TAB** (`target="_blank" rel="noopener"`). Profiles
+  must never open inside the band.
+
+**Verification owed → `tests/ui/week-band.mjs`:**
+- Exactly one element paints the nav art (the B10 assertion, extended to the band).
+- Three profiles, not more.
+- Each shows the trophy for its place, and the copy says "if the week ended now".
+- A profile link carries `target="_blank"` and `rel` containing `noopener`.
+- A click below the band collapses it.
+
+**Shots owed:** `home.week.band` — "The podium, if the week ended now".
+**New routes:** none.
+
+---
+
+## B52 — Planet explore shows game identities
+
+The explore list on a planet hero shows the **in-game account name**, not the
+Cluster profile name. A gamer with two accounts on that game **appears twice**,
+and that is correct: these are accounts, not people. Clicking one reveals their
+Cluster or Discord name and links through to the profile.
+
+**The rule, decided and written down now so it is not re-litigated:**
+
+> **Leaderboards are per-ACCOUNT. Challenge entry is per-GAMER.**
+>
+> A ladder ranks accounts because that is what the game ranks — two accounts of
+> one person are two positions on that game's ladder, and hiding one would make
+> our board disagree with the game's own. A challenge is a prize pool, and a
+> prize pool ranks people, because one person taking two podium places takes a
+> prize meant to spread (B38).
+>
+> Different questions, different right answers. Neither is a bug in the other.
+
+**Verification owed → `tests/db/planet-explore.mts` + `tests/ui/planet.mjs`:**
+- A gamer with two accounts on a game appears twice in explore.
+- Each row shows the in-game name, not the display name.
+- The reveal names the Cluster profile and links to it.
+- The same gamer still holds exactly one entry in a challenge on that game.
+
+**Shots owed:** `planet.explore.accounts` — "That game's ladder, by that game's names".
+**New routes:** none.
+
+---
+
+## B53 — Admin owns every trophy, including the ones already held
+
+- Edit image, name, title, description — **the change propagates to every gamer
+  holding that trophy.**
+- Assign or change its dollar value — it becomes worth that to every holder.
+- Per trophy, always visible: **who holds it, how many hold it, how many have
+  redeemed it.**
+- Hide-from-marketplace toggle.
+- **A trophy held by at least one gamer cannot be deleted.** Everything else
+  about it stays editable.
+
+### B53.0 The hazard, located correctly
+
+> **Corrected from the instruction.** It named `trophy_awards` snapshotting "the
+> trophy's cash value at purchase time" at `schema.ts:644`. Checked before
+> building: **line 644 is `marketplaceOrders`**, and **`userTrophies`
+> (`schema.ts:666`) has no value column at all** — a holding carries
+> `trophyId`, `placement`, `status`, and nothing about money. Value is read LIVE
+> from `trophies.value` by join.
+>
+> So half the requirement is already free: unredeemed holdings track the trophy's
+> value automatically, because they never stored one.
+>
+> The freeze happens somewhere else. `app/actions/trophies.ts:136` —
+> `const amount = awards.reduce((s, a) => s + Number(a.value ?? 0), 0)` — writes
+> `trophyRedeems.amount` at REQUEST time. That row is the money.
+
+**The rule, therefore:**
+
+- Editing `trophies.value` **changes what every unredeemed holding is worth.**
+  That is the feature.
+- It **must never move `trophyRedeems.amount`** on a row that is pending,
+  approved, sent or paid. A payout whose value changes after it left is a
+  reconciliation failure with a real person on the other end, and a *pending*
+  request is a number a gamer has already been shown.
+
+**Verification owed → `tests/db/trophy-admin.mts`** (money-touching, written
+with the item):
+- Editing name/image/description changes what every holder sees.
+- Raising the value raises what an unredeemed holding is worth.
+- A pending redemption's amount is unchanged by a later value edit.
+- So is an approved, a sent, and a paid one — all four states.
+- Lowering the value does not reduce an already-requested amount either.
+- A trophy with at least one holder cannot be deleted, and the refusal says why.
+- A trophy with no holders can be.
+- The holder count, and the redeemed count, are correct.
+
+**Shots owed:** `admin.trophy.holders` — "Who holds it, and what it is worth to
+them".
+**New routes:** none.
+
+---
+
+## B54 — The bot card design overhaul
+
+A complete redesign of how every card renders. Same content, far better
+display. **A card is a web page, not a poster.**
+
+- **A fixed top strip**: branding top-RIGHT, card title or gamer identity
+  top-LEFT.
+- **Everything below is free space** for the body, laid out to render what a
+  gamer sees on the platform.
+- **Challenge and planet cards get their background image.** They are basic
+  lists today. Game account cards likewise.
+- **The game logo moves into the top strip, semi-transparent.** The mascot
+  likewise. Both are decoration: draw over them freely, and if a card reads
+  better without either, leave them out.
+- **Text flow is cut off on most cards today. Fix it properly** — no fixed text
+  heights (that clips descenders, and it is a known bug), clamp names, let the
+  body size itself.
+- **Every leaderboard and standings shows the IN-GAME NAME first**, Cluster name
+  secondary. It is that game's ladder and that game's challenge; the game
+  identity is the subject. (Consistent with B52.)
+- **Design each card around its body content**, not around a template.
+
+### B54.0 Sequencing, and this one matters
+
+**B54 leads the Discord band. B3, B13, B14, B20, B27 and B28 follow it.**
+
+If the guides or the Home card are rebuilt before the layout system is
+redefined, they get built twice — once against the current template and once
+against B54's. B27 is already ☑ for button *position*; its card *rendering* is
+downstream of this.
+
+**Verification owed → `tests/ui/cards.mjs` + `tests/db/cards.mts`:**
+- No card clips its text at a fixed height (rendered height ≥ content height).
+- Every card has the top strip, with branding right and identity left.
+- Challenge and planet cards carry a background image.
+- Every standings row leads with the in-game name.
+- A long display name clamps rather than overflowing.
+- Satori renders every card kind without throwing (the marks are divs, not SVG).
+
+**Shots owed:** retired, not added — B28 replaces `bot.card.*` with live renders.
+**New routes:** none.
+
+---
+
+## B55 — The platform is slow, and it always has been
+
+Not a regression: it has been like this since day one, so it is structural.
+Everyone feels it — gamers, mods in the console, server owners, brands — and
+admin is the worst.
+
+**Seven causes. All seven were checked against the file before this was written,
+and two of them were not quite what the report said.** Both corrections are
+recorded here rather than discovered mid-fix.
+
+### B55.1 A badge that scans the whole message table — CONFIRMED, and worse
+
+`app/admin/layout.tsx:40-44` calls `adminInbox()` to compute ONE number: how
+many threads have anything unread. `adminInbox` (`lib/threads.ts:153`) fans out
+to two queries:
+
+- `serverThreads` → `lib/server-messages.ts:171` `inbox()`, which selects
+  **every column including `body`** with `.limit(2000)` and groups in JS;
+- `brandThreads` (`lib/threads.ts:175`) — **no limit at all**, joined to
+  `brands`, also selecting bodies.
+
+Megabytes over the wire, on every admin page load, to render a number. Two
+`count(distinct …)` queries replace it. This is the single biggest win and it
+gets worse every day the tables grow.
+
+### B55.2 Nothing in the chrome is per-request cached except the user — CONFIRMED
+
+`getCurrentUser` and `getSession` correctly use React `cache()`
+(`lib/auth.ts:84`, `:37`). These do not: `getContent` (`lib/cms.ts:227`),
+`currentAccess` (`lib/departments.ts:118`), `getStaffGrants`
+(`lib/permissions.ts:12`), `countPendingRequests`
+(`lib/challenge-requests.ts:145`), `adminInbox` (`lib/threads.ts:153`).
+
+`getContent` alone runs **five times per render** — `app/layout.tsx:37`,
+`app/layout.tsx:86`, `components/Nav.tsx:108`, `components/Footer.tsx:16`,
+`components/FloatingOrbs.tsx:23` — five separate reads of the same
+`platform_settings` table.
+
+### B55.3 Every query is its own HTTPS round trip — CONFIRMED
+
+`lib/db/index.ts:884` uses `drizzle-orm/neon-http`: no pooling, no pipelining.
+Each query is a fresh HTTPS request. **This is not fixed by swapping the
+driver** — it is fixed by making fewer queries, which is what B55.1 and B55.2
+do. Anything still sequential that could be `Promise.all` goes with them.
+
+### B55.4 The admin layout re-runs on every tab — CORRECTED
+
+The report says `headers()` at `app/admin/layout.tsx:72` forces the layout
+dynamic, and that removing it makes tab switching instant.
+
+**`headers()` is not the only thing making it dynamic.** Line 21 calls
+`getCurrentUser()`, which reads `cookies()` — and an admin layout must know who
+you are, so it cannot stop. Removing `headers()` alone therefore does **not**
+make this layout static or cacheable.
+
+So the fix is measured, not assumed: instrument first, establish whether a
+sibling navigation actually re-runs the layout, and only then decide whether
+moving the check is worth it. **The guard does not weaken either way** —
+`/admin/users` and `/admin/linked-accounts` stay admin-only and no department
+reaches them, which `tests/db/taxonomy.mts` already asserts and which must still
+pass afterwards.
+
+### B55.5 The badges block the nav — CONFIRMED
+
+Both counts are awaited before the rail renders. Behind `<Suspense>`, the nav
+paints and the numbers arrive.
+
+### B55.6 Planet explore pulls unbounded rows — CONFIRMED
+
+`lib/planet-explore.ts:45` selects **every** `linked_game_accounts` row for the
+game joined to `users`, with no limit; `:65` selects **every** `stat_current`
+row for the game across every tracked metric, also unlimited. Both are grouped
+in JS to render a short list. `app/api/planet/gamer/route.ts` limits to 60; the
+page path does not.
+
+### B55.7 Riot: ~9 uncached external calls per view — CONFIRMED, cause corrected
+
+`rj()` (`lib/providers/riot-lol-rich.ts:9`) sets `cache: "no-store"`, so nothing
+uses Next's fetch cache. One snapshot is: summoner + mastery + match-ids
+(`:106-108`, parallel) + **five match details** (`:126`) + spectator = **nine
+calls**, each with a 7–8s timeout.
+
+**The "cached 6h" comment is not a lie, it is pointing at a different function.**
+`matchCache` (`:88`, 6h, used at `:205`/`:240`) belongs to
+`getLolMatchDetail` — the click-through view. The card path calls
+`matchSummaryFor` (`:157`) → `getMatchRaw` (`:195`) **directly, with no cache
+lookup at all**. There is also a `snapCache` (`:87`) at 5 minutes.
+
+And both are **in-process `Map`s**, which do not survive between serverless
+invocations. On Vercel a cold lambda has an empty cache, so most views pay all
+nine calls.
+
+This is external latency: no database change touches it. Serve the stored
+`statCurrent` snapshot immediately and refresh in the background (the sync cron
+exists), or put the rich card behind `<Suspense>` so the profile paints without
+waiting on Riot. **A gamer must never stare at a blank card while we talk to
+Riot nine times.**
+
+### B55.8 Measurement is part of the item
+
+A performance fix with no before/after is a claim, not a result. Query count and
+wall time are recorded for a representative page on every surface — public,
+feed, admin, brand portal, server portal — before and after, and the numbers go
+in the commit message. **B55.6 and B55.7 are measured separately from the
+page-render fixes**, because they have different causes and it must be visible
+which change bought which improvement.
+
+**Verification owed → `tests/db/perf.mts` + the existing suites:**
+- The unread badge issues a bounded number of queries and reads no message body.
+- `getContent` called five times in one render issues one query.
+- Planet explore is bounded however many accounts exist.
+- **`tests/db/taxonomy.mts` still passes** — caching is exactly the kind of
+  change that builds cleanly and breaks an authorization boundary.
+
+**Shots owed:** none.
+**New routes:** none.
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -2722,6 +3087,15 @@ only renderer of a CP figure (B2). Nothing here changes what anything costs.
 | §1.1, V1 | the capture pass ran in wave 1 | **The 28 screenshots now in `public/shots/` are PROVISIONAL.** The capture was run early, against a wave-1 build, which is a deviation from §1.1's ordering. The reason that rule exists is directly ahead in the queue: **B23** rewrites `/`, `/pricing`, `/servers`, `/discord-bot`, `/brands` and `/blog`, so every full-page shot of those is a picture of copy that will not exist; **B41** replaces the homepage entirely; **B2** puts the coin on every CP figure; **B27** changes the button layout on every bot card; **B34** reprices the currency, so every dollar figure in a shot changes; and **B28** retires the `bot.card.*` rows in favour of live renders. A **full recapture is owed** once Part I closes — see V1.R. Until then the stale shots stay: they are not recaptured piecemeal, and the capture script is not re-run at the end of each wave. |
 | B34, B18 | "make the marketplace show the quests… make the balance clickable" | **B48.** The repricing made the shelf unreachable for a new gamer and the page offered no path off it. The quests, the balance link and the promoted redemption value are that path. |
 | B36 | — (found while building) | `buyCampaign` never created an invoice, so a campaign could run and pay out prizes and never be billed unless a human remembered. B36 now issues the invoice at purchase; the "retermed challenge invoice" it described did not exist. |
+| B38 | — (found while building) | The uniqueness was ALREADY enforced: `cp_challenge_user_idx` is unique on (challenge, user), so a second account never could enter. What was missing was the telling and the switch — the web join action discarded its result entirely, so a gamer who picked their smurf got silence and a standing on the other account. B38 is now the disclosure and the before-the-start switch, not the constraint. |
+| B5, B6, B19 | "a proper modal flow, not a click that just happens" | **Folded into B49.** All four are the same screen; built separately it would be redesigned four times. Numbers and rows kept, nothing renumbered. |
+| B53 | the hazard was mislocated | The instruction named `trophy_awards` snapshotting value at `schema.ts:644`. Line 644 is `marketplaceOrders`; `userTrophies` (`:666`) has **no value column** and reads `trophies.value` live. The real freeze is `trophyRedeems.amount`, written at `app/actions/trophies.ts:136`. B53.0 carries the corrected rule. |
+| B3, B13, B14, B20, B27, B28 | "B54 must lead the Discord band" | **B54 is now first in wave 3** and the rest follow it. Rebuilding a card before the layout system is redefined builds it twice. |
+| B29 | rescoped | Already honoured in practice: `/admin/shots`, `/admin/email`, `/admin/cp-calculator` and `/admin/growth-review` all carry a `system:` key in `lib/admin-nav.ts`. What remains is the AUDIT and the assertion, not a retrofit. |
+| V0.1 | ".scratch holds twelve legacy suites, ~390 assertions" | **Checked: they are not there.** `.scratch/` holds 72 files; none of the twelve named exist, and the 33 scripts present carry **zero** `ok()`/`eq()` assertions — they are `console.log` probes named after build items. Nothing was at risk. `tests/run-all.mjs` + `npm test` added over the seven real suites instead. |
+| B34, V0.1 | the twelve legacy suites arrived from the other container | **Correction to my own earlier finding.** `.scratch/` is gitignored, so the suites lived only in the OTHER session's container and were never in this clone — my report ("only my own probes here") was true of this machine and not of the work. Commit `1e08929` moved all twelve in: 12 new files, zero modifications (`git show --diff-filter=M` empty). Two needed fixing and neither was a product defect: `marketplace.mts`'s `grantCp` wrote `userQuestProgress.qp`, which **B34.2 stopped being the source of truth** — CP moved to the `quest_events` ledger and `getTotalCp` sums `CP_PAID` — so the wallet read zero and sixteen assertions failed behind one broken fixture. Fixed the FIXTURE, not the assertions. Three more hardcoded pre-B34 CP figures (5,000 and 200,000) now derive from `DEFAULT_CP_PER_DOLLAR`. `bot-growth.mts` needs a running server for one block; it probes and skips rather than failing. |
+| B55.4 | "reading headers() forces the layout dynamic" | **Corrected before building.** True but not sufficient: `app/admin/layout.tsx:21` calls `getCurrentUser()`, which reads `cookies()`, so the layout is dynamic regardless. Removing `headers()` alone does not make it static. Measured rather than assumed. |
+| B55.7 | "the comments claim matches are cached 6h — check whether that caching actually happens" | **Checked: it happens, in a function the card never calls.** `matchCache` (6h) is used only by `getLolMatchDetail`, the click-through. The card path goes `matchSummaryFor` → `getMatchRaw` with no cache lookup. Both caches are in-process `Map`s and do not survive a cold lambda. |
 | — | *(next amendment here)* | |
 
 ---
@@ -2803,6 +3177,14 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/offers.mts` | **B30** | off by default; the discount is its own line; totals equal lines; admin edits survive recalculation | owed |
 | `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
 | `tests/db/email.mts` + `tests/ui/admin-email.mjs` | **B32** | no key = no-op, never throws; every template fills; webhooks update status; no key or payment detail in a subject | owed |
+| `tests/db/marketplace.mts` + `tests/ui/marketplace.mjs` (extend) | **B49** (absorbs B5/B6/B19) | no purchase without a confirm; the confirm states price and balance before/after; the gift confirm shows the recipient; balance re-checked at confirm, not only at open | owed |
+| `tests/ui/quests.mjs` | **B50** | every action shows its CP and its cap, read from `getUserQuests` rather than restated | owed |
+| `tests/ui/week-band.mjs` | **B51** | exactly one element paints the nav art; three profiles; the trophy per place reads "if the week ended now"; profiles open in a new tab with rel=noopener | owed |
+| `tests/db/planet-explore.mts` + `tests/ui/planet.mjs` | **B52** | two accounts of one gamer appear twice; rows lead with the in-game name; challenge entry stays one-per-gamer | owed |
+| `tests/db/trophy-admin.mts` | **B53** | edits propagate to holders; raising the value raises unredeemed holdings; a pending/approved/sent/paid redemption's amount NEVER moves, up or down; a held trophy cannot be deleted and the ACTION refuses, not just the helper | **written — 30 assertions** |
+| `tests/ui/cards.mjs` + `tests/db/cards.mts` | **B54** | no card clips text at a fixed height; the top strip is present; challenge and planet cards carry a background; standings lead with the in-game name; every card kind renders through Satori | owed |
+| `tests/db/entry-rules.mts` | **B38** | a second account makes no second entry and the response names the one entered; the other account is free on a different challenge; switching allowed before the start and refused after, with the reason; the score is re-baselined; two different gamers unaffected | **written — 24 assertions** |
+| `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |
 | `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
 | `tests/db/abuse.mts` | **B35** | the hold refuses inside the window and releases after; an unknown unlock date fails CLOSED; unqualified accounts raise raw and not qualified; the stamp is one-way; a draft or cancelled payout is not a track record | **written — 27 assertions** |
 | `tests/ui/marketplace.mjs` | **B48** | every quest reachable from the shelf; the balance is a link; dollar value and CP price agree on every tile; the redemption value outsizes the price | **written — 18 assertions** |
@@ -2885,6 +3267,12 @@ the correct state for it.
 | `gamer.marketplace.earn` | "The shelf, and how to reach it" | `/marketplace` with the quest cards | not captured — placeholder |
 | `admin.abuse.review` | "Growth we look at before we pay for it" | `/admin/growth-review` | not captured — placeholder |
 | `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | the brand portal, blocked banner | not captured — placeholder |
+| `gamer.marketplace.checkout` | "One confirm, and what it costs" | the checkout modal | not captured — placeholder |
+| `gamer.marketplace.gift` | "Confirm the person before the points move" | the gift confirm | not captured — placeholder |
+| `gamer.quest.guide` | "What to do, what it pays, and how often" | a quest page, actions revealed | not captured — placeholder |
+| `home.week.band` | "The podium, if the week ended now" | `/`, band expanded | not captured — placeholder |
+| `planet.explore.accounts` | "That game's ladder, by that game's names" | a planet hero | not captured — placeholder |
+| `admin.trophy.holders` | "Who holds it, and what it is worth to them" | `/admin/trophies` | not captured — placeholder |
 | `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page | not captured — placeholder |
 | `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` | not captured — placeholder |
 | `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` | not captured — placeholder |

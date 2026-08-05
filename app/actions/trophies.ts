@@ -58,10 +58,42 @@ export async function requestRedeem(input: {
   method: string;
   /** ISO-3166 alpha-2, so the provider offers methods that exist where they live. */
   country?: string;
-}): Promise<{ ok?: true; error?: string }> {
+  /** yyyy-mm-dd. Asked for at the first redemption and only there (B37). */
+  birthDate?: string;
+}): Promise<{ ok?: true; error?: string; needs?: ("age" | "country")[] }> {
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in first." };
   const db = await getDb();
+
+  // B37: age and country, before anything else happens.
+  //
+  // FIRST, ahead of the payout-preference write and well ahead of any provider
+  // call, because the point of refusing here is that the gamer's trophies are
+  // never locked into a request that cannot complete. Being told "we cannot pay
+  // your country" after the trophies have moved to `pending` is the failure this
+  // exists to prevent.
+  {
+    const { eligibilityFor, eligibilityOf, ageFrom } = await import("@/lib/eligibility");
+    // Anything supplied on this submission is saved first, so a gamer answering
+    // the question is not refused for not having answered it.
+    const patch: Record<string, unknown> = {};
+    if (input.birthDate) {
+      const d = new Date(input.birthDate);
+      if (Number.isNaN(d.getTime())) return { error: "That date of birth doesn't look right." };
+      patch.birthDate = d;
+    }
+    if (input.country) patch.country = input.country.trim().toUpperCase().slice(0, 2);
+    if (Object.keys(patch).length) {
+      await db.update(schema.users).set(patch).where(eq(schema.users.id, user.id));
+    }
+    const elig = Object.keys(patch).length
+      ? eligibilityOf(
+          ageFrom((patch.birthDate as Date) ?? null) ?? (await eligibilityFor(db, user.id)).age,
+          (patch.country as string) ?? user.country ?? null,
+        )
+      : await eligibilityFor(db, user.id);
+    if (!elig.ok) return { error: elig.message, needs: elig.missing };
+  }
 
   if (!METHOD_OPTIONS.some((m) => m.key === input.method)) {
     return { error: "Pick how you'd like to be paid." };

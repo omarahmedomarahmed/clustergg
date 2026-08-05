@@ -154,9 +154,37 @@ async function getLolLive(puuid: string, platform: string, key: string, dd: { ve
   } catch { return { inGame: false }; }
 }
 
+/**
+ * Raw match JSON, through the 6h cache (B55.7).
+ *
+ * A match is immutable once played, and `matchCache` was already here holding
+ * exactly this for six hours — but only `getLolMatchDetail`, the click-through
+ * view, ever looked in it. The CARD path went `matchSummaryFor` →
+ * `getMatchRaw` with no cache lookup at all, so every profile view fetched five
+ * match details fresh: nine Riot calls per view, each with a 7–8s timeout.
+ *
+ * Keyed on the match id alone, unlike the summary cache below it, because the
+ * raw payload is the same for every player in the game — two people on the same
+ * match now share one fetch.
+ */
+const rawMatchCache = new Map<string, { v: any; exp: number }>();
+
+async function getMatchRawCached(matchId: string, cluster: string, key: string): Promise<any> {
+  const hit = rawMatchCache.get(matchId);
+  if (hit && hit.exp > Date.now()) return hit.v;
+  const v = await getMatchRaw(matchId, cluster, key);
+  // Bounded: an in-process Map that only ever grows is a memory leak on a warm
+  // lambda. Oldest-first eviction is enough for a cache this shape.
+  if (rawMatchCache.size > 500) {
+    for (const k of [...rawMatchCache.keys()].slice(0, 250)) rawMatchCache.delete(k);
+  }
+  rawMatchCache.set(matchId, { v, exp: Date.now() + 6 * 3600_000 });
+  return v;
+}
+
 async function matchSummaryFor(matchId: string, puuid: string, cluster: string, key: string, dd: { version: string; byId: Map<number, Champ> }): Promise<LolMatchSummary | null> {
   try {
-    const detail = await getMatchRaw(matchId, cluster, key);
+    const detail = await getMatchRawCached(matchId, cluster, key);
     const info = detail.info;
     const p = (info.participants ?? []).find((x: any) => x.puuid === puuid);
     if (!p) return null;
@@ -209,7 +237,8 @@ export async function getLolMatchDetail(matchId: string, puuid: string, platform
   let dd: { version: string; byId: Map<number, Champ> };
   try { dd = await dataDragon(); } catch { dd = { version: "14.1.1", byId: new Map() }; }
   try {
-    const detail = await getMatchRaw(matchId, cluster, key);
+    // Same raw payload as the card's summary — one fetch serves both.
+    const detail = await getMatchRawCached(matchId, cluster, key);
     const info = detail.info;
     let dur = Number(info.gameDuration ?? 0);
     if (dur > 100000) dur = Math.round(dur / 1000);

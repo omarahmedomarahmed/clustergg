@@ -42,6 +42,18 @@ export default async function AdminRedeemsPage() {
     .innerJoin(schema.users, eq(schema.trophyRedeems.userId, schema.users.id))
     .orderBy(desc(schema.trophyRedeems.createdAt)).limit(100);
 
+  // B37: per-recipient annual totals, on demand.
+  //
+  // Not a tax filing and not advice — it is the answer to "who did we pay, how
+  // much, this year", which is the question that has to be answerable before
+  // anybody can file anything. Kept as the WHOLE list rather than pre-filtered
+  // by the threshold: the threshold is a number counsel may move, and a report
+  // that filters by it cannot answer the question after it moves.
+  const { annualRecipients, US_REPORT_THRESHOLD } = await import("@/lib/eligibility");
+  const taxYear = new Date().getUTCFullYear();
+  const recipients = await annualRecipients(db, taxYear);
+  const overLine = recipients.filter((r) => r.overThreshold);
+
   const awardIds = [...new Set(rows.flatMap(({ r }) => r.awardIds ?? []))];
   const awards = awardIds.length
     ? await db.select({ id: schema.userTrophies.id, name: schema.trophies.name, value: schema.trophies.value })
@@ -145,6 +157,47 @@ export default async function AdminRedeemsPage() {
         exactly how they want the money — bank transfer, PayPal, a prepaid card or a gift card in their own
         currency. The trophies leave their shelf when it is collected.
       </p>
+
+      {/* What we have paid this year, per person. */}
+      {recipients.length > 0 && (
+        <details className="glass mb-6 p-5">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Paid in {taxYear} — {recipients.length} recipient{recipients.length === 1 ? "" : "s"}
+            {overLine.length > 0 && (
+              <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
+                {overLine.length} over ${US_REPORT_THRESHOLD.toLocaleString()}
+              </span>
+            )}
+          </summary>
+          <p className="mt-2 text-xs text-muted max-w-3xl">
+            Counted from the date the money moved, not the date it was requested — a request approved in December
+            and paid in January belongs to January. ${US_REPORT_THRESHOLD.toLocaleString()} is where US information
+            reporting typically begins; what gets filed, and by whom, is a question for counsel and not for this page.
+          </p>
+          <table className="mt-3 w-full text-sm">
+            <thead className="text-[10px] uppercase tracking-widest text-muted">
+              <tr className="border-b border-white/10">
+                <th className="py-2 text-left">Recipient</th>
+                <th className="py-2 text-left">Country</th>
+                <th className="py-2 text-right">Paid in {taxYear}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recipients.map((r) => (
+                <tr key={r.userId} className="border-b border-white/5">
+                  <td className="py-2">
+                    <Link href={`/u/${r.slug}`} className="hover:text-cyan-300">{r.name}</Link>
+                  </td>
+                  <td className="py-2 text-muted">{r.country ?? "—"}</td>
+                  <td className={`py-2 text-right tabular-nums font-semibold ${r.overThreshold ? "text-amber-300" : ""}`}>
+                    ${r.total.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
 
       <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm">
         <span className="text-muted">Paying through</span>

@@ -9,7 +9,7 @@ import { uid } from "@/lib/utils";
 import { evaluateBadgesForUser } from "@/lib/badges";
 import { recomputeExpertScores } from "@/lib/experts";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
-import { joinChallengeFor } from "@/lib/challenges";
+import { joinChallengeFor, switchChallengeAccount } from "@/lib/challenges";
 
 // ---------- Feed control panel ----------
 // Persist the gamer's feed dashboard prefs: which stat tiles show + which
@@ -262,5 +262,22 @@ export async function joinChallenge(challengeId: string, path: string, formData?
     source: "web",
     accessKey,
   });
+  revalidatePath(path);
+}
+
+/**
+ * Move an entry to another of your accounts, before the challenge starts (B38).
+ *
+ * A separate action from joining on purpose. Joining again with a different
+ * account cannot silently move the entry — that would make "enter" and "change
+ * my mind" the same gesture, and one of them is reversible in a way the other
+ * is not. This is the deliberate one, and `switchChallengeAccount` refuses it
+ * once the challenge has started.
+ */
+export async function switchEntryAccount(challengeId: string, path: string, formData: FormData) {
+  const me = await requireUser();
+  const linkedAccountId = String(formData.get("linkedAccountId") ?? "");
+  if (!linkedAccountId) return;
+  await switchChallengeAccount(me.id, challengeId, linkedAccountId);
   revalidatePath(path);
 }
