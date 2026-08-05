@@ -244,10 +244,23 @@ export async function sendRedeem(redeemId: string): Promise<{ ok?: true; error?:
     amount: { amount: Number(r.amount), currency: r.currency },
     memo: `Cluster trophy payout — ${(r.awardIds ?? []).length} ${((r.awardIds ?? []).length === 1 ? "trophy" : "trophies")}`,
   });
-  if (!res.ok) return { error: res.error };
+  // A failed send stays APPROVED and records WHY (B39).
+  //
+  // It used to return the provider's error to whoever pressed the button and
+  // write nothing. The state was right — approved, not lost — but the reason
+  // lived in a toast that closed, so the next person saw an approved payout that
+  // had simply never gone out and no way to know it had been tried.
+  if (!res.ok) {
+    await db.update(schema.trophyRedeems)
+      .set({ failedReason: res.error ?? "The payout provider refused it and gave no reason." })
+      .where(eq(schema.trophyRedeems.id, r.id));
+    return { error: res.error };
+  }
 
   await db.update(schema.trophyRedeems).set({
     status: "sent",
+    // Cleared: this one went.
+    failedReason: null,
     sentAt: new Date(),
     providerKey: adapter.key,
     providerRef: res.ref || null,

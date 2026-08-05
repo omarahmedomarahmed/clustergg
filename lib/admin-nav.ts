@@ -176,6 +176,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/trophies", label: "Trophies", desc: "The prize catalogue and what each is worth.", metric: "trophies" , system: "trophies" },
       { href: "/admin/redeems", label: "Trophy redemptions", desc: "Winners cashing in. Pay out or reject.", metric: "redeems", queue: true , system: "trophies" },
       { href: "/admin/growth-review", label: "Growth review", desc: "Servers whose linked-member growth is worth a look before a payout goes out.", queue: true, system: "billing" },
+      { href: "/admin/stuck", label: "Stuck money", desc: "Every state where a prize has nowhere to go — what is stuck, why, and what unsticks it.", queue: true, system: "trophies" },
       { href: "/admin/marketplace", label: "Marketplace", desc: "Trophies bought with Cluster Points — the shelf, the ledger and what we owe.", system: "trophies" },
     ],
   },

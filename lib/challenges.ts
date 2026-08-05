@@ -1,4 +1,4 @@
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { getDb, schema, type DB } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
@@ -437,7 +437,17 @@ export async function challengeStandings(challengeId: string, limit = 50): Promi
         eq(schema.challengeParticipants.challengeId, challengeId),
         eq(schema.challengeParticipants.status, "active"),
       ))
-      .orderBy(desc(schema.challengeParticipants.currentPoints))
+      // THE TIE-BREAK: equal points, earlier entry wins (B39).
+      //
+      // This ordered by points alone, so two gamers on the same score were
+      // placed in whatever order the database happened to return — which can
+      // differ between two reads of the same standings, and decides who gets a
+      // trophy. A tie-break invented after the fact is always disputed, so this
+      // one is fixed, deterministic, and stated in the rules before entry.
+      //
+      // Earliest entry rather than latest: the person who committed first, on
+      // less information about what score would win, is the one rewarded.
+      .orderBy(desc(schema.challengeParticipants.currentPoints), asc(schema.challengeParticipants.joinedAt))
       .limit(limit);
     return rows.map((r, i) => ({ ...r, place: i + 1 }));
   } catch { return []; }

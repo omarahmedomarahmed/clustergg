@@ -151,6 +151,7 @@ export const SHOT_REGISTRY: ShotDef[] = [
   { key: "admin.email.compose", group: "admin", claim: "Email any gamer, brand or server owner", capturedFrom: "/admin/email", as: "admin", openText: "Write to someone" },
   { key: "admin.cp.calculator", group: "admin", claim: "Every point we give away, modelled before we give it", capturedFrom: "/admin/cp-calculator", as: "admin" },
   { key: "admin.abuse.review", group: "admin", claim: "Growth we look at before we pay for it", capturedFrom: "/admin/growth-review", as: "admin" },
+  { key: "admin.stuck.money", group: "admin", claim: "Every prize has somewhere to go, or a reason it does not", capturedFrom: "/admin/stuck", as: "admin" },
 
   // ---- The bot ----
   { key: "bot.card.profile", group: "bot", claim: "Your trophies and every account, on one card", capturedFrom: "/api/card/profile?slug=nova", as: "guest" },

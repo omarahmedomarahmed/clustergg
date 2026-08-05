@@ -314,7 +314,7 @@ the remaining edits; Part II is the whole platform.
 | B36 | Brands prepay: due on issue, live on creation, settled by the first challenge's end | new `lib/prepay.ts`, `lib/sponsored-campaigns.ts`, `lib/challenge-requests.ts`, the brand portal | batch 4 | ☑ |
 | B37 | The legal framing of the economy | new `lib/eligibility.ts`, new `/legal/economy`, `app/actions/trophies.ts`, `/admin/redeems` | batch 4 | ☑ (**every threshold is a placeholder for counsel** — flagged in the code and on the page) |
 | B38 | One gamer, one account, one challenge | `lib/challenges.ts`, `app/actions/social.ts`, the challenge page | batch 4 | ☑ |
-| B39 | Stuck money: every state where a prize has nowhere to go | challenges, redeems, an admin view | batch 4 | ☐ |
+| B39 | Stuck money: every state where a prize has nowhere to go | new `lib/stuck-money.ts`, new `/admin/stuck`, `lib/challenges.ts`, `app/actions/trophies.ts` | batch 4 | ☑ |
 | B40 | Deleting an account with a balance | `app/settings/account` | batch 4 | ☐ |
 | B41 | The gamer homepage: hero, challenges, quests, missions, Discord | `app/page.tsx` | batch 4 | ☐ |
 | B42 | Missions: the guided first week, on homepage, quests page and feed | `lib/quest-game.ts` `StarterMissions` | batch 4 | ☐ |
@@ -3190,6 +3190,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/abuse.mts` | **B35** | the hold refuses inside the window and releases after; an unknown unlock date fails CLOSED; unqualified accounts raise raw and not qualified; the stamp is one-way; a draft or cancelled payout is not a track record | **written — 27 assertions** |
 | `tests/ui/marketplace.mjs` | **B48** | every quest reachable from the shelf; the balance is a link; dollar value and CP price agree on every tile; the redemption value outsizes the price | **written — 18 assertions** |
 | `tests/db/server-profile.mts` | **B47** | the gate at 500 linked; completeness has one definition; the missing-field list; nothing clawed back; manual mail logged and refused without an address | **write with the item — it decides who gets paid, see §1.1** |
+| `tests/db/stuck-money.mts` | **B39** | one assertion per row of the decision table; a tie is broken by entry time and is stable across reads; nothing is paid twice; every state reaches the admin view | **written — 33 assertions** |
 | `tests/db/wallet.mts` | **B18** | an empty wallet is honest; the ledger RECONCILES against the wallet and against `cpWallet`; a trophy is not a points movement; a bought trophy appears once; a gift costs the receiver nothing; no payment detail in any state | **written — 42 assertions** |
 | `tests/db/announce-queue.mts` | **B33** | publishing enqueues and returns; draining is idempotent; 429 reschedules; nothing fans out inline from a server action | **write with the item — money-adjacent, see §1.1** |
 | `tests/db/cp-economics.mts` | **B34** | no uncapped action; the 624 fixture; the 500 ceiling holds absolutely; award once, progress twice; $5 bronze = 50,000 CP; CP per impression under the CPM | **write with the item** |
@@ -3269,6 +3270,7 @@ the correct state for it.
 | `gamer.marketplace.earn` | "The shelf, and how to reach it" | `/marketplace` with the quest cards | not captured — placeholder |
 | `gamer.wallet` | "Your points, your trophies, what they are worth" | `/wallet` | not captured — placeholder |
 | `gamer.wallet.ledger` | "Every point accounted for" | `/wallet`, the movement list | not captured — placeholder |
+| `admin.stuck.money` | "Every prize has somewhere to go, or a reason it does not" | `/admin/stuck` | not captured — placeholder |
 | `admin.abuse.review` | "Growth we look at before we pay for it" | `/admin/growth-review` | not captured — placeholder |
 | `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | the brand portal, blocked banner | not captured — placeholder |
 | `gamer.marketplace.checkout` | "One confirm, and what it costs" | the checkout modal | not captured — placeholder |
