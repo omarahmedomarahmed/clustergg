@@ -108,9 +108,21 @@ export default async function WalletPage() {
 
       {/* The trophy case, with a redeem action on each. */}
       <section>
-        <h2 className="mb-3 flex items-center gap-2 text-lg font-bold">
-          <Icon name="trophy" size={18} className="text-amber-300" /> Your trophies
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-lg font-bold">
+            <Icon name="trophy" size={18} className="text-amber-300" /> Your trophies
+          </h2>
+          {/* The full flow (B6). The popup on the card is still there for one
+              trophy; this is the route for the moment somebody cashes out $400,
+              and it is the one that can be linked to, refreshed and resumed. */}
+          {wallet.trophiesHeld > 0 && (
+            <Link href="/redeem"
+              className="rounded-full bg-emerald-500/25 px-4 py-2 text-xs font-black text-emerald-100 transition hover:bg-emerald-500/35">
+              Cash out ${wallet.trophyValue.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              <Icon name="chevronRight" size={11} className="ml-1 inline" />
+            </Link>
+          )}
+        </div>
         <TrophyCase awards={shelf} redeems={redeems} savedMethod={savedMethod} changesUsed={0} variant="card" />
       </section>
 
