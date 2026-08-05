@@ -21,6 +21,15 @@ export const users = pgTable("users", {
   bannerUrl: text("banner_url"),
   bio: text("bio"),
   country: text("country"),           // ISO-3166 alpha-2 (e.g. "EG") → flag shown next to the name everywhere
+  /**
+   * Date of birth, asked for ONCE and only when it is needed (B37).
+   *
+   * Not collected at signup: playing has no age gate here, being PAID does, and
+   * a birthday field on a signup form is a field most people lie in and all of
+   * them resent. It is asked for at the first redemption, where the reason for
+   * asking is self-evident.
+   */
+  birthDate: timestamp("birth_date", { withTimezone: true, mode: "date" }),
   locale: text("locale").notNull().default("en"), // "en" | "ar" — the gamer's chosen site language
   title: text("title"), // flex title shown under the name (e.g. "Blitz Grandmaster")
   role: text("role").notNull().default("user"), // user | admin | superadmin | brand

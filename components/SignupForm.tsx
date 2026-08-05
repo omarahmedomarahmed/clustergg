@@ -19,7 +19,8 @@ export default function SignupForm() {
       </form>
       <p className="mt-4 text-xs text-muted/80">
         By joining you agree to the <Link href="/legal/terms" className="underline">Terms</Link> and{" "}
-        <Link href="/legal/privacy" className="underline">Privacy Policy</Link>.
+        <Link href="/legal/privacy" className="underline">Privacy Policy</Link>. Points and payouts are covered
+        separately in the <Link href="/legal/economy" className="underline">Economy terms</Link>.
       </p>
     </>
   );

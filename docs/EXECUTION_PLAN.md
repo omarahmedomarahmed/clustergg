@@ -297,7 +297,7 @@ the remaining edits; Part II is the whole platform.
 | B34 | **The repriced economy**: 1,000 CP = $0.10, every action capped, 500/day ceiling | `lib/quests.ts`, `lib/marketplace.ts`, supersedes B16/B17's numbers | batch 4 | ☑ |
 | B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | new `lib/abuse.ts`, payouts, tier unlocks, new `/admin/growth-review` | batch 4 | ☑ (defences 1–2 + the review queue; **velocity limits still owed** — see below) |
 | B36 | Brands prepay: due on issue, live on creation, settled by the first challenge's end | new `lib/prepay.ts`, `lib/sponsored-campaigns.ts`, `lib/challenge-requests.ts`, the brand portal | batch 4 | ☑ |
-| B37 | The legal framing of the economy | new `/legal/economy`, redemption eligibility gates | batch 4 | ☐ |
+| B37 | The legal framing of the economy | new `lib/eligibility.ts`, new `/legal/economy`, `app/actions/trophies.ts`, `/admin/redeems` | batch 4 | ☑ (**every threshold is a placeholder for counsel** — flagged in the code and on the page) |
 | B38 | One gamer, one account, one challenge | challenge entry rules | batch 4 | ☐ |
 | B39 | Stuck money: every state where a prize has nowhere to go | challenges, redeems, an admin view | batch 4 | ☐ |
 | B40 | Deleting an account with a balance | `app/settings/account` | batch 4 | ☐ |
@@ -2803,6 +2803,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/offers.mts` | **B30** | off by default; the discount is its own line; totals equal lines; admin edits survive recalculation | owed |
 | `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
 | `tests/db/email.mts` + `tests/ui/admin-email.mjs` | **B32** | no key = no-op, never throws; every template fills; webhooks update status; no key or payment detail in a subject | owed |
+| `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |
 | `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
 | `tests/db/abuse.mts` | **B35** | the hold refuses inside the window and releases after; an unknown unlock date fails CLOSED; unqualified accounts raise raw and not qualified; the stamp is one-way; a draft or cancelled payout is not a track record | **written — 27 assertions** |
 | `tests/ui/marketplace.mjs` | **B48** | every quest reachable from the shelf; the balance is a link; dollar value and CP price agree on every tile; the redemption value outsizes the price | **written — 18 assertions** |

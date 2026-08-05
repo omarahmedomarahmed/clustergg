@@ -1,0 +1,186 @@
+// Who we can pay, and what we have to know before we pay them (B37).
+//
+// Free points → trophies → real money, paid worldwide, is a prize and promotion
+// scheme. This file is the ENFORCEMENT half of that: the prose lives at
+// /legal/economy, and prose that nothing in the code checks is a wish.
+//
+// **Not legal advice.** Every threshold here is a placeholder a lawyer has to
+// confirm before launch, and each one says so where it is defined. What this
+// file guarantees is that when those numbers change, they change in one place
+// and the redemption path already reads them.
+
+import { and, eq, gte, lt, sql } from "drizzle-orm";
+import type { DB } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+
+/**
+ * The minimum age to redeem for money.
+ *
+ * 18, not 13. Playing is one thing; being PAID is a contract, and a minor's
+ * contract is voidable nearly everywhere — which means a payout to a
+ * fifteen-year-old is money we may have to return and cannot get back from the
+ * payout provider. Under-18s can still earn points, hold trophies and win
+ * challenges; what they cannot do is cash out.
+ *
+ * ⚠ Confirm with counsel before launch. Some jurisdictions set it higher.
+ */
+export const MIN_REDEEM_AGE = 18;
+
+/**
+ * Countries we will not pay into.
+ *
+ * Comprehensively sanctioned jurisdictions. The payout provider will refuse
+ * these anyway, so refusing here is not extra strictness — it is **kinder**: a
+ * gamer learns before they lock their trophies into a request that will fail,
+ * rather than after.
+ *
+ * ⚠ This list moves. It is a placeholder for counsel and has to be reviewed
+ * against the current OFAC/EU/UK lists before launch, and on a schedule after.
+ */
+export const BLOCKED_COUNTRIES: Record<string, string> = {
+  CU: "Cuba", IR: "Iran", KP: "North Korea", SY: "Syria",
+  RU: "Russia", BY: "Belarus",
+};
+
+/**
+ * The US information-reporting line that arrives first.
+ *
+ * We are not filing anything from code. What this number does is make the
+ * question answerable: which recipients crossed it this year, so the people who
+ * do file have the list rather than a database and a hope.
+ *
+ * ⚠ Thresholds vary by country and change by year. Counsel decides who reports
+ * what; this is the trigger for asking.
+ */
+export const US_REPORT_THRESHOLD = 600;
+
+export type EligibilityReason = "ok" | "no_age" | "no_country" | "underage" | "blocked_country";
+
+export type Eligibility = {
+  ok: boolean;
+  reason: EligibilityReason;
+  /** What to say to the gamer. Empty when ok. */
+  message: string;
+  /** What we still need from them, so the form can ask for exactly that. */
+  missing: ("age" | "country")[];
+  age: number | null;
+  country: string | null;
+};
+
+/** Whole years between a birth date and now. Nothing clever, and no timezone. */
+export function ageFrom(birthDate: Date | string | null | undefined, now = new Date()): number | null {
+  if (!birthDate) return null;
+  const b = new Date(birthDate);
+  if (Number.isNaN(b.getTime())) return null;
+  let age = now.getUTCFullYear() - b.getUTCFullYear();
+  const m = now.getUTCMonth() - b.getUTCMonth();
+  if (m < 0 || (m === 0 && now.getUTCDate() < b.getUTCDate())) age--;
+  return age;
+}
+
+/**
+ * Pure: given an age and a country, may this person be paid?
+ *
+ * Separated from the database read so the rule can be tested without one, and
+ * so the same rule can be applied to a form the gamer is still filling in.
+ */
+export function eligibilityOf(age: number | null, country: string | null): Eligibility {
+  const cc = (country ?? "").trim().toUpperCase() || null;
+  const missing: ("age" | "country")[] = [];
+  if (age === null) missing.push("age");
+  if (!cc) missing.push("country");
+
+  if (age === null) {
+    return { ok: false, reason: "no_age", missing, age, country: cc,
+      message: "We need your date of birth before we can pay out. Points and trophies are unaffected — this is only about cashing out." };
+  }
+  if (!cc) {
+    return { ok: false, reason: "no_country", missing, age, country: cc,
+      message: "We need the country you live in before we can pay out — it decides which payout methods exist for you." };
+  }
+  if (age < MIN_REDEEM_AGE) {
+    return { ok: false, reason: "underage", missing, age, country: cc,
+      message: `You have to be ${MIN_REDEEM_AGE} to cash out. Keep earning — your points and trophies are yours and they keep, and you can redeem them when you turn ${MIN_REDEEM_AGE}.` };
+  }
+  if (BLOCKED_COUNTRIES[cc]) {
+    return { ok: false, reason: "blocked_country", missing, age, country: cc,
+      message: `We cannot send payments to ${BLOCKED_COUNTRIES[cc]}. Our payout partner will not process them, so we are telling you now rather than after your trophies are locked into a request that fails. You keep the trophies.` };
+  }
+  return { ok: true, reason: "ok", missing: [], age, country: cc, message: "" };
+}
+
+/** The same rule, against the account on file. */
+export async function eligibilityFor(db: DB, userId: string): Promise<Eligibility> {
+  try {
+    const [u] = await db.select({ birthDate: schema.users.birthDate, country: schema.users.country })
+      .from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+    return eligibilityOf(ageFrom(u?.birthDate), u?.country ?? null);
+  } catch {
+    // Fail CLOSED. This gate decides whether money leaves, and B35 settled the
+    // principle: a guard that opens when the database hiccups is not a guard.
+    return { ok: false, reason: "no_age", missing: ["age", "country"], age: null, country: null,
+      message: "We could not check your details just now. Try again in a moment." };
+  }
+}
+
+/**
+ * What one recipient was PAID in a calendar year.
+ *
+ * Counted from `paidAt` and from paid rows only — a request that was approved in
+ * December and paid in January belongs to January, because the year that matters
+ * for reporting is the year the money moved. Counting by request date would put
+ * it in the wrong year every time, and the error would only ever be found by
+ * somebody reconciling a tax form.
+ */
+export async function annualPayout(db: DB, userId: string, year: number): Promise<number> {
+  try {
+    const start = new Date(Date.UTC(year, 0, 1));
+    const end = new Date(Date.UTC(year + 1, 0, 1));
+    const [row] = await db.select({ n: sql<number>`COALESCE(SUM(${schema.trophyRedeems.amount}), 0)` })
+      .from(schema.trophyRedeems)
+      .where(and(
+        eq(schema.trophyRedeems.userId, userId),
+        eq(schema.trophyRedeems.status, "paid"),
+        gte(schema.trophyRedeems.paidAt, start),
+        lt(schema.trophyRedeems.paidAt, end),
+      ));
+    return Math.round(Number(row?.n ?? 0) * 100) / 100;
+  } catch { return 0; }
+}
+
+export type RecipientYear = { userId: string; name: string; slug: string; country: string | null; total: number; overThreshold: boolean };
+
+/**
+ * Everyone we paid in a year, and who crossed the reporting line.
+ *
+ * The whole list rather than only those over the threshold: the threshold is a
+ * number counsel may move, and a report that pre-filters by it cannot answer
+ * the question after it moves.
+ */
+export async function annualRecipients(db: DB, year: number): Promise<RecipientYear[]> {
+  try {
+    const start = new Date(Date.UTC(year, 0, 1));
+    const end = new Date(Date.UTC(year + 1, 0, 1));
+    const rows = await db.select({
+      userId: schema.trophyRedeems.userId,
+      name: schema.users.displayName,
+      slug: schema.users.slug,
+      country: schema.users.country,
+      total: sql<number>`COALESCE(SUM(${schema.trophyRedeems.amount}), 0)`,
+    }).from(schema.trophyRedeems)
+      .innerJoin(schema.users, eq(schema.users.id, schema.trophyRedeems.userId))
+      .where(and(
+        eq(schema.trophyRedeems.status, "paid"),
+        gte(schema.trophyRedeems.paidAt, start),
+        lt(schema.trophyRedeems.paidAt, end),
+      ))
+      .groupBy(schema.trophyRedeems.userId, schema.users.displayName, schema.users.slug, schema.users.country);
+    return rows
+      .map((r) => ({
+        userId: r.userId, name: r.name, slug: r.slug, country: r.country,
+        total: Math.round(Number(r.total ?? 0) * 100) / 100,
+        overThreshold: Number(r.total ?? 0) >= US_REPORT_THRESHOLD,
+      }))
+      .sort((a, b) => b.total - a.total);
+  } catch { return []; }
+}

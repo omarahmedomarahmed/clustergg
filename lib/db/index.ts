@@ -424,6 +424,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "department_id" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "vote_count" integer NOT NULL DEFAULT 0`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "discord_views" integer NOT NULL DEFAULT 0`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "birth_date" timestamptz`,
   `CREATE TABLE IF NOT EXISTS "profile_votes" (
     "profile_user_id" text NOT NULL,
     "voter_user_id" text,

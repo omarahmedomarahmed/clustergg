@@ -45,6 +45,13 @@ export default function TrophyCase({
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [step, setStep] = useState<"shelf" | "payout">("shelf");
   const [currency, setCurrency] = useState<string>(savedMethod?.currency || "USD");
+  // B37: asked for HERE and nowhere else. Playing has no age gate; being paid
+  // does, and a birthday field on a signup form is one most people lie in and
+  // all of them resent. The fields appear only when the server says it needs
+  // them, so a gamer who has already answered never sees them again.
+  const [needs, setNeeds] = useState<("age" | "country")[]>([]);
+  const [birthDate, setBirthDate] = useState("");
+  const [country, setCountry] = useState("");
   const [method, setMethod] = useState<string>(
     METHODS.some((m) => m.key === savedMethod?.method) ? savedMethod!.method : "bank",
   );
@@ -65,8 +72,12 @@ export default function TrophyCase({
 
   const submit = () => start(async () => {
     setError(null);
-    const res = await requestRedeem({ awardIds: selected.map((a) => a.id), currency, method });
-    if (res.error) { setError(res.error); return; }
+    const res = await requestRedeem({
+      awardIds: selected.map((a) => a.id), currency, method,
+      birthDate: birthDate || undefined, country: country || undefined,
+    });
+    if (res.error) { setError(res.error); setNeeds(res.needs ?? []); return; }
+    setNeeds([]);
     setSel({}); setStep("shelf"); router.refresh();
   });
   const act = (fn: () => Promise<{ ok?: true; error?: string }>) => start(async () => {
@@ -282,6 +293,29 @@ export default function TrophyCase({
                 {["USD", "EUR", "GBP", "EGP", "SAR", "AED"].map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </label>
+            {needs.length > 0 && (
+              <div className="rounded-xl border border-amber-400/35 bg-amber-500/5 px-3 py-3 space-y-2">
+                <div className="text-xs font-semibold text-amber-200">
+                  {tr("Two things before we can pay you")}
+                </div>
+                <p className="text-[11px] text-muted">
+                  {tr("Being paid is a contract, so we need your age and where you live. We ask once, and only here — your points and trophies were never affected by this.")}
+                </p>
+                {needs.includes("age") && (
+                  <label className="block text-xs text-muted">{tr("Date of birth")}
+                    <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)}
+                      className="input-cosmic mt-1 w-full" />
+                  </label>
+                )}
+                {needs.includes("country") && (
+                  <label className="block text-xs text-muted">{tr("Country you live in")}
+                    <input type="text" maxLength={2} placeholder="EG" value={country}
+                      onChange={(e) => setCountry(e.target.value.toUpperCase())}
+                      className="input-cosmic mt-1 w-full uppercase" />
+                  </label>
+                )}
+              </div>
+            )}
             <div className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-[11px] text-muted">
               <b className="text-ink">{tr("We never ask for your bank details.")}</b>{" "}
               {tr("Once staff approve this, you get a link that opens our payout partner's own page — you pick exactly where the money goes there, from thousands of options in your country. Nothing about your account is ever stored on Cluster.")}
@@ -297,6 +331,9 @@ export default function TrophyCase({
               className="money-btn w-full pressable rounded-full px-6 py-3 font-bold text-white disabled:opacity-60">
               {pending ? tr("Submitting…") : `${tr("Request payout")} · $${selectedTotal.toLocaleString()} ${currency}`}
             </button>
+            <p className="text-center text-[10px] text-muted">
+              <a href="/legal/economy" className="underline hover:text-ink">{tr("Economy & payout terms")}</a>
+            </p>
           </div>
         )}
       </div>
