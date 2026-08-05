@@ -79,6 +79,7 @@ export async function seedDemoActivity(db: {
   await seedStuckMoney(db);
   await seedServerScale(db);
   await seedNavArt(db);
+  await seedPodiumPrizes(db);
   await seedFeatureShots(db);
   if (admin) await seedAuditTrail(db, admin.id);
 }
@@ -754,6 +755,32 @@ async function seedPayoutAccounts(db: any, gamers: { id: string; slug: string }[
 // `next/headers`, and pulling that into the seed's module graph breaks the
 // production build outright — the seed is imported by the database bootstrap.
 // Same trap the week-key lookup fell into; the fix is the same shape.
+// ===== What the Profile-of-the-Week podium is playing for =====
+//
+// B51 gives each place its own trophy, and an unconfigured podium renders the
+// old generic crown — correct, and indistinguishable from the feature not
+// existing. Three tiers, descending, so the demo shows the thing the item is
+// actually about: that first place is worth more than third and a contender can
+// see by how much.
+async function seedPodiumPrizes(db: any) {
+  // From `lib/week`, not `lib/profile-week`: the latter reaches `next/headers`
+  // and importing it here fails the build rather than the typecheck.
+  const { PODIUM_TROPHY_KEYS } = await import("@/lib/week");
+  const existing = await db.select().from(schema.platformSettings)
+    .where(eq(schema.platformSettings.key, PODIUM_TROPHY_KEYS[0]));
+  if (existing.length && existing[0]?.value) return;
+  const wanted = ["legendary", "gold", "silver"];
+  const all = await db.select().from(schema.trophies);
+  if (!all.length) return;
+  for (const [i, tier] of wanted.entries()) {
+    const t = all.find((x: { tier: string }) => x.tier === tier) ?? all[i] ?? all[0];
+    if (!t) continue;
+    await db.insert(schema.platformSettings)
+      .values({ key: PODIUM_TROPHY_KEYS[i], value: t.id })
+      .onConflictDoNothing();
+  }
+}
+
 async function seedNavArt(db: any) {
   const [existing] = await db.select().from(schema.platformSettings)
     .where(eq(schema.platformSettings.key, "brand.nav.bg")).limit(1);
