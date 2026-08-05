@@ -353,7 +353,7 @@ export const ALWAYS_OPEN = [...ALWAYS_OPEN_EXACT, ...ALWAYS_OPEN_UNDER];
  *
  * Admins are not staff for this check; `requireSystemFor` returns before it.
  */
-export const ADMIN_ONLY = ["/admin/users", "/admin/linked-accounts"];
+export const ADMIN_ONLY = ["/admin/users", "/admin/linked-accounts", "/admin/payments"];
 
 
 export function pathAllowedFor(systems: string[], path: string): boolean {
