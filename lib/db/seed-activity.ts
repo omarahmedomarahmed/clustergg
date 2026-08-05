@@ -74,6 +74,9 @@ export async function seedDemoActivity(db: {
   await seedChallengeRequests(db);
   await seedPayoutAccounts(db, gamers);
   await seedCampaignInvoices(db);
+  // AFTER the marketplace, because it needs a redeem row to break and a trophy
+  // to strand.
+  await seedStuckMoney(db);
   await seedServerScale(db);
   await seedNavArt(db);
   await seedFeatureShots(db);
@@ -440,6 +443,66 @@ async function seedMarketplace(db: any, gamers: { id: string; slug: string }[]) 
       details: {}, status: s.status, createdAt: ago(s.days), decidedAt: s.status === "pending" ? null : ago(s.days - 1),
       ...(s.extra ?? {}),
     }).onConflictDoNothing();
+  }
+}
+
+// ===== Money with nowhere to go =====
+//
+// B39 shipped the stuck-money console with a gap I stated rather than hid: the
+// demo reached three of its five states and not the other two, so the screen was
+// correct but not demonstrable. Two of the five — a failed payout and a prize
+// whose owner is gone — are exactly the ones that need a decision and that carry
+// a dollar figure, which makes them the ones worth being able to see.
+//
+// Both are seeded as states, not as new nouns: the failed payout is one of the
+// redeems `seedMarketplace` already created, pushed back to `approved` with the
+// provider's reason on it, which is precisely what the failure path does. The
+// departed winner is a separate user, because a real one leaving would take the
+// demo's own data with them.
+async function seedStuckMoney(db: any) {
+  // ---- a redemption the provider refused ----
+  //
+  // Not a new row: the real failure path sets `status` back to `approved` and
+  // records `failedReason`, so the demo has to arrive at the same state the
+  // same way, or the console would be reading something production never writes.
+  const [alreadyFailed] = await db.select({ c: sql<number>`count(*)` })
+    .from(schema.trophyRedeems).where(sql`${schema.trophyRedeems.failedReason} is not null`);
+  if (!Number(alreadyFailed?.c ?? 0)) {
+    const [sent] = await db.select().from(schema.trophyRedeems)
+      .where(eq(schema.trophyRedeems.status, "sent")).limit(1);
+    if (sent) {
+      await db.update(schema.trophyRedeems).set({
+        status: "approved",
+        failedReason: "Provider rejected: the recipient's country is not supported for this method.",
+      }).where(eq(schema.trophyRedeems.id, sent.id));
+    }
+  }
+
+  // ---- a prize whose owner is gone ----
+  //
+  // Awarded past the 90-day hold, so the console shows the row in the state that
+  // actually asks something of an admin ("forfeit it") rather than the one that
+  // asks nothing ("held in case they come back"). Status `deleted` keeps them
+  // out of every leaderboard and directory, all of which filter on `active`.
+  const ghostSlug = "departed-winner";
+  const [ghost] = await db.select({ id: schema.users.id }).from(schema.users)
+    .where(eq(schema.users.slug, ghostSlug)).limit(1);
+  if (!ghost) {
+    const id = uid();
+    await db.insert(schema.users).values({
+      id, slug: ghostSlug, displayName: "Departed Winner",
+      email: `${ghostSlug}@demo.invalid`, passwordHash: "x",
+      status: "deleted", profileVisibility: "private",
+      createdAt: ago(400),
+    }).onConflictDoNothing();
+    const [prize] = await db.select().from(schema.trophies)
+      .where(eq(schema.trophies.tier, "gold")).limit(1);
+    if (prize) {
+      await db.insert(schema.userTrophies).values({
+        id: uid(), userId: id, trophyId: prize.id, placement: 1,
+        status: "held", awardedAt: ago(120),
+      }).onConflictDoNothing();
+    }
   }
 }
 
