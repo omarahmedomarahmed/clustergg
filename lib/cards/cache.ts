@@ -52,6 +52,25 @@ export async function getOrRenderCard(kind: string, cacheKey: string, data: Card
     }
   } catch { /* fall through to a fresh render */ }
 
+  // The daily ceiling (B46).
+  //
+  // Checked HERE, after the cache lookup, so a hit costs nothing extra — the
+  // ceiling is about renders, and a cache hit is not one. When it trips we
+  // serve the last good card for this key rather than failing: a stale card is
+  // a card, a missing card is a broken Discord message, and the person looking
+  // at it did nothing wrong.
+  try {
+    const { renderBudget } = await import("@/lib/cards/budget");
+    const budget = await renderBudget();
+    if (budget.exhausted) {
+      if (existing?.url) return { url: existing.url, cached: true };
+      // Nothing stored for this key and no budget to draw one. Null sends the
+      // caller to the live route, which renders on demand — the same fallback
+      // an unconfigured Blob store already uses.
+      return null;
+    }
+  } catch { /* a budget we cannot read must not stop rendering */ }
+
   let url: string | null = null;
   let bytes = 0;
   try {
