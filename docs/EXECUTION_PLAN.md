@@ -293,7 +293,7 @@ the remaining edits; Part II is the whole platform.
 | B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
 | B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☑ |
-| B18 | The wallet — CP, dollar value, trophy case, one ledger | new `/wallet`, `lib/marketplace.ts`, the trophy case | batch 2 | ☐ |
+| B18 | The wallet — CP, dollar value, trophy case, one ledger | new `lib/wallet.ts`, new `/wallet`, `components/FeatureShot.tsx` | batch 2 | ☑ |
 | B19 | Marketplace, revamped | `/marketplace`, the quests-page section | batch 2 | ☐ **folded into B49** |
 | B20 | The wallet card, in Discord | the bot wallet card, the redeem stepper | batch 2 | ☐ |
 | B21 | The economy, explained in visuals, everywhere | bot guides, quests, wallet, homepage, deck | batch 2 | ☐ |
@@ -326,6 +326,7 @@ the remaining edits; Part II is the whole platform.
 | S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
 | S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
 | S4 | **A JSX expression rendering as literal text** on every unaffordable trophy tile — a backtick where a fragment belonged, so the marketplace read `$<Cp amount={t.cpPrice - balance} /> to go` | `components/TrophyMarket.tsx` | wave 2 (found by B34) | ☑ |
+| S10 | **Every `<FeatureShot>` slot placed since B47 rendered a BROKEN IMAGE, not a placeholder** — `seedFeatureShots` wrote `/shots/<key>.jpg` for every registry key whether the file existed or not, so eight registered-but-uncaptured slots showed a full-height box of alt text. Precisely the set the "place them and leave them EMPTY" rule creates | `lib/shots.ts`, `lib/db/seed-activity.ts`, `components/FeatureShot.tsx` | wave 2 (found by B18) | ☑ |
 | S9 | **Deleting a trophy silently deleted every holder's copy of it** — `user_trophies.trophyId` is `onDelete: "cascade"` (`schema.ts:669`) while `marketplace_orders.trophyId` is `onDelete: "restrict"` (`:649`), so a trophy that was ever BOUGHT was refused by the database and one that was only ever WON cascaded away. The gap was "won, never bought" — most trophies | `app/actions/admin.ts`, `lib/trophy-admin.ts` | wave 2 (found by B53) | ☑ |
 | S8 | **Demo campaign invoices** — the overdue banner, the dunning schedule and the publish block were all built, correct, and invisible, because the demo's campaigns predated invoicing and nothing owed anything | `lib/db/seed-activity.ts` | wave 2 (B36 fallout) | ☑ |
 | S7 | **A quest card contained no link on its default tab** — `role="link"` with a `router.push`, so it worked for a mouse and Enter and nothing else; the only `<Link>` lived on the non-default leaderboard tab | `components/QuestCard.tsx` | wave 2 (found by B48) | ☑ |
@@ -3189,6 +3190,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/abuse.mts` | **B35** | the hold refuses inside the window and releases after; an unknown unlock date fails CLOSED; unqualified accounts raise raw and not qualified; the stamp is one-way; a draft or cancelled payout is not a track record | **written — 27 assertions** |
 | `tests/ui/marketplace.mjs` | **B48** | every quest reachable from the shelf; the balance is a link; dollar value and CP price agree on every tile; the redemption value outsizes the price | **written — 18 assertions** |
 | `tests/db/server-profile.mts` | **B47** | the gate at 500 linked; completeness has one definition; the missing-field list; nothing clawed back; manual mail logged and refused without an address | **write with the item — it decides who gets paid, see §1.1** |
+| `tests/db/wallet.mts` | **B18** | an empty wallet is honest; the ledger RECONCILES against the wallet and against `cpWallet`; a trophy is not a points movement; a bought trophy appears once; a gift costs the receiver nothing; no payment detail in any state | **written — 42 assertions** |
 | `tests/db/announce-queue.mts` | **B33** | publishing enqueues and returns; draining is idempotent; 429 reschedules; nothing fans out inline from a server action | **write with the item — money-adjacent, see §1.1** |
 | `tests/db/cp-economics.mts` | **B34** | no uncapped action; the 624 fixture; the 500 ceiling holds absolutely; award once, progress twice; $5 bronze = 50,000 CP; CP per impression under the CPM | **write with the item** |
 | `tests/db/abuse.mts` | **B35** | holding period blocks then releases; qualified count drives tiers; velocity limits bite | **write with the item** |
@@ -3265,6 +3267,8 @@ the correct state for it.
 | `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` | not captured — placeholder |
 | `gamer.cp.capped` | "Capped, and told plainly" | `/quests`, today’s limits above the history | not captured — placeholder |
 | `gamer.marketplace.earn` | "The shelf, and how to reach it" | `/marketplace` with the quest cards | not captured — placeholder |
+| `gamer.wallet` | "Your points, your trophies, what they are worth" | `/wallet` | not captured — placeholder |
+| `gamer.wallet.ledger` | "Every point accounted for" | `/wallet`, the movement list | not captured — placeholder |
 | `admin.abuse.review` | "Growth we look at before we pay for it" | `/admin/growth-review` | not captured — placeholder |
 | `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | the brand portal, blocked banner | not captured — placeholder |
 | `gamer.marketplace.checkout` | "One confirm, and what it costs" | the checkout modal | not captured — placeholder |

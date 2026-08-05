@@ -44,9 +44,15 @@ export default async function FeatureShot({
 
   return (
     <figure className={`relative ${className}`} data-shot-key={shotKey}>
+      {/* An EMPTY slot does not reserve a hero.
+          `ratio` is what a real screenshot needs so the page does not shift when
+          it loads. A placeholder needs none of that — it has nothing to shift —
+          and reserving 16:9 for one pushed the whole wallet below the fold with
+          a wall of nothing. Slots stay empty until V1.R by design, so the empty
+          state has to be a state somebody can live with, not a hole. */}
       <div
-        className="relative overflow-hidden rounded-2xl border border-violet-400/20 bg-black/30"
-        style={{ aspectRatio: shot.width && shot.height ? `${shot.width} / ${shot.height}` : ratio }}
+        className={`relative overflow-hidden rounded-2xl border border-violet-400/20 bg-black/30 ${shot.imageUrl ? "" : "py-6"}`}
+        style={shot.imageUrl ? { aspectRatio: shot.width && shot.height ? `${shot.width} / ${shot.height}` : ratio } : undefined}
       >
         {shot.imageUrl ? (
           /* eslint-disable-next-line @next/next/no-img-element */
@@ -61,13 +67,13 @@ export default async function FeatureShot({
              and it states the claim it is standing in for — so anybody reading
              the page can see both that a picture is missing and exactly what it
              was supposed to show. */
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-violet-400/30 px-6 text-center">
-            <Icon name="image" size={22} className="text-violet-300/70" />
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-2xl border-2 border-dashed border-violet-400/30 px-6 text-center">
+            <Icon name="image" size={16} className="text-violet-300/70" />
             <div className="text-[11px] font-mono uppercase tracking-widest text-violet-300/70">{shotKey}</div>
-            {shot.claim && <div className="max-w-sm text-xs text-muted">Screenshot pending — this space proves: “{shot.claim}”</div>}
+            {shot.claim && <div className="text-xs text-muted">Screenshot pending — proves: “{shot.claim}”</div>}
             {staff && (
               <Link href={`/admin/shots?key=${encodeURIComponent(shotKey)}`}
-                className="mt-1 rounded-full border border-violet-400/40 px-3 py-1 text-[11px] font-semibold text-violet-200 hover:border-cyan-400/60">
+                className="rounded-full border border-violet-400/40 px-3 py-0.5 text-[11px] font-semibold text-violet-200 hover:border-cyan-400/60">
                 Upload it
               </Link>
             )}

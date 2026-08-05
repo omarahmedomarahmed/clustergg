@@ -361,7 +361,12 @@ function startOfUtcDay(): Date { const d = new Date(); d.setUTCHours(0, 0, 0, 0)
  * number — so it coalesces to `qp_awarded`. Every read of "how much CP" goes
  * through this expression; there is no second definition anywhere.
  */
-const CP_PAID = sql<number>`COALESCE(${schema.questEvents.cpAwarded}, ${schema.questEvents.qpAwarded})`;
+/**
+ * Exported for the wallet (B18), which has to sum the same number the rest of
+ * the product does. A second definition of "how much CP did this pay" is how a
+ * wallet and a leaderboard end up disagreeing.
+ */
+export const CP_PAID_SQL = sql<number>`COALESCE(${schema.questEvents.cpAwarded}, ${schema.questEvents.qpAwarded})`;
 
 /** The one ceiling, from settings, with the model's default when unset. */
 export async function dailyCpCeiling(db: DB): Promise<number> {
@@ -377,7 +382,7 @@ export async function dailyCpCeiling(db: DB): Promise<number> {
 /** How much CP this gamer has already been credited today (UTC). */
 export async function cpEarnedToday(db: DB, userId: string): Promise<number> {
   try {
-    const [row] = await db.select({ n: sql<number>`COALESCE(SUM(${CP_PAID}), 0)` })
+    const [row] = await db.select({ n: sql<number>`COALESCE(SUM(${CP_PAID_SQL}), 0)` })
       .from(schema.questEvents)
       .where(and(eq(schema.questEvents.userId, userId), gte(schema.questEvents.createdAt, startOfUtcDay())));
     return Number(row?.n ?? 0);
@@ -622,7 +627,7 @@ export async function getTotalCp(db: DB, userId: string | null): Promise<number>
   // item removed. The ledger is append-only and its rollover preserves the
   // total, so before the split the two agreed — this is the same number, read
   // from the side that stayed true.
-  const [row] = await db.select({ c: sql<number>`COALESCE(SUM(${CP_PAID}), 0)` })
+  const [row] = await db.select({ c: sql<number>`COALESCE(SUM(${CP_PAID_SQL}), 0)` })
     .from(schema.questEvents).where(eq(schema.questEvents.userId, userId));
   return Number(row?.c ?? 0);
 }
@@ -705,7 +710,7 @@ export async function getCpLedger(db: DB, userId: string | null, opts?: { questI
   if (opts?.questId) wheres.push(eq(schema.questEvents.questId, opts.questId));
   const rows = await db.select({
     id: schema.questEvents.id, questId: schema.questEvents.questId, actionKey: schema.questEvents.actionKey,
-    qp: CP_PAID, at: schema.questEvents.createdAt,
+    qp: CP_PAID_SQL, at: schema.questEvents.createdAt,
     key: schema.quests.key, name: schema.quests.name, color: schema.quests.color, logoUrl: schema.quests.logoUrl,
   }).from(schema.questEvents).innerJoin(schema.quests, eq(schema.questEvents.questId, schema.quests.id))
     .where(and(...wheres)).orderBy(desc(schema.questEvents.createdAt)).limit(opts?.limit ?? 120);

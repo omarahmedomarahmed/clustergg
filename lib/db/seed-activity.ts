@@ -722,7 +722,7 @@ async function seedNavArt(db: any) {
 // which is a different and much worse operation. The plan says so at V1.R; this
 // is the code it is talking about.
 async function seedFeatureShots(db: any) {
-  const { SHOT_REGISTRY } = await import("@/lib/shots");
+  const { SHOT_REGISTRY, CAPTURED_SHOT_KEYS } = await import("@/lib/shots");
   const existing = await db.select().from(schema.featureShots);
   const byKey = new Map(existing.map((r: { key: string }) => [r.key, r]));
 
@@ -732,9 +732,21 @@ async function seedFeatureShots(db: any) {
     // Twenty-eight full-page PNGs at 2x weighed 28MB; as JPEG they weigh 3.7MB
     // and look identical at display size. Cards stay PNG because they are copied
     // byte-for-byte from the render endpoint rather than re-encoded.
-    const bundled = `/shots/${def.key}.${def.capturedFrom.startsWith("/api/card/") ? "png" : "jpg"}`;
-    // An admin's replacement is anything that is not the bundled path.
-    if (row?.imageUrl && row.imageUrl !== bundled) continue;
+    // NULL when nothing was ever captured for this key.
+    //
+    // This wrote the bundled path unconditionally, so a registered-but-
+    // uncaptured slot pointed at a file that does not exist and rendered a
+    // BROKEN IMAGE — a full-height box of alt text — rather than the labelled
+    // placeholder. Every slot placed since B47 was in that state, which is
+    // exactly the set the "place them and leave them EMPTY" rule creates.
+    const captured = CAPTURED_SHOT_KEYS.has(def.key);
+    const bundled = captured
+      ? `/shots/${def.key}.${def.capturedFrom.startsWith("/api/card/") ? "png" : "jpg"}`
+      : null;
+    // An admin's replacement is anything that is not the bundled path. A row
+    // pointing at a bundled file we no longer ship is OURS, not theirs, so it is
+    // cleared rather than preserved.
+    if (row?.imageUrl && row.imageUrl !== bundled && !row.imageUrl.startsWith("/shots/")) continue;
     await db.insert(schema.featureShots).values({
       key: def.key,
       imageUrl: bundled,

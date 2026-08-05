@@ -61,12 +61,61 @@ export type ShotDef = {
   openText?: string;
 };
 
+/**
+ * The keys that actually have a file in `public/shots/` (B18, found the hard way).
+ *
+ * `seedFeatureShots` wrote `/shots/<key>.jpg` for EVERY registry key regardless
+ * of whether the file existed, so a registered-but-uncaptured slot rendered a
+ * BROKEN IMAGE — a full-height box showing alt text — instead of the labelled
+ * placeholder it was designed to show. Eight slots were in that state: every one
+ * placed since B47, which is precisely the set the "place slots and leave them
+ * EMPTY" rule created.
+ *
+ * A list rather than a filesystem check: `public/` is not reliably readable from
+ * a serverless function, and this has to be right in production, not only
+ * locally. **V1.R adds every key it captures to this list** — a shot that is not
+ * here renders as a placeholder, which is the correct and visible default.
+ */
+export const CAPTURED_SHOT_KEYS = new Set<string>([
+  "admin.challenge.rules",
+  "admin.payments.providers",
+  "admin.shots.console",
+  "bot.card.challenge",
+  "bot.card.market",
+  "bot.card.profile",
+  "brand.analytics.roas",
+  "brand.campaign.builder",
+  "brand.invoice",
+  "brand.reach.perserver",
+  "gamer.cp.ledger",
+  "gamer.feed.dashboard",
+  "gamer.leaderboard.rank",
+  "gamer.linked.verified",
+  "gamer.lol.card",
+  "gamer.marketplace.shelf",
+  "gamer.planet.page",
+  "gamer.profile.public",
+  "gamer.quest.map",
+  "gamer.redeem.method",
+  "nav.badges",
+  "nav.potw.expanded",
+  "planet.completed.standings",
+  "server.earnings.ledger",
+  "server.growth.journey",
+  "server.members.winnings",
+  "server.payout.history",
+  "server.tier.flagship",
+]);
+
 // Ordered by group, then by how early a visitor meets it.
 export const SHOT_REGISTRY: ShotDef[] = [
   // ---- The gamer ----
   { key: "gamer.profile.public", group: "gamer", claim: "A profile worth sharing", capturedFrom: "/u/nova", as: "guest" },
   // B17. Registered and left empty until V1.R.
   { key: "gamer.cp.capped", group: "gamer", claim: "Capped, and told plainly", capturedFrom: "/quests", as: "gamer" },
+  // B18. Registered and left empty until V1.R.
+  { key: "gamer.wallet", group: "gamer", claim: "Your points, your trophies, what they are worth", capturedFrom: "/wallet", as: "gamer" },
+  { key: "gamer.wallet.ledger", group: "gamer", claim: "Every point accounted for", capturedFrom: "/wallet", as: "gamer" },
   { key: "gamer.linked.verified", group: "gamer", claim: "Every account is verified against the game's own API", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='linked-accounts']" },
   { key: "gamer.lol.card", group: "gamer", claim: "Your rank, in the game's own words", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='lol-card']", openText: "League of Legends" },
   { key: "gamer.cp.ledger", group: "gamer", claim: "Every point is accounted for", capturedFrom: "/quests", as: "gamer" },
