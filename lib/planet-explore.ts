@@ -19,8 +19,8 @@ import { toRegion, REGIONS } from "@/lib/regions";
  * that gives those fifteen their names. `app/api/planet/gamer/route.ts` already
  * limits to 60; this is the path that did not.
  */
-const EXPLORE_ACCOUNT_CAP = 2000;
-const EXPLORE_STAT_CAP = 4000;
+export const EXPLORE_ACCOUNT_CAP = 2000;
+export const EXPLORE_STAT_CAP = 4000;
 
 // Everything the planet-explorer hero needs for one planet, in one call:
 // game leaderboards (with entries), auto-derived champion mastery boards,
@@ -28,9 +28,29 @@ const EXPLORE_STAT_CAP = 4000;
 // every gamer carrying their game-specific avatar. Structured so ANY game can
 // fill it; modules with no data are simply returned empty and hidden by the UI.
 
-export type ExploreEntry = { rank: number; slug: string; name: string; avatar: string | null; country: string | null; accountId: string | null; provider: string | null; value: number; rankLabel: string | null };
+/**
+ * One row on a planet's ladder (B52).
+ *
+ * `ign` is the name the GAME knows them by; `name` is their Cluster profile.
+ * The row shows the ign, because this is that game's ladder and a gamer looking
+ * for themselves is looking for the tag they play under. The Cluster identity
+ * appears when the row is opened.
+ *
+ * A gamer with two accounts on a game therefore appears TWICE, and that is
+ * correct rather than a duplicate: these are accounts, not people.
+ *
+ *   Leaderboards are per-ACCOUNT. Challenge entry is per-GAMER.
+ *
+ * A ladder ranks accounts because that is what the game ranks — hiding one of
+ * somebody's two would make our board disagree with the game's own. A challenge
+ * is a prize pool, and a prize pool ranks people, because one person taking two
+ * podium places takes a prize meant to spread (B38, enforced by the unique
+ * index `cp_challenge_user_idx`). Different questions, different right answers;
+ * neither is a bug in the other.
+ */
+export type ExploreEntry = { rank: number; slug: string; name: string; ign: string | null; avatar: string | null; country: string | null; accountId: string | null; provider: string | null; value: number; rankLabel: string | null };
 export type ExploreBoard = { metricKey: string; title: string; unit: string | null; sortDir: string; entries: ExploreEntry[] };
-export type ChampBoard = { championId: number; ddId: string; name: string; iconUrl: string; splashUrl: string; entries: { rank: number; slug: string; name: string; avatar: string | null; country: string | null; accountId: string; points: number; level: number }[] };
+export type ChampBoard = { championId: number; ddId: string; name: string; iconUrl: string; splashUrl: string; entries: { rank: number; slug: string; name: string; ign: string | null; avatar: string | null; country: string | null; accountId: string; points: number; level: number }[] };
 export type ExploreChallenge = {
   id: string; title: string; coverUrl: string | null; startAt: string; endAt: string; status: string;
   description: string; format: string; conditions: { metric: string; op: string; value: number }[];
@@ -96,17 +116,17 @@ export async function getPlanetExplore(
     rows.sort((x, y) => b.sortDir === "asc" ? x.value - y.value : y.value - x.value);
     const entries: ExploreEntry[] = rows.slice(0, 15).map((r, i) => {
       const a = accById.get(r.accountId);
-      return { rank: i + 1, slug: a?.slug ?? "", name: a?.name ?? "Gamer", avatar: a ? gameAvatar(a) : null, country: a?.country ?? null, accountId: r.accountId, provider: a?.provider ?? null, value: r.value, rankLabel: r.rankLabel };
+      return { rank: i + 1, slug: a?.slug ?? "", name: a?.name ?? "Gamer", ign: a?.ign ?? null, avatar: a ? gameAvatar(a) : null, country: a?.country ?? null, accountId: r.accountId, provider: a?.provider ?? null, value: r.value, rankLabel: r.rankLabel };
     }).filter((e) => e.slug);
     return { metricKey: b.metricKey, title: te("leaderboard", b.id, "title", b.title), unit: b.unit ?? null, sortDir: b.sortDir, entries };
   }).filter((b) => b.entries.length > 0);
 
   // ---- Champion mastery boards (auto-derived from connected accounts) ----
-  const champMap = new Map<number, { ddId: string; name: string; iconUrl: string; rows: { slug: string; name: string; avatar: string | null; country: string | null; accountId: string; points: number; level: number }[] }>();
+  const champMap = new Map<number, { ddId: string; name: string; iconUrl: string; rows: { slug: string; name: string; ign: string | null; avatar: string | null; country: string | null; accountId: string; points: number; level: number }[] }>();
   for (const a of accounts) {
     for (const ch of championsOf(a.providerData)) {
       if (!champMap.has(ch.championId)) champMap.set(ch.championId, { ddId: ch.ddId, name: ch.name, iconUrl: ch.iconUrl, rows: [] });
-      champMap.get(ch.championId)!.rows.push({ slug: a.slug, name: a.name, avatar: gameAvatar(a), country: a.country ?? null, accountId: a.id, points: ch.points, level: ch.level });
+      champMap.get(ch.championId)!.rows.push({ slug: a.slug, name: a.name, ign: a.ign ?? null, avatar: gameAvatar(a), country: a.country ?? null, accountId: a.id, points: ch.points, level: ch.level });
     }
   }
   const championBoards: ChampBoard[] = [...champMap.entries()].map(([championId, v]) => ({
