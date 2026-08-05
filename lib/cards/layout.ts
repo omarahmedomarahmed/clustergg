@@ -229,8 +229,17 @@ export const DEFAULT_LAYOUT: CardLayout = {
   // cards get screenshotted, cropped and reposted, and the only thing that
   // travels with them is this mark — so it is drawn at a size that survives
   // being seen at thumbnail scale in somebody else's feed.
-  mark: { x: 87.5, y: 77.5, size: 250 },
-  badge: { x: 91, y: 11.5, size: 96 },
+  // TOP-RIGHT (B54). It sat bottom-right at y:77.5, which put our mark in the
+  // busiest part of most cards — under the standings, over the prize art — and
+  // meant a card cropped for a tweet lost the branding first. The strip along
+  // the top is the one band every card keeps free by construction, so branding
+  // goes there, on the right, with the card's own identity on the left.
+  //
+  // An admin who has hand-placed the mark keeps their placement: this is the
+  // DEFAULT, and `spot()` only falls back to it for an unset value.
+  mark: { x: 91.5, y: 8.5, size: 132 },
+  // Pushed below the strip, since the mark now owns the top-right corner.
+  badge: { x: 91, y: 26, size: 96 },
   // The text column stops short of the sponsor box AND of the logo.
   //
   // Satori has no float, so text cannot wrap around either of them — the
@@ -239,7 +248,16 @@ export const DEFAULT_LAYOUT: CardLayout = {
   // top, the logo at the bottom, and (on a world card) the splash between.
   // This is the cost of carrying inventory on every card, taken once, in one
   // place, instead of discovered per card in production.
-  content: { x: 4.7, y: 7, w: 58.5, h: 84 },
+  // Starts under the strip, and now uses the WIDTH the mark gave up.
+  //
+  // 58.5% was the right number when the logo sat bottom-right and the ad sat
+  // top-right: the column had to end before both. With branding in the strip,
+  // the only thing still reserved on the right is the ad — and an unsold card
+  // has nothing there at all, which is why the first render after moving the
+  // mark had a dead half. `sideBox` still hands the world card its splash
+  // rectangle from the live layout, so widening here narrows that automatically
+  // rather than letting the two overlap.
+  content: { x: 4.7, y: 15, w: 78, h: 76 },
   // Top-right corner at 400 wide — the biggest unit that still leaves a
   // readable text column, and the same coordinates on every card so a brand's
   // creative lands in the same place whatever the bot was asked for. The badge

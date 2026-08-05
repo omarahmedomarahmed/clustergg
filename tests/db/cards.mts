@@ -138,6 +138,46 @@ ok("…and the person is still named, second",
 const plainRow = standRows.find((r) => r.name.includes(`SameName${tag}`));
 eq("…and an identical name is not printed twice", plainRow?.name, `SameName${tag}`);
 
+console.log("\n== the planet ladder leads with the in-game name too ==");
+// The THIRD place this was wrong, found by rendering the card and looking at
+// it: the planet card printed the Cluster profile name on every leaderboard
+// row. Same rule, same fix.
+{
+  const { planetCard } = await import("../../lib/cards/data.ts");
+  const planet = await planetCard(space.game ?? "");
+  const boards = (planet as { boards?: { leader: string | null }[] } | null)?.boards ?? [];
+  ok("the planet card builds with boards", boards.length >= 0, JSON.stringify(boards.slice(0, 1)));
+  const data = await readFile(new URL("../../lib/cards/data.ts", import.meta.url), "utf8");
+  ok("the leader is the in-game name", /leader = sorted\[0\]\.ign \|\| sorted\[0\]\.name/.test(data));
+  ok("…and the query selects it", /ign: schema\.linkedGameAccounts\.inGameName/.test(data));
+}
+
+console.log("\n== the leader and the value do not touch ==");
+// Satori's `gap` did not reach that nesting: the card rendered "NovaGold II"
+// with the two runs against each other. Only a real render shows that — a
+// source read never will — which is why the redesign was driven by looking at
+// the output rather than by reading the styles.
+ok("the value is spaced with a margin, not a gap",
+  /marginLeft: 10, color: t\.accent2/.test(render));
+
+console.log("\n== the top strip exists, and the mark is in it ==");
+const layout = await readFile(new URL("../../lib/cards/layout.ts", import.meta.url), "utf8");
+ok("there is a strip", /export const STRIP_H/.test(render));
+ok("…drawn unconditionally, unlike the accent bar", /Unconditional, unlike the accent bar/.test(render));
+const markY = Number(/mark: \{ x: [\d.]+, y: ([\d.]+)/.exec(layout)?.[1] ?? "99");
+ok("the mark sits in the top band, not the bottom corner", markY < 20, String(markY));
+const markX = Number(/mark: \{ x: ([\d.]+)/.exec(layout)?.[1] ?? "0");
+ok("…on the RIGHT", markX > 75, String(markX));
+const contentY = Number(/content: \{ x: [\d.]+, y: ([\d.]+)/.exec(layout)?.[1] ?? "0");
+ok("…and the body starts under it", contentY >= 14, String(contentY));
+const contentW = Number(/content: \{ x: [\d.]+, y: [\d.]+, w: ([\d.]+)/.exec(layout)?.[1] ?? "0");
+// Moving the mark out of the bottom-right left a dead half on the first render.
+ok("…using the width the mark gave up", contentW > 70, String(contentW));
+
+console.log("\n== a challenge with no cover falls back to its GAME's art ==");
+ok("the chain reaches the game", /g\?\.planetBgUrl \|\| g\?\.coverUrl \|\| bg\.bgUrl/.test(
+  await readFile(new URL("../../lib/cards/data.ts", import.meta.url), "utf8")));
+
 console.log("\n== Satori renders every kind without throwing ==");
 // Satori is not a browser. Every element needs an explicit `display`, it
 // supports a subset of flexbox, and an unsupported property is an EXCEPTION

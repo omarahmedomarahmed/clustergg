@@ -23,6 +23,16 @@ import type {
 export const CARD_W = 1200;
 export const CARD_H = 630;
 
+/**
+ * The fixed top strip (B54).
+ *
+ * Identity left, branding right, and everything under it free for the body.
+ * Sized so the mark reads at thumbnail scale without eating a sixth of the
+ * canvas — these cards get screenshotted and reposted, and the strip is what
+ * survives a crop.
+ */
+export const STRIP_H = 92;
+
 const INK = "#f2f3ff";
 const MUTED = "#9aa0c3";
 const VOID = "#04051a";
@@ -216,6 +226,20 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
           <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: alpha(theme.accent2, 0.11, FALLBACK_ACCENT2) }} />
         </>
       ) : null}
+      {/* THE TOP STRIP (B54).
+          One band every card keeps free by construction: the card's own
+          identity on the left, our branding on the right, and everything below
+          it free space for the body. A scrim rather than a solid bar, so the
+          background art still reads through — a card is a web page, not a
+          poster with a header glued on.
+
+          Unconditional, unlike the accent bar under it: `l.bar` is an admin
+          toggle for the coloured rule, and the strip is what the layout is
+          built around. */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: STRIP_H, display: "flex",
+        background: "linear-gradient(180deg, rgba(4,5,26,0.82) 0%, rgba(4,5,26,0.34) 70%, rgba(4,5,26,0) 100%)",
+      }} />
       {l.bar ? (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
       ) : null}
@@ -1099,11 +1123,15 @@ function PlanetBody(d: PlanetCard) {
           ) : boards.slice(0, 3).map((b, i) => (
             <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 14px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
               <div style={{ fontSize: pBo.f(22), fontWeight: 700 }}>{clamp(b.title, 22)}</div>
-              <div style={{ display: "flex", gap: 10, fontSize: pBo.f(17), color: MUTED }}>
+              {/* `marginLeft`, not `gap`. Satori's gap support does not reach
+                  this nesting — it rendered "NovaGold II" with the two runs
+                  touching, which is the kind of thing only a real render shows
+                  and a source read never will. */}
+              <div style={{ display: "flex", fontSize: pBo.f(17), color: MUTED }}>
                 {b.leader ? (
                   <>
                     <div style={{ display: "flex", color: "#fbbf24" }}>{`#1 ${clamp(b.leader, 13)}`}</div>
-                    {b.value ? <div style={{ display: "flex", color: t.accent2 }}>{clamp(b.value, 10)}</div> : null}
+                    {b.value ? <div style={{ display: "flex", marginLeft: 10, color: t.accent2 }}>{clamp(b.value, 10)}</div> : null}
                   </>
                 ) : (
                   <div style={{ display: "flex" }}>unclaimed — take it</div>

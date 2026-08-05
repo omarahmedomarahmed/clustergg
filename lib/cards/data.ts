@@ -354,6 +354,10 @@ export async function planetCard(game: string): Promise<CardData | null> {
       const rows = await db.select({
         value: schema.statCurrent.metricValue, rankLabel: schema.statCurrent.rankLabel,
         name: schema.users.displayName,
+        // The IN-GAME name (B54/B52). This is that game's ladder, and it was
+        // printing the Cluster profile name — the same defect the challenge
+        // card had, in a third place.
+        ign: schema.linkedGameAccounts.inGameName,
       }).from(schema.statCurrent)
         .innerJoin(schema.linkedGameAccounts, eq(schema.statCurrent.linkedAccountId, schema.linkedGameAccounts.id))
         .innerJoin(schema.users, eq(schema.linkedGameAccounts.userId, schema.users.id))
@@ -361,7 +365,7 @@ export async function planetCard(game: string): Promise<CardData | null> {
       entries = rows.length;
       const sorted = [...rows].sort((a, b) => board.sortDir === "asc" ? a.value - b.value : b.value - a.value);
       if (sorted[0]) {
-        leader = sorted[0].name;
+        leader = sorted[0].ign || sorted[0].name;
         value = sorted[0].rankLabel ?? String(Math.round(sorted[0].value * 100) / 100);
       }
     } catch { /* a board we can't read is still a board that exists */ }
@@ -422,8 +426,14 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
   const [participants, [g], bg] = await Promise.all([
     db.select({ id: schema.challengeParticipants.id }).from(schema.challengeParticipants)
       .where(eq(schema.challengeParticipants.challengeId, ch.id)),
-    db.select({ logoUrl: schema.games.logoUrl, accent: schema.games.accent, accent2: schema.games.accent2 })
-      .from(schema.games).where(eq(schema.games.name, ch.game)).limit(1),
+    // The game's OWN art too (B54). A challenge with no cover of its own used
+    // to fall past `bot_challenge` to nothing and render as a flat gradient —
+    // a competition on League of Legends looking like a competition on nothing.
+    // Its game always has a planet background or a cover.
+    db.select({
+      logoUrl: schema.games.logoUrl, accent: schema.games.accent, accent2: schema.games.accent2,
+      planetBgUrl: schema.games.planetBgUrl, coverUrl: schema.games.coverUrl,
+    }).from(schema.games).where(eq(schema.games.name, ch.game)).limit(1),
     cardBg("bot_challenge"),
   ]);
 
@@ -503,8 +513,11 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
     theme: {
       accent: g?.accent || BRAND.accent,
       accent2: g?.accent2 || BRAND.accent2,
-      bgUrl: ch.coverUrl || ch.heroUrl || bg.bgUrl,
-      bgFallbacks: [ch.heroUrl, bg.bgUrl],
+      // Its own art first, then the GAME's, then the configured default. The
+      // game's art is the addition: a challenge without a cover is common and
+      // should still look like the game it is on.
+      bgUrl: ch.coverUrl || ch.heroUrl || g?.planetBgUrl || g?.coverUrl || bg.bgUrl,
+      bgFallbacks: [ch.heroUrl, g?.planetBgUrl, g?.coverUrl, bg.bgUrl],
     },
   };
 }
