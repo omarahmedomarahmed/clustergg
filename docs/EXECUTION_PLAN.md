@@ -295,8 +295,8 @@ the remaining edits; Part II is the whole platform.
 | B32 | Email: Resend, one template system, a delivery console | new `lib/email/`, `email_log`, new `/admin/email`, the webhook | batch 4 | ☑ |
 | B33 | **Announcements become a queue** (live bug — sequential await in a server action) | `lib/discord/announce.ts`, the calling actions, a drain cron | batch 4 | ☐ |
 | B34 | **The repriced economy**: 1,000 CP = $0.10, every action capped, 500/day ceiling | `lib/quests.ts`, `lib/marketplace.ts`, supersedes B16/B17's numbers | batch 4 | ☑ |
-| B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | payouts, tier unlocks, signup | batch 4 | ☐ |
-| B36 | Brands prepay: due on issue, live on creation, settled by the first challenge's end | `lib/invoices.ts`, publishing, dunning | batch 4 | ☐ |
+| B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | new `lib/abuse.ts`, payouts, tier unlocks, new `/admin/growth-review` | batch 4 | ☑ (defences 1–2 + the review queue; **velocity limits still owed** — see below) |
+| B36 | Brands prepay: due on issue, live on creation, settled by the first challenge's end | new `lib/prepay.ts`, `lib/sponsored-campaigns.ts`, `lib/challenge-requests.ts`, the brand portal | batch 4 | ☑ |
 | B37 | The legal framing of the economy | new `/legal/economy`, redemption eligibility gates | batch 4 | ☐ |
 | B38 | One gamer, one account, one challenge | challenge entry rules | batch 4 | ☐ |
 | B39 | Stuck money: every state where a prize has nowhere to go | challenges, redeems, an admin view | batch 4 | ☐ |
@@ -311,9 +311,12 @@ the remaining edits; Part II is the whole platform.
 | S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
 | S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
 | S4 | **A JSX expression rendering as literal text** on every unaffordable trophy tile — a backtick where a fragment belonged, so the marketplace read `$<Cp amount={t.cpPrice - balance} /> to go` | `components/TrophyMarket.tsx` | wave 2 (found by B34) | ☑ |
+| S8 | **Demo campaign invoices** — the overdue banner, the dunning schedule and the publish block were all built, correct, and invisible, because the demo's campaigns predated invoicing and nothing owed anything | `lib/db/seed-activity.ts` | wave 2 (B36 fallout) | ☑ |
+| S7 | **A quest card contained no link on its default tab** — `role="link"` with a `router.push`, so it worked for a mouse and Enter and nothing else; the only `<Link>` lived on the non-default leaderboard tab | `components/QuestCard.tsx` | wave 2 (found by B48) | ☑ |
+| S6 | **A demo server at tier scale** — 522 linked, 180 qualified — because the tier ladder, the qualified split, the holding period and the review queue were all correct and all invisible at two members a server | `lib/db/seed-activity.ts` | wave 2 (B35 fallout) | ☑ |
 | S5 | **Demo balances rescaled for B34's prices**, as balances net of what the seeded orders spend — Nova can afford exactly one trophy, Atlas none | `lib/db/seed-activity.ts` | wave 2 (B34 fallout) | ☑ |
 | B47 | **The server profile becomes mandatory, and gates the 5%** + admin can email anyone manually | `discord_guilds.contact_email`, `lib/discord/community.ts`, `lib/server-earnings.ts`, `lib/billing.ts`, the portal, `/admin/email` | batch 5 | ☑ |
-| B48 | **The marketplace says how you get the points** — quest cards on the shelf, a clickable balance, the redemption value promoted | `/marketplace`, `components/TrophyMarket.tsx`, `components/QuestCard.tsx` | wave 2 (after B35) | ☐ |
+| B48 | **The marketplace says how you get the points** — quest cards on the shelf, a clickable balance, the redemption value promoted | `/marketplace`, `components/TrophyMarket.tsx`, `components/QuestCard.tsx` | wave 2 (after B35) | ☑ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
 **S rows** are work that shipped without being planned — support the build
@@ -2143,6 +2146,15 @@ Three defences, in order of value:
 3. **Account-creation velocity limits** — per IP, per Discord account age, per
    email domain. Not a wall, a friction: enough that fifty accounts is work.
 
+> **Status.** Defences 1 and 2 and the review queue are built. **Defence 3 is
+> not, and is deliberately last**: B34 already took the gamer-side incentive
+> from $63/day to $2.50/day for fifty accounts, and defence 2 means those fifty
+> accounts move no tier until each one has been linked a week AND proven
+> ownership of a game account — which is the cost velocity limits were meant to
+> impose, applied at the point where money is decided rather than at signup.
+> It stays owed because it is still the cheapest way to stop the noise, but it
+> no longer guards anything on its own.
+
 Plus an admin view: servers whose linked-member growth is anomalous, so a human
 can look before a payout goes out.
 
@@ -2163,10 +2175,27 @@ can look before a payout goes out.
 Today a brand can have a challenge run, gamers win, trophies redeem into real
 cash — and then not pay. The money went out; it never came in.
 
+> **Verified against the code, and it is worse than this said.** `buyCampaign`
+> (`lib/sponsored-campaigns.ts`) creates the campaign, opens slot 0 as a
+> challenge request, and **never creates an invoice at all**. Invoices are
+> monthly, per brand, created by hand from `/admin/billing`, and they carry
+> *game* lines derived from campaigns that are already running. So the failure
+> mode is not "a brand pays late" — it is "a campaign runs, pays out prizes, and
+> is never billed unless a human remembers". The first thing this item does is
+> issue the invoice at the moment of purchase.
+>
+> **One correction to the mechanism below.** There is no separate challenge
+> invoice type to retermed from 30 days to 0: `dueDateFrom(issued, 30)` is the
+> monthly subscription path and stays as it is. A *campaign* invoice is a new
+> thing, issued on purchase with same-day terms, and the 30-day default is left
+> alone — a brand's monthly subscription and a campaign it just bought are two
+> different promises and should not share a due date.
+
 **The decided policy:**
 
-- The invoice is **due on the day it is issued**. `dueDateFrom(issued, 30)`
-  becomes `dueDateFrom(issued, 0)` for challenge invoices.
+- The invoice is **issued the moment a campaign is bought, and due that day**
+  (`dueDateFrom(issued, 0)`). The monthly subscription invoice keeps its 30-day
+  terms — see the correction above.
 - **The challenge still goes live immediately.** We are not holding a
   community's competition hostage over a payment term, and the first campaign is
   the one where trust is being built.
@@ -2692,6 +2721,7 @@ only renderer of a CP figure (B2). Nothing here changes what anything costs.
 | the deck | funding is $100K, not $30K | Corrected in **B44**; every stale $30K reference is part of that item. |
 | §1.1, V1 | the capture pass ran in wave 1 | **The 28 screenshots now in `public/shots/` are PROVISIONAL.** The capture was run early, against a wave-1 build, which is a deviation from §1.1's ordering. The reason that rule exists is directly ahead in the queue: **B23** rewrites `/`, `/pricing`, `/servers`, `/discord-bot`, `/brands` and `/blog`, so every full-page shot of those is a picture of copy that will not exist; **B41** replaces the homepage entirely; **B2** puts the coin on every CP figure; **B27** changes the button layout on every bot card; **B34** reprices the currency, so every dollar figure in a shot changes; and **B28** retires the `bot.card.*` rows in favour of live renders. A **full recapture is owed** once Part I closes — see V1.R. Until then the stale shots stay: they are not recaptured piecemeal, and the capture script is not re-run at the end of each wave. |
 | B34, B18 | "make the marketplace show the quests… make the balance clickable" | **B48.** The repricing made the shelf unreachable for a new gamer and the page offered no path off it. The quests, the balance link and the promoted redemption value are that path. |
+| B36 | — (found while building) | `buyCampaign` never created an invoice, so a campaign could run and pay out prizes and never be billed unless a human remembered. B36 now issues the invoice at purchase; the "retermed challenge invoice" it described did not exist. |
 | — | *(next amendment here)* | |
 
 ---
@@ -2773,7 +2803,9 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/offers.mts` | **B30** | off by default; the discount is its own line; totals equal lines; admin edits survive recalculation | owed |
 | `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
 | `tests/db/email.mts` + `tests/ui/admin-email.mjs` | **B32** | no key = no-op, never throws; every template fills; webhooks update status; no key or payment detail in a subject | owed |
-| `tests/ui/marketplace.mjs` | **B48** | every quest reachable from the shelf; the balance is a link; dollar value and CP price agree on every tile; the redemption value outsizes the price | owed |
+| `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
+| `tests/db/abuse.mts` | **B35** | the hold refuses inside the window and releases after; an unknown unlock date fails CLOSED; unqualified accounts raise raw and not qualified; the stamp is one-way; a draft or cancelled payout is not a track record | **written — 27 assertions** |
+| `tests/ui/marketplace.mjs` | **B48** | every quest reachable from the shelf; the balance is a link; dollar value and CP price agree on every tile; the redemption value outsizes the price | **written — 18 assertions** |
 | `tests/db/server-profile.mts` | **B47** | the gate at 500 linked; completeness has one definition; the missing-field list; nothing clawed back; manual mail logged and refused without an address | **write with the item — it decides who gets paid, see §1.1** |
 | `tests/db/announce-queue.mts` | **B33** | publishing enqueues and returns; draining is idempotent; 429 reschedules; nothing fans out inline from a server action | **write with the item — money-adjacent, see §1.1** |
 | `tests/db/cp-economics.mts` | **B34** | no uncapped action; the 624 fixture; the 500 ceiling holds absolutely; award once, progress twice; $5 bronze = 50,000 CP; CP per impression under the CPM | **write with the item** |
@@ -2851,6 +2883,8 @@ the correct state for it.
 | `admin.cp.calculator` | "Every point we give away, modelled before we give it" | `/admin/cp-calculator` | not captured — placeholder |
 | `gamer.cp.capped` | "Capped, and told plainly" | `/quests`, today’s limits above the history | not captured — placeholder |
 | `gamer.marketplace.earn` | "The shelf, and how to reach it" | `/marketplace` with the quest cards | not captured — placeholder |
+| `admin.abuse.review` | "Growth we look at before we pay for it" | `/admin/growth-review` | not captured — placeholder |
+| `brand.invoice.due` | "Due when it is issued — you have the first challenge to settle" | the brand portal, blocked banner | not captured — placeholder |
 | `page.servers.hero` · `server.tiers.three` | the server-owner argument | the consolidated server page | not captured — placeholder |
 | `page.brands.hero` · `brand.tiers.three` | the brand argument | `/for-brands` | not captured — placeholder |
 | `page.pricing.switch` | "Brands pay. Owners earn." | `/pricing` | not captured — placeholder |

@@ -304,6 +304,16 @@ export async function buyCampaign(input: {
       targeting: input.targeting ?? {},
     });
 
+    // B36: the invoice is issued HERE, at purchase, due the same day.
+    //
+    // Before this, buying a campaign created no invoice at all — the challenges
+    // ran, prizes paid out, and the brand was only ever billed if a human
+    // remembered to open a monthly invoice. The challenge still opens either
+    // way: we do not hold a community's competition hostage over a payment
+    // term, and the brand has until its first challenge ends to settle.
+    const { invoiceCampaign } = await import("@/lib/prepay");
+    await invoiceCampaign(db, campaignId);
+
     const requestId = await openSlot(campaignId, 0);
     return { ok: true, campaignId, requestId };
   } catch { return { ok: false, reason: "error", message: "Couldn't create that campaign. Try again." }; }

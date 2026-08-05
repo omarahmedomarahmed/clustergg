@@ -155,7 +155,7 @@ export async function countPendingRequests(): Promise<number> {
 
 export type ApproveResult =
   | { ok: true; challengeId: string; accessKey: string }
-  | { ok: false; reason: "not_found" | "not_pending" | "no_planet" | "error" };
+  | { ok: false; reason: "not_found" | "not_pending" | "no_planet" | "error" | "brand_unpaid"; message?: string };
 
 // Approving is what makes the challenge real: it creates the `challenges` row
 // as private to the requesting server, mints the access key, and announces it
@@ -176,6 +176,19 @@ export async function approveRequest(
 
   try {
     const db = await getDb();
+    // B36: a brand that has not settled its first campaign gets nothing new
+    // published.
+    //
+    // The stop is HERE, at approval, and not at purchase or at payout. Buying is
+    // allowed — that is the debt being created. Prizes already won are paid
+    // regardless, because a gamer must never lose a prize over a brand's
+    // invoice. What stops is new inventory, which is the only lever that costs
+    // the brand rather than the people who did the work.
+    if (req.brandId) {
+      const { brandBlocked } = await import("@/lib/prepay");
+      const block = await brandBlocked(db, req.brandId);
+      if (block.blocked) return { ok: false, reason: "brand_unpaid", message: block.reason };
+    }
     // A challenge lives on its game's planet, so the planet has to exist.
     const [space] = await db.select({ id: schema.spaces.id })
       .from(schema.spaces).where(eq(schema.spaces.game, req.game)).limit(1);

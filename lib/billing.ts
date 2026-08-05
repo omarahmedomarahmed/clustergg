@@ -55,7 +55,17 @@ export type PodiumPayout = {
 export type ServerEarningRow = {
   guildId: string;
   name: string;
+  /** Every member with a first-link timestamp. What an owner already sees. */
   linked: number;
+  /**
+   * The ones that count toward a tier (B35): linked for a week, holding at
+   * least one game account whose ownership is proven.
+   *
+   * Both numbers are carried, always. Showing only the qualified count reads as
+   * members having vanished; showing only the raw count promises a tier that is
+   * not being paid. The rule is not a secret — see `QUALIFY_RULE`.
+   */
+  qualifiedLinked: number;
   /** What this server's TIER pays. Shown so the ladder still means something. */
   ownerPct: number;
   /** What it is actually earning — 0 until the profile is complete (B47). */
@@ -212,10 +222,9 @@ export async function billingSummary(
         community: schema.discordGuilds.community,
         contactEmail: schema.discordGuilds.contactEmail,
       }).from(schema.discordGuilds).where(eq(schema.discordGuilds.status, "active")),
-      db.select({
-        guildId: schema.discordGuildMembers.guildId,
-        n: sql<number>`count(${schema.discordGuildMembers.firstLinkedAt})`,
-      }).from(schema.discordGuildMembers).groupBy(schema.discordGuildMembers.guildId),
+      // B35: both counts. The tier reads the QUALIFIED one; the raw one is what
+      // the owner already sees and must keep seeing.
+      (async () => (await import("@/lib/abuse")).linkedCounts(db))(),
       // Entrants per (challenge, server) — the apportionment the earnings model
       // needs to split one challenge's fee across the servers that supplied it.
       db.select({
@@ -228,7 +237,7 @@ export async function billingSummary(
         .groupBy(schema.challengeParticipants.challengeId, schema.discordGuildMembers.guildId),
     ]);
 
-    const linkedBy = new Map(linkedCounts.map((l) => [l.guildId, Number(l.n ?? 0)]));
+    const linkedBy = linkedCounts;
     const totalEntrants = new Map<string, number>();
     for (const e of entrantsByGuild) {
       totalEntrants.set(e.challengeId, (totalEntrants.get(e.challengeId) ?? 0) + Number(e.n ?? 0));
@@ -244,7 +253,9 @@ export async function billingSummary(
 
     const owedBy = new Map<string, { owed: number; challenges: number }>();
     for (const e of entrantsByGuild) {
-      const linked = linkedBy.get(e.guildId) ?? 0;
+      // The QUALIFIED count decides the rate here too — the split and the table
+      // must not disagree about what tier a server is on.
+      const linked = linkedBy.get(e.guildId)?.qualified ?? 0;
       const share = challengeEarning({
         linked,
         entrants: Number(e.n ?? 0),
@@ -259,12 +270,17 @@ export async function billingSummary(
 
     const servers: ServerEarningRow[] = guilds
       .map((g) => {
-        const linked = linkedBy.get(g.guildId) ?? 0;
+        const c = linkedBy.get(g.guildId) ?? { raw: 0, qualified: 0 };
+        // The TIER reads the qualified count. A linked account with no proof of
+        // ownership and no history is not a member, it is a row — and rows are
+        // cheap while a tier is worth a share of brand spend forever.
+        const linked = c.qualified;
         const o = owedBy.get(g.guildId);
         return {
           guildId: g.guildId,
           name: g.name || g.guildId,
-          linked,
+          linked: c.raw,
+          qualifiedLinked: c.qualified,
           // The tier's rate, so the table still shows what the server has
           // reached — and `earning` beside it, which is what it is actually
           // being paid. Showing only the gated number would read as the tier

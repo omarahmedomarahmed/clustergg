@@ -1,6 +1,9 @@
 import { getDb } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { marketplaceCatalog } from "@/lib/marketplace";
+import { getUserQuests, getQuestTops } from "@/lib/quests";
+import QuestCard from "@/components/QuestCard";
+import Link from "next/link";
 import TrophyMarket from "@/components/TrophyMarket";
 import AdSlot from "@/components/AdSlot";
 import Icon from "@/components/Icon";
@@ -17,6 +20,15 @@ export default async function MarketplacePage() {
   const db = await getDb();
   const session = await getSession();
   const { trophies, wallet, rate } = await marketplaceCatalog(db, { userId: session?.uid ?? null });
+  // B48: the quests come to the shelf.
+  //
+  // B34 priced a $5 trophy at 50,000 CP — a hundred days at the ceiling, which
+  // is the intended economy. But it makes this a shelf a new gamer cannot reach,
+  // and a price with no visible path to affording it does not read as
+  // aspiration, it reads as a wall. The answer to "how do I get there?" belongs
+  // on the page that asked the question.
+  const quests = await getUserQuests(db, session?.uid ?? null);
+  const tops = await getQuestTops(db, quests.map((q) => q.id), 3);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 space-y-8">
@@ -46,6 +58,31 @@ export default async function MarketplacePage() {
       <AdSlot placement="marketplace_top" />
 
       <TrophyMarket trophies={trophies} wallet={wallet} signedIn={!!session?.uid} />
+
+      {/* How you get the points, under the things they buy. */}
+      {quests.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="flex items-center gap-2 text-lg font-bold">
+                <Icon name="spark" size={18} className="text-violet-300" /> How you earn them
+              </h2>
+              <p className="mt-0.5 max-w-2xl text-xs text-muted">
+                Every quest pays Cluster Points for things you were doing anyway. Nothing here costs money, and
+                every action states its daily cap before you start.
+              </p>
+            </div>
+            <Link href="/quests" className="ghost-btn rounded-full px-4 py-2 text-xs font-semibold">
+              Open your quests <Icon name="chevronRight" size={12} className="ml-1 inline" />
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {quests.map((q) => (
+              <QuestCard key={q.id} quest={q} top={tops.get(q.id) ?? []} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

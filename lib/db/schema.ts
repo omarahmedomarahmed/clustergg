@@ -906,6 +906,18 @@ export const discordGuilds = pgTable("discord_guilds", {
   adOptIn: boolean("ad_opt_in").notNull().default(true),
   adUnlockedAt: timestamp("ad_unlocked_at", { withTimezone: true, mode: "date" }),
   /**
+   * When this server first crossed a paying tier (B35).
+   *
+   * Written ONCE and never rewritten, so a server that dips below the threshold
+   * and climbs back does not get a fresh holding period — and, more to the
+   * point, cannot be given one deliberately. Null on a server that has never
+   * reached a tier, and also on one that reached it before this column existed;
+   * `payoutHold` treats an unknown start date as held rather than released,
+   * because that is exactly the case where somebody arrived by a route we did
+   * not record.
+   */
+  tierUnlockedAt: timestamp("tier_unlocked_at", { withTimezone: true, mode: "date" }),
+  /**
    * When this server's funded welcome challenge was created.
    *
    * Null means it is owed one — including for every server that installed the

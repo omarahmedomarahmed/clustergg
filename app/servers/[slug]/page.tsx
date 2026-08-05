@@ -84,6 +84,17 @@ export default async function ServerPortalPage({
     getPayoutAccount("server", server.guildId),
     payer("payout"),
   ]);
+  // B35: both counts and the rule, on the owner's own screen. A rule an owner
+  // cannot read is a rule they will assume is arbitrary — and the moment to
+  // learn that half your members do not count toward a tier is long before the
+  // payout that does not arrive.
+  const { linkedCountsFor, QUALIFY_RULE, payoutHoldFor } = await import("@/lib/abuse");
+  const { getDb } = await import("@/lib/db");
+  const abuseDb = await getDb();
+  const [counts, hold] = await Promise.all([
+    linkedCountsFor(abuseDb, server.guildId),
+    payoutHoldFor(abuseDb, server.guildId),
+  ]);
   const payVendor = vendorBy(pay.adapter.key);
 
   // Opening the dashboard IS reading the thread — an unread badge that survives
@@ -309,6 +320,24 @@ export default async function ServerPortalPage({
                   <Metric label="On Cluster" value={data.stats.joined} />
                   <Metric label="Linked a game" value={data.stats.linked} accent />
                   <Metric label="Left" value={data.stats.left} />
+                </div>
+
+                {/* Both numbers, and why they differ. */}
+                <div className="rounded-2xl border border-white/10 p-4">
+                  <div className="flex flex-wrap items-baseline gap-3">
+                    <span className="text-sm font-semibold">
+                      <b className={counts.qualified < counts.raw ? "text-amber-300" : "text-emerald-300"}>
+                        {counts.qualified.toLocaleString()}
+                      </b>
+                      <span className="text-muted"> of {counts.raw.toLocaleString()} linked members count toward your tier</span>
+                    </span>
+                  </div>
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted">{QUALIFY_RULE}</p>
+                  {hold.held && (
+                    <p className="mt-2 rounded-xl border border-amber-400/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">
+                      {hold.reason}
+                    </p>
+                  )}
                 </div>
                 <CommandFeed
                   rows={feed.map((f) => ({

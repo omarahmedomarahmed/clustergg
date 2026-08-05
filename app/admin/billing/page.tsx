@@ -264,7 +264,9 @@ export default async function BillingPage({
               <thead className="text-[10px] uppercase tracking-widest text-muted">
                 <tr className="border-b border-white/10">
                   <th className="py-2 text-left">Server</th>
-                  <th className="py-2 text-right">Linked</th>
+                  {/* B35: both counts, always. The tier reads the qualified one;
+                      the raw one is what the owner already sees. */}
+                  <th className="py-2 text-right">Qualified / linked</th>
                   <th className="py-2 text-right">Their share</th>
                   <th className="py-2 text-right">Challenges</th>
                   <th className="py-2 text-right">Owed</th>
@@ -276,7 +278,10 @@ export default async function BillingPage({
                     <td className="py-2.5">
                       <Link href={`/admin/discord/${s.guildId}`} className="hover:text-cyan-300">{s.name}</Link>
                     </td>
-                    <td className="py-2.5 text-right tabular-nums">{s.linked.toLocaleString()}</td>
+                    <td className="py-2.5 text-right tabular-nums">
+                      <span className={s.qualifiedLinked < s.linked ? "text-amber-300" : ""}>{s.qualifiedLinked.toLocaleString()}</span>
+                      <span className="text-muted"> / {s.linked.toLocaleString()}</span>
+                    </td>
                     <td className="py-2.5 text-right tabular-nums">
                       {s.ownerPct}% <span className="text-muted">/ {s.clusterPct}% us</span>
                     </td>

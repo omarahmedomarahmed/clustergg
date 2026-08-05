@@ -192,6 +192,19 @@ export async function releasePayout(payoutId: string): Promise<Res> {
   const payout = await getPayout(payoutId);
   if (!payout) return { error: "That payout no longer exists." };
 
+  // B35: the holding period, checked at RELEASE rather than at open.
+  //
+  // Opening a payout is bookkeeping and is reversible; releasing it hands money
+  // to a provider, and money that has left a provider cannot be brought back.
+  // This is the only reversal mechanism the product has, so it sits at the last
+  // possible moment and it fails closed.
+  const { payoutHoldFor } = await import("@/lib/abuse");
+  const hold = await payoutHoldFor(await getDb(), payout.guildId);
+  if (hold.held) {
+    await audit(admin.id, "payout.release_held", payoutId, { reason: hold.reason, until: hold.until });
+    return { error: hold.reason };
+  }
+
   const owner = await guildOwner(payout.guildId);
   const res = await sendPayout(payoutId, {
     name: owner.name || payout.guildName || payout.guildId,
