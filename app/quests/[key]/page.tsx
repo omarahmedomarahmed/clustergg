@@ -4,7 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { marketplaceCatalog } from "@/lib/marketplace";
 import TrophyMarket from "@/components/TrophyMarket";
-import { getQuestByKey, getTotalCp, getCpLedger, getStarterMissions } from "@/lib/quests";
+import { getQuestByKey, getTotalCp, getCpLedger, getStarterMissions, capsToday } from "@/lib/quests";
 import { getQuestPanelArt } from "@/lib/quest-hero";
 import { getContent } from "@/lib/cms";
 import QuestMapHero from "@/components/QuestMapHero";
@@ -15,6 +15,7 @@ import { getT } from "@/lib/i18n/t-server";
 import { localizeQuest } from "@/lib/i18n/entities";
 import { cardMeta } from "@/lib/og";
 import Cp from "@/components/Cp";
+import QuestGuide from "@/components/QuestGuide";
 
 export const dynamic = "force-dynamic";
 
@@ -35,12 +36,13 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   if (!detail) notFound();
 
   const { quest: questRaw, allQuests, tierHolders, leaderboard } = detail;
-  const [totalCp, questLedger, brand, missions, panelArt] = await Promise.all([
+  const [totalCp, questLedger, brand, missions, panelArt, caps] = await Promise.all([
     getTotalCp(db, user?.id ?? null),
     getCpLedger(db, user?.id ?? null, { questId: questRaw.id, limit: 200 }),
     getContent(["brand.quest.rocket"]),
     getStarterMissions(db, user?.id ?? null),
     getQuestPanelArt(),
+    capsToday(db, user?.id ?? null),
   ]);
   const rocketUrl = brand["brand.quest.rocket"] || undefined;
   const { tr, te } = await getT();
@@ -52,6 +54,20 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
     <div>
       <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} rocketUrl={rocketUrl}
         game={{ rules: quest.rules, log: questLedger, totalCp, art: panelArt, missions, cpPerDollar: market.rate }} />
+
+      {/* How to earn on THIS quest, on the page about it (B50) — not only
+          inside the map popup, which is behind a tap somebody has to know to
+          take. Same component, same figures, one quest. */}
+      <div className="mx-auto max-w-3xl px-4 pb-4">
+        <QuestGuide
+          quests={[{ id: quest.id, key: quest.key, name: quest.name, color: quest.color,
+            accent2: quest.accent2, logoUrl: quest.logoUrl, rules: quest.rules }]}
+          caps={user ? caps : null}
+          cpPerDollar={market.rate}
+          signedIn={!!user}
+          defaultOpen={quest.key}
+        />
+      </div>
 
       {/* Glorified milestone leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">

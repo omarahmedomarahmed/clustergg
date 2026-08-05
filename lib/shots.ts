@@ -97,6 +97,7 @@ export const CAPTURED_SHOT_KEYS = new Set<string>([
   "gamer.marketplace.shelf",
   "gamer.planet.page",
   "gamer.profile.public",
+  "gamer.quest.guide",
   "gamer.quest.map",
   "gamer.redeem.method",
   "nav.badges",
@@ -122,6 +123,9 @@ export const SHOT_REGISTRY: ShotDef[] = [
   { key: "gamer.lol.card", group: "gamer", claim: "Your rank, in the game's own words", capturedFrom: "/u/nova", as: "guest", selector: "[data-shot='lol-card']", openText: "League of Legends" },
   { key: "gamer.cp.ledger", group: "gamer", claim: "Every point is accounted for", capturedFrom: "/quests", as: "gamer" },
   { key: "gamer.quest.map", group: "gamer", claim: "Quests you actually travel", capturedFrom: "/quests", as: "gamer" },
+  // B50. Signed IN, because the half that makes it a guide rather than a rate
+  // card is today's progress sitting on the action it belongs to.
+  { key: "gamer.quest.guide", group: "gamer", claim: "What to do, what it pays, and how often", capturedFrom: "/quests", as: "gamer", selector: "[data-quest-guide]" },
   { key: "gamer.marketplace.shelf", group: "gamer", claim: "Spend points on real trophies", capturedFrom: "/marketplace", as: "gamer" },
   // Both are MODAL states (B49). The capture pass has to open the checkout —
   // click "Get it", then "Gift it" and pick somebody — before it can shoot
