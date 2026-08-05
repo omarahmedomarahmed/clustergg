@@ -43,8 +43,8 @@ const COMMON: Region[] = [
   },
   {
     key: "mascot", label: "Astronaut", kind: "art",
-    x: 51, y: 0, w: 9, h: 17.1,
-    note: "The mascot rides in the strip, semi-transparent. It stood bottom-left at 200px until B54, which put it behind the last lines of every card's body — the cards with the most to say read the worst.",
+    x: 82.1, y: 60.8, w: 15.8, h: 30.2,
+    note: "The mascot stands in the column to the RIGHT of the text, below the badge. It was bottom-left at 200px until B54, which put it behind the last lines of every card's body — the cards with the most to say read the worst. Art here is covered on world cards, where the splash panel takes the same column.",
   },
   {
     key: "logo", label: "Cluster logo", kind: "brand",
@@ -63,15 +63,18 @@ const COMMON: Region[] = [
   },
 ];
 
-// The left column, where nearly every card puts its headline and stats. Held
-// dark by the scrim, so art here reads as texture rather than subject.
+// The column nearly every card puts its headline and stats in. Held dark by the
+// scrim, so art here reads as texture rather than subject.
 //
-// It ends at 63% now, not 79%: the right-hand 420px belongs to the sponsor at
-// the top and the logo at the bottom, and Satori has no float, so text cannot
-// wrap around either of them.
+// It starts AT the top now (B54): its first section is the card's identity, and
+// the strip's left is what that is for. And it is 78% wide rather than 58.5%,
+// because the branding that used to sit bottom-right is in the strip — with one
+// exception the guide cannot draw, since it depends on the card rather than on
+// the kind: a SOLD card's column stops before the creative, because Satori has
+// no float and text cannot wrap around a picture.
 const TEXT_COLUMN: Region = {
   key: "text", label: "Text column", kind: "text",
-  x: 4.6, y: 7, w: 58.5, h: 62,
+  x: 4.7, y: 2.4, w: 78, h: 80,
   note: "Headline, subtitle and stat pills. The scrim darkens this hardest — put atmosphere here, never a face or a logo.",
 };
 

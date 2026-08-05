@@ -234,18 +234,24 @@ export const AD_RATIO = 0.3125;
 export const AD_LABEL_H = 22;
 
 export const DEFAULT_LAYOUT: CardLayout = {
-  // INTO THE STRIP (B54), and smaller for it.
+  // OUT of the content column (B54).
   //
-  // It stood at x:9, y:84 — bottom-left, 200px, which is inside the content
-  // column (x 4.7..82.7%, y 15..91%). So the one figure every card carries was
-  // drawn behind the last two lines of every card's body, and the cards that
-  // read worst were the ones with the most to say. In the strip it is
-  // decoration in a band that is kept free by construction, which is the only
-  // place on the card where a decorative figure costs the body nothing.
+  // It stood at x:9, y:84 — bottom-LEFT, 200px, which is inside the content
+  // column. So the one figure every card carries was drawn behind the last two
+  // lines of every card's body, and the cards that read worst were the ones
+  // with the most to say.
   //
-  // Left of the sponsor box's left edge (780px) on purpose: half an astronaut
-  // sticking out from behind a paid creative is worse than no astronaut.
-  mascot: { x: 55.5, y: 8.7, size: 108 },
+  // B54 says the mascot moves into the top strip. It was there for one commit,
+  // and rendering a real challenge is what took it out again: with the body now
+  // starting AT the top, the strip's left is the card's identity and its right
+  // is our mark, and a long title ran straight through the astronaut's chest.
+  // The item allows for exactly this — "both are decoration: draw over them
+  // freely, and if a card reads better without either, leave them out" — so it
+  // takes the one band that is reserved on every card instead: the column to
+  // the right of the text, below the badge. Nothing is drawn there unless a
+  // card asks for it (the world card's splash, which covers the mascot because
+  // it is drawn later, which is the right order).
+  mascot: { x: 90, y: 76, size: 190 },
   // The GAME's logo, faint, under the identity line on the left. Says whose
   // card this is before a word of it is read.
   gameMark: { x: 6.2, y: 7.6, size: 88 },
@@ -283,7 +289,7 @@ export const DEFAULT_LAYOUT: CardLayout = {
   // mark had a dead half. `sideBox` still hands the world card its splash
   // rectangle from the live layout, so widening here narrows that automatically
   // rather than letting the two overlap.
-  content: { x: 4.7, y: 15, w: 78, h: 76 },
+  content: { x: 4.7, y: 2.4, w: 78, h: 89 },
   // Top-right corner at 400 wide — the biggest unit that still leaves a
   // readable text column, and the same coordinates on every card so a brand's
   // creative lands in the same place whatever the bot was asked for. The badge
@@ -885,6 +891,41 @@ export function sideBox(l: CardLayout, o: { hasAd: boolean; hasBadge: boolean; b
 
 /** True when that column is big enough to be worth drawing at all. */
 export const sideBoxFits = (b: { width: number; height: number }) => b.width > 60 && b.height > 60;
+
+/**
+ * The content box, narrowed if a sponsor box is standing in it.
+ *
+ * B54 widened the column from 58.5% to 78% and started it at the top of the
+ * card, which is right for the card a server actually sees most of the time —
+ * an UNSOLD one. On a sold card the same geometry ran the title straight under
+ * the creative: "Blitz Supernova — Weekly Wins Ra…" with the last word behind
+ * our own logo, and the description sliced off mid-sentence by the ad's edge.
+ *
+ * Satori has no float, so the text cannot wrap around the creative; the column
+ * has to end before it. The old layout paid that cost on every card forever by
+ * keeping the column narrow whether or not anything was ever sold. This pays it
+ * only when there is something to pay it for.
+ *
+ * Height and top are untouched — only the width moves, so nothing reflows
+ * vertically and a card that fitted still fits.
+ */
+export function contentBoxFor(l: CardLayout, hasAd: boolean) {
+  const box = contentBox(l.content);
+  if (!hasAd || l.ad.hidden) return box;
+  const ad = adBox(l.ad);
+  // The obstacle is not just the creative: the mark slides LEFT of it on a sold
+  // card (see `markLeftFor`), which put our own logo inside the text column —
+  // the second render of this had "Weekly Wins" running behind the mark. The
+  // column ends before the right-hand furniture, whichever piece of it comes
+  // first.
+  const wall = l.mark.hidden ? ad.left : Math.min(ad.left, markLeftFor(l, true));
+  const overlapsY = box.top < ad.bottom && ad.top < box.top + box.height;
+  if (!overlapsY || box.left + box.width <= wall) return box;
+  // Never narrower than a third of the canvas: a column squeezed to nothing by
+  // an admin who dragged the ad across the card is an unreadable card, and the
+  // creative overlapping some text is the lesser of those two.
+  return { ...box, width: Math.max(CANVAS_W / 3, wall - 16 - box.left) };
+}
 
 export function contentBox(c: ContentBox): { left: number; top: number; width: number; height: number } {
   return {

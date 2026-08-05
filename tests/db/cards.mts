@@ -172,7 +172,11 @@ ok("the mark sits in the top band, not the bottom corner", markY < 20, String(ma
 const markX = Number(/mark: \{ x: ([\d.]+)/.exec(layout)?.[1] ?? "0");
 ok("…on the RIGHT", markX > 75, String(markX));
 const contentY = Number(/content: \{ x: [\d.]+, y: ([\d.]+)/.exec(layout)?.[1] ?? "0");
-ok("…and the body starts under it", contentY >= 14, String(contentY));
+// It started BELOW the strip in the first pass, which left the band empty on
+// every card — a dark bar with our mark in it and nothing else. The body starts
+// IN the strip now: its first section is the card's identity, which is what the
+// strip's left is for.
+ok("…and the body starts IN the strip, not below it", contentY < 14.6, String(contentY));
 const contentW = Number(/content: \{ x: [\d.]+, y: [\d.]+, w: ([\d.]+)/.exec(layout)?.[1] ?? "0");
 // Moving the mark out of the bottom-right left a dead half on the first render.
 ok("…using the width the mark gave up", contentW > 70, String(contentW));
@@ -183,7 +187,7 @@ console.log("\n== the strip's three tenants do not sit on top of each other ==")
 // unsold, which is how all three shipped in the first pass.
 {
   const {
-    DEFAULT_LAYOUT, adBox, spotBox, markLeftFor, mascotYields,
+    DEFAULT_LAYOUT, adBox, spotBox, contentBox, markLeftFor, mascotYields,
   } = await import("../../lib/cards/layout.ts");
   const L = DEFAULT_LAYOUT;
   const ad = adBox(L.ad);
@@ -200,20 +204,56 @@ console.log("\n== the strip's three tenants do not sit on top of each other ==")
   eq("…and an unsold card is untouched", markLeftFor(L, false), mark.left);
   ok("…and it never goes off the left edge", slid >= 0, String(slid));
 
-  // 2. The slid mark lands where the mascot stands, so the mascot yields —
-  //    a grey shoulder behind the logo is worse than no mascot.
-  ok("the mascot yields on a sold card", mascotYields(L, true));
-  ok("…and stands on an unsold one", !mascotYields(L, false));
-  // Not a blanket rule: moved out of the way, it stays on every card.
-  ok("…and a mascot placed clear of both keeps its place",
-    !mascotYields({ ...L, mascot: { ...L.mascot, x: 20, y: 80 } }, true));
+  // 2. A mascot standing where the slid mark lands yields — a grey shoulder
+  //    behind the logo is worse than no mascot. The house default no longer
+  //    stands there (it was in the strip for one commit; a long title ran
+  //    straight through it), so this is asserted where the rule applies: an
+  //    admin who drags it into the strip.
+  const inStrip = { ...L, mascot: { ...L.mascot, x: 55.5, y: 8.7, size: 108 } };
+  ok("a mascot in the strip yields on a sold card", mascotYields(inStrip, true));
+  ok("…and stands on an unsold one", !mascotYields(inStrip, false));
+  ok("the house default is clear of both and always stands", !mascotYields(L, true));
 
-  // 3. Both branding elements are in the strip band, and the body is under it.
-  ok("the mascot rides in the strip", spotBox(L.mascot, 1).top < STRIP,
-    String(spotBox(L.mascot, 1).top));
-  ok("the game logo does too", spotBox(L.gameMark, 1).top < STRIP,
+  // 3. The game logo is in the strip, and the mascot is out of the text column.
+  ok("the game logo rides in the strip", spotBox(L.gameMark, 1).top < STRIP,
     String(spotBox(L.gameMark, 1).top));
   ok("…on the LEFT, where the identity is", L.gameMark.x < 20, String(L.gameMark.x));
+  const body = contentBox(L.content);
+  const m = spotBox(L.mascot, 1);
+  ok("the mascot is out of the text column", m.left >= body.left + body.width - 24,
+    `mascot ${m.left}, column ends ${body.left + body.width}`);
+
+  // 4. The body starts IN the strip — its first section is the card's identity,
+  //    which is what the strip's left is for. It was pushed below the strip in
+  //    the first pass, which left the band empty on every card.
+  ok("the body starts in the strip", body.top < STRIP, String(body.top));
+  ok("…and stops before our mark", body.left + body.width <= spotBox(L.mark, 1).left,
+    `${body.left + body.width} vs ${spotBox(L.mark, 1).left}`);
+}
+
+console.log("\n== a SOLD card gives the column back to the sponsor ==");
+// Satori has no float: text cannot wrap around a creative, so the column has to
+// end before it. The old layout paid that on every card forever by staying
+// narrow whether or not anything ever sold. This pays it only when sold.
+{
+  const { DEFAULT_LAYOUT: L, adBox, contentBox, contentBoxFor, markLeftFor, spotBox } =
+    await import("../../lib/cards/layout.ts");
+  const wide = contentBoxFor(L, false);
+  const sold = contentBoxFor(L, true);
+  eq("an unsold card keeps the full column", wide, contentBox(L.content));
+  ok("a sold one narrows", sold.width < wide.width, `${sold.width} vs ${wide.width}`);
+  eq("…and nothing moves vertically", [sold.top, sold.height], [wide.top, wide.height]);
+  const ad = adBox(L.ad);
+  ok("…clearing the creative", sold.left + sold.width <= ad.left, String(sold.left + sold.width));
+  // The mark slides LEFT of the ad, INTO the column — so the wall is whichever
+  // comes first. The second render of this had "Weekly Wins" behind the mark.
+  ok("…and clearing the slid mark too", sold.left + sold.width <= markLeftFor(L, true),
+    `${sold.left + sold.width} vs ${markLeftFor(L, true)}`);
+  ok("a hidden sponsor slot changes nothing",
+    contentBoxFor({ ...L, ad: { ...L.ad, hidden: true } }, true).width === wide.width);
+  // An admin dragging the ad across the card cannot squeeze the text to nothing.
+  const squeezed = contentBoxFor({ ...L, ad: { ...L.ad, x: 20 } }, true);
+  ok("…and the column has a floor", squeezed.width >= 400, String(squeezed.width));
 }
 
 console.log("\n== the game's logo is drawn once, not twice ==");
@@ -241,9 +281,10 @@ console.log("\n== the clamps follow the column, they do not stay where they were
   const { DEFAULT_LAYOUT } = await import("../../lib/cards/layout.ts");
   ok("the column really did get wider", DEFAULT_LAYOUT.content.w > 58.5, String(DEFAULT_LAYOUT.content.w));
   ok("there is one scale, from the live layout", /function clampFor\(t: CardTheme\)/.test(render));
-  ok("…taken from the content width", /t\.layout\?\.content\.w \?\? DEFAULT_LAYOUT\.content\.w/.test(render));
   ok("…and bounded, so a hand-set column cannot make a card unreadable",
     /Math\.max\(0\.6, Math\.min\(1\.8/.test(render));
+  ok("…and it is the EFFECTIVE width, so a sold card clamps to its narrow column",
+    /contentBoxFor\(l, !!t\.ad\)\.width/.test(render));
   // Applied by shadowing, so a body that was missed keeps exactly what it drew.
   const shadowed = (render.match(/const clamp = clampFor\(t\);/g) ?? []).length;
   ok("every card body takes the scaled clamp", shadowed >= 12, String(shadowed));

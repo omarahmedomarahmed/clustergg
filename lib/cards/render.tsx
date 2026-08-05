@@ -3,7 +3,7 @@ import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import {
-  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, markLeftFor, mascotYields, opacityOf,
+  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBoxFor, markLeftFor, mascotYields, opacityOf,
   partOf, plateBg, sideBox, sideBoxFits, spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset, PartDraw } from "@/lib/cards/layout";
@@ -190,7 +190,6 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side
   const corner = badgeContent(theme, proposedCorner, cornerIsGameLogo, !!gameMarkUrl);
   const mark = spotBox(l.mark, 1);
   const badge = spotBox(l.badge, 1);
-  const content = contentBox(l.content);
   // The sponsor, and the badge pushed clear of it. `badgeTopFor` returns the
   // badge's own top when there's no ad or no collision, so an unsold card and a
   // hand-placed badge are both untouched.
@@ -201,6 +200,8 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side
   // sponsor box covers the strip's right end entirely and a sold card ships
   // with no Cluster mark on it at all.
   const markLeft = markLeftFor(l, !!ad);
+  // Narrowed only while a sponsor box is standing in it — see `contentBoxFor`.
+  const content = contentBoxFor(l, !!ad);
   // The free rectangle to the right of the content: starts where the text
   // column ends, stops at the canvas edge, and begins under whichever of the
   // sponsor box and the badge hangs lowest. Computed from the LIVE layout, so
@@ -635,7 +636,11 @@ const nf = (n: number) => n.toLocaleString("en-US");
  * exactly what it drew before.
  */
 function clampFor(t: CardTheme) {
-  const w = t.layout?.content.w ?? DEFAULT_LAYOUT.content.w;
+  const l = t.layout ?? DEFAULT_LAYOUT;
+  // The EFFECTIVE width, not the stored one: a sold card's column is narrowed
+  // around the sponsor box, and clamping to the stored 78% there would hand
+  // every line a third more characters than the column can hold.
+  const w = (contentBoxFor(l, !!t.ad).width / CANVAS_W) * 100;
   const k = Math.max(0.6, Math.min(1.8, w / 58.5));
   return (s: string | null | undefined, max: number) => clamp(s, Math.round(max * k));
 }
