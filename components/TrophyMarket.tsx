@@ -1,10 +1,11 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import Cp from "@/components/Cp";
-import { purchaseTrophy, type BuyState } from "@/app/actions/marketplace";
+import TrophyCheckout from "@/components/TrophyCheckout";
+import type { BuyState } from "@/app/actions/marketplace";
 import type { MarketTrophy, CpWallet } from "@/lib/marketplace";
 
 // The shelf.
@@ -34,9 +35,11 @@ export default function TrophyMarket({
   compact?: boolean;
   heading?: string;
 }) {
-  const [state, buy, buying] = useActionState<BuyState, FormData>(purchaseTrophy, undefined);
+  // The result of the LAST completed purchase, handed back by the checkout —
+  // the shelf owns the confirmation banner and the live balance, the modal owns
+  // the transaction.
+  const [state, setState] = useState<BuyState>(undefined);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [gift, setGift] = useState(false);
   const [tier, setTier] = useState<string>("all");
   const [afford, setAfford] = useState(false);
 
@@ -121,7 +124,6 @@ export default function TrophyMarket({
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {shown.map((t) => {
             const can = signedIn && balance >= t.cpPrice;
-            const open = openId === t.id;
             return (
               <div key={t.id} data-trophy={t.id}
                 className={`glass overflow-hidden border ${TIER_RING[t.tier] ?? "border-white/10"}`}>
@@ -158,43 +160,17 @@ export default function TrophyMarket({
                     <a href="/login" className="ghost-btn mt-2 block rounded-full px-3 py-1.5 text-center text-[11px]">
                       Sign in to buy
                     </a>
-                  ) : !open ? (
-                    <button type="button" onClick={() => { setOpenId(t.id); setGift(false); }}
+                  ) : (
+                    // Opens the checkout (B49). It used to open an inline form
+                    // whose submit button spent the points — a click with no
+                    // step in between, which is how a gamer's first notice of a
+                    // purchase was a different balance.
+                    <button type="button" onClick={() => setOpenId(t.id)}
                       disabled={!can}
                       className={`mt-2 w-full rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
                         can ? "bg-cyan-500/20 text-cyan-100 hover:bg-cyan-500/30" : "cursor-not-allowed bg-white/5 text-muted"}`}>
                       {can ? "Get it" : <><Cp amount={t.cpPrice - balance} /> to go</>}
                     </button>
-                  ) : (
-                    <form action={buy} className="mt-2 space-y-1.5">
-                      <input type="hidden" name="trophyId" value={t.id} />
-                      <div className="flex gap-1">
-                        <button type="button" onClick={() => setGift(false)}
-                          className={`flex-1 rounded-full px-2 py-1 text-[10px] font-bold ${!gift ? "bg-cyan-500/25 text-cyan-100" : "bg-white/5 text-muted"}`}>
-                          For me
-                        </button>
-                        <button type="button" onClick={() => setGift(true)}
-                          className={`flex-1 rounded-full px-2 py-1 text-[10px] font-bold ${gift ? "bg-violet-500/25 text-violet-100" : "bg-white/5 text-muted"}`}>
-                          Gift it
-                        </button>
-                      </div>
-                      {gift && (
-                        <>
-                          <input name="recipientSlug" required placeholder="their profile name"
-                            className="input-cosmic !py-1 w-full text-[11px]" />
-                          <input name="message" placeholder="a note (optional)" maxLength={200}
-                            className="input-cosmic !py-1 w-full text-[11px]" />
-                        </>
-                      )}
-                      <div className="flex gap-1">
-                        <button disabled={buying}
-                          className="flex-1 rounded-full bg-emerald-500/25 px-2 py-1 text-[11px] font-bold text-emerald-100 disabled:opacity-50">
-                          {buying ? "…" : `Spend ${num(t.cpPrice)}`}
-                        </button>
-                        <button type="button" onClick={() => setOpenId(null)}
-                          className="rounded-full bg-white/5 px-2 py-1 text-[11px] text-muted">Cancel</button>
-                      </div>
-                    </form>
                   )}
                 </div>
               </div>
@@ -202,6 +178,18 @@ export default function TrophyMarket({
           })}
         </div>
       )}
+
+      {/* The checkout (B49). Rendered once, outside the grid, so the modal is
+          not a child of a card whose overflow would clip it. */}
+      {openId && (() => {
+        const t = trophies.find((x) => x.id === openId);
+        if (!t) return null;
+        return (
+          <TrophyCheckout trophy={t} balance={balance}
+            onClose={() => setOpenId(null)}
+            onDone={(s) => { setState(s); setOpenId(null); }} />
+        );
+      })()}
 
       {compact && trophies.length > shown.length && (
         <a href="/marketplace" className="inline-flex items-center gap-1 text-xs text-cyan-300 hover:underline">

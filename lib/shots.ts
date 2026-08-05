@@ -92,6 +92,8 @@ export const CAPTURED_SHOT_KEYS = new Set<string>([
   "gamer.leaderboard.rank",
   "gamer.linked.verified",
   "gamer.lol.card",
+  "gamer.marketplace.checkout",
+  "gamer.marketplace.gift",
   "gamer.marketplace.shelf",
   "gamer.planet.page",
   "gamer.profile.public",
@@ -121,6 +123,12 @@ export const SHOT_REGISTRY: ShotDef[] = [
   { key: "gamer.cp.ledger", group: "gamer", claim: "Every point is accounted for", capturedFrom: "/quests", as: "gamer" },
   { key: "gamer.quest.map", group: "gamer", claim: "Quests you actually travel", capturedFrom: "/quests", as: "gamer" },
   { key: "gamer.marketplace.shelf", group: "gamer", claim: "Spend points on real trophies", capturedFrom: "/marketplace", as: "gamer" },
+  // Both are MODAL states (B49). The capture pass has to open the checkout —
+  // click "Get it", then "Gift it" and pick somebody — before it can shoot
+  // `[data-checkout]`. Registered now so V1.R has the claim and the selector;
+  // deliberately uncaptured, like every other slot placed this wave.
+  { key: "gamer.marketplace.checkout", group: "gamer", claim: "One confirm, and what it costs", capturedFrom: "/marketplace", as: "gamer", selector: "[data-checkout]", openText: "Get it" },
+  { key: "gamer.marketplace.gift", group: "gamer", claim: "Confirm the person before the points move", capturedFrom: "/marketplace", as: "gamer", selector: "[data-checkout]", openText: "Gift it" },
   { key: "gamer.redeem.method", group: "gamer", claim: "Cash out without giving us your bank", capturedFrom: "/feed", as: "gamer" },
   { key: "gamer.feed.dashboard", group: "gamer", claim: "Build the dashboard you want to look at", capturedFrom: "/feed", as: "gamer" },
   { key: "gamer.leaderboard.rank", group: "gamer", claim: "Ranked against everyone who plays it", capturedFrom: "/leaderboards", as: "guest" },
