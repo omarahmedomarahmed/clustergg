@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { asc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
@@ -115,7 +116,14 @@ export type Access = {
   systems: string[];
 };
 
-export async function currentAccess(): Promise<Access | null> {
+/**
+ * Who this staff member is and what they run — once per request (B55.2).
+ *
+ * Called by the admin layout AND by `requireSystemFor` on the page inside it,
+ * so an uncached version was at least two identical reads on every admin
+ * navigation. `cache()` takes no arguments here, so the dedupe is total.
+ */
+export const currentAccess = cache(async (): Promise<Access | null> => {
   const user = await getCurrentUser();
   if (!user || !isStaff(user)) return null;
   if (isAdmin(user)) {
@@ -138,7 +146,7 @@ export async function currentAccess(): Promise<Access | null> {
     // when the database hiccups is the worst possible failure mode.
     return { user, isAdmin: false, department: null, systems: [] };
   }
-}
+});
 
 /**
  * Page guard.

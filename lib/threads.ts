@@ -1,4 +1,5 @@
-import { and, desc, eq } from "drizzle-orm";
+import { cache } from "react";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
 // Every conversation in the product, read the same way.
@@ -149,6 +150,36 @@ export type InboxThread = {
   /** Server threads only: replies that never reached Discord. */
   undelivered: number;
 };
+
+/**
+ * How many threads have something unread — the badge, and NOTHING else (B55.1).
+ *
+ * The admin layout used to call `adminInbox()` for this one integer. That fans
+ * out to `inbox()`, which selects **every column including the message body**
+ * with `.limit(2000)` and groups in JS, plus `brandThreads`, which had **no
+ * limit at all**. Megabytes over the wire, on every admin page load, to render a
+ * number — and it got worse every day the tables grew.
+ *
+ * Two `count(distinct …)` queries, no bodies, bounded by nothing that grows.
+ *
+ * "Unread" means a message FROM them that we have not read. A reply we wrote
+ * ourselves is not something we are waiting on, which is why `sender` is in both
+ * predicates.
+ */
+export const unreadThreadCount = cache(async (): Promise<number> => {
+  try {
+    const db = await getDb();
+    const [servers, brands] = await Promise.all([
+      db.select({ n: sql<number>`count(distinct ${schema.serverMessages.guildId})` })
+        .from(schema.serverMessages)
+        .where(and(eq(schema.serverMessages.sender, "server"), eq(schema.serverMessages.readByAdmin, false))),
+      db.select({ n: sql<number>`count(distinct ${schema.brandMessages.brandId})` })
+        .from(schema.brandMessages)
+        .where(and(eq(schema.brandMessages.sender, "brand"), eq(schema.brandMessages.readByAdmin, false))),
+    ]);
+    return Number(servers[0]?.n ?? 0) + Number(brands[0]?.n ?? 0);
+  } catch { return 0; }
+});
 
 export async function adminInbox(): Promise<InboxThread[]> {
   const [servers, brands] = await Promise.all([serverThreads(), brandThreads()]);

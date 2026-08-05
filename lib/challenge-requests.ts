@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PRICING_DEFAULTS } from "@/lib/pricing";
@@ -142,14 +143,15 @@ export async function getRequest(id: string): Promise<RequestRow | null> {
   } catch { return null; }
 }
 
-export async function countPendingRequests(): Promise<number> {
+/** The queue badge — once per request (B55.2). */
+export const countPendingRequests = cache(async (): Promise<number> => {
   try {
     const db = await getDb();
     const rows = await db.select({ id: schema.challengeRequests.id })
       .from(schema.challengeRequests).where(eq(schema.challengeRequests.status, "pending"));
     return rows.length;
   } catch { return 0; }
-}
+});
 
 // ===== Approval =====
 

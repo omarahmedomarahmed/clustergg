@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -542,7 +543,26 @@ async function tierHolderCountMap(db: DB, tierIds: string[]): Promise<Map<string
   return new Map(rows.map((r) => [r.tierId, Number(r.c)]));
 }
 
-export async function getUserQuests(db: DB, userId: string | null): Promise<QuestView[]> {
+/**
+ * The quest views, once per (request, gamer) — B55.2.
+ *
+ * Four queries: quests, tiers, progress, and the holder counts joined to users.
+ * `FloatingOrbs` is in the GLOBAL chrome, so every page in the product paid
+ * those four — including admin pages that show no quest at all — and any page
+ * that also renders quests paid them twice. Measurement put this quartet at the
+ * top of every surface once `platform_settings` was fixed.
+ *
+ * `db` is a process singleton so it is a stable cache key; the identity that
+ * actually varies is the gamer.
+ */
+const questsFor = cache(async (db: DB, userId: string | null): Promise<QuestView[]> =>
+  getUserQuestsUncached(db, userId));
+
+export function getUserQuests(db: DB, userId: string | null): Promise<QuestView[]> {
+  return questsFor(db, userId);
+}
+
+async function getUserQuestsUncached(db: DB, userId: string | null): Promise<QuestView[]> {
   const quests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true)).orderBy(schema.quests.sortOrder);
   if (quests.length === 0) return [];
   const questIds = quests.map((q) => q.id);
