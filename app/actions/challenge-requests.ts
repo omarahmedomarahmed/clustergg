@@ -45,7 +45,9 @@ export async function approveChallengeRequest(
 
   if (!res.ok) {
     return {
-      error: res.reason === "no_planet"
+      error: res.reason === "brand_unpaid"
+        ? (res.message ?? "That brand has an unpaid campaign invoice past its grace period.")
+        : res.reason === "no_planet"
         ? "That game has no planet yet — create it under Planets first."
         : res.reason === "not_pending"
           ? "That request has already been reviewed."

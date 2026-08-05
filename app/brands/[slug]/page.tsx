@@ -254,6 +254,9 @@ export default async function BrandPortalPage({
     busy: busyGames.has(g.game),
     owned: mineByGame.has(g.game),
   }));
+  // B36: what is owed, when it is due, and what happens if it is not paid.
+  const { brandBlocked } = await import("@/lib/prepay");
+  const prepay = await brandBlocked(db, brand.id);
   const buyQuote = campaignQuote();
   const buyWeeks = slotWindows(nextMonday());
 
@@ -306,6 +309,34 @@ export default async function BrandPortalPage({
         signOutSlug={brand.slug ?? brand.id}
       />
       <div className="mx-auto max-w-5xl px-4 py-8">
+        {/* The overdue state, above the tabs and on every tab (B36).
+            A brand that is about to be blocked, or already is, should not have
+            to find that out by clicking into billing — and the consequence is
+            stated with the amount, because "overdue" without "and here is what
+            happens next" is a nag rather than a notice. */}
+        {prepay.invoiceId && prepay.stage !== "paid" && (
+          <div className={`mb-6 rounded-2xl border p-5 ${prepay.blocked ? "border-rose-400/40 bg-rose-500/5" : "border-amber-400/35 bg-amber-500/5"}`}>
+            <div className="flex flex-wrap items-center gap-3">
+              <Icon name="alert" size={18} className={prepay.blocked ? "text-rose-300" : "text-amber-300"} />
+              <div className="min-w-0 flex-1">
+                <div className={`font-bold ${prepay.blocked ? "text-rose-200" : "text-amber-200"}`}>
+                  {prepay.blocked
+                    ? `Invoice ${prepay.invoiceNumber} is unpaid — nothing new is being published`
+                    : `Invoice ${prepay.invoiceNumber} is due — $${prepay.amount.toLocaleString()}`}
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-muted">
+                  {prepay.blocked
+                    ? prepay.reason
+                    : <>Campaign invoices are due the day they are issued. You have until your first challenge ends
+                        {prepay.graceEndsAt ? <> — {new Date(prepay.graceEndsAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</> : null}
+                        {" "}to settle it. After that we stop publishing new challenges for you; the ones already
+                        running finish, and every prize already won is still paid.</>}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <Tabs tabs={[
           {
             key: "overview", label: "Overview", icon: "chart",

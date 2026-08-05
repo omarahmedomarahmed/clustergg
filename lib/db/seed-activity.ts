@@ -73,6 +73,7 @@ export async function seedDemoActivity(db: {
   await seedServerPayouts(db);
   await seedChallengeRequests(db);
   await seedPayoutAccounts(db, gamers);
+  await seedCampaignInvoices(db);
   await seedServerScale(db);
   await seedNavArt(db);
   await seedFeatureShots(db);
@@ -231,6 +232,28 @@ async function seedServerScale(db: any) {
   for (const c of chunk(users, 100)) await db.insert(schema.users).values(c).onConflictDoNothing();
   for (const c of chunk(members, 100)) await db.insert(schema.discordGuildMembers).values(c).onConflictDoNothing();
   for (const c of chunk(accounts, 100)) await db.insert(schema.linkedGameAccounts).values(c).onConflictDoNothing();
+}
+
+/**
+ * Campaign invoices for the demo's campaigns (B36).
+ *
+ * Production now issues one at the moment a campaign is bought. The demo's
+ * campaigns predate that, so without this the overdue banner, the dunning
+ * schedule and the publish block are all built, all correct, and all invisible —
+ * the brand portal shows nothing because nothing owes anything.
+ *
+ * One is left DELIBERATELY UNPAID with its first challenge already ended, which
+ * is the blocked state: the uncomfortable one, and the only one worth looking
+ * at. A demo where every invoice is settled demonstrates the happy path nobody
+ * needed to see.
+ */
+async function seedCampaignInvoices(db: any) {
+  const campaigns = await db.select().from(schema.sponsoredCampaigns);
+  if (!campaigns.length) return;
+  const { invoiceCampaign } = await import("@/lib/prepay");
+  for (const c of campaigns) {
+    await invoiceCampaign(db, c.id);
+  }
 }
 
 // ===== Views and votes =====

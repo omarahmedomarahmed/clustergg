@@ -1076,6 +1076,13 @@ export async function runBootMaintenance(db: DB) {
     await seedQuests(db); await ensureQuestArt(db); await repriceQuests(db);
   } catch { /* non-fatal */ }
 
+  // B36: the dunning schedule. Each stage sends once, deduped from the email
+  // log, so running this on every boot cannot spam a brand.
+  try {
+    const { runDunning } = await import("@/lib/prepay");
+    await runDunning(db);
+  } catch { /* dunning must never take a boot down */ }
+
   // Animated quest maps: fill in the generated loop for quests that have none
   // (or still carry a superseded generated loop). 3D terrain meshes likewise.
   for (const [key, url] of Object.entries(QUEST_MAP_VIDEOS)) {
