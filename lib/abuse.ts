@@ -20,7 +20,7 @@
 //   3. Creation-velocity friction. Not a wall — enough that fifty accounts is
 //      work.
 
-import { and, count, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, count, eq, gte, ilike, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
@@ -250,4 +250,109 @@ export async function anomalousGrowth(db: DB): Promise<GrowthFlag[]> {
     }
     return flags.sort((a, b) => b.unqualifiedShare - a.unqualifiedShare || b.raw - a.raw);
   } catch { return []; }
+}
+
+// ===== Defence 3: account-creation velocity (B35) =====
+//
+// Deliberately last, and worth saying why it is here at all.
+//
+// B34 took the gamer-side incentive from $63/day to $2.50/day for fifty
+// accounts, and defence 2 means those fifty move no tier until each has been
+// linked a week AND proven ownership of a game account. So the cost velocity
+// limits were meant to impose is already imposed, at the point where money is
+// decided rather than at signup. This is not what stops the fraud any more.
+//
+// It is still worth having, for a narrower reason: it stops the NOISE. Fifty
+// accounts created in a minute is fifty rows in every admin list, fifty entries
+// in a leaderboard, and a support queue full of "who are these". A friction that
+// makes fifty accounts feel like work is enough — and it must stay a friction,
+// never a wall, because the person it inconveniences most is a real gamer on a
+// shared university NAT.
+
+/** Signups from one source, per window, before we make it awkward. */
+export const SIGNUP_LIMIT = 10;
+export const SIGNUP_WINDOW_HOURS = 24;
+
+/** A Discord account younger than this is not, by itself, a refusal. */
+export const YOUNG_DISCORD_DAYS = 7;
+
+/** Domains where a fresh address costs nothing, so the count means less. */
+export const DISPOSABLE_DOMAINS = [
+  "mailinator.com", "guerrillamail.com", "10minutemail.com", "tempmail.com",
+  "throwawaymail.com", "yopmail.com", "trashmail.com", "sharklasers.com",
+];
+
+export type VelocityVerdict = {
+  /** May this signup proceed? */
+  ok: boolean;
+  /** How many we have already seen from this source in the window. */
+  seen: number;
+  limit: number;
+  /** What tripped, for the admin log and for the message. */
+  reasons: string[];
+  /** Said to the person, if it is refused. Never accuses them of anything. */
+  message: string;
+};
+
+const domainOf = (email: string) => (email.split("@")[1] ?? "").toLowerCase();
+
+/**
+ * Should this signup be slowed down?
+ *
+ * Counts prior signups in the window from the same source — an IP, or an email
+ * domain that is not a mainstream provider. **Never counts by IP alone for a
+ * mainstream domain**: a hundred people on one university NAT with gmail
+ * addresses are a hundred people, and refusing the eleventh is refusing a real
+ * gamer for somebody else's behaviour.
+ *
+ * Fails OPEN. A velocity check that cannot read the database must not stop
+ * people signing up — the thing it protects is tidiness, and the thing failing
+ * closed costs is customers.
+ */
+export async function signupVelocity(
+  db: DB,
+  input: { ip?: string | null; email?: string | null; discordCreatedAt?: Date | null },
+): Promise<VelocityVerdict> {
+  const open: VelocityVerdict = {
+    ok: true, seen: 0, limit: SIGNUP_LIMIT, reasons: [], message: "",
+  };
+  try {
+    const since = new Date(Date.now() - SIGNUP_WINDOW_HOURS * 3600_000);
+    const reasons: string[] = [];
+    const domain = domainOf(input.email ?? "");
+    const disposable = DISPOSABLE_DOMAINS.includes(domain);
+
+    // The count that decides. A disposable domain is a source; a mainstream one
+    // is not, because "ten gmail signups today" is a Tuesday.
+    let seen = 0;
+    if (disposable && domain) {
+      const [row] = await db.select({ n: sql<number>`count(*)` }).from(schema.users)
+        .where(and(gte(schema.users.createdAt, since), ilike(schema.users.email, `%@${domain}`)));
+      seen = Number(row?.n ?? 0);
+      if (seen >= SIGNUP_LIMIT) reasons.push(`${seen} accounts from ${domain} in ${SIGNUP_WINDOW_HOURS}h`);
+    }
+
+    // A young Discord account is a SIGNAL, never a refusal on its own — every
+    // real gamer's Discord account was one day old once.
+    if (input.discordCreatedAt) {
+      const days = (Date.now() - input.discordCreatedAt.getTime()) / 86400_000;
+      if (days < YOUNG_DISCORD_DAYS) reasons.push(`Discord account is ${Math.floor(days)} days old`);
+    }
+
+    // Refuse only when the COUNT trips. The other signals ride along for the
+    // admin review queue; on their own they describe a new gamer.
+    const tripped = disposable && seen >= SIGNUP_LIMIT;
+    return {
+      ok: !tripped,
+      seen,
+      limit: SIGNUP_LIMIT,
+      reasons,
+      message: tripped
+        // Never accuses. The person reading this is usually not the one the
+        // limit is for, and telling somebody they look like a bot is how you
+        // lose the one real gamer it caught.
+        ? "We've had a lot of signups from that email provider today. Use a different address, or come back tomorrow — nothing is wrong with your account."
+        : "",
+    };
+  } catch { return open; }
 }
