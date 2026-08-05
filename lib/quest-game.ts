@@ -89,4 +89,14 @@ export type QuestGamePayload = {
   totalCp: number;
   art?: QuestPanelArt;
   missions?: StarterMissions;
+  /**
+   * Cluster Points per dollar (B15).
+   *
+   * The rules panel listed what each action pays and stopped there, which reads
+   * as a score. These points buy a trophy that redeems for cash, so the panel
+   * now prices the day's maximum — the honest version of "glorify the actions",
+   * because it is the caps that make the number credible rather than fine print
+   * hiding it. Optional: a payload without it simply shows CP as before.
+   */
+  cpPerDollar?: number;
 };

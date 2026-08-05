@@ -290,7 +290,7 @@ the remaining edits; Part II is the whole platform.
 | B12 | Planet hero: live only; completed challenges + standings on the page | `lib/planet-explore.ts`, `app/planets/[slug]/page.tsx` | batch 2 | ☑ |
 | B13 | The bot guides, rebuilt — fewer than nine, redesigned | `lib/cards/*`, `lib/discord/onboard.ts`, `/cluster guide` | batch 2 | ☐ |
 | B14 | The Home card: a Cluster home page, in Discord | new `home` card kind, `lib/discord/screens.ts` | batch 2 | ☐ |
-| B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☐ |
+| B15 | The new CP actions wired into the quests that exist | `lib/quests.ts` `ACTION_CATALOG`, the redeem/gift/install paths | batch 2 | ☑ |
 | B16 | **The CP economics model and the admin calculator** | new `lib/cp-economics.ts`, new `/admin/cp-calculator`, `platform_settings` | batch 2 | ☑ |
 | B17 | Daily caps on every action — silent enforcement, full disclosure | `lib/quests.ts` `awardQuestAction`, quest cards, the CP history | batch 2 | ☑ |
 | B18 | The wallet — CP, dollar value, trophy case, one ledger | new `lib/wallet.ts`, new `/wallet`, `components/FeatureShot.tsx` | batch 2 | ☑ |
@@ -3099,6 +3099,7 @@ which change bought which improvement.
 | B55.7 | "the comments claim matches are cached 6h — check whether that caching actually happens" | **Checked: it happens, in a function the card never calls.** `matchCache` (6h) is used only by `getLolMatchDetail`, the click-through. The card path goes `matchSummaryFor` → `getMatchRaw` with no cache lookup. Both caches are in-process `Map`s and do not survive a cold lambda. |
 | B40 | "deletion proceeds if confirmed and the balance is zeroed with a ledger entry" | **Not zeroed — there is nothing left to zero.** `deleteAccount` calls `db.delete(users)` and every CP row cascades, so there is no surviving row to write a zeroing ledger entry against. The forfeiture is recorded where it can still be read: the `account.deleted` email, sent BEFORE the delete, carries the balance and its dollar value. Also found while building: `deletionImpact` fanned out with `Promise.all`, so a dead database rejected four promises and only the first was observed — the other three were unhandled rejections. It uses `allSettled` and re-throws, which keeps the fail-open behaviour and observes every leg. |
 | B39 | the stated gap is closed | B39 shipped saying "the demo data exercises only three of the six states… seeding the other three is owed". `seedStuckMoney` now produces the two that carry a dollar figure and need a decision: a redemption pushed back to `approved` with the provider's reason (the same state the real failure path writes, not a new row), and a departed winner past the 90-day hold. `cancelled_with_entries` remains suite-only — cancelling a seeded challenge would remove it from every other demo screen. |
+| B15 | — (found while building) | Three of the four had no emitter; the fourth (`bot_added`) has no signed-in user at its only seam and is **B22's** to wire, so B15 ships the three that could be. Also: `repriceQuests` (`lib/quests.ts:270`) was ALREADY seeding all four onto their quests with weights and caps, so the quest pages had been advertising four ways to earn that nothing could earn. The "glorify" half is priced rather than decorated — the rules panel now totals the day's caps and converts at the platform rate. On the seeded economy that reads **199 CP = $0.02 a day** for the orbit quest, which is true and is worth looking at: it is B34's numbers, stated out loud for the first time. |
 | — | *(next amendment here)* | |
 
 ---
@@ -3165,7 +3166,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/planet.mjs` | **B12** | live-only hero; completed section with real standings | owed |
 | `tests/ui/bot-guides.mjs` | **B13** | fewer than nine guides; the CP guide's numbers equal `ACTION_CATALOG` | owed |
 | `tests/ui/bot-home.mjs` + `tests/db/bot-home.mts` | **B14** | the home card, both background states, three live + four quests, the empty state | owed |
-| `tests/db/quests.mts` | **B15** | the new actions award on the real code path, deduped, capped | owed |
+| `tests/db/quest-actions.mts` | **B15** | the new actions award on the real code path, deduped, capped; buying for yourself is not a gift; the emitters are awaited, not floated | ☑ 42 |
 | `tests/db/cp-economics.mts` | **B16**, **B34** | the model against a hand-computed fixture; ~~the multi-quest multiplier~~ **the absence of one, per B34.2**; no uncapped action survives; what the calculator writes is what the engine pays | **written — 57 assertions** |
 | `tests/db/caps.mts` | **B17** | past the cap the action still succeeds and awards zero, silently; the cap is shown up front; the maxed entry appears in history with its figure and its reset | **written — 18 assertions** (the UI half is covered in-browser; a `tests/ui/caps.mjs` is still owed for CI) |
 | `tests/ui/wallet.mjs` + `tests/db/wallet.mts` | **B18** | dollar value correct; the ledger reconciles; no payment field in any state | owed |

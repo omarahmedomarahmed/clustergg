@@ -1,7 +1,7 @@
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema, type DB } from "@/lib/db";
 import { uid } from "@/lib/utils";
-import { getTotalCp } from "@/lib/quests";
+import { awardQuestAction, getTotalCp } from "@/lib/quests";
 
 // The trophy marketplace: what Cluster Points are FOR.
 //
@@ -258,6 +258,21 @@ export async function buyTrophy(
         href: from?.slug ? `/u/${from.slug}` : "/profile",
       });
     } catch { /* a failed notification must not fail a purchase */ }
+
+    // Giving and receiving both earn on the orbit quest (B15).
+    //
+    // Only on a GIFT. Buying a trophy for yourself is already its own reward and
+    // paying CP for the act of spending CP would be a loop that pays for itself.
+    // Both sides key on the order, so one gift is one award each however many
+    // times this is retried, and the buyer's daily cap is what stops a pair of
+    // accounts gifting the same trophy back and forth all afternoon.
+    //
+    // `awardQuestAction` swallows its own errors by design — gamification must
+    // never fail the purchase that triggered it — but these are awaited rather
+    // than floated: a floating promise in a server action is killed when the
+    // response is sent (§0), which is how an award silently never happens.
+    await awardQuestAction(db, buyerId, "gift_sent", { refType: "order", refId: orderId });
+    await awardQuestAction(db, recipientId, "gift_received", { refType: "order", refId: orderId });
   }
 
   return {

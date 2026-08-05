@@ -51,7 +51,7 @@ export default async function QuestDetailPage({ params }: { params: Promise<{ ke
   return (
     <div>
       <QuestMapHero quest={quest} tierHolders={tierHolders} tabs={tabs} backHref="/quests" totalCp={totalCp} rocketUrl={rocketUrl}
-        game={{ rules: quest.rules, log: questLedger, totalCp, art: panelArt, missions }} />
+        game={{ rules: quest.rules, log: questLedger, totalCp, art: panelArt, missions, cpPerDollar: market.rate }} />
 
       {/* Glorified milestone leaderboard */}
       <div className="mx-auto max-w-3xl px-4 pb-16">
