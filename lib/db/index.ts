@@ -883,7 +883,9 @@ async function createDb(): Promise<DB> {
     const { neon } = await import("@neondatabase/serverless");
     const { drizzle } = await import("drizzle-orm/neon-http");
     const client = neon(process.env.DATABASE_URL);
-    const db = drizzle(client, { schema }) as DB;
+    // B55.8: query counting, off unless PERF_COUNT=1.
+    const { perfLogger, perfEnabled } = await import("./perf");
+    const db = drizzle(client, { schema, ...(perfEnabled() ? { logger: perfLogger } : {}) }) as DB;
     await ensureProvisioned(db);
     return db;
   }
@@ -891,7 +893,8 @@ async function createDb(): Promise<DB> {
   const { PGlite } = await import("@electric-sql/pglite");
   const { drizzle } = await import("drizzle-orm/pglite");
   const client = new PGlite();
-  const db = drizzle(client, { schema }) as DB;
+  const { perfLogger, perfEnabled } = await import("./perf");
+  const db = drizzle(client, { schema, ...(perfEnabled() ? { logger: perfLogger } : {}) }) as DB;
   const { DDL } = await import("./ddl");
   await client.exec(DDL);
   // Apply the same idempotent column back-fills so demo mode matches the schema
