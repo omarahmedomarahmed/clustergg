@@ -3748,6 +3748,174 @@ Discord policy decision (A7).
 
 ---
 
+## B72 — Stop the bleeding
+
+The report came back **DO NOT INVEST** with seven fatal risks. `docs/DD_RESPONSE.md`
+is the full reply — what we accept, the four things we dispute, and the five
+phases below. **B72 is phase 0 and nothing else in the queue moves until it
+lands.** Every item here is a shipped defect with a live customer or a live legal
+exposure on it, and each one is a thing we would not be able to explain.
+
+| What | Where | The change |
+|---|---|---|
+| **Fabricated ROAS** | `lib/brand-report.ts:105-115` | Media value is computed from **server headcount** and labelled "Counted delivery". It is a false statement to a paying customer. Remove the media-value and ROAS figures entirely. Show delivered impressions from logged rows, or the words "not yet measured". A computed proxy never carries the word "counted". |
+| **The open beacon** | `app/api/ads/beacon/route.ts` | Unauthenticated and forgeable — the reviewer minted CP with a `curl`. Signed payload, session-bound, origin-checked, rate-limited. No CP from a call we cannot attribute. |
+| **Trophy gifting** | `lib/marketplace.ts`, the gift surfaces | **Delete it.** One removal closes three holes at once: the money-transmission trigger, the 1099 aggregation hole, and the under-18 cash-out bypass. Following and messaging stay (B68). |
+| **The age gate** | signup vs `app/redeem` | The 18+ check exists and fails closed — it fires at **cash-out**, which is exactly the design that manufactures COPPA "actual knowledge". Move it to registration. |
+| **`AUTH_SECRET`** | `lib/auth.ts:7` | Hardcoded fallback. Fail to boot without it, the way the blob token already behaves. |
+| **Self-launching campaigns** | `app/actions/brand-portal.ts:137` | A self-serve creative upload goes live with no approval, contradicting our own written gate. Restore it. |
+
+**Gate 0 — none of these may be deferred for a feature.** They are the
+difference between "early" and "misleading".
+
+**Verification owed → `tests/db/integrity.mts` (new):** a beacon call with no
+signature awards nothing; the brand report contains no field derived from
+headcount; no gift path exists; a registration without a date of birth is
+refused; the app throws on boot with `AUTH_SECRET` unset; an uploaded creative
+is `pending` until approved.
+
+---
+
+## B73 — The two questions that decide whether the business exists
+
+Neither is an engineering task and neither is ours to answer alone. Both were
+already on our own unassessed list (`COMMERCIAL_MODEL.md` §10, A7 and A8) and the
+report is right that "unassessed" is not a status a company can hold.
+
+| Question | What we need back |
+|---|---|
+| **Does Discord permit this?** Third-party paid creatives inside bot messages; cash-convertible points paid for engagement; verification at 100 servers forces a human review of exactly this. | A written read of the Developer Policy from counsel. If the answer is no: a partner conversation, or a product that does not put paid creatives inside bot messages. |
+| **Is paying cash for engagement regulated?** FinCEN CVC administrator status, state money-transmitter licensing, sanctions screening, 1099 thresholds. | A status opinion. **Gifting is deleted in B72 specifically so this opinion can come back "no".** |
+
+**Gate 1 — the real one.** If Discord's answer is no, the ad-placement business
+inside Discord ends and the company is the sponsored-challenge business only.
+**B74 through B79 do not start before this answer.** Everything downstream is
+worthless if the landlord says no.
+
+---
+
+## B74 — Money integrity
+
+The ledger cannot survive concurrency. `drizzle-orm/neon-http` cannot open an
+interactive transaction at all (`lib/db/index.ts:911`), so **every** ceiling
+check, purchase and redemption is a read-then-write race today.
+
+- Move the money paths onto a pooled driver so a transaction is possible.
+- The 500 ceiling enforced **inside** a transaction, on a locked row.
+- `buyTrophy` and `requestRedeem` transactional — no double spend.
+- No bare `catch {}` on a money path. A failure must be distinguishable from a success.
+- Replace the vacuous assertion at `tests/db/marketplace.mts:148` — it asserts a
+  value that cannot be negative — with a real concurrency test.
+- **CI**: type-check, lint and the suite on every push. There is none today.
+
+**Gate 2 — a concurrency test proving the ceiling holds under parallel writes.**
+No CP feature ships before it passes.
+
+**Verification owed → `tests/db/concurrency.mts` (new):** N parallel awards past
+the ceiling settle at exactly the ceiling; two simultaneous purchases of the last
+affordable trophy leave one buyer and a non-negative balance; a redemption
+submitted twice pays once.
+
+---
+
+## B75 — Measurement honesty, then delivery
+
+Order matters and it is the opposite of the order we were building in: **we do
+not build delivery counting on a number we cannot trust.**
+
+1. **Define what an impression IS**, write it down, and only count what meets the
+   definition. Discord's count-on-post is not an IAB viewable impression and must
+   never be sold as one. Where we cannot measure viewability, we say so on the
+   report rather than inferring it.
+2. Delivery counting: target and delivered per campaign, pacing, stop-at-target,
+   frequency cap, and no silent cutoff — **B65** already carries
+   `maxCreativesInRotation` silently dropping paying brands.
+3. Billing fields on the campaign (`cpm`, `viewsTarget`) so a floor price is
+   enforceable by the system rather than by an email.
+4. Cache and ad separation: a cached card must not re-serve one brand's creative
+   or skip its count.
+5. Under-delivery has a remedy **in the system** — make-good or credit.
+6. Reporting per placement, from logged rows only, with the card kind attributed.
+
+---
+
+## B76 — The guarantee, made real in code
+
+`COMMERCIAL_MODEL.md` §2 claims a 15-screen floor. The report found the code does
+not implement it, and it is right on every count.
+
+- **Build the four missing emitters.** `stat_levelup`, `play_session`,
+  `challenge_progress` and `share_card` are priced, are in every mission
+  variation, and **nothing fires them**. Missions were built on actions that do
+  not exist.
+- **Wire `lib/missions.ts` to a surface.** It is imported by nothing but its own
+  test. A model with no caller is a document, not a feature.
+- **The passive cap.** The active/passive flag and the 125 CP passive ceiling the
+  commercial model claims do not exist in `lib/quests.ts`. Implement, or delete
+  the claim.
+- **The 25-CP rule.** `win_challenge` at 100 and `best_profile_award` at 100 break
+  the "no action pays more than 25" bound the guarantee rests on. Enforce it, or
+  restate the guarantee to exclude them and show the resulting floor.
+- **Log the over-cap actions** with "max CP for today reached" — already decided,
+  still owed.
+
+**Verification owed → `tests/db/missions.mts`, `tests/db/quests.mts`:** every
+priced action has an emitter, asserted by scanning the callers of
+`awardQuestAction` rather than the catalogue; no action exceeds 25; the passive
+subtotal cannot exceed 125 in a day.
+
+---
+
+## B77 — The caps our own cost control set
+
+`lib/cards/budget.ts:23-27` caps rendering at roughly **200 daily gamers**. B46
+set that as a spend control without checking it against the growth the commercial
+model assumes — two of our own documents contradicting each other. Raise or scale
+the caps against the ladder, and make the ceiling a **configured** number an
+admin can see and change, not a constant.
+
+---
+
+## B78 — The model, restated
+
+- `revenue = screens × CPM/1000 × fill`. **Fill rate was missing from our
+  break-even and that is our error**, not a dispute.
+- Every rung of the ladder declares **registered vs daily-active**. The report's
+  0.51 screens/gamer/day divides by registered accounts and ours divided by
+  daily-active; that switch alone is worth ~30× and our table never said which.
+- Cost and revenue use the **same** engagement assumption in the same paragraph.
+- `COMMERCIAL_MODEL.md` gains a **CURRENT STATE vs TARGET STATE** header and every
+  unbuilt mechanism is marked **NOT BUILT**. It was written in the present tense
+  for a backlog and a reader with no context reasonably read it as shipped.
+
+---
+
+## B79 — Earn the right to sell
+
+- **Instrument three numbers** and stop arguing about them: real screens per
+  daily-active gamer per day, real fill against a signed brand, real mission
+  time-on-task.
+- **Test the CPA product.** Price on verified entrants rather than views —
+  `benchmarkCpe = $3.50` already exists in the model and carries roughly 70× the
+  headroom of a display view. One signed advertiser paying for measured actions.
+
+**Gate 4 — one signed insertion order.** Until an advertiser pays for something
+measured, the CPM number is an opinion. **B66 (admin console), B67 (brand portal)
+and B69 (public site) do not start before this**, because they serve a revenue
+model that has not cleared a gate.
+
+---
+
+## B80 — Security and privacy debt
+
+The remainder of the report's verified findings, none fatal alone, all real:
+the 90-day purge the privacy policy promises and the product does not perform;
+the Riot **development** key on a live product whose terms prohibit contests
+(production key with registration, or drop Riot); cookie consent that is
+decorative; deletion that leaves PII behind; a default IP salt.
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -3809,6 +3977,7 @@ Discord policy decision (A7).
 | B61 | **blocked on a measured number** | Before writing a variation I summed `ACTION_CATALOG`: everything a gamer could possibly do in a day, at every cap, is **624 CP**, and stripping the five actions nobody does daily (win a challenge, top 3, Best Profile, add the bot, connect an account) leaves **224**. The mission is two actions per quest — eight — and the best eight repeatable actions total about **140**. **"Eight actions totalling exactly 500" cannot be built at today's prices**, and the 1-CP ad watch cannot close a 360-point gap when its own cap is worth 20 CP. Four ways forward are written into B61.0b; three of them touch B34's price table, which is real money. My recommendation is the one that costs nothing: the mission totals what is achievable and is its own bar, and the 500 framing moves to the CAP display — "140 of a possible 500 today" — which is true, already computable from `capsToday`, and needs no repricing. Not built pending the decision, because every variation's arithmetic depends on it. |
 | B61 | repriced and built, with **one red assertion left on purpose** | The catalogue is repriced so every quest's mission pool tops out at exactly 125 and four make 500; posts, comments and reactions are retired to weight 0 (kept, not deleted, so a stored weight naming one reads zero instead of throwing); `share_card` moved to orbit, `challenge_progress` and `play_session` added because conquest and ascension had no daily action; gifts stay priced identically both ways at cap 2; bot-add goes 50/cap-1 to 25/cap-2. **`tests/db/cp-economics.mts` caught a real one before it shipped:** ad impressions at 5 CP paid out **$0.50 per 1,000 against a floor CPM of $0.50** — every cent of the ad revenue straight back out. Repriced to 1 CP (a fifth of the floor), which cost the signal quest one of its two workable task pairs, so missions 1/3 and 2/4 share signal blocks and take their variety from the other three quests. **Still red, and left red:** `a determined faker needs hours per dollar` — the reprice takes faking from over 60 minutes per dollar to **27**. That is the assertion doing its job on a change I made, and it is a decision about abuse economics rather than a fixture to update. Two ways out: cut the caps on the cheap social actions, or accept 27 and say so. **Owner's call, and nothing else in B61 ships until it is made.** |
 | ALL | "mark this point as pivotal — full commercial offer and platform structure" | **The pivot, recorded.** `docs/COMMERCIAL_MODEL.md` is now the reference for every number in this plan and supersedes any stated earlier. The machine in one line: a gamer earning 500 CP costs $0.05 and is *guaranteed* to have opened ≥15 screens, because no action pays over 25 CP and at most 125 CP a day may be passive — 375 CP is 15 active actions. At $5 CPM ($500 = 100,000 views) that is a 50% margin. The guarantee is the whole model: at 5 screens the break-even CPM is $10, above the market ceiling, so that scenario is not a thin business but *no* business. Filed: **B64** the catalogue and the passive cap, **B65** ad delivery (today we cannot deliver a promised number of views to anybody — `hash(card) % brandCount` with no budget, no pacing, and a silent cutoff that drops paying brands), **B66** admin as a sales console with headroom, alerts and danger zones, **B67** the self-serve brand portal, **B68** the social purge, **B69** the public commercial pages, **B70** component screenshots, **B71** adversarial due diligence. Two risks are named and unassessed on purpose: whether paying users cash for engagement is regulated, and whether Discord's policy permits any of it. Either can end the company and neither is ours to answer. |
+| B71 | the report came back **DO NOT INVEST** | **Answered in full: `docs/DD_RESPONSE.md`.** Fifteen findings accepted without argument, four disputed narrowly, five of our own errors added that the report did not catch. The three we cannot argue with — Discord's policy, the money-transmission trigger in gifting, and paying minors — can each end the company independently of any code, and two of them were on our own unassessed list. Filed as **B72** (stop the bleeding: ROAS off, beacon closed, gifting deleted, age gate moved to signup, `AUTH_SECRET` fatal, approval gate restored), **B73** (the Discord and FinCEN questions, as **Gate 1** — nothing downstream starts before the answer), **B74** (transactions, races, CI, as Gate 2), **B75** (define an impression *before* counting delivery), **B76** (the guarantee made real: four priced actions have no emitter and `lib/missions.ts` is imported by nothing but its test), **B77** (B46's render cap throttles the growth our own commercial model assumes), **B78** (the model restated **with fill rate**, which we had omitted, and with the registered-vs-daily-active denominator declared), **B79** (instrument three numbers, test CPA, **one signed IO as Gate 4** — B66, B67 and B69 wait behind it), **B80** (privacy and security debt). **Reordered, not just added:** the admin console, the brand portal and the public site were the front of the queue and are now behind a gate, because building the storefront for a model that has not cleared Gate 1 is the exact mistake the report is about. What we dispute and why is in §2 of the response; **none of the four disputes rescues the model** and the response says so. |
 | — | *(next amendment here)* | |
 
 ---
