@@ -186,6 +186,15 @@ export type CardLayout = {
    */
   badgeShow?: BadgeShow;
   content: ContentBox;
+  /**
+   * A thin line around the whole card, 0-100. 0 turns it off.
+   *
+   * The replacement for the gradient rule that used to run across the top: that
+   * read as a notification banner, and what a section actually needs is an edge
+   * so it stops being a rectangle of art with words on it. One quiet line, not
+   * a light.
+   */
+  stroke?: number;
   /** Darkness (0-100) of the plate drawn behind text blocks. 0 turns it off. */
   plate: number;
   /** Corner radius of that plate, in canvas pixels. */
@@ -233,73 +242,81 @@ export const AD_RATIO = 0.3125;
 /** The "Sponsored · Brand" strip drawn under the creative, in canvas pixels. */
 export const AD_LABEL_H = 22;
 
+// THE SHARED CARD LAYOUT (B56.0).
+//
+// A card is a SECTION of the platform rendered to PNG, and a section has three
+// bands and no furniture floating in the middle of it:
+//
+//   TOP-LEFT     the card's identity: an IMAGE — the game's logo, the gamer's
+//                avatar, the game account's avatar, the quest's art — with the
+//                title and one line of context beside it. Never text alone;
+//                every kind has a picture of the thing it is about and a card
+//                that opens with a headline in space could be any card.
+//   TOP-RIGHT    the ad. FIXED, on every card, without exception. There is no
+//                "unsold": when no brand has bought the slot the house creative
+//                fills it, because the slot is the product and an empty corner
+//                teaches a server owner that the bot sometimes has one.
+//   EVERYTHING   free space, edge to edge. Nothing is drawn into the body that
+//   BELOW        the body has to lay itself out around — no mascot in the
+//                bottom-right, no logo tile in a corner, no badge hanging off
+//                the strip. The Cluster mark is in this band and is a WATERMARK
+//                behind the content, so it brands the card without taking a
+//                rectangle from it.
+//
+// What that replaced, and why each went:
+//
+//   the gradient bar    A glowing rule across the top made every card look like
+//                       a notification. A section has a border, not a light.
+//                       `stroke` is the replacement: one thin, quiet line.
+//   the corner mark     Our logo sat between the identity and the ad and was
+//                       the third thing competing for a band that has room for
+//                       two. It is the watermark now.
+//   the mascot          It had been in three places in three commits — bottom
+//                       left (behind the body text), the strip (through the
+//                       title), then the right column (taking a column the body
+//                       now needs). The body is free space; the mascot is not
+//                       part of it.
+//   the badge           A fourth thing in the top band, on a band with an ad in
+//                       it. Off by default; a card that wants a level or a
+//                       trophy row draws it in its own body, where it belongs.
 export const DEFAULT_LAYOUT: CardLayout = {
-  // OUT of the content column (B54).
+  // OFF by default. The body is free space edge to edge, and a figure standing
+  // in it is exactly the thing that stops a card being laid out properly. An
+  // admin who wants it on a particular kind can unhide and place it.
+  mascot: { x: 90, y: 76, size: 190, hidden: true },
+  // THE IDENTITY IMAGE, top-left — the picture of whatever this card is about.
+  // (Stored under its old key so no admin's saved placement is lost; it used to
+  // be a faint watermark of the game's logo in the same corner.)
+  gameMark: { x: 8.2, y: 17.5, size: 108 },
+  // THE WATERMARK, in the body band, behind the content.
   //
-  // It stood at x:9, y:84 — bottom-LEFT, 200px, which is inside the content
-  // column. So the one figure every card carries was drawn behind the last two
-  // lines of every card's body, and the cards that read worst were the ones
-  // with the most to say.
-  //
-  // B54 says the mascot moves into the top strip. It was there for one commit,
-  // and rendering a real challenge is what took it out again: with the body now
-  // starting AT the top, the strip's left is the card's identity and its right
-  // is our mark, and a long title ran straight through the astronaut's chest.
-  // The item allows for exactly this — "both are decoration: draw over them
-  // freely, and if a card reads better without either, leave them out" — so it
-  // takes the one band that is reserved on every card instead: the column to
-  // the right of the text, below the badge. Nothing is drawn there unless a
-  // card asks for it (the world card's splash, which covers the mascot because
-  // it is drawn later, which is the right order).
-  mascot: { x: 90, y: 76, size: 190 },
-  // The GAME's logo, faint, under the identity line on the left. Says whose
-  // card this is before a word of it is read.
-  gameMark: { x: 6.2, y: 7.6, size: 88 },
-  // Bottom-right at 250, on every card, without exception.
-  //
-  // It was 104px and it read as a favicon somebody forgot to remove. These
-  // cards get screenshotted, cropped and reposted, and the only thing that
-  // travels with them is this mark — so it is drawn at a size that survives
-  // being seen at thumbnail scale in somebody else's feed.
-  // TOP-RIGHT (B54). It sat bottom-right at y:77.5, which put our mark in the
-  // busiest part of most cards — under the standings, over the prize art — and
-  // meant a card cropped for a tweet lost the branding first. The strip along
-  // the top is the one band every card keeps free by construction, so branding
-  // goes there, on the right, with the card's own identity on the left.
-  //
-  // An admin who has hand-placed the mark keeps their placement: this is the
-  // DEFAULT, and `spot()` only falls back to it for an unset value.
-  mark: { x: 91.5, y: 8.5, size: 132 },
-  // Pushed below the strip, since the mark now owns the top-right corner.
-  badge: { x: 91, y: 26, size: 96 },
-  // The text column stops short of the sponsor box AND of the logo.
-  //
-  // Satori has no float, so text cannot wrap around either of them — the
-  // column has to end before the right-hand furniture starts. 758px of the
-  // 1200 belongs to content; the 420 to its right belongs to the brand at the
-  // top, the logo at the bottom, and (on a world card) the splash between.
-  // This is the cost of carrying inventory on every card, taken once, in one
-  // place, instead of discovered per card in production.
-  // Starts under the strip, and now uses the WIDTH the mark gave up.
-  //
-  // 58.5% was the right number when the logo sat bottom-right and the ad sat
-  // top-right: the column had to end before both. With branding in the strip,
-  // the only thing still reserved on the right is the ad — and an unsold card
-  // has nothing there at all, which is why the first render after moving the
-  // mark had a dead half. `sideBox` still hands the world card its splash
-  // rectangle from the live layout, so widening here narrows that automatically
-  // rather than letting the two overlap.
-  content: { x: 4.7, y: 2.4, w: 78, h: 89 },
-  // Top-right corner at 400 wide — the biggest unit that still leaves a
-  // readable text column, and the same coordinates on every card so a brand's
-  // creative lands in the same place whatever the bot was asked for. The badge
-  // is pushed clear of it automatically; see `badgeTopFor`.
-  ad: { x: 81.7, y: 12.8, size: 400 },
+  // It has been bottom-right (over the standings), then top-right in the strip
+  // (under the sponsor box, which is drawn last, so on a sold card it was not
+  // on the card at all). Both were attempts to give our mark a rectangle of its
+  // own on a card that has no spare rectangle. As a watermark it costs nothing:
+  // it is behind every word, it survives the crop, and no body has to lay
+  // itself out around it.
+  mark: { x: 50, y: 63, size: 430, opacity: 7 },
+  // OFF by default — see the note above. Unhide it per kind if a card wants it.
+  badge: { x: 91, y: 26, size: 96, hidden: true },
+  // The whole band below the strip, edge to edge. Not a column any more: there
+  // is nothing to its right to stop for, which is the entire point of moving
+  // the mark, the mascot and the badge out of the body.
+  content: { x: 4, y: 30.2, w: 92, h: 65 },
+  // TOP-RIGHT, fixed, on every card. 400 wide: `adBox` gives it 125 of creative
+  // plus the disclosure strip, so it bottoms out at 179 and the body starts
+  // under it. Everything else in the top band is placed around this, because
+  // this is the one element whose position is a commercial promise.
+  ad: { x: 79.3, y: 15, size: 400 },
   plate: 46,
   plateRadius: 22,
   dim: 62,
   glows: false,
-  bar: true,
+  // The gradient rule is GONE (B56.0) — see the note above. `bar` survives so
+  // an admin who wants it can turn it back on, and so no stored layout breaks.
+  bar: false,
+  // A single thin line around the card, at this opacity. 0 turns it off.
+  stroke: 26,
   scrim: true,
   badgeShow: "auto",
   parts: {},
@@ -488,7 +505,11 @@ export function parseLayout(raw: string | null | undefined): CardLayout {
     plateRadius: num(o.plateRadius, DEFAULT_LAYOUT.plateRadius, 0, 60),
     dim: num(o.dim, DEFAULT_LAYOUT.dim, 0, 100),
     glows: o.glows === true,
-    bar: o.bar !== false,
+    // Defaults OFF now (B56.0): a stored layout that predates the redesign has
+    // no `bar` key, and reviving the gradient rule for every one of them would
+    // undo the redesign on exactly the cards an admin had already tuned.
+    bar: o.bar === true,
+    stroke: num(o.stroke, DEFAULT_LAYOUT.stroke ?? 0, 0, 100),
     scrim: o.scrim !== false,
     badgeShow: typeof o.badgeShow === "string" && BADGE_SHOW_IDS.has(o.badgeShow as BadgeShow)
       ? (o.badgeShow as BadgeShow) : "auto",

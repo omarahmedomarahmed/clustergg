@@ -119,6 +119,8 @@ export type QuestCard = {
 export type CpSummaryCard = {
   kind: "cp-summary";
   displayName: string;
+  /** The gamer's avatar — the identity image every card carries (B56.0). */
+  avatarUrl?: string | null;
   totalCp: number;
   level: number;
   quests: { name: string; cp: number; target: number; tier: string; accent: string }[];

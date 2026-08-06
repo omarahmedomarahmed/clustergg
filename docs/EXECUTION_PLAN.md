@@ -3085,6 +3085,45 @@ B54 said "laid out to render what a gamer sees on the platform". That was meant
 as **visual language**, and it was built as **the same data**. Those are not the
 same instruction, and the difference is the whole item.
 
+### B56.0 The shared layout is redesigned FIRST — and completely
+
+**No card kind is rebuilt until this is settled.** Building a body against a
+layout that is about to change builds it twice, which is exactly what happened:
+the marketplace card was rebuilt on the old frame and had to be rebuilt again.
+
+A card is a SECTION of the platform rendered to PNG. Three bands, no furniture:
+
+- **TOP-LEFT — the identity, and it is always an IMAGE.** The game's logo on a
+  challenge or a leaderboard, the gamer's avatar on a profile, the game
+  account's avatar on a game-stats card, the quest's art on a quest. Never a
+  headline alone. A title in empty space could be any card on the platform.
+- **TOP-RIGHT — the ad. Fixed, on every card, without exception.** There is no
+  "unsold": when no brand has bought the impression the HOUSE creative fills it.
+  The slot is the product, and a corner that is sometimes empty teaches a server
+  owner that the bot sometimes has one.
+- **EVERYTHING BELOW — free space, edge to edge.** Nothing is drawn into the
+  body that the body must lay itself out around. No mascot bottom-right, no logo
+  tile in a corner, no badge hanging off the band.
+
+And:
+
+- **The gradient rule at the top is removed.** It made every card read as a
+  notification. A thin `stroke` around the card replaces it — an edge, not a
+  light — and it is admin-editable like everything else.
+- **The Cluster mark moves into the body band as a WATERMARK**, transparent,
+  behind the content.
+
+**Verification owed → `tests/db/cards.mts` (now) + `tests/ui/cards.mjs`:**
+- The identity image is top-left and unhidden; the ad is top-right and never
+  hidden by default; nothing else is in that band.
+- Every one of the thirteen bodies declares an identity, and the image falls
+  back rather than leaving the slot empty.
+- The house creative fills the slot, through the same transcode a brand's
+  upload takes.
+- The body starts under the ad, runs edge to edge, and reaches the bottom.
+- The mark is in the body band, faint, and drawn BEFORE the content.
+- The stroke exists, is drawn last, and 0 turns it off.
+
 ### B56.1 The requirement
 
 A gamer looking at a Discord card must feel they are looking at Cluster.
@@ -3209,6 +3248,7 @@ carry their own rows.
 | B54 (cont.) | the scaled clamp broke a card the moment it landed | Rendering the market card after the column fix showed **"Champion's Nebula Cup" wrapped to two lines and sitting on top of the GOLD label under it** — the exact bug a comment in that file says was fixed once already. Cause: a market tile is 218px wide whatever the content column is doing, so scaling ITS clamp with the column widened the limit from 17 characters to 23 and let the name back through. The clamp is now two functions: `clampAt` (raw, for a fixed-width box) and the column-scaled one built on it. Same card, same cause, one line up: the shelf was `TILE_W * 3 + 24` — three per row because three fitted the 703px column it was written against, leaving 460 empty pixels once the column went to 936. It counts what fits now, from the effective width, so a sold card drops to two per row rather than running its shelf under the creative. |
 | B54 | "two requirements were missing from B54 as written" | **B56.** The cards must carry the platform's VISUAL LANGUAGE — its section headers, card-within-card shapes, stat tiles, pills, spacing rhythm and use of cover art as a section background — not merely its data in poster form; and no kind inherits its current shape, all thirteen designed from the platform section they mirror. B54 is unchanged and is not redone: its layout system is what B56 builds inside. Filed as a new item rather than an edit to B54 because B54's own progress rows describe work that shipped, and rewriting them would make the ledger say something that was never true. |
 | B56 | market — the first kind rebuilt | **Read `components/TrophyMarket.tsx` first, and the card had every number in it and none of its shape.** The platform shelf is: a glass tile ringed by TIER (that colour is the information), a square art plate the picture sits on, the name, the tier in small caps, then **the dollar value promoted** with "redeems for cash" under it, then the CP price. The card drew a 44px icon beside a number bubble and put name, tier and both figures on one line — a receipt. The dollar-over-CP order is not decoration: it is **B48's** decision about what makes a trophy an asset rather than a sticker, and a card that inverts it argues with the page. Also changed: the wallet is now the platform's boxed, tinted stat tile rather than a bare number, and the shelf shows ONE row of four instead of two rows of six — six only ever fitted because the receipt shape was 138px tall. The three shapes (`GlassCard`, `ArtPanel`, `StatTile`) live in one place with the real `.glass` values from `app/globals.css:45`, because re-styling a sub-card per body is how thirteen cards end up looking like thirteen products. Rendered sold and unsold: the first pass clipped the last pill off the bottom edge, which only the render showed. |
+| B56 | "COMPLETE REDESIGN — no old layout, and edit the shared one before any card type" | **B56.0, and the market card was rebuilt again on the new frame.** I filed the clarification and then built a card kind on the layout it was about to replace, which is the thing the instruction said not to do; that work is redone rather than kept. The shared layout is now three bands: an identity IMAGE plus its name top-left, the ad top-right on **every** card (the house creative fills it — there is no "unsold"), and free space edge to edge below. Gone: the gradient rule (a `stroke` replaces it), the corner logo tile, the mascot, the badge. The Cluster mark is a watermark behind the body. All thirteen bodies now hand their identity to the frame instead of drawing a headline as their first block, which is also what freed the body: the profile's trophy case moved out of a side column into real tiles across the full width, and the challenge's prize podium came out of the top-right corner where a sold card was burying it. |
 | — | *(next amendment here)* | |
 
 ---
@@ -3295,7 +3335,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/week-band.mjs` + `tests/db/week-prizes.mts` | **B51** | one element paints the nav art; three profiles, not more; each shows the trophy for its place and says "if the week ended now"; every profile link is `target=_blank` + `noopener`; a click below collapses it; and the close awards the RIGHT object to each place | ☑ 16 + 19 |
 | `tests/db/planet-explore.mts` + `tests/ui/planet.mjs` | **B52** | a gamer with two accounts appears twice; each row is the in-game name, not the display name; the reveal names the Cluster profile and links to it; the same gamer still holds exactly ONE challenge entry | ☑ 17 + 9 |
 | `tests/db/trophy-admin.mts` | **B53** | edits propagate to holders; raising the value raises unredeemed holdings; a pending/approved/sent/paid redemption's amount NEVER moves, up or down; a held trophy cannot be deleted and the ACTION refuses, not just the helper | **written — 30 assertions** |
-| `tests/db/cards.mts` | **B54** | no text box carries a fixed height; every standings row leads with the in-game name on BOTH cards; the strip's three tenants do not sit on each other (the mark clears the sponsor box, the column clears the mark, the game logo is drawn once); the clamps follow the column; Satori renders every kind without throwing | ☑ 84 |
+| `tests/db/cards.mts` | **B54** | no text box carries a fixed height; every standings row leads with the in-game name on BOTH cards; the strip's three tenants do not sit on each other (the mark clears the sponsor box, the column clears the mark, the game logo is drawn once); the clamps follow the column; Satori renders every kind without throwing | ☑ 80 |
 | `tests/ui/cards.mjs` | **B54**, **B56** | every kind declares the platform component it mirrors and that file exists; every section a body draws is a declared `part`, so admin can edit all of it; every kind renders SOLD and unsold without throwing and neither puts content under the sponsor box; no kind is a bare list where the platform section is tiled; the shared vocabulary (headers, pills, stat tiles, sub-cards) comes from one place rather than being re-styled per body | ☐ |
 | `tests/db/entry-rules.mts` | **B38** | a second account makes no second entry and the response names the one entered; the other account is free on a different challenge; switching allowed before the start and refused after, with the reason; the score is re-baselined; two different gamers unaffected | **written — 24 assertions** |
 | `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |

@@ -274,6 +274,9 @@ export async function cpSummaryCard(slug: string): Promise<CardData | null> {
   return {
     kind: "cp-summary",
     displayName: user.displayName,
+    // B56.0: every card's top-left is a picture of the thing it is about, and
+    // for a gamer's quest summary that is the gamer.
+    avatarUrl: user.avatarUrl,
     totalCp,
     level: levelFromCp(totalCp).level,
     quests: quests.slice(0, 4).map((q) => ({

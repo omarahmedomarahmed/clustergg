@@ -39,8 +39,10 @@ const { readFile } = await import("node:fs/promises");
 const db = await getDb();
 const tag = uid().slice(0, 6);
 
-/** The strip's height in canvas pixels — the band every card keeps free. */
-const STRIP = 92;
+/** The top band's height in canvas pixels — see `STRIP_H` in the renderer.
+ *  It is the sponsor box's own bottom plus air, because the ad is the one
+ *  element up there whose size is a commercial promise. */
+const STRIP = 196;
 
 console.log("== no card clips its text at a fixed height ==");
 // The failure: `height: 15` on a text box holds today because the copy in it
@@ -163,114 +165,86 @@ console.log("\n== the leader and the value do not touch ==");
 ok("the value is spaced with a margin, not a gap",
   /marginLeft: 10, color: t\.accent2/.test(render));
 
-console.log("\n== the top strip exists, and the mark is in it ==");
-const layout = await readFile(new URL("../../lib/cards/layout.ts", import.meta.url), "utf8");
-ok("there is a strip", /export const STRIP_H/.test(render));
-ok("…drawn unconditionally, unlike the accent bar", /Unconditional, unlike the accent bar/.test(render));
-const markY = Number(/mark: \{ x: [\d.]+, y: ([\d.]+)/.exec(layout)?.[1] ?? "99");
-ok("the mark sits in the top band, not the bottom corner", markY < 20, String(markY));
-const markX = Number(/mark: \{ x: ([\d.]+)/.exec(layout)?.[1] ?? "0");
-ok("…on the RIGHT", markX > 75, String(markX));
-const contentY = Number(/content: \{ x: [\d.]+, y: ([\d.]+)/.exec(layout)?.[1] ?? "0");
-// It started BELOW the strip in the first pass, which left the band empty on
-// every card — a dark bar with our mark in it and nothing else. The body starts
-// IN the strip now: its first section is the card's identity, which is what the
-// strip's left is for.
-ok("…and the body starts IN the strip, not below it", contentY < 14.6, String(contentY));
-const contentW = Number(/content: \{ x: [\d.]+, y: [\d.]+, w: ([\d.]+)/.exec(layout)?.[1] ?? "0");
-// Moving the mark out of the bottom-right left a dead half on the first render.
-ok("…using the width the mark gave up", contentW > 70, String(contentW));
-
-console.log("\n== the strip's three tenants do not sit on top of each other ==");
-// All three of these were found by rendering a SOLD card and looking at it.
-// None of them is visible in an unsold render, and the demo fixtures are
-// unsold, which is how all three shipped in the first pass.
+console.log("\n== B56.0: the shared layout has three bands and no furniture ==");
+// The redesign, stated as rules. Everything the old assertions here described —
+// the mark in a corner, the mark sliding around the ad, the column narrowing
+// beside it, the faint game watermark under the title — was furniture in a band
+// that has room for two things, and it is gone.
 {
-  const {
-    DEFAULT_LAYOUT, adBox, spotBox, contentBox, markLeftFor, mascotYields,
-  } = await import("../../lib/cards/layout.ts");
-  const L = DEFAULT_LAYOUT;
-  const ad = adBox(L.ad);
-  const mark = spotBox(L.mark, 1);
-
-  // 1. The default sponsor box covers the default mark completely. That is the
-  //    bug, stated as arithmetic: 1032..1164 across sits inside 780..1180.
-  ok("the sponsor box would bury the mark where it sits",
-    mark.left > ad.left && mark.left < ad.left + ad.width,
-    `mark ${mark.left}, ad ${ad.left}..${ad.left + ad.width}`);
-  const slid = markLeftFor(L, true);
-  ok("…so a SOLD card slides it clear", slid + mark.width <= ad.left,
-    `${slid} + ${mark.width} vs ${ad.left}`);
-  eq("…and an unsold card is untouched", markLeftFor(L, false), mark.left);
-  ok("…and it never goes off the left edge", slid >= 0, String(slid));
-
-  // 2. A mascot standing where the slid mark lands yields — a grey shoulder
-  //    behind the logo is worse than no mascot. The house default no longer
-  //    stands there (it was in the strip for one commit; a long title ran
-  //    straight through it), so this is asserted where the rule applies: an
-  //    admin who drags it into the strip.
-  const inStrip = { ...L, mascot: { ...L.mascot, x: 55.5, y: 8.7, size: 108 } };
-  ok("a mascot in the strip yields on a sold card", mascotYields(inStrip, true));
-  ok("…and stands on an unsold one", !mascotYields(inStrip, false));
-  ok("the house default is clear of both and always stands", !mascotYields(L, true));
-
-  // 3. The game logo is in the strip, and the mascot is out of the text column.
-  ok("the game logo rides in the strip", spotBox(L.gameMark, 1).top < STRIP,
-    String(spotBox(L.gameMark, 1).top));
-  ok("…on the LEFT, where the identity is", L.gameMark.x < 20, String(L.gameMark.x));
-  const body = contentBox(L.content);
-  const m = spotBox(L.mascot, 1);
-  ok("the mascot is out of the text column", m.left >= body.left + body.width - 24,
-    `mascot ${m.left}, column ends ${body.left + body.width}`);
-
-  // 4. The body starts IN the strip — its first section is the card's identity,
-  //    which is what the strip's left is for. It was pushed below the strip in
-  //    the first pass, which left the band empty on every card.
-  ok("the body starts in the strip", body.top < STRIP, String(body.top));
-  ok("…and stops before our mark", body.left + body.width <= spotBox(L.mark, 1).left,
-    `${body.left + body.width} vs ${spotBox(L.mark, 1).left}`);
-}
-
-console.log("\n== a SOLD card gives the column back to the sponsor ==");
-// Satori has no float: text cannot wrap around a creative, so the column has to
-// end before it. The old layout paid that on every card forever by staying
-// narrow whether or not anything ever sold. This pays it only when sold.
-{
-  const { DEFAULT_LAYOUT: L, adBox, contentBox, contentBoxFor, markLeftFor, spotBox } =
+  const { DEFAULT_LAYOUT: L, adBox, spotBox, contentBox } =
     await import("../../lib/cards/layout.ts");
-  const wide = contentBoxFor(L, false);
-  const sold = contentBoxFor(L, true);
-  eq("an unsold card keeps the full column", wide, contentBox(L.content));
-  ok("a sold one narrows", sold.width < wide.width, `${sold.width} vs ${wide.width}`);
-  eq("…and nothing moves vertically", [sold.top, sold.height], [wide.top, wide.height]);
+  const layoutSrc = await readFile(new URL("../../lib/cards/layout.ts", import.meta.url), "utf8");
+
+  // TOP-LEFT: the identity image.
+  const id = spotBox(L.gameMark, 1);
+  ok("the identity image is top-LEFT", id.left < 200 && id.top < STRIP, `${id.left},${id.top}`);
+  ok("…and it is not hidden", !L.gameMark.hidden);
+
+  // TOP-RIGHT: the ad, and it is the only other thing up there.
   const ad = adBox(L.ad);
-  ok("…clearing the creative", sold.left + sold.width <= ad.left, String(sold.left + sold.width));
-  // The mark slides LEFT of the ad, INTO the column — so the wall is whichever
-  // comes first. The second render of this had "Weekly Wins" behind the mark.
-  ok("…and clearing the slid mark too", sold.left + sold.width <= markLeftFor(L, true),
-    `${sold.left + sold.width} vs ${markLeftFor(L, true)}`);
-  ok("a hidden sponsor slot changes nothing",
-    contentBoxFor({ ...L, ad: { ...L.ad, hidden: true } }, true).width === wide.width);
-  // An admin dragging the ad across the card cannot squeeze the text to nothing.
-  const squeezed = contentBoxFor({ ...L, ad: { ...L.ad, x: 20 } }, true);
-  ok("…and the column has a floor", squeezed.width >= 400, String(squeezed.width));
+  ok("the ad is top-RIGHT", ad.left > 600 && ad.top < 60, `${ad.left},${ad.top}`);
+  ok("…and it is never hidden by default", !L.ad.hidden);
+  ok("the identity ends before the creative", /adB\.left - idBox\.left - 28/.test(render));
+
+  // Nothing else is in the top band.
+  ok("the badge is off", L.badge.hidden === true);
+  ok("the mascot is off", L.mascot.hidden === true);
+  ok("the gradient rule is off", L.bar === false);
+  ok("…and a layout saved before the redesign does not revive it",
+    /bar: o\.bar === true/.test(layoutSrc));
+
+  // THE BODY: edge to edge, under the ad, with nothing drawn into it.
+  const body = contentBox(L.content);
+  ok("the body starts under the ad", body.top >= ad.bottom, `${body.top} vs ${ad.bottom}`);
+  ok("…and runs edge to edge", L.content.x <= 5 && L.content.w >= 90, `${L.content.x}/${L.content.w}`);
+  ok("…all the way to the bottom", body.top + body.height >= 560, String(body.top + body.height));
+
+  // THE MARK: a watermark BEHIND the body, not a tile in a corner.
+  const mark = spotBox(L.mark, 1);
+  ok("the mark is in the body band", mark.top > STRIP, String(mark.top));
+  ok("…faint", (L.mark.opacity ?? 100) < 20, String(L.mark.opacity));
+  ok("…big enough to read as a watermark rather than a sticker", L.mark.size > 300, String(L.mark.size));
+  // Drawn BEFORE the children, which is what makes it a watermark rather than
+  // one more thing every body has to lay itself out around.
+  ok("…and drawn behind the content",
+    render.indexOf("THE CLUSTER MARK, as a WATERMARK") < render.indexOf("{children}"));
+
+  // THE EDGE: one thin line, replacing the gradient rule.
+  ok("there is a stroke", (L.stroke ?? 0) > 0, String(L.stroke));
+  ok("…drawn last, so nothing paints over it",
+    render.indexOf("THE EDGE (B56.0)") > render.indexOf("<AdSlot"));
+  ok("…and 0 turns it off", /\(l\.stroke \?\? 0\) > 0 \?/.test(render));
 }
 
-console.log("\n== the game's logo is drawn once, not twice ==");
-// The first render of the strip printed the game's mark twice: faint at
-// top-left AND crisp in the corner, one under the other. Six card bodies
-// proposed it as their corner badge because until B54 it was the only game
-// identity a card carried.
-ok("the corner steps aside when the strip has it",
-  /cornerIsGameLogo && stripHasGameLogo \? undefined : proposed/.test(render));
-ok("…only on \"auto\", so an explicit choice still wins",
-  /if \(show === "auto"\) return cornerIsGameLogo/.test(render));
-ok("…and the strip stands down when the badge is set to the game's logo",
-  /badgeShow \?\? "auto"\) === "game" \|\| l\.gameMark\.hidden/.test(render));
-ok("the challenge card no longer heads its trophy stack with it",
-  /It is in the strip now/.test(render));
-ok("…and the bodies that propose it say so", (render.match(/cornerIsGameLogo/g) ?? []).length >= 7,
-  String((render.match(/cornerIsGameLogo/g) ?? []).length));
+console.log("\n== every card carries an ad, and every card carries an image ==");
+// "There is no such thing as an unsold card." The slot is the product: a corner
+// that is sometimes empty teaches a server owner that the bot sometimes has
+// one, and that is the hardest thing to un-teach.
+{
+  const ads = await readFile(new URL("../../lib/cards/ads.ts", import.meta.url), "utf8");
+  ok("there is a house creative", /export const HOUSE_AD: CardAdSlot/.test(ads));
+  ok("…used as the fallback, through the same transcode a brand's upload takes",
+    /preparedAd\(d\.theme\.ad \?\? HOUSE_AD\)/.test(render));
+  ok("…and only an admin hiding the slot takes it off",
+    /l\.ad\.hidden \? null : theme\.ad/.test(render));
+
+  // Every body passes an identity, and every identity resolves to a picture.
+  const bodies = [...render.matchAll(/^function (\w+Body)\(/gm)].map((m) => m[1]);
+  ok("there are thirteen bodies", bodies.length === 13, JSON.stringify(bodies));
+  const without: string[] = [];
+  for (let i = 0; i < bodies.length; i++) {
+    const from = render.indexOf(`function ${bodies[i]}(`);
+    const to = i + 1 < bodies.length ? render.indexOf(`function ${bodies[i + 1]}(`) : render.length;
+    if (!/identity=\{\{/.test(render.slice(from, to))) without.push(bodies[i]);
+  }
+  eq("every one of them declares its identity", without, []);
+  ok("…and the image falls back rather than leaving the slot empty",
+    /identity\?\.imageUrl \|\| theme\.badge\?\.gameLogoUrl \|\| theme\.markUrl/.test(render));
+  // The band is a FIXED height, so the text fits it rather than pushing the
+  // block down into the body — which is what the first render did, straight
+  // over the challenge card's own pills.
+  ok("the identity text is clamped to the band", /maxHeight: STRIP_H - idBox\.top/.test(render));
+}
 
 console.log("\n== the clamps follow the column, they do not stay where they were ==");
 // Widening the content column from 58.5% to 78% left fifty character counts

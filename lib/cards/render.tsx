@@ -2,8 +2,9 @@ import { ImageResponse } from "next/og";
 import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
+import { HOUSE_AD } from "@/lib/cards/ads";
 import {
-  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBoxFor, markLeftFor, mascotYields, opacityOf,
+  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBoxFor, mascotYields, opacityOf,
   partOf, plateBg, sideBox, sideBoxFits, spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset, PartDraw } from "@/lib/cards/layout";
@@ -31,7 +32,10 @@ export const CARD_H = 630;
  * canvas — these cards get screenshotted and reposted, and the strip is what
  * survives a crop.
  */
-export const STRIP_H = 92;
+// The top band's height: the sponsor box's own bottom, plus air. Derived rather
+// than chosen, because the ad is the one element in that band whose size is a
+// commercial promise — everything else is placed around it.
+export const STRIP_H = 196;
 
 const INK = "#f2f3ff";
 const MUTED = "#9aa0c3";
@@ -163,9 +167,30 @@ function badgeContent(
   return undefined;
 }
 
-function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side }: {
+function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, identity, side }: {
   theme: CardTheme;
   children: React.ReactNode;
+  /**
+   * The card's own identity, drawn top-left (B56.0).
+   *
+   * Every kind passes one, and every one of them has an IMAGE: the game's logo
+   * on a challenge or a leaderboard, the gamer's avatar on a profile, the game
+   * account's avatar on a game-stats card, the quest's art on a quest. A card
+   * whose top-left is a headline in empty space could be any card, and the body
+   * below it then has to re-state what it is about instead of getting on with
+   * showing it.
+   */
+  identity?: {
+    title: string;
+    subtitle?: string | null;
+    /** A small line above the title — "LIVE CHALLENGE", "PLANET", "WEEK 42". */
+    eyebrow?: string | null;
+    imageUrl?: string | null;
+    /** Avatars are round; logos and cover art are not. */
+    round?: boolean;
+    /** Headline size, for the kinds whose names run long. */
+    size?: number;
+  };
   corner?: React.ReactNode;
   /** The corner proposal is the game's logo — see `badgeContent`. */
   cornerIsGameLogo?: boolean;
@@ -181,26 +206,28 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side
 }) {
   const l = theme.layout ?? DEFAULT_LAYOUT;
   const mascot = spotBox(l.mascot, 1);
-  const gameMark = spotBox(l.gameMark, 1);
-  // Drawn only when the badge is not already showing the very same logo at
-  // full strength, which is the one case where a faint copy of it is noise.
-  const gameMarkUrl = (theme.layout?.badgeShow ?? "auto") === "game" || l.gameMark.hidden
-    ? null
-    : theme.badge?.gameLogoUrl ?? null;
-  const corner = badgeContent(theme, proposedCorner, cornerIsGameLogo, !!gameMarkUrl);
+  const corner = badgeContent(theme, proposedCorner, cornerIsGameLogo, false);
   const mark = spotBox(l.mark, 1);
   const badge = spotBox(l.badge, 1);
-  // The sponsor, and the badge pushed clear of it. `badgeTopFor` returns the
-  // badge's own top when there's no ad or no collision, so an unsold card and a
-  // hand-placed badge are both untouched.
-  const ad = theme.ad && !l.ad.hidden ? theme.ad : null;
+  // THE AD IS ALWAYS ON (B56.0).
+  //
+  // There is no such thing as an unsold card. When no brand has bought this
+  // impression the HOUSE creative fills it, because the slot IS the product: a
+  // corner that is sometimes empty teaches a server owner that the bot
+  // sometimes has one, and it is the hardest thing to un-teach. Only an admin
+  // hiding the slot on a kind takes it off, and that is a decision somebody
+  // made rather than an accident of inventory.
+  const ad = l.ad.hidden ? null : theme.ad ?? null;
   const adB = adBox(l.ad);
   const badgeTop = badgeTopFor(l, !!ad, 1);
-  // …and the mark slid clear of it the same way. Without this the default
-  // sponsor box covers the strip's right end entirely and a sold card ships
-  // with no Cluster mark on it at all.
-  const markLeft = markLeftFor(l, !!ad);
-  // Narrowed only while a sponsor box is standing in it — see `contentBoxFor`.
+  // The identity block, top-left: the picture and the name of the thing.
+  const idBox = spotBox(l.gameMark, 1);
+  const idImage = identity?.imageUrl || theme.badge?.gameLogoUrl || theme.markUrl || null;
+  // It ends before the sponsor box, always. Satori has no float, so a title
+  // long enough to reach the creative would be drawn straight under it.
+  const idWidth = Math.max(220, adB.left - idBox.left - 28);
+  /** The text's own share of that, once the picture has taken its bite. */
+  const idText = Math.max(160, idWidth - idBox.width - 18);
   const content = contentBoxFor(l, !!ad);
   // The free rectangle to the right of the content: starts where the text
   // column ends, stops at the canvas edge, and begins under whichever of the
@@ -254,41 +281,65 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side
           <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: alpha(theme.accent2, 0.11, FALLBACK_ACCENT2) }} />
         </>
       ) : null}
-      {/* THE TOP STRIP (B54).
-          One band every card keeps free by construction: the card's own
-          identity on the left, our branding on the right, and everything below
-          it free space for the body. A scrim rather than a solid bar, so the
-          background art still reads through — a card is a web page, not a
-          poster with a header glued on.
-
-          Unconditional, unlike the accent bar under it: `l.bar` is an admin
-          toggle for the coloured rule, and the strip is what the layout is
-          built around. */}
+      {/* THE TOP BAND (B56.0).
+          Two things live here and only two: the card's IDENTITY on the left and
+          the AD on the right. A scrim rather than a solid bar, so background
+          art still reads through — this is a section of the platform, not a
+          poster with a header glued on. */}
       <div style={{
         position: "absolute", top: 0, left: 0, right: 0, height: STRIP_H, display: "flex",
-        background: "linear-gradient(180deg, rgba(4,5,26,0.82) 0%, rgba(4,5,26,0.34) 70%, rgba(4,5,26,0) 100%)",
+        background: "linear-gradient(180deg, rgba(4,5,26,0.86) 0%, rgba(4,5,26,0.42) 62%, rgba(4,5,26,0) 100%)",
       }} />
-      {/* The GAME's logo, faint, in the strip (B54).
-          It says whose card this is before a word of it is read — and it is
-          decoration, so it goes UNDER the identity line rather than beside it
-          and costs the body nothing.
-
-          Skipped when the badge is already drawing the same logo at full
-          strength: two of one mark in one band is a mistake, not a design. The
-          bytes are already inline — `badge.gameLogoUrl` is filled from the
-          PREPARED body (see `withTheme`), so this never sends Satori after a
-          remote host mid-render. */}
-      {gameMarkUrl && !l.gameMark.hidden ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={gameMarkUrl} alt="" width={gameMark.width} height={gameMark.height}
-          style={{
-            position: "absolute", left: gameMark.left, top: gameMark.top,
-            width: gameMark.width, height: gameMark.height, objectFit: "contain",
-            // Faint by house default; an explicit setting wins.
-            opacity: opacityOf(l.gameMark.opacity) ?? 0.18,
-            ...styleOf({ ...l.gameMark, opacity: undefined }),
-          }} />
+      {/* THE IDENTITY, top-left: a picture of the thing, then its name.
+          Never text alone. Every kind has an image of what it is about — the
+          game's logo, the gamer's avatar, the account's avatar, the quest art —
+          and a card that opens with a headline floating in space could be any
+          card on the platform. `identityImage` falls back through the game's
+          logo to our own mark so the slot is never empty. */}
+      {identity && !l.gameMark.hidden ? (
+        <div style={{
+          position: "absolute", left: idBox.left, top: idBox.top,
+          maxWidth: idWidth, display: "flex", alignItems: "center", gap: 18,
+        }}>
+          {idImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={idImage} alt="" width={idBox.width} height={idBox.height}
+              style={{
+                width: idBox.width, height: idBox.height, objectFit: "cover",
+                borderRadius: identity.round ? idBox.width / 2 : Math.round(idBox.width * 0.26),
+                border: `3px solid ${alpha(theme.accent, 0.55)}`,
+                ...styleOf({ ...l.gameMark, opacity: undefined }),
+              }} />
+          ) : null}
+          {/* Clamped and clipped, because this band is a FIXED height (B56.0).
+              The first render of it let a two-line title and a two-line
+              subtitle push the block straight down into the body, over the
+              pills the challenge card draws there. The band is the frame; the
+              text fits it rather than the other way round. */}
+          <div style={{
+            display: "flex", flexDirection: "column", gap: 4,
+            maxWidth: idWidth - idBox.width - 18, maxHeight: STRIP_H - idBox.top - 12,
+            overflow: "hidden",
+          }}>
+            {identity.eyebrow ? (
+              <div style={{ display: "flex", fontSize: 17, fontWeight: 800, letterSpacing: 2.4, textTransform: "uppercase", color: safeColor(theme.accent2, FALLBACK_ACCENT2) }}>
+                {identity.eyebrow}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", fontSize: identity.size ?? 40, fontWeight: 800, lineHeight: 1.06, color: INK }}>
+              {clampAt(identity.title, Math.floor(idText / ((identity.size ?? 40) * 0.52)))}
+            </div>
+            {identity.subtitle ? (
+              <div style={{ display: "flex", fontSize: 20, color: MUTED, lineHeight: 1.25 }}>
+                {clampAt(identity.subtitle, Math.floor(idText / 10))}
+              </div>
+            ) : null}
+          </div>
+        </div>
       ) : null}
+      {/* The gradient rule is GONE (B56.0): it read as a notification banner.
+          Kept behind an admin toggle that now defaults off, so a deployment
+          that wants it back has it. */}
       {l.bar ? (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
       ) : null}
@@ -312,6 +363,33 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side
             ...styleOf({ ...l.mascot, opacity: undefined }),
           }} />
       ) : null}
+      {/* THE CLUSTER MARK, as a WATERMARK in the body band (B56.0).
+          It has been bottom-right (over the standings) and top-right (under the
+          sponsor box, which is drawn last — so on a sold card our mark was not
+          on the card at all). Both were attempts to give it a rectangle of its
+          own on a card that has no spare rectangle. Behind the content it costs
+          nothing, survives the crop, and no body has to lay itself out around
+          it. Drawn BEFORE the children for exactly that reason. */}
+      {!l.mark.hidden ? (
+        <div style={{
+          position: "absolute", left: mark.left, top: mark.top, width: mark.width, height: mark.height,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          // Faint by house default; an explicit setting wins.
+          opacity: opacityOf(l.mark.opacity) ?? 0.07,
+          ...styleOf({ ...l.mark, opacity: undefined }),
+        }}>
+          {theme.markUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={theme.markUrl} alt="" width={mark.width} height={mark.height}
+              style={{ width: mark.width, height: mark.height, objectFit: "contain" }} />
+          ) : (
+            // A LETTERFORM, not a tile. The tile was right when this was a
+            // 132px mark in a corner; behind the content at 430px it is a pale
+            // rounded square the size of a coaster sitting under the trophies.
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: mark.width, height: mark.height, fontSize: Math.round(mark.width * 0.9), fontWeight: 800, color: safeColor(theme.accent2, FALLBACK_ACCENT2) }}>C</div>
+          )}
+        </div>
+      ) : null}
       {/* The content block. Its box is part of the layout, so moving the logo
           out of a corner can actually give the card that corner back. */}
       <div style={{ position: "absolute", left: content.left, top: content.top, width: content.width, height: content.height, display: "flex", flexDirection: "column", overflow: "hidden" }}>
@@ -320,27 +398,6 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side
       {/* The right-hand column. Drawn before the logo on purpose: the logo is
           the one thing that is never covered. */}
       {side && sideBoxFits(side_) ? side(side_) : null}
-      {/* The real logo mark, drawn on top of everything. Falls back to the
-          wordmark only when no logo is configured, so a card is never
-          unbranded. */}
-      {!l.mark.hidden ? (
-        <div style={{
-          position: "absolute", left: markLeft, top: mark.top, width: mark.width, height: mark.height,
-          display: "flex", alignItems: "center", justifyContent: "center", ...styleOf(l.mark),
-        }}>
-          {theme.markUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={theme.markUrl} alt="" width={mark.width} height={mark.height}
-              style={{ width: mark.width, height: mark.height, borderRadius: Math.round(mark.width * 0.23), objectFit: "contain" }} />
-          ) : (
-            // Drawn at 62% of the spot, not filling it. The mark is 250px now,
-            // and a deployment that hasn't uploaded a logo yet should get a
-            // wordmark-sized placeholder, not a 250px solid tile painted over
-            // the corner of every card it renders.
-            <div style={{ width: Math.round(mark.width * 0.62), height: Math.round(mark.width * 0.62), borderRadius: Math.round(mark.width * 0.14), display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: Math.round(mark.width * 0.34), fontWeight: 700, color: "#fff" }}>C</div>
-          )}
-        </div>
-      ) : null}
       {/* Top-right furniture: game logo, level pill, or the trophy stack. Right
           edge pinned to the spot so a stack of different heights still hangs
           from the same line. */}
@@ -361,6 +418,17 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, side
           So it wins over every other layer, and only an admin hiding the slot
           on this card kind takes it off. */}
       {ad ? <AdSlot ad={ad} box={adB} opacity={l.ad.opacity} /> : null}
+      {/* THE EDGE (B56.0). One thin, quiet line, replacing the gradient rule
+          that used to run across the top and read as a notification banner.
+          What a section needs is an edge, so it stops being a rectangle of art
+          with words on it. Drawn last so nothing paints over it; 0 turns it
+          off. */}
+      {(l.stroke ?? 0) > 0 ? (
+        <div style={{
+          position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex",
+          borderRadius: 2, border: `2px solid rgba(255,255,255,${((l.stroke ?? 0) / 100 * 0.5).toFixed(3)})`,
+        }} />
+      ) : null}
     </div>
   );
 }
@@ -683,30 +751,6 @@ function Bar({ pct, accent: a1, accent2: a2, h = 16 }: { pct: number; accent: st
   );
 }
 
-function Title({ text, sub, accent: a1, accent2: a2, theme, p, size = 52 }: {
-  text: string; sub?: string | null; accent: string; accent2: string; theme: CardTheme;
-  /** The `title` section's setting, when the card has one. */
-  p?: PartDraw;
-  /**
-   * Headline size. 52 is the house default — the text column lost 120px to the
-   * sponsor box and the logo, and a two-word title at the old 58 wrapped to
-   * three lines. Dense cards pass something smaller: on a challenge card every
-   * line the title takes is a line the standings don't get.
-   */
-  size?: number;
-}) {
-  const [accent, accent2] = [safeColor(a1), safeColor(a2, FALLBACK_ACCENT2)];
-  const f = p?.f ?? ((n: number) => n);
-  if (p?.hidden) return null;
-  return (
-    <Plate theme={theme} style={{ gap: 6, ...styleOf({ opacity: p?.opacity }) }}>
-      <div style={{ fontSize: f(size), fontWeight: 700, lineHeight: 1.05, color: INK }}>{text}</div>
-      {sub ? <div style={{ fontSize: f(Math.round(size * 0.46)), color: MUTED }}>{sub}</div> : null}
-      <div style={{ display: "flex", width: 132, height: 6, borderRadius: 999, marginTop: 8, background: `linear-gradient(90deg, ${accent}, ${accent2})` }} />
-    </Plate>
-  );
-}
-
 const nf = (n: number) => n.toLocaleString("en-US");
 
 // Truncate on a word boundary. A hard slice reads as a bug ("…from the Che"),
@@ -767,8 +811,8 @@ function ProfileBody(d: ProfileCard) {
   const t = d.theme;
   // Scaled to the column this layout gives the card — see `clampFor`.
   const clamp = clampFor(t);
-  const [pIdentity, pStats, pTrophies, pChallenges, pAccounts] =
-    ["identity", "stats", "trophies", "challenges", "accounts"].map((k) => part(t, k));
+  const [pStats, pTrophies, pChallenges, pAccounts] =
+    ["stats", "trophies", "challenges", "accounts"].map((k) => part(t, k));
   // Three, not five.
   //
   // The card is 1200x630 and a fourth tile makes all four unreadable — the name
@@ -789,24 +833,14 @@ function ProfileBody(d: ProfileCard) {
   return (
     <Frame
       theme={t}
-      // The trophy shelf, drawn into the free rectangle to the right of the
-      // text — under the sponsor box, above the mark. `box` is computed from the
-      // LIVE layout, so an admin who drags the ad elsewhere moves the shelf with
-      // it rather than leaving it overlapping.
-      side={trophies.length ? (box) => <TrophyShelf trophies={trophies} total={d.trophyCount ?? trophies.length} box={box} p={pTrophies} /> : undefined}
+      // The gamer IS the identity of a profile card, so it goes in the top
+      // band's left with their avatar (B56.0) rather than being re-stated as
+      // the first block of the body.
+      identity={{
+        imageUrl: d.avatarUrl, round: true, title: clamp(d.displayName, 18) ?? d.displayName,
+        subtitle: `clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`,
+      }}
     >
-      <Section p={pIdentity}>
-        <Plate theme={t} style={{ gap: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <Avatar url={d.avatarUrl} ring={t.accent} size={pIdentity.f(104)} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div style={{ fontSize: pIdentity.f(52), fontWeight: 700, lineHeight: 1.05 }}>{clamp(d.displayName, 18)}</div>
-              <div style={{ fontSize: pIdentity.f(23), color: MUTED }}>{`clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`}</div>
-            </div>
-          </div>
-        </Plate>
-      </Section>
-
       <Section p={pStats} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 22 }}>
         {/* The level belongs with the other things that describe this gamer —
             points, views, votes — not floating in the card's top-right corner
@@ -820,6 +854,37 @@ function ProfileBody(d: ProfileCard) {
         </Pill>
         {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)" size={pStats.f(21)}>{clamp(d.award, 22)}</Pill> : null}
       </Section>
+
+      {/* THE TROPHY CASE, in the body (B56.0).
+          It used to be drawn into a column beside the text, because the body
+          was a narrow column and the space to its right was otherwise dead.
+          The body is edge-to-edge free space now, so the case is a row of real
+          tiles — art on its plate, the name, and the cash value, which is the
+          whole reason a trophy is worth showing. */}
+      {trophies.length ? (
+        <Section p={pTrophies} style={{ gap: 6, marginTop: 16 }}>
+          <Head p={pTrophies}>
+            {(d.trophyCount ?? trophies.length) > trophies.length
+              ? `TROPHY CASE · ${nf(d.trophyCount ?? trophies.length)}`
+              : "TROPHY CASE"}
+          </Head>
+          <div style={{ display: "flex", flexDirection: "row", gap: 12 }}>
+            {trophies.map((x, i) => (
+              <GlassCard key={i} pad={9} style={{ width: 172, gap: 5 }}>
+                <ArtPanel url={x.imageUrl} size={84} />
+                <div style={{ display: "flex", fontSize: 17, fontWeight: 800, color: INK, lineHeight: 1.25 }}>
+                  {clampAt(x.name, 18)}
+                </div>
+                {x.value ? (
+                  <div style={{ display: "flex", fontSize: 20, fontWeight: 900, color: "#fde68a" }}>
+                    {`$${nf(x.value)}`}
+                  </div>
+                ) : null}
+              </GlassCard>
+            ))}
+          </div>
+        </Section>
+      ) : null}
 
       {/* What they're competing in right now — the one thing on this card that
           another gamer can act on. */}
@@ -883,10 +948,13 @@ function GameStatsBody(d: GameStatsCard) {
   const statCount = hasRich ? 2 : 6;
 
   return (
-    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
-    ) : undefined}>
+    <Frame theme={t} identity={{
+      // The GAME ACCOUNT's own avatar when the game has one, the game's logo
+      // otherwise. This card is about that account, not about the person.
+      imageUrl: d.gameAvatarUrl || d.logoUrl, round: !!d.gameAvatarUrl,
+      eyebrow: clamp(d.game, 20), title: clamp(d.tag, 20) ?? d.tag,
+      subtitle: clamp(`${d.region ? `${d.region} · ` : ""}${d.displayName}`, 44),
+    }}>
       {/* Identity first: the in-game name people searched for, and the human behind it. */}
       <Section p={pId} style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
         <Avatar url={d.gameAvatarUrl || d.avatarUrl} size={pId.f(78)} ring={t.accent} />
@@ -983,11 +1051,11 @@ function QuestBody(d: QuestCard) {
   const next = d.nextThreshold ?? 0;
   const pct = next > 0 ? (d.cp / next) * 100 : 100;
   return (
-    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain" }} />
-    ) : undefined}>
-      <Title text={d.questName} sub={d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      // The quest's own art, top-left. It is the picture of the thing.
+      imageUrl: d.logoUrl, eyebrow: "QUEST", title: d.questName,
+      subtitle: d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline,
+    }}>
       {(() => {
         const p = part(t, "progress");
         return (
@@ -1027,8 +1095,11 @@ function CpSummaryBody(d: CpSummaryCard) {
   const clamp = clampFor(t);
   const p = part(t, "quests");
   return (
-    <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
-      <Title text={`${clamp(d.displayName, 16)}'s quests`} sub={`${nf(d.totalCp)} total Cluster Points`} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      imageUrl: d.avatarUrl, round: true, eyebrow: `LEVEL ${d.level}`,
+      title: `${clamp(d.displayName, 16)}'s quests`,
+      subtitle: `${nf(d.totalCp)} total Cluster Points`,
+    }}>
       <Section p={p} style={{ gap: 16, marginTop: 30, flex: 1 }}>
         {d.quests.slice(0, 4).map((q, i) => {
           const pct = q.target > 0 ? (q.cp / q.target) * 100 : 100;
@@ -1053,11 +1124,12 @@ function LeaderboardBody(d: LeaderboardCard) {
   const [pRows, pEmpty] = ["rows", "empty"].map((k) => part(t, k));
   const medal = ["#fbbf24", "#cbd5e1", "#b45309"];
   return (
-    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
-    ) : undefined}>
-      <Title text={clamp(d.title, 26) ?? d.title} sub={clamp(d.subtitle, 42)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      // The GAME's logo: it is that game's ladder, scored on that game's
+      // accounts, which is the same rule B52 wrote for the rows themselves.
+      imageUrl: d.logoUrl, eyebrow: "LEADERBOARD",
+      title: clamp(d.title, 26) ?? d.title, subtitle: clamp(d.subtitle, 42),
+    }}>
       {d.rows.length === 0 ? (
         <Section p={pEmpty} style={{ marginTop: 40 }}>
           <div style={{ display: "flex", fontSize: pEmpty.f(24), color: MUTED, lineHeight: 1.3 }}>
@@ -1092,60 +1164,70 @@ function ChallengeBody(d: ChallengeCard) {
   const days = Math.max(0, Math.ceil((ends.getTime() - Date.now()) / 86400000));
   const trophies = pTro.hidden ? [] : d.trophies.slice(0, 3);
   return (
-    <Frame theme={t} corner={(
-      // Trophies live top-RIGHT, in a ROW under the game logo.
-      //
-      // They used to stack vertically, which was fine when the logo sat at
-      // 104px in the far corner — with the mark at 250 a three-high stack ran
-      // straight into it. A row is the same three prizes in a third of the
-      // height, and the prize is the reason to enter, so it cannot be the thing
-      // that gets covered.
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-        {/* The game's logo used to head this stack. It is in the strip now
-            (B54), and the first render of the redesign printed both — the
-            watermark top-left and a crisp copy of the same mark in the corner,
-            one under the other. The prize is what this corner is for. An admin
-            who wants the logo back here sets the badge to "the game's logo",
-            and the watermark stands down for it. */}
-        {trophies.length ? (
-          // A PODIUM, not a row.
-          //
-          // The prize pool is what a challenge is FOR, and three equal tiles in
-          // rank order read as a list of files rather than as first, second and
-          // third. Silver on the left, gold raised in the middle, bronze on the
-          // right, on plinths of decreasing height — the shape everyone already
-          // knows, so the hierarchy is legible before a single word is read.
-          (() => {
+    <Frame theme={t} identity={{
+      // The GAME's logo: it is that game's challenge, scored on that game's
+      // accounts (B52's rule, applied to the card's subject).
+      imageUrl: d.logoUrl, eyebrow: d.ended ? "FINISHED CHALLENGE" : "LIVE CHALLENGE",
+      title: clamp(d.title, 30) ?? "", subtitle: clamp(d.description, 62), size: 38,
+    }}>
+      {/* The LIVE pill and the game name are the identity band's eyebrow now,
+          so what is left here is only the thing the band cannot say: that this
+          one is private and needs a key. */}
+      <Section p={pStatus} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        {d.isPrivate ? (
+          <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)" size={pStatus.f(20)}>
+            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 3, background: "#fbbf24" }} />
+            {clamp(d.serverName ? `${d.serverName.toUpperCase()} · KEY TO JOIN` : "KEY TO JOIN", 26)}
+          </Pill>
+        ) : null}
+      </Section>
+      <Section p={pMeta} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 20 }}>
+        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pMeta.f(20)}>{d.ended ? "FINISHED" : `${days}d left`}</Pill>
+        <Pill size={pMeta.f(20)}>{`${nf(d.participants)} joined`}</Pill>
+        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pMeta.f(20)}>{clamp(d.prize, 20)}</Pill> : null}
+      </Section>
+
+      {/* THE PRIZE PODIUM, in the body (B56.0).
+          It used to hang off the top-right corner, under the game logo — a
+          fourth thing in a band that has room for two, and on a sold card it
+          was under the creative. The prize is the reason to enter, so it goes
+          in the free space with everything else that matters, as a podium:
+          silver left, gold raised in the middle, bronze right, on plinths of
+          decreasing height. The shape everyone already knows, so the hierarchy
+          is legible before a word is read. */}
+      {trophies.length ? (
+        <Section p={pTro} style={{ gap: 6, marginTop: 16 }}>
+          {(() => {
             const byPlace = (n: number) => trophies.find((x) => x.place === n);
             const order = [byPlace(2), byPlace(1), byPlace(3)].filter(Boolean) as typeof trophies;
-            const PLINTH: Record<number, number> = { 1: 34, 2: 22, 3: 14 };
+            const PLINTH: Record<number, number> = { 1: 30, 2: 20, 3: 13 };
             const COLOUR: Record<number, string> = { 1: "#fbbf24", 2: "#cbd5e1", 3: "#b45309" };
             const total = trophies.reduce((sum, x) => sum + (x.value || 0), 0);
             return (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {total > 0 ? (
-                  <div style={{ display: "flex", fontSize: pTro.f(17), fontWeight: 800, color: "#fbbf24", letterSpacing: 0.4 }}>
+                  <div style={{ display: "flex", fontSize: pTro.f(18), fontWeight: 800, color: "#fbbf24", letterSpacing: 0.4 }}>
                     {`$${nf(total)} PRIZE POOL`}
                   </div>
                 ) : null}
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
                   {order.map((tr, i) => {
                     const c = COLOUR[tr.place] ?? MUTED;
-                    const lift = pTro.f(PLINTH[tr.place] ?? 14);
+                    const art = pTro.f(tr.place === 1 ? 68 : 54);
                     return (
-                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(tr.place === 1 ? 96 : 82) }}>
+                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(tr.place === 1 ? 92 : 78) }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={tr.imageUrl} alt="" width={pTro.f(tr.place === 1 ? 76 : 60)} height={pTro.f(tr.place === 1 ? 76 : 60)}
-                          style={{ width: pTro.f(tr.place === 1 ? 76 : 60), height: pTro.f(tr.place === 1 ? 76 : 60), objectFit: "contain" }} />
+                        <img src={tr.imageUrl} alt="" width={art} height={art}
+                          style={{ width: art, height: art, objectFit: "contain" }} />
                         <div style={{ display: "flex", fontSize: pTro.f(15), fontWeight: 800, color: c }}>
                           {tr.value > 0 ? `$${nf(tr.value)}` : `${tr.place}`}
                         </div>
-                        {/* The plinth. Explicit height per place — Satori has no
-                            flex-grow tricks to lean on here, and the difference
-                            in height IS the ranking. */}
+                        {/* Explicit height per place — Satori has no flex-grow
+                            tricks to lean on here, and the difference in height
+                            IS the ranking. */}
                         <div style={{
                           display: "flex", alignItems: "flex-start", justifyContent: "center",
-                          width: "100%", height: lift, borderRadius: 6,
+                          width: "100%", height: pTro.f(PLINTH[tr.place] ?? 13), borderRadius: 6,
                           background: alpha(c, 0.22), border: `1px solid ${alpha(c, 0.5)}`,
                           fontSize: pTro.f(14), fontWeight: 800, color: c, paddingTop: 2,
                         }}>
@@ -1157,34 +1239,9 @@ function ChallengeBody(d: ChallengeCard) {
                 </div>
               </div>
             );
-          })()
-        ) : null}
-      </div>
-    )}>
-      <Section p={pStatus} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-        <Pill color="#34d399" bg="rgba(52,211,153,0.14)" size={pStatus.f(20)}>
-          <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#34d399" }} />
-          {pStatus.say("LIVE")}
-        </Pill>
-        {d.isPrivate ? (
-          <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)" size={pStatus.f(20)}>
-            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 3, background: "#fbbf24" }} />
-            {clamp(d.serverName ? `${d.serverName.toUpperCase()} · KEY TO JOIN` : "KEY TO JOIN", 26)}
-          </Pill>
-        ) : null}
-        <Pill size={pStatus.f(20)}>{clamp(d.game, 18)}</Pill>
-      </Section>
-      {/* 42, and clamped to fit one line of it. This is the densest card on the
-          platform — pills, title, meta, timeline and four standings rows in
-          529px — and a title that wraps costs a standings row. */}
-      <div style={{ display: "flex", marginTop: 14 }}>
-        <Title text={clamp(d.title, 28) ?? ""} sub={clamp(d.description, 68)} size={42} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
-      </div>
-      <Section p={pMeta} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 20 }}>
-        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pMeta.f(20)}>{d.ended ? "FINISHED" : `${days}d left`}</Pill>
-        <Pill size={pMeta.f(20)}>{`${nf(d.participants)} joined`}</Pill>
-        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pMeta.f(20)}>{clamp(d.prize, 20)}</Pill> : null}
-      </Section>
+          })()}
+        </Section>
+      ) : null}
 
       {/* Who can enter, when the answer isn't "anyone".
           A gamer deciding whether to tap Join needs to know in advance that the
@@ -1279,15 +1336,10 @@ function PlanetBody(d: PlanetCard) {
   const challenges = d.challenges ?? [];
   const boards = d.boards ?? [];
   return (
-    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={80} height={80} style={{ width: 80, height: 80, borderRadius: 20, objectFit: "cover" }} />
-    ) : undefined}>
-      <Title
-        text={`${clamp(d.game, 18)} Planet`}
-        sub={`${nf(d.gamers)} gamer${d.gamers === 1 ? "" : "s"} here${d.serverGamers != null ? ` · ${nf(d.serverGamers)} from this server` : ""}`}
-        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
-      />
+    <Frame theme={t} identity={{
+      imageUrl: d.logoUrl, eyebrow: "PLANET", title: `${clamp(d.game, 18)}`,
+      subtitle: `${nf(d.gamers)} gamer${d.gamers === 1 ? "" : "s"} here${d.serverGamers != null ? ` · ${nf(d.serverGamers)} from this server` : ""}`,
+    }}>
 
       <div style={{ display: "flex", gap: 14, marginTop: 22, flex: 1 }}>
         <Column p={pCh} label={`${pCh.say("LIVE CHALLENGES")} · ${challenges.length}`} accent={t.accent}>
@@ -1412,7 +1464,9 @@ function MarketBody(d: MarketCard) {
   // six that carry none of it, and the shelf is a preview: /marketplace is
   // where the other two hundred live.
   const shown = (d.trophies ?? []).slice(0, COLS);
-  const ART = 100;
+  // Sized to the body the shared layout leaves (B56.0): the identity band took
+  // the top 196px, so a tile that fitted the old full-height column overflows.
+  const ART = 84;
 
   // The platform rings a tile by TIER and that colour IS the information —
   // legendary glows amber, bronze is orange. `TIER_RING`, TrophyMarket.tsx:21.
@@ -1421,14 +1475,15 @@ function MarketBody(d: MarketCard) {
   };
 
   return (
-    <Frame theme={t}>
-      <Title text={d.title} sub={clamp(d.subtitle, 64)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
-
+    <Frame theme={t} identity={{
+      imageUrl: d.trophies?.[0]?.imageUrl ?? null, eyebrow: "MARKETPLACE",
+      title: d.title, subtitle: clamp(d.subtitle, 64),
+    }}>
       {/* The wallet. BOXED, tinted, and stated as value with the next step
           under it — the platform's own shape (TrophyMarket.tsx:80), because it
           is the most-looked-at number on the screen and a shelf you cannot
           price yourself against is a catalogue. */}
-      <Section p={pBal} style={{ marginTop: 6, flexDirection: "row" }}>
+      <Section p={pBal} style={{ marginTop: 2, flexDirection: "row" }}>
         <StatTile
           accent={t.accent2}
           figure={(
@@ -1449,7 +1504,7 @@ function MarketBody(d: MarketCard) {
           </div>
         </Section>
       ) : (
-        <Section p={pTiles} style={{ marginTop: 10 }}>
+        <Section p={pTiles} style={{ marginTop: 8 }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: GAP, width: TILE_W * COLS + GAP * (COLS - 1) }}>
             {shown.map((x, i) => (
               <GlassCard key={x.id} ring={TIER[x.tier.toLowerCase()] ?? null} pad={10}
@@ -1526,11 +1581,10 @@ function WeekBody(d: WeekCard) {
   const entries = d.entries ?? [];
 
   return (
-    <Frame theme={t} corner={result && d.trophy?.imageUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.trophy.imageUrl} alt="" width={96} height={96} style={{ width: 96, height: 96, objectFit: "contain" }} />
-    ) : undefined}>
-      <Title text={d.title} sub={clamp(d.subtitle, 64)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      imageUrl: d.trophy?.imageUrl ?? null, eyebrow: result ? "RESULT" : "THIS WEEK",
+      title: d.title, subtitle: clamp(d.subtitle, 64),
+    }}>
 
       {entries.length === 0 ? (
         <Section p={pEmpty} style={{ marginTop: 40 }}>
@@ -1621,8 +1675,10 @@ function PlanetsBody(d: PlanetsCard) {
   const clamp = clampFor(t);
   const p = part(t, "tiles");
   return (
-    <Frame theme={t}>
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      imageUrl: d.games?.[0]?.logoUrl ?? null, eyebrow: "THE GALAXY",
+      title: d.title, subtitle: d.subtitle,
+    }}>
       <Section p={p} style={{ flexDirection: "row", flexWrap: "wrap", alignContent: "flex-start", gap: 12, marginTop: 24, flex: 1 }}>
         {d.games.slice(0, 12).map((g, i) => (
           // 4 tiles per row of the narrower text column: 4×158 + 3×12 = 668.
@@ -1661,16 +1717,10 @@ function GuideBody(d: GuideCard) {
   const t = d.theme;
   const clamp = clampFor(t);
   return (
-    <Frame theme={t} cornerIsGameLogo corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
-    ) : undefined}>
-      {d.badge ? (
-        <Section p={part(t, "status")} style={{ flexDirection: "row", marginBottom: 14 }}>
-          <Pill color={t.accent} bg={alpha(t.accent, 0.12)}>{part(t, "status").say(d.badge)}</Pill>
-        </Section>
-      ) : null}
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      imageUrl: d.logoUrl, eyebrow: d.badge || "GUIDE",
+      title: d.title, subtitle: d.subtitle,
+    }}>
       {/* The steps FIT the card instead of being cut off at four.
           `steps.slice(0, 4)` silently threw away everything past the fourth,
           which is why the card called "Everything Cluster does" listed four of
@@ -1745,22 +1795,15 @@ function WorldBody(d: WorldCard) {
       // where it reads as a caption rather than as a third thing competing for
       // the same corner as the sponsor.
       side={art ? (box) => <SplashPanel url={art} logoUrl={d.logoUrl} caption={d.skinName ?? d.name} box={box} accent={t.accent} p={pArt} /> : undefined}
-      cornerIsGameLogo
-      corner={!art && d.logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
-      ) : undefined}
+      identity={{
+        imageUrl: d.logoUrl, eyebrow: d.entityKind.toUpperCase(),
+        title: clamp(d.name, 22) ?? d.name,
+        subtitle: d.skinName ? `${clamp(d.skinName, 24)} · ${d.game}` : d.game,
+      }}
     >
       <Section p={pStatus} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
-        <Pill color={t.accent} bg={alpha(t.accent, 0.14)} size={pStatus.f(19)}>{pStatus.say(d.entityKind.toUpperCase())}</Pill>
         {d.role ? <Pill size={pStatus.f(19)}>{clamp(d.role, 22)}</Pill> : null}
       </Section>
-
-      <Title
-        text={clamp(d.name, 22) ?? d.name}
-        sub={d.skinName ? `${clamp(d.skinName, 24)} · ${d.game}` : d.game}
-        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
-      />
 
       {d.lore ? (
         <Section p={pLore} style={{ marginTop: 16 }}>
@@ -1861,42 +1904,6 @@ function CpCoin({ size = 20 }: { size?: number }) {
   );
 }
 
-function TrophyShelf({ trophies, total, box, p }: {
-  trophies: { name: string; imageUrl: string; value?: number }[];
-  total: number;
-  box: { left: number; top: number; width: number; height: number };
-  p: PartDraw;
-}) {
-  // The art is square and sized to the column, capped so a wide column does not
-  // blow one trophy up to fill the card.
-  const art = Math.max(44, Math.min(96, Math.round(box.width * 0.42)));
-  return (
-    <div style={{
-      position: "absolute", left: box.left, top: box.top, width: box.width, height: box.height,
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 6,
-    }}>
-      <div style={{ display: "flex", fontSize: 15, letterSpacing: 2, color: MUTED }}>
-        {`TROPHIES${total > trophies.length ? ` · ${nf(total)}` : ""}`}
-      </div>
-      <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", justifyContent: "center", gap: 10 }}>
-        {trophies.map((tr, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: art }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={tr.imageUrl} alt="" width={art} height={art}
-              style={{ width: art, height: art, objectFit: "contain" }} />
-            {/* No fixed height — a fixed one clips descenders, which was a real
-                bug on the market card. A valueless trophy prints nothing rather
-                than "$0", which would read as a promise we did not make. */}
-            {tr.value && tr.value > 0 ? (
-              <div style={{ display: "flex", fontSize: 17, fontWeight: 700, color: "#34d399" }}>{`$${nf(tr.value)}`}</div>
-            ) : null}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function SplashPanel({ url, logoUrl, caption, box, accent, p }: {
   url: string;
   logoUrl?: string | null;
@@ -1948,12 +1955,11 @@ function SearchBody(d: SearchCard) {
   const clamp = clampFor(t);
   const p = part(t, "rows");
   return (
-    <Frame theme={t}>
-      <Title
-        text={`"${clamp(d.query, 20) ?? d.query}"`}
-        sub={`${d.results.length} matches — pick one below`}
-        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
-      />
+    <Frame theme={t} identity={{
+      imageUrl: d.results?.[0]?.imageUrl ?? null, eyebrow: "SEARCH",
+      title: `"${clamp(d.query, 20) ?? d.query}"`,
+      subtitle: `${d.results.length} matches — pick one below`,
+    }}>
       <Section p={p} style={{ gap: 8, marginTop: 20, flex: 1, overflow: "hidden" }}>
         {d.results.slice(0, 6).map((r, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderRadius: 14, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -1997,6 +2003,48 @@ function body(d: CardData) {
 // animated .gif avatar it can't decode — takes down the entire card. Doing it
 // up front means a bad image degrades to its placeholder instead, and the
 // render itself touches the network zero times.
+async function prepareCard(d: CardData): Promise<CardData> {
+  // The whole image step gets one deadline. Past it the card is drawn with
+  // whatever resolved — a person who tapped a button gets a card, not a spinner
+  // that eventually times out in Discord's proxy.
+  const [body, brand, rawLayout, ad] = await Promise.all([
+    withDeadline(prepareBody(d), d),
+    withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
+    withDeadline(layoutFor(d.kind), DEFAULT_LAYOUT),
+    // THE HOUSE CREATIVE IS THE FALLBACK, not an empty corner (B56.0). Applied
+    // here rather than in the renderer so it goes through the same transcode a
+    // brand's upload does — Satori fetches and decodes what it is handed, and
+    // the one path that has been proven is `toEmbeddable`.
+    withDeadline(preparedAd(d.theme.ad ?? HOUSE_AD), null),
+  ]);
+  // Admin-placed art goes through the same resolver as everything else: Satori
+  // fetches remote images itself and one unreachable host takes down the whole
+  // card, so an asset that won't load is DROPPED rather than drawn as a hole.
+  const layout = await withDeadline(withAssets(rawLayout, d), { ...rawLayout, assets: [] });
+  // What the badge COULD show on this card, gathered once. An admin can
+  // override what the corner draws per card kind, and the override needs these
+  // to hand — dug out of the union here rather than inside the renderer, so
+  // "the game's logo" means the same thing on every kind that has one.
+  const any = body as Record<string, unknown>;
+  const firstTrophy = Array.isArray(any.trophies) && any.trophies.length
+    ? (any.trophies[0] as { imageUrl?: string }).imageUrl ?? null
+    : (any.trophy as { imageUrl?: string } | undefined)?.imageUrl ?? null;
+  const badge = {
+    gameLogoUrl: typeof any.logoUrl === "string" ? any.logoUrl : null,
+    level: typeof any.level === "number" ? any.level : null,
+    trophyUrl: firstTrophy,
+  };
+  // Colours are normalised here, once, on the way in — so every card body can
+  // use `theme.accent` directly and no unparseable value ever reaches Satori.
+  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad, badge }) } as CardData;
+}
+
+// Resolve every image on a card to inline bytes before drawing.
+//
+// Satori fetches remote images itself, and one unreachable host — or one
+// animated .gif avatar it can't decode — takes down the entire card. Doing it
+// up front means a bad image degrades to its placeholder instead, and the
+// render itself touches the network zero times.
 // The mascot and the logo mark, as inline bytes. Resolved once per render and
 // merged onto every card kind here rather than in each data loader, so a card
 // kind added later can't forget them.
@@ -2021,38 +2069,6 @@ async function preparedAd(ad: CardAdSlot | null | undefined): Promise<CardAdSlot
   if (!ad?.imageUrl) return null;
   const imageUrl = await toEmbeddable(ad.imageUrl, { maxWidth: 720 });
   return imageUrl ? { ...ad, imageUrl } : null;
-}
-
-async function prepareCard(d: CardData): Promise<CardData> {
-  // The whole image step gets one deadline. Past it the card is drawn with
-  // whatever resolved — a person who tapped a button gets a card, not a spinner
-  // that eventually times out in Discord's proxy.
-  const [body, brand, rawLayout, ad] = await Promise.all([
-    withDeadline(prepareBody(d), d),
-    withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
-    withDeadline(layoutFor(d.kind), DEFAULT_LAYOUT),
-    withDeadline(preparedAd(d.theme.ad), null),
-  ]);
-  // Admin-placed art goes through the same resolver as everything else: Satori
-  // fetches remote images itself and one unreachable host takes down the whole
-  // card, so an asset that won't load is DROPPED rather than drawn as a hole.
-  const layout = await withDeadline(withAssets(rawLayout, d), { ...rawLayout, assets: [] });
-  // What the badge COULD show on this card, gathered once. An admin can
-  // override what the corner draws per card kind, and the override needs these
-  // to hand — dug out of the union here rather than inside the renderer, so
-  // "the game's logo" means the same thing on every kind that has one.
-  const any = body as Record<string, unknown>;
-  const firstTrophy = Array.isArray(any.trophies) && any.trophies.length
-    ? (any.trophies[0] as { imageUrl?: string }).imageUrl ?? null
-    : (any.trophy as { imageUrl?: string } | undefined)?.imageUrl ?? null;
-  const badge = {
-    gameLogoUrl: typeof any.logoUrl === "string" ? any.logoUrl : null,
-    level: typeof any.level === "number" ? any.level : null,
-    trophyUrl: firstTrophy,
-  };
-  // Colours are normalised here, once, on the way in — so every card body can
-  // use `theme.accent` directly and no unparseable value ever reaches Satori.
-  return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad, badge }) } as CardData;
 }
 
 // The background, with fallbacks. Tried in order and stops at the first that
