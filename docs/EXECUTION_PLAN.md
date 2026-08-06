@@ -3389,15 +3389,30 @@ that is a true statement rather than a special case somebody has to code.
   full 500, **however they earned it**: the mission's own tasks or anything
   else. Miss a day without the full 500 and the streak resets to zero.
 
+  **Milestones REPEAT.** Day 7 awards its trophy; day 14 awards the next one;
+  miss a day and the count returns to zero, and the climb back to 7 awards the
+  7-day trophy **again**. That is the design: the streak is a loop, not a
+  ladder you finish. A milestone fires once per streak — reaching day 7 does not
+  re-award at day 8 — and a longer streak passes through every milestone below
+  it in turn.
+
   **This is real spend outside the 500/day cap, and it is the one thing in this
-  item that is not framing.** A trophy redeems for dollars, so a streak
-  milestone is a payment the cap does not see. Three things keep it bounded and
-  they are requirements, not suggestions: the milestone trophies are chosen by
-  an admin from the existing shelf (so their value is a number somebody set on
-  purpose), a milestone pays **once per gamer per milestone** and never repeats
-  on a later streak, and the awarded trophy goes through the same
-  `userTrophies` path as a won one so it is visible to every existing report
-  that watches what the platform gives away.
+  item that is not framing.** A trophy redeems for dollars, so a milestone is a
+  payment the cap does not see, and a repeatable milestone is a *recurring* one:
+  a 7-day trophy is winnable up to 52 times a year by one gamer. The bound is
+  therefore its VALUE, not its frequency, and two existing controls carry it —
+  both already in the schema, neither needing anything new:
+
+  - `trophies.value` (`lib/db/schema.ts:632`) is the admin's dollar figure. The
+    early milestones are set low on purpose; at $0.10 a 7-day trophy is $5.20 a
+    year for a gamer who never misses a day, which is a number worth stating
+    plainly in the admin screen next to the field.
+  - `trophies.inMarketplace` (`:651`) already decides whether a trophy is listed
+    for sale. A milestone trophy can be earned-only — off the shelf entirely —
+    which is the admin's call per trophy.
+
+  And it is awarded through the same `userTrophies` path as a won one, so every
+  existing report that watches what the platform gives away still sees it.
 
 ### B61.5 Surfaces
 
@@ -3414,8 +3429,11 @@ quest page, and the same button in Discord.
 - 500 CP earned outside the mission reads 500/500 with its tasks unticked.
 - **The mission writes no CP.** Asserted against the ledger, because this is the
   rule the item rests on. (A streak milestone writes a TROPHY, never CP.)
-- A milestone pays once per gamer per milestone, and a second streak past the
-  same day count awards nothing.
+- A milestone pays once per STREAK: day 7 awards, day 8 does not re-award, and
+  a fresh streak that reaches 7 awards it again.
+- A streak that reaches 14 has awarded both the 7-day and the 14-day trophy.
+- A milestone whose trophy an admin has deleted awards nothing and does not
+  throw — the streak keeps counting.
 - A day with 500 CP earned entirely outside the mission still extends the
   streak.
 - A missed day resets the streak to zero.
@@ -3556,6 +3574,7 @@ introducing.
 | B60 | shipped | The card coin is the same two layers the website draws: the built-in glyph always, the admin's `brand.cpIcon` painted OVER it. Same CMS key, so changing the coin changes it on the thing that travels furthest without a deploy — and resolved in the prepare step alongside the mark and the mascot, because Satori fetches what it is handed and this appears on nearly every card. The word "CP" is gone as a unit from both places it survived (the quest card's progress line and the wallet tile's exchange rate), and the coin now LEADS the figure like a currency symbol, which is `components/Cp.tsx`'s own rule. The assertion that keeps it gone scans only what is DRAWN — the first version of it read the comment explaining why the word was removed and failed on the explanation. |
 | B61, B56, B57 | "streaks award a trophy; trophies stack; no price on a profile; swap the challenge panes; CP is the big number on the shelf; a new nav band" | **B61 amended, B62 and B63 filed.** The streak now PAYS — admin picks a trophy per milestone — which reverses the "status only" recommendation, so the reason that recommendation existed is written into the item instead of dropped: a trophy redeems for dollars, so a milestone is spend the 500/day cap does not see. Three bounds are requirements now — admin chooses the trophy from the existing shelf, a milestone pays once per gamer and never again on a later streak, and it is awarded through the same `userTrophies` path as a won one so every existing report sees it. Also decided: a day counts when the full 500 is earned **however** it was earned, which is what B61.3 already made true for free. **B62**: the same trophy held three times is one tile with a count, not three pictures; a gamer's own trophies show no price (a price on a profile turns a case into a receipt and puts a number on a gift), while the shelf keeps both figures with the CP price as the big one — deliberately reversing B56's ordering there, because B48 promoted the dollar to prove a trophy is an ASSET and the shelf's job is the PURCHASE. **B63**: the mission/streak band, and the pass over the week band that was already owed. |
 | B62 | the card half is shipped | Duplicate trophies STACK in the data layer, keyed on name+image rather than on the trophy id — two rows can be the same prize re-issued and a gamer does not care which id it was. Four awards of two trophies is two tiles, one carrying `x3`, and the heading still says 4 because that is how many they hold. The dollar figure is off a gamer's own trophies entirely. The shelf swapped its two figures: the CP price is 30px and the redemption value is the 14px line under it — reversing B56's ordering **on that card only**, because B48 promoted the dollar to prove a trophy is an ASSET and the shelf's job is the PURCHASE. And the challenge card's panes swapped: the scoreboard is what a returning gamer came back for. **Still owed on B62:** the same stacking and price rules on the WEB profile (`components/TrophyCase.tsx`), which is where a gamer looks at their own case most. |
+| B61 | "milestones repeat after a reset" | **Corrected: my bound was wrong for the design.** I had written "pays once per gamer, ever"; the streak is a LOOP — day 7 awards, day 14 awards the next, a missed day returns the count to zero, and the climb back to 7 awards the 7-day trophy **again**. A milestone fires once per streak, and a longer streak passes through every milestone below it. Which moves the economic bound from frequency to VALUE — a 7-day trophy is winnable up to 52 times a year by one gamer — and **both controls for it already exist**: `trophies.value` (`schema.ts:632`) is the dollar figure, and `trophies.inMarketplace` (`:651`) already decides whether a trophy is listed for sale, so a milestone trophy can be earned-only with no new field. The admin screen states the annual figure next to the value, because $0.10 reads as nothing and $5.20 a year per gamer reads as a decision. |
 | — | *(next amendment here)* | |
 
 ---
