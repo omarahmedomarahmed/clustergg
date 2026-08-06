@@ -3200,6 +3200,102 @@ carry their own rows.
 
 ---
 
+## B57 — The body is a GRID, not one column
+
+**Shared-layout work. Finishes B56.0; every per-card rebuild depends on it.**
+
+B56.0 made the body free space edge to edge. One block of content spread across
+1100px is not a layout — it is a wide list. A card's body is divided into
+**panes**, side by side rather than stacked:
+
+- **One pane** where the card has one thing to say (leaderboard, cp-summary).
+- **Two panes, left and right** where it has two (profile: accounts left,
+  trophies right. Challenge: details and pills left, prize case right — which is
+  what gives the standings their room back).
+- **Four panes, 2×2** where it has four. The **planet card** is the one that
+  needs all four: two ladders on the left, live challenges and the game world on
+  the right — the planet explorer, rendered.
+
+The pane grid is part of the LAYOUT, so an admin sets one, two or four per card
+kind and moves the split, and a card with nothing for a pane simply leaves it
+empty rather than drawing a box.
+
+**Every entity drawn in a pane carries its own art** — each challenge its cover,
+each hero/weapon/map its portrait, each quest its badge, each trophy its render.
+A pane of names is the list this item exists to replace.
+
+**Verification owed → `tests/db/cards.mts` + `tests/ui/cards.mjs`:**
+- The pane count is admin-set per kind and the geometry comes from one helper,
+  so the editor and the renderer cannot disagree.
+- A card with fewer things than panes leaves the pane empty, never a box.
+- Panes never overlap each other, the ad, or the identity band.
+- Every entity row/tile in a pane draws its own art when it has any.
+
+**Shots owed:** none (B28 replaces `bot.card.*` with live renders).
+**New routes:** none.
+
+---
+
+## B58 — Card DATA references: what each pane pulls, and who decides
+
+The admin card-layout editor is a drawing tool, and drawing is not what it is
+for any more — the cards are being built in code. What an admin actually needs
+is to say **where each pane's content comes from**:
+
+- which two ladders the planet card shows,
+- which three challenges,
+- which heroes / weapons / maps from the game world,
+- which trophies lead the marketplace shelf.
+
+And the GAMER needs the same power over their own card: which four game accounts
+appear when the card can only draw four, which sections show at all.
+
+So each pane declares a **data reference** — a source id plus its options —
+resolved at render time. Admin sets the reference per card kind; a gamer's own
+profile card carries their overrides on top.
+
+**The editor keeps its canvas**: an admin who wants to move something still can.
+It stops being the only thing the editor does.
+
+**Rules this must not break:** every reference is a stored id or an enum, never
+free text that reaches Satori (B54's rule); a gamer's overrides can only ever
+NARROW what their own card shows, never reach another gamer's data; and every
+new surface registers in `lib/systems.ts` (B29).
+
+**Verification owed → `tests/db/card-refs.mts`:**
+- A pane with no reference falls back to the card's own default and never blanks.
+- A reference to a deleted row resolves to the fallback rather than an empty
+  card.
+- A gamer's override can hide their own accounts and cannot name another gamer's.
+- Admin's per-kind reference survives a layout save that touches nothing else.
+
+**Shots owed:** the admin editor's reference panel.
+**New routes:** none.
+
+---
+
+## B59 — A gamer can see and control their own card, on the website
+
+The bot card of a gamer's profile is the thing that travels — it is what a
+server sees when they are shared. Today a gamer cannot see it at all.
+
+- **In profile customization**: the real rendered card, updating as they
+  customise, with the controls from B58 (which accounts, which sections) and a
+  switch to hide it.
+- **On their public profile**: the same card rendered as a snapshot of the
+  account, unless they have hidden it.
+
+**Verification owed → `tests/ui/profile-card.mjs`:**
+- The card shown in customization is the SAME renderer the bot uses, not a
+  mock-up of it.
+- Hiding it removes it from the public profile and not from the bot.
+- A gamer's account selection is reflected in the rendered card.
+
+**Shots owed:** the customization panel and the public-profile snapshot.
+**New routes:** none.
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -3249,6 +3345,7 @@ carry their own rows.
 | B54 | "two requirements were missing from B54 as written" | **B56.** The cards must carry the platform's VISUAL LANGUAGE — its section headers, card-within-card shapes, stat tiles, pills, spacing rhythm and use of cover art as a section background — not merely its data in poster form; and no kind inherits its current shape, all thirteen designed from the platform section they mirror. B54 is unchanged and is not redone: its layout system is what B56 builds inside. Filed as a new item rather than an edit to B54 because B54's own progress rows describe work that shipped, and rewriting them would make the ledger say something that was never true. |
 | B56 | market — the first kind rebuilt | **Read `components/TrophyMarket.tsx` first, and the card had every number in it and none of its shape.** The platform shelf is: a glass tile ringed by TIER (that colour is the information), a square art plate the picture sits on, the name, the tier in small caps, then **the dollar value promoted** with "redeems for cash" under it, then the CP price. The card drew a 44px icon beside a number bubble and put name, tier and both figures on one line — a receipt. The dollar-over-CP order is not decoration: it is **B48's** decision about what makes a trophy an asset rather than a sticker, and a card that inverts it argues with the page. Also changed: the wallet is now the platform's boxed, tinted stat tile rather than a bare number, and the shelf shows ONE row of four instead of two rows of six — six only ever fitted because the receipt shape was 138px tall. The three shapes (`GlassCard`, `ArtPanel`, `StatTile`) live in one place with the real `.glass` values from `app/globals.css:45`, because re-styling a sub-card per body is how thirteen cards end up looking like thirteen products. Rendered sold and unsold: the first pass clipped the last pill off the bottom edge, which only the render showed. |
 | B56 | "COMPLETE REDESIGN — no old layout, and edit the shared one before any card type" | **B56.0, and the market card was rebuilt again on the new frame.** I filed the clarification and then built a card kind on the layout it was about to replace, which is the thing the instruction said not to do; that work is redone rather than kept. The shared layout is now three bands: an identity IMAGE plus its name top-left, the ad top-right on **every** card (the house creative fills it — there is no "unsold"), and free space edge to edge below. Gone: the gradient rule (a `stroke` replaces it), the corner logo tile, the mascot, the badge. The Cluster mark is a watermark behind the body. All thirteen bodies now hand their identity to the frame instead of drawing a headline as their first block, which is also what freed the body: the profile's trophy case moved out of a side column into real tiles across the full width, and the challenge's prize podium came out of the top-right corner where a sold card was burying it. |
+| B56.0 | "divide the body into panes; set the data each pane pulls; show the gamer their own card" | Split into three, because they are three different kinds of work and only the first is shared-layout: **B57** makes the body a grid of one, two or four panes (the planet card is the 2×2 case — two ladders, challenges, the game world, over the planet's own globe art); **B58** gives every pane a DATA REFERENCE — which ladders, which challenges, which heroes, which four of a gamer's accounts — set by admin per kind and narrowed by the gamer for their own card, which is also the redesign of what the card-layout editor is FOR; **B59** renders a gamer's own card inside profile customization and on their public profile, with a switch to hide it. B57 is shared and is built now; B58 and B59 follow the per-card work. |
 | — | *(next amendment here)* | |
 
 ---
@@ -3337,6 +3434,8 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/trophy-admin.mts` | **B53** | edits propagate to holders; raising the value raises unredeemed holdings; a pending/approved/sent/paid redemption's amount NEVER moves, up or down; a held trophy cannot be deleted and the ACTION refuses, not just the helper | **written — 30 assertions** |
 | `tests/db/cards.mts` | **B54** | no text box carries a fixed height; every standings row leads with the in-game name on BOTH cards; the strip's three tenants do not sit on each other (the mark clears the sponsor box, the column clears the mark, the game logo is drawn once); the clamps follow the column; Satori renders every kind without throwing | ☑ 80 |
 | `tests/ui/cards.mjs` | **B54**, **B56** | every kind declares the platform component it mirrors and that file exists; every section a body draws is a declared `part`, so admin can edit all of it; every kind renders SOLD and unsold without throwing and neither puts content under the sponsor box; no kind is a bare list where the platform section is tiled; the shared vocabulary (headers, pills, stat tiles, sub-cards) comes from one place rather than being re-styled per body | ☐ |
+| `tests/db/card-refs.mts` | **B58** | a pane with no reference falls back and never blanks; a reference to a deleted row resolves to the fallback; a gamer's override can hide their own accounts and cannot name another gamer's; admin's per-kind reference survives an unrelated layout save | ☐ |
+| `tests/ui/profile-card.mjs` | **B59** | the card in customization is the SAME renderer the bot uses; hiding removes it from the public profile and not from the bot; the account selection is reflected in the render | ☐ |
 | `tests/db/entry-rules.mts` | **B38** | a second account makes no second entry and the response names the one entered; the other account is free on a different challenge; switching allowed before the start and refused after, with the reason; the score is re-baselined; two different gamers unaffected | **written — 24 assertions** |
 | `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |
 | `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
