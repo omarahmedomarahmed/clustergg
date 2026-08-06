@@ -201,7 +201,10 @@ console.log("\n== B56.0: the shared layout has three bands and no furniture ==")
 
   // THE MARK: a watermark BEHIND the body, not a tile in a corner.
   const mark = spotBox(L.mark, 1);
-  ok("the mark is in the body band", mark.top > STRIP, String(mark.top));
+  // Its CENTRE is what matters — a 430px watermark starts above the band's
+  // bottom edge and that is fine; what must not happen is it sitting in the top
+  // band as a corner tile again.
+  ok("the mark is in the body band", L.mark.y > 40, String(L.mark.y));
   ok("…faint", (L.mark.opacity ?? 100) < 20, String(L.mark.opacity));
   ok("…big enough to read as a watermark rather than a sticker", L.mark.size > 300, String(L.mark.size));
   // Drawn BEFORE the children, which is what makes it a watermark rather than
@@ -276,17 +279,75 @@ ok("the market tile uses the unscaled one", /\{clampAt\(x\.name, \d+\)\}/.test(r
 ok("…and says why", /this tile is 218px/.test(render));
 // The shelf itself was `TILE_W * 3 + 24` — three because three fitted the
 // column it was written against, leaving 460 empty pixels once it widened.
-ok("the shelf counts the columns that fit", /const COLS = Math\.max\(2, Math\.min\(4/.test(render));
+ok("the shelf counts the columns that fit", /const COLS = Math\.max\(2, Math\.min\(5/.test(render));
 ok("…from the EFFECTIVE column, so a sold card narrows the shelf too",
   /contentBoxFor\(t\.layout \?\? DEFAULT_LAYOUT, !!t\.ad\)\.width/.test(render));
 // B56 made it ONE row, tall: four tiles carrying the platform's hierarchy
 // sell the shelf better than six carrying none of it, and the shelf is a
 // preview — /marketplace is where the other two hundred live.
 ok("…and shows a whole number of rows", /slice\(0, COLS\)/.test(render));
+// FIVE across when the width allows (B57) — the shelf is a shelf.
+ok("…up to five of them", /Math\.min\(5,/.test(render));
 
 console.log("\n== a challenge with no cover falls back to its GAME's art ==");
 ok("the chain reaches the game", /g\?\.planetBgUrl \|\| g\?\.coverUrl \|\| bg\.bgUrl/.test(
   await readFile(new URL("../../lib/cards/data.ts", import.meta.url), "utf8")));
+
+console.log("\n== B57: the body is a GRID, and the grid comes from one helper ==");
+// Free space edge to edge is not a layout — one block of content across 1100px
+// is a wide list. The panes are part of the LAYOUT so an admin sets them per
+// kind, and the geometry lives in ONE helper so the editor and the renderer
+// cannot draw a pane in two different places.
+{
+  const { DEFAULT_LAYOUT: L, KIND_PANES, panes, parseLayout, contentBox } =
+    await import("../../lib/cards/layout.ts");
+
+  const one = panes(parseLayout(null, "leaderboard"));
+  eq("a one-pane kind gets one rectangle", one.length, 1);
+  eq("…and it is the whole body", one[0], contentBox(L.content));
+
+  const two = panes(parseLayout(null, "profile"));
+  eq("a profile gets two", two.length, 2);
+  ok("…side by side, not stacked", two[0].top === two[1].top && two[1].left > two[0].left,
+    JSON.stringify(two));
+  ok("…and they do not overlap", two[0].left + two[0].width <= two[1].left);
+
+  const four = panes(parseLayout(null, "planet"));
+  eq("the planet card gets four", four.length, 4);
+  ok("…two by two", four[0].top === four[1].top && four[2].top > four[0].top, JSON.stringify(four.map((f) => f.top)));
+  ok("…in reading order", four[1].left > four[0].left && four[3].left > four[2].left);
+  // Nothing may reach the ad or the identity band.
+  const { adBox } = await import("../../lib/cards/layout.ts");
+  ok("no pane reaches the top band", four.every((f) => f.top >= adBox(L.ad).bottom));
+  ok("…or the bottom edge", four.every((f) => f.top + f.height <= 630));
+
+  ok("the kinds that need panes declare them", !!KIND_PANES.planet && !!KIND_PANES.profile);
+  // A stored layout overrides the kind default like any other field, so an
+  // admin who wants one column on a profile gets one column.
+  eq("an admin's own choice wins",
+    panes(parseLayout(JSON.stringify({ bodyCols: 1, bodyRows: 1 }), "planet")).length, 1);
+
+  // A pane with nothing in it is NOT drawn. An empty bordered box reads as a
+  // broken card rather than as a gamer with nothing there yet.
+  ok("an empty pane is not drawn", /pane && paneBoxes\[i\] \? \(/.test(render));
+  // Satori has no Fragment: a pane handed <>…</> lays its children out as if
+  // the pane were a row, which put the profile's LINKED ACCOUNTS heading beside
+  // its stat pills and half off the pane.
+  ok("every pane is a real element", /function Pane\(\{ children/.test(render));
+  ok("…with a height, so `flex: 1` inside it has something to claim",
+    /width: "100%", height: "100%"/.test(render));
+  ok("…and the reason is written down", /Satori has no Fragment/.test(render));
+
+  // Every entity a pane draws carries its own art.
+  // From the DOC COMMENT, not from `function` — the claim about which component
+  // this mirrors lives in the comment, which is the thing being asserted.
+  const planetBody = render.slice(render.indexOf("* The planet card"), render.indexOf("function PlanetsBody"));
+  ok("the planet's game world draws each entity's art", /<ArtPanel url=\{w\.imageUrl\}/.test(planetBody));
+  ok("…and it mirrors the planet explorer", /PlanetExplorer\.tsx/.test(planetBody));
+  const profileBody = render.slice(render.indexOf("function ProfileBody"), render.indexOf("function GameStatsBody"));
+  ok("a linked account draws its game's logo", /a\.logoUrl \?/.test(profileBody));
+  ok("a trophy draws its render", /<ArtPanel url=\{x\.imageUrl\}/.test(profileBody));
+}
 
 console.log("\n== B56: the cards speak the platform's visual language ==");
 // B54 asked for cards "laid out to render what a gamer sees on the platform"

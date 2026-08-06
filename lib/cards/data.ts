@@ -377,6 +377,18 @@ export async function planetCard(game: string): Promise<CardData | null> {
 
   return {
     kind: "planet",
+    // The game's own world, from the cached snapshot — never a live fetch on a
+    // card render. No snapshot yet means no fourth pane, which is the rule the
+    // pane grid is built on: a card with nothing for a pane leaves it empty
+    // rather than drawing a box with nothing in it.
+    world: await (async () => {
+      try {
+        const { getCachedEntityList } = await import("@/lib/game-world-cache");
+        return (await getCachedEntityList(g.name)).slice(0, 4)
+          .map((e) => ({ name: e.name, imageUrl: e.image || null, role: e.role }));
+      } catch { return []; }
+    })(),
+    
     game: g.name,
     logoUrl: g.logoUrl,
     description: g.description || null,

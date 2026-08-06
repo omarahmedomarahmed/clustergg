@@ -183,6 +183,14 @@ export type PlanetCard = {
   description?: string | null;
   challenges: { title: string; endsAt: string; participants: number; prize?: string | null }[];
   boards: { title: string; leader: string | null; value: string | null; entries: number }[];
+  /**
+   * The game's own world — heroes, weapons, maps (B57).
+   *
+   * The planet page is not two lists; it is the planet EXPLORER, and the fourth
+   * thing on it is the game itself. Each carries its own art, because a row of
+   * hero names is the list this whole item exists to replace.
+   */
+  world?: { name: string; imageUrl?: string | null; role?: string | null }[];
   /** Distinct gamers with a linked account on this game. */
   gamers: number;
   serverGamers?: number | null;

@@ -195,6 +195,24 @@ export type CardLayout = {
    * a light.
    */
   stroke?: number;
+  /**
+   * How the body is divided (B57).
+   *
+   * B56.0 made the body free space edge to edge, and one block of content
+   * spread across 1100px is not a layout — it is a wide list. A body is PANES,
+   * side by side rather than stacked: one where the card has one thing to say,
+   * two where it has two (a profile's accounts and its trophy case), four where
+   * it has four (the planet card — two ladders, the live challenges, the game
+   * world; the planet explorer, rendered).
+   *
+   * Part of the layout rather than of the code, so an admin sets it per kind.
+   * A card with nothing for a pane leaves it EMPTY — never a box with nothing
+   * in it, which is the failure mode a grid invites.
+   */
+  bodyCols?: 1 | 2;
+  bodyRows?: 1 | 2;
+  /** The gap between panes, in canvas pixels. */
+  gutter?: number;
   /** Darkness (0-100) of the plate drawn behind text blocks. 0 turns it off. */
   plate: number;
   /** Corner radius of that plate, in canvas pixels. */
@@ -317,6 +335,11 @@ export const DEFAULT_LAYOUT: CardLayout = {
   bar: false,
   // A single thin line around the card, at this opacity. 0 turns it off.
   stroke: 26,
+  // One pane by default: a kind that has not been given a second thing to say
+  // should not be handed a second column to fill.
+  bodyCols: 1,
+  bodyRows: 1,
+  gutter: 26,
   scrim: true,
   badgeShow: "auto",
   parts: {},
@@ -479,14 +502,15 @@ function bgSources(v: unknown): string[] {
 }
 
 /** Parse whatever is stored into a layout that is always safe to render. */
-export function parseLayout(raw: string | null | undefined): CardLayout {
-  if (!raw) return DEFAULT_LAYOUT;
+export function parseLayout(raw: string | null | undefined, kind?: string): CardLayout {
+  const kindPanes = (kind && KIND_PANES[kind]) || { cols: DEFAULT_LAYOUT.bodyCols ?? 1, rows: DEFAULT_LAYOUT.bodyRows ?? 1 };
+  if (!raw) return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows };
   let o: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return DEFAULT_LAYOUT;
+    if (!parsed || typeof parsed !== "object") return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows };
     o = parsed as Record<string, unknown>;
-  } catch { return DEFAULT_LAYOUT; }
+  } catch { return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows }; }
 
   const c = (o.content ?? {}) as Partial<ContentBox>;
   return {
@@ -510,6 +534,9 @@ export function parseLayout(raw: string | null | undefined): CardLayout {
     // undo the redesign on exactly the cards an admin had already tuned.
     bar: o.bar === true,
     stroke: num(o.stroke, DEFAULT_LAYOUT.stroke ?? 0, 0, 100),
+    bodyCols: (num(o.bodyCols, kindPanes.cols, 1, 2) === 2 ? 2 : 1) as 1 | 2,
+    bodyRows: (num(o.bodyRows, kindPanes.rows, 1, 2) === 2 ? 2 : 1) as 1 | 2,
+    gutter: num(o.gutter, DEFAULT_LAYOUT.gutter ?? 26, 0, 80),
     scrim: o.scrim !== false,
     badgeShow: typeof o.badgeShow === "string" && BADGE_SHOW_IDS.has(o.badgeShow as BadgeShow)
       ? (o.badgeShow as BadgeShow) : "auto",
@@ -946,6 +973,54 @@ export function contentBoxFor(l: CardLayout, hasAd: boolean) {
   // an admin who dragged the ad across the card is an unreadable card, and the
   // creative overlapping some text is the lesser of those two.
   return { ...box, width: Math.max(CANVAS_W / 3, wall - 16 - box.left) };
+}
+
+/**
+ * The rectangle of each body pane (B57).
+ *
+ * ONE helper, shared by the renderer and the layout editor, for the same reason
+ * `sideBox` is shared: a pane the editor draws in a different place from where
+ * the renderer draws it is worse than no editor at all.
+ *
+ * Returns as many rectangles as the layout asks for, reading order — left to
+ * right, then top to bottom. A card hands its panes in the same order and the
+ * ones it has no content for are simply not drawn.
+ */
+/**
+ * How many panes each kind's body wants, before an admin says otherwise (B57).
+ *
+ * A default rather than a rule: it is the shape the card was designed to, and
+ * `parseLayout` lets a stored layout override it like any other field. Kinds
+ * not listed here get one pane, which is the right answer for a leaderboard —
+ * a second column of nothing is worse than a wide list.
+ */
+export const KIND_PANES: Record<string, { cols: 1 | 2; rows: 1 | 2 }> = {
+  // Accounts on the left, the trophy case on the right.
+  profile: { cols: 2, rows: 1 },
+  // Details and prize on the left, so the standings get the right-hand column
+  // back — they were being squeezed by a podium drawn above them.
+  challenge: { cols: 2, rows: 1 },
+  // THE 2x2. Two ladders, the live challenges and the game world: the planet
+  // explorer, rendered.
+  planet: { cols: 2, rows: 2 },
+  // Mains and recent matches, side by side, the way the account page reads.
+  "game-stats": { cols: 2, rows: 1 },
+};
+
+export function panes(l: CardLayout): { left: number; top: number; width: number; height: number }[] {
+  const box = contentBox(l.content);
+  const cols = l.bodyCols === 2 ? 2 : 1;
+  const rows = l.bodyRows === 2 ? 2 : 1;
+  const g = Math.max(0, l.gutter ?? 26);
+  const w = (box.width - g * (cols - 1)) / cols;
+  const h = (box.height - g * (rows - 1)) / rows;
+  const out: { left: number; top: number; width: number; height: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      out.push({ left: box.left + c * (w + g), top: box.top + r * (h + g), width: w, height: h });
+    }
+  }
+  return out;
 }
 
 export function contentBox(c: ContentBox): { left: number; top: number; width: number; height: number } {

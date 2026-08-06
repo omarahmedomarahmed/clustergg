@@ -4,7 +4,7 @@ import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
 import { HOUSE_AD } from "@/lib/cards/ads";
 import {
-  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBoxFor, mascotYields, opacityOf,
+  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBoxFor, mascotYields, opacityOf, panes,
   partOf, plateBg, sideBox, sideBoxFits, spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset, PartDraw } from "@/lib/cards/layout";
@@ -167,9 +167,10 @@ function badgeContent(
   return undefined;
 }
 
-function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, identity, side }: {
+function Frame({ theme, children, panes: bodyPanes, corner: proposedCorner, cornerIsGameLogo, identity, side }: {
   theme: CardTheme;
-  children: React.ReactNode;
+  /** The whole body as one pane. A card that divides it passes `panes`. */
+  children?: React.ReactNode;
   /**
    * The card's own identity, drawn top-left (B56.0).
    *
@@ -191,6 +192,22 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, iden
     /** Headline size, for the kinds whose names run long. */
     size?: number;
   };
+  /**
+   * The body, as PANES (B57).
+   *
+   * Reading order — left, right, then the second row. Each is drawn into the
+   * rectangle `panes()` computes from the LIVE layout, so an admin who moves
+   * the split moves the content with it, and the editor draws the same
+   * rectangles the renderer does.
+   *
+   * A pane the card has no content for is not drawn. An empty bordered box is
+   * the failure mode a grid invites, and it looks like the card is broken
+   * rather than like the gamer has nothing there yet.
+   *
+   * A card that passes `children` instead gets the whole body as one pane,
+   * which is the right answer for a leaderboard.
+   */
+  panes?: (React.ReactNode | null)[];
   corner?: React.ReactNode;
   /** The corner proposal is the game's logo — see `badgeContent`. */
   cornerIsGameLogo?: boolean;
@@ -229,6 +246,7 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, iden
   /** The text's own share of that, once the picture has taken its bite. */
   const idText = Math.max(160, idWidth - idBox.width - 18);
   const content = contentBoxFor(l, !!ad);
+  const paneBoxes = panes(l);
   // The free rectangle to the right of the content: starts where the text
   // column ends, stops at the canvas edge, and begins under whichever of the
   // sponsor box and the badge hangs lowest. Computed from the LIVE layout, so
@@ -390,11 +408,22 @@ function Frame({ theme, children, corner: proposedCorner, cornerIsGameLogo, iden
           )}
         </div>
       ) : null}
-      {/* The content block. Its box is part of the layout, so moving the logo
-          out of a corner can actually give the card that corner back. */}
-      <div style={{ position: "absolute", left: content.left, top: content.top, width: content.width, height: content.height, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {children}
-      </div>
+      {/* THE BODY, as panes (B57). One box when the card has one thing to say,
+          two or four when it has more — and the geometry comes from the same
+          helper the editor draws with, so the two cannot disagree. */}
+      {bodyPanes
+        ? bodyPanes.map((pane, i) => (pane && paneBoxes[i] ? (
+          <div key={i} style={{
+            position: "absolute", left: paneBoxes[i].left, top: paneBoxes[i].top,
+            width: paneBoxes[i].width, height: paneBoxes[i].height,
+            display: "flex", flexDirection: "column", overflow: "hidden",
+          }}>{pane}</div>
+        ) : null))
+        : (
+          <div style={{ position: "absolute", left: content.left, top: content.top, width: content.width, height: content.height, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {children}
+          </div>
+        )}
       {/* The right-hand column. Drawn before the logo on purpose: the logo is
           the one thing that is never covered. */}
       {side && sideBoxFits(side_) ? side(side_) : null}
@@ -716,6 +745,21 @@ function StatTile({ figure, label, foot, accent, align = "flex-start", pad = 12 
   );
 }
 
+/**
+ * One pane's own column.
+ *
+ * Satori has no Fragment: a pane handed `<>…</>` lays its children out as if
+ * the pane were a row, which put the profile card's LINKED ACCOUNTS heading
+ * beside its stat pills and half off the pane. Every pane is a real element.
+ */
+function Pane({ children }: { children: React.ReactNode }) {
+  // `height: 100%` is load-bearing: a section inside a pane that uses `flex: 1`
+  // to claim the leftover space — the challenge card's standings do — collapses
+  // to nothing when its parent's height is auto. The standings simply were not
+  // on the card.
+  return <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}>{children}</div>;
+}
+
 function Pill({ children, color = MUTED, bg = "rgba(255,255,255,0.07)", size = 21 }: {
   children: React.ReactNode; color?: string; bg?: string; size?: number;
 }) {
@@ -828,7 +872,7 @@ function ProfileBody(d: ProfileCard) {
   // the right column is otherwise empty below the ad, and three pieces of art
   // stacked there read as a trophy shelf on a shelf. It costs the text column
   // nothing, so the arena keeps its three rows and the accounts keep four tiles.
-  const accounts = d.accounts.slice(0, challenges.length ? 4 : 6);
+  const accounts = d.accounts.slice(0, (trophies.length || challenges.length) ? 4 : 6);
   const accountsHidden = Math.max(0, d.accounts.length - accounts.length);
   return (
     <Frame
@@ -840,98 +884,105 @@ function ProfileBody(d: ProfileCard) {
         imageUrl: d.avatarUrl, round: true, title: clamp(d.displayName, 18) ?? d.displayName,
         subtitle: `clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`,
       }}
-    >
-      <Section p={pStats} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 22 }}>
-        {/* The level belongs with the other things that describe this gamer —
-            points, views, votes — not floating in the card's top-right corner
-            as an unexplained badge. It reads as a stat because it is one. */}
-        <Pill color={t.accent2} bg={alpha(t.accent2, 0.16, FALLBACK_ACCENT2)} size={pStats.f(21)}>{`LV ${nf(d.level)}`}</Pill>
-        <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(21)}><CpCoin size={pStats.f(18)} />{nf(d.totalCp)}</Pill>
-        <Pill size={pStats.f(21)}>{`${nf(d.views)} views`}</Pill>
-        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pStats.f(21)}>
-          <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#fbbf24" }} />
-          {`${nf(d.votes)} votes`}
-        </Pill>
-        {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)" size={pStats.f(21)}>{clamp(d.award, 22)}</Pill> : null}
-      </Section>
+      // TWO PANES (B57): what they PLAY on the left, what they have WON on the
+      // right. One column made those two compete for the same vertical inches,
+      // which is why the accounts kept losing — a gamer with three trophies and
+      // five accounts saw the trophies and two of the accounts.
+      panes={[
+        <Pane key="left">
+          <Section p={pStats} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+            {/* The level belongs with the other things that describe this gamer
+                — points, views, votes — not floating in a corner as an
+                unexplained badge. It reads as a stat because it is one. */}
+            <Pill color={t.accent2} bg={alpha(t.accent2, 0.16, FALLBACK_ACCENT2)} size={pStats.f(19)}>{`LV ${nf(d.level)}`}</Pill>
+            <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(19)}><CpCoin size={pStats.f(16)} />{nf(d.totalCp)}</Pill>
+            <Pill size={pStats.f(19)}>{`${nf(d.views)} views`}</Pill>
+            <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pStats.f(19)}>
+              <div style={{ display: "flex", width: 11, height: 11, borderRadius: 6, background: "#fbbf24" }} />
+              {`${nf(d.votes)} votes`}
+            </Pill>
+            {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)" size={pStats.f(19)}>{clamp(d.award, 22)}</Pill> : null}
+          </Section>
 
-      {/* THE TROPHY CASE, in the body (B56.0).
-          It used to be drawn into a column beside the text, because the body
-          was a narrow column and the space to its right was otherwise dead.
-          The body is edge-to-edge free space now, so the case is a row of real
-          tiles — art on its plate, the name, and the cash value, which is the
-          whole reason a trophy is worth showing. */}
-      {trophies.length ? (
-        <Section p={pTrophies} style={{ gap: 6, marginTop: 16 }}>
-          <Head p={pTrophies}>
-            {(d.trophyCount ?? trophies.length) > trophies.length
-              ? `TROPHY CASE · ${nf(d.trophyCount ?? trophies.length)}`
-              : "TROPHY CASE"}
-          </Head>
-          <div style={{ display: "flex", flexDirection: "row", gap: 12 }}>
-            {trophies.map((x, i) => (
-              <GlassCard key={i} pad={9} style={{ width: 172, gap: 5 }}>
-                <ArtPanel url={x.imageUrl} size={84} />
-                <div style={{ display: "flex", fontSize: 17, fontWeight: 800, color: INK, lineHeight: 1.25 }}>
-                  {clampAt(x.name, 18)}
-                </div>
-                {x.value ? (
-                  <div style={{ display: "flex", fontSize: 20, fontWeight: 900, color: "#fde68a" }}>
-                    {`$${nf(x.value)}`}
-                  </div>
-                ) : null}
-              </GlassCard>
-            ))}
-          </div>
-        </Section>
-      ) : null}
-
-      {/* What they're competing in right now — the one thing on this card that
-          another gamer can act on. */}
-      {challenges.length ? (
-        <Section p={pChallenges} style={{ gap: 6, marginTop: 14 }}>
-          <Head p={pChallenges}>IN THE ARENA</Head>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {challenges.map((c, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 14, background: "rgba(0,0,0,0.48)", border: `1px solid ${c.live ? alpha(t.accent2, 0.45, FALLBACK_ACCENT2) : "rgba(255,255,255,0.10)"}` }}>
-                {c.live ? <div style={{ display: "flex", width: 10, height: 10, borderRadius: 5, background: "#34d399" }} /> : null}
-                <div style={{ fontSize: pChallenges.f(19), fontWeight: 700 }}>{clamp(c.title, 22)}</div>
-                <div style={{ fontSize: pChallenges.f(17), color: MUTED }}>{c.place ? `#${c.place}` : `${nf(c.points)} pts`}</div>
+          <Section p={pAccounts} style={{ marginTop: 14, gap: 8 }}>
+            {/* The count belongs in the heading when the card can't show them
+                all — a gamer with six accounts seeing four, with nothing saying
+                so, reads as us having lost two of them. */}
+            <Head p={pAccounts}>{accountsHidden ? `LINKED ACCOUNTS · ${nf(d.accounts.length)}` : "LINKED ACCOUNTS"}</Head>
+            {accounts.length === 0 ? (
+              <div style={{ display: "flex", fontSize: pAccounts.f(22), color: MUTED }}>No games linked yet — link one to unlock quests.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {accounts.map((a, i) => (
+                  <GlassCard key={i} pad={9} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    {/* Its own art — every entity a pane draws carries the
+                        picture of the thing (B57). */}
+                    {a.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={a.logoUrl} alt="" width={40} height={40} style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover" }} />
+                    ) : <div style={{ width: 40, height: 40, borderRadius: 10, display: "flex", background: alpha(t.accent, 0.2) }} />}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <div style={{ fontSize: pAccounts.f(21), fontWeight: 700 }}>{clampAt(a.tag, 18)}</div>
+                      <div style={{ fontSize: pAccounts.f(16), color: MUTED }}>{clampAt(a.headline || a.game, 26)}</div>
+                    </div>
+                  </GlassCard>
+                ))}
               </div>
-            ))}
-          </div>
-        </Section>
-      ) : null}
+            )}
+          </Section>
+        </Pane>,
 
-      <Section p={pAccounts} style={{ marginTop: 14, gap: 8, flex: 1 }}>
-        {/* The count belongs in the heading when the card can't show them all —
-            a gamer with six accounts seeing two, with nothing saying so, reads
-            as us having lost four of them. Every account gets its own button
-            underneath the card regardless (see `linkedAccountsOf`). */}
-        <Head p={pAccounts}>{accountsHidden ? `LINKED ACCOUNTS · ${nf(d.accounts.length)}` : "LINKED ACCOUNTS"}</Head>
-        {accounts.length === 0 ? (
-          <div style={{ display: "flex", fontSize: pAccounts.f(24), color: MUTED }}>No games linked yet — link one to unlock quests.</div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {accounts.map((a, i) => (
-              // A percentage, not a pixel width: the text column is narrower
-              // now that the sponsor and the logo own the right-hand side, and
-              // a hard 340 tipped two tiles per row into one.
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderRadius: 18, background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.10)", width: "48%" }}>
-                {a.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.logoUrl} alt="" width={42} height={42} style={{ width: 42, height: 42, borderRadius: 10, objectFit: "cover" }} />
-                ) : <div style={{ width: 42, height: 42, borderRadius: 10, display: "flex", background: alpha(t.accent, 0.2) }} />}
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div style={{ fontSize: pAccounts.f(22), fontWeight: 700 }}>{clamp(a.tag, 16)}</div>
-                  <div style={{ fontSize: pAccounts.f(17), color: MUTED }}>{clamp(a.headline || a.game, 22)}</div>
+        // The right pane: what they have WON, and what they are playing for.
+        (trophies.length || challenges.length) ? (
+          <Pane key="right">
+            {trophies.length ? (
+              <Section p={pTrophies} style={{ gap: 6 }}>
+                <Head p={pTrophies}>
+                  {(d.trophyCount ?? trophies.length) > trophies.length
+                    ? `TROPHY CASE · ${nf(d.trophyCount ?? trophies.length)}`
+                    : "TROPHY CASE"}
+                </Head>
+                <div style={{ display: "flex", flexDirection: "row", gap: 10 }}>
+                  {trophies.map((x, i) => (
+                    <GlassCard key={i} pad={8} style={{ width: 160, gap: 4 }}>
+                      <ArtPanel url={x.imageUrl} size={78} />
+                      <div style={{ display: "flex", fontSize: 16, fontWeight: 800, color: INK, lineHeight: 1.2 }}>
+                        {clampAt(x.name, 16)}
+                      </div>
+                      {x.value ? (
+                        <div style={{ display: "flex", fontSize: 19, fontWeight: 900, color: "#fde68a" }}>
+                          {`$${nf(x.value)}`}
+                        </div>
+                      ) : null}
+                    </GlassCard>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
-    </Frame>
+              </Section>
+            ) : null}
+
+            {/* What they're competing in right now — the one thing on this card
+                another gamer can act on. */}
+            {challenges.length ? (
+              <Section p={pChallenges} style={{ gap: 6, marginTop: 14 }}>
+                <Head p={pChallenges}>IN THE ARENA</Head>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {challenges.map((c, i) => (
+                    <GlassCard key={i} pad={9} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+                      ring={c.live ? t.accent2 : null}>
+                      {c.live ? <div style={{ display: "flex", width: 10, height: 10, borderRadius: 5, background: "#34d399" }} /> : null}
+                      <div style={{ display: "flex", fontSize: pChallenges.f(18), fontWeight: 700 }}>{clampAt(c.title, 22)}</div>
+                      <div style={{ display: "flex", fontSize: pChallenges.f(16), color: MUTED, marginLeft: 8 }}>
+                        {c.place ? `#${c.place}` : `${nf(c.points)} pts`}
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+              </Section>
+            ) : null}
+          </Pane>
+        ) : null,
+      ]}
+    />
   );
 }
 
@@ -1164,12 +1215,21 @@ function ChallengeBody(d: ChallengeCard) {
   const days = Math.max(0, Math.ceil((ends.getTime() - Date.now()) / 86400000));
   const trophies = pTro.hidden ? [] : d.trophies.slice(0, 3);
   return (
-    <Frame theme={t} identity={{
+    <Frame theme={t}
+      identity={{
       // The GAME's logo: it is that game's challenge, scored on that game's
       // accounts (B52's rule, applied to the card's subject).
       imageUrl: d.logoUrl, eyebrow: d.ended ? "FINISHED CHALLENGE" : "LIVE CHALLENGE",
       title: clamp(d.title, 30) ?? "", subtitle: clamp(d.description, 62), size: 38,
-    }}>
+      }}
+      // TWO PANES (B57): the details and the prize on the LEFT, the standings
+      // on the RIGHT. The podium was drawn above the standings and squeezed
+      // them to a row and a half — on the densest card on the platform, the
+      // scoreboard is the reason people come back, so it gets a column of its
+      // own rather than whatever is left after the prize.
+      panes={[
+        <Pane key="left">
+
       {/* The LIVE pill and the game name are the identity band's eyebrow now,
           so what is left here is only the thing the band cannot say: that this
           one is private and needs a key. */}
@@ -1243,6 +1303,10 @@ function ChallengeBody(d: ChallengeCard) {
         </Section>
       ) : null}
 
+        </Pane>,
+
+        // The RIGHT pane: who can enter, the window, and the scoreboard.
+        <Pane key="right">
       {/* Who can enter, when the answer isn't "anyone".
           A gamer deciding whether to tap Join needs to know in advance that the
           answer will be no — finding out after joining is how a competition
@@ -1304,7 +1368,9 @@ function ChallengeBody(d: ChallengeCard) {
           ))
         )}
       </Section>
-    </Frame>
+        </Pane>,
+      ]}
+    />
   );
 }
 
@@ -1329,31 +1395,75 @@ function dayLabel(iso: string): string {
 // actually has. Counters answered neither — "3 challenges" doesn't tell you
 // whether one ends tonight, and the old "gamers ranked" wasn't even a count of
 // gamers.
+/**
+ * The planet card — the Discord rendering of the planet explorer
+ * (`app/planets/[slug]/page.tsx`, `components/PlanetExplorer.tsx`).
+ *
+ * FOUR PANES (B57), which is what a planet actually is: the two ladders down
+ * the left, the live challenges and the game's own world down the right, over
+ * the planet's globe art. It was two columns of text rows — the same content,
+ * with none of the shape and none of the art.
+ */
 function PlanetBody(d: PlanetCard) {
   const t = d.theme;
   const clamp = clampFor(t);
-  const [pCh, pBo] = ["challenges", "boards"].map((k) => part(t, k));
+  const [pCh, pBo, pWorld] = ["challenges", "boards", "world"].map((k) => part(t, k));
   const challenges = d.challenges ?? [];
   const boards = d.boards ?? [];
+  const world = pWorld.hidden ? [] : (d.world ?? []);
+
+  const Board = (b: PlanetCard["boards"][number], i: number) => (
+    <GlassCard key={i} pad={10} style={{ gap: 3 }}>
+      <div style={{ display: "flex", fontSize: pBo.f(21), fontWeight: 700 }}>{clamp(b.title, 22)}</div>
+      {/* `marginLeft`, not `gap`. Satori's gap support does not reach this
+          nesting — it rendered "NovaGold II" with the two runs touching, which
+          is the kind of thing only a real render shows. */}
+      <div style={{ display: "flex", fontSize: pBo.f(17), color: MUTED }}>
+        {b.leader ? (
+          <>
+            <div style={{ display: "flex", color: "#fbbf24" }}>{`#1 ${clamp(b.leader, 13)}`}</div>
+            {b.value ? <div style={{ display: "flex", marginLeft: 10, color: t.accent2 }}>{clamp(b.value, 10)}</div> : null}
+          </>
+        ) : (
+          <div style={{ display: "flex" }}>unclaimed — take it</div>
+        )}
+      </div>
+    </GlassCard>
+  );
+
+  // The ladders split down the left: the two the admin put first get a pane
+  // each, so a board is a block rather than a line in a list.
+  const half = Math.ceil(Math.min(boards.length, 4) / 2) || 1;
+
   return (
     <Frame theme={t} identity={{
       imageUrl: d.logoUrl, eyebrow: "PLANET", title: `${clamp(d.game, 18)}`,
       subtitle: `${nf(d.gamers)} gamer${d.gamers === 1 ? "" : "s"} here${d.serverGamers != null ? ` · ${nf(d.serverGamers)} from this server` : ""}`,
-    }}>
+    }}
+      panes={[
+        // TOP-LEFT and BOTTOM-LEFT: the ladders.
+        boards.length ? (
+          <Column p={pBo} label={`${pBo.say("LEADERBOARDS")} · ${boards.length}`} accent={t.accent2}>
+            {boards.slice(0, half).map(Board)}
+          </Column>
+        ) : (
+          <Column p={pBo} label={pBo.say("LEADERBOARDS")} accent={t.accent2}>
+            <Empty p={pBo}>No boards on this game yet.</Empty>
+          </Column>
+        ),
 
-      <div style={{ display: "flex", gap: 14, marginTop: 22, flex: 1 }}>
+        // TOP-RIGHT: what is running right now.
         <Column p={pCh} label={`${pCh.say("LIVE CHALLENGES")} · ${challenges.length}`} accent={t.accent}>
           {challenges.length === 0 ? (
             <Empty p={pCh}>Nothing running right now. The next one lands here first.</Empty>
           ) : challenges.slice(0, 3).map((c, i) => {
             const days = Math.max(0, Math.ceil((new Date(c.endsAt).getTime() - Date.now()) / 86400000));
             return (
-              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 14px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
-                <div style={{ fontSize: pCh.f(22), fontWeight: 700 }}>{clamp(c.title, 22)}</div>
+              <GlassCard key={i} pad={10} style={{ gap: 3 }}>
+                <div style={{ display: "flex", fontSize: pCh.f(21), fontWeight: 700 }}>{clamp(c.title, 22)}</div>
                 {/* One text node with its own separators rather than three flex
                     children: Satori does not put the `gap` between adjacent
-                    inline-ish divs here, so they render welded together
-                    ("5d left2 in"). Explicit margins on the one coloured part. */}
+                    inline-ish divs here, so they render welded together. */}
                 <div style={{ display: "flex", fontSize: pCh.f(17), color: MUTED }}>
                   <div style={{ display: "flex", color: days <= 1 ? "#fda4af" : MUTED }}>
                     {`${days === 0 ? "ends today" : `${days}d left`} · ${nf(c.participants)} in`}
@@ -1362,36 +1472,43 @@ function PlanetBody(d: PlanetCard) {
                       and a sentence in it wraps the row onto three lines. */}
                   {c.prize ? <div style={{ display: "flex", marginLeft: 8, color: "#fbbf24" }}>{clamp(c.prize, 12)}</div> : null}
                 </div>
-              </div>
+              </GlassCard>
             );
           })}
-        </Column>
+        </Column>,
 
-        <Column p={pBo} label={`${pBo.say("LEADERBOARDS")} · ${boards.length}`} accent={t.accent2}>
-          {boards.length === 0 ? (
-            <Empty p={pBo}>No boards on this game yet.</Empty>
-          ) : boards.slice(0, 3).map((b, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 14px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
-              <div style={{ fontSize: pBo.f(22), fontWeight: 700 }}>{clamp(b.title, 22)}</div>
-              {/* `marginLeft`, not `gap`. Satori's gap support does not reach
-                  this nesting — it rendered "NovaGold II" with the two runs
-                  touching, which is the kind of thing only a real render shows
-                  and a source read never will. */}
-              <div style={{ display: "flex", fontSize: pBo.f(17), color: MUTED }}>
-                {b.leader ? (
-                  <>
-                    <div style={{ display: "flex", color: "#fbbf24" }}>{`#1 ${clamp(b.leader, 13)}`}</div>
-                    {b.value ? <div style={{ display: "flex", marginLeft: 10, color: t.accent2 }}>{clamp(b.value, 10)}</div> : null}
-                  </>
-                ) : (
-                  <div style={{ display: "flex" }}>unclaimed — take it</div>
-                )}
-              </div>
+        // BOTTOM-LEFT: the rest of the ladders. Nothing here when there is only
+        // one board, and nothing is what gets drawn.
+        boards.length > half ? (
+          <Column p={pBo} label={pBo.say("")} accent={t.accent2}>
+            {boards.slice(half, 4).map(Board)}
+          </Column>
+        ) : null,
+
+        // BOTTOM-RIGHT: the game's own world, each with its art. Empty until
+        // the snapshot has been synced for this game, which is a pane that is
+        // simply not drawn rather than a box with nothing in it.
+        world.length ? (
+          <Column p={pWorld} label={pWorld.say("THE GAME")} accent={t.accent}>
+            <div style={{ display: "flex", flexDirection: "row", gap: 8 }}>
+              {world.slice(0, 4).map((w, i) => (
+                <GlassCard key={i} pad={7} style={{ width: 116, gap: 4 }}>
+                  <ArtPanel url={w.imageUrl} size={72} pad={6} />
+                  <div style={{ display: "flex", fontSize: 15, fontWeight: 700, color: INK, lineHeight: 1.2 }}>
+                    {clampAt(w.name, 13)}
+                  </div>
+                  {w.role ? (
+                    <div style={{ display: "flex", fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                      {clampAt(w.role, 12)}
+                    </div>
+                  ) : null}
+                </GlassCard>
+              ))}
             </div>
-          ))}
-        </Column>
-      </div>
-    </Frame>
+          </Column>
+        ) : null,
+      ]}
+    />
   );
 }
 
@@ -1451,13 +1568,15 @@ function MarketBody(d: MarketCard) {
   const t = d.theme;
   const clamp = clampFor(t);
   const [pBal, pTiles, pPills, pEmpty] = ["balance", "tiles", "pills", "empty"].map((k) => part(t, k));
-  const TILE_W = 218;
   const GAP = 12;
+  const TILE_W = 208;
   // How many fit, rather than three because three fitted once. Taken from the
   // EFFECTIVE column, so a sold card drops to two per row instead of running
   // its shelf under the creative.
   const columnW = contentBoxFor(t.layout ?? DEFAULT_LAYOUT, !!t.ad).width;
-  const COLS = Math.max(2, Math.min(4, Math.floor((columnW + GAP) / (TILE_W + GAP))));
+  // FIVE across when the width allows: the shelf is a shelf, and four was
+  // only ever what fitted at 218px wide.
+  const COLS = Math.max(2, Math.min(5, Math.floor((columnW + GAP) / (TILE_W + GAP))));
   // ONE row, tall. The old card showed six tiles at 138px, which is what it
   // took to fit two rows of the receipt shape — and the shape was the problem.
   // Four tiles that carry the platform's hierarchy sell the shelf better than
