@@ -3,6 +3,11 @@ import { requireSystemFor } from "@/lib/departments";
 import { offers } from "@/lib/offers";
 import { campaignAnalytics } from "@/lib/campaigns-read";
 import CampaignConsole from "@/components/CampaignConsole";
+import WelcomeQueue from "@/components/WelcomeQueue";
+import { welcomeChallenges } from "@/lib/welcome-admin";
+import { getDb, schema } from "@/lib/db";
+import { providerForGame } from "@/lib/challenge-requests";
+import { eq, isNull, and } from "drizzle-orm";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +25,19 @@ export default async function OffersConsolePage() {
   await requireSystemFor("/admin/offers");
   const state = await offers();
   const analytics = await campaignAnalytics(state.campaign);
+
+  // The welcome queue (B43). Only games we can actually verify play on are
+  // offered — a competition on a game we cannot read scores from is a poster.
+  const db = await getDb();
+  const [welcome, allGames, freeServers] = await Promise.all([
+    welcomeChallenges(),
+    db.select({ name: schema.games.name }).from(schema.games).where(eq(schema.games.isActive, true)),
+    db.select({ guildId: schema.discordGuilds.guildId, name: schema.discordGuilds.name })
+      .from(schema.discordGuilds)
+      .where(and(eq(schema.discordGuilds.status, "active"), isNull(schema.discordGuilds.welcomeChallengeId)))
+      .limit(200),
+  ]);
+  const games = allGames.map((g) => g.name).filter((n) => !!providerForGame(n)).sort();
 
   return (
     <div className="space-y-6">
@@ -41,6 +59,17 @@ export default async function OffersConsolePage() {
         brands={state.brands}
         challengePrice={state.pricing.challengePrice}
         challengesPerBrand={state.finance.freeChallengesPerBrand}
+      />
+
+      <WelcomeQueue
+        rows={welcome.map((w) => ({
+          challengeId: w.challengeId, guildId: w.guildId, serverName: w.serverName,
+          game: w.game, state: w.state, blocker: w.blocker, value: w.value,
+          ownerOnboarded: w.ownerOnboarded, billed: w.billed,
+        }))}
+        games={games}
+        serversWithoutOne={freeServers.map((g) => ({ guildId: g.guildId, name: g.name || g.guildId }))}
+        defaultValue={state.campaign.server.value}
       />
 
       {/* What it has cost, and what came back. */}

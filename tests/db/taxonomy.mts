@@ -14,6 +14,11 @@
 process.env.DEMO_DB = "1";
 
 let pass = 0, fail = 0;
+// This suite predates the `eq` helper the newer ones carry. Added rather than
+// rewriting every assertion below it to fit.
+const eq = (name: string, got: unknown, want: unknown) =>
+  ok(name, JSON.stringify(got) === JSON.stringify(want), `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
+
 const ok = (name: string, cond: boolean, extra = "") => {
   if (cond) { pass++; console.log(`  ✓ ${name}`); }
   else { fail++; console.log(`  ✗ ${name}${extra ? ` — ${extra}` : ""}`); }
@@ -117,6 +122,126 @@ try {
 } catch (e) {
   fail++;
   console.log("  ✗ threw:", (e as Error).message);
+}
+
+// ===== B29: nothing ships without an owner in the taxonomy =====
+//
+// The rescoped item is the AUDIT and the assertion, not a retrofit — the
+// mechanism already fails safe (`pathAllowedFor` treats a page no desk claims as
+// admin-only). What was missing is a check that keeps it true as pages are
+// added, and a decision on the pages that are unowned today.
+
+console.log("\n== every admin page is either OWNED or deliberately admin-only ==");
+{
+  const { ADMIN_ONLY, ALWAYS_OPEN_EXACT, ALWAYS_OPEN_UNDER, pathAllowedFor, SYSTEMS } =
+    await import("../../lib/systems.ts");
+  const { ownersOfPath } = await import("../../lib/admin-nav.ts");
+  const { readFile } = await import("node:fs/promises");
+
+  const nav = await readFile(new URL("../../lib/admin-nav.ts", import.meta.url), "utf8");
+  const hrefs = [...nav.matchAll(/href:\s*"(\/admin[^"]*)"/g)].map((m) => m[1]);
+  ok("the console has pages", hrefs.length > 10, String(hrefs.length));
+
+  // Three legitimate categories, and NO fourth. A page that is none of these is
+  // a page somebody added without deciding who runs it.
+  const unowned: string[] = [];
+  for (const href of [...new Set(hrefs)]) {
+    const owned = ownersOfPath(href).length > 0;
+    const adminOnly = ADMIN_ONLY.some((p) => href === p || href.startsWith(`${p}/`));
+    const open = ALWAYS_OPEN_EXACT.includes(href)
+      || ALWAYS_OPEN_UNDER.some((p) => href === p || href.startsWith(`${p}/`));
+    if (!owned && !adminOnly && !open) unowned.push(href);
+  }
+  // These are unowned BY DECISION — each is a founder/operator surface with no
+  // department that should run it, and `pathAllowedFor` already refuses them.
+  // Listed here so adding a page to the console without filing it fails this
+  // test rather than becoming invisible.
+  const DELIBERATELY_UNOWNED = [
+    "/admin/messages", "/admin/analytics", "/admin/dataroom", "/admin/audit-log",
+    "/admin/discord/hq", "/admin/roles", "/admin/departments", "/admin/storage",
+    "/admin/settings",
+  ];
+  const surprises = unowned.filter((h) => !DELIBERATELY_UNOWNED.includes(h));
+  eq("no page is unowned by accident", surprises, []);
+  // …and every one of those is genuinely refused, not just listed.
+  const everything = SYSTEMS.map((s2) => s2.key);
+  for (const href of unowned) {
+    ok(`"${href}" refuses a department that runs EVERYTHING`, !pathAllowedFor(everything, href));
+  }
+
+  console.log("\n== the standing exceptions refuse everyone ==");
+  // /admin/users and /admin/linked-accounts are the gamer directory and every
+  // linked game account — the most sensitive thing in the product. /admin/payments
+  // was admin-only only by the unclaimed FALLBACK; filing it under a system later
+  // would have quietly handed it over. It is now on the list by decision.
+  for (const path of ["/admin/users", "/admin/linked-accounts", "/admin/payments"]) {
+    ok(`${path} is on the explicit list`, ADMIN_ONLY.includes(path), JSON.stringify(ADMIN_ONLY));
+    ok(`…and refuses a department granted every system`, !pathAllowedFor(everything, path));
+    ok(`…and refuses a sub-path too`, !pathAllowedFor(everything, `${path}/anything`));
+  }
+
+  console.log("\n== a department reaches its own pages and no others ==");
+  const withOwners = [...new Set(hrefs)].filter((h) => ownersOfPath(h).length > 0);
+  const sample = withOwners.find((h) => ownersOfPath(h).length === 1);
+  ok("there is a singly-owned page to test with", !!sample, String(sample));
+  if (sample) {
+    const owner = ownersOfPath(sample)[0];
+    ok(`a department running "${owner}" reaches ${sample}`, pathAllowedFor([owner], sample));
+    const notMine = withOwners.filter((h) => !ownersOfPath(h).includes(owner));
+    const leaked = notMine.filter((h) => pathAllowedFor([owner], h));
+    eq("…and reaches nothing it does not own", leaked, []);
+  }
+
+  console.log("\n== no page checks permissions on its own ==");
+  // The failure this prevents: a page that works because you happen to be an
+  // admin, with its own inline role check, invisible to the department editor.
+  const { readdir } = await import("node:fs/promises");
+  const walk = async (dir: URL): Promise<URL[]> => {
+    const out: URL[] = [];
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      const next = new URL(`${e.name}${e.isDirectory() ? "/" : ""}`, dir);
+      if (e.isDirectory()) out.push(...await walk(next));
+      else if (e.name === "page.tsx") out.push(next);
+    }
+    return out;
+  };
+  const pages = await walk(new URL("../../app/admin/", import.meta.url));
+  ok("there are admin pages to check", pages.length > 10, String(pages.length));
+  // What actually matters is that every page GOES THROUGH a guard. A role
+  // comparison on its own is not the smell — the first version of this flagged
+  // `/admin/roles` (which uses `isSuper` to decide whether the page lets you
+  // EDIT, inside a page already guarded) and `/admin/users` (which reads the
+  // role of the person in the ROW, not the viewer). Both are correct. The
+  // failure to catch is a page with no guard at all, which works only because
+  // you happen to be an admin and is invisible to the department editor.
+  // The guard is in the LAYOUT, not on each page — one gate for the whole area,
+  // which is the right architecture and which my first two attempts at this
+  // assertion both missed. Forty pages have no guard call in the page file
+  // because they do not need one.
+  const layout = await readFile(new URL("../../app/admin/layout.tsx", import.meta.url), "utf8");
+  ok("the admin layout refuses a signed-out visitor", /redirect\("\/login"\)/.test(layout));
+  ok("…and a non-staff one", /isStaff\(user\)/.test(layout));
+  ok("…and gates every path through the TAXONOMY, not a role list",
+    /pathAllowedFor\(systems, path\)/.test(layout), "");
+  ok("…refusing with notFound rather than a redirect that names the page",
+    /pathAllowedFor\(systems, path\)\) notFound\(\)/.test(layout));
+
+  // So the thing to catch on a PAGE is one that builds its own gate anyway —
+  // parallel permission logic that the department editor cannot see. A role
+  // comparison alone is not that: /admin/roles uses `isSuper` to decide whether
+  // an already-guarded page lets you EDIT, and /admin/users reads the role of
+  // the person in the ROW. Both flagged by my first version; both correct.
+  const roleOnly: string[] = [];
+  for (const f of pages) {
+    const text = await readFile(f, "utf8");
+    const rel = f.pathname.split("/app/")[1];
+    // A page that redirects or 404s on its own role check is gating itself.
+    if (/(redirect|notFound)\(\)?[^;]*\)[^;]*;?\s*$/m.test(text)
+      && /\b(me|user|viewer)\??\.role\s*===\s*"[^"]+"\s*\)?\s*\)?\s*(\?|&&|\|\|)?[^;]{0,40}(redirect|notFound)/.test(text)) {
+      roleOnly.push(rel);
+    }
+  }
+  eq("no page builds its own gate beside the layout's", roleOnly, []);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

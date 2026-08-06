@@ -1,5 +1,5 @@
 import { getContent } from "@/lib/cms";
-import { DEFAULT_LAYOUT, LAYOUT_KINDS, layoutKey, parseLayout, type CardLayout } from "@/lib/cards/layout";
+import { LAYOUT_KINDS, layoutKey, parseLayout, type CardLayout } from "@/lib/cards/layout";
 
 // Reading card layouts out of platform settings. Server-only — it touches the
 // CMS, which touches the database, which a client component may not.
@@ -26,9 +26,11 @@ export async function allLayouts(): Promise<Record<string, CardLayout>> {
   const value: Record<string, CardLayout> = {};
   try {
     const c = await getContent(LAYOUT_KINDS.map(layoutKey));
-    for (const kind of LAYOUT_KINDS) value[kind] = parseLayout(c[layoutKey(kind)]);
+    // The KIND matters: `parseLayout` falls back to that kind's own pane shape
+    // (B57's `KIND_PANES`) rather than to the generic one-pane default.
+    for (const kind of LAYOUT_KINDS) value[kind] = parseLayout(c[layoutKey(kind)], kind);
   } catch {
-    for (const kind of LAYOUT_KINDS) value[kind] = DEFAULT_LAYOUT;
+    for (const kind of LAYOUT_KINDS) value[kind] = parseLayout(null, kind);
   }
   holder[MEMO_KEY] = { at: Date.now(), value };
   return value;
@@ -36,7 +38,7 @@ export async function allLayouts(): Promise<Record<string, CardLayout>> {
 
 export async function layoutFor(kind: string): Promise<CardLayout> {
   const all = await allLayouts();
-  return all[kind] ?? DEFAULT_LAYOUT;
+  return all[kind] ?? parseLayout(null, kind);
 }
 
 export function forgetLayouts(): void {

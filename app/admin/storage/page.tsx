@@ -25,6 +25,90 @@ const CAT_META: Record<ImageCategory, { label: string; cls: string; note: string
 const HUGE = 500 * 1024; // 0.5 MB — flag anything bigger to compress
 const kb = (n: number) => n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(2)} MB` : `${Math.round(n / 1024)} KB`;
 
+async function CardBudgetPanel() {
+  const { storeReport, evictionCandidates, CARD_TTL_DAYS } = await import("@/lib/cards/budget");
+  const [report, next] = await Promise.all([storeReport(), evictionCandidates(5)]);
+  const mb = (b: number) => `${(b / 1048576).toFixed(1)} MB`;
+  const pct = report.budget.ceiling > 0
+    ? Math.min(100, (report.budget.used / report.budget.ceiling) * 100) : 0;
+
+  return (
+    <section className="glass p-5" data-card-budget>
+      <h2 className="font-bold">Card rendering &amp; store</h2>
+      <p className="mt-0.5 text-xs text-muted">
+        Every Discord card is a PNG we render once and keep. The ceiling stops a busted cache key
+        billing us overnight; the cap stops the store growing forever. When the ceiling trips we serve
+        the last good card rather than failing — a stale card is a card.
+      </p>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-white/10 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted">Rendered today</div>
+          <div className={`mt-0.5 text-lg font-black ${report.budget.exhausted ? "text-rose-300" : "text-ink"}`}
+            data-budget-used>
+            {report.budget.used.toLocaleString()} <span className="text-xs font-semibold text-muted">of {report.budget.ceiling.toLocaleString()}</span>
+          </div>
+          <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: report.budget.exhausted ? "#fb7185" : "#22d3ee" }} />
+          </div>
+          {report.budget.exhausted && (
+            <div className="mt-1 text-[10px] font-bold text-rose-300">
+              Ceiling reached — serving stale cards until it resets.
+            </div>
+          )}
+        </div>
+        <div className="rounded-2xl border border-white/10 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted">Cards held</div>
+          <div className="mt-0.5 text-lg font-black" data-cards-held>
+            {report.totalCount.toLocaleString()} <span className="text-xs font-semibold text-muted">of {report.cap.toLocaleString()}</span>
+          </div>
+          {report.overCap > 0 && (
+            <div className="mt-1 text-[10px] font-bold text-amber-300">
+              {report.overCap.toLocaleString()} over the cap — the least recently used go first.
+            </div>
+          )}
+        </div>
+        <div className="rounded-2xl border border-white/10 px-4 py-3">
+          <div className="text-[10px] uppercase tracking-wider text-muted">Held weight</div>
+          <div className="mt-0.5 text-lg font-black">{mb(report.totalBytes)}</div>
+          <div className="mt-1 text-[10px] text-muted">Anything untouched for {CARD_TTL_DAYS} days is evictable.</div>
+        </div>
+      </div>
+
+      {report.byKind.length > 0 && (
+        <div className="mt-3 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/10 text-left text-[10px] uppercase tracking-wider text-muted">
+                <th className="py-1.5 pr-3">Kind</th>
+                <th className="py-1.5 pr-3 text-right">Cards</th>
+                <th className="py-1.5 pr-3 text-right">Weight</th>
+                <th className="py-1.5 text-right">Served</th>
+              </tr>
+            </thead>
+            <tbody>
+              {report.byKind.map((k) => (
+                <tr key={k.kind} className="border-b border-white/5" data-kind={k.kind}>
+                  <td className="py-1.5 pr-3 font-semibold">{k.kind}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{k.count.toLocaleString()}</td>
+                  <td className="py-1.5 pr-3 text-right tabular-nums">{mb(k.bytes)}</td>
+                  <td className="py-1.5 text-right tabular-nums text-muted">{k.hits.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {next.length > 0 && (
+        <p className="mt-2 text-[11px] text-muted">
+          Next to go: {next.map((c) => `${c.kind}/${c.cacheKey}`).join(", ")}.
+        </p>
+      )}
+    </section>
+  );
+}
+
 export default async function AdminStoragePage() {
   const refs = await collectImageRefs();
   const sizes = await measureSizes(refs);
@@ -54,6 +138,12 @@ export default async function AdminStoragePage() {
         <h1 className="text-2xl font-bold">Image storage audit</h1>
         <p className="text-sm text-muted mt-1">Every image the platform stores — where it lives (our Blob vs Higgsfield) and how big it is, so you know exactly what to compress. Neon should only ever hold short Blob links.</p>
       </div>
+
+      {/* The render budget and the card store (B46).
+          Vercel Pro raises the ceiling; it does not remove it. This is the
+          graph that turns "a bug busted the cache overnight" from an invoice
+          into something somebody notices the same day. */}
+      <CardBudgetPanel />
 
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">

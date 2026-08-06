@@ -2,8 +2,9 @@ import { ImageResponse } from "next/og";
 import { loadCardFonts, cardFontFamily } from "@/lib/cards/fonts";
 import { toEmbeddable, withDeadline } from "@/lib/cards/img";
 import { brandCardArt } from "@/lib/cards/brand";
+import { HOUSE_AD } from "@/lib/cards/ads";
 import {
-  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBox, opacityOf,
+  AD_LABEL_H, CANVAS_W, DEFAULT_LAYOUT, adBox, assetBox, badgeTopFor, contentBoxFor, mascotYields, opacityOf, panes,
   partOf, plateBg, sideBox, sideBoxFits, spotBox, transformOf,
 } from "@/lib/cards/layout";
 import type { CardAsset, PartDraw } from "@/lib/cards/layout";
@@ -22,6 +23,19 @@ import type {
 
 export const CARD_W = 1200;
 export const CARD_H = 630;
+
+/**
+ * The fixed top strip (B54).
+ *
+ * Identity left, branding right, and everything under it free for the body.
+ * Sized so the mark reads at thumbnail scale without eating a sixth of the
+ * canvas — these cards get screenshotted and reposted, and the strip is what
+ * survives a crop.
+ */
+// The top band's height: the sponsor box's own bottom, plus air. Derived rather
+// than chosen, because the ad is the one element in that band whose size is a
+// commercial promise — everything else is placed around it.
+export const STRIP_H = 196;
 
 const INK = "#f2f3ff";
 const MUTED = "#9aa0c3";
@@ -117,9 +131,24 @@ function safeTheme(theme: CardTheme): CardTheme {
 function badgeContent(
   theme: CardTheme,
   proposed: React.ReactNode,
+  /**
+   * True when the proposal IS the game's logo — and therefore the same picture
+   * the strip is now drawing as a watermark (B54).
+   *
+   * Six card bodies propose the game's logo in the corner, because until B54 it
+   * was the only game identity a card carried. The strip carries it now, so on
+   * "auto" the corner steps aside rather than printing the mark twice — which is
+   * exactly what the first render of this did, one under the other, and the only
+   * way to see it was to look at the picture.
+   *
+   * Only on "auto": an admin who explicitly chose "the game's logo" gets the
+   * crisp corner badge they asked for, and the watermark stands down instead.
+   */
+  cornerIsGameLogo = false,
+  stripHasGameLogo = false,
 ): React.ReactNode {
   const show = theme.layout?.badgeShow ?? "auto";
-  if (show === "auto") return proposed;
+  if (show === "auto") return cornerIsGameLogo && stripHasGameLogo ? undefined : proposed;
   if (show === "none") return undefined;
   const b = theme.badge ?? {};
   if (show === "game" && b.gameLogoUrl) {
@@ -138,10 +167,50 @@ function badgeContent(
   return undefined;
 }
 
-function Frame({ theme, children, corner: proposedCorner, side }: {
+function Frame({ theme, children, panes: bodyPanes, corner: proposedCorner, cornerIsGameLogo, identity, side }: {
   theme: CardTheme;
-  children: React.ReactNode;
+  /** The whole body as one pane. A card that divides it passes `panes`. */
+  children?: React.ReactNode;
+  /**
+   * The card's own identity, drawn top-left (B56.0).
+   *
+   * Every kind passes one, and every one of them has an IMAGE: the game's logo
+   * on a challenge or a leaderboard, the gamer's avatar on a profile, the game
+   * account's avatar on a game-stats card, the quest's art on a quest. A card
+   * whose top-left is a headline in empty space could be any card, and the body
+   * below it then has to re-state what it is about instead of getting on with
+   * showing it.
+   */
+  identity?: {
+    title: string;
+    subtitle?: string | null;
+    /** A small line above the title — "LIVE CHALLENGE", "PLANET", "WEEK 42". */
+    eyebrow?: string | null;
+    imageUrl?: string | null;
+    /** Avatars are round; logos and cover art are not. */
+    round?: boolean;
+    /** Headline size, for the kinds whose names run long. */
+    size?: number;
+  };
+  /**
+   * The body, as PANES (B57).
+   *
+   * Reading order — left, right, then the second row. Each is drawn into the
+   * rectangle `panes()` computes from the LIVE layout, so an admin who moves
+   * the split moves the content with it, and the editor draws the same
+   * rectangles the renderer does.
+   *
+   * A pane the card has no content for is not drawn. An empty bordered box is
+   * the failure mode a grid invites, and it looks like the card is broken
+   * rather than like the gamer has nothing there yet.
+   *
+   * A card that passes `children` instead gets the whole body as one pane,
+   * which is the right answer for a leaderboard.
+   */
+  panes?: (React.ReactNode | null)[];
   corner?: React.ReactNode;
+  /** The corner proposal is the game's logo — see `badgeContent`. */
+  cornerIsGameLogo?: boolean;
   /**
    * The right-hand column, between the sponsor and the logo.
    *
@@ -152,18 +221,32 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
    */
   side?: (box: { left: number; top: number; width: number; height: number }) => React.ReactNode;
 }) {
-  const corner = badgeContent(theme, proposedCorner);
   const l = theme.layout ?? DEFAULT_LAYOUT;
   const mascot = spotBox(l.mascot, 1);
+  const corner = badgeContent(theme, proposedCorner, cornerIsGameLogo, false);
   const mark = spotBox(l.mark, 1);
   const badge = spotBox(l.badge, 1);
-  const content = contentBox(l.content);
-  // The sponsor, and the badge pushed clear of it. `badgeTopFor` returns the
-  // badge's own top when there's no ad or no collision, so an unsold card and a
-  // hand-placed badge are both untouched.
-  const ad = theme.ad && !l.ad.hidden ? theme.ad : null;
+  // THE AD IS ALWAYS ON (B56.0).
+  //
+  // There is no such thing as an unsold card. When no brand has bought this
+  // impression the HOUSE creative fills it, because the slot IS the product: a
+  // corner that is sometimes empty teaches a server owner that the bot
+  // sometimes has one, and it is the hardest thing to un-teach. Only an admin
+  // hiding the slot on a kind takes it off, and that is a decision somebody
+  // made rather than an accident of inventory.
+  const ad = l.ad.hidden ? null : theme.ad ?? null;
   const adB = adBox(l.ad);
   const badgeTop = badgeTopFor(l, !!ad, 1);
+  // The identity block, top-left: the picture and the name of the thing.
+  const idBox = spotBox(l.gameMark, 1);
+  const idImage = identity?.imageUrl || theme.badge?.gameLogoUrl || theme.markUrl || null;
+  // It ends before the sponsor box, always. Satori has no float, so a title
+  // long enough to reach the creative would be drawn straight under it.
+  const idWidth = Math.max(220, adB.left - idBox.left - 28);
+  /** The text's own share of that, once the picture has taken its bite. */
+  const idText = Math.max(160, idWidth - idBox.width - 18);
+  const content = contentBoxFor(l, !!ad);
+  const paneBoxes = panes(l);
   // The free rectangle to the right of the content: starts where the text
   // column ends, stops at the canvas edge, and begins under whichever of the
   // sponsor box and the badge hangs lowest. Computed from the LIVE layout, so
@@ -216,6 +299,65 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
           <div style={{ position: "absolute", bottom: -280, right: -180, width: 760, height: 760, borderRadius: 999, display: "flex", background: alpha(theme.accent2, 0.11, FALLBACK_ACCENT2) }} />
         </>
       ) : null}
+      {/* THE TOP BAND (B56.0).
+          Two things live here and only two: the card's IDENTITY on the left and
+          the AD on the right. A scrim rather than a solid bar, so background
+          art still reads through — this is a section of the platform, not a
+          poster with a header glued on. */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: STRIP_H, display: "flex",
+        background: "linear-gradient(180deg, rgba(4,5,26,0.86) 0%, rgba(4,5,26,0.42) 62%, rgba(4,5,26,0) 100%)",
+      }} />
+      {/* THE IDENTITY, top-left: a picture of the thing, then its name.
+          Never text alone. Every kind has an image of what it is about — the
+          game's logo, the gamer's avatar, the account's avatar, the quest art —
+          and a card that opens with a headline floating in space could be any
+          card on the platform. `identityImage` falls back through the game's
+          logo to our own mark so the slot is never empty. */}
+      {identity && !l.gameMark.hidden ? (
+        <div style={{
+          position: "absolute", left: idBox.left, top: idBox.top,
+          maxWidth: idWidth, display: "flex", alignItems: "center", gap: 18,
+        }}>
+          {idImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={idImage} alt="" width={idBox.width} height={idBox.height}
+              style={{
+                width: idBox.width, height: idBox.height, objectFit: "cover",
+                borderRadius: identity.round ? idBox.width / 2 : Math.round(idBox.width * 0.26),
+                border: `3px solid ${alpha(theme.accent, 0.55)}`,
+                ...styleOf({ ...l.gameMark, opacity: undefined }),
+              }} />
+          ) : null}
+          {/* Clamped and clipped, because this band is a FIXED height (B56.0).
+              The first render of it let a two-line title and a two-line
+              subtitle push the block straight down into the body, over the
+              pills the challenge card draws there. The band is the frame; the
+              text fits it rather than the other way round. */}
+          <div style={{
+            display: "flex", flexDirection: "column", gap: 4,
+            maxWidth: idWidth - idBox.width - 18, maxHeight: STRIP_H - idBox.top - 12,
+            overflow: "hidden",
+          }}>
+            {identity.eyebrow ? (
+              <div style={{ display: "flex", fontSize: 17, fontWeight: 800, letterSpacing: 2.4, textTransform: "uppercase", color: safeColor(theme.accent2, FALLBACK_ACCENT2) }}>
+                {identity.eyebrow}
+              </div>
+            ) : null}
+            <div style={{ display: "flex", fontSize: identity.size ?? 40, fontWeight: 800, lineHeight: 1.06, color: INK }}>
+              {clampAt(identity.title, Math.floor(idText / ((identity.size ?? 40) * 0.52)))}
+            </div>
+            {identity.subtitle ? (
+              <div style={{ display: "flex", fontSize: 20, color: MUTED, lineHeight: 1.25 }}>
+                {clampAt(identity.subtitle, Math.floor(idText / 10))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+      {/* The gradient rule is GONE (B56.0): it read as a notification banner.
+          Kept behind an admin toggle that now defaults off, so a deployment
+          that wants it back has it. */}
       {l.bar ? (
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 8, display: "flex", background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent2})` }} />
       ) : null}
@@ -225,46 +367,66 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
       {(l.assets ?? []).filter((a) => !a.front).map((a) => <Asset key={a.id} a={a} />)}
 
       {/* The astronaut, behind the content. */}
-      {theme.astronautUrl && !l.mascot.hidden ? (
+      {theme.astronautUrl && !l.mascot.hidden && !mascotYields(l, !!ad) ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={theme.astronautUrl} alt="" width={mascot.width} height={mascot.height}
           style={{
             position: "absolute", left: mascot.left, top: mascot.top,
             width: mascot.width, height: mascot.height, objectFit: "contain",
-            // 0.85 is the house default; an explicit setting overrides it.
-            opacity: opacityOf(l.mascot.opacity) ?? 0.85,
+            // Semi-transparent by house default (B54): in the strip it is
+            // decoration sharing a band with the identity line and the mark,
+            // and at the 0.85 it carried in the bottom-left corner it competed
+            // with both. An explicit setting overrides it.
+            opacity: opacityOf(l.mascot.opacity) ?? 0.55,
             ...styleOf({ ...l.mascot, opacity: undefined }),
           }} />
       ) : null}
-      {/* The content block. Its box is part of the layout, so moving the logo
-          out of a corner can actually give the card that corner back. */}
-      <div style={{ position: "absolute", left: content.left, top: content.top, width: content.width, height: content.height, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {children}
-      </div>
-      {/* The right-hand column. Drawn before the logo on purpose: the logo is
-          the one thing that is never covered. */}
-      {side && sideBoxFits(side_) ? side(side_) : null}
-      {/* The real logo mark, drawn on top of everything. Falls back to the
-          wordmark only when no logo is configured, so a card is never
-          unbranded. */}
+      {/* THE CLUSTER MARK, as a WATERMARK in the body band (B56.0).
+          It has been bottom-right (over the standings) and top-right (under the
+          sponsor box, which is drawn last — so on a sold card our mark was not
+          on the card at all). Both were attempts to give it a rectangle of its
+          own on a card that has no spare rectangle. Behind the content it costs
+          nothing, survives the crop, and no body has to lay itself out around
+          it. Drawn BEFORE the children for exactly that reason. */}
       {!l.mark.hidden ? (
         <div style={{
           position: "absolute", left: mark.left, top: mark.top, width: mark.width, height: mark.height,
-          display: "flex", alignItems: "center", justifyContent: "center", ...styleOf(l.mark),
+          display: "flex", alignItems: "center", justifyContent: "center",
+          // Faint by house default; an explicit setting wins.
+          opacity: opacityOf(l.mark.opacity) ?? 0.07,
+          ...styleOf({ ...l.mark, opacity: undefined }),
         }}>
           {theme.markUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={theme.markUrl} alt="" width={mark.width} height={mark.height}
-              style={{ width: mark.width, height: mark.height, borderRadius: Math.round(mark.width * 0.23), objectFit: "contain" }} />
+              style={{ width: mark.width, height: mark.height, objectFit: "contain" }} />
           ) : (
-            // Drawn at 62% of the spot, not filling it. The mark is 250px now,
-            // and a deployment that hasn't uploaded a logo yet should get a
-            // wordmark-sized placeholder, not a 250px solid tile painted over
-            // the corner of every card it renders.
-            <div style={{ width: Math.round(mark.width * 0.62), height: Math.round(mark.width * 0.62), borderRadius: Math.round(mark.width * 0.14), display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(135deg, ${theme.accent}, ${theme.accent2})`, fontSize: Math.round(mark.width * 0.34), fontWeight: 700, color: "#fff" }}>C</div>
+            // A LETTERFORM, not a tile. The tile was right when this was a
+            // 132px mark in a corner; behind the content at 430px it is a pale
+            // rounded square the size of a coaster sitting under the trophies.
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: mark.width, height: mark.height, fontSize: Math.round(mark.width * 0.9), fontWeight: 800, color: safeColor(theme.accent2, FALLBACK_ACCENT2) }}>C</div>
           )}
         </div>
       ) : null}
+      {/* THE BODY, as panes (B57). One box when the card has one thing to say,
+          two or four when it has more — and the geometry comes from the same
+          helper the editor draws with, so the two cannot disagree. */}
+      {bodyPanes
+        ? bodyPanes.map((pane, i) => (pane && paneBoxes[i] ? (
+          <div key={i} style={{
+            position: "absolute", left: paneBoxes[i].left, top: paneBoxes[i].top,
+            width: paneBoxes[i].width, height: paneBoxes[i].height,
+            display: "flex", flexDirection: "column", overflow: "hidden",
+          }}>{pane}</div>
+        ) : null))
+        : (
+          <div style={{ position: "absolute", left: content.left, top: content.top, width: content.width, height: content.height, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            {children}
+          </div>
+        )}
+      {/* The right-hand column. Drawn before the logo on purpose: the logo is
+          the one thing that is never covered. */}
+      {side && sideBoxFits(side_) ? side(side_) : null}
       {/* Top-right furniture: game logo, level pill, or the trophy stack. Right
           edge pinned to the spot so a stack of different heights still hangs
           from the same line. */}
@@ -285,6 +447,17 @@ function Frame({ theme, children, corner: proposedCorner, side }: {
           So it wins over every other layer, and only an admin hiding the slot
           on this card kind takes it off. */}
       {ad ? <AdSlot ad={ad} box={adB} opacity={l.ad.opacity} /> : null}
+      {/* THE EDGE (B56.0). One thin, quiet line, replacing the gradient rule
+          that used to run across the top and read as a notification banner.
+          What a section needs is an edge, so it stops being a rectangle of art
+          with words on it. Drawn last so nothing paints over it; 0 turns it
+          off. */}
+      {(l.stroke ?? 0) > 0 ? (
+        <div style={{
+          position: "absolute", top: 0, left: 0, width: CARD_W, height: CARD_H, display: "flex",
+          borderRadius: 2, border: `2px solid rgba(255,255,255,${((l.stroke ?? 0) / 100 * 0.5).toFixed(3)})`,
+        }} />
+      ) : null}
     </div>
   );
 }
@@ -477,6 +650,116 @@ function Plate({ theme, children, style }: {
   );
 }
 
+// ===== The platform's vocabulary (B56) =====
+//
+// B54 asked for cards "laid out to render what a gamer sees on the platform".
+// That was built as the same DATA, and it was meant as the same VISUAL
+// LANGUAGE: a gamer looking at a card in Discord should feel they are looking
+// at Cluster, not at a nicer poster of the same numbers.
+//
+// So the shapes the site repeats everywhere live here, once, and every body
+// draws with them. Re-styling a sub-card per body is how thirteen cards end up
+// looking like thirteen products — and it is the specific thing `tests/ui/
+// cards.mjs` checks, because it is invisible on any single card.
+//
+// The source of truth is `app/globals.css:45` (`.glass`) and the components
+// that use it. These are its values, not an impression of them.
+
+/** `.glass` — app/globals.css:45. The card-within-card the whole site is made of. */
+const GLASS_BG = "linear-gradient(160deg, rgba(139,92,246,0.07), rgba(34,211,238,0.04) 55%, rgba(255,255,255,0.02))";
+const GLASS_BORDER = "rgba(139,92,246,0.18)";
+
+/**
+ * One sub-card.
+ *
+ * `ring` overrides the border where the platform tints it by meaning — the
+ * marketplace rings a legendary trophy in amber (`TIER_RING`,
+ * components/TrophyMarket.tsx:21) and that colour IS the information.
+ */
+function GlassCard({ children, ring, style, pad = 12 }: {
+  children: React.ReactNode; ring?: string | null; style?: React.CSSProperties; pad?: number;
+}) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", borderRadius: 16, padding: pad,
+      background: GLASS_BG, border: `1px solid ${ring ? safeColor(ring, GLASS_BORDER) : GLASS_BORDER}`,
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The square plate a tile's picture sits on.
+ *
+ * The platform never floats product art on the page — a trophy, a game logo, a
+ * champion portrait always sits on `bg-black/30` inside its card
+ * (components/TrophyMarket.tsx:129). It is what stops a transparent PNG from
+ * dissolving into whatever artwork is behind the card.
+ */
+function ArtPanel({ url, size, pad = 8, corner }: {
+  url?: string | null; size: number; pad?: number; corner?: React.ReactNode;
+}) {
+  return (
+    <div style={{
+      display: "flex", position: "relative", width: "100%", height: size,
+      alignItems: "center", justifyContent: "center", borderRadius: 12,
+      background: "rgba(0,0,0,0.30)", padding: pad,
+    }}>
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" width={size - pad * 2} height={size - pad * 2}
+          style={{ width: size - pad * 2, height: size - pad * 2, objectFit: "contain" }} />
+      ) : null}
+      {corner ? (
+        <div style={{ position: "absolute", top: 6, right: 6, display: "flex" }}>{corner}</div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A figure stated as value, in its own bordered box.
+ *
+ * The platform's recurring "here is your number and what it means" shape — the
+ * wallet on the marketplace shelf (components/TrophyMarket.tsx:80) is the
+ * canonical one: the figure, what it is for, and the next step, boxed and
+ * tinted in the accent rather than set loose in the paragraph.
+ */
+function StatTile({ figure, label, foot, accent, align = "flex-start", pad = 12 }: {
+  figure: React.ReactNode; label?: string | null; foot?: string | null;
+  accent: string; align?: "flex-start" | "flex-end"; pad?: number;
+}) {
+  const c = safeColor(accent, FALLBACK_ACCENT2);
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: align, gap: 2,
+      borderRadius: 16, padding: `${pad - 4}px ${pad + 4}px`,
+      border: `1px solid ${alpha(c, 0.25)}`, background: alpha(c, 0.06),
+    }}>
+      <div style={{ display: "flex", alignItems: "center", color: c }}>{figure}</div>
+      {label ? <div style={{ display: "flex", fontSize: 15, letterSpacing: 1.4, textTransform: "uppercase", color: MUTED }}>{label}</div> : null}
+      {foot ? <div style={{ display: "flex", fontSize: 15, fontWeight: 700, color: alpha(c, 0.75) }}>{foot}</div> : null}
+    </div>
+  );
+}
+
+/**
+ * One pane's own column.
+ *
+ * Satori has no Fragment: a pane handed `<>…</>` lays its children out as if
+ * the pane were a row, which put the profile card's LINKED ACCOUNTS heading
+ * beside its stat pills and half off the pane. Every pane is a real element.
+ */
+function Pane({ children }: { children: React.ReactNode }) {
+  // `height: 100%` is load-bearing: a section inside a pane that uses `flex: 1`
+  // to claim the leftover space — the challenge card's standings do — collapses
+  // to nothing when its parent's height is auto. The standings simply were not
+  // on the card.
+  return <div style={{ display: "flex", flexDirection: "column", width: "100%", height: "100%" }}>{children}</div>;
+}
+
 function Pill({ children, color = MUTED, bg = "rgba(255,255,255,0.07)", size = 21 }: {
   children: React.ReactNode; color?: string; bg?: string; size?: number;
 }) {
@@ -512,35 +795,52 @@ function Bar({ pct, accent: a1, accent2: a2, h = 16 }: { pct: number; accent: st
   );
 }
 
-function Title({ text, sub, accent: a1, accent2: a2, theme, p, size = 52 }: {
-  text: string; sub?: string | null; accent: string; accent2: string; theme: CardTheme;
-  /** The `title` section's setting, when the card has one. */
-  p?: PartDraw;
-  /**
-   * Headline size. 52 is the house default — the text column lost 120px to the
-   * sponsor box and the logo, and a two-word title at the old 58 wrapped to
-   * three lines. Dense cards pass something smaller: on a challenge card every
-   * line the title takes is a line the standings don't get.
-   */
-  size?: number;
-}) {
-  const [accent, accent2] = [safeColor(a1), safeColor(a2, FALLBACK_ACCENT2)];
-  const f = p?.f ?? ((n: number) => n);
-  if (p?.hidden) return null;
-  return (
-    <Plate theme={theme} style={{ gap: 6, ...styleOf({ opacity: p?.opacity }) }}>
-      <div style={{ fontSize: f(size), fontWeight: 700, lineHeight: 1.05, color: INK }}>{text}</div>
-      {sub ? <div style={{ fontSize: f(Math.round(size * 0.46)), color: MUTED }}>{sub}</div> : null}
-      <div style={{ display: "flex", width: 132, height: 6, borderRadius: 999, marginTop: 8, background: `linear-gradient(90deg, ${accent}, ${accent2})` }} />
-    </Plate>
-  );
-}
-
 const nf = (n: number) => n.toLocaleString("en-US");
 
 // Truncate on a word boundary. A hard slice reads as a bug ("…from the Che"),
 // and these strings are admin-written, so they can be any length.
-function clamp(s: string | null | undefined, max: number): string | undefined {
+/**
+ * The same clamp, scaled to the column this card's layout actually gives it.
+ *
+ * Every character count in this file was chosen against a 58.5%-wide content
+ * column — the number that was right when the logo sat bottom-right and the
+ * text had to end before it. B54 moved the branding into the strip and widened
+ * the column to 78%, and every one of those counts stayed where it was: the
+ * first render after the redesign clipped "Blitz Supernova — Weekly…" with 470
+ * empty pixels to the right of the ellipsis. Fifty magic numbers, all wrong by
+ * the same ratio.
+ *
+ * So the ratio is applied once, here, from the LIVE layout — which also means
+ * an admin narrowing the column narrows the text with it rather than getting
+ * overflow, and widening it gets the words back.
+ *
+ * Used by shadowing: `const clamp = clampFor(t)` at the top of a card body. A
+ * body that hasn't been converted keeps the unscaled module function, which is
+ * exactly what it drew before.
+ */
+/** The column-scaled clamp is the default; `clampAt` is the unscaled one. */
+const clamp = clampAt;
+
+function clampFor(t: CardTheme) {
+  const l = t.layout ?? DEFAULT_LAYOUT;
+  // The EFFECTIVE width, not the stored one: a sold card's column is narrowed
+  // around the sponsor box, and clamping to the stored 78% there would hand
+  // every line a third more characters than the column can hold.
+  const w = (contentBoxFor(l, !!t.ad).width / CANVAS_W) * 100;
+  const k = Math.max(0.6, Math.min(1.8, w / 58.5));
+  return (s: string | null | undefined, max: number) => clampAt(s, Math.round(max * k));
+}
+
+/**
+ * The raw clamp, in characters, with no column scaling.
+ *
+ * Use this inside a FIXED-WIDTH box — a market tile is 218px whatever the
+ * content column is doing, and scaling its name clamp with the column is how
+ * "Champion's Nebula Cup" came back: 21 characters passed a limit that had been
+ * widened from 17 to 23 for a column the tile does not live in, wrapped to two
+ * lines, and landed on top of the tier label under it.
+ */
+function clampAt(s: string | null | undefined, max: number): string | undefined {
   if (!s) return undefined;
   const text = s.trim();
   if (text.length <= max) return text;
@@ -553,8 +853,10 @@ function clamp(s: string | null | undefined, max: number): string | undefined {
 
 function ProfileBody(d: ProfileCard) {
   const t = d.theme;
-  const [pIdentity, pStats, pTrophies, pChallenges, pAccounts] =
-    ["identity", "stats", "trophies", "challenges", "accounts"].map((k) => part(t, k));
+  // Scaled to the column this layout gives the card — see `clampFor`.
+  const clamp = clampFor(t);
+  const [pStats, pTrophies, pChallenges, pAccounts] =
+    ["stats", "trophies", "challenges", "accounts"].map((k) => part(t, k));
   // Three, not five.
   //
   // The card is 1200x630 and a fourth tile makes all four unreadable — the name
@@ -570,94 +872,133 @@ function ProfileBody(d: ProfileCard) {
   // the right column is otherwise empty below the ad, and three pieces of art
   // stacked there read as a trophy shelf on a shelf. It costs the text column
   // nothing, so the arena keeps its three rows and the accounts keep four tiles.
-  const accounts = d.accounts.slice(0, challenges.length ? 4 : 6);
+  const accounts = d.accounts.slice(0, (trophies.length || challenges.length) ? 4 : 6);
   const accountsHidden = Math.max(0, d.accounts.length - accounts.length);
   return (
     <Frame
       theme={t}
-      // The trophy shelf, drawn into the free rectangle to the right of the
-      // text — under the sponsor box, above the mark. `box` is computed from the
-      // LIVE layout, so an admin who drags the ad elsewhere moves the shelf with
-      // it rather than leaving it overlapping.
-      side={trophies.length ? (box) => <TrophyShelf trophies={trophies} total={d.trophyCount ?? trophies.length} box={box} p={pTrophies} /> : undefined}
-    >
-      <Section p={pIdentity}>
-        <Plate theme={t} style={{ gap: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
-            <Avatar url={d.avatarUrl} ring={t.accent} size={pIdentity.f(104)} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <div style={{ fontSize: pIdentity.f(52), fontWeight: 700, lineHeight: 1.05 }}>{clamp(d.displayName, 18)}</div>
-              <div style={{ fontSize: pIdentity.f(23), color: MUTED }}>{`clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`}</div>
-            </div>
-          </div>
-        </Plate>
-      </Section>
+      // The gamer IS the identity of a profile card, so it goes in the top
+      // band's left with their avatar (B56.0) rather than being re-stated as
+      // the first block of the body.
+      identity={{
+        imageUrl: d.avatarUrl, round: true, title: clamp(d.displayName, 18) ?? d.displayName,
+        subtitle: `clustergg.com/u/${d.slug}${d.title ? ` · ${d.title}` : ""}`,
+      }}
+      // TWO PANES (B57): what they PLAY on the left, what they have WON on the
+      // right. One column made those two compete for the same vertical inches,
+      // which is why the accounts kept losing — a gamer with three trophies and
+      // five accounts saw the trophies and two of the accounts.
+      panes={[
+        <Pane key="left">
+          <Section p={pStats} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+            {/* The level belongs with the other things that describe this gamer
+                — points, views, votes — not floating in a corner as an
+                unexplained badge. It reads as a stat because it is one. */}
+            <Pill color={t.accent2} bg={alpha(t.accent2, 0.16, FALLBACK_ACCENT2)} size={pStats.f(19)}>{`LV ${nf(d.level)}`}</Pill>
+            <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(19)}><CpCoin size={pStats.f(16)} icon={t.cpIconUrl} />{nf(d.totalCp)}</Pill>
+            <Pill size={pStats.f(19)}>{`${nf(d.views)} views`}</Pill>
+            <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pStats.f(19)}>
+              <div style={{ display: "flex", width: 11, height: 11, borderRadius: 6, background: "#fbbf24" }} />
+              {`${nf(d.votes)} votes`}
+            </Pill>
+            {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)" size={pStats.f(19)}>{clamp(d.award, 22)}</Pill> : null}
+          </Section>
 
-      <Section p={pStats} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 22 }}>
-        {/* The level belongs with the other things that describe this gamer —
-            points, views, votes — not floating in the card's top-right corner
-            as an unexplained badge. It reads as a stat because it is one. */}
-        <Pill color={t.accent2} bg={alpha(t.accent2, 0.16, FALLBACK_ACCENT2)} size={pStats.f(21)}>{`LV ${nf(d.level)}`}</Pill>
-        <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(21)}><CpCoin size={pStats.f(18)} />{nf(d.totalCp)}</Pill>
-        <Pill size={pStats.f(21)}>{`${nf(d.views)} views`}</Pill>
-        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pStats.f(21)}>
-          <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#fbbf24" }} />
-          {`${nf(d.votes)} votes`}
-        </Pill>
-        {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)" size={pStats.f(21)}>{clamp(d.award, 22)}</Pill> : null}
-      </Section>
-
-      {/* What they're competing in right now — the one thing on this card that
-          another gamer can act on. */}
-      {challenges.length ? (
-        <Section p={pChallenges} style={{ gap: 6, marginTop: 14 }}>
-          <Head p={pChallenges}>IN THE ARENA</Head>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-            {challenges.map((c, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 14px", borderRadius: 14, background: "rgba(0,0,0,0.48)", border: `1px solid ${c.live ? alpha(t.accent2, 0.45, FALLBACK_ACCENT2) : "rgba(255,255,255,0.10)"}` }}>
-                {c.live ? <div style={{ display: "flex", width: 10, height: 10, borderRadius: 5, background: "#34d399" }} /> : null}
-                <div style={{ fontSize: pChallenges.f(19), fontWeight: 700 }}>{clamp(c.title, 22)}</div>
-                <div style={{ fontSize: pChallenges.f(17), color: MUTED }}>{c.place ? `#${c.place}` : `${nf(c.points)} pts`}</div>
+          <Section p={pAccounts} style={{ marginTop: 14, gap: 8 }}>
+            {/* The count belongs in the heading when the card can't show them
+                all — a gamer with six accounts seeing four, with nothing saying
+                so, reads as us having lost two of them. */}
+            <Head p={pAccounts}>{accountsHidden ? `LINKED ACCOUNTS · ${nf(d.accounts.length)}` : "LINKED ACCOUNTS"}</Head>
+            {accounts.length === 0 ? (
+              <div style={{ display: "flex", fontSize: pAccounts.f(22), color: MUTED }}>No games linked yet — link one to unlock quests.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {accounts.map((a, i) => (
+                  <GlassCard key={i} pad={9} style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+                    {/* Its own art — every entity a pane draws carries the
+                        picture of the thing (B57). */}
+                    {a.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={a.logoUrl} alt="" width={40} height={40} style={{ width: 40, height: 40, borderRadius: 10, objectFit: "cover" }} />
+                    ) : <div style={{ width: 40, height: 40, borderRadius: 10, display: "flex", background: alpha(t.accent, 0.2) }} />}
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      <div style={{ fontSize: pAccounts.f(21), fontWeight: 700 }}>{clampAt(a.tag, 18)}</div>
+                      <div style={{ fontSize: pAccounts.f(16), color: MUTED }}>{clampAt(a.headline || a.game, 26)}</div>
+                    </div>
+                  </GlassCard>
+                ))}
               </div>
-            ))}
-          </div>
-        </Section>
-      ) : null}
+            )}
+          </Section>
+        </Pane>,
 
-      <Section p={pAccounts} style={{ marginTop: 14, gap: 8, flex: 1 }}>
-        {/* The count belongs in the heading when the card can't show them all —
-            a gamer with six accounts seeing two, with nothing saying so, reads
-            as us having lost four of them. Every account gets its own button
-            underneath the card regardless (see `linkedAccountsOf`). */}
-        <Head p={pAccounts}>{accountsHidden ? `LINKED ACCOUNTS · ${nf(d.accounts.length)}` : "LINKED ACCOUNTS"}</Head>
-        {accounts.length === 0 ? (
-          <div style={{ display: "flex", fontSize: pAccounts.f(24), color: MUTED }}>No games linked yet — link one to unlock quests.</div>
-        ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
-            {accounts.map((a, i) => (
-              // A percentage, not a pixel width: the text column is narrower
-              // now that the sponsor and the logo own the right-hand side, and
-              // a hard 340 tipped two tiles per row into one.
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 16px", borderRadius: 18, background: "rgba(0,0,0,0.48)", border: "1px solid rgba(255,255,255,0.10)", width: "48%" }}>
-                {a.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={a.logoUrl} alt="" width={42} height={42} style={{ width: 42, height: 42, borderRadius: 10, objectFit: "cover" }} />
-                ) : <div style={{ width: 42, height: 42, borderRadius: 10, display: "flex", background: alpha(t.accent, 0.2) }} />}
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  <div style={{ fontSize: pAccounts.f(22), fontWeight: 700 }}>{clamp(a.tag, 16)}</div>
-                  <div style={{ fontSize: pAccounts.f(17), color: MUTED }}>{clamp(a.headline || a.game, 22)}</div>
+        // The right pane: what they have WON, and what they are playing for.
+        (trophies.length || challenges.length) ? (
+          <Pane key="right">
+            {trophies.length ? (
+              <Section p={pTrophies} style={{ gap: 6 }}>
+                <Head p={pTrophies}>
+                  {(d.trophyCount ?? trophies.length) > trophies.length
+                    ? `TROPHY CASE · ${nf(d.trophyCount ?? trophies.length)}`
+                    : "TROPHY CASE"}
+                </Head>
+                <div style={{ display: "flex", flexDirection: "row", gap: 10 }}>
+                  {trophies.map((x, i) => (
+                    <GlassCard key={i} pad={8} style={{ width: 160, gap: 4 }}>
+                      {/* The COUNT, not the price (B62).
+                          Held more than once — bought one, won one, earned one
+                          at a streak milestone — it is ONE tile with a count on
+                          it. Three identical pictures read as a bug, and the
+                          count is the impressive part.
+                          And no dollar figure: a price on a profile turns a
+                          trophy case into a receipt, and puts a number on a
+                          gift. The value belongs on the shelf, where it is
+                          deciding something. */}
+                      <ArtPanel url={x.imageUrl} size={78} corner={(x.count ?? 1) > 1 ? (
+                        <div style={{
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          paddingLeft: 7, paddingRight: 7, height: 24, borderRadius: 999,
+                          fontSize: 15, fontWeight: 900, color: "#0b1020", background: "#fbbf24",
+                        }}>{`x${x.count}`}</div>
+                      ) : undefined} />
+                      <div style={{ display: "flex", fontSize: 16, fontWeight: 800, color: INK, lineHeight: 1.2 }}>
+                        {clampAt(x.name, 16)}
+                      </div>
+                    </GlassCard>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </Section>
-    </Frame>
+              </Section>
+            ) : null}
+
+            {/* What they're competing in right now — the one thing on this card
+                another gamer can act on. */}
+            {challenges.length ? (
+              <Section p={pChallenges} style={{ gap: 6, marginTop: 14 }}>
+                <Head p={pChallenges}>IN THE ARENA</Head>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {challenges.map((c, i) => (
+                    <GlassCard key={i} pad={9} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}
+                      ring={c.live ? t.accent2 : null}>
+                      {c.live ? <div style={{ display: "flex", width: 10, height: 10, borderRadius: 5, background: "#34d399" }} /> : null}
+                      <div style={{ display: "flex", fontSize: pChallenges.f(18), fontWeight: 700 }}>{clampAt(c.title, 22)}</div>
+                      <div style={{ display: "flex", fontSize: pChallenges.f(16), color: MUTED, marginLeft: 8 }}>
+                        {c.place ? `#${c.place}` : `${nf(c.points)} pts`}
+                      </div>
+                    </GlassCard>
+                  ))}
+                </div>
+              </Section>
+            ) : null}
+          </Pane>
+        ) : null,
+      ]}
+    />
   );
 }
 
 function GameStatsBody(d: GameStatsCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pId, pLive, pStats, pChamps, pMatches, pRank, pEmpty] =
     ["identity", "live", "stats", "champions", "matches", "rank", "empty"].map((k) => part(t, k));
   const champs = pChamps.hidden ? [] : (d.champions ?? []);
@@ -668,10 +1009,13 @@ function GameStatsBody(d: GameStatsCard) {
   const statCount = hasRich ? 2 : 6;
 
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
-    ) : undefined}>
+    <Frame theme={t} identity={{
+      // The GAME ACCOUNT's own avatar when the game has one, the game's logo
+      // otherwise. This card is about that account, not about the person.
+      imageUrl: d.gameAvatarUrl || d.logoUrl, round: !!d.gameAvatarUrl,
+      eyebrow: clamp(d.game, 20), title: clamp(d.tag, 20) ?? d.tag,
+      subtitle: clamp(`${d.region ? `${d.region} · ` : ""}${d.displayName}`, 44),
+    }}>
       {/* Identity first: the in-game name people searched for, and the human behind it. */}
       <Section p={pId} style={{ flexDirection: "row", alignItems: "center", gap: 18 }}>
         <Avatar url={d.gameAvatarUrl || d.avatarUrl} size={pId.f(78)} ring={t.accent} />
@@ -764,22 +1108,30 @@ function GameStatsBody(d: GameStatsCard) {
 
 function QuestBody(d: QuestCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const next = d.nextThreshold ?? 0;
   const pct = next > 0 ? (d.cp / next) * 100 : 100;
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={78} height={78} style={{ width: 78, height: 78, objectFit: "contain" }} />
-    ) : undefined}>
-      <Title text={d.questName} sub={d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      // The quest's own art, top-left. It is the picture of the thing.
+      imageUrl: d.logoUrl, eyebrow: "QUEST", title: d.questName,
+      subtitle: d.displayName ? `${d.displayName}${d.tagline ? ` · ${d.tagline}` : ""}` : d.tagline,
+    }}>
       {(() => {
         const p = part(t, "progress");
         return (
           <Section p={p} style={{ marginTop: 30 }}>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
-              <div style={{ fontSize: p.f(70), fontWeight: 700, color: t.accent2, lineHeight: 1 }}>{nf(d.cp)}</div>
-              <div style={{ fontSize: p.f(25), color: MUTED, paddingBottom: 10 }}>
-                {`${p.say("CP")}${next > 0 ? ` / ${nf(next)} → ${d.nextTier ?? ""}` : " · max tier"}`}
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: 14 }}>
+              {/* The coin LEADS the figure, like a currency symbol — the same
+                  order `components/Cp.tsx` uses, and the reason the word is
+                  gone (B60): "4,120 CP" reads as a score with a unit on it,
+                  the mark in front of it reads as money. */}
+              <div style={{ display: "flex", paddingBottom: p.f(8) }}>
+                <CpCoin size={p.f(34)} icon={t.cpIconUrl} />
+              </div>
+              <div style={{ display: "flex", fontSize: p.f(70), fontWeight: 700, color: t.accent2, lineHeight: 1 }}>{nf(d.cp)}</div>
+              <div style={{ display: "flex", fontSize: p.f(25), color: MUTED, paddingBottom: 10 }}>
+                {next > 0 ? `/ ${nf(next)} → ${d.nextTier ?? ""}` : "· max tier"}
               </div>
             </div>
             <div style={{ display: "flex", marginTop: 18 }}><Bar pct={pct} accent={t.accent} accent2={t.accent2} h={18} /></div>
@@ -796,7 +1148,7 @@ function QuestBody(d: QuestCard) {
               <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, padding: "16px 8px", borderRadius: 20, background: tier.earned ? alpha(t.accent, 0.12) : "rgba(0,0,0,0.42)", border: `1px solid ${tier.earned ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.10)"}` }}>
                 <div style={{ display: "flex", width: 20, height: 20, borderRadius: 10, background: tier.earned ? t.accent : "transparent", border: `3px solid ${tier.earned ? t.accent : "rgba(255,255,255,0.32)"}` }} />
                 <div style={{ fontSize: p.f(19), fontWeight: 700, color: tier.earned ? t.accent : MUTED }}>{clamp(tier.name, 10)}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: p.f(16), color: MUTED }}><CpCoin size={p.f(14)} />{nf(tier.threshold)}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: p.f(16), color: MUTED }}><CpCoin size={p.f(14)} icon={t.cpIconUrl} />{nf(tier.threshold)}</div>
               </div>
             ))}
           </Section>
@@ -808,10 +1160,14 @@ function QuestBody(d: QuestCard) {
 
 function CpSummaryBody(d: CpSummaryCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const p = part(t, "quests");
   return (
-    <Frame theme={t} corner={<Pill color={t.accent2} bg="rgba(0,0,0,0.45)">LV {d.level}</Pill>}>
-      <Title text={`${clamp(d.displayName, 16)}'s quests`} sub={`${nf(d.totalCp)} total Cluster Points`} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      imageUrl: d.avatarUrl, round: true, eyebrow: `LEVEL ${d.level}`,
+      title: `${clamp(d.displayName, 16)}'s quests`,
+      subtitle: `${nf(d.totalCp)} total Cluster Points`,
+    }}>
       <Section p={p} style={{ gap: 16, marginTop: 30, flex: 1 }}>
         {d.quests.slice(0, 4).map((q, i) => {
           const pct = q.target > 0 ? (q.cp / q.target) * 100 : 100;
@@ -832,14 +1188,16 @@ function CpSummaryBody(d: CpSummaryCard) {
 
 function LeaderboardBody(d: LeaderboardCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pRows, pEmpty] = ["rows", "empty"].map((k) => part(t, k));
   const medal = ["#fbbf24", "#cbd5e1", "#b45309"];
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
-    ) : undefined}>
-      <Title text={clamp(d.title, 26) ?? d.title} sub={clamp(d.subtitle, 42)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      // The GAME's logo: it is that game's ladder, scored on that game's
+      // accounts, which is the same rule B52 wrote for the rows themselves.
+      imageUrl: d.logoUrl, eyebrow: "LEADERBOARD",
+      title: clamp(d.title, 26) ?? d.title, subtitle: clamp(d.subtitle, 42),
+    }}>
       {d.rows.length === 0 ? (
         <Section p={pEmpty} style={{ marginTop: 40 }}>
           <div style={{ display: "flex", fontSize: pEmpty.f(24), color: MUTED, lineHeight: 1.3 }}>
@@ -867,104 +1225,28 @@ function LeaderboardBody(d: LeaderboardCard) {
 
 function ChallengeBody(d: ChallengeCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pStatus, pMeta, pTime, pStand, pTro, pEmpty, pRules] =
     ["status", "meta", "timeline", "standings", "trophies", "empty", "rules"].map((k) => part(t, k));
   const ends = new Date(d.endsAt);
   const days = Math.max(0, Math.ceil((ends.getTime() - Date.now()) / 86400000));
   const trophies = pTro.hidden ? [] : d.trophies.slice(0, 3);
   return (
-    <Frame theme={t} corner={(
-      // Trophies live top-RIGHT, in a ROW under the game logo.
+    <Frame theme={t}
+      identity={{
+      // The GAME's logo: it is that game's challenge, scored on that game's
+      // accounts (B52's rule, applied to the card's subject).
+      imageUrl: d.logoUrl, eyebrow: d.ended ? "FINISHED CHALLENGE" : "LIVE CHALLENGE",
+      title: clamp(d.title, 30) ?? "", subtitle: clamp(d.description, 62), size: 38,
+      }}
+      // TWO PANES (B57), and the SCOREBOARD LEADS (B62.3).
       //
-      // They used to stack vertically, which was fine when the logo sat at
-      // 104px in the far corner — with the mark at 250 a three-high stack ran
-      // straight into it. A row is the same three prizes in a third of the
-      // height, and the prize is the reason to enter, so it cannot be the thing
-      // that gets covered.
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-        {d.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={d.logoUrl} alt="" width={58} height={58} style={{ width: 58, height: 58, borderRadius: 14, objectFit: "cover" }} />
-        ) : null}
-        {trophies.length ? (
-          // A PODIUM, not a row.
-          //
-          // The prize pool is what a challenge is FOR, and three equal tiles in
-          // rank order read as a list of files rather than as first, second and
-          // third. Silver on the left, gold raised in the middle, bronze on the
-          // right, on plinths of decreasing height — the shape everyone already
-          // knows, so the hierarchy is legible before a single word is read.
-          (() => {
-            const byPlace = (n: number) => trophies.find((x) => x.place === n);
-            const order = [byPlace(2), byPlace(1), byPlace(3)].filter(Boolean) as typeof trophies;
-            const PLINTH: Record<number, number> = { 1: 34, 2: 22, 3: 14 };
-            const COLOUR: Record<number, string> = { 1: "#fbbf24", 2: "#cbd5e1", 3: "#b45309" };
-            const total = trophies.reduce((sum, x) => sum + (x.value || 0), 0);
-            return (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                {total > 0 ? (
-                  <div style={{ display: "flex", fontSize: pTro.f(17), fontWeight: 800, color: "#fbbf24", letterSpacing: 0.4 }}>
-                    {`$${nf(total)} PRIZE POOL`}
-                  </div>
-                ) : null}
-                <div style={{ display: "flex", alignItems: "flex-end", gap: 6 }}>
-                  {order.map((tr, i) => {
-                    const c = COLOUR[tr.place] ?? MUTED;
-                    const lift = pTro.f(PLINTH[tr.place] ?? 14);
-                    return (
-                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(tr.place === 1 ? 96 : 82) }}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={tr.imageUrl} alt="" width={pTro.f(tr.place === 1 ? 76 : 60)} height={pTro.f(tr.place === 1 ? 76 : 60)}
-                          style={{ width: pTro.f(tr.place === 1 ? 76 : 60), height: pTro.f(tr.place === 1 ? 76 : 60), objectFit: "contain" }} />
-                        <div style={{ display: "flex", fontSize: pTro.f(15), fontWeight: 800, color: c }}>
-                          {tr.value > 0 ? `$${nf(tr.value)}` : `${tr.place}`}
-                        </div>
-                        {/* The plinth. Explicit height per place — Satori has no
-                            flex-grow tricks to lean on here, and the difference
-                            in height IS the ranking. */}
-                        <div style={{
-                          display: "flex", alignItems: "flex-start", justifyContent: "center",
-                          width: "100%", height: lift, borderRadius: 6,
-                          background: alpha(c, 0.22), border: `1px solid ${alpha(c, 0.5)}`,
-                          fontSize: pTro.f(14), fontWeight: 800, color: c, paddingTop: 2,
-                        }}>
-                          {tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()
-        ) : null}
-      </div>
-    )}>
-      <Section p={pStatus} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-        <Pill color="#34d399" bg="rgba(52,211,153,0.14)" size={pStatus.f(20)}>
-          <div style={{ display: "flex", width: 12, height: 12, borderRadius: 6, background: "#34d399" }} />
-          {pStatus.say("LIVE")}
-        </Pill>
-        {d.isPrivate ? (
-          <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)" size={pStatus.f(20)}>
-            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 3, background: "#fbbf24" }} />
-            {clamp(d.serverName ? `${d.serverName.toUpperCase()} · KEY TO JOIN` : "KEY TO JOIN", 26)}
-          </Pill>
-        ) : null}
-        <Pill size={pStatus.f(20)}>{clamp(d.game, 18)}</Pill>
-      </Section>
-      {/* 42, and clamped to fit one line of it. This is the densest card on the
-          platform — pills, title, meta, timeline and four standings rows in
-          529px — and a title that wraps costs a standings row. */}
-      <div style={{ display: "flex", marginTop: 14 }}>
-        <Title text={clamp(d.title, 28) ?? ""} sub={clamp(d.description, 68)} size={42} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
-      </div>
-      <Section p={pMeta} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 20 }}>
-        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pMeta.f(20)}>{d.ended ? "FINISHED" : `${days}d left`}</Pill>
-        <Pill size={pMeta.f(20)}>{`${nf(d.participants)} joined`}</Pill>
-        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pMeta.f(20)}>{clamp(d.prize, 20)}</Pill> : null}
-      </Section>
-
+      // It was details-and-prize left, standings right. The standings are what
+      // a returning gamer came back for — the prize is why they entered, and
+      // they entered already — so the scoreboard reads first and the prize
+      // sits beside it.
+      panes={[
+        <Pane key="board">
       {/* Who can enter, when the answer isn't "anyone".
           A gamer deciding whether to tap Join needs to know in advance that the
           answer will be no — finding out after joining is how a competition
@@ -1007,13 +1289,106 @@ function ChallengeBody(d: ChallengeCard) {
           (d.standings ?? []).slice(0, 4).map((s) => (
             <div key={s.place} style={{ display: "flex", alignItems: "center", flexShrink: 0, gap: 12, padding: "6px 14px", borderRadius: 12, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.08)" }}>
               <div style={{ fontSize: pStand.f(19), fontWeight: 700, width: pStand.f(38), color: ["#fbbf24", "#cbd5e1", "#b45309"][s.place - 1] ?? MUTED }}>{`#${s.place}`}</div>
-              <div style={{ fontSize: pStand.f(20), fontWeight: 700, flex: 1 }}>{clamp(s.name, 18)}</div>
+              {/* The in-game name leads; the Cluster name is the quiet second
+                  line, and only when the two differ (B54/B52). No fixed height
+                  on either — a box sized to hold one line is what cut the
+                  descenders off every name with a p or a y in it. */}
+              <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", fontSize: pStand.f(20), fontWeight: 700, lineHeight: 1.35 }}>
+                  {clamp(s.name, 18)}
+                </div>
+                {s.alt ? (
+                  <div style={{ display: "flex", fontSize: pStand.f(13), color: MUTED, lineHeight: 1.35 }}>
+                    {clamp(s.alt, 22)}
+                  </div>
+                ) : null}
+              </div>
               <div style={{ fontSize: pStand.f(20), fontWeight: 700, color: t.accent2 }}>{`${nf(s.points)} pts`}</div>
             </div>
           ))
         )}
       </Section>
-    </Frame>
+        </Pane>,
+
+        // Beside it: what it is, and what it pays.
+        <Pane key="details">
+
+      {/* The LIVE pill and the game name are the identity band's eyebrow now,
+          so what is left here is only the thing the band cannot say: that this
+          one is private and needs a key. */}
+      <Section p={pStatus} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+        {d.isPrivate ? (
+          <Pill color="#fbbf24" bg="rgba(251,191,36,0.14)" size={pStatus.f(20)}>
+            <div style={{ display: "flex", width: 12, height: 12, borderRadius: 3, background: "#fbbf24" }} />
+            {clamp(d.serverName ? `${d.serverName.toUpperCase()} · KEY TO JOIN` : "KEY TO JOIN", 26)}
+          </Pill>
+        ) : null}
+      </Section>
+      <Section p={pMeta} style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, marginTop: 20 }}>
+        <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pMeta.f(20)}>{d.ended ? "FINISHED" : `${days}d left`}</Pill>
+        <Pill size={pMeta.f(20)}>{`${nf(d.participants)} joined`}</Pill>
+        {d.prize ? <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pMeta.f(20)}>{clamp(d.prize, 20)}</Pill> : null}
+      </Section>
+
+      {/* THE PRIZE PODIUM, in the body (B56.0).
+          It used to hang off the top-right corner, under the game logo — a
+          fourth thing in a band that has room for two, and on a sold card it
+          was under the creative. The prize is the reason to enter, so it goes
+          in the free space with everything else that matters, as a podium:
+          silver left, gold raised in the middle, bronze right, on plinths of
+          decreasing height. The shape everyone already knows, so the hierarchy
+          is legible before a word is read. */}
+      {trophies.length ? (
+        <Section p={pTro} style={{ gap: 6, marginTop: 16 }}>
+          {(() => {
+            const byPlace = (n: number) => trophies.find((x) => x.place === n);
+            const order = [byPlace(2), byPlace(1), byPlace(3)].filter(Boolean) as typeof trophies;
+            const PLINTH: Record<number, number> = { 1: 30, 2: 20, 3: 13 };
+            const COLOUR: Record<number, string> = { 1: "#fbbf24", 2: "#cbd5e1", 3: "#b45309" };
+            const total = trophies.reduce((sum, x) => sum + (x.value || 0), 0);
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {total > 0 ? (
+                  <div style={{ display: "flex", fontSize: pTro.f(18), fontWeight: 800, color: "#fbbf24", letterSpacing: 0.4 }}>
+                    {`$${nf(total)} PRIZE POOL`}
+                  </div>
+                ) : null}
+                <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+                  {order.map((tr, i) => {
+                    const c = COLOUR[tr.place] ?? MUTED;
+                    const art = pTro.f(tr.place === 1 ? 68 : 54);
+                    return (
+                      <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: pTro.f(tr.place === 1 ? 92 : 78) }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={tr.imageUrl} alt="" width={art} height={art}
+                          style={{ width: art, height: art, objectFit: "contain" }} />
+                        <div style={{ display: "flex", fontSize: pTro.f(15), fontWeight: 800, color: c }}>
+                          {tr.value > 0 ? `$${nf(tr.value)}` : `${tr.place}`}
+                        </div>
+                        {/* Explicit height per place — Satori has no flex-grow
+                            tricks to lean on here, and the difference in height
+                            IS the ranking. */}
+                        <div style={{
+                          display: "flex", alignItems: "flex-start", justifyContent: "center",
+                          width: "100%", height: pTro.f(PLINTH[tr.place] ?? 13), borderRadius: 6,
+                          background: alpha(c, 0.22), border: `1px solid ${alpha(c, 0.5)}`,
+                          fontSize: pTro.f(14), fontWeight: 800, color: c, paddingTop: 2,
+                        }}>
+                          {tr.place === 1 ? "1st" : tr.place === 2 ? "2nd" : "3rd"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+        </Section>
+      ) : null}
+
+        </Pane>,
+      ]}
+    />
   );
 }
 
@@ -1038,35 +1413,75 @@ function dayLabel(iso: string): string {
 // actually has. Counters answered neither — "3 challenges" doesn't tell you
 // whether one ends tonight, and the old "gamers ranked" wasn't even a count of
 // gamers.
+/**
+ * The planet card — the Discord rendering of the planet explorer
+ * (`app/planets/[slug]/page.tsx`, `components/PlanetExplorer.tsx`).
+ *
+ * FOUR PANES (B57), which is what a planet actually is: the two ladders down
+ * the left, the live challenges and the game's own world down the right, over
+ * the planet's globe art. It was two columns of text rows — the same content,
+ * with none of the shape and none of the art.
+ */
 function PlanetBody(d: PlanetCard) {
   const t = d.theme;
-  const [pCh, pBo] = ["challenges", "boards"].map((k) => part(t, k));
+  const clamp = clampFor(t);
+  const [pCh, pBo, pWorld] = ["challenges", "boards", "world"].map((k) => part(t, k));
   const challenges = d.challenges ?? [];
   const boards = d.boards ?? [];
-  return (
-    <Frame theme={t} corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={80} height={80} style={{ width: 80, height: 80, borderRadius: 20, objectFit: "cover" }} />
-    ) : undefined}>
-      <Title
-        text={`${clamp(d.game, 18)} Planet`}
-        sub={`${nf(d.gamers)} gamer${d.gamers === 1 ? "" : "s"} here${d.serverGamers != null ? ` · ${nf(d.serverGamers)} from this server` : ""}`}
-        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
-      />
+  const world = pWorld.hidden ? [] : (d.world ?? []);
 
-      <div style={{ display: "flex", gap: 14, marginTop: 22, flex: 1 }}>
+  const Board = (b: PlanetCard["boards"][number], i: number) => (
+    <GlassCard key={i} pad={10} style={{ gap: 3 }}>
+      <div style={{ display: "flex", fontSize: pBo.f(21), fontWeight: 700 }}>{clamp(b.title, 22)}</div>
+      {/* `marginLeft`, not `gap`. Satori's gap support does not reach this
+          nesting — it rendered "NovaGold II" with the two runs touching, which
+          is the kind of thing only a real render shows. */}
+      <div style={{ display: "flex", fontSize: pBo.f(17), color: MUTED }}>
+        {b.leader ? (
+          <>
+            <div style={{ display: "flex", color: "#fbbf24" }}>{`#1 ${clamp(b.leader, 13)}`}</div>
+            {b.value ? <div style={{ display: "flex", marginLeft: 10, color: t.accent2 }}>{clamp(b.value, 10)}</div> : null}
+          </>
+        ) : (
+          <div style={{ display: "flex" }}>unclaimed — take it</div>
+        )}
+      </div>
+    </GlassCard>
+  );
+
+  // The ladders split down the left: the two the admin put first get a pane
+  // each, so a board is a block rather than a line in a list.
+  const half = Math.ceil(Math.min(boards.length, 4) / 2) || 1;
+
+  return (
+    <Frame theme={t} identity={{
+      imageUrl: d.logoUrl, eyebrow: "PLANET", title: `${clamp(d.game, 18)}`,
+      subtitle: `${nf(d.gamers)} gamer${d.gamers === 1 ? "" : "s"} here${d.serverGamers != null ? ` · ${nf(d.serverGamers)} from this server` : ""}`,
+    }}
+      panes={[
+        // TOP-LEFT and BOTTOM-LEFT: the ladders.
+        boards.length ? (
+          <Column p={pBo} label={`${pBo.say("LEADERBOARDS")} · ${boards.length}`} accent={t.accent2}>
+            {boards.slice(0, half).map(Board)}
+          </Column>
+        ) : (
+          <Column p={pBo} label={pBo.say("LEADERBOARDS")} accent={t.accent2}>
+            <Empty p={pBo}>No boards on this game yet.</Empty>
+          </Column>
+        ),
+
+        // TOP-RIGHT: what is running right now.
         <Column p={pCh} label={`${pCh.say("LIVE CHALLENGES")} · ${challenges.length}`} accent={t.accent}>
           {challenges.length === 0 ? (
             <Empty p={pCh}>Nothing running right now. The next one lands here first.</Empty>
           ) : challenges.slice(0, 3).map((c, i) => {
             const days = Math.max(0, Math.ceil((new Date(c.endsAt).getTime() - Date.now()) / 86400000));
             return (
-              <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 14px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
-                <div style={{ fontSize: pCh.f(22), fontWeight: 700 }}>{clamp(c.title, 22)}</div>
+              <GlassCard key={i} pad={10} style={{ gap: 3 }}>
+                <div style={{ display: "flex", fontSize: pCh.f(21), fontWeight: 700 }}>{clamp(c.title, 22)}</div>
                 {/* One text node with its own separators rather than three flex
                     children: Satori does not put the `gap` between adjacent
-                    inline-ish divs here, so they render welded together
-                    ("5d left2 in"). Explicit margins on the one coloured part. */}
+                    inline-ish divs here, so they render welded together. */}
                 <div style={{ display: "flex", fontSize: pCh.f(17), color: MUTED }}>
                   <div style={{ display: "flex", color: days <= 1 ? "#fda4af" : MUTED }}>
                     {`${days === 0 ? "ends today" : `${days}d left`} · ${nf(c.participants)} in`}
@@ -1075,32 +1490,43 @@ function PlanetBody(d: PlanetCard) {
                       and a sentence in it wraps the row onto three lines. */}
                   {c.prize ? <div style={{ display: "flex", marginLeft: 8, color: "#fbbf24" }}>{clamp(c.prize, 12)}</div> : null}
                 </div>
-              </div>
+              </GlassCard>
             );
           })}
-        </Column>
+        </Column>,
 
-        <Column p={pBo} label={`${pBo.say("LEADERBOARDS")} · ${boards.length}`} accent={t.accent2}>
-          {boards.length === 0 ? (
-            <Empty p={pBo}>No boards on this game yet.</Empty>
-          ) : boards.slice(0, 3).map((b, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", gap: 3, padding: "10px 14px", borderRadius: 14, background: "rgba(0,0,0,0.46)", border: "1px solid rgba(255,255,255,0.09)" }}>
-              <div style={{ fontSize: pBo.f(22), fontWeight: 700 }}>{clamp(b.title, 22)}</div>
-              <div style={{ display: "flex", gap: 10, fontSize: pBo.f(17), color: MUTED }}>
-                {b.leader ? (
-                  <>
-                    <div style={{ display: "flex", color: "#fbbf24" }}>{`#1 ${clamp(b.leader, 13)}`}</div>
-                    {b.value ? <div style={{ display: "flex", color: t.accent2 }}>{clamp(b.value, 10)}</div> : null}
-                  </>
-                ) : (
-                  <div style={{ display: "flex" }}>unclaimed — take it</div>
-                )}
-              </div>
+        // BOTTOM-LEFT: the rest of the ladders. Nothing here when there is only
+        // one board, and nothing is what gets drawn.
+        boards.length > half ? (
+          <Column p={pBo} label={pBo.say("")} accent={t.accent2}>
+            {boards.slice(half, 4).map(Board)}
+          </Column>
+        ) : null,
+
+        // BOTTOM-RIGHT: the game's own world, each with its art. Empty until
+        // the snapshot has been synced for this game, which is a pane that is
+        // simply not drawn rather than a box with nothing in it.
+        world.length ? (
+          <Column p={pWorld} label={pWorld.say("THE GAME")} accent={t.accent}>
+            <div style={{ display: "flex", flexDirection: "row", gap: 8 }}>
+              {world.slice(0, 4).map((w, i) => (
+                <GlassCard key={i} pad={7} style={{ width: 116, gap: 4 }}>
+                  <ArtPanel url={w.imageUrl} size={72} pad={6} />
+                  <div style={{ display: "flex", fontSize: 15, fontWeight: 700, color: INK, lineHeight: 1.2 }}>
+                    {clampAt(w.name, 13)}
+                  </div>
+                  {w.role ? (
+                    <div style={{ display: "flex", fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 0.8 }}>
+                      {clampAt(w.role, 12)}
+                    </div>
+                  ) : null}
+                </GlassCard>
+              ))}
             </div>
-          ))}
-        </Column>
-      </div>
-    </Frame>
+          </Column>
+        ) : null,
+      ]}
+    />
   );
 }
 
@@ -1128,40 +1554,84 @@ function Empty({ children, p }: { children: React.ReactNode; p?: PartDraw }) {
 // frame: a server that has watched the standings move all week should recognise
 // the card that ends it, with the podium in the same place the leaders were.
 /**
- * The marketplace shelf: two rows of three, both numbers on every tile.
+ * The marketplace shelf — the Discord rendering of `components/TrophyMarket.tsx`.
  *
- * The dollar value is the point. A CP price alone reads as a game currency;
- * "12,000 CP · $8" is a gamer's free points quoted in money, which is the whole
- * reason to keep playing a week you already lost.
+ * B56: the platform section, not an approximation of it. Read that file before
+ * changing this one; where the two disagree, the component is right.
+ *
+ * What the shelf actually is, in the order it says it:
+ *
+ *   the heading and its caption            TrophyMarket.tsx:68-77
+ *   the wallet, BOXED and tinted, stated
+ *     as value with the next step under it TrophyMarket.tsx:80-90
+ *   a grid of glass tiles, each ringed by
+ *     TIER                                 TrophyMarket.tsx:21-26, :126
+ *   a square art plate per tile            TrophyMarket.tsx:129-137
+ *   name, then tier in small caps          TrophyMarket.tsx:139-140
+ *   the DOLLAR value, promoted, with
+ *     "redeems for cash" under it          TrophyMarket.tsx:142-157
+ *   the CP price under that                TrophyMarket.tsx:158-160
+ *
+ * The old card had all of the same data and none of that shape: a 44px icon
+ * beside a number bubble, then name, tier and both figures on one line. It read
+ * as a receipt. The promotion of the dollar over the CP price is not decoration
+ * either — it is B48's decision about what makes a trophy an asset rather than
+ * a sticker, and a card that inverts it argues with the page.
+ *
+ * The number bubble stays, and is the one thing on this card the platform has
+ * no equivalent for: in Discord you buy by typing the number, so the tile has
+ * to carry it.
  */
 function MarketBody(d: MarketCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pBal, pTiles, pPills, pEmpty] = ["balance", "tiles", "pills", "empty"].map((k) => part(t, k));
-  // Six, in two rows of three. The tile is sized to the CONTENT column, not to
-  // the canvas: the ad slot owns the top-right, so a tile wide enough to look
-  // right against 1200px wraps to two-per-row and pushes the second row off the
-  // bottom — which is exactly what the first draft did.
-  const shown = (d.trophies ?? []).slice(0, 6);
-  const TILE_W = 218;
-  const TILE_H = 138;
+  const GAP = 12;
+  const TILE_W = 208;
+  // How many fit, rather than three because three fitted once. Taken from the
+  // EFFECTIVE column, so a sold card drops to two per row instead of running
+  // its shelf under the creative.
+  const columnW = contentBoxFor(t.layout ?? DEFAULT_LAYOUT, !!t.ad).width;
+  // FIVE across when the width allows: the shelf is a shelf, and four was
+  // only ever what fitted at 218px wide.
+  const COLS = Math.max(2, Math.min(5, Math.floor((columnW + GAP) / (TILE_W + GAP))));
+  // ONE row, tall. The old card showed six tiles at 138px, which is what it
+  // took to fit two rows of the receipt shape — and the shape was the problem.
+  // Four tiles that carry the platform's hierarchy sell the shelf better than
+  // six that carry none of it, and the shelf is a preview: /marketplace is
+  // where the other two hundred live.
+  const shown = (d.trophies ?? []).slice(0, COLS);
+  // Sized to the body the shared layout leaves (B56.0): the identity band took
+  // the top 196px, so a tile that fitted the old full-height column overflows.
+  const ART = 84;
+
+  // The platform rings a tile by TIER and that colour IS the information —
+  // legendary glows amber, bronze is orange. `TIER_RING`, TrophyMarket.tsx:21.
+  const TIER: Record<string, string> = {
+    legendary: "#fcd34d", gold: "#fbbf24", silver: "#cbd5e1", bronze: "#fb923c",
+  };
 
   return (
-    <Frame theme={t}>
-      <Title text={d.title} sub={clamp(d.subtitle, 64)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
-
-      {/* The balance, in its own region — a shelf you can't price yourself
-          against is a catalogue. Positioned rather than in flow, because every
-          other block on this card is absolutely placed by the layout editor and
-          a single in-flow element lands underneath them. */}
-      <Section p={pBal} style={{ marginTop: 4 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-          <span style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, fontSize: pBal.f(40), fontWeight: 900, color: t.accent2 }}>
-            <CpCoin size={pBal.f(24)} />{d.balance.toLocaleString()}
-          </span>
-          <span style={{ display: "flex", fontSize: pBal.f(19), fontWeight: 700, color: MUTED }}>
-            {pBal.say(`to spend · ${d.earned.toLocaleString()} earned all-time`)}
-          </span>
-        </div>
+    <Frame theme={t} identity={{
+      imageUrl: d.trophies?.[0]?.imageUrl ?? null, eyebrow: "MARKETPLACE",
+      title: d.title, subtitle: clamp(d.subtitle, 64),
+    }}>
+      {/* The wallet. BOXED, tinted, and stated as value with the next step
+          under it — the platform's own shape (TrophyMarket.tsx:80), because it
+          is the most-looked-at number on the screen and a shelf you cannot
+          price yourself against is a catalogue. */}
+      <Section p={pBal} style={{ marginTop: 2, flexDirection: "row" }}>
+        <StatTile
+          accent={t.accent2}
+          figure={(
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, fontSize: pBal.f(38), fontWeight: 900 }}>
+              <CpCoin size={pBal.f(24)} icon={t.cpIconUrl} />{d.balance.toLocaleString()}
+            </div>
+          )}
+          label={pBal.say(`to spend · ${d.earned.toLocaleString()} earned all-time`)}
+          foot={`${d.cpPerDollar.toLocaleString()} = $1`}
+          pad={9}
+        />
       </Section>
 
       {shown.length === 0 ? (
@@ -1171,66 +1641,68 @@ function MarketBody(d: MarketCard) {
           </div>
         </Section>
       ) : (
-        <Section p={pTiles}>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, width: TILE_W * 3 + 24 }}>
+        <Section p={pTiles} style={{ marginTop: 8 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: GAP, width: TILE_W * COLS + GAP * (COLS - 1) }}>
             {shown.map((x, i) => (
-              <div key={x.id} style={{
-                display: "flex", flexDirection: "column", width: TILE_W, height: TILE_H,
-                borderRadius: 16, padding: 11, gap: 4,
-                background: "rgba(0,0,0,0.38)",
-                border: `2px solid ${x.affordable ? `${t.accent}66` : "rgba(255,255,255,0.10)"}`,
-                // Out of reach reads dimmer rather than absent: it is the thing
-                // worth playing for, so it has to stay on the shelf.
-                opacity: x.affordable ? 1 : 0.6,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  {x.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={x.imageUrl} alt="" width={44} height={44}
-                      style={{ width: 44, height: 44, objectFit: "contain" }} />
-                  ) : (
-                    <div style={{ display: "flex", width: 44, height: 44, borderRadius: 11, background: "rgba(255,255,255,0.07)" }} />
-                  )}
+              <GlassCard key={x.id} ring={TIER[x.tier.toLowerCase()] ?? null} pad={10}
+                style={{
+                  width: TILE_W, gap: 6,
+                  // Out of reach reads dimmer rather than absent: it is the
+                  // thing worth playing for, so it stays on the shelf.
+                  opacity: x.affordable ? 1 : 0.62,
+                }}>
+                {/* The square plate. The platform never floats trophy art on
+                    the page, and on a card there is background artwork behind
+                    it — a transparent PNG with no plate dissolves into it. */}
+                <ArtPanel url={x.imageUrl} size={ART} corner={(
                   <div style={{
                     display: "flex", width: 26, height: 26, borderRadius: 999,
-                    alignItems: "center", justifyContent: "center", marginLeft: "auto",
+                    alignItems: "center", justifyContent: "center",
                     fontSize: 16, fontWeight: 900, color: "#0b1020", background: t.accent2,
-                  }}>
-                    {i + 1}
-                  </div>
+                  }}>{i + 1}</div>
+                )} />
+                {/* `clampAt`, not the column-scaled clamp: this tile is 218px
+                    wide whatever the content column is doing. And no fixed
+                    height — a box sized for one line cuts the descenders off
+                    every name with a p or a y in it. */}
+                <div style={{ display: "flex", fontSize: 18, fontWeight: 800, color: "#fff", lineHeight: 1.3 }}>
+                  {clampAt(x.name, 20)}
                 </div>
-                {/* Fixed height and a hard clamp: "Champion's Nebula Cup"
-                    wrapped to two lines and landed on top of the tier, which is
-                    the one failure mode a fixed-size tile has. */}
-                {/* No fixed height: clipping a box to hold one line cut the
-                    descenders off every name with a p or a y in it. The clamp
-                    keeps it to one line instead, which is the actual goal. */}
-                <div style={{ display: "flex", fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>
-                  {clamp(x.name, 17)}
-                </div>
-                <div style={{ display: "flex", height: 15, fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: 1 }}>
+                <div style={{ display: "flex", fontSize: 12, lineHeight: 1.35, color: MUTED, textTransform: "uppercase", letterSpacing: 1 }}>
                   {x.tier}
                 </div>
-                {/* BOTH numbers. The CP price alone reads as a game currency;
-                    the dollar beside it is what says the free points are money. */}
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: "auto" }}>
-                  <span style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 5, fontSize: 23, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED }}>
-                    <CpCoin size={17} />{x.cpPrice.toLocaleString()}
-                  </span>
-                  <span style={{ display: "flex", fontSize: 18, fontWeight: 800, color: "#34d399" }}>
-                    = ${x.value.toLocaleString()}
-                  </span>
+                {/* THE DOLLAR, promoted — B48's decision, and the platform sets
+                    it at 2xl black amber with its caption under it. The CP
+                    price follows, because that is the cost and this is the
+                    worth. Inverting the two argues with the page. */}
+                {/* THE PRICE IS THE BIG NUMBER (B62).
+                    B56 promoted the dollar here, following B48's decision that
+                    the redemption value is what makes a trophy an asset rather
+                    than a sticker. That is true of a trophy and it is the wrong
+                    emphasis for a SHOP: what a gamer is deciding on this tile is
+                    whether to spend, and the price is the thing they spend. The
+                    dollar stays, under it, smaller — the proof, not the ask. */}
+                <div style={{
+                  display: "flex", flexDirection: "row", alignItems: "center", gap: 7, marginTop: 2,
+                  fontSize: 30, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED,
+                }}>
+                  <CpCoin size={24} icon={t.cpIconUrl} />{x.cpPrice.toLocaleString()}
                 </div>
-              </div>
+                {x.value > 0 ? (
+                  <div style={{ display: "flex", fontSize: 14, fontWeight: 700, letterSpacing: 0.4, color: "rgba(252,211,77,0.82)" }}>
+                    {`redeems for $${x.value.toLocaleString()}`}
+                  </div>
+                ) : null}
+              </GlassCard>
             ))}
           </div>
         </Section>
       )}
 
-      <Section p={pPills} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-        <Pill color={t.accent2} bg={alpha(t.accent2, 0.13)} size={pPills.f(19)}>
-          {`${d.cpPerDollar.toLocaleString()} CP = $1`}
-        </Pill>
+      {/* One line, not two. The exchange rate moved into the wallet tile where
+          the platform puts it; what is left is the thing a gamer is actually
+          afraid of when they spend. */}
+      <Section p={pPills} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
         <Pill color="#34d399" bg="rgba(52,211,153,0.13)" size={pPills.f(19)}>
           Spending never lowers your level
         </Pill>
@@ -1241,17 +1713,17 @@ function MarketBody(d: MarketCard) {
 
 function WeekBody(d: WeekCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pRows, pPills, pEmpty] = ["rows", "pills", "empty"].map((k) => part(t, k));
   const medal = ["#fbbf24", "#cbd5e1", "#d08a4a"];
   const result = d.mode === "result";
   const entries = d.entries ?? [];
 
   return (
-    <Frame theme={t} corner={result && d.trophy?.imageUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.trophy.imageUrl} alt="" width={96} height={96} style={{ width: 96, height: 96, objectFit: "contain" }} />
-    ) : undefined}>
-      <Title text={d.title} sub={clamp(d.subtitle, 64)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      imageUrl: d.trophy?.imageUrl ?? null, eyebrow: result ? "RESULT" : "THIS WEEK",
+      title: d.title, subtitle: clamp(d.subtitle, 64),
+    }}>
 
       {entries.length === 0 ? (
         <Section p={pEmpty} style={{ marginTop: 40 }}>
@@ -1339,10 +1811,13 @@ function WeekBody(d: WeekCard) {
 
 function PlanetsBody(d: PlanetsCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const p = part(t, "tiles");
   return (
-    <Frame theme={t}>
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      imageUrl: d.games?.[0]?.logoUrl ?? null, eyebrow: "THE GALAXY",
+      title: d.title, subtitle: d.subtitle,
+    }}>
       <Section p={p} style={{ flexDirection: "row", flexWrap: "wrap", alignContent: "flex-start", gap: 12, marginTop: 24, flex: 1 }}>
         {d.games.slice(0, 12).map((g, i) => (
           // 4 tiles per row of the narrower text column: 4×158 + 3×12 = 668.
@@ -1379,17 +1854,12 @@ const GUIDE_SCALE: Record<number, { num: number; title: number; body: number; ro
 
 function GuideBody(d: GuideCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   return (
-    <Frame theme={t} corner={d.logoUrl ? (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={d.logoUrl} alt="" width={76} height={76} style={{ width: 76, height: 76, objectFit: "contain" }} />
-    ) : undefined}>
-      {d.badge ? (
-        <Section p={part(t, "status")} style={{ flexDirection: "row", marginBottom: 14 }}>
-          <Pill color={t.accent} bg={alpha(t.accent, 0.12)}>{part(t, "status").say(d.badge)}</Pill>
-        </Section>
-      ) : null}
-      <Title text={d.title} sub={d.subtitle} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
+    <Frame theme={t} identity={{
+      imageUrl: d.logoUrl, eyebrow: d.badge || "GUIDE",
+      title: d.title, subtitle: d.subtitle,
+    }}>
       {/* The steps FIT the card instead of being cut off at four.
           `steps.slice(0, 4)` silently threw away everything past the fourth,
           which is why the card called "Everything Cluster does" listed four of
@@ -1450,6 +1920,7 @@ function GuideBody(d: GuideCard) {
 // at ten thousand times — was rendered as a line of text.
 function WorldBody(d: WorldCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const [pStatus, pLore, pAb, pArt, pMeta] =
     ["status", "lore", "abilities", "art", "meta"].map((k) => part(t, k));
   // Four abilities, not three: every one of these games ships a passive and
@@ -1463,21 +1934,15 @@ function WorldBody(d: WorldCard) {
       // where it reads as a caption rather than as a third thing competing for
       // the same corner as the sponsor.
       side={art ? (box) => <SplashPanel url={art} logoUrl={d.logoUrl} caption={d.skinName ?? d.name} box={box} accent={t.accent} p={pArt} /> : undefined}
-      corner={!art && d.logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={d.logoUrl} alt="" width={72} height={72} style={{ width: 72, height: 72, borderRadius: 16, objectFit: "cover" }} />
-      ) : undefined}
+      identity={{
+        imageUrl: d.logoUrl, eyebrow: d.entityKind.toUpperCase(),
+        title: clamp(d.name, 22) ?? d.name,
+        subtitle: d.skinName ? `${clamp(d.skinName, 24)} · ${d.game}` : d.game,
+      }}
     >
       <Section p={pStatus} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
-        <Pill color={t.accent} bg={alpha(t.accent, 0.14)} size={pStatus.f(19)}>{pStatus.say(d.entityKind.toUpperCase())}</Pill>
         {d.role ? <Pill size={pStatus.f(19)}>{clamp(d.role, 22)}</Pill> : null}
       </Section>
-
-      <Title
-        text={clamp(d.name, 22) ?? d.name}
-        sub={d.skinName ? `${clamp(d.skinName, 24)} · ${d.game}` : d.game}
-        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
-      />
 
       {d.lore ? (
         <Section p={pLore} style={{ marginTop: 16 }}>
@@ -1562,11 +2027,24 @@ function WorldBody(d: WorldCard) {
  * Two rings and a bolt, matching `cpCoin` in components/Icon.tsx closely enough
  * that the web and the cards read as the same currency.
  */
-function CpCoin({ size = 20 }: { size?: number }) {
+/**
+ * The CP coin — TWO LAYERS, exactly as the website draws it (B60).
+ *
+ * `components/Cp.tsx` layers the built-in glyph with the admin's uploaded art
+ * painted over it, and the comment there says why: before it, only the upload
+ * rendered, so an install where nobody had uploaded one had no currency mark at
+ * all. The cards drew only the built-in one, which is the same mistake in the
+ * other direction — an admin changing the coin changed it everywhere except the
+ * thing that travels furthest.
+ *
+ * The upload sits ON the glyph rather than beside it, so the amber ring reads
+ * as the coin's own body behind whatever art is on its face.
+ */
+function CpCoin({ size = 20, icon }: { size?: number; icon?: string | null }) {
   const ring = Math.max(1, Math.round(size * 0.08));
   return (
     <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center",
+      display: "flex", position: "relative", alignItems: "center", justifyContent: "center",
       width: size, height: size, borderRadius: size,
       border: `${ring}px solid #fbbf24`, background: "rgba(251,191,36,0.14)",
     }}>
@@ -1574,42 +2052,11 @@ function CpCoin({ size = 20 }: { size?: number }) {
         display: "flex", width: Math.round(size * 0.16), height: Math.round(size * 0.46),
         background: "#fbbf24", transform: "skewX(-18deg)",
       }} />
-    </div>
-  );
-}
-
-function TrophyShelf({ trophies, total, box, p }: {
-  trophies: { name: string; imageUrl: string; value?: number }[];
-  total: number;
-  box: { left: number; top: number; width: number; height: number };
-  p: PartDraw;
-}) {
-  // The art is square and sized to the column, capped so a wide column does not
-  // blow one trophy up to fill the card.
-  const art = Math.max(44, Math.min(96, Math.round(box.width * 0.42)));
-  return (
-    <div style={{
-      position: "absolute", left: box.left, top: box.top, width: box.width, height: box.height,
-      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-start", gap: 6,
-    }}>
-      <div style={{ display: "flex", fontSize: 15, letterSpacing: 2, color: MUTED }}>
-        {`TROPHIES${total > trophies.length ? ` · ${nf(total)}` : ""}`}
-      </div>
-      <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", justifyContent: "center", gap: 10 }}>
-        {trophies.map((tr, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, width: art }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={tr.imageUrl} alt="" width={art} height={art}
-              style={{ width: art, height: art, objectFit: "contain" }} />
-            {/* No fixed height — a fixed one clips descenders, which was a real
-                bug on the market card. A valueless trophy prints nothing rather
-                than "$0", which would read as a promise we did not make. */}
-            {tr.value && tr.value > 0 ? (
-              <div style={{ display: "flex", fontSize: 17, fontWeight: 700, color: "#34d399" }}>{`$${nf(tr.value)}`}</div>
-            ) : null}
-          </div>
-        ))}
-      </div>
+      {icon ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={icon} alt="" width={size} height={size}
+          style={{ position: "absolute", top: -ring, left: -ring, width: size, height: size, objectFit: "contain" }} />
+      ) : null}
     </div>
   );
 }
@@ -1662,14 +2109,14 @@ function SplashPanel({ url, logoUrl, caption, box, accent, p }: {
 // thing — one hit renders that hit, and none says so in words.
 function SearchBody(d: SearchCard) {
   const t = d.theme;
+  const clamp = clampFor(t);
   const p = part(t, "rows");
   return (
-    <Frame theme={t}>
-      <Title
-        text={`"${clamp(d.query, 20) ?? d.query}"`}
-        sub={`${d.results.length} matches — pick one below`}
-        accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")}
-      />
+    <Frame theme={t} identity={{
+      imageUrl: d.results?.[0]?.imageUrl ?? null, eyebrow: "SEARCH",
+      title: `"${clamp(d.query, 20) ?? d.query}"`,
+      subtitle: `${d.results.length} matches — pick one below`,
+    }}>
       <Section p={p} style={{ gap: 8, marginTop: 20, flex: 1, overflow: "hidden" }}>
         {d.results.slice(0, 6).map((r, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 14px", borderRadius: 14, background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.08)" }}>
@@ -1713,41 +2160,19 @@ function body(d: CardData) {
 // animated .gif avatar it can't decode — takes down the entire card. Doing it
 // up front means a bad image degrades to its placeholder instead, and the
 // render itself touches the network zero times.
-// The mascot and the logo mark, as inline bytes. Resolved once per render and
-// merged onto every card kind here rather than in each data loader, so a card
-// kind added later can't forget them.
-async function preparedBrand(): Promise<{ astronautUrl: string | null; markUrl: string | null }> {
-  try {
-    const b = await brandCardArt();
-    const [astronautUrl, markUrl] = await Promise.all([
-      toEmbeddable(b.astronautUrl, { maxWidth: 420 }),
-      toEmbeddable(b.markUrl, { maxWidth: 128 }),
-    ]);
-    return { astronautUrl, markUrl };
-  } catch { return { astronautUrl: null, markUrl: null }; }
-}
-
-// The sponsor creative, as inline bytes.
-//
-// A brand uploads whatever their agency gave them — WebP, an SVG, a 4MB PNG —
-// and Satori decodes none of those. Resolved here like every other image, and
-// an ad whose art won't load is DROPPED: an empty labelled box would tell a
-// server there's an advertiser while showing them nothing.
-async function preparedAd(ad: CardAdSlot | null | undefined): Promise<CardAdSlot | null> {
-  if (!ad?.imageUrl) return null;
-  const imageUrl = await toEmbeddable(ad.imageUrl, { maxWidth: 720 });
-  return imageUrl ? { ...ad, imageUrl } : null;
-}
-
 async function prepareCard(d: CardData): Promise<CardData> {
   // The whole image step gets one deadline. Past it the card is drawn with
   // whatever resolved — a person who tapped a button gets a card, not a spinner
   // that eventually times out in Discord's proxy.
   const [body, brand, rawLayout, ad] = await Promise.all([
     withDeadline(prepareBody(d), d),
-    withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
+    withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null, cpIconUrl: null }),
     withDeadline(layoutFor(d.kind), DEFAULT_LAYOUT),
-    withDeadline(preparedAd(d.theme.ad), null),
+    // THE HOUSE CREATIVE IS THE FALLBACK, not an empty corner (B56.0). Applied
+    // here rather than in the renderer so it goes through the same transcode a
+    // brand's upload does — Satori fetches and decodes what it is handed, and
+    // the one path that has been proven is `toEmbeddable`.
+    withDeadline(preparedAd(d.theme.ad ?? HOUSE_AD), null),
   ]);
   // Admin-placed art goes through the same resolver as everything else: Satori
   // fetches remote images itself and one unreachable host takes down the whole
@@ -1769,6 +2194,43 @@ async function prepareCard(d: CardData): Promise<CardData> {
   // Colours are normalised here, once, on the way in — so every card body can
   // use `theme.accent` directly and no unparseable value ever reaches Satori.
   return { ...body, theme: safeTheme({ ...body.theme, ...brand, layout, ad, badge }) } as CardData;
+}
+
+// Resolve every image on a card to inline bytes before drawing.
+//
+// Satori fetches remote images itself, and one unreachable host — or one
+// animated .gif avatar it can't decode — takes down the entire card. Doing it
+// up front means a bad image degrades to its placeholder instead, and the
+// render itself touches the network zero times.
+// The mascot and the logo mark, as inline bytes. Resolved once per render and
+// merged onto every card kind here rather than in each data loader, so a card
+// kind added later can't forget them.
+async function preparedBrand(): Promise<{ astronautUrl: string | null; markUrl: string | null; cpIconUrl: string | null }> {
+  try {
+    const b = await brandCardArt();
+    const [astronautUrl, markUrl, cpIconUrl] = await Promise.all([
+      toEmbeddable(b.astronautUrl, { maxWidth: 420 }),
+      toEmbeddable(b.markUrl, { maxWidth: 128 }),
+      // Small, and asked for at twice the biggest size any card draws it —
+      // resolved HERE rather than in the renderer, because Satori fetches what
+      // it is handed and the coin appears on nearly every card. One slow host
+      // would be one slow host on all of them.
+      toEmbeddable(b.cpIconUrl, { maxWidth: 96 }),
+    ]);
+    return { astronautUrl, markUrl, cpIconUrl };
+  } catch { return { astronautUrl: null, markUrl: null, cpIconUrl: null }; }
+}
+
+// The sponsor creative, as inline bytes.
+//
+// A brand uploads whatever their agency gave them — WebP, an SVG, a 4MB PNG —
+// and Satori decodes none of those. Resolved here like every other image, and
+// an ad whose art won't load is DROPPED: an empty labelled box would tell a
+// server there's an advertiser while showing them nothing.
+async function preparedAd(ad: CardAdSlot | null | undefined): Promise<CardAdSlot | null> {
+  if (!ad?.imageUrl) return null;
+  const imageUrl = await toEmbeddable(ad.imageUrl, { maxWidth: 720 });
+  return imageUrl ? { ...ad, imageUrl } : null;
 }
 
 // The background, with fallbacks. Tried in order and stops at the first that

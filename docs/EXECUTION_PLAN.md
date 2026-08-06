@@ -276,7 +276,7 @@ the remaining edits; Part II is the whole platform.
 
 | # | Build item | Touches | Added | Built |
 |---|---|---|---|---|
-| B1 | The spam audit — announcement audiences, cooldowns, kill switches | `lib/discord/announce.ts`, `lib/link-account.ts`, new `lib/discord/audience.ts`, `/admin/discord` | plan v1 | ☐ |
+| B1 | The spam audit — announcement audiences, cooldowns, kill switches | `lib/discord/announce.ts`, `lib/link-account.ts`, new `lib/discord/audience.ts`, `/admin/discord` | plan v1 | ☑ |
 | B2 | The CP coin — a currency, not a word | `components/Icon.tsx`, new `components/Cp.tsx`, 11 files, `lib/cards/render.tsx`, the nav | plan v1 | ☑ |
 | B3 | Bot cards — install, list cards, flows, landing layout | `lib/discord/onboard.ts`, `screens.ts`, `components.ts`, `app/api/discord/interactions/route.ts`, the card layers | plan v1 | ☐ |
 | B4 | The server portal, inside Discord | new `discord_guild_roles`, `/cluster admin`, six `srv_*` card kinds, `lib/server-portal.ts` (read only) | plan v1 | ☐ |
@@ -304,13 +304,13 @@ the remaining edits; Part II is the whole platform.
 | B26 | LoL stats read as ranks; the level stops appearing twice | new `lib/metric-display.ts`, `app/feed`, `components/LolCard.tsx`, `components/ProfileAccounts.tsx` | batch 3 | ☑ |
 | B27 | Every bot card: buttons grouped by meaning and position | `lib/discord/components.ts` `rows()`, `lib/discord/sponsor.ts` | batch 3 | ☑ (position; colour is B3.0.2) |
 | B28 | The bot preview rebuilt — scoped per section, live renders instead of shots | the preview component, the marketing pages | batch 3 | ☐ |
-| B29 | Everything new is an admin system, staffable by department | `lib/systems.ts`, every new surface | batch 3 | ☐ |
+| B29 | Everything new is an admin system, staffable by department | `lib/systems.ts`, every new surface | batch 3 | ☑ |
 | B30 | The founding offers: admin console, paused by default, bill discounts | `lib/offers.ts`, `lib/invoices.ts`, new `/admin/offers` | batch 3 | ☑ |
-| B31 | Welcome challenges: auto-drafted, sponsored by Cluster, billed to Cluster | the install path, the server portal, the house brand, billing | batch 3 | ☐ |
+| B31 | Welcome challenges: auto-drafted, sponsored by Cluster, billed to Cluster | the install path, the server portal, the house brand, billing | batch 3 | ☑ |
 | B32 | Email: Resend, one template system, a delivery console | new `lib/email/`, `email_log`, new `/admin/email`, the webhook | batch 4 | ☑ |
 | B33 | **Announcements become a queue** (live bug — sequential await in a server action) | `lib/discord/announce.ts`, the calling actions, a drain cron | batch 4 | ☐ |
 | B34 | **The repriced economy**: 1,000 CP = $0.10, every action capped, 500/day ceiling | `lib/quests.ts`, `lib/marketplace.ts`, supersedes B16/B17's numbers | batch 4 | ☑ |
-| B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | new `lib/abuse.ts`, payouts, tier unlocks, new `/admin/growth-review` | batch 4 | ☑ (defences 1–2 + the review queue; **velocity limits still owed** — see below) |
+| B35 | Anti-abuse: payout holding period, qualified linked accounts, velocity limits | new `lib/abuse.ts`, payouts, tier unlocks, new `/admin/growth-review` | batch 4 | ☑ |
 | B36 | Brands prepay: due on issue, live on creation, settled by the first challenge's end | new `lib/prepay.ts`, `lib/sponsored-campaigns.ts`, `lib/challenge-requests.ts`, the brand portal | batch 4 | ☑ |
 | B37 | The legal framing of the economy | new `lib/eligibility.ts`, new `/legal/economy`, `app/actions/trophies.ts`, `/admin/redeems` | batch 4 | ☑ (**every threshold is a placeholder for counsel** — flagged in the code and on the page) |
 | B38 | One gamer, one account, one challenge | `lib/challenges.ts`, `app/actions/social.ts`, the challenge page | batch 4 | ☑ |
@@ -318,10 +318,10 @@ the remaining edits; Part II is the whole platform.
 | B40 | Deleting an account with a balance | `app/settings/account` | batch 4 | ☑ |
 | B41 | The gamer homepage: hero, challenges, quests, missions, Discord | `app/page.tsx` | batch 4 | ☐ |
 | B42 | Missions: the guided first week, on homepage, quests page and feed | `lib/quest-game.ts` `StarterMissions` | batch 4 | ☐ |
-| B43 | Welcome challenges under admin control (amends B31) | admin challenges, the welcome type | batch 4 | ☐ |
+| B43 | Welcome challenges under admin control (amends B31) | admin challenges, the welcome type | batch 4 | ☑ |
 | B44 | The promotional campaigns console (amends B30) + funding figure is $100K | `/admin/offers`, `lib/invoices.ts`, the deck | batch 4 | ☑ |
-| B45 | The portal key follows ownership | the guild refresh path, key rotation | batch 4 | ☐ |
-| B46 | Spend limits on storage and rendering | `lib/storage-audit.ts`, the card cache, `/admin/storage` | batch 4 | ☐ |
+| B45 | The portal key follows ownership | the guild refresh path, key rotation | batch 4 | ☑ |
+| B46 | Spend limits on storage and rendering | `lib/storage-audit.ts`, the card cache, `/admin/storage` | batch 4 | ☑ |
 | S1 | **The demo activity layer** — 36 of 74 tables had no rows, so every screen that reports on activity reported zero | new `lib/db/seed-activity.ts`, `lib/db/seed.ts` | wave 1 | ☑ |
 | S2 | **The capture script** — one command turns a running build into every screenshot in R2 | new `scripts/capture-shots.mjs`, `public/shots/` | wave 1 | ☑ (provisional — V1.R recaptures) |
 | S3 | Demo fixtures the rules could not be tested without: rank-carrying stats, priced trophies, a shelf big enough to cap, deterministic portal keys, nav art | `lib/db/seed.ts`, `lib/db/seed-activity.ts` | wave 1 | ☑ |
@@ -340,6 +340,7 @@ the remaining edits; Part II is the whole platform.
 | B52 | **Planet explore shows game identities** — in-game name, one row per account | `lib/planet-explore.ts`, `app/planets/[slug]/page.tsx` | wave 2 | ☑ |
 | B53 | **Admin owns every trophy, including the ones already held** | new `lib/trophy-admin.ts`, `/admin/trophies`, `app/actions/admin.ts`, `lib/db/schema.ts` | wave 2 (**money-touching**) | ☑ |
 | B54 | **The bot card design overhaul** — a card is a web page, not a poster. **Leads the Discord band: B3, B13, B14, B20, B27, B28 follow it** | `lib/cards/render.tsx`, `lib/cards/part-content.ts`, `lib/cards/data.ts` | wave 3 | ☐ |
+| B56 | **The cards must look like the platform** — B54's clarification: the platform's visual language, and no kind inherits its old shape. **Sits with B54 at the head of the Discord band** | `lib/cards/render.tsx`, `lib/cards/layout-guide.ts`, `tests/ui/cards.mjs` | wave 3 | ☐ |
 | B55 | **The platform is slow** — a live, structural performance defect on every surface | `app/admin/layout.tsx`, `lib/threads.ts`, `lib/cms.ts`, `lib/departments.ts`, `lib/planet-explore.ts`, `lib/providers/riot-lol-rich.ts` | **wave 2, ahead of everything** | ☐ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
@@ -3073,6 +3074,464 @@ which change bought which improvement.
 
 ---
 
+## B56 — The cards must look like the platform, not like better posters
+
+**B54's clarification, arriving as its own item.** B54 stands: the layout
+system, the strip, the sponsor-aware column, the clamps and the spot geometry
+are all correct and none of it is redone here. What was missing from B54 as
+written is what goes INSIDE that frame.
+
+B54 said "laid out to render what a gamer sees on the platform". That was meant
+as **visual language**, and it was built as **the same data**. Those are not the
+same instruction, and the difference is the whole item.
+
+### B56.0 The shared layout is redesigned FIRST — and completely
+
+**No card kind is rebuilt until this is settled.** Building a body against a
+layout that is about to change builds it twice, which is exactly what happened:
+the marketplace card was rebuilt on the old frame and had to be rebuilt again.
+
+A card is a SECTION of the platform rendered to PNG. Three bands, no furniture:
+
+- **TOP-LEFT — the identity, and it is always an IMAGE.** The game's logo on a
+  challenge or a leaderboard, the gamer's avatar on a profile, the game
+  account's avatar on a game-stats card, the quest's art on a quest. Never a
+  headline alone. A title in empty space could be any card on the platform.
+- **TOP-RIGHT — the ad. Fixed, on every card, without exception.** There is no
+  "unsold": when no brand has bought the impression the HOUSE creative fills it.
+  The slot is the product, and a corner that is sometimes empty teaches a server
+  owner that the bot sometimes has one.
+- **EVERYTHING BELOW — free space, edge to edge.** Nothing is drawn into the
+  body that the body must lay itself out around. No mascot bottom-right, no logo
+  tile in a corner, no badge hanging off the band.
+
+And:
+
+- **The gradient rule at the top is removed.** It made every card read as a
+  notification. A thin `stroke` around the card replaces it — an edge, not a
+  light — and it is admin-editable like everything else.
+- **The Cluster mark moves into the body band as a WATERMARK**, transparent,
+  behind the content.
+
+**Verification owed → `tests/db/cards.mts` (now) + `tests/ui/cards.mjs`:**
+- The identity image is top-left and unhidden; the ad is top-right and never
+  hidden by default; nothing else is in that band.
+- Every one of the thirteen bodies declares an identity, and the image falls
+  back rather than leaving the slot empty.
+- The house creative fills the slot, through the same transcode a brand's
+  upload takes.
+- The body starts under the ad, runs edge to edge, and reaches the bottom.
+- The mark is in the body band, faint, and drawn BEFORE the content.
+- The stroke exists, is drawn last, and 0 turns it off.
+
+### B56.1 The requirement
+
+A gamer looking at a Discord card must feel they are looking at Cluster.
+Concretely, that means the card carries the platform's own vocabulary:
+
+- the same **section headers**,
+- the same **card-within-card** shapes,
+- the same **stat tiles**,
+- the same **pills and chips**,
+- the same **spacing rhythm**,
+- the same use of **cover art as a section background**.
+
+Not an approximation of a section in poster form. The Discord rendering *of that
+section*.
+
+### B56.2 Do not inherit the old shape
+
+All **thirteen** kinds are in scope: `profile`, `game-stats`, `challenge`,
+`leaderboard`, `planet`, `planets`, `quest`, `cp-summary`, `guide`, `week`,
+`market`, `world`, `search`.
+
+Each body is designed from **what the platform shows for that thing**, not from
+what the current card happens to draw. Where a card is a list because a list was
+the easy thing to render, it does not stay a list. Background art on the
+section, real tiles, real hierarchy.
+
+The current bodies are the thing being replaced, so they are not evidence. The
+evidence is the component: the planet page, the profile, the quest page, the
+marketplace shelf, the leaderboard widget. **Read the real component before
+writing the card**, and name it in the comment at the top of the body — a card
+that claims to mirror a section and drifts from it is worse than one that never
+claimed to, because nobody re-checks it.
+
+### B56.3 The method, per kind, in this order
+
+One kind at a time, and the order is not optional:
+
+1. Read the platform component it mirrors.
+2. Rebuild the body against it.
+3. **Render it and look at it**, side by side with the section.
+4. **Render it SOLD as well as unsold.** Three of the four defects B54's second
+   pass found were invisible on an unsold card, and every fixture is unsold. A
+   kind is not done until both have been looked at.
+5. Only then move to the next kind.
+
+### B56.4 What this does NOT change
+
+- The layout system. Spots, the strip, `contentBoxFor`, `markLeftFor`,
+  `clampFor`/`clampAt` and the admin editor all stand.
+- Admin control. Every section a body draws is a `part` in `layout-guide.ts`, so
+  it can be hidden, resized, reordered and (where it has fixed copy) reworded
+  without a deploy. A new section that is not a declared part is a section admin
+  cannot touch — see B29.
+- Satori's limits. A subset of flexbox, an explicit `display` on every element,
+  and an unsupported property is an exception rather than a no-op. The platform
+  component is the reference for the LOOK; it is not code that can be pasted.
+
+**Verification owed → `tests/ui/cards.mjs` + `tests/db/cards.mts`:**
+- Every kind declares the platform component it mirrors, and that component
+  exists at the named path.
+- Every section a body draws is a declared `part` for that kind, so admin can
+  edit all of it.
+- Every kind renders SOLD and unsold without throwing, and neither render puts
+  content under the sponsor box.
+- No kind is a bare list where the platform section is tiled.
+- The shared vocabulary is shared: section headers, pills, stat tiles and
+  card-within-card shapes come from one place in the renderer rather than being
+  re-styled per body.
+
+**Shots owed:** none of the cards themselves — B28 replaces `bot.card.*` with
+live renders, and V1.R recaptures. The PLATFORM sections being mirrored already
+carry their own rows.
+**New routes:** none.
+
+---
+
+## B57 — The body is a GRID, not one column
+
+**Shared-layout work. Finishes B56.0; every per-card rebuild depends on it.**
+
+B56.0 made the body free space edge to edge. One block of content spread across
+1100px is not a layout — it is a wide list. A card's body is divided into
+**panes**, side by side rather than stacked:
+
+- **One pane** where the card has one thing to say (leaderboard, cp-summary).
+- **Two panes, left and right** where it has two (profile: accounts left,
+  trophies right. Challenge: details and pills left, prize case right — which is
+  what gives the standings their room back).
+- **Four panes, 2×2** where it has four. The **planet card** is the one that
+  needs all four: two ladders on the left, live challenges and the game world on
+  the right — the planet explorer, rendered.
+
+The pane grid is part of the LAYOUT, so an admin sets one, two or four per card
+kind and moves the split, and a card with nothing for a pane simply leaves it
+empty rather than drawing a box.
+
+**Every entity drawn in a pane carries its own art** — each challenge its cover,
+each hero/weapon/map its portrait, each quest its badge, each trophy its render.
+A pane of names is the list this item exists to replace.
+
+**Verification owed → `tests/db/cards.mts` + `tests/ui/cards.mjs`:**
+- The pane count is admin-set per kind and the geometry comes from one helper,
+  so the editor and the renderer cannot disagree.
+- A card with fewer things than panes leaves the pane empty, never a box.
+- Panes never overlap each other, the ad, or the identity band.
+- Every entity row/tile in a pane draws its own art when it has any.
+
+**Shots owed:** none (B28 replaces `bot.card.*` with live renders).
+**New routes:** none.
+
+---
+
+## B58 — Card DATA references: what each pane pulls, and who decides
+
+The admin card-layout editor is a drawing tool, and drawing is not what it is
+for any more — the cards are being built in code. What an admin actually needs
+is to say **where each pane's content comes from**:
+
+- which two ladders the planet card shows,
+- which three challenges,
+- which heroes / weapons / maps from the game world,
+- which trophies lead the marketplace shelf.
+
+And the GAMER needs the same power over their own card: which four game accounts
+appear when the card can only draw four, which sections show at all.
+
+So each pane declares a **data reference** — a source id plus its options —
+resolved at render time. Admin sets the reference per card kind; a gamer's own
+profile card carries their overrides on top.
+
+**The editor keeps its canvas**: an admin who wants to move something still can.
+It stops being the only thing the editor does.
+
+**Rules this must not break:** every reference is a stored id or an enum, never
+free text that reaches Satori (B54's rule); a gamer's overrides can only ever
+NARROW what their own card shows, never reach another gamer's data; and every
+new surface registers in `lib/systems.ts` (B29).
+
+**Verification owed → `tests/db/card-refs.mts`:**
+- A pane with no reference falls back to the card's own default and never blanks.
+- A reference to a deleted row resolves to the fallback rather than an empty
+  card.
+- A gamer's override can hide their own accounts and cannot name another gamer's.
+- Admin's per-kind reference survives a layout save that touches nothing else.
+
+**Shots owed:** the admin editor's reference panel.
+**New routes:** none.
+
+---
+
+## B59 — A gamer can see and control their own card, on the website
+
+The bot card of a gamer's profile is the thing that travels — it is what a
+server sees when they are shared. Today a gamer cannot see it at all.
+
+- **In profile customization**: the real rendered card, updating as they
+  customise, with the controls from B58 (which accounts, which sections) and a
+  switch to hide it.
+- **On their public profile**: the same card rendered as a snapshot of the
+  account, unless they have hidden it.
+
+**Verification owed → `tests/ui/profile-card.mjs`:**
+- The card shown in customization is the SAME renderer the bot uses, not a
+  mock-up of it.
+- Hiding it removes it from the public profile and not from the bot.
+- A gamer's account selection is reflected in the rendered card.
+
+**Shots owed:** the customization panel and the public-profile snapshot.
+**New routes:** none.
+
+---
+
+## B60 — The CP coin, composited, everywhere a card says CP
+
+`components/Cp.tsx` draws the coin as TWO layers: the built-in `cpCoin` glyph
+always, and the admin's uploaded art (`brand.cpIcon`, `lib/cms.ts:197`) painted
+over it. The comment in that file says why — before it, only the upload
+rendered, so an install where nobody had uploaded one had no currency mark at
+all.
+
+**The cards do not do this.** `lib/cards/render.tsx` has its own `CpCoin`: an
+amber ring with a skewed bar, drawn from divs, which never sees `brand.cpIcon`.
+
+- The card coin becomes the same composite: the drawn coin, with the admin's art
+  over it at the same size. Resolved to inline bytes in the prepare step
+  alongside `markUrl` and `astronautUrl` — Satori fetching a remote host
+  mid-render is how one slow image takes a card down.
+- **The word "CP" stops appearing on cards as a unit.** Two left:
+  `render.tsx:1117` (the quest card's `CP / 100 → Bronze`) and `:1614`
+  (`10,000 CP = $1`). Prose that explains what Cluster Points ARE keeps the
+  words — that is `Cp.tsx`'s own rule, and it is right: a currency symbol nobody
+  has had named for them is a puzzle.
+
+**Verification owed → `tests/db/cards.mts`:**
+- The card coin draws the admin's art over the glyph, not instead of it.
+- The art is resolved in the prepare step, never fetched by Satori.
+- No card draws "CP" as a unit suffix.
+
+**Shots owed:** none. **New routes:** none.
+
+---
+
+## B61 — The Daily Mission
+
+The 500 CP daily cap, given a shape. **Framing, not economics.**
+
+### B61.0 The rule the whole item rests on
+
+**The mission awards no CP of its own.** Not a completion bonus, not a streak
+bonus, not a rounding gift. Every point comes from the actions the gamer already
+does, at the prices `ACTION_CATALOG` already sets, under the caps B17 already
+enforces. The moment the mission pays, the cap stops being the ceiling and the
+platform's exposure doubles through a feature that looks like copywriting.
+
+### B61.1 Four variations, rotating weekly
+
+Not random forever: **four missions**, and the week picks which one everybody is
+on. Same variation all week, next variation next week, four-week cycle. A gamer
+and their friend see the same mission, support can reproduce what somebody saw,
+and "why is mine different" has an answer.
+
+Each mission is **two actions from each of the four quests — eight in all — and
+their CP totals exactly 500.** The 1-CP ad watch is the rounding term, which is
+what makes "exactly 500" always solvable.
+
+### B61.2 The tasks are PERSONAL
+
+The variation is fixed; the words are not. Each task is resolved against this
+gamer's own data:
+
+- "Raise any stat on **<their in-game name>**" — their real account, named.
+- "Share your profile card in **<the server they joined from>**" — that server.
+- "Join **<a live challenge on a game they have linked and have NOT entered>**" —
+  a specific competition they can actually enter today.
+
+A task that cannot be personalised (no linked account, no server, nothing live)
+falls back to its generic wording rather than naming nothing.
+
+### B61.3 Progress is READ, never counted separately
+
+`quest_events` is the source of truth for CP (B34.2). The mission's total is the
+day's summed CP; each task's tick is that action's own count for the day. Two
+reads of one ledger — which is what makes the case that matters correct for
+free: **500/500 with no tasks ticked** is a gamer who earned it another way, and
+that is a true statement rather than a special case somebody has to code.
+
+### B61.4 Decided, and written down
+
+- **Seeded, not random.** The mission is a pure function of `(week, userId)` for
+  its personalisation and of `week` alone for its shape. No `Math.random()` at
+  request time: a different mission on the phone than on the web is not a bug
+  anybody can debug.
+- **One day boundary.** The mission's day is `capsToday`'s day, from the same
+  helper. Two midnights is the version of this bug that only appears for people
+  in the wrong timezone.
+- **Availability is checked.** "Join a challenge x3" in a server with two live
+  challenges is impossible. Counts are solved against each action's real cap and
+  against what actually exists.
+- **Social counts stay at 1-2.** "Follow 5 friends" is a real incentive to
+  inflate the social graph — B35's problem arriving through a new door.
+- **A streak, and it AWARDS A TROPHY.** Admin sets which trophy at which day
+  count — milestones, several of them. A day counts when the gamer earned the
+  full 500, **however they earned it**: the mission's own tasks or anything
+  else. Miss a day without the full 500 and the streak resets to zero.
+
+  **Milestones REPEAT.** Day 7 awards its trophy; day 14 awards the next one;
+  miss a day and the count returns to zero, and the climb back to 7 awards the
+  7-day trophy **again**. That is the design: the streak is a loop, not a
+  ladder you finish. A milestone fires once per streak — reaching day 7 does not
+  re-award at day 8 — and a longer streak passes through every milestone below
+  it in turn.
+
+  **This is real spend outside the 500/day cap, and it is the one thing in this
+  item that is not framing.** A trophy redeems for dollars, so a milestone is a
+  payment the cap does not see, and a repeatable milestone is a *recurring* one:
+  a 7-day trophy is winnable up to 52 times a year by one gamer. The bound is
+  therefore its VALUE, not its frequency, and two existing controls carry it —
+  both already in the schema, neither needing anything new:
+
+  - `trophies.value` (`lib/db/schema.ts:632`) is the admin's dollar figure, and
+    **any trophy can be a milestone trophy — valued or $0.** At $0.10 a 7-day
+    trophy is $5.20 a year for a gamer who never misses a day, which is a number
+    the admin screen states next to the field: $0.10 reads as nothing, $5.20 a
+    year per gamer reads as a decision.
+  - A **$0 trophy is not redeemable**, and it is not free either: `priceOf`
+    (`lib/marketplace.ts:92-103`) floors every price at 500 CP, so a trophy with
+    no cash value still costs a full day's cap to buy. That is the natural home
+    for the early milestones.
+  - `trophies.inMarketplace` (`:651`) decides whether it is listed at all. Worth
+    knowing which way round it cuts: leave a milestone trophy ON the shelf and it
+    can be bought for 500 CP — one day's earnings — by somebody who never held a
+    streak, so what makes it feel earned is taking it OFF. That is the admin's
+    call per trophy and the screen should say what it costs to buy while it is on.
+
+  **The milestone's trophy VALUE is shown** on the streak display — on the nav
+  band and on the mission card — beside the day count it unlocks at. A milestone
+  a gamer cannot price is a milestone they cannot want.
+
+  And it is awarded through the same `userTrophies` path as a won one, so every
+  existing report that watches what the platform gives away still sees it.
+
+### B61.5 Surfaces
+
+A `mission` card kind (the fourteenth), a button on the quests tab and on every
+quest page, and the same button in Discord.
+
+**Verification owed → `tests/db/missions.mts`:**
+- Every one of the four variations totals exactly 500 CP, at today's prices.
+- The same `(week, userId)` gives the same mission twice; a different week gives
+  a different one; the cycle returns to the first after four.
+- No task's count exceeds that action's daily cap.
+- A gamer with no linked account, no server and no live challenge still gets a
+  complete mission in generic wording.
+- 500 CP earned outside the mission reads 500/500 with its tasks unticked.
+- **The mission writes no CP.** Asserted against the ledger, because this is the
+  rule the item rests on. (A streak milestone writes a TROPHY, never CP.)
+- A milestone pays once per STREAK: day 7 awards, day 8 does not re-award, and
+  a fresh streak that reaches 7 awards it again.
+- A streak that reaches 14 has awarded both the 7-day and the 14-day trophy.
+- A milestone whose trophy an admin has deleted awards nothing and does not
+  throw — the streak keeps counting.
+- A $0 milestone trophy is awarded like any other and redeems for nothing.
+- The band and the card show each milestone's day count AND its trophy's value.
+- A day with 500 CP earned entirely outside the mission still extends the
+  streak.
+- A missed day resets the streak to zero.
+- A named challenge is one the gamer has NOT entered and CAN enter.
+
+**Shots owed:** the mission panel on `/quests`.
+**New routes:** none (the panel lives on `/quests` and `/quests/<key>`).
+
+---
+
+## B62 — A trophy is a thing you own, not a price tag
+
+Two changes to how trophies read, both about the same confusion: a gamer's
+trophy case is a brag, and a shelf is a shop. They are currently drawn the same
+way.
+
+### B62.1 The same trophy, owned more than once, is ONE tile with a count
+
+A gamer can hold the same trophy several times over — bought one, won one in a
+challenge, earned one at a streak milestone. That is three rows of the same
+picture today. It becomes **one tile with `x3`**, on the profile page and on the
+card. The count is what is impressive; three identical pictures read as a bug.
+
+### B62.2 The gamer's own trophies do not show a price
+
+On the profile and on the profile card, a trophy is shown **without its cash
+value**. The value belongs on the marketplace, where it is deciding something.
+On a profile it turns a trophy case into a receipt, and it prices a gift.
+
+The MARKETPLACE keeps both figures and swaps their weight: **the CP price is the
+big number** — that is what a gamer pays and what they are deciding about — and
+"redeems for $X" is the smaller line under it. (This reverses B56's ordering on
+that card, deliberately: B48 promoted the dollar to prove a trophy is an asset,
+and the shelf's job is the purchase.)
+
+**Verification owed → `tests/db/cards.mts` + `tests/db/trophies.mts`:**
+- Three copies of one trophy resolve to one entry with `count: 3`.
+- The profile card draws no dollar figure on a trophy.
+- The marketplace card draws the CP price larger than the dollar line.
+
+### B62.3 The challenge card's panes swap
+
+Standings LEFT, prize podium RIGHT. The scoreboard is what a returning gamer
+came for and it reads first.
+
+---
+
+## B63 — The nav bands: profile of the week, and the mission streak
+
+A second band under the profile-of-the-week band, and a pass over both.
+
+### B63.1 The new band — today's mission and the streak
+
+Collapsed: the streak's day count and where they stand. Expanded: today's
+mission with each task and whether it is done, the milestones with the trophy
+at each, and how far off the next one is. **Click anywhere to close.**
+
+### B63.2 Both bands use the NAV's background art
+
+The profile-of-the-week band expands onto a dark solid panel today. It uses the
+nav's own background image instead — collapsed and expanded, and the same for
+the new band, so the two read as one piece of chrome rather than as two
+features that landed separately.
+
+### B63.3 The week band's profiles become their CARDS
+
+The profiles inside it are drawn as the same profile card the bot renders (B59's
+renderer), not as a separate web treatment of the same data. And the expanded
+band is **smaller** — it currently takes more height than the thing it is
+introducing.
+
+**Verification owed → `tests/ui/nav-bands.mjs`:**
+- Both bands carry the nav's background art, collapsed and expanded.
+- The mission band shows today's tasks with their done state, and the streak
+  with its next milestone.
+- Clicking anywhere in an expanded band closes it.
+- The week band's profiles are the card renderer's output, not a second
+  implementation.
+- The expanded week band is shorter than it was.
+
+**Shots owed:** both bands, collapsed and expanded.
+**New routes:** none.
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -3108,6 +3567,28 @@ which change bought which improvement.
 | B52 | — (the rule now has a home) | The explore list was already per-ACCOUNT — a gamer with two accounts on a game did appear twice — but every row printed the **Cluster display name**, so the two rows looked like one person duplicated rather than two accounts ranked. Rows now carry `ign`; the reveal names the Cluster profile and links to it. `tests/db/planet-explore.mts` is where the rule is written down — *leaderboards are per-ACCOUNT, challenge entry is per-GAMER* — so a future reader who finds "the same gamer twice" has somewhere to look before deciding it is a duplicate and fixing it. Two of my own assertions were wrong before the code was: one picked a planet with a provider but no active ladder and would have passed on zero rows, and one asserted account-uniqueness page-wide when it holds only per-board (rank and win rate are two ladders). Both fixed against what the page actually does. |
 | B50 | "the quest page already renders `rules` as a plain list" | **It did not — the map popup did.** The action list lived inside `QuestGame`'s rules panel, which is behind the quest map and behind a tap. `/quests` itself showed quest cards, a CP total, a history and the shelf, and no way to find out what any action pays. The guide is now on `/quests` and on `/quests/<key>`, above the history: what to do before a record of having done it. Every figure reads `getUserQuests`' `rules` and B17's `capsToday` — nothing restated — and today's usage sits on the action it belongs to rather than only in the separate limits panel, because "why did that give me nothing?" is asked about one action. |
 | B30, B44 | — (found in a browser, after the suite passed) | `getContent` returns **`""`** for a key never set, and `Number("")` is `0` — finite and non-negative, so the fallback never applied and a fresh install read the brand campaign as **0%** where the default is 100%. The unit test could not have caught it: it fed `{}`, not `{ key: "" }`. Fixed in `num()`, asserted with the real shape. Also, the same client-boundary trap as B51 for the third time: `lib/campaigns.ts` is imported by `lib/invoices.ts`, which is imported by two CLIENT components, so anything in it reaching `lib/cms` → `lib/i18n/server` → `next/headers` fails the BUILD with an error naming i18n and nothing in this feature. A dynamic import does **not** help — Next traces those too. The model is now pure in `lib/campaigns.ts` and the reads live in `lib/campaigns-read.ts`. |
+| B31.2 | — (corrected mid-build, by the user) | **The house brand already exists.** `runBootMaintenance` (`lib/db/seed.ts:1134`) inserts it on every boot with the fixed id `house-cluster-brand`, and production's row carries every house ad creative and its own brand portal. My first version of `lib/house-brand.ts` looked it up by SLUG and would have created a second "Cluster" brand on any database whose slug differed — splitting the ledger this item exists to keep whole and orphaning those creatives. It now resolves by the known id first, adopts a flagged/named/slugged row second, and only ever inserts using that same id so boot maintenance's insert stays a no-op. The suite asserts the resolved brand IS the seeded one, that its creatives are still attached, and that exactly one brand is called Cluster. B31.1 is shipped (draft, sponsored, billed); **B43's admin-side completion, cancellation and the on-demand `welcome` type remain owed.** |
+| B43 | — (found by building) | The demo seed calling `houseBrand()` deadlocked the BUILD: that helper calls `getDb()`, and the seed runs inside the bootstrap `getDb()` is still completing. It surfaced as static generation timing out after 60s on five unrelated routes, with the error naming `/settings/connections` and nothing about the seed. The seed now uses the handle it was passed, which is the rule the rest of that module already followed. Also: the queue is seeded with one draft stuck on a game we cannot verify — the state that needs a human — so the console is demonstrable rather than merely correct. |
+| B45 | — (a pre-existing bug found while building) | `notifyAdmins` in `app/actions/trophies.ts:48` selected `role = "admin"`. **No account in this codebase has that role** — they are `superadmin`, `staff` and `user` — so every "payout preference locked" notice it has ever raised went to **zero people, silently**, since it was written. Found because B45 copied the same query and its own notice vanished. Both now match `["admin", "superadmin"]`, and the suite asserts it against the DATA (no account has the bare role) so the roles moving again fails the test rather than the product. |
+| B46 | — (stated rather than papered over) | The dashboard reads **0 cards, 0 MB** in the demo, and that is correct: Blob is not configured here, so nothing has ever been rendered or stored. Unlike B39's stuck-money gap I did NOT seed rows to make it demonstrable — a fabricated storage figure is a lie about real spend, and this panel exists precisely to be believed. The empty state is the true state. Also decided and written down: `updatedAt` is **not** touched on a cache hit, so a popular card whose payload has not changed in 30 days is evictable. That is deliberate — the alternative is a database write per Discord message, and eviction costs one re-render. |
+| B29 | the audit found one real gap | **`/admin/payments` was admin-only only by ACCIDENT.** It carried no `system:` key, so `pathAllowedFor` refused it via the unclaimed-page fallback — correct today, and one `system:` key away from being silently delegable. The plan named it alongside `/admin/users` and `/admin/linked-accounts`; it is now on the explicit `ADMIN_ONLY` list, which is a decision rather than a side effect. The other nine unowned pages are unowned BY DECISION (founder/operator surfaces) and are now listed in the suite, so adding a page to the console without filing it fails a test instead of becoming invisible. Two of my own assertions were wrong first: one flagged any role comparison — catching `/admin/roles` (deciding whether an already-guarded page lets you EDIT) and `/admin/users` (reading the role of the person in the ROW); the other demanded a guard call in every page file, when the guard correctly lives ONCE in `app/admin/layout.tsx:74`. |
+| B1.1 | "it announces to every server on the network" | **Half of that was already fixed.** `announceAccountLinked` scopes to `guildsOf(userId)` and posts with `{ only: mine }` — the fan-out defect is gone. What was still true is the FLOATING PROMISE: `void announceAccountLinked(...).catch(() => {})` at `lib/link-account.ts:94`, killed when the response is sent (trap 6), so the announcement happened or did not depending on how fast the caller returned. Since B33 it only enqueues, so awaiting it costs almost nothing. The audience was fixed by remembering to, though — `lib/discord/audience.ts` now makes it a declared policy, and the suite walks `announce.ts` and fails on any export missing from the table, so the next announcement cannot be added without answering the question. |
+| B35 | defence 3 shipped, narrower than written | The velocity limit is **a friction on NOISE, not a defence against fraud**, and the item's own status note already said why: B34 took the incentive from $63/day to $2.50/day for fifty accounts, and defence 2 means those fifty move no tier until each is a week old AND has proven a game account. So it refuses only on the count from a **disposable** email domain — a mainstream domain is not a source, because ten gmail signups today is a Tuesday and refusing the eleventh refuses a real gamer for somebody else's behaviour. A young Discord account is a SIGNAL for the review queue and never a refusal on its own. It fails OPEN: what it protects is tidiness, and what failing closed costs is customers. |
+| tooling | "npm test takes forever" | **Measured, then fixed: ~9 minutes → 174s.** Every db suite stands up its own in-memory PGlite, so they share nothing and the wall clock was almost entirely 29 sequential bootstraps. They now run in parallel across `cores-1` lanes with output captured and printed per suite, so the log still reads top-to-bottom. The **ui** suites stay serial on purpose — they share one server, one port and one set of demo data, and running those concurrently would have them racing over the same rows, which is a flaky suite pretending to be a fast one. |
+| B54 | the layout is redesigned; per-card body work remains | Shipped: the in-game name leads every standings row on BOTH cards (found a second violation while asserting the first — `challengeStandingsCard` read `<cluster> · <account>`, the Cluster name first, and my assertion pointed at the wrong field which is how I found it); the last fixed-height text box removed, with a test that fails on any `height:` beside a `fontSize:` so the descender bug cannot come back; and every card kind asserted to render through Satori without throwing. **Then built by RENDERING and looking**, which is the only way this half could have been done: the strip is in (mark moved from bottom-right y:77.5 to the top band, content starts under it), the challenge card falls back to its GAME's art when it has no cover of its own, and the content column took back the width the mark gave up — the first render after moving it had a dead right half, which no source read would have shown. Two more defects surfaced the same way: the planet card's ladder printed the CLUSTER name (the third place that was wrong), and Satori's `gap` did not reach that nesting so it rendered "NovaGold II" with the runs touching. **Still owed:** the semi-transparent game logo and mascot in the strip, and per-card body layouts for the kinds that are still list-shaped. B3/B13/B14/B20/B27/B28 are **unblocked** — the layout system they would have been built against twice is now settled. |
+| B54 (cont.) | the strip was empty, and a SOLD card was never rendered | **Everything below was found by rendering and looking, and three of the four are invisible on an unsold card — which is what the demo fixtures are.** (1) The default sponsor box is 780..1180 across and the mark, newly moved to the strip, is 1032..1164: the ad is drawn last, so **every sold card shipped with no Cluster mark on it at all.** `markLeftFor` slides it clear, the same treatment `badgeTopFor` already gave the badge. (2) The mark then landed inside the text column — "Weekly Wins" behind our own logo — so `contentBoxFor` narrows the column on a sold card only, ending it before whichever piece of right-hand furniture comes first. The old layout paid that cost on EVERY card forever by staying narrow whether or not anything sold. (3) The game logo went into the strip as a faint watermark and printed **twice**, because six card bodies proposed it as their badge back when it was the only game identity a card carried; the corner now steps aside on "auto" only. (4) Fifty character clamps were tuned against the 58.5% column and none of them moved when it went to 78%: the leaderboard read "Blitz Supernova — Weekly…" with 470 empty pixels after the ellipsis. `clampFor` takes the ratio from the live layout, and from the EFFECTIVE width, so a sold card clamps to its narrower column. **The strip's left was empty on every card** — the body started below it. It starts at the top now, so each card's first section (the LIVE/game pills, the headline) is the identity the strip is for. The mascot went into the strip per the item and came straight back out: a long title ran through the astronaut's chest, and the item's own "if a card reads better without either, leave them out" is the answer. It stands in the column right of the text instead, which is reserved on every card. `gameMark` is a real spot — editable, draggable, copyable to every kind, in the card guide. **Still owed:** per-card body layouts for the kinds that are still list-shaped, and `tests/ui/cards.mjs`. |
+| B54 (cont.) | the scaled clamp broke a card the moment it landed | Rendering the market card after the column fix showed **"Champion's Nebula Cup" wrapped to two lines and sitting on top of the GOLD label under it** — the exact bug a comment in that file says was fixed once already. Cause: a market tile is 218px wide whatever the content column is doing, so scaling ITS clamp with the column widened the limit from 17 characters to 23 and let the name back through. The clamp is now two functions: `clampAt` (raw, for a fixed-width box) and the column-scaled one built on it. Same card, same cause, one line up: the shelf was `TILE_W * 3 + 24` — three per row because three fitted the 703px column it was written against, leaving 460 empty pixels once the column went to 936. It counts what fits now, from the effective width, so a sold card drops to two per row rather than running its shelf under the creative. |
+| B54 | "two requirements were missing from B54 as written" | **B56.** The cards must carry the platform's VISUAL LANGUAGE — its section headers, card-within-card shapes, stat tiles, pills, spacing rhythm and use of cover art as a section background — not merely its data in poster form; and no kind inherits its current shape, all thirteen designed from the platform section they mirror. B54 is unchanged and is not redone: its layout system is what B56 builds inside. Filed as a new item rather than an edit to B54 because B54's own progress rows describe work that shipped, and rewriting them would make the ledger say something that was never true. |
+| B56 | market — the first kind rebuilt | **Read `components/TrophyMarket.tsx` first, and the card had every number in it and none of its shape.** The platform shelf is: a glass tile ringed by TIER (that colour is the information), a square art plate the picture sits on, the name, the tier in small caps, then **the dollar value promoted** with "redeems for cash" under it, then the CP price. The card drew a 44px icon beside a number bubble and put name, tier and both figures on one line — a receipt. The dollar-over-CP order is not decoration: it is **B48's** decision about what makes a trophy an asset rather than a sticker, and a card that inverts it argues with the page. Also changed: the wallet is now the platform's boxed, tinted stat tile rather than a bare number, and the shelf shows ONE row of four instead of two rows of six — six only ever fitted because the receipt shape was 138px tall. The three shapes (`GlassCard`, `ArtPanel`, `StatTile`) live in one place with the real `.glass` values from `app/globals.css:45`, because re-styling a sub-card per body is how thirteen cards end up looking like thirteen products. Rendered sold and unsold: the first pass clipped the last pill off the bottom edge, which only the render showed. |
+| B56 | "COMPLETE REDESIGN — no old layout, and edit the shared one before any card type" | **B56.0, and the market card was rebuilt again on the new frame.** I filed the clarification and then built a card kind on the layout it was about to replace, which is the thing the instruction said not to do; that work is redone rather than kept. The shared layout is now three bands: an identity IMAGE plus its name top-left, the ad top-right on **every** card (the house creative fills it — there is no "unsold"), and free space edge to edge below. Gone: the gradient rule (a `stroke` replaces it), the corner logo tile, the mascot, the badge. The Cluster mark is a watermark behind the body. All thirteen bodies now hand their identity to the frame instead of drawing a headline as their first block, which is also what freed the body: the profile's trophy case moved out of a side column into real tiles across the full width, and the challenge's prize podium came out of the top-right corner where a sold card was burying it. |
+| B56.0 | "divide the body into panes; set the data each pane pulls; show the gamer their own card" | Split into three, because they are three different kinds of work and only the first is shared-layout: **B57** makes the body a grid of one, two or four panes (the planet card is the 2×2 case — two ladders, challenges, the game world, over the planet's own globe art); **B58** gives every pane a DATA REFERENCE — which ladders, which challenges, which heroes, which four of a gamer's accounts — set by admin per kind and narrowed by the gamer for their own card, which is also the redesign of what the card-layout editor is FOR; **B59** renders a gamer's own card inside profile customization and on their public profile, with a switch to hide it. B57 is shared and is built now; B58 and B59 follow the per-card work. |
+| B57 | the pane grid, and four cards moved onto it | The geometry is one exported helper (`panes()`), shared by the renderer and the editor for the same reason `sideBox` is — a pane the editor draws somewhere the renderer does not is worse than no editor. `KIND_PANES` gives each kind its shape as a DEFAULT, overridable per kind like any other stored field. **Profile** is two panes: what they play on the left, what they have won on the right — one column made those compete for the same inches, which is why the accounts kept losing. **Challenge** is two: details and prize left, the scoreboard right, which is the standings' column back. **Planet** is the 2×2 the item asks for, and it gained a fourth thing to show — the game's own world, read from the cached snapshot, never a live fetch on a render. **Market** shows five. Two defects only the render found: Satori has no Fragment, so a pane handed `<>…</>` laid its children out as if the pane were a row (the profile's LINKED ACCOUNTS heading sat beside its stat pills, half off the pane), and a pane with an auto height collapsed every `flex: 1` inside it — the challenge card's standings were simply not drawn. |
+| B57 | "do all your recommendations; four missions rotating weekly, and personalise the words" | **B60** (the coin composite) and **B61** (the Daily Mission) filed. Every recommendation is in the item as a rule rather than as advice: no CP from the mission, seeded not random, one day boundary shared with `capsToday`, progress READ from `quest_events` rather than counted again, availability checked, social counts held at 1-2, and the streak as status only. The two decisions that came back: **four variations rotating weekly for everyone** rather than a per-gamer draw — which answers "why is mine different from my friend's" and makes support able to reproduce a mission — and the task WORDS personalised against the gamer's own data (their in-game name, the server they joined from, a live challenge on a game they have linked and have not entered). Build order: B60, then B58's data references, then B61 on top of them. |
+| B60 | shipped | The card coin is the same two layers the website draws: the built-in glyph always, the admin's `brand.cpIcon` painted OVER it. Same CMS key, so changing the coin changes it on the thing that travels furthest without a deploy — and resolved in the prepare step alongside the mark and the mascot, because Satori fetches what it is handed and this appears on nearly every card. The word "CP" is gone as a unit from both places it survived (the quest card's progress line and the wallet tile's exchange rate), and the coin now LEADS the figure like a currency symbol, which is `components/Cp.tsx`'s own rule. The assertion that keeps it gone scans only what is DRAWN — the first version of it read the comment explaining why the word was removed and failed on the explanation. |
+| B61, B56, B57 | "streaks award a trophy; trophies stack; no price on a profile; swap the challenge panes; CP is the big number on the shelf; a new nav band" | **B61 amended, B62 and B63 filed.** The streak now PAYS — admin picks a trophy per milestone — which reverses the "status only" recommendation, so the reason that recommendation existed is written into the item instead of dropped: a trophy redeems for dollars, so a milestone is spend the 500/day cap does not see. Three bounds are requirements now — admin chooses the trophy from the existing shelf, a milestone pays once per gamer and never again on a later streak, and it is awarded through the same `userTrophies` path as a won one so every existing report sees it. Also decided: a day counts when the full 500 is earned **however** it was earned, which is what B61.3 already made true for free. **B62**: the same trophy held three times is one tile with a count, not three pictures; a gamer's own trophies show no price (a price on a profile turns a case into a receipt and puts a number on a gift), while the shelf keeps both figures with the CP price as the big one — deliberately reversing B56's ordering there, because B48 promoted the dollar to prove a trophy is an ASSET and the shelf's job is the PURCHASE. **B63**: the mission/streak band, and the pass over the week band that was already owed. |
+| B62 | the card half is shipped | Duplicate trophies STACK in the data layer, keyed on name+image rather than on the trophy id — two rows can be the same prize re-issued and a gamer does not care which id it was. Four awards of two trophies is two tiles, one carrying `x3`, and the heading still says 4 because that is how many they hold. The dollar figure is off a gamer's own trophies entirely. The shelf swapped its two figures: the CP price is 30px and the redemption value is the 14px line under it — reversing B56's ordering **on that card only**, because B48 promoted the dollar to prove a trophy is an ASSET and the shelf's job is the PURCHASE. And the challenge card's panes swapped: the scoreboard is what a returning gamer came back for. **Still owed on B62:** the same stacking and price rules on the WEB profile (`components/TrophyCase.tsx`), which is where a gamer looks at their own case most. |
+| B61 | "milestones repeat after a reset" | **Corrected: my bound was wrong for the design.** I had written "pays once per gamer, ever"; the streak is a LOOP — day 7 awards, day 14 awards the next, a missed day returns the count to zero, and the climb back to 7 awards the 7-day trophy **again**. A milestone fires once per streak, and a longer streak passes through every milestone below it. Which moves the economic bound from frequency to VALUE — a 7-day trophy is winnable up to 52 times a year by one gamer — and **both controls for it already exist**: `trophies.value` (`schema.ts:632`) is the dollar figure, and `trophies.inMarketplace` (`:651`) already decides whether a trophy is listed for sale, so a milestone trophy can be earned-only with no new field. The admin screen states the annual figure next to the value, because $0.10 reads as nothing and $5.20 a year per gamer reads as a decision. |
+| B61 | "any trophy can be a milestone, $0 or valued; show the value on the milestone" | Checked rather than assumed: `priceOf` (`lib/marketplace.ts:92-103`) floors every price at **500 CP**, so a $0 trophy is non-redeemable but costs a full day's cap to buy — which is what makes it the natural home for the early milestones. Worth stating which way `inMarketplace` cuts, because it is the opposite of the intuition: a milestone trophy left ON the shelf can be **bought** for one day's earnings by somebody who never held a streak, so what makes it feel earned is taking it off. Admin picks any trophy for any milestone, and the day count and the trophy's value are both shown on the band and the card — a milestone a gamer cannot price is a milestone they cannot want. |
 | — | *(next amendment here)* | |
 
 ---
@@ -3186,15 +3667,21 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/metrics.mts` + `tests/ui/lol-card.mjs` | **B26** | a `rankLabel` always displays over its number; sorting still uses the number; no duplicate stat key on any provider | owed |
 | `tests/ui/bot-preview.mjs` | **B28** | scoped per section; live renders not images; every card states its command | owed |
 | `tests/db/taxonomy.mts` | **B29** | every admin route is a registered system; departments reach only what they are granted; the two admin-only paths refuse everyone | owed |
-| `tests/db/offers.mts` | **B30** + **B44** | both off by default and the reader fails closed; the discount is its own line at the configured percentage of the CHALLENGE lines; placements still billed; the total is the sum of its lines; nothing is granted while a campaign is off; no document claims $30K | ☑ 51 |
-| `tests/db/welcome-challenge.mts` | **B31** | one draft per guild; approve still produces a draft; billed to the house brand at the admin-set value | owed |
+| `tests/db/offers.mts` | **B30** + **B44** | both off by default and the reader fails closed; the discount is its own line at the configured percentage of the CHALLENGE lines; placements still billed; the total is the sum of its lines; nothing is granted while a campaign is off; the funding figure is stated as $100K everywhere | ☑ 51 |
+| `tests/db/welcome-challenge.mts` | **B31** + **B43** | the house brand is the one boot maintenance made, with its creatives; the grant is a draft nobody sees; it bills once to Cluster; admin completes it into the SAME challenge, still a draft; cancelling voids the line rather than deleting it; admin can create one for any server | ☑ 75 |
 | `tests/db/email.mts` + `tests/ui/admin-email.mjs` | **B32** | no key = no-op, never throws; every template fills; webhooks update status; no key or payment detail in a subject | owed |
 | `tests/db/marketplace.mts` + `tests/ui/marketplace.mjs` (extend) | **B49** (absorbs B5/B6/B19) | no purchase without a confirm; the confirm states price and balance before/after; the gift confirm shows the recipient; balance re-checked at confirm, not only at open | owed |
 | `tests/ui/quests.mjs` | **B50** | every action with its CP value and daily cap; the figures cross-check between the index and the single-quest render; an uncapped action is named, never given an invented ceiling; today's usage sits on the action | ☑ 15 |
 | `tests/ui/week-band.mjs` + `tests/db/week-prizes.mts` | **B51** | one element paints the nav art; three profiles, not more; each shows the trophy for its place and says "if the week ended now"; every profile link is `target=_blank` + `noopener`; a click below collapses it; and the close awards the RIGHT object to each place | ☑ 16 + 19 |
 | `tests/db/planet-explore.mts` + `tests/ui/planet.mjs` | **B52** | a gamer with two accounts appears twice; each row is the in-game name, not the display name; the reveal names the Cluster profile and links to it; the same gamer still holds exactly ONE challenge entry | ☑ 17 + 9 |
 | `tests/db/trophy-admin.mts` | **B53** | edits propagate to holders; raising the value raises unredeemed holdings; a pending/approved/sent/paid redemption's amount NEVER moves, up or down; a held trophy cannot be deleted and the ACTION refuses, not just the helper | **written — 30 assertions** |
-| `tests/ui/cards.mjs` + `tests/db/cards.mts` | **B54** | no card clips text at a fixed height; the top strip is present; challenge and planet cards carry a background; standings lead with the in-game name; every card kind renders through Satori | owed |
+| `tests/db/cards.mts` | **B54** | no text box carries a fixed height; every standings row leads with the in-game name on BOTH cards; the strip's three tenants do not sit on each other (the mark clears the sponsor box, the column clears the mark, the game logo is drawn once); the clamps follow the column; Satori renders every kind without throwing | ☑ 120 |
+| `tests/ui/cards.mjs` | **B54**, **B56** | every kind declares the platform component it mirrors and that file exists; every section a body draws is a declared `part`, so admin can edit all of it; every kind renders SOLD and unsold without throwing and neither puts content under the sponsor box; no kind is a bare list where the platform section is tiled; the shared vocabulary (headers, pills, stat tiles, sub-cards) comes from one place rather than being re-styled per body | ☐ |
+| `tests/db/card-refs.mts` | **B58** | a pane with no reference falls back and never blanks; a reference to a deleted row resolves to the fallback; a gamer's override can hide their own accounts and cannot name another gamer's; admin's per-kind reference survives an unrelated layout save | ☐ |
+| `tests/ui/profile-card.mjs` | **B59** | the card in customization is the SAME renderer the bot uses; hiding removes it from the public profile and not from the bot; the account selection is reflected in the render | ☐ |
+| `tests/db/missions.mts` | **B61** | all four variations total exactly 500 CP at today's prices; same (week, user) gives the same mission and the cycle returns after four; no count exceeds that action's daily cap; a gamer with no account, server or live challenge still gets a complete mission; 500 earned elsewhere reads 500/500 with tasks unticked; **the mission writes no CP**, asserted against the ledger; a named challenge is one they have not entered and can enter | ☐ |
+| `tests/db/trophies.mts` | **B62** | three copies of one trophy resolve to one entry with count 3; a gamer's own trophies carry no dollar figure; the shelf draws the CP price larger than the dollar line | ☐ |
+| `tests/ui/nav-bands.mjs` | **B63** | both bands carry the nav's background art collapsed and expanded; the mission band shows today's tasks with their done state and the next milestone; clicking anywhere in an expanded band closes it; the week band's profiles are the card renderer's output rather than a second implementation; the expanded week band is shorter | ☐ |
 | `tests/db/entry-rules.mts` | **B38** | a second account makes no second entry and the response names the one entered; the other account is free on a different challenge; switching allowed before the start and refused after, with the reason; the score is re-baselined; two different gamers unaffected | **written — 24 assertions** |
 | `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |
 | `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
@@ -3213,8 +3700,8 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/account-deletion.mts` + `tests/ui/account-deletion.mjs` | **B40** | the impact numbers are the wallet's own; a payout in flight is a hard refusal with a reason; a typed word is required; the email goes BEFORE the row does | ☑ 53 + 17 |
 | `tests/ui/home-gamer.mjs` | **B41** | renders both states; the game filter; quest switching with caps shown | owed |
 | `tests/db/missions.mts` + `tests/ui/missions.mjs` | **B42** | one-time, per quest, identical progress in three places, capped | owed |
-| `tests/db/portal-key.mts` | **B45** | rotates once on owner change; old key refused; delivered only to the new owner | owed |
-| `tests/db/storage-budget.mts` | **B46** | LRU eviction; the daily ceiling serves stale rather than failing | owed |
+| `tests/db/portal-key.mts` | **B45** | a changed owner rotates the key exactly once; the old key is refused immediately; the new key goes to the new owner and nowhere else; an undelivered DM is LOUD | ☑ 30 |
+| `tests/db/storage-budget.mts` | **B46** | eviction takes least-recently-used and past-TTL first; the daily ceiling serves STALE rather than failing; a budget that cannot be read does not stop rendering; the report's totals reconcile with its own rows | ☑ 30 |
 | `tests/ui/e2e-*.mjs`, `tests/db/e2e-*.mts` | **V3** | the full matrix, per user type | owed |
 | `docs/UAT/*.md` | **V5** | human acceptance, two rounds per role — not automatable, by design | owed |
 

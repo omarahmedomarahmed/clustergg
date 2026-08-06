@@ -135,6 +135,85 @@ ok("it returns without throwing", Array.isArray(flags));
 ok("a five-member server is below the threshold for a human's attention",
   !flags.some((f) => f.guildId === guildId));
 
+console.log("\n== defence 3: velocity is a friction, not a wall ==");
+// Deliberately last, and narrower than it sounds. B34 took the incentive from
+// $63/day to $2.50/day for fifty accounts, and defence 2 means those fifty move
+// no tier until each is a week old AND has proven a game account. So this does
+// not stop the fraud any more — it stops the NOISE, and it must stay cheap
+// enough that a real gamer on a shared university NAT never meets it.
+{
+  const { signupVelocity, SIGNUP_LIMIT, DISPOSABLE_DOMAINS, YOUNG_DISCORD_DAYS } =
+    await import("../../lib/abuse.ts");
+  const vtag = uid().slice(0, 6);
+
+  const mkSignup = async (email: string, ageDays = 0) => {
+    const id = uid();
+    await db.insert(schema.users).values({
+      id, slug: `v-${id.slice(0, 8)}`, displayName: "V", email,
+      passwordHash: "x", createdAt: new Date(Date.now() - ageDays * 86400_000),
+    } as never);
+  };
+
+  // A mainstream domain is NOT a source.
+  for (let i = 0; i < SIGNUP_LIMIT + 5; i++) await mkSignup(`real${i}-${vtag}@gmail.com`);
+  const mainstream = await signupVelocity(db, { email: `another-${vtag}@gmail.com` });
+  ok("fifteen gmail signups today do not refuse the sixteenth", mainstream.ok,
+    JSON.stringify(mainstream));
+  eq("…and nothing is counted against them", mainstream.seen, 0);
+
+  // A disposable one is.
+  const throwaway = DISPOSABLE_DOMAINS[0];
+  const firstOne = await signupVelocity(db, { email: `a-${vtag}@${throwaway}` });
+  ok("the FIRST throwaway signup is allowed", firstOne.ok, JSON.stringify(firstOne));
+  for (let i = 0; i < SIGNUP_LIMIT; i++) await mkSignup(`t${i}-${vtag}@${throwaway}`);
+  const eleventh = await signupVelocity(db, { email: `late-${vtag}@${throwaway}` });
+  eq("…and the eleventh is refused", eleventh.ok, false);
+  ok("…saying how many it saw", eleventh.seen >= SIGNUP_LIMIT, String(eleventh.seen));
+  // The message matters as much as the rule: the person reading it is usually
+  // not the one the limit is for.
+  ok("…without accusing them of anything",
+    !/bot|fraud|abuse|suspicious/i.test(eleventh.message), eleventh.message);
+  ok("…and telling them their account is fine",
+    /nothing is wrong with your account/i.test(eleventh.message), eleventh.message);
+
+  // Yesterday's signups are outside the window.
+  const oldTag = uid().slice(0, 6);
+  for (let i = 0; i < SIGNUP_LIMIT + 2; i++) await mkSignup(`old${i}-${oldTag}@${DISPOSABLE_DOMAINS[1]}`, 3);
+  const nextDay = await signupVelocity(db, { email: `today-${oldTag}@${DISPOSABLE_DOMAINS[1]}` });
+  ok("a burst three days ago does not refuse today", nextDay.ok, JSON.stringify(nextDay));
+
+  console.log("\n== a young Discord account is a SIGNAL, never a refusal ==");
+  // Every real gamer's Discord account was one day old once.
+  const young = await signupVelocity(db, {
+    email: `young-${vtag}@gmail.com`,
+    discordCreatedAt: new Date(Date.now() - 2 * 86400_000),
+  });
+  ok("it does not refuse", young.ok, JSON.stringify(young));
+  ok("…but it is recorded for the review queue",
+    young.reasons.some((r) => /days old/.test(r)), JSON.stringify(young.reasons));
+  ok(`…and the threshold is ${YOUNG_DISCORD_DAYS} days`, YOUNG_DISCORD_DAYS > 0);
+
+  console.log("\n== it fails OPEN ==");
+  // What it protects is tidiness. What failing closed costs is customers.
+  const broken = { select() { throw new Error("db down"); } } as never;
+  const swallowed: unknown[] = [];
+  const onUnhandled = (e: unknown) => swallowed.push(e);
+  process.on("unhandledRejection", onUnhandled);
+  const down = await signupVelocity(broken, { email: `x-${vtag}@${throwaway}` });
+  await new Promise((r) => setImmediate(r));
+  process.off("unhandledRejection", onUnhandled);
+  eq("a broken read allows the signup", down.ok, true);
+
+  console.log("\n== it is wired into the real signup path ==");
+  const { readFile } = await import("node:fs/promises");
+  const auth = await readFile(new URL("../../app/actions/auth.ts", import.meta.url), "utf8");
+  ok("signup consults it", /signupVelocity\(db, \{ email \}\)/.test(auth));
+  ok("…and refuses with its own message rather than a generic one",
+    /if \(!v\.ok\) return \{ error: v\.message \}/.test(auth));
+  ok("…before the account row is written",
+    auth.indexOf("signupVelocity") < auth.indexOf("insert(schema.users)"));
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);

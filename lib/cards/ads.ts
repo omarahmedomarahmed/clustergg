@@ -148,6 +148,38 @@ export const PREVIEW_AD: CardAdSlot = {
     ).toString("base64"),
 };
 
+/**
+ * The house creative — what fills the slot when no brand has bought it (B56.0).
+ *
+ * There is no such thing as an unsold card. The ad box is fixed on every card
+ * the bot draws, and a corner that is sometimes empty teaches a server owner
+ * that the bot sometimes has one — which is the hardest thing to un-teach, and
+ * it is the reason a brand is buying the slot in the first place.
+ *
+ * Inline SVG, so a platform with no Blob storage and no house campaign still
+ * renders a complete card. A real house creative uploaded against the Cluster
+ * brand outranks this: `pickCardAd` serves it like any other, and this is only
+ * reached when that returns nothing.
+ */
+export const HOUSE_AD: CardAdSlot = {
+  brandName: "Cluster",
+  label: "From Cluster",
+  imageUrl:
+    "data:image/svg+xml;base64," +
+    Buffer.from(
+      `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="200">
+        <defs><linearGradient id="h" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/>
+        </linearGradient></defs>
+        <rect width="640" height="200" fill="#05061c"/>
+        <rect width="640" height="200" fill="url(#h)" opacity="0.18"/>
+        <text x="36" y="82" fill="#ffffff" font-family="sans-serif" font-size="42" font-weight="bold">Play. Earn. Cash out.</text>
+        <text x="36" y="124" fill="#c9c9e6" font-family="sans-serif" font-size="24">Link a game account and get paid to play</text>
+        <text x="36" y="166" fill="#22d3ee" font-family="sans-serif" font-size="24" font-weight="bold">clustergg.com</text>
+      </svg>`,
+    ).toString("base64"),
+};
+
 /** The card, with whichever brand this render belongs to attached. */
 export async function withCardAd<T extends CardData>(
   data: T,

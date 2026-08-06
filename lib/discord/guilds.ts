@@ -52,9 +52,30 @@ export async function upsertGuild(guildId: string, patch: Partial<GuildRow> = {}
         };
       }
     }
+    // Who we thought owned it, BEFORE we overwrite the row (B45).
+    //
+    // This is the detection point and it was already here — Discord reports the
+    // new `owner_id` on every refresh and we wrote it over the old one without
+    // reading it first. The old portal key kept working, so a previous owner
+    // kept access to earnings and payouts for a community that was no longer
+    // theirs.
+    const [was] = await db.select({ owner: schema.discordGuilds.ownerDiscordId })
+      .from(schema.discordGuilds).where(eq(schema.discordGuilds.guildId, guildId)).limit(1);
+
     const values = { guildId, status: "active" as const, removedAt: null, ...meta, ...patch };
     await db.insert(schema.discordGuilds).values(values)
       .onConflictDoUpdate({ target: schema.discordGuilds.guildId, set: values });
+
+    // AFTER the write, so the rotation reads the row Discord just described.
+    // Awaited rather than floated: a floating promise in a server context is
+    // killed when the response is sent (§0), and this one moves access to money.
+    if (was) {
+      const nextOwner = (values as { ownerDiscordId?: string | null }).ownerDiscordId;
+      if (nextOwner && was.owner && was.owner !== nextOwner) {
+        const { onOwnerChanged } = await import("@/lib/portal-key");
+        await onOwnerChanged(guildId, was.owner, nextOwner);
+      }
+    }
   } catch { /* onboarding still succeeded even if we couldn't record it */ }
 }
 

@@ -11,21 +11,34 @@ import { getContent } from "@/lib/cms";
 // the mascot and logo the rest of the site already uses, so there is nothing to
 // configure for them to appear.
 
-export type BrandArt = { astronautUrl: string | null; markUrl: string | null };
+export type BrandArt = {
+  astronautUrl: string | null;
+  markUrl: string | null;
+  /**
+   * The admin's uploaded CP coin (B60).
+   *
+   * The website draws the coin as two layers — the built-in glyph always, the
+   * upload painted over it (`components/Cp.tsx`) — and the cards drew only the
+   * built-in one. Same key, so an admin who changes the coin changes it on the
+   * cards too, without a deploy.
+   */
+  cpIconUrl: string | null;
+};
 
-const KEYS = ["card.astronaut", "card.mark", "brand.quest.astronaut.front", "brand.logo"];
+const KEYS = ["card.astronaut", "card.mark", "brand.quest.astronaut.front", "brand.logo", "brand.cpIcon"];
 
 let memo: { at: number; value: BrandArt } | null = null;
 const TTL = 60_000;
 
 export async function brandCardArt(): Promise<BrandArt> {
   if (memo && Date.now() - memo.at < TTL) return memo.value;
-  let value: BrandArt = { astronautUrl: null, markUrl: null };
+  let value: BrandArt = { astronautUrl: null, markUrl: null, cpIconUrl: null };
   try {
     const c = await getContent(KEYS);
     value = {
       astronautUrl: c["card.astronaut"] || c["brand.quest.astronaut.front"] || null,
       markUrl: c["card.mark"] || c["brand.logo"] || null,
+      cpIconUrl: c["brand.cpIcon"] || null,
     };
   } catch { /* cards still render with the built-in wordmark */ }
   memo = { at: Date.now(), value };

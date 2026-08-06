@@ -143,6 +143,18 @@ export type CardAsset = {
 export type CardLayout = {
   /** The astronaut mascot. */
   mascot: Spot;
+  /**
+   * The GAME's logo, drawn faint in the top strip (B54).
+   *
+   * Decoration, not furniture: it says which game this card is about at a
+   * glance, behind the identity line rather than beside it, so the strip reads
+   * as that game's card without spending a slot the content needs. Drawn under
+   * everything, at `opacity` — the house default is faint on purpose.
+   *
+   * Skipped when the badge is already showing the same logo, because two of one
+   * mark in one band is a mistake rather than a design.
+   */
+  gameMark: Spot;
   /** The Cluster logo mark. */
   mark: Spot;
   /** Top-right furniture: game logo, level pill, or the challenge trophy stack. */
@@ -174,6 +186,33 @@ export type CardLayout = {
    */
   badgeShow?: BadgeShow;
   content: ContentBox;
+  /**
+   * A thin line around the whole card, 0-100. 0 turns it off.
+   *
+   * The replacement for the gradient rule that used to run across the top: that
+   * read as a notification banner, and what a section actually needs is an edge
+   * so it stops being a rectangle of art with words on it. One quiet line, not
+   * a light.
+   */
+  stroke?: number;
+  /**
+   * How the body is divided (B57).
+   *
+   * B56.0 made the body free space edge to edge, and one block of content
+   * spread across 1100px is not a layout — it is a wide list. A body is PANES,
+   * side by side rather than stacked: one where the card has one thing to say,
+   * two where it has two (a profile's accounts and its trophy case), four where
+   * it has four (the planet card — two ladders, the live challenges, the game
+   * world; the planet explorer, rendered).
+   *
+   * Part of the layout rather than of the code, so an admin sets it per kind.
+   * A card with nothing for a pane leaves it EMPTY — never a box with nothing
+   * in it, which is the failure mode a grid invites.
+   */
+  bodyCols?: 1 | 2;
+  bodyRows?: 1 | 2;
+  /** The gap between panes, in canvas pixels. */
+  gutter?: number;
   /** Darkness (0-100) of the plate drawn behind text blocks. 0 turns it off. */
   plate: number;
   /** Corner radius of that plate, in canvas pixels. */
@@ -221,35 +260,86 @@ export const AD_RATIO = 0.3125;
 /** The "Sponsored · Brand" strip drawn under the creative, in canvas pixels. */
 export const AD_LABEL_H = 22;
 
+// THE SHARED CARD LAYOUT (B56.0).
+//
+// A card is a SECTION of the platform rendered to PNG, and a section has three
+// bands and no furniture floating in the middle of it:
+//
+//   TOP-LEFT     the card's identity: an IMAGE — the game's logo, the gamer's
+//                avatar, the game account's avatar, the quest's art — with the
+//                title and one line of context beside it. Never text alone;
+//                every kind has a picture of the thing it is about and a card
+//                that opens with a headline in space could be any card.
+//   TOP-RIGHT    the ad. FIXED, on every card, without exception. There is no
+//                "unsold": when no brand has bought the slot the house creative
+//                fills it, because the slot is the product and an empty corner
+//                teaches a server owner that the bot sometimes has one.
+//   EVERYTHING   free space, edge to edge. Nothing is drawn into the body that
+//   BELOW        the body has to lay itself out around — no mascot in the
+//                bottom-right, no logo tile in a corner, no badge hanging off
+//                the strip. The Cluster mark is in this band and is a WATERMARK
+//                behind the content, so it brands the card without taking a
+//                rectangle from it.
+//
+// What that replaced, and why each went:
+//
+//   the gradient bar    A glowing rule across the top made every card look like
+//                       a notification. A section has a border, not a light.
+//                       `stroke` is the replacement: one thin, quiet line.
+//   the corner mark     Our logo sat between the identity and the ad and was
+//                       the third thing competing for a band that has room for
+//                       two. It is the watermark now.
+//   the mascot          It had been in three places in three commits — bottom
+//                       left (behind the body text), the strip (through the
+//                       title), then the right column (taking a column the body
+//                       now needs). The body is free space; the mascot is not
+//                       part of it.
+//   the badge           A fourth thing in the top band, on a band with an ad in
+//                       it. Off by default; a card that wants a level or a
+//                       trophy row draws it in its own body, where it belongs.
 export const DEFAULT_LAYOUT: CardLayout = {
-  mascot: { x: 9, y: 84, size: 200 },
-  // Bottom-right at 250, on every card, without exception.
+  // OFF by default. The body is free space edge to edge, and a figure standing
+  // in it is exactly the thing that stops a card being laid out properly. An
+  // admin who wants it on a particular kind can unhide and place it.
+  mascot: { x: 90, y: 76, size: 190, hidden: true },
+  // THE IDENTITY IMAGE, top-left — the picture of whatever this card is about.
+  // (Stored under its old key so no admin's saved placement is lost; it used to
+  // be a faint watermark of the game's logo in the same corner.)
+  gameMark: { x: 8.2, y: 17.5, size: 108 },
+  // THE WATERMARK, in the body band, behind the content.
   //
-  // It was 104px and it read as a favicon somebody forgot to remove. These
-  // cards get screenshotted, cropped and reposted, and the only thing that
-  // travels with them is this mark — so it is drawn at a size that survives
-  // being seen at thumbnail scale in somebody else's feed.
-  mark: { x: 87.5, y: 77.5, size: 250 },
-  badge: { x: 91, y: 11.5, size: 96 },
-  // The text column stops short of the sponsor box AND of the logo.
-  //
-  // Satori has no float, so text cannot wrap around either of them — the
-  // column has to end before the right-hand furniture starts. 758px of the
-  // 1200 belongs to content; the 420 to its right belongs to the brand at the
-  // top, the logo at the bottom, and (on a world card) the splash between.
-  // This is the cost of carrying inventory on every card, taken once, in one
-  // place, instead of discovered per card in production.
-  content: { x: 4.7, y: 7, w: 58.5, h: 84 },
-  // Top-right corner at 400 wide — the biggest unit that still leaves a
-  // readable text column, and the same coordinates on every card so a brand's
-  // creative lands in the same place whatever the bot was asked for. The badge
-  // is pushed clear of it automatically; see `badgeTopFor`.
-  ad: { x: 81.7, y: 12.8, size: 400 },
+  // It has been bottom-right (over the standings), then top-right in the strip
+  // (under the sponsor box, which is drawn last, so on a sold card it was not
+  // on the card at all). Both were attempts to give our mark a rectangle of its
+  // own on a card that has no spare rectangle. As a watermark it costs nothing:
+  // it is behind every word, it survives the crop, and no body has to lay
+  // itself out around it.
+  mark: { x: 50, y: 63, size: 430, opacity: 7 },
+  // OFF by default — see the note above. Unhide it per kind if a card wants it.
+  badge: { x: 91, y: 26, size: 96, hidden: true },
+  // The whole band below the strip, edge to edge. Not a column any more: there
+  // is nothing to its right to stop for, which is the entire point of moving
+  // the mark, the mascot and the badge out of the body.
+  content: { x: 4, y: 30.2, w: 92, h: 65 },
+  // TOP-RIGHT, fixed, on every card. 400 wide: `adBox` gives it 125 of creative
+  // plus the disclosure strip, so it bottoms out at 179 and the body starts
+  // under it. Everything else in the top band is placed around this, because
+  // this is the one element whose position is a commercial promise.
+  ad: { x: 79.3, y: 15, size: 400 },
   plate: 46,
   plateRadius: 22,
   dim: 62,
   glows: false,
-  bar: true,
+  // The gradient rule is GONE (B56.0) — see the note above. `bar` survives so
+  // an admin who wants it can turn it back on, and so no stored layout breaks.
+  bar: false,
+  // A single thin line around the card, at this opacity. 0 turns it off.
+  stroke: 26,
+  // One pane by default: a kind that has not been given a second thing to say
+  // should not be handed a second column to fill.
+  bodyCols: 1,
+  bodyRows: 1,
+  gutter: 26,
   scrim: true,
   badgeShow: "auto",
   parts: {},
@@ -412,18 +502,20 @@ function bgSources(v: unknown): string[] {
 }
 
 /** Parse whatever is stored into a layout that is always safe to render. */
-export function parseLayout(raw: string | null | undefined): CardLayout {
-  if (!raw) return DEFAULT_LAYOUT;
+export function parseLayout(raw: string | null | undefined, kind?: string): CardLayout {
+  const kindPanes = (kind && KIND_PANES[kind]) || { cols: DEFAULT_LAYOUT.bodyCols ?? 1, rows: DEFAULT_LAYOUT.bodyRows ?? 1 };
+  if (!raw) return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows };
   let o: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return DEFAULT_LAYOUT;
+    if (!parsed || typeof parsed !== "object") return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows };
     o = parsed as Record<string, unknown>;
-  } catch { return DEFAULT_LAYOUT; }
+  } catch { return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows }; }
 
   const c = (o.content ?? {}) as Partial<ContentBox>;
   return {
     mascot: spot(o.mascot, DEFAULT_LAYOUT.mascot),
+    gameMark: spot(o.gameMark, DEFAULT_LAYOUT.gameMark),
     mark: spot(o.mark, DEFAULT_LAYOUT.mark),
     badge: spot(o.badge, DEFAULT_LAYOUT.badge),
     ad: spot(o.ad, DEFAULT_LAYOUT.ad),
@@ -437,7 +529,14 @@ export function parseLayout(raw: string | null | undefined): CardLayout {
     plateRadius: num(o.plateRadius, DEFAULT_LAYOUT.plateRadius, 0, 60),
     dim: num(o.dim, DEFAULT_LAYOUT.dim, 0, 100),
     glows: o.glows === true,
-    bar: o.bar !== false,
+    // Defaults OFF now (B56.0): a stored layout that predates the redesign has
+    // no `bar` key, and reviving the gradient rule for every one of them would
+    // undo the redesign on exactly the cards an admin had already tuned.
+    bar: o.bar === true,
+    stroke: num(o.stroke, DEFAULT_LAYOUT.stroke ?? 0, 0, 100),
+    bodyCols: (num(o.bodyCols, kindPanes.cols, 1, 2) === 2 ? 2 : 1) as 1 | 2,
+    bodyRows: (num(o.bodyRows, kindPanes.rows, 1, 2) === 2 ? 2 : 1) as 1 | 2,
+    gutter: num(o.gutter, DEFAULT_LAYOUT.gutter ?? 26, 0, 80),
     scrim: o.scrim !== false,
     badgeShow: typeof o.badgeShow === "string" && BADGE_SHOW_IDS.has(o.badgeShow as BadgeShow)
       ? (o.badgeShow as BadgeShow) : "auto",
@@ -755,6 +854,58 @@ export function badgeTopFor(l: CardLayout, hasAd: boolean, badgeRatio = 1): numb
 }
 
 /**
+ * Where our own mark actually hangs once a sponsor box is on the card.
+ *
+ * B54 moved the mark to the top-right strip (x 91.5, y 8.5 → 1032..1164 across,
+ * -12..119 down). The default sponsor box is x 81.7, y 12.8, 400 wide, which
+ * `adBox` puts at 780..1180 across and -24..208 down — so on every SOLD card the
+ * ad was drawn last, over the top, and our mark was gone. Unsold cards looked
+ * right, which is exactly the sort of thing that ships.
+ *
+ * Same treatment `badgeTopFor` gives the badge, in the other axis: the mark
+ * slides LEFT to clear the creative rather than down, because the strip is the
+ * band it belongs in and dropping it out of the strip is a different card. An
+ * admin who has hand-placed either keeps their placement whenever the two do
+ * not actually collide, and a card with no ad is untouched.
+ */
+export function markLeftFor(l: CardLayout, hasAd: boolean): number {
+  const mark = spotBox(l.mark, 1);
+  if (!hasAd || l.ad.hidden || l.mark.hidden) return mark.left;
+  const ad = adBox(l.ad);
+  const overlapsX = mark.left < ad.left + ad.width && ad.left < mark.left + mark.width;
+  const overlapsY = mark.top < ad.bottom && ad.top < mark.top + mark.height;
+  if (!overlapsX || !overlapsY) return mark.left;
+  // Never push it off the left edge: a mark half off the canvas is worse than
+  // one that shares a few pixels with the creative.
+  return Math.max(8, ad.left - mark.width - 16);
+}
+
+const overlap = (a: { left: number; top: number; width: number; height: number },
+  b: { left: number; top: number; width: number; height: number }) =>
+  a.left < b.left + b.width && b.left < a.left + a.width
+  && a.top < b.top + b.height && b.top < a.top + a.height;
+
+/**
+ * Does the mascot have to stand down on this card?
+ *
+ * The strip has three tenants and only two of them are load-bearing. On a SOLD
+ * card the creative takes the right end and `markLeftFor` slides our mark left
+ * to clear it — straight into where the mascot stands. The first render of that
+ * was a grey shoulder poking out from behind the logo, which is worse than no
+ * mascot at all.
+ *
+ * So it yields, and only when it actually collides: an unsold card keeps it, and
+ * an admin who has dragged it somewhere the mark never reaches keeps it on every
+ * card. Decoration gives way to the two things that are not.
+ */
+export function mascotYields(l: CardLayout, hasAd: boolean): boolean {
+  if (l.mascot.hidden || l.mark.hidden || !hasAd || l.ad.hidden) return false;
+  const mascot = spotBox(l.mascot, 1);
+  const mark = { ...spotBox(l.mark, 1), left: markLeftFor(l, true) };
+  return overlap(mascot, mark) || overlap(mascot, adBox(l.ad));
+}
+
+/**
  * The right-hand column, under the sponsor box.
  *
  * The world card's splash banner lives here, and where it lands is not a fixed
@@ -788,6 +939,89 @@ export function sideBox(l: CardLayout, o: { hasAd: boolean; hasBadge: boolean; b
 
 /** True when that column is big enough to be worth drawing at all. */
 export const sideBoxFits = (b: { width: number; height: number }) => b.width > 60 && b.height > 60;
+
+/**
+ * The content box, narrowed if a sponsor box is standing in it.
+ *
+ * B54 widened the column from 58.5% to 78% and started it at the top of the
+ * card, which is right for the card a server actually sees most of the time —
+ * an UNSOLD one. On a sold card the same geometry ran the title straight under
+ * the creative: "Blitz Supernova — Weekly Wins Ra…" with the last word behind
+ * our own logo, and the description sliced off mid-sentence by the ad's edge.
+ *
+ * Satori has no float, so the text cannot wrap around the creative; the column
+ * has to end before it. The old layout paid that cost on every card forever by
+ * keeping the column narrow whether or not anything was ever sold. This pays it
+ * only when there is something to pay it for.
+ *
+ * Height and top are untouched — only the width moves, so nothing reflows
+ * vertically and a card that fitted still fits.
+ */
+export function contentBoxFor(l: CardLayout, hasAd: boolean) {
+  const box = contentBox(l.content);
+  if (!hasAd || l.ad.hidden) return box;
+  const ad = adBox(l.ad);
+  // The obstacle is not just the creative: the mark slides LEFT of it on a sold
+  // card (see `markLeftFor`), which put our own logo inside the text column —
+  // the second render of this had "Weekly Wins" running behind the mark. The
+  // column ends before the right-hand furniture, whichever piece of it comes
+  // first.
+  const wall = l.mark.hidden ? ad.left : Math.min(ad.left, markLeftFor(l, true));
+  const overlapsY = box.top < ad.bottom && ad.top < box.top + box.height;
+  if (!overlapsY || box.left + box.width <= wall) return box;
+  // Never narrower than a third of the canvas: a column squeezed to nothing by
+  // an admin who dragged the ad across the card is an unreadable card, and the
+  // creative overlapping some text is the lesser of those two.
+  return { ...box, width: Math.max(CANVAS_W / 3, wall - 16 - box.left) };
+}
+
+/**
+ * The rectangle of each body pane (B57).
+ *
+ * ONE helper, shared by the renderer and the layout editor, for the same reason
+ * `sideBox` is shared: a pane the editor draws in a different place from where
+ * the renderer draws it is worse than no editor at all.
+ *
+ * Returns as many rectangles as the layout asks for, reading order — left to
+ * right, then top to bottom. A card hands its panes in the same order and the
+ * ones it has no content for are simply not drawn.
+ */
+/**
+ * How many panes each kind's body wants, before an admin says otherwise (B57).
+ *
+ * A default rather than a rule: it is the shape the card was designed to, and
+ * `parseLayout` lets a stored layout override it like any other field. Kinds
+ * not listed here get one pane, which is the right answer for a leaderboard —
+ * a second column of nothing is worse than a wide list.
+ */
+export const KIND_PANES: Record<string, { cols: 1 | 2; rows: 1 | 2 }> = {
+  // Accounts on the left, the trophy case on the right.
+  profile: { cols: 2, rows: 1 },
+  // Details and prize on the left, so the standings get the right-hand column
+  // back — they were being squeezed by a podium drawn above them.
+  challenge: { cols: 2, rows: 1 },
+  // THE 2x2. Two ladders, the live challenges and the game world: the planet
+  // explorer, rendered.
+  planet: { cols: 2, rows: 2 },
+  // Mains and recent matches, side by side, the way the account page reads.
+  "game-stats": { cols: 2, rows: 1 },
+};
+
+export function panes(l: CardLayout): { left: number; top: number; width: number; height: number }[] {
+  const box = contentBox(l.content);
+  const cols = l.bodyCols === 2 ? 2 : 1;
+  const rows = l.bodyRows === 2 ? 2 : 1;
+  const g = Math.max(0, l.gutter ?? 26);
+  const w = (box.width - g * (cols - 1)) / cols;
+  const h = (box.height - g * (rows - 1)) / rows;
+  const out: { left: number; top: number; width: number; height: number }[] = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      out.push({ left: box.left + c * (w + g), top: box.top + r * (h + g), width: w, height: h });
+    }
+  }
+  return out;
+}
 
 export function contentBox(c: ContentBox): { left: number; top: number; width: number; height: number } {
   return {

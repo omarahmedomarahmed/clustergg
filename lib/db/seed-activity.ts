@@ -80,6 +80,7 @@ export async function seedDemoActivity(db: {
   await seedServerScale(db);
   await seedNavArt(db);
   await seedPodiumPrizes(db);
+  await seedWelcomeQueue(db);
   await seedFeatureShots(db);
   if (admin) await seedAuditTrail(db, admin.id);
 }
@@ -778,6 +779,68 @@ async function seedPodiumPrizes(db: any) {
     await db.insert(schema.platformSettings)
       .values({ key: PODIUM_TROPHY_KEYS[i], value: t.id })
       .onConflictDoNothing();
+  }
+}
+
+// ===== One welcome challenge, stuck the way real ones get stuck =====
+//
+// The campaign is off by default, so nothing has ever granted one and the admin
+// queue renders its empty state — correct, and indistinguishable from the
+// feature not existing. This seeds the row that MATTERS: a draft on a game we
+// cannot verify scores on, which is the state that needs a human and the one the
+// queue was built for. Billed to the house brand like a real one, so the ledger
+// point is visible too.
+async function seedWelcomeQueue(db: any) {
+  const [existing] = await db.select({ c: sql<number>`count(*)` }).from(schema.challenges)
+    .where(eq(schema.challenges.kind, "welcome"));
+  if (Number(existing?.c ?? 0) > 0) return;
+
+  const [guild] = await db.select().from(schema.discordGuilds)
+    .where(eq(schema.discordGuilds.status, "active")).limit(1);
+  const [space] = await db.select().from(schema.spaces).limit(1);
+  if (!guild || !space) return;
+
+  // The house brand is read through the PASSED handle, not via `houseBrand()`.
+  //
+  // That helper calls `getDb()`, and this runs inside the bootstrap `getDb()` is
+  // still completing — a re-entrant call that deadlocks. It showed up as static
+  // page generation timing out after 60s on five unrelated routes, with a build
+  // error naming `/settings/connections` and nothing about the seed. Same rule
+  // the rest of this module already follows: use the handle you were given.
+  const { HOUSE_BRAND_ID } = await import("@/lib/house-brand");
+  const [brand] = await db.select({ id: schema.brands.id })
+    .from(schema.brands).where(eq(schema.brands.id, HOUSE_BRAND_ID)).limit(1);
+  const id = uid();
+  await db.insert(schema.challenges).values({
+    id, spaceId: space.id,
+    // Deliberately a game with no provider — this is the stuck state.
+    game: "Rocket League", provider: "chesscom",
+    title: `${guild.name || "Server"} — Welcome Challenge`,
+    description: "A competition for this server only, funded by Cluster.",
+    format: "top3", cadence: "weekly", rules: { conditions: [] }, pointsEngine: { wins: 10 },
+    visibility: "private", guildId: guild.guildId, accessKey: "WELCOME",
+    startAt: ago(2), endAt: new Date(Date.now() + 5 * day),
+    status: "draft", kind: "welcome",
+    sponsorBrandId: brand?.id ?? null, sponsorPrice: 25,
+    prizeDescription: "$25 prize pool, funded by Cluster",
+    createdAt: ago(2),
+  }).onConflictDoNothing();
+  await db.update(schema.discordGuilds)
+    .set({ welcomeChallengeAt: ago(2), welcomeChallengeId: id })
+    .where(eq(schema.discordGuilds.guildId, guild.guildId));
+  // The bill, inline for the same reason.
+  if (brand) {
+    const invId = uid();
+    await db.insert(schema.brandInvoices).values({
+      id: invId, brandId: brand.id, number: `WLC-${invId.slice(0, 6)}`,
+      status: "draft", currency: "USD", periodLabel: "This month",
+      issuedAt: ago(2), dueAt: new Date(Date.now() + 28 * day), payToken: uid(),
+    }).onConflictDoNothing();
+    await db.insert(schema.invoiceLines).values({
+      id: uid(), invoiceId: invId, kind: "game",
+      label: `Welcome challenge — ${guild.name || guild.guildId}`,
+      quantity: 1, unitAmount: 25, sourceType: "welcome", sourceId: id, sortOrder: 0,
+    }).onConflictDoNothing();
   }
 }
 

@@ -9,7 +9,8 @@
 // which is why they are opt-in rather than default: a suite that fails because
 // nobody started a server teaches people to ignore failures.
 
-import { spawnSync, spawn } from "node:child_process";
+import { spawnSync, spawn, execFile } from "node:child_process";
+import { cpus } from "node:os";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -85,23 +86,58 @@ if (withUi) {
   }
 }
 
-let failed = 0;
-const results = [];
-for (const s of suites) {
-  console.log(`\n\x1b[1m▶ ${s.file}\x1b[0m`);
-  const cmd = s.kind === "db" ? ["npx", "tsx", s.file] : ["node", s.file];
-  const r = spawnSync(cmd[0], cmd.slice(1), {
-    stdio: "inherit",
+// The db suites run in PARALLEL; the ui suites do not.
+//
+// Every db suite stands up its OWN in-memory PGlite, so they share nothing and
+// the wall-clock cost was almost entirely 29 sequential bootstraps. The browser
+// suites share one server, one port and one set of demo data — running those
+// concurrently would have them racing over the same rows, which is a flaky
+// suite pretending to be a fast one.
+//
+// Output is captured per suite and printed when that suite finishes, so the log
+// still reads top-to-bottom instead of interleaving.
+const LANES = Math.max(2, Math.min(8, (cpus().length || 4) - 1));
+
+const runOne = (s) => new Promise((resolve) => {
+  const cmd = s.kind === "db" ? ["npx", ["tsx", s.file]] : ["node", [s.file]];
+  execFile(cmd[0], cmd[1], {
     env: { ...process.env, DEMO_DB: "1", BASE_URL: `http://localhost:${PORT}` },
+    maxBuffer: 32 * 1024 * 1024,
+  }, (err, stdout, stderr) => {
+    resolve({ file: s.file, ok: !err, out: `${stdout}${stderr}` });
   });
-  const okRun = r.status === 0;
-  if (!okRun) failed++;
-  results.push({ file: s.file, ok: okRun });
+});
+
+async function runLanes(list, lanes) {
+  const out = [];
+  let next = 0;
+  const worker = async () => {
+    while (next < list.length) {
+      const s = list[next++];
+      const r = await runOne(s);
+      console.log(`\n\x1b[1m▶ ${r.file}\x1b[0m`);
+      process.stdout.write(r.out);
+      out.push(r);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(lanes, list.length) }, worker));
+  return out;
 }
+
+const t0 = Date.now();
+const dbSuites = suites.filter((s) => s.kind === "db");
+const uiSuites = suites.filter((s) => s.kind === "ui");
+
+const results = [
+  ...await runLanes(dbSuites, LANES),
+  // One at a time, against the one server.
+  ...await runLanes(uiSuites, 1),
+];
+const failed = results.filter((r) => !r.ok).length;
 
 console.log("\n────────────────────────────────");
 for (const r of results) console.log(`${r.ok ? "\x1b[32m  pass\x1b[0m" : "\x1b[31m  FAIL\x1b[0m"}  ${r.file}`);
-console.log(`${results.length - failed}/${results.length} suites passed`);
+console.log(`${results.length - failed}/${results.length} suites passed in ${((Date.now() - t0) / 1000).toFixed(0)}s (${LANES} lanes)`);
 if (!withUi) console.log("(browser suites skipped — run `npm test -- --ui`, which starts and stops its own server)");
 killServers();
 process.exit(failed ? 1 : 0);

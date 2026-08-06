@@ -105,9 +105,25 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     // stable rather than whatever the query happened to return. The cash value
     // travels with each one: a trophy nobody can price reads as a badge, and
     // the entire point of this economy is that these are worth real money.
-    trophies: [...won]
-      .sort((a, b) => (b.value - a.value) || (b.awardedAt.getTime() - a.awardedAt.getTime()))
-      .map((t) => ({ name: t.name, imageUrl: t.imageUrl, value: t.value })),
+    // STACKED (B62): the same trophy held more than once — bought one, won one,
+    // earned one at a streak milestone — is ONE entry with a count. Three rows
+    // of the same picture read as a bug, and the count is the impressive part.
+    // Keyed on name+image rather than on the trophy id, because two rows can be
+    // the same prize re-issued, and a gamer does not care which id it was.
+    trophies: (() => {
+      const by = new Map<string, { name: string; imageUrl: string; value: number; count: number; at: number }>();
+      for (const t of won) {
+        const key = `${t.name}::${t.imageUrl}`;
+        const hit = by.get(key);
+        if (hit) { hit.count += 1; hit.at = Math.max(hit.at, t.awardedAt.getTime()); }
+        else by.set(key, { name: t.name, imageUrl: t.imageUrl, value: t.value, count: 1, at: t.awardedAt.getTime() });
+      }
+      return [...by.values()]
+        .sort((a, b) => (b.value - a.value) || (b.at - a.at))
+        .map(({ name, imageUrl, value, count }) => ({ name, imageUrl, value, count }));
+    })(),
+    // The TOTAL held, which is still the honest number for the heading — a
+    // gamer with three of one trophy and two of another has five.
     trophyCount: won.length,
     challenges,
     theme: {
@@ -274,6 +290,9 @@ export async function cpSummaryCard(slug: string): Promise<CardData | null> {
   return {
     kind: "cp-summary",
     displayName: user.displayName,
+    // B56.0: every card's top-left is a picture of the thing it is about, and
+    // for a gamer's quest summary that is the gamer.
+    avatarUrl: user.avatarUrl,
     totalCp,
     level: levelFromCp(totalCp).level,
     quests: quests.slice(0, 4).map((q) => ({
@@ -354,6 +373,10 @@ export async function planetCard(game: string): Promise<CardData | null> {
       const rows = await db.select({
         value: schema.statCurrent.metricValue, rankLabel: schema.statCurrent.rankLabel,
         name: schema.users.displayName,
+        // The IN-GAME name (B54/B52). This is that game's ladder, and it was
+        // printing the Cluster profile name — the same defect the challenge
+        // card had, in a third place.
+        ign: schema.linkedGameAccounts.inGameName,
       }).from(schema.statCurrent)
         .innerJoin(schema.linkedGameAccounts, eq(schema.statCurrent.linkedAccountId, schema.linkedGameAccounts.id))
         .innerJoin(schema.users, eq(schema.linkedGameAccounts.userId, schema.users.id))
@@ -361,7 +384,7 @@ export async function planetCard(game: string): Promise<CardData | null> {
       entries = rows.length;
       const sorted = [...rows].sort((a, b) => board.sortDir === "asc" ? a.value - b.value : b.value - a.value);
       if (sorted[0]) {
-        leader = sorted[0].name;
+        leader = sorted[0].ign || sorted[0].name;
         value = sorted[0].rankLabel ?? String(Math.round(sorted[0].value * 100) / 100);
       }
     } catch { /* a board we can't read is still a board that exists */ }
@@ -370,6 +393,18 @@ export async function planetCard(game: string): Promise<CardData | null> {
 
   return {
     kind: "planet",
+    // The game's own world, from the cached snapshot — never a live fetch on a
+    // card render. No snapshot yet means no fourth pane, which is the rule the
+    // pane grid is built on: a card with nothing for a pane leaves it empty
+    // rather than drawing a box with nothing in it.
+    world: await (async () => {
+      try {
+        const { getCachedEntityList } = await import("@/lib/game-world-cache");
+        return (await getCachedEntityList(g.name)).slice(0, 4)
+          .map((e) => ({ name: e.name, imageUrl: e.image || null, role: e.role }));
+      } catch { return []; }
+    })(),
+    
     game: g.name,
     logoUrl: g.logoUrl,
     description: g.description || null,
@@ -422,8 +457,14 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
   const [participants, [g], bg] = await Promise.all([
     db.select({ id: schema.challengeParticipants.id }).from(schema.challengeParticipants)
       .where(eq(schema.challengeParticipants.challengeId, ch.id)),
-    db.select({ logoUrl: schema.games.logoUrl, accent: schema.games.accent, accent2: schema.games.accent2 })
-      .from(schema.games).where(eq(schema.games.name, ch.game)).limit(1),
+    // The game's OWN art too (B54). A challenge with no cover of its own used
+    // to fall past `bot_challenge` to nothing and render as a flat gradient —
+    // a competition on League of Legends looking like a competition on nothing.
+    // Its game always has a planet background or a cover.
+    db.select({
+      logoUrl: schema.games.logoUrl, accent: schema.games.accent, accent2: schema.games.accent2,
+      planetBgUrl: schema.games.planetBgUrl, coverUrl: schema.games.coverUrl,
+    }).from(schema.games).where(eq(schema.games.name, ch.game)).limit(1),
     cardBg("bot_challenge"),
   ]);
 
@@ -486,13 +527,28 @@ export async function challengeCard(challengeId: string): Promise<CardData | nul
     prize: ch.prizeDescription || null,
     isPrivate: ch.visibility === "private" && !!ch.accessKey,
     serverName,
-    standings: standings.map((s) => ({ place: s.place, name: s.displayName, points: s.points })),
+    // The IN-GAME name leads (B54, consistent with B52).
+    //
+    // `challengeStandings` has returned `inGameName` all along and this line
+    // threw it away. It is that game's challenge, scored on that game's
+    // account, so the game identity is the subject — a gamer looking for
+    // themselves on a card is looking for the tag they play under. The Cluster
+    // name rides along as the secondary line.
+    standings: standings.map((s) => ({
+      place: s.place,
+      name: s.inGameName || s.displayName,
+      alt: s.inGameName && s.inGameName !== s.displayName ? s.displayName : null,
+      points: s.points,
+    })),
     trophies,
     theme: {
       accent: g?.accent || BRAND.accent,
       accent2: g?.accent2 || BRAND.accent2,
-      bgUrl: ch.coverUrl || ch.heroUrl || bg.bgUrl,
-      bgFallbacks: [ch.heroUrl, bg.bgUrl],
+      // Its own art first, then the GAME's, then the configured default. The
+      // game's art is the addition: a challenge without a cover is common and
+      // should still look like the game it is on.
+      bgUrl: ch.coverUrl || ch.heroUrl || g?.planetBgUrl || g?.coverUrl || bg.bgUrl,
+      bgFallbacks: [ch.heroUrl, g?.planetBgUrl, g?.coverUrl, bg.bgUrl],
     },
   };
 }
@@ -588,9 +644,13 @@ export async function challengeStandingsCard(challengeId: string): Promise<CardD
       : "Nobody has scored yet — first point leads",
     rows: live.map((r, i) => ({
       rank: i + 1,
-      // The ACCOUNT that is competing, next to the person. With two accounts on
-      // one game these are different names, and only one of them is entered.
-      name: r.account && r.account !== r.name ? `${r.name} · ${r.account}` : r.name,
+      // The ACCOUNT leads (B54, matching B52).
+      //
+      // This read `${r.name} · ${r.account}` — the Cluster name first. It is
+      // that game's challenge, scored on that game's account, and with two
+      // accounts on one game only one of them is entered: the entered one is
+      // the subject. The person rides along second.
+      name: r.account && r.account !== r.name ? `${r.account} · ${r.name}` : (r.account || r.name),
       value: `${r.points} pts`,
       avatarUrl: r.avatarUrl,
     })),

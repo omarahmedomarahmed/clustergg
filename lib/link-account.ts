@@ -91,7 +91,16 @@ export async function linkGameAccountFor(
   // so this is the moment the counter moves — and possibly crosses the line.
   void markMemberLinked(userId).catch(() => {});
   // Never awaited into the result — a failed announcement must not fail a link.
-  void announceAccountLinked(userId, provider.game).catch(() => {});
+  // Awaited, not floated (B1.1, trap 6).
+  //
+  // `void …catch(() => {})` looks safe and is not: a floating promise in a
+  // server action is killed when the response is sent, so the announcement
+  // sometimes happened and sometimes did not, depending on how fast the caller
+  // returned. Since B33 this only ENQUEUES — a couple of inserts, drained by
+  // cron — so awaiting it costs almost nothing and makes it deterministic.
+  // Its own errors are still swallowed: a link that succeeded must not fail
+  // because Discord did.
+  try { await announceAccountLinked(userId, provider.game); } catch { /* the link stands */ }
 
   return {
     ok: true, accountId: id, game: provider.game, name: verified.name,

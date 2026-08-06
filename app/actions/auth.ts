@@ -27,6 +27,19 @@ export async function register(_prev: FormState, formData: FormData): Promise<Fo
     .where(eq(schema.users.slug, slug)).limit(1);
   if (slugTaken) slug = `${slug}-${uid().slice(0, 4).toLowerCase()}`;
 
+  // Defence 3 (B35): make fifty accounts feel like work.
+  //
+  // A FRICTION, never a wall. It refuses only on the count from a disposable
+  // email domain — a mainstream domain is not a source, because "ten gmail
+  // signups today" is a Tuesday and refusing the eleventh refuses a real gamer
+  // for somebody else's behaviour. It also fails open: what it protects is
+  // tidiness, and what failing closed costs is customers.
+  {
+    const { signupVelocity } = await import("@/lib/abuse");
+    const v = await signupVelocity(db, { email });
+    if (!v.ok) return { error: v.message };
+  }
+
   // First user on a fresh database becomes superadmin (bootstrap).
   const [{ c }] = await db.select({ c: count() }).from(schema.users);
   const role = Number(c) === 0 ? "superadmin" : "user";

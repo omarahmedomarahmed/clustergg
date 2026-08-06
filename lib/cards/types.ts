@@ -37,6 +37,8 @@ export type CardTheme = {
   // that says where all three of them go.
   astronautUrl?: string | null;
   markUrl?: string | null;
+  /** The admin's CP coin, drawn OVER the built-in glyph (B60). */
+  cpIconUrl?: string | null;
   layout?: CardLayout;
   // The sponsor for this render. Attached before the card is hashed for the
   // cache, so each brand's version of a card is stored and reused separately
@@ -76,7 +78,13 @@ export type ProfileCard = {
   // Ordered most valuable first. `value` is the admin-assigned dollar figure
   // the trophy redeems for — the card prints it, because a trophy nobody can
   // price reads as a badge rather than as money.
-  trophies?: { name: string; imageUrl: string; value?: number }[];
+  /**
+   * `count` is how many of THIS trophy they hold (B62): bought one, won one,
+   * earned one at a streak milestone is one tile with `x3` on it, not three
+   * identical pictures. `value` is carried but the profile card does not draw
+   * it — a price on a profile turns a trophy case into a receipt.
+   */
+  trophies?: { name: string; imageUrl: string; value?: number; count?: number }[];
   trophyCount?: number;           // total won, when more than the card can show
   challenges?: { title: string; live: boolean; points: number; place?: number | null }[];
   theme: CardTheme;
@@ -119,6 +127,8 @@ export type QuestCard = {
 export type CpSummaryCard = {
   kind: "cp-summary";
   displayName: string;
+  /** The gamer's avatar — the identity image every card carries (B56.0). */
+  avatarUrl?: string | null;
   totalCp: number;
   level: number;
   quests: { name: string; cp: number; target: number; tier: string; accent: string }[];
@@ -151,7 +161,12 @@ export type ChallengeCard = {
   startsAt?: string | null;     // ISO — so the card can show the full window
   // Live standings. A challenge card without them is a poster; with them it's a
   // scoreboard people come back to.
-  standings?: { place: number; name: string; points: number; you?: boolean }[];
+  /**
+   * `name` is the IN-GAME name — that game's challenge, scored on that game's
+   * account, so the game identity is the subject (B54, matching B52). `alt` is
+   * the Cluster display name, present only when it differs.
+   */
+  standings?: { place: number; name: string; alt?: string | null; points: number; you?: boolean }[];
   /**
    * Who can enter, in the game's own words — "Gold or above in Solo/Duo".
    *
@@ -176,6 +191,14 @@ export type PlanetCard = {
   description?: string | null;
   challenges: { title: string; endsAt: string; participants: number; prize?: string | null }[];
   boards: { title: string; leader: string | null; value: string | null; entries: number }[];
+  /**
+   * The game's own world — heroes, weapons, maps (B57).
+   *
+   * The planet page is not two lists; it is the planet EXPLORER, and the fourth
+   * thing on it is the game itself. Each carries its own art, because a row of
+   * hero names is the list this whole item exists to replace.
+   */
+  world?: { name: string; imageUrl?: string | null; role?: string | null }[];
   /** Distinct gamers with a linked account on this game. */
   gamers: number;
   serverGamers?: number | null;
