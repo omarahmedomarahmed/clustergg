@@ -66,6 +66,16 @@ export const users = pgTable("users", {
   theme: jsonb("theme").$type<Record<string, unknown>>().notNull().default({}),
   // Feed control-panel prefs: which stat tiles to show + which challenges /
   // game-leaderboards the gamer follows (pinned to the top of their feed).
+  /**
+   * What this gamer says about their OWN bot card (B58/B59).
+   *
+   * Narrowing only: which of their accounts it may draw, which sections they
+   * have switched off, and whether it appears on their public profile. It can
+   * never widen what the card shows and never names a row that is not theirs —
+   * see `narrow()` in lib/cards/refs.ts, which filters rows already fetched for
+   * them rather than building a query from what they typed.
+   */
+  cardPrefs: jsonb("card_prefs").$type<{ accounts?: string[]; hide?: string[]; showOnProfile?: boolean }>().notNull().default({}),
   feedPrefs: jsonb("feed_prefs").$type<{ stats?: string[]; challenges?: string[]; leaderboards?: string[] }>().notNull().default({}),
   createdAt: now("created_at"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),

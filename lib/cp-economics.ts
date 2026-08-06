@@ -180,14 +180,49 @@ export function abuseSurface(c: EconConfig): AbuseRow[] {
 }
 
 /**
- * How long a determined faker needs to reach a dollar, doing only the cheapest
- * thing on the list.
+ * How long a determined faker needs to reach a dollar — WITH the caps applied.
  *
- * The single most useful number on the calculator: it converts "is 3 CP for a
- * comment too much?" into "a bot farm earns $1 an hour", which is a question
- * anybody can answer.
+ * The first version of this took the fastest action and ignored its cap, which
+ * answered a question about a platform we do not run: at 25 CP in 4 seconds it
+ * reported 27 minutes per dollar, when clicking an ad is capped at 3 a day and
+ * pays 75 CP however long anybody sits there.
+ *
+ * What actually bounds a faker is the pair of limits the platform really has:
+ * every action's daily cap, and the global ceiling on top of them. So the model
+ * is now the honest one — fill a day with every self-serve action up to its cap,
+ * see how much that pays and how long it takes, and count how many ACCOUNT-DAYS
+ * a dollar needs. It reports minutes of work per dollar across all of them.
+ *
+ * The difference is not cosmetic: it is 27 minutes versus about six hours, and
+ * the second number is the one a decision should be made on.
  */
 export function minutesPerDollar(c: EconConfig): number | null {
+  const surface = abuseSurface(c);
+  if (!surface.length) return null;
+
+  // One account, one day, doing everything self-serve up to its cap.
+  const rawCp = surface.reduce((sum, r) => sum + r.cpPerDay, 0);
+  // The ceiling still applies, and it is usually what binds.
+  const cpPerAccountDay = c.ceiling > 0 ? Math.min(rawCp, c.ceiling) : rawCp;
+  if (cpPerAccountDay <= 0) return null;
+
+  const secondsPerAccountDay = surface.reduce((sum, r) => {
+    const occurrences = r.cpPerDay / Math.max(1, r.cpPerMinute * r.secondsEach / 60);
+    return sum + occurrences * r.secondsEach;
+  }, 0);
+
+  const accountDays = c.cpPerDollar / cpPerAccountDay;
+  return (accountDays * secondsPerAccountDay) / 60;
+}
+
+/**
+ * The old figure, kept and renamed for what it actually is.
+ *
+ * Useful for pricing ONE action — "is 25 CP for a click too much?" — and
+ * misleading as a measure of the platform, which is how it came to say 27
+ * minutes. Nothing should gate on this.
+ */
+export function fastestActionMinutesPerDollar(c: EconConfig): number | null {
   const best = abuseSurface(c)[0];
   if (!best || best.cpPerMinute <= 0) return null;
   return c.cpPerDollar / best.cpPerMinute;

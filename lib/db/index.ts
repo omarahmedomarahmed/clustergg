@@ -26,6 +26,7 @@ function rowsOf(result: unknown): Record<string, unknown>[] {
 const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "title" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "theme" jsonb NOT NULL DEFAULT '{}'::jsonb`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "card_prefs" jsonb NOT NULL DEFAULT '{}'::jsonb`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "profile_visibility" text NOT NULL DEFAULT 'public'`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "allow_messages_from" text NOT NULL DEFAULT 'everyone'`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_notifications" boolean NOT NULL DEFAULT true`,

@@ -1,4 +1,5 @@
 import type { CardKind } from "@/lib/cards/types";
+import { parseRefs } from "@/lib/cards/refs";
 
 // Where every element lands on a rendered PNG card — under admin control.
 //
@@ -209,6 +210,15 @@ export type CardLayout = {
    * A card with nothing for a pane leaves it EMPTY — never a box with nothing
    * in it, which is the failure mode a grid invites.
    */
+  /**
+   * WHERE each pane pulls its content from (B58), keyed by part.
+   *
+   * Stored with the layout because it is the same decision, made in the same
+   * screen, about the same card — and because `parseLayout` already round-trips
+   * everything through one validator, which is what keeps admin input off
+   * Satori.
+   */
+  refs?: Record<string, { source: string; ids?: string[] }>;
   bodyCols?: 1 | 2;
   bodyRows?: 1 | 2;
   /** The gap between panes, in canvas pixels. */
@@ -537,6 +547,10 @@ export function parseLayout(raw: string | null | undefined, kind?: string): Card
     bodyCols: (num(o.bodyCols, kindPanes.cols, 1, 2) === 2 ? 2 : 1) as 1 | 2,
     bodyRows: (num(o.bodyRows, kindPanes.rows, 1, 2) === 2 ? 2 : 1) as 1 | 2,
     gutter: num(o.gutter, DEFAULT_LAYOUT.gutter ?? 26, 0, 80),
+    // Through B58's own parser: an unknown source falls back to the kind's
+    // default rather than blanking the pane, and an id that is not id-shaped is
+    // dropped rather than handed to a query.
+    refs: parseRefs(o.refs, kind as never),
     scrim: o.scrim !== false,
     badgeShow: typeof o.badgeShow === "string" && BADGE_SHOW_IDS.has(o.badgeShow as BadgeShow)
       ? (o.badgeShow as BadgeShow) : "auto",
