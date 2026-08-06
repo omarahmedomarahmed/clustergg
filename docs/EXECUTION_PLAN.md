@@ -3296,6 +3296,120 @@ server sees when they are shared. Today a gamer cannot see it at all.
 
 ---
 
+## B60 — The CP coin, composited, everywhere a card says CP
+
+`components/Cp.tsx` draws the coin as TWO layers: the built-in `cpCoin` glyph
+always, and the admin's uploaded art (`brand.cpIcon`, `lib/cms.ts:197`) painted
+over it. The comment in that file says why — before it, only the upload
+rendered, so an install where nobody had uploaded one had no currency mark at
+all.
+
+**The cards do not do this.** `lib/cards/render.tsx` has its own `CpCoin`: an
+amber ring with a skewed bar, drawn from divs, which never sees `brand.cpIcon`.
+
+- The card coin becomes the same composite: the drawn coin, with the admin's art
+  over it at the same size. Resolved to inline bytes in the prepare step
+  alongside `markUrl` and `astronautUrl` — Satori fetching a remote host
+  mid-render is how one slow image takes a card down.
+- **The word "CP" stops appearing on cards as a unit.** Two left:
+  `render.tsx:1117` (the quest card's `CP / 100 → Bronze`) and `:1614`
+  (`10,000 CP = $1`). Prose that explains what Cluster Points ARE keeps the
+  words — that is `Cp.tsx`'s own rule, and it is right: a currency symbol nobody
+  has had named for them is a puzzle.
+
+**Verification owed → `tests/db/cards.mts`:**
+- The card coin draws the admin's art over the glyph, not instead of it.
+- The art is resolved in the prepare step, never fetched by Satori.
+- No card draws "CP" as a unit suffix.
+
+**Shots owed:** none. **New routes:** none.
+
+---
+
+## B61 — The Daily Mission
+
+The 500 CP daily cap, given a shape. **Framing, not economics.**
+
+### B61.0 The rule the whole item rests on
+
+**The mission awards no CP of its own.** Not a completion bonus, not a streak
+bonus, not a rounding gift. Every point comes from the actions the gamer already
+does, at the prices `ACTION_CATALOG` already sets, under the caps B17 already
+enforces. The moment the mission pays, the cap stops being the ceiling and the
+platform's exposure doubles through a feature that looks like copywriting.
+
+### B61.1 Four variations, rotating weekly
+
+Not random forever: **four missions**, and the week picks which one everybody is
+on. Same variation all week, next variation next week, four-week cycle. A gamer
+and their friend see the same mission, support can reproduce what somebody saw,
+and "why is mine different" has an answer.
+
+Each mission is **two actions from each of the four quests — eight in all — and
+their CP totals exactly 500.** The 1-CP ad watch is the rounding term, which is
+what makes "exactly 500" always solvable.
+
+### B61.2 The tasks are PERSONAL
+
+The variation is fixed; the words are not. Each task is resolved against this
+gamer's own data:
+
+- "Raise any stat on **<their in-game name>**" — their real account, named.
+- "Share your profile card in **<the server they joined from>**" — that server.
+- "Join **<a live challenge on a game they have linked and have NOT entered>**" —
+  a specific competition they can actually enter today.
+
+A task that cannot be personalised (no linked account, no server, nothing live)
+falls back to its generic wording rather than naming nothing.
+
+### B61.3 Progress is READ, never counted separately
+
+`quest_events` is the source of truth for CP (B34.2). The mission's total is the
+day's summed CP; each task's tick is that action's own count for the day. Two
+reads of one ledger — which is what makes the case that matters correct for
+free: **500/500 with no tasks ticked** is a gamer who earned it another way, and
+that is a true statement rather than a special case somebody has to code.
+
+### B61.4 Decided, and written down
+
+- **Seeded, not random.** The mission is a pure function of `(week, userId)` for
+  its personalisation and of `week` alone for its shape. No `Math.random()` at
+  request time: a different mission on the phone than on the web is not a bug
+  anybody can debug.
+- **One day boundary.** The mission's day is `capsToday`'s day, from the same
+  helper. Two midnights is the version of this bug that only appears for people
+  in the wrong timezone.
+- **Availability is checked.** "Join a challenge x3" in a server with two live
+  challenges is impossible. Counts are solved against each action's real cap and
+  against what actually exists.
+- **Social counts stay at 1-2.** "Follow 5 friends" is a real incentive to
+  inflate the social graph — B35's problem arriving through a new door.
+- **A streak, as STATUS ONLY.** Days completed in a row, no CP, no trophy,
+  nothing redeemable. It is the strongest retention lever here and it costs
+  nothing, which is the only reason it is safe.
+
+### B61.5 Surfaces
+
+A `mission` card kind (the fourteenth), a button on the quests tab and on every
+quest page, and the same button in Discord.
+
+**Verification owed → `tests/db/missions.mts`:**
+- Every one of the four variations totals exactly 500 CP, at today's prices.
+- The same `(week, userId)` gives the same mission twice; a different week gives
+  a different one; the cycle returns to the first after four.
+- No task's count exceeds that action's daily cap.
+- A gamer with no linked account, no server and no live challenge still gets a
+  complete mission in generic wording.
+- 500 CP earned outside the mission reads 500/500 with its tasks unticked.
+- **The mission writes no CP.** Asserted against the ledger, because this is the
+  rule the item rests on.
+- A named challenge is one the gamer has NOT entered and CAN enter.
+
+**Shots owed:** the mission panel on `/quests`.
+**New routes:** none (the panel lives on `/quests` and `/quests/<key>`).
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -3347,6 +3461,7 @@ server sees when they are shared. Today a gamer cannot see it at all.
 | B56 | "COMPLETE REDESIGN — no old layout, and edit the shared one before any card type" | **B56.0, and the market card was rebuilt again on the new frame.** I filed the clarification and then built a card kind on the layout it was about to replace, which is the thing the instruction said not to do; that work is redone rather than kept. The shared layout is now three bands: an identity IMAGE plus its name top-left, the ad top-right on **every** card (the house creative fills it — there is no "unsold"), and free space edge to edge below. Gone: the gradient rule (a `stroke` replaces it), the corner logo tile, the mascot, the badge. The Cluster mark is a watermark behind the body. All thirteen bodies now hand their identity to the frame instead of drawing a headline as their first block, which is also what freed the body: the profile's trophy case moved out of a side column into real tiles across the full width, and the challenge's prize podium came out of the top-right corner where a sold card was burying it. |
 | B56.0 | "divide the body into panes; set the data each pane pulls; show the gamer their own card" | Split into three, because they are three different kinds of work and only the first is shared-layout: **B57** makes the body a grid of one, two or four panes (the planet card is the 2×2 case — two ladders, challenges, the game world, over the planet's own globe art); **B58** gives every pane a DATA REFERENCE — which ladders, which challenges, which heroes, which four of a gamer's accounts — set by admin per kind and narrowed by the gamer for their own card, which is also the redesign of what the card-layout editor is FOR; **B59** renders a gamer's own card inside profile customization and on their public profile, with a switch to hide it. B57 is shared and is built now; B58 and B59 follow the per-card work. |
 | B57 | the pane grid, and four cards moved onto it | The geometry is one exported helper (`panes()`), shared by the renderer and the editor for the same reason `sideBox` is — a pane the editor draws somewhere the renderer does not is worse than no editor. `KIND_PANES` gives each kind its shape as a DEFAULT, overridable per kind like any other stored field. **Profile** is two panes: what they play on the left, what they have won on the right — one column made those compete for the same inches, which is why the accounts kept losing. **Challenge** is two: details and prize left, the scoreboard right, which is the standings' column back. **Planet** is the 2×2 the item asks for, and it gained a fourth thing to show — the game's own world, read from the cached snapshot, never a live fetch on a render. **Market** shows five. Two defects only the render found: Satori has no Fragment, so a pane handed `<>…</>` laid its children out as if the pane were a row (the profile's LINKED ACCOUNTS heading sat beside its stat pills, half off the pane), and a pane with an auto height collapsed every `flex: 1` inside it — the challenge card's standings were simply not drawn. |
+| B57 | "do all your recommendations; four missions rotating weekly, and personalise the words" | **B60** (the coin composite) and **B61** (the Daily Mission) filed. Every recommendation is in the item as a rule rather than as advice: no CP from the mission, seeded not random, one day boundary shared with `capsToday`, progress READ from `quest_events` rather than counted again, availability checked, social counts held at 1-2, and the streak as status only. The two decisions that came back: **four variations rotating weekly for everyone** rather than a per-gamer draw — which answers "why is mine different from my friend's" and makes support able to reproduce a mission — and the task WORDS personalised against the gamer's own data (their in-game name, the server they joined from, a live challenge on a game they have linked and have not entered). Build order: B60, then B58's data references, then B61 on top of them. |
 | — | *(next amendment here)* | |
 
 ---
@@ -3437,6 +3552,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/ui/cards.mjs` | **B54**, **B56** | every kind declares the platform component it mirrors and that file exists; every section a body draws is a declared `part`, so admin can edit all of it; every kind renders SOLD and unsold without throwing and neither puts content under the sponsor box; no kind is a bare list where the platform section is tiled; the shared vocabulary (headers, pills, stat tiles, sub-cards) comes from one place rather than being re-styled per body | ☐ |
 | `tests/db/card-refs.mts` | **B58** | a pane with no reference falls back and never blanks; a reference to a deleted row resolves to the fallback; a gamer's override can hide their own accounts and cannot name another gamer's; admin's per-kind reference survives an unrelated layout save | ☐ |
 | `tests/ui/profile-card.mjs` | **B59** | the card in customization is the SAME renderer the bot uses; hiding removes it from the public profile and not from the bot; the account selection is reflected in the render | ☐ |
+| `tests/db/missions.mts` | **B61** | all four variations total exactly 500 CP at today's prices; same (week, user) gives the same mission and the cycle returns after four; no count exceeds that action's daily cap; a gamer with no account, server or live challenge still gets a complete mission; 500 earned elsewhere reads 500/500 with tasks unticked; **the mission writes no CP**, asserted against the ledger; a named challenge is one they have not entered and can enter | ☐ |
 | `tests/db/entry-rules.mts` | **B38** | a second account makes no second entry and the response names the one entered; the other account is free on a different challenge; switching allowed before the start and refused after, with the reason; the score is re-baselined; two different gamers unaffected | **written — 24 assertions** |
 | `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |
 | `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
