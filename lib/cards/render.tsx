@@ -553,6 +553,101 @@ function Plate({ theme, children, style }: {
   );
 }
 
+// ===== The platform's vocabulary (B56) =====
+//
+// B54 asked for cards "laid out to render what a gamer sees on the platform".
+// That was built as the same DATA, and it was meant as the same VISUAL
+// LANGUAGE: a gamer looking at a card in Discord should feel they are looking
+// at Cluster, not at a nicer poster of the same numbers.
+//
+// So the shapes the site repeats everywhere live here, once, and every body
+// draws with them. Re-styling a sub-card per body is how thirteen cards end up
+// looking like thirteen products — and it is the specific thing `tests/ui/
+// cards.mjs` checks, because it is invisible on any single card.
+//
+// The source of truth is `app/globals.css:45` (`.glass`) and the components
+// that use it. These are its values, not an impression of them.
+
+/** `.glass` — app/globals.css:45. The card-within-card the whole site is made of. */
+const GLASS_BG = "linear-gradient(160deg, rgba(139,92,246,0.07), rgba(34,211,238,0.04) 55%, rgba(255,255,255,0.02))";
+const GLASS_BORDER = "rgba(139,92,246,0.18)";
+
+/**
+ * One sub-card.
+ *
+ * `ring` overrides the border where the platform tints it by meaning — the
+ * marketplace rings a legendary trophy in amber (`TIER_RING`,
+ * components/TrophyMarket.tsx:21) and that colour IS the information.
+ */
+function GlassCard({ children, ring, style, pad = 12 }: {
+  children: React.ReactNode; ring?: string | null; style?: React.CSSProperties; pad?: number;
+}) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", borderRadius: 16, padding: pad,
+      background: GLASS_BG, border: `1px solid ${ring ? safeColor(ring, GLASS_BORDER) : GLASS_BORDER}`,
+      ...style,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * The square plate a tile's picture sits on.
+ *
+ * The platform never floats product art on the page — a trophy, a game logo, a
+ * champion portrait always sits on `bg-black/30` inside its card
+ * (components/TrophyMarket.tsx:129). It is what stops a transparent PNG from
+ * dissolving into whatever artwork is behind the card.
+ */
+function ArtPanel({ url, size, pad = 8, corner }: {
+  url?: string | null; size: number; pad?: number; corner?: React.ReactNode;
+}) {
+  return (
+    <div style={{
+      display: "flex", position: "relative", width: "100%", height: size,
+      alignItems: "center", justifyContent: "center", borderRadius: 12,
+      background: "rgba(0,0,0,0.30)", padding: pad,
+    }}>
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" width={size - pad * 2} height={size - pad * 2}
+          style={{ width: size - pad * 2, height: size - pad * 2, objectFit: "contain" }} />
+      ) : null}
+      {corner ? (
+        <div style={{ position: "absolute", top: 6, right: 6, display: "flex" }}>{corner}</div>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A figure stated as value, in its own bordered box.
+ *
+ * The platform's recurring "here is your number and what it means" shape — the
+ * wallet on the marketplace shelf (components/TrophyMarket.tsx:80) is the
+ * canonical one: the figure, what it is for, and the next step, boxed and
+ * tinted in the accent rather than set loose in the paragraph.
+ */
+function StatTile({ figure, label, foot, accent, align = "flex-start", pad = 12 }: {
+  figure: React.ReactNode; label?: string | null; foot?: string | null;
+  accent: string; align?: "flex-start" | "flex-end"; pad?: number;
+}) {
+  const c = safeColor(accent, FALLBACK_ACCENT2);
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", alignItems: align, gap: 2,
+      borderRadius: 16, padding: `${pad - 4}px ${pad + 4}px`,
+      border: `1px solid ${alpha(c, 0.25)}`, background: alpha(c, 0.06),
+    }}>
+      <div style={{ display: "flex", alignItems: "center", color: c }}>{figure}</div>
+      {label ? <div style={{ display: "flex", fontSize: 15, letterSpacing: 1.4, textTransform: "uppercase", color: MUTED }}>{label}</div> : null}
+      {foot ? <div style={{ display: "flex", fontSize: 15, fontWeight: 700, color: alpha(c, 0.75) }}>{foot}</div> : null}
+    </div>
+  );
+}
+
 function Pill({ children, color = MUTED, bg = "rgba(255,255,255,0.07)", size = 21 }: {
   children: React.ReactNode; color?: string; bg?: string; size?: number;
 }) {
@@ -1272,49 +1367,79 @@ function Empty({ children, p }: { children: React.ReactNode; p?: PartDraw }) {
 // frame: a server that has watched the standings move all week should recognise
 // the card that ends it, with the podium in the same place the leaders were.
 /**
- * The marketplace shelf: two rows of three, both numbers on every tile.
+ * The marketplace shelf — the Discord rendering of `components/TrophyMarket.tsx`.
  *
- * The dollar value is the point. A CP price alone reads as a game currency;
- * "12,000 CP · $8" is a gamer's free points quoted in money, which is the whole
- * reason to keep playing a week you already lost.
+ * B56: the platform section, not an approximation of it. Read that file before
+ * changing this one; where the two disagree, the component is right.
+ *
+ * What the shelf actually is, in the order it says it:
+ *
+ *   the heading and its caption            TrophyMarket.tsx:68-77
+ *   the wallet, BOXED and tinted, stated
+ *     as value with the next step under it TrophyMarket.tsx:80-90
+ *   a grid of glass tiles, each ringed by
+ *     TIER                                 TrophyMarket.tsx:21-26, :126
+ *   a square art plate per tile            TrophyMarket.tsx:129-137
+ *   name, then tier in small caps          TrophyMarket.tsx:139-140
+ *   the DOLLAR value, promoted, with
+ *     "redeems for cash" under it          TrophyMarket.tsx:142-157
+ *   the CP price under that                TrophyMarket.tsx:158-160
+ *
+ * The old card had all of the same data and none of that shape: a 44px icon
+ * beside a number bubble, then name, tier and both figures on one line. It read
+ * as a receipt. The promotion of the dollar over the CP price is not decoration
+ * either — it is B48's decision about what makes a trophy an asset rather than
+ * a sticker, and a card that inverts it argues with the page.
+ *
+ * The number bubble stays, and is the one thing on this card the platform has
+ * no equivalent for: in Discord you buy by typing the number, so the tile has
+ * to carry it.
  */
 function MarketBody(d: MarketCard) {
   const t = d.theme;
   const clamp = clampFor(t);
   const [pBal, pTiles, pPills, pEmpty] = ["balance", "tiles", "pills", "empty"].map((k) => part(t, k));
-  // Six, in two rows of three. The tile is sized to the CONTENT column, not to
-  // the canvas: the ad slot owns the top-right, so a tile wide enough to look
-  // right against 1200px wraps to two-per-row and pushes the second row off the
-  // bottom — which is exactly what the first draft did.
   const TILE_W = 218;
-  const TILE_H = 138;
   const GAP = 12;
-  // How many fit, rather than three because three fitted once. The row was
-  // `TILE_W * 3 + 24` — right for the 703px column it was written against, and
-  // 460 empty pixels on the right once B54 widened it to 936. Taken from the
+  // How many fit, rather than three because three fitted once. Taken from the
   // EFFECTIVE column, so a sold card drops to two per row instead of running
   // its shelf under the creative.
   const columnW = contentBoxFor(t.layout ?? DEFAULT_LAYOUT, !!t.ad).width;
   const COLS = Math.max(2, Math.min(4, Math.floor((columnW + GAP) / (TILE_W + GAP))));
-  const shown = (d.trophies ?? []).slice(0, COLS * 2);
+  // ONE row, tall. The old card showed six tiles at 138px, which is what it
+  // took to fit two rows of the receipt shape — and the shape was the problem.
+  // Four tiles that carry the platform's hierarchy sell the shelf better than
+  // six that carry none of it, and the shelf is a preview: /marketplace is
+  // where the other two hundred live.
+  const shown = (d.trophies ?? []).slice(0, COLS);
+  const ART = 100;
+
+  // The platform rings a tile by TIER and that colour IS the information —
+  // legendary glows amber, bronze is orange. `TIER_RING`, TrophyMarket.tsx:21.
+  const TIER: Record<string, string> = {
+    legendary: "#fcd34d", gold: "#fbbf24", silver: "#cbd5e1", bronze: "#fb923c",
+  };
 
   return (
     <Frame theme={t}>
       <Title text={d.title} sub={clamp(d.subtitle, 64)} accent={t.accent} accent2={t.accent2} theme={t} p={part(t, "title")} />
 
-      {/* The balance, in its own region — a shelf you can't price yourself
-          against is a catalogue. Positioned rather than in flow, because every
-          other block on this card is absolutely placed by the layout editor and
-          a single in-flow element lands underneath them. */}
-      <Section p={pBal} style={{ marginTop: 4 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-          <span style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, fontSize: pBal.f(40), fontWeight: 900, color: t.accent2 }}>
-            <CpCoin size={pBal.f(24)} />{d.balance.toLocaleString()}
-          </span>
-          <span style={{ display: "flex", fontSize: pBal.f(19), fontWeight: 700, color: MUTED }}>
-            {pBal.say(`to spend · ${d.earned.toLocaleString()} earned all-time`)}
-          </span>
-        </div>
+      {/* The wallet. BOXED, tinted, and stated as value with the next step
+          under it — the platform's own shape (TrophyMarket.tsx:80), because it
+          is the most-looked-at number on the screen and a shelf you cannot
+          price yourself against is a catalogue. */}
+      <Section p={pBal} style={{ marginTop: 6, flexDirection: "row" }}>
+        <StatTile
+          accent={t.accent2}
+          figure={(
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, fontSize: pBal.f(38), fontWeight: 900 }}>
+              <CpCoin size={pBal.f(24)} />{d.balance.toLocaleString()}
+            </div>
+          )}
+          label={pBal.say(`to spend · ${d.earned.toLocaleString()} earned all-time`)}
+          foot={`${d.cpPerDollar.toLocaleString()} CP = $1`}
+          pad={9}
+        />
       </Section>
 
       {shown.length === 0 ? (
@@ -1324,72 +1449,66 @@ function MarketBody(d: MarketCard) {
           </div>
         </Section>
       ) : (
-        <Section p={pTiles}>
+        <Section p={pTiles} style={{ marginTop: 10 }}>
           <div style={{ display: "flex", flexWrap: "wrap", gap: GAP, width: TILE_W * COLS + GAP * (COLS - 1) }}>
             {shown.map((x, i) => (
-              <div key={x.id} style={{
-                display: "flex", flexDirection: "column", width: TILE_W, height: TILE_H,
-                borderRadius: 16, padding: 11, gap: 4,
-                background: "rgba(0,0,0,0.38)",
-                border: `2px solid ${x.affordable ? `${t.accent}66` : "rgba(255,255,255,0.10)"}`,
-                // Out of reach reads dimmer rather than absent: it is the thing
-                // worth playing for, so it has to stay on the shelf.
-                opacity: x.affordable ? 1 : 0.6,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                  {x.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={x.imageUrl} alt="" width={44} height={44}
-                      style={{ width: 44, height: 44, objectFit: "contain" }} />
-                  ) : (
-                    <div style={{ display: "flex", width: 44, height: 44, borderRadius: 11, background: "rgba(255,255,255,0.07)" }} />
-                  )}
+              <GlassCard key={x.id} ring={TIER[x.tier.toLowerCase()] ?? null} pad={10}
+                style={{
+                  width: TILE_W, gap: 6,
+                  // Out of reach reads dimmer rather than absent: it is the
+                  // thing worth playing for, so it stays on the shelf.
+                  opacity: x.affordable ? 1 : 0.62,
+                }}>
+                {/* The square plate. The platform never floats trophy art on
+                    the page, and on a card there is background artwork behind
+                    it — a transparent PNG with no plate dissolves into it. */}
+                <ArtPanel url={x.imageUrl} size={ART} corner={(
                   <div style={{
                     display: "flex", width: 26, height: 26, borderRadius: 999,
-                    alignItems: "center", justifyContent: "center", marginLeft: "auto",
+                    alignItems: "center", justifyContent: "center",
                     fontSize: 16, fontWeight: 900, color: "#0b1020", background: t.accent2,
-                  }}>
-                    {i + 1}
-                  </div>
-                </div>
-                {/* Fixed height and a hard clamp: "Champion's Nebula Cup"
-                    wrapped to two lines and landed on top of the tier, which is
-                    the one failure mode a fixed-size tile has. */}
-                {/* No fixed height: clipping a box to hold one line cut the
-                    descenders off every name with a p or a y in it. The clamp
-                    keeps it to one line instead, which is the actual goal. */}
+                  }}>{i + 1}</div>
+                )} />
                 {/* `clampAt`, not the column-scaled clamp: this tile is 218px
-                    wide whatever the content column is doing. */}
-                <div style={{ display: "flex", fontSize: 17, fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>
-                  {clampAt(x.name, 17)}
+                    wide whatever the content column is doing. And no fixed
+                    height — a box sized for one line cuts the descenders off
+                    every name with a p or a y in it. */}
+                <div style={{ display: "flex", fontSize: 18, fontWeight: 800, color: "#fff", lineHeight: 1.3 }}>
+                  {clampAt(x.name, 20)}
                 </div>
-                {/* No fixed height here either. It held today because the tier
-                    words are uppercase and have no descenders — which is a
-                    property of the copy, not of the layout, and the first
-                    lower-case tier somebody adds would have clipped. */}
                 <div style={{ display: "flex", fontSize: 12, lineHeight: 1.35, color: MUTED, textTransform: "uppercase", letterSpacing: 1 }}>
                   {x.tier}
                 </div>
-                {/* BOTH numbers. The CP price alone reads as a game currency;
-                    the dollar beside it is what says the free points are money. */}
-                <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: "auto" }}>
-                  <span style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 5, fontSize: 23, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED }}>
-                    <CpCoin size={17} />{x.cpPrice.toLocaleString()}
-                  </span>
-                  <span style={{ display: "flex", fontSize: 18, fontWeight: 800, color: "#34d399" }}>
-                    = ${x.value.toLocaleString()}
-                  </span>
+                {/* THE DOLLAR, promoted — B48's decision, and the platform sets
+                    it at 2xl black amber with its caption under it. The CP
+                    price follows, because that is the cost and this is the
+                    worth. Inverting the two argues with the page. */}
+                {x.value > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", marginTop: 2 }}>
+                    <div style={{ display: "flex", fontSize: 30, fontWeight: 900, lineHeight: 1.05, color: "#fde68a" }}>
+                      {`$${x.value.toLocaleString()}`}
+                    </div>
+                    <div style={{ display: "flex", fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(252,211,77,0.72)" }}>
+                      redeems for cash
+                    </div>
+                  </div>
+                ) : null}
+                <div style={{
+                  display: "flex", flexDirection: "row", alignItems: "center", gap: 5,
+                  fontSize: 20, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED,
+                }}>
+                  <CpCoin size={15} />{x.cpPrice.toLocaleString()}
                 </div>
-              </div>
+              </GlassCard>
             ))}
           </div>
         </Section>
       )}
 
-      <Section p={pPills} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-        <Pill color={t.accent2} bg={alpha(t.accent2, 0.13)} size={pPills.f(19)}>
-          {`${d.cpPerDollar.toLocaleString()} CP = $1`}
-        </Pill>
+      {/* One line, not two. The exchange rate moved into the wallet tile where
+          the platform puts it; what is left is the thing a gamer is actually
+          afraid of when they spend. */}
+      <Section p={pPills} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 8 }}>
         <Pill color="#34d399" bg="rgba(52,211,153,0.13)" size={pPills.f(19)}>
           Spending never lowers your level
         </Pill>

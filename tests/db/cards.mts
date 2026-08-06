@@ -298,18 +298,75 @@ console.log("\n== a FIXED-WIDTH box does not clamp by the column ==");
 // wrap to two lines, and land on top of the GOLD label under it.
 ok("there is an unscaled clamp", /function clampAt\(s: string \| null \| undefined/.test(render));
 ok("…and the scaled one is built on it", /=> clampAt\(s, Math\.round\(max \* k\)\)/.test(render));
-ok("the market tile uses the unscaled one", /\{clampAt\(x\.name, 17\)\}/.test(render));
+ok("the market tile uses the unscaled one", /\{clampAt\(x\.name, \d+\)\}/.test(render));
 ok("…and says why", /this tile is 218px/.test(render));
 // The shelf itself was `TILE_W * 3 + 24` — three because three fitted the
 // column it was written against, leaving 460 empty pixels once it widened.
 ok("the shelf counts the columns that fit", /const COLS = Math\.max\(2, Math\.min\(4/.test(render));
 ok("…from the EFFECTIVE column, so a sold card narrows the shelf too",
   /contentBoxFor\(t\.layout \?\? DEFAULT_LAYOUT, !!t\.ad\)\.width/.test(render));
-ok("…and shows a whole number of rows", /slice\(0, COLS \* 2\)/.test(render));
+// B56 made it ONE row, tall: four tiles carrying the platform's hierarchy
+// sell the shelf better than six carrying none of it, and the shelf is a
+// preview — /marketplace is where the other two hundred live.
+ok("…and shows a whole number of rows", /slice\(0, COLS\)/.test(render));
 
 console.log("\n== a challenge with no cover falls back to its GAME's art ==");
 ok("the chain reaches the game", /g\?\.planetBgUrl \|\| g\?\.coverUrl \|\| bg\.bgUrl/.test(
   await readFile(new URL("../../lib/cards/data.ts", import.meta.url), "utf8")));
+
+console.log("\n== B56: the cards speak the platform's visual language ==");
+// B54 asked for cards "laid out to render what a gamer sees on the platform"
+// and that was built as the same DATA. B56 is the same sentence read as VISUAL
+// LANGUAGE: the same section headers, sub-cards, stat tiles, pills and spacing.
+//
+// Two things are checkable without eyes, and they are the two that rot: that a
+// body NAMES the component it mirrors (a card that claims to mirror a section
+// and drifts is worse than one that never claimed, because nobody re-checks
+// it), and that the shared shapes are actually shared rather than re-styled per
+// body — which is invisible on any single card and obvious across thirteen.
+{
+  const { stat } = await import("node:fs/promises");
+  ok("there is one glass sub-card", /function GlassCard\(/.test(render));
+  ok("…built on the platform's own values, not an impression of them",
+    /app\/globals\.css:45/.test(render) && /rgba\(139,92,246,0\.07\)/.test(render));
+  ok("there is one art plate", /function ArtPanel\(/.test(render));
+  ok("there is one stat tile", /function StatTile\(/.test(render));
+
+  // Every component a body claims to mirror must exist. A stale path here is a
+  // body describing a section that was renamed or deleted.
+  const claimed = [...render.matchAll(/(?:components|app)\/[\w/[\]-]+\.tsx/g)].map((m) => m[0]);
+  ok("bodies name the components they mirror", claimed.length >= 1, JSON.stringify(claimed.slice(0, 4)));
+  const missing: string[] = [];
+  for (const c of new Set(claimed)) {
+    await stat(new URL(`../../${c}`, import.meta.url)).catch(() => { missing.push(c); });
+  }
+  eq("…and every named component exists", missing, []);
+}
+
+console.log("\n== the market card IS the shelf, not a receipt of it ==");
+// components/TrophyMarket.tsx, read before this was written. The old card had
+// every number and none of the shape: a 44px icon beside a number bubble, then
+// name, tier and both figures on one line.
+{
+  // From the DOC COMMENT, not from `function` — the claim about which component
+  // this mirrors is in the comment, which is the whole point of asserting it.
+  const body = render.slice(render.indexOf("* The marketplace shelf"), render.indexOf("function WeekBody"));
+  ok("it names the component it mirrors", /components\/TrophyMarket\.tsx/.test(body));
+  ok("the tiles are the shared sub-card", /<GlassCard/.test(body));
+  ok("…ringed by TIER, because that colour is the information",
+    /ring=\{TIER\[x\.tier\.toLowerCase\(\)\]/.test(body));
+  ok("…on the shared art plate", /<ArtPanel/.test(body));
+  ok("the wallet is the shared stat tile", /<StatTile/.test(body));
+  // B48 decided the dollar is what makes a trophy an asset rather than a
+  // sticker. A card that puts the CP price above it argues with the page.
+  ok("the DOLLAR is promoted above the CP price",
+    body.indexOf("redeems for cash") < body.indexOf("x.cpPrice.toLocaleString()"),
+    `${body.indexOf("redeems for cash")} vs ${body.indexOf("x.cpPrice.toLocaleString()")}`);
+  ok("…and says why", /B48's decision/.test(body));
+  // The number bubble is the one thing the platform has no equivalent for: in
+  // Discord you buy by typing the number.
+  ok("the tile still carries its number", /\{i \+ 1\}/.test(body));
+}
 
 console.log("\n== Satori renders every kind without throwing ==");
 // Satori is not a browser. Every element needs an explicit `display`, it
