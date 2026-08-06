@@ -340,6 +340,7 @@ the remaining edits; Part II is the whole platform.
 | B52 | **Planet explore shows game identities** — in-game name, one row per account | `lib/planet-explore.ts`, `app/planets/[slug]/page.tsx` | wave 2 | ☑ |
 | B53 | **Admin owns every trophy, including the ones already held** | new `lib/trophy-admin.ts`, `/admin/trophies`, `app/actions/admin.ts`, `lib/db/schema.ts` | wave 2 (**money-touching**) | ☑ |
 | B54 | **The bot card design overhaul** — a card is a web page, not a poster. **Leads the Discord band: B3, B13, B14, B20, B27, B28 follow it** | `lib/cards/render.tsx`, `lib/cards/part-content.ts`, `lib/cards/data.ts` | wave 3 | ☐ |
+| B56 | **The cards must look like the platform** — B54's clarification: the platform's visual language, and no kind inherits its old shape. **Sits with B54 at the head of the Discord band** | `lib/cards/render.tsx`, `lib/cards/layout-guide.ts`, `tests/ui/cards.mjs` | wave 3 | ☐ |
 | B55 | **The platform is slow** — a live, structural performance defect on every surface | `app/admin/layout.tsx`, `lib/threads.ts`, `lib/cms.ts`, `lib/departments.ts`, `lib/planet-explore.ts`, `lib/providers/riot-lol-rich.ts` | **wave 2, ahead of everything** | ☐ |
 | B47+ | **Open.** Every instruction from here lands as its own row. | — | — | — |
 
@@ -3073,6 +3074,93 @@ which change bought which improvement.
 
 ---
 
+## B56 — The cards must look like the platform, not like better posters
+
+**B54's clarification, arriving as its own item.** B54 stands: the layout
+system, the strip, the sponsor-aware column, the clamps and the spot geometry
+are all correct and none of it is redone here. What was missing from B54 as
+written is what goes INSIDE that frame.
+
+B54 said "laid out to render what a gamer sees on the platform". That was meant
+as **visual language**, and it was built as **the same data**. Those are not the
+same instruction, and the difference is the whole item.
+
+### B56.1 The requirement
+
+A gamer looking at a Discord card must feel they are looking at Cluster.
+Concretely, that means the card carries the platform's own vocabulary:
+
+- the same **section headers**,
+- the same **card-within-card** shapes,
+- the same **stat tiles**,
+- the same **pills and chips**,
+- the same **spacing rhythm**,
+- the same use of **cover art as a section background**.
+
+Not an approximation of a section in poster form. The Discord rendering *of that
+section*.
+
+### B56.2 Do not inherit the old shape
+
+All **thirteen** kinds are in scope: `profile`, `game-stats`, `challenge`,
+`leaderboard`, `planet`, `planets`, `quest`, `cp-summary`, `guide`, `week`,
+`market`, `world`, `search`.
+
+Each body is designed from **what the platform shows for that thing**, not from
+what the current card happens to draw. Where a card is a list because a list was
+the easy thing to render, it does not stay a list. Background art on the
+section, real tiles, real hierarchy.
+
+The current bodies are the thing being replaced, so they are not evidence. The
+evidence is the component: the planet page, the profile, the quest page, the
+marketplace shelf, the leaderboard widget. **Read the real component before
+writing the card**, and name it in the comment at the top of the body — a card
+that claims to mirror a section and drifts from it is worse than one that never
+claimed to, because nobody re-checks it.
+
+### B56.3 The method, per kind, in this order
+
+One kind at a time, and the order is not optional:
+
+1. Read the platform component it mirrors.
+2. Rebuild the body against it.
+3. **Render it and look at it**, side by side with the section.
+4. **Render it SOLD as well as unsold.** Three of the four defects B54's second
+   pass found were invisible on an unsold card, and every fixture is unsold. A
+   kind is not done until both have been looked at.
+5. Only then move to the next kind.
+
+### B56.4 What this does NOT change
+
+- The layout system. Spots, the strip, `contentBoxFor`, `markLeftFor`,
+  `clampFor`/`clampAt` and the admin editor all stand.
+- Admin control. Every section a body draws is a `part` in `layout-guide.ts`, so
+  it can be hidden, resized, reordered and (where it has fixed copy) reworded
+  without a deploy. A new section that is not a declared part is a section admin
+  cannot touch — see B29.
+- Satori's limits. A subset of flexbox, an explicit `display` on every element,
+  and an unsupported property is an exception rather than a no-op. The platform
+  component is the reference for the LOOK; it is not code that can be pasted.
+
+**Verification owed → `tests/ui/cards.mjs` + `tests/db/cards.mts`:**
+- Every kind declares the platform component it mirrors, and that component
+  exists at the named path.
+- Every section a body draws is a declared `part` for that kind, so admin can
+  edit all of it.
+- Every kind renders SOLD and unsold without throwing, and neither render puts
+  content under the sponsor box.
+- No kind is a bare list where the platform section is tiled.
+- The shared vocabulary is shared: section headers, pills, stat tiles and
+  card-within-card shapes come from one place in the renderer rather than being
+  re-styled per body.
+
+**Shots owed:** none of the cards themselves — B28 replaces `bot.card.*` with
+live renders, and V1.R recaptures. The PLATFORM sections being mirrored already
+carry their own rows.
+**New routes:** none.
+
+---
+
 ### Amendments
 
 | Amends | The instruction | What changed |
@@ -3119,6 +3207,7 @@ which change bought which improvement.
 | B54 | the layout is redesigned; per-card body work remains | Shipped: the in-game name leads every standings row on BOTH cards (found a second violation while asserting the first — `challengeStandingsCard` read `<cluster> · <account>`, the Cluster name first, and my assertion pointed at the wrong field which is how I found it); the last fixed-height text box removed, with a test that fails on any `height:` beside a `fontSize:` so the descender bug cannot come back; and every card kind asserted to render through Satori without throwing. **Then built by RENDERING and looking**, which is the only way this half could have been done: the strip is in (mark moved from bottom-right y:77.5 to the top band, content starts under it), the challenge card falls back to its GAME's art when it has no cover of its own, and the content column took back the width the mark gave up — the first render after moving it had a dead right half, which no source read would have shown. Two more defects surfaced the same way: the planet card's ladder printed the CLUSTER name (the third place that was wrong), and Satori's `gap` did not reach that nesting so it rendered "NovaGold II" with the runs touching. **Still owed:** the semi-transparent game logo and mascot in the strip, and per-card body layouts for the kinds that are still list-shaped. B3/B13/B14/B20/B27/B28 are **unblocked** — the layout system they would have been built against twice is now settled. |
 | B54 (cont.) | the strip was empty, and a SOLD card was never rendered | **Everything below was found by rendering and looking, and three of the four are invisible on an unsold card — which is what the demo fixtures are.** (1) The default sponsor box is 780..1180 across and the mark, newly moved to the strip, is 1032..1164: the ad is drawn last, so **every sold card shipped with no Cluster mark on it at all.** `markLeftFor` slides it clear, the same treatment `badgeTopFor` already gave the badge. (2) The mark then landed inside the text column — "Weekly Wins" behind our own logo — so `contentBoxFor` narrows the column on a sold card only, ending it before whichever piece of right-hand furniture comes first. The old layout paid that cost on EVERY card forever by staying narrow whether or not anything sold. (3) The game logo went into the strip as a faint watermark and printed **twice**, because six card bodies proposed it as their badge back when it was the only game identity a card carried; the corner now steps aside on "auto" only. (4) Fifty character clamps were tuned against the 58.5% column and none of them moved when it went to 78%: the leaderboard read "Blitz Supernova — Weekly…" with 470 empty pixels after the ellipsis. `clampFor` takes the ratio from the live layout, and from the EFFECTIVE width, so a sold card clamps to its narrower column. **The strip's left was empty on every card** — the body started below it. It starts at the top now, so each card's first section (the LIVE/game pills, the headline) is the identity the strip is for. The mascot went into the strip per the item and came straight back out: a long title ran through the astronaut's chest, and the item's own "if a card reads better without either, leave them out" is the answer. It stands in the column right of the text instead, which is reserved on every card. `gameMark` is a real spot — editable, draggable, copyable to every kind, in the card guide. **Still owed:** per-card body layouts for the kinds that are still list-shaped, and `tests/ui/cards.mjs`. |
 | B54 (cont.) | the scaled clamp broke a card the moment it landed | Rendering the market card after the column fix showed **"Champion's Nebula Cup" wrapped to two lines and sitting on top of the GOLD label under it** — the exact bug a comment in that file says was fixed once already. Cause: a market tile is 218px wide whatever the content column is doing, so scaling ITS clamp with the column widened the limit from 17 characters to 23 and let the name back through. The clamp is now two functions: `clampAt` (raw, for a fixed-width box) and the column-scaled one built on it. Same card, same cause, one line up: the shelf was `TILE_W * 3 + 24` — three per row because three fitted the 703px column it was written against, leaving 460 empty pixels once the column went to 936. It counts what fits now, from the effective width, so a sold card drops to two per row rather than running its shelf under the creative. |
+| B54 | "two requirements were missing from B54 as written" | **B56.** The cards must carry the platform's VISUAL LANGUAGE — its section headers, card-within-card shapes, stat tiles, pills, spacing rhythm and use of cover art as a section background — not merely its data in poster form; and no kind inherits its current shape, all thirteen designed from the platform section they mirror. B54 is unchanged and is not redone: its layout system is what B56 builds inside. Filed as a new item rather than an edit to B54 because B54's own progress rows describe work that shipped, and rewriting them would make the ledger say something that was never true. |
 | — | *(next amendment here)* | |
 
 ---
@@ -3206,6 +3295,7 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/planet-explore.mts` + `tests/ui/planet.mjs` | **B52** | a gamer with two accounts appears twice; each row is the in-game name, not the display name; the reveal names the Cluster profile and links to it; the same gamer still holds exactly ONE challenge entry | ☑ 17 + 9 |
 | `tests/db/trophy-admin.mts` | **B53** | edits propagate to holders; raising the value raises unredeemed holdings; a pending/approved/sent/paid redemption's amount NEVER moves, up or down; a held trophy cannot be deleted and the ACTION refuses, not just the helper | **written — 30 assertions** |
 | `tests/db/cards.mts` | **B54** | no text box carries a fixed height; every standings row leads with the in-game name on BOTH cards; the strip's three tenants do not sit on each other (the mark clears the sponsor box, the column clears the mark, the game logo is drawn once); the clamps follow the column; Satori renders every kind without throwing | ☑ 70 |
+| `tests/ui/cards.mjs` | **B54**, **B56** | every kind declares the platform component it mirrors and that file exists; every section a body draws is a declared `part`, so admin can edit all of it; every kind renders SOLD and unsold without throwing and neither puts content under the sponsor box; no kind is a bare list where the platform section is tiled; the shared vocabulary (headers, pills, stat tiles, sub-cards) comes from one place rather than being re-styled per body | ☐ |
 | `tests/db/entry-rules.mts` | **B38** | a second account makes no second entry and the response names the one entered; the other account is free on a different challenge; switching allowed before the start and refused after, with the reason; the score is re-baselined; two different gamers unaffected | **written — 24 assertions** |
 | `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |
 | `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
