@@ -37,6 +37,8 @@ export type CardTheme = {
   // that says where all three of them go.
   astronautUrl?: string | null;
   markUrl?: string | null;
+  /** The admin's CP coin, drawn OVER the built-in glyph (B60). */
+  cpIconUrl?: string | null;
   layout?: CardLayout;
   // The sponsor for this render. Attached before the card is hashed for the
   // cache, so each brand's version of a card is stored and reused separately

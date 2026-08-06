@@ -293,6 +293,47 @@ console.log("\n== a challenge with no cover falls back to its GAME's art ==");
 ok("the chain reaches the game", /g\?\.planetBgUrl \|\| g\?\.coverUrl \|\| bg\.bgUrl/.test(
   await readFile(new URL("../../lib/cards/data.ts", import.meta.url), "utf8")));
 
+console.log("\n== B60: the coin is two layers, and the word is gone ==");
+// `components/Cp.tsx` draws the coin as the built-in glyph with the admin's
+// upload painted OVER it, and says why: before that, only the upload rendered,
+// so an install where nobody had uploaded one had no currency mark at all. The
+// cards drew only the built-in one — the same mistake in the other direction,
+// since an admin changing the coin changed it everywhere except the thing that
+// travels furthest.
+{
+  const web = await readFile(new URL("../../components/Cp.tsx", import.meta.url), "utf8");
+  ok("the website layers the two", /Icon name="cpCoin"/.test(web) && /var\(--cp-icon\)/.test(web));
+  ok("the card coin takes the admin's art", /function CpCoin\(\{ size = 20, icon \}/.test(render));
+  ok("…and draws it OVER the glyph, not instead of it",
+    /position: "absolute", top: -ring, left: -ring/.test(render));
+  ok("…and the glyph is drawn whether or not there is an upload",
+    render.indexOf("border: `${ring}px solid #fbbf24`") < render.indexOf("{icon ? ("));
+  // Resolved in the prepare step, like the mark and the mascot: Satori fetches
+  // what it is handed, and this appears on nearly every card.
+  ok("the art is resolved before the render", /toEmbeddable\(b\.cpIconUrl/.test(render));
+  ok("…from the same CMS key the website uses",
+    /"brand\.cpIcon"/.test(await readFile(new URL("../../lib/cards/brand.ts", import.meta.url), "utf8")));
+  // Every place a card draws the coin passes the art. One that does not is a
+  // coin that silently reverts to the built-in glyph.
+  const coins = [...render.matchAll(/<CpCoin ([^/]*)\/>/g)].map((m) => m[1]);
+  ok("every card coin is the composite", coins.length > 0 && coins.every((c) => /icon=\{t\.cpIconUrl\}/.test(c)),
+    JSON.stringify(coins));
+  // "CP" as a UNIT is gone. Prose that explains what Cluster Points are keeps
+  // the words — that is `Cp.tsx`'s own rule and it is right.
+  // Comments are excluded: this file EXPLAINS why the word is gone, and the
+  // explanation quotes it. What is being asserted is what gets DRAWN.
+  // Both comment forms, including the JSX `{/* … */}` blocks whose CONTINUATION
+  // lines start with an ordinary word — which is where the first version of
+  // this assertion found its own explanation and failed on it.
+  const drawn = render
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  const unit = [...drawn.matchAll(/[`'"][^`'"\n]*\bCP\b[^`'"\n]*[`'"]/g)]
+    .map((m) => m[0])
+    .filter((x) => !/Cluster Points/.test(x));
+  eq("no card writes CP as a unit", unit, []);
+}
+
 console.log("\n== B57: the body is a GRID, and the grid comes from one helper ==");
 // Free space edge to edge is not a layout — one block of content across 1100px
 // is a wide list. The panes are part of the LAYOUT so an admin sets them per

@@ -895,7 +895,7 @@ function ProfileBody(d: ProfileCard) {
                 — points, views, votes — not floating in a corner as an
                 unexplained badge. It reads as a stat because it is one. */}
             <Pill color={t.accent2} bg={alpha(t.accent2, 0.16, FALLBACK_ACCENT2)} size={pStats.f(19)}>{`LV ${nf(d.level)}`}</Pill>
-            <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(19)}><CpCoin size={pStats.f(16)} />{nf(d.totalCp)}</Pill>
+            <Pill color={t.accent2} bg="rgba(255,255,255,0.08)" size={pStats.f(19)}><CpCoin size={pStats.f(16)} icon={t.cpIconUrl} />{nf(d.totalCp)}</Pill>
             <Pill size={pStats.f(19)}>{`${nf(d.views)} views`}</Pill>
             <Pill color="#fbbf24" bg="rgba(251,191,36,0.12)" size={pStats.f(19)}>
               <div style={{ display: "flex", width: 11, height: 11, borderRadius: 6, background: "#fbbf24" }} />
@@ -1111,10 +1111,17 @@ function QuestBody(d: QuestCard) {
         const p = part(t, "progress");
         return (
           <Section p={p} style={{ marginTop: 30 }}>
-            <div style={{ display: "flex", alignItems: "flex-end", gap: 16 }}>
-              <div style={{ fontSize: p.f(70), fontWeight: 700, color: t.accent2, lineHeight: 1 }}>{nf(d.cp)}</div>
-              <div style={{ fontSize: p.f(25), color: MUTED, paddingBottom: 10 }}>
-                {`${p.say("CP")}${next > 0 ? ` / ${nf(next)} → ${d.nextTier ?? ""}` : " · max tier"}`}
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "flex-end", gap: 14 }}>
+              {/* The coin LEADS the figure, like a currency symbol — the same
+                  order `components/Cp.tsx` uses, and the reason the word is
+                  gone (B60): "4,120 CP" reads as a score with a unit on it,
+                  the mark in front of it reads as money. */}
+              <div style={{ display: "flex", paddingBottom: p.f(8) }}>
+                <CpCoin size={p.f(34)} icon={t.cpIconUrl} />
+              </div>
+              <div style={{ display: "flex", fontSize: p.f(70), fontWeight: 700, color: t.accent2, lineHeight: 1 }}>{nf(d.cp)}</div>
+              <div style={{ display: "flex", fontSize: p.f(25), color: MUTED, paddingBottom: 10 }}>
+                {next > 0 ? `/ ${nf(next)} → ${d.nextTier ?? ""}` : "· max tier"}
               </div>
             </div>
             <div style={{ display: "flex", marginTop: 18 }}><Bar pct={pct} accent={t.accent} accent2={t.accent2} h={18} /></div>
@@ -1131,7 +1138,7 @@ function QuestBody(d: QuestCard) {
               <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, flex: 1, padding: "16px 8px", borderRadius: 20, background: tier.earned ? alpha(t.accent, 0.12) : "rgba(0,0,0,0.42)", border: `1px solid ${tier.earned ? alpha(t.accent, 0.53) : "rgba(255,255,255,0.10)"}` }}>
                 <div style={{ display: "flex", width: 20, height: 20, borderRadius: 10, background: tier.earned ? t.accent : "transparent", border: `3px solid ${tier.earned ? t.accent : "rgba(255,255,255,0.32)"}` }} />
                 <div style={{ fontSize: p.f(19), fontWeight: 700, color: tier.earned ? t.accent : MUTED }}>{clamp(tier.name, 10)}</div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: p.f(16), color: MUTED }}><CpCoin size={p.f(14)} />{nf(tier.threshold)}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: p.f(16), color: MUTED }}><CpCoin size={p.f(14)} icon={t.cpIconUrl} />{nf(tier.threshold)}</div>
               </div>
             ))}
           </Section>
@@ -1607,11 +1614,11 @@ function MarketBody(d: MarketCard) {
           accent={t.accent2}
           figure={(
             <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, fontSize: pBal.f(38), fontWeight: 900 }}>
-              <CpCoin size={pBal.f(24)} />{d.balance.toLocaleString()}
+              <CpCoin size={pBal.f(24)} icon={t.cpIconUrl} />{d.balance.toLocaleString()}
             </div>
           )}
           label={pBal.say(`to spend · ${d.earned.toLocaleString()} earned all-time`)}
-          foot={`${d.cpPerDollar.toLocaleString()} CP = $1`}
+          foot={`${d.cpPerDollar.toLocaleString()} = $1`}
           pad={9}
         />
       </Section>
@@ -1671,7 +1678,7 @@ function MarketBody(d: MarketCard) {
                   display: "flex", flexDirection: "row", alignItems: "center", gap: 5,
                   fontSize: 20, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED,
                 }}>
-                  <CpCoin size={15} />{x.cpPrice.toLocaleString()}
+                  <CpCoin size={15} icon={t.cpIconUrl} />{x.cpPrice.toLocaleString()}
                 </div>
               </GlassCard>
             ))}
@@ -2007,11 +2014,24 @@ function WorldBody(d: WorldCard) {
  * Two rings and a bolt, matching `cpCoin` in components/Icon.tsx closely enough
  * that the web and the cards read as the same currency.
  */
-function CpCoin({ size = 20 }: { size?: number }) {
+/**
+ * The CP coin — TWO LAYERS, exactly as the website draws it (B60).
+ *
+ * `components/Cp.tsx` layers the built-in glyph with the admin's uploaded art
+ * painted over it, and the comment there says why: before it, only the upload
+ * rendered, so an install where nobody had uploaded one had no currency mark at
+ * all. The cards drew only the built-in one, which is the same mistake in the
+ * other direction — an admin changing the coin changed it everywhere except the
+ * thing that travels furthest.
+ *
+ * The upload sits ON the glyph rather than beside it, so the amber ring reads
+ * as the coin's own body behind whatever art is on its face.
+ */
+function CpCoin({ size = 20, icon }: { size?: number; icon?: string | null }) {
   const ring = Math.max(1, Math.round(size * 0.08));
   return (
     <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center",
+      display: "flex", position: "relative", alignItems: "center", justifyContent: "center",
       width: size, height: size, borderRadius: size,
       border: `${ring}px solid #fbbf24`, background: "rgba(251,191,36,0.14)",
     }}>
@@ -2019,6 +2039,11 @@ function CpCoin({ size = 20 }: { size?: number }) {
         display: "flex", width: Math.round(size * 0.16), height: Math.round(size * 0.46),
         background: "#fbbf24", transform: "skewX(-18deg)",
       }} />
+      {icon ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={icon} alt="" width={size} height={size}
+          style={{ position: "absolute", top: -ring, left: -ring, width: size, height: size, objectFit: "contain" }} />
+      ) : null}
     </div>
   );
 }
@@ -2128,7 +2153,7 @@ async function prepareCard(d: CardData): Promise<CardData> {
   // that eventually times out in Discord's proxy.
   const [body, brand, rawLayout, ad] = await Promise.all([
     withDeadline(prepareBody(d), d),
-    withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null }),
+    withDeadline(preparedBrand(), { astronautUrl: null, markUrl: null, cpIconUrl: null }),
     withDeadline(layoutFor(d.kind), DEFAULT_LAYOUT),
     // THE HOUSE CREATIVE IS THE FALLBACK, not an empty corner (B56.0). Applied
     // here rather than in the renderer so it goes through the same transcode a
@@ -2167,15 +2192,20 @@ async function prepareCard(d: CardData): Promise<CardData> {
 // The mascot and the logo mark, as inline bytes. Resolved once per render and
 // merged onto every card kind here rather than in each data loader, so a card
 // kind added later can't forget them.
-async function preparedBrand(): Promise<{ astronautUrl: string | null; markUrl: string | null }> {
+async function preparedBrand(): Promise<{ astronautUrl: string | null; markUrl: string | null; cpIconUrl: string | null }> {
   try {
     const b = await brandCardArt();
-    const [astronautUrl, markUrl] = await Promise.all([
+    const [astronautUrl, markUrl, cpIconUrl] = await Promise.all([
       toEmbeddable(b.astronautUrl, { maxWidth: 420 }),
       toEmbeddable(b.markUrl, { maxWidth: 128 }),
+      // Small, and asked for at twice the biggest size any card draws it —
+      // resolved HERE rather than in the renderer, because Satori fetches what
+      // it is handed and the coin appears on nearly every card. One slow host
+      // would be one slow host on all of them.
+      toEmbeddable(b.cpIconUrl, { maxWidth: 96 }),
     ]);
-    return { astronautUrl, markUrl };
-  } catch { return { astronautUrl: null, markUrl: null }; }
+    return { astronautUrl, markUrl, cpIconUrl };
+  } catch { return { astronautUrl: null, markUrl: null, cpIconUrl: null }; }
 }
 
 // The sponsor creative, as inline bytes.
