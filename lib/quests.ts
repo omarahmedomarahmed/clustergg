@@ -14,6 +14,12 @@ export type QuestActionKey =
   | "join_planet" | "write_post" | "write_comment" | "reaction_given" | "reaction_received"
   | "follower_gained" | "message_new" | "profile_views_25"
   | "connect_account" | "stat_levelup"
+  // B61's repricing. `challenge_progress` and `play_session` exist because two
+  // quests had no genuinely DAILY action — conquest's only repeatable one was
+  // joining, and you cannot join the same thing twice — and `share_card`
+  // because "share your card in <server>" is the task the mission's
+  // personalisation was written around.
+  | "challenge_progress" | "play_session" | "share_card"
   | "ad_impression" | "ad_click"
   | "profile_vote_received" | "best_profile_award"
   | "botlist_vote" | "bot_added" | "redeem_trophy" | "gift_sent" | "gift_received";
@@ -38,40 +44,95 @@ export type QuestActionKey =
  * table exists to have.
  */
 export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string; defaultWeight: number; defaultCap: number }[] = [
-  { key: "join_challenge",   label: "Join a challenge",        group: "conquest",  defaultWeight: 10, defaultCap: 2 },
+  // ===== Repriced for the Daily Mission (B61) =====
+  //
+  // The old table could not close: everything a gamer could do in a day, at
+  // every cap, was 624 CP, and stripping the actions nobody does daily left
+  // 224 — against a 500 ceiling and a mission of eight tasks. So the mission's
+  // arithmetic was impossible, not merely tight.
+  //
+  // Now every quest's MISSION POOL tops out at exactly 125, four quests make
+  // 500, and any valid pair of tasks from a quest sums to 125. Prices are
+  // multiples of 5 and mostly of 25, which is why no 1-CP rounding term is
+  // needed any more — that was a patch for arithmetic that did not close.
+  //
+  // **Repricing does not raise the daily cost per gamer**: the 500 ceiling is
+  // unchanged and is still the guarantee. What it changes is that the ceiling
+  // becomes REACHABLE — protection on purpose rather than protection by
+  // accident. A gamer who never misses now earns $0.05 a day.
+  //
+  // Every number here is a DEFAULT. Each quest stores its own `actionWeights`
+  // and `dailyCaps`, so an admin edits any of them without a deploy.
+
+  // Conquest — competing.
+  { key: "join_challenge",   label: "Join a challenge",        group: "conquest",  defaultWeight: 25, defaultCap: 2 },
   { key: "finish_challenge", label: "Finish a challenge",      group: "conquest",  defaultWeight: 25, defaultCap: 2 },
+  // The daily conquest action. Joining cannot be one: you cannot join the same
+  // competition twice, so a quest about competing had nothing to do on day two.
+  { key: "challenge_progress", label: "Move your score in a challenge", group: "conquest", defaultWeight: 25, defaultCap: 4 },
+  // Kept, priced as before, and OUT of the mission pool: nobody wins a
+  // challenge daily, and a task nobody can finish is a mission that teaches
+  // gamers the mission is not for them.
   { key: "top3_challenge",   label: "Place top 3",             group: "conquest",  defaultWeight: 50, defaultCap: 1 },
   { key: "win_challenge",    label: "Win a challenge (1st)",   group: "conquest",  defaultWeight: 100, defaultCap: 1 },
-  { key: "join_planet",      label: "Join a planet",           group: "orbit",     defaultWeight: 10, defaultCap: 1 },
-  { key: "write_post",       label: "Write a post",            group: "orbit",     defaultWeight: 3, defaultCap: 3 },
-  { key: "write_comment",    label: "Write a comment",         group: "orbit",     defaultWeight: 1, defaultCap: 5 },
-  { key: "reaction_given",   label: "React to a post",         group: "orbit",     defaultWeight: 1, defaultCap: 5 },
-  { key: "reaction_received",label: "Get a reaction",          group: "orbit",     defaultWeight: 1, defaultCap: 10 },
-  { key: "follower_gained",  label: "Gain a follower",         group: "orbit",     defaultWeight: 2, defaultCap: 5 },
-  { key: "message_new",      label: "Message a new gamer",     group: "orbit",     defaultWeight: 1, defaultCap: 5 },
-  { key: "profile_views_25", label: "Every 25 profile views",  group: "orbit",     defaultWeight: 2, defaultCap: 5 },
-  // Identity: being voted for is the purest form of "other gamers orbit you",
-  // which is exactly what this quest measures.
-  { key: "profile_vote_received", label: "Someone votes for your profile", group: "orbit", defaultWeight: 3, defaultCap: 5 },
-  { key: "best_profile_award",    label: "Place in Best Profile",          group: "orbit", defaultWeight: 100, defaultCap: 1 },
-  // Giving and receiving are priced the same and capped at one a day, because
-  // any gap between them is an arbitrage a pair of accounts can farm.
-  { key: "gift_sent",        label: "Send a gift",             group: "orbit",     defaultWeight: 10, defaultCap: 1 },
-  { key: "gift_received",    label: "Receive a gift",          group: "orbit",     defaultWeight: 10, defaultCap: 1 },
-  // Voting for Cluster on a bot list.
+
+  // Orbit — social identity.
   //
-  // This is the one action here that grows the PLATFORM rather than the gamer's
-  // standing in it — bot-list ranking is votes, and every list that matters lets
-  // a person vote every twelve hours. Rewarding it in CP puts the ask inside a
-  // currency they already care about instead of inventing a parallel one, and
-  // the twice-a-day cap is the vote cooldown rather than a number we picked.
-  { key: "botlist_vote",     label: "Vote for Cluster on a bot list", group: "signal", defaultWeight: 15, defaultCap: 2 },
-  { key: "bot_added",        label: "Add the bot to a server", group: "signal",    defaultWeight: 50, defaultCap: 1 },
+  // Posts, comments and reactions are GONE from the quest actions: there are no
+  // posts on planets any more. Following, messaging and gifting stay, because
+  // those are the social features that remain.
+  //
+  // `share_card` carries a 75 rather than a follower or a gift, and that is
+  // deliberate: sharing a card is not farmable for value — it costs the gamer
+  // nothing, gains them nothing but the CP, and spreads our cards into servers.
+  // Followers, votes and gifts stay at 2 because they ARE farmable by a pair of
+  // accounts, which is B35's problem arriving through a new door.
+  { key: "share_card",       label: "Share a Cluster card in a server", group: "orbit", defaultWeight: 25, defaultCap: 3 },
+  { key: "profile_views_25", label: "Every 25 profile views",  group: "orbit",     defaultWeight: 25, defaultCap: 3 },
+  { key: "follower_gained",  label: "Gain a follower",         group: "orbit",     defaultWeight: 25, defaultCap: 2 },
+  { key: "profile_vote_received", label: "Someone votes for your profile", group: "orbit", defaultWeight: 25, defaultCap: 2 },
+  // Giving and receiving are priced the SAME and capped low, because any gap
+  // between them is an arbitrage a pair of accounts can farm.
+  { key: "gift_sent",        label: "Send a gift",             group: "orbit",     defaultWeight: 25, defaultCap: 2 },
+  { key: "gift_received",    label: "Receive a gift",          group: "orbit",     defaultWeight: 25, defaultCap: 2 },
+  { key: "message_new",      label: "Message a new gamer",     group: "orbit",     defaultWeight: 10, defaultCap: 3 },
+  { key: "join_planet",      label: "Join a planet",           group: "orbit",     defaultWeight: 25, defaultCap: 1 },
+  { key: "best_profile_award",    label: "Place in Best Profile",          group: "orbit", defaultWeight: 100, defaultCap: 1 },
+
+  // Ascension — your game accounts.
+  { key: "stat_levelup",     label: "A tracked stat rises",    group: "ascension", defaultWeight: 25, defaultCap: 4 },
+  // The quest is about game accounts, and the thing you do with a game account
+  // is play. Ascension needed a second daily action once `share_card` moved to
+  // orbit where it belongs.
+  { key: "play_session",     label: "Land a tracked match",    group: "ascension", defaultWeight: 25, defaultCap: 3 },
+  { key: "redeem_trophy",    label: "Redeem a trophy",         group: "ascension", defaultWeight: 25, defaultCap: 2 },
   { key: "connect_account",  label: "Connect a game account",  group: "ascension", defaultWeight: 50, defaultCap: 1 },
-  { key: "stat_levelup",     label: "A tracked stat rises",    group: "ascension", defaultWeight: 5, defaultCap: 4 },
-  { key: "redeem_trophy",    label: "Redeem a trophy",         group: "ascension", defaultWeight: 25, defaultCap: 1 },
-  { key: "ad_impression",    label: "See an ad (impression)",  group: "signal",    defaultWeight: 1, defaultCap: 20 },
-  { key: "ad_click",         label: "Click an ad",             group: "signal",    defaultWeight: 2, defaultCap: 5 },
+
+  // Signal — growth and attention.
+  // ONE CP, not five. At five, `tests/db/cp-economics.mts` showed us paying
+  // $0.50 per 1,000 impressions against a floor CPM of $0.50 — every cent of
+  // the ad revenue, straight back out. That suite exists for exactly this, and
+  // it caught it before the price shipped. At 1 CP the payout is $0.10 per
+  // 1,000, a fifth of the floor.
+  { key: "ad_impression",    label: "See an ad (impression)",  group: "signal",    defaultWeight: 1, defaultCap: 25 },
+  { key: "ad_click",         label: "Click an ad",             group: "signal",    defaultWeight: 25, defaultCap: 3 },
+  { key: "botlist_vote",     label: "Vote for Cluster on a bot list", group: "signal", defaultWeight: 25, defaultCap: 2 },
+  // Was 50 at a cap of ONE — a once-ever action. Self-limiting by nature, since
+  // you run out of servers you own, so a cap of 2 is safe and it becomes
+  // something a gamer can actually be asked to do.
+  { key: "bot_added",        label: "Add the bot to a server", group: "signal",    defaultWeight: 25, defaultCap: 2 },
+
+  // ===== Retired from the quest actions (B61) =====
+  //
+  // There are no posts on planets any more. The FEATURE is not removed yet —
+  // that is a separate decision with stored rows behind it — but these pay
+  // nothing, which is what "remove them from the quest actions" means. Left
+  // here at weight 0 rather than deleted, so a quest whose stored
+  // `actionWeights` still names one reads it as zero instead of throwing.
+  { key: "write_post",       label: "Write a post (retired)",     group: "orbit", defaultWeight: 0, defaultCap: 1 },
+  { key: "write_comment",    label: "Write a comment (retired)",  group: "orbit", defaultWeight: 0, defaultCap: 1 },
+  { key: "reaction_given",   label: "React to a post (retired)",  group: "orbit", defaultWeight: 0, defaultCap: 1 },
+  { key: "reaction_received",label: "Get a reaction (retired)",   group: "orbit", defaultWeight: 0, defaultCap: 1 },
 ];
 
 /**
@@ -80,7 +141,8 @@ export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string
  *
  * It is a *fixture*, asserted in `tests/db/cp-economics.mts`, so that moving a
  * weight is a deliberate act with a visible diff rather than something that
- * quietly drifts. It is deliberately HIGHER than the ceiling: the caps shape
+ * quietly drifts. B61's repricing moved it from 624 to its current value, which
+ * is exactly the kind of change this fixture exists to make visible. It is deliberately HIGHER than the ceiling: the caps shape
  * behaviour, the ceiling is the guarantee, and the guarantee must not depend on
  * nobody happening to win a challenge and take Best Profile on the same day.
  */
