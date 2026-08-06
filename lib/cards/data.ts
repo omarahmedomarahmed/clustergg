@@ -6,6 +6,7 @@ import { levelFromCp } from "@/lib/level";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys } from "@/lib/card-bg";
 import type { CardData, CardTheme } from "@/lib/cards/types";
+import { narrow, parseGamerPrefs } from "@/lib/cards/refs";
 
 // Server-side loaders that turn platform data into card payloads. Shared by the
 // card API route and (later) the Discord bot screens, so a card looks identical
@@ -87,7 +88,11 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     views: user.profileViews ?? 0,
     votes: user.voteCount ?? 0,
     award: null,
-    accounts: accounts.map((a) => {
+    // THE GAMER'S OWN CHOICE (B58), applied as a FILTER over rows already
+    // fetched for them — never as a query built from what they picked. An id
+    // they do not own therefore selects nothing rather than selecting somebody
+    // else's account, and no selection means all of theirs.
+    accounts: narrow(accounts, parseGamerPrefs(user.cardPrefs).accounts).map((a) => {
       const p = getProvider(a.provider);
       const game = p?.game ?? a.provider;
       const s = stats.find((x) => x.linkedAccountId === a.id);
@@ -400,7 +405,20 @@ export async function planetCard(game: string): Promise<CardData | null> {
     world: await (async () => {
       try {
         const { getCachedEntityList } = await import("@/lib/game-world-cache");
-        return (await getCachedEntityList(g.name)).slice(0, 4)
+        const all = await getCachedEntityList(g.name);
+        // B58: the admin's reference decides WHICH. "These heroes" is the whole
+        // reason this exists — a game with two hundred champions needs somebody
+        // to choose four, and a slice of whatever the snapshot returned first is
+        // not a choice.
+        const { refFor } = await import("@/lib/cards/refs");
+        const { layoutFor } = await import("@/lib/cards/layout-store");
+        const ref = refFor((await layoutFor("planet")).refs, "planet", "world");
+        const picked = ref.source === "world.pick" && ref.ids?.length
+          // Named order, not snapshot order: an admin who lists three heroes
+          // means those three, in that order.
+          ? ref.ids.map((id) => all.find((e) => e.id === id)).filter(Boolean) as typeof all
+          : all;
+        return picked.slice(0, 4)
           .map((e) => ({ name: e.name, imageUrl: e.image || null, role: e.role }));
       } catch { return []; }
     })(),
