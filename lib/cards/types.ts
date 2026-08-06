@@ -78,7 +78,13 @@ export type ProfileCard = {
   // Ordered most valuable first. `value` is the admin-assigned dollar figure
   // the trophy redeems for — the card prints it, because a trophy nobody can
   // price reads as a badge rather than as money.
-  trophies?: { name: string; imageUrl: string; value?: number }[];
+  /**
+   * `count` is how many of THIS trophy they hold (B62): bought one, won one,
+   * earned one at a streak milestone is one tile with `x3` on it, not three
+   * identical pictures. `value` is carried but the profile card does not draw
+   * it — a price on a profile turns a trophy case into a receipt.
+   */
+  trophies?: { name: string; imageUrl: string; value?: number; count?: number }[];
   trophyCount?: number;           // total won, when more than the card can show
   challenges?: { title: string; live: boolean; points: number; place?: number | null }[];
   theme: CardTheme;

@@ -293,6 +293,54 @@ console.log("\n== a challenge with no cover falls back to its GAME's art ==");
 ok("the chain reaches the game", /g\?\.planetBgUrl \|\| g\?\.coverUrl \|\| bg\.bgUrl/.test(
   await readFile(new URL("../../lib/cards/data.ts", import.meta.url), "utf8")));
 
+console.log("\n== B62: a trophy is a thing you own, not a price tag ==");
+{
+  // A gamer can hold the same trophy several times — bought one, won one,
+  // earned one at a streak milestone. Three rows of the same picture read as a
+  // bug; one tile with a count reads as the brag it is.
+  const tro = await db.select().from(schema.trophies).limit(2);
+  const stackId = uid();
+  await db.insert(schema.users).values({
+    id: stackId, slug: `stack-${tag}`, displayName: `Stacker ${tag}`,
+    email: `${stackId}@test.invalid`, passwordHash: "x",
+  } as never);
+  for (const n of [0, 0, 0, 1]) {
+    await db.insert(schema.userTrophies).values({
+      id: uid(), userId: stackId, trophyId: tro[n].id, awardedAt: new Date(),
+    } as never);
+  }
+  const { profileCard } = await import("../../lib/cards/data.ts");
+  const pc = await profileCard(`stack-${tag}`) as { trophies?: { name: string; count?: number }[]; trophyCount?: number };
+  const held = pc.trophies ?? [];
+  eq("four awards of two trophies are two tiles", held.length, 2);
+  const three = held.find((x) => x.name === tro[0].name);
+  eq("…and the repeated one carries its count", three?.count, 3);
+  eq("…while the heading still says how many they hold", pc.trophyCount, 4);
+  ok("the card draws the count", /`x\$\{x\.count\}`/.test(render));
+
+  // No price on a gamer's own trophies: a price on a profile turns a trophy
+  // case into a receipt, and puts a number on a gift.
+  const profileBody = render.slice(render.indexOf("function ProfileBody"), render.indexOf("function GameStatsBody"));
+  ok("the profile card draws no dollar figure on a trophy", !/\$\$\{nf\(x\.value\)\}/.test(profileBody));
+  ok("…and says why", /trophy case into a receipt/.test(profileBody));
+
+  // The SHELF keeps both and swaps their weight.
+  const shelf = render.slice(render.indexOf("* The marketplace shelf"), render.indexOf("function WeekBody"));
+  const price = /fontSize: 30, fontWeight: 900, color: x\.affordable/.test(shelf);
+  const dollar = /fontSize: 14, fontWeight: 700, letterSpacing: 0\.4/.test(shelf);
+  ok("the shelf's CP price is the big number", price, shelf.slice(shelf.indexOf("THE PRICE IS THE BIG NUMBER"), shelf.indexOf("THE PRICE IS THE BIG NUMBER") + 60));
+  ok("…and the dollar is the smaller line under it", dollar);
+  ok("…drawn in that order", shelf.indexOf("x.cpPrice.toLocaleString()") < shelf.indexOf("redeems for $"));
+}
+
+console.log("\n== B62.3: the challenge card leads with the scoreboard ==");
+{
+  const body = render.slice(render.indexOf("function ChallengeBody"), render.indexOf("function windowPct"));
+  ok("the standings pane comes first", body.indexOf('<Pane key="board">') < body.indexOf('<Pane key="details">'),
+    `${body.indexOf('<Pane key="board">')} vs ${body.indexOf('<Pane key="details">')}`);
+  ok("…and the prize sits beside it", /Beside it: what it is, and what it pays/.test(body));
+}
+
 console.log("\n== B60: the coin is two layers, and the word is gone ==");
 // `components/Cp.tsx` draws the coin as the built-in glyph with the admin's
 // upload painted OVER it, and says why: before that, only the upload rendered,

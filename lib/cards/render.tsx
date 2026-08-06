@@ -945,15 +945,25 @@ function ProfileBody(d: ProfileCard) {
                 <div style={{ display: "flex", flexDirection: "row", gap: 10 }}>
                   {trophies.map((x, i) => (
                     <GlassCard key={i} pad={8} style={{ width: 160, gap: 4 }}>
-                      <ArtPanel url={x.imageUrl} size={78} />
+                      {/* The COUNT, not the price (B62).
+                          Held more than once — bought one, won one, earned one
+                          at a streak milestone — it is ONE tile with a count on
+                          it. Three identical pictures read as a bug, and the
+                          count is the impressive part.
+                          And no dollar figure: a price on a profile turns a
+                          trophy case into a receipt, and puts a number on a
+                          gift. The value belongs on the shelf, where it is
+                          deciding something. */}
+                      <ArtPanel url={x.imageUrl} size={78} corner={(x.count ?? 1) > 1 ? (
+                        <div style={{
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          paddingLeft: 7, paddingRight: 7, height: 24, borderRadius: 999,
+                          fontSize: 15, fontWeight: 900, color: "#0b1020", background: "#fbbf24",
+                        }}>{`x${x.count}`}</div>
+                      ) : undefined} />
                       <div style={{ display: "flex", fontSize: 16, fontWeight: 800, color: INK, lineHeight: 1.2 }}>
                         {clampAt(x.name, 16)}
                       </div>
-                      {x.value ? (
-                        <div style={{ display: "flex", fontSize: 19, fontWeight: 900, color: "#fde68a" }}>
-                          {`$${nf(x.value)}`}
-                        </div>
-                      ) : null}
                     </GlassCard>
                   ))}
                 </div>
@@ -1229,13 +1239,79 @@ function ChallengeBody(d: ChallengeCard) {
       imageUrl: d.logoUrl, eyebrow: d.ended ? "FINISHED CHALLENGE" : "LIVE CHALLENGE",
       title: clamp(d.title, 30) ?? "", subtitle: clamp(d.description, 62), size: 38,
       }}
-      // TWO PANES (B57): the details and the prize on the LEFT, the standings
-      // on the RIGHT. The podium was drawn above the standings and squeezed
-      // them to a row and a half — on the densest card on the platform, the
-      // scoreboard is the reason people come back, so it gets a column of its
-      // own rather than whatever is left after the prize.
+      // TWO PANES (B57), and the SCOREBOARD LEADS (B62.3).
+      //
+      // It was details-and-prize left, standings right. The standings are what
+      // a returning gamer came back for — the prize is why they entered, and
+      // they entered already — so the scoreboard reads first and the prize
+      // sits beside it.
       panes={[
-        <Pane key="left">
+        <Pane key="board">
+      {/* Who can enter, when the answer isn't "anyone".
+          A gamer deciding whether to tap Join needs to know in advance that the
+          answer will be no — finding out after joining is how a competition
+          feels rigged. Nothing is drawn for an open challenge: most are open,
+          and a pill saying "anyone" on every card is a pill nobody reads. */}
+      {(d.entryRules ?? []).length > 0 && !pRules.hidden ? (
+        <Section p={pRules} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
+          {(d.entryRules ?? []).slice(0, 2).map((line, i) => (
+            <Pill key={i} color="#a78bfa" bg="rgba(167,139,250,0.14)" size={pRules.f(19)}>
+              {clamp(line, 34)}
+            </Pill>
+          ))}
+        </Section>
+      ) : null}
+
+      {/* Timeline: the whole window, not just "5d left". People want to know if
+          they're early enough to still matter. */}
+      {d.startsAt ? (
+        <Section p={pTime} style={{ gap: 5, marginTop: 16 }}>
+          <Bar pct={windowPct(d.startsAt, d.endsAt)} accent={t.accent} accent2={t.accent2} h={10} />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: pTime.f(16), color: MUTED }}>
+            <div style={{ display: "flex" }}>{dayLabel(d.startsAt)}</div>
+            <div style={{ display: "flex" }}>{dayLabel(d.endsAt)}</div>
+          </div>
+        </Section>
+      ) : null}
+
+      {/* overflow:hidden, not because anything should overflow — because when
+          something does, Yoga's answer is to COMPRESS the children, and a
+          compressed heading renders on top of the first row instead of above
+          it. Clipping the fourth row is a card that reads; overlapping text is
+          a card that looks broken. */}
+      <Section p={pStand} style={{ gap: 6, marginTop: 14, flex: 1, overflow: "hidden" }}>
+        <Head p={pStand}>{d.ended ? "FINAL STANDINGS" : "STANDINGS"}</Head>
+        {(d.standings ?? []).length === 0 ? (
+          <div style={{ display: "flex", fontSize: pEmpty.f(20), color: MUTED }}>
+            {pEmpty.say("No one has scored yet — first mover takes the lead.")}
+          </div>
+        ) : (
+          (d.standings ?? []).slice(0, 4).map((s) => (
+            <div key={s.place} style={{ display: "flex", alignItems: "center", flexShrink: 0, gap: 12, padding: "6px 14px", borderRadius: 12, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.08)" }}>
+              <div style={{ fontSize: pStand.f(19), fontWeight: 700, width: pStand.f(38), color: ["#fbbf24", "#cbd5e1", "#b45309"][s.place - 1] ?? MUTED }}>{`#${s.place}`}</div>
+              {/* The in-game name leads; the Cluster name is the quiet second
+                  line, and only when the two differ (B54/B52). No fixed height
+                  on either — a box sized to hold one line is what cut the
+                  descenders off every name with a p or a y in it. */}
+              <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+                <div style={{ display: "flex", fontSize: pStand.f(20), fontWeight: 700, lineHeight: 1.35 }}>
+                  {clamp(s.name, 18)}
+                </div>
+                {s.alt ? (
+                  <div style={{ display: "flex", fontSize: pStand.f(13), color: MUTED, lineHeight: 1.35 }}>
+                    {clamp(s.alt, 22)}
+                  </div>
+                ) : null}
+              </div>
+              <div style={{ fontSize: pStand.f(20), fontWeight: 700, color: t.accent2 }}>{`${nf(s.points)} pts`}</div>
+            </div>
+          ))
+        )}
+      </Section>
+        </Pane>,
+
+        // Beside it: what it is, and what it pays.
+        <Pane key="details">
 
       {/* The LIVE pill and the game name are the identity band's eyebrow now,
           so what is left here is only the thing the band cannot say: that this
@@ -1310,71 +1386,6 @@ function ChallengeBody(d: ChallengeCard) {
         </Section>
       ) : null}
 
-        </Pane>,
-
-        // The RIGHT pane: who can enter, the window, and the scoreboard.
-        <Pane key="right">
-      {/* Who can enter, when the answer isn't "anyone".
-          A gamer deciding whether to tap Join needs to know in advance that the
-          answer will be no — finding out after joining is how a competition
-          feels rigged. Nothing is drawn for an open challenge: most are open,
-          and a pill saying "anyone" on every card is a pill nobody reads. */}
-      {(d.entryRules ?? []).length > 0 && !pRules.hidden ? (
-        <Section p={pRules} style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 12 }}>
-          {(d.entryRules ?? []).slice(0, 2).map((line, i) => (
-            <Pill key={i} color="#a78bfa" bg="rgba(167,139,250,0.14)" size={pRules.f(19)}>
-              {clamp(line, 34)}
-            </Pill>
-          ))}
-        </Section>
-      ) : null}
-
-      {/* Timeline: the whole window, not just "5d left". People want to know if
-          they're early enough to still matter. */}
-      {d.startsAt ? (
-        <Section p={pTime} style={{ gap: 5, marginTop: 16 }}>
-          <Bar pct={windowPct(d.startsAt, d.endsAt)} accent={t.accent} accent2={t.accent2} h={10} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: pTime.f(16), color: MUTED }}>
-            <div style={{ display: "flex" }}>{dayLabel(d.startsAt)}</div>
-            <div style={{ display: "flex" }}>{dayLabel(d.endsAt)}</div>
-          </div>
-        </Section>
-      ) : null}
-
-      {/* overflow:hidden, not because anything should overflow — because when
-          something does, Yoga's answer is to COMPRESS the children, and a
-          compressed heading renders on top of the first row instead of above
-          it. Clipping the fourth row is a card that reads; overlapping text is
-          a card that looks broken. */}
-      <Section p={pStand} style={{ gap: 6, marginTop: 14, flex: 1, overflow: "hidden" }}>
-        <Head p={pStand}>{d.ended ? "FINAL STANDINGS" : "STANDINGS"}</Head>
-        {(d.standings ?? []).length === 0 ? (
-          <div style={{ display: "flex", fontSize: pEmpty.f(20), color: MUTED }}>
-            {pEmpty.say("No one has scored yet — first mover takes the lead.")}
-          </div>
-        ) : (
-          (d.standings ?? []).slice(0, 4).map((s) => (
-            <div key={s.place} style={{ display: "flex", alignItems: "center", flexShrink: 0, gap: 12, padding: "6px 14px", borderRadius: 12, background: "rgba(0,0,0,0.42)", border: "1px solid rgba(255,255,255,0.08)" }}>
-              <div style={{ fontSize: pStand.f(19), fontWeight: 700, width: pStand.f(38), color: ["#fbbf24", "#cbd5e1", "#b45309"][s.place - 1] ?? MUTED }}>{`#${s.place}`}</div>
-              {/* The in-game name leads; the Cluster name is the quiet second
-                  line, and only when the two differ (B54/B52). No fixed height
-                  on either — a box sized to hold one line is what cut the
-                  descenders off every name with a p or a y in it. */}
-              <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
-                <div style={{ display: "flex", fontSize: pStand.f(20), fontWeight: 700, lineHeight: 1.35 }}>
-                  {clamp(s.name, 18)}
-                </div>
-                {s.alt ? (
-                  <div style={{ display: "flex", fontSize: pStand.f(13), color: MUTED, lineHeight: 1.35 }}>
-                    {clamp(s.alt, 22)}
-                  </div>
-                ) : null}
-              </div>
-              <div style={{ fontSize: pStand.f(20), fontWeight: 700, color: t.accent2 }}>{`${nf(s.points)} pts`}</div>
-            </div>
-          ))
-        )}
-      </Section>
         </Pane>,
       ]}
     />
@@ -1664,22 +1675,24 @@ function MarketBody(d: MarketCard) {
                     it at 2xl black amber with its caption under it. The CP
                     price follows, because that is the cost and this is the
                     worth. Inverting the two argues with the page. */}
+                {/* THE PRICE IS THE BIG NUMBER (B62).
+                    B56 promoted the dollar here, following B48's decision that
+                    the redemption value is what makes a trophy an asset rather
+                    than a sticker. That is true of a trophy and it is the wrong
+                    emphasis for a SHOP: what a gamer is deciding on this tile is
+                    whether to spend, and the price is the thing they spend. The
+                    dollar stays, under it, smaller — the proof, not the ask. */}
+                <div style={{
+                  display: "flex", flexDirection: "row", alignItems: "center", gap: 7, marginTop: 2,
+                  fontSize: 30, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED,
+                }}>
+                  <CpCoin size={24} icon={t.cpIconUrl} />{x.cpPrice.toLocaleString()}
+                </div>
                 {x.value > 0 ? (
-                  <div style={{ display: "flex", flexDirection: "column", marginTop: 2 }}>
-                    <div style={{ display: "flex", fontSize: 30, fontWeight: 900, lineHeight: 1.05, color: "#fde68a" }}>
-                      {`$${x.value.toLocaleString()}`}
-                    </div>
-                    <div style={{ display: "flex", fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: "rgba(252,211,77,0.72)" }}>
-                      redeems for cash
-                    </div>
+                  <div style={{ display: "flex", fontSize: 14, fontWeight: 700, letterSpacing: 0.4, color: "rgba(252,211,77,0.82)" }}>
+                    {`redeems for $${x.value.toLocaleString()}`}
                   </div>
                 ) : null}
-                <div style={{
-                  display: "flex", flexDirection: "row", alignItems: "center", gap: 5,
-                  fontSize: 20, fontWeight: 900, color: x.affordable ? t.accent2 : MUTED,
-                }}>
-                  <CpCoin size={15} icon={t.cpIconUrl} />{x.cpPrice.toLocaleString()}
-                </div>
               </GlassCard>
             ))}
           </div>

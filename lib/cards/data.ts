@@ -105,9 +105,25 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     // stable rather than whatever the query happened to return. The cash value
     // travels with each one: a trophy nobody can price reads as a badge, and
     // the entire point of this economy is that these are worth real money.
-    trophies: [...won]
-      .sort((a, b) => (b.value - a.value) || (b.awardedAt.getTime() - a.awardedAt.getTime()))
-      .map((t) => ({ name: t.name, imageUrl: t.imageUrl, value: t.value })),
+    // STACKED (B62): the same trophy held more than once — bought one, won one,
+    // earned one at a streak milestone — is ONE entry with a count. Three rows
+    // of the same picture read as a bug, and the count is the impressive part.
+    // Keyed on name+image rather than on the trophy id, because two rows can be
+    // the same prize re-issued, and a gamer does not care which id it was.
+    trophies: (() => {
+      const by = new Map<string, { name: string; imageUrl: string; value: number; count: number; at: number }>();
+      for (const t of won) {
+        const key = `${t.name}::${t.imageUrl}`;
+        const hit = by.get(key);
+        if (hit) { hit.count += 1; hit.at = Math.max(hit.at, t.awardedAt.getTime()); }
+        else by.set(key, { name: t.name, imageUrl: t.imageUrl, value: t.value, count: 1, at: t.awardedAt.getTime() });
+      }
+      return [...by.values()]
+        .sort((a, b) => (b.value - a.value) || (b.at - a.at))
+        .map(({ name, imageUrl, value, count }) => ({ name, imageUrl, value, count }));
+    })(),
+    // The TOTAL held, which is still the honest number for the heading — a
+    // gamer with three of one trophy and two of another has five.
     trophyCount: won.length,
     challenges,
     theme: {
