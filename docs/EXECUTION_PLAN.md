@@ -3384,9 +3384,20 @@ that is a true statement rather than a special case somebody has to code.
   against what actually exists.
 - **Social counts stay at 1-2.** "Follow 5 friends" is a real incentive to
   inflate the social graph — B35's problem arriving through a new door.
-- **A streak, as STATUS ONLY.** Days completed in a row, no CP, no trophy,
-  nothing redeemable. It is the strongest retention lever here and it costs
-  nothing, which is the only reason it is safe.
+- **A streak, and it AWARDS A TROPHY.** Admin sets which trophy at which day
+  count — milestones, several of them. A day counts when the gamer earned the
+  full 500, **however they earned it**: the mission's own tasks or anything
+  else. Miss a day without the full 500 and the streak resets to zero.
+
+  **This is real spend outside the 500/day cap, and it is the one thing in this
+  item that is not framing.** A trophy redeems for dollars, so a streak
+  milestone is a payment the cap does not see. Three things keep it bounded and
+  they are requirements, not suggestions: the milestone trophies are chosen by
+  an admin from the existing shelf (so their value is a number somebody set on
+  purpose), a milestone pays **once per gamer per milestone** and never repeats
+  on a later streak, and the awarded trophy goes through the same
+  `userTrophies` path as a won one so it is visible to every existing report
+  that watches what the platform gives away.
 
 ### B61.5 Surfaces
 
@@ -3402,11 +3413,91 @@ quest page, and the same button in Discord.
   complete mission in generic wording.
 - 500 CP earned outside the mission reads 500/500 with its tasks unticked.
 - **The mission writes no CP.** Asserted against the ledger, because this is the
-  rule the item rests on.
+  rule the item rests on. (A streak milestone writes a TROPHY, never CP.)
+- A milestone pays once per gamer per milestone, and a second streak past the
+  same day count awards nothing.
+- A day with 500 CP earned entirely outside the mission still extends the
+  streak.
+- A missed day resets the streak to zero.
 - A named challenge is one the gamer has NOT entered and CAN enter.
 
 **Shots owed:** the mission panel on `/quests`.
 **New routes:** none (the panel lives on `/quests` and `/quests/<key>`).
+
+---
+
+## B62 — A trophy is a thing you own, not a price tag
+
+Two changes to how trophies read, both about the same confusion: a gamer's
+trophy case is a brag, and a shelf is a shop. They are currently drawn the same
+way.
+
+### B62.1 The same trophy, owned more than once, is ONE tile with a count
+
+A gamer can hold the same trophy several times over — bought one, won one in a
+challenge, earned one at a streak milestone. That is three rows of the same
+picture today. It becomes **one tile with `x3`**, on the profile page and on the
+card. The count is what is impressive; three identical pictures read as a bug.
+
+### B62.2 The gamer's own trophies do not show a price
+
+On the profile and on the profile card, a trophy is shown **without its cash
+value**. The value belongs on the marketplace, where it is deciding something.
+On a profile it turns a trophy case into a receipt, and it prices a gift.
+
+The MARKETPLACE keeps both figures and swaps their weight: **the CP price is the
+big number** — that is what a gamer pays and what they are deciding about — and
+"redeems for $X" is the smaller line under it. (This reverses B56's ordering on
+that card, deliberately: B48 promoted the dollar to prove a trophy is an asset,
+and the shelf's job is the purchase.)
+
+**Verification owed → `tests/db/cards.mts` + `tests/db/trophies.mts`:**
+- Three copies of one trophy resolve to one entry with `count: 3`.
+- The profile card draws no dollar figure on a trophy.
+- The marketplace card draws the CP price larger than the dollar line.
+
+### B62.3 The challenge card's panes swap
+
+Standings LEFT, prize podium RIGHT. The scoreboard is what a returning gamer
+came for and it reads first.
+
+---
+
+## B63 — The nav bands: profile of the week, and the mission streak
+
+A second band under the profile-of-the-week band, and a pass over both.
+
+### B63.1 The new band — today's mission and the streak
+
+Collapsed: the streak's day count and where they stand. Expanded: today's
+mission with each task and whether it is done, the milestones with the trophy
+at each, and how far off the next one is. **Click anywhere to close.**
+
+### B63.2 Both bands use the NAV's background art
+
+The profile-of-the-week band expands onto a dark solid panel today. It uses the
+nav's own background image instead — collapsed and expanded, and the same for
+the new band, so the two read as one piece of chrome rather than as two
+features that landed separately.
+
+### B63.3 The week band's profiles become their CARDS
+
+The profiles inside it are drawn as the same profile card the bot renders (B59's
+renderer), not as a separate web treatment of the same data. And the expanded
+band is **smaller** — it currently takes more height than the thing it is
+introducing.
+
+**Verification owed → `tests/ui/nav-bands.mjs`:**
+- Both bands carry the nav's background art, collapsed and expanded.
+- The mission band shows today's tasks with their done state, and the streak
+  with its next milestone.
+- Clicking anywhere in an expanded band closes it.
+- The week band's profiles are the card renderer's output, not a second
+  implementation.
+- The expanded week band is shorter than it was.
+
+**Shots owed:** both bands, collapsed and expanded.
+**New routes:** none.
 
 ---
 
@@ -3463,6 +3554,7 @@ quest page, and the same button in Discord.
 | B57 | the pane grid, and four cards moved onto it | The geometry is one exported helper (`panes()`), shared by the renderer and the editor for the same reason `sideBox` is — a pane the editor draws somewhere the renderer does not is worse than no editor. `KIND_PANES` gives each kind its shape as a DEFAULT, overridable per kind like any other stored field. **Profile** is two panes: what they play on the left, what they have won on the right — one column made those compete for the same inches, which is why the accounts kept losing. **Challenge** is two: details and prize left, the scoreboard right, which is the standings' column back. **Planet** is the 2×2 the item asks for, and it gained a fourth thing to show — the game's own world, read from the cached snapshot, never a live fetch on a render. **Market** shows five. Two defects only the render found: Satori has no Fragment, so a pane handed `<>…</>` laid its children out as if the pane were a row (the profile's LINKED ACCOUNTS heading sat beside its stat pills, half off the pane), and a pane with an auto height collapsed every `flex: 1` inside it — the challenge card's standings were simply not drawn. |
 | B57 | "do all your recommendations; four missions rotating weekly, and personalise the words" | **B60** (the coin composite) and **B61** (the Daily Mission) filed. Every recommendation is in the item as a rule rather than as advice: no CP from the mission, seeded not random, one day boundary shared with `capsToday`, progress READ from `quest_events` rather than counted again, availability checked, social counts held at 1-2, and the streak as status only. The two decisions that came back: **four variations rotating weekly for everyone** rather than a per-gamer draw — which answers "why is mine different from my friend's" and makes support able to reproduce a mission — and the task WORDS personalised against the gamer's own data (their in-game name, the server they joined from, a live challenge on a game they have linked and have not entered). Build order: B60, then B58's data references, then B61 on top of them. |
 | B60 | shipped | The card coin is the same two layers the website draws: the built-in glyph always, the admin's `brand.cpIcon` painted OVER it. Same CMS key, so changing the coin changes it on the thing that travels furthest without a deploy — and resolved in the prepare step alongside the mark and the mascot, because Satori fetches what it is handed and this appears on nearly every card. The word "CP" is gone as a unit from both places it survived (the quest card's progress line and the wallet tile's exchange rate), and the coin now LEADS the figure like a currency symbol, which is `components/Cp.tsx`'s own rule. The assertion that keeps it gone scans only what is DRAWN — the first version of it read the comment explaining why the word was removed and failed on the explanation. |
+| B61, B56, B57 | "streaks award a trophy; trophies stack; no price on a profile; swap the challenge panes; CP is the big number on the shelf; a new nav band" | **B61 amended, B62 and B63 filed.** The streak now PAYS — admin picks a trophy per milestone — which reverses the "status only" recommendation, so the reason that recommendation existed is written into the item instead of dropped: a trophy redeems for dollars, so a milestone is spend the 500/day cap does not see. Three bounds are requirements now — admin chooses the trophy from the existing shelf, a milestone pays once per gamer and never again on a later streak, and it is awarded through the same `userTrophies` path as a won one so every existing report sees it. Also decided: a day counts when the full 500 is earned **however** it was earned, which is what B61.3 already made true for free. **B62**: the same trophy held three times is one tile with a count, not three pictures; a gamer's own trophies show no price (a price on a profile turns a case into a receipt and puts a number on a gift), while the shelf keeps both figures with the CP price as the big one — deliberately reversing B56's ordering there, because B48 promoted the dollar to prove a trophy is an ASSET and the shelf's job is the PURCHASE. **B63**: the mission/streak band, and the pass over the week band that was already owed. |
 | — | *(next amendment here)* | |
 
 ---
@@ -3554,6 +3646,8 @@ written live in `.scratch/` and are **gitignored** — V0.1 moves them into
 | `tests/db/card-refs.mts` | **B58** | a pane with no reference falls back and never blanks; a reference to a deleted row resolves to the fallback; a gamer's override can hide their own accounts and cannot name another gamer's; admin's per-kind reference survives an unrelated layout save | ☐ |
 | `tests/ui/profile-card.mjs` | **B59** | the card in customization is the SAME renderer the bot uses; hiding removes it from the public profile and not from the bot; the account selection is reflected in the render | ☐ |
 | `tests/db/missions.mts` | **B61** | all four variations total exactly 500 CP at today's prices; same (week, user) gives the same mission and the cycle returns after four; no count exceeds that action's daily cap; a gamer with no account, server or live challenge still gets a complete mission; 500 earned elsewhere reads 500/500 with tasks unticked; **the mission writes no CP**, asserted against the ledger; a named challenge is one they have not entered and can enter | ☐ |
+| `tests/db/trophies.mts` | **B62** | three copies of one trophy resolve to one entry with count 3; a gamer's own trophies carry no dollar figure; the shelf draws the CP price larger than the dollar line | ☐ |
+| `tests/ui/nav-bands.mjs` | **B63** | both bands carry the nav's background art collapsed and expanded; the mission band shows today's tasks with their done state and the next milestone; clicking anywhere in an expanded band closes it; the week band's profiles are the card renderer's output rather than a second implementation; the expanded week band is shorter | ☐ |
 | `tests/db/entry-rules.mts` | **B38** | a second account makes no second entry and the response names the one entered; the other account is free on a different challenge; switching allowed before the start and refused after, with the reason; the score is re-baselined; two different gamers unaffected | **written — 24 assertions** |
 | `tests/db/eligibility.mts` | **B37** | redemption refused without an age or a country, with the reason; the boundary age is not off by one; a sanctioned country is refused by name; nothing is committed on a refusal; the annual total is right across a year boundary and counts the date the money moved | **written — 33 assertions** (a `tests/ui/legal.mjs` is still owed for CI; the page and its three links were browser-verified by hand) |
 | `tests/db/prepay.mts` | **B36** | the invoice exists at purchase and is due that day; billed once; the challenge still opens; past the window unpaid a NEW challenge is refused with the reason; a won prize is still held and redeemable; paying unblocks; each dunning stage sends once | **written — 26 assertions** |
