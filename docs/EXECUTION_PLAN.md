@@ -3338,6 +3338,58 @@ does, at the prices `ACTION_CATALOG` already sets, under the caps B17 already
 enforces. The moment the mission pays, the cap stops being the ceiling and the
 platform's exposure doubles through a feature that looks like copywriting.
 
+### B61.0b BLOCKED ON A NUMBER: 500 is not reachable from eight actions
+
+**Measured before building, and it changes the item.** From `ACTION_CATALOG`
+(`lib/quests.ts:40-74`), at today's weights and caps:
+
+| | CP if a gamer did EVERYTHING, at every cap |
+|---|---|
+| conquest | 220 |
+| orbit | 199 |
+| signal | 110 |
+| ascension | 95 |
+| **everything** | **624** |
+
+The daily ceiling is 500. So 500 in a day means doing roughly **80% of
+literally everything**, including the actions nobody does daily — winning a
+challenge (100), placing top 3 (50), Best Profile (100), adding the bot (50),
+connecting an account (50). Strip those five and what is left — the genuinely
+repeatable actions — totals **224 CP across all four quests**.
+
+And the mission is *two actions per quest*, eight in all. The best eight
+repeatable actions come to roughly **140 CP**. Not 500. Not close.
+
+**So "eight actions totalling exactly 500" cannot be built at today's prices.**
+The 1-CP ad watch rounds a remainder; it cannot close a 360-point gap — the ad
+impression cap is 20 a day, worth 20 CP.
+
+Four ways forward, and the choice is the owner's because three of them touch
+money:
+
+1. **The mission totals what is actually achievable** (~140-224) and is its own
+   bar. The 500 ceiling stays what it is — a ceiling — and "completed today's
+   mission" and "hit the daily cap" become two different, both-true statements.
+   Costs nothing and changes no prices.
+2. **Reprice.** Raise weights so eight repeatable actions reach 500. This is
+   B34's table, which is real money: 500 CP is $0.05, and the platform's whole
+   cost model is that table.
+3. **Raise the caps** rather than the weights — more ad watches, more comments.
+   Same objection, plus it rewards volume on exactly the actions B35 worries
+   about.
+4. **Let the mission include the rare one-offs** — "win a challenge" as a task.
+   Reaches 500 honestly and is completed by almost nobody, which is a mission
+   that teaches gamers the mission is not for them.
+
+**My recommendation is (1)**, and I would not fold the 500 into it at all: the
+mission's job is to make a day's earning legible, and a target nobody can hit is
+the opposite of that. If the 500 framing matters, it belongs on the CAP display
+("you have earned 140 of a possible 500 today"), which is true, already
+computable from `capsToday`, and needs no repricing.
+
+**Nothing below is built until this is decided**, because every variation's
+arithmetic depends on the answer.
+
 ### B61.1 Four variations, rotating weekly
 
 Not random forever: **four missions**, and the week picks which one everybody is
@@ -3590,6 +3642,7 @@ introducing.
 | B61 | "milestones repeat after a reset" | **Corrected: my bound was wrong for the design.** I had written "pays once per gamer, ever"; the streak is a LOOP — day 7 awards, day 14 awards the next, a missed day returns the count to zero, and the climb back to 7 awards the 7-day trophy **again**. A milestone fires once per streak, and a longer streak passes through every milestone below it. Which moves the economic bound from frequency to VALUE — a 7-day trophy is winnable up to 52 times a year by one gamer — and **both controls for it already exist**: `trophies.value` (`schema.ts:632`) is the dollar figure, and `trophies.inMarketplace` (`:651`) already decides whether a trophy is listed for sale, so a milestone trophy can be earned-only with no new field. The admin screen states the annual figure next to the value, because $0.10 reads as nothing and $5.20 a year per gamer reads as a decision. |
 | B61 | "any trophy can be a milestone, $0 or valued; show the value on the milestone" | Checked rather than assumed: `priceOf` (`lib/marketplace.ts:92-103`) floors every price at **500 CP**, so a $0 trophy is non-redeemable but costs a full day's cap to buy — which is what makes it the natural home for the early milestones. Worth stating which way `inMarketplace` cuts, because it is the opposite of the intuition: a milestone trophy left ON the shelf can be **bought** for one day's earnings by somebody who never held a streak, so what makes it feel earned is taking it off. Admin picks any trophy for any milestone, and the day count and the trophy's value are both shown on the band and the card — a milestone a gamer cannot price is a milestone they cannot want. |
 | B58 | the model is shipped; the editor panel remains | `lib/cards/refs.ts` is the registry and nothing else — no database, no CMS, no server imports — because the layout editor is a client component and needs the same parser the renderer uses. Three rules are enforced there rather than remembered: **an unset reference draws what the card already drew** (a registry whose default is "nothing" turns the layout screen into a way to empty a card by opening it), **an unknown or renamed source falls back** rather than blanking a pane, and **what an admin types never reaches a query** — ids are id-shaped or dropped, and the list is capped. The gamer's half is a FILTER over rows already fetched for them, never a query built from their input: an id belonging to somebody else selects nothing and falls back to their own, which the suite asserts end-to-end against two real gamers rather than against the model in isolation. A stale pick — the account they chose, since unlinked — also falls back, because showing somebody an empty card for our own stale row is punishing them for it. **Still owed:** the editor's reference panel, and the gamer-facing controls (which arrive with B59). |
+| B61 | **blocked on a measured number** | Before writing a variation I summed `ACTION_CATALOG`: everything a gamer could possibly do in a day, at every cap, is **624 CP**, and stripping the five actions nobody does daily (win a challenge, top 3, Best Profile, add the bot, connect an account) leaves **224**. The mission is two actions per quest — eight — and the best eight repeatable actions total about **140**. **"Eight actions totalling exactly 500" cannot be built at today's prices**, and the 1-CP ad watch cannot close a 360-point gap when its own cap is worth 20 CP. Four ways forward are written into B61.0b; three of them touch B34's price table, which is real money. My recommendation is the one that costs nothing: the mission totals what is achievable and is its own bar, and the 500 framing moves to the CAP display — "140 of a possible 500 today" — which is true, already computable from `capsToday`, and needs no repricing. Not built pending the decision, because every variation's arithmetic depends on it. |
 | — | *(next amendment here)* | |
 
 ---
