@@ -179,7 +179,7 @@ eq("…and appears in the money log", (await getCpLedger(db, veteran)).length, 1
 // somebody will quote in a meeting.
 console.log("\n== the model ==");
 const { defaultConfig, maxDailyCp, maxDailyCost, expectedDailyCost, exposure,
-  abuseSurface, minutesPerDollar, actionMaxDaily, DEFAULT_ASSUMPTIONS } =
+  abuseSurface, minutesPerDollar, fastestActionMinutesPerDollar, actionMaxDaily, DEFAULT_ASSUMPTIONS } =
   await import("../../lib/cp-economics.ts");
 
 const cfg = defaultConfig();
@@ -248,7 +248,13 @@ ok("winning a challenge is NOT on the free surface — it needs a game and a res
 // surface still has to contain the cheap social ones.
 ok("messaging a new gamer IS", surface.some((r) => r.key === "message_new"));
 const mpd = minutesPerDollar(cfg)!;
+// CAP-AWARE now. The old figure took the fastest action and ignored its cap,
+// which answered a question about a platform we do not run: it read 27 minutes
+// when clicking an ad is capped at 3 a day. Filling a day with every self-serve
+// action, under the ceiling, is ~6 hours of work per dollar.
 ok("a determined faker needs hours per dollar, not minutes", mpd > 60, `${mpd.toFixed(0)} min/$`);
+ok("…and the single-action figure is kept for pricing ONE action, gating nothing",
+  (fastestActionMinutesPerDollar(cfg) ?? 0) > 0);
 console.log(`       (cheapest path: ${surface[0].label} at ${surface[0].cpPerMinute.toFixed(1)} CP/min → ${(mpd / 60).toFixed(1)} hours per dollar)`);
 
 // The plan's load-bearing bullet for B16.2: "assert through the real award
