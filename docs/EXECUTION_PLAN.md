@@ -3403,13 +3403,24 @@ that is a true statement rather than a special case somebody has to code.
   therefore its VALUE, not its frequency, and two existing controls carry it —
   both already in the schema, neither needing anything new:
 
-  - `trophies.value` (`lib/db/schema.ts:632`) is the admin's dollar figure. The
-    early milestones are set low on purpose; at $0.10 a 7-day trophy is $5.20 a
-    year for a gamer who never misses a day, which is a number worth stating
-    plainly in the admin screen next to the field.
-  - `trophies.inMarketplace` (`:651`) already decides whether a trophy is listed
-    for sale. A milestone trophy can be earned-only — off the shelf entirely —
-    which is the admin's call per trophy.
+  - `trophies.value` (`lib/db/schema.ts:632`) is the admin's dollar figure, and
+    **any trophy can be a milestone trophy — valued or $0.** At $0.10 a 7-day
+    trophy is $5.20 a year for a gamer who never misses a day, which is a number
+    the admin screen states next to the field: $0.10 reads as nothing, $5.20 a
+    year per gamer reads as a decision.
+  - A **$0 trophy is not redeemable**, and it is not free either: `priceOf`
+    (`lib/marketplace.ts:92-103`) floors every price at 500 CP, so a trophy with
+    no cash value still costs a full day's cap to buy. That is the natural home
+    for the early milestones.
+  - `trophies.inMarketplace` (`:651`) decides whether it is listed at all. Worth
+    knowing which way round it cuts: leave a milestone trophy ON the shelf and it
+    can be bought for 500 CP — one day's earnings — by somebody who never held a
+    streak, so what makes it feel earned is taking it OFF. That is the admin's
+    call per trophy and the screen should say what it costs to buy while it is on.
+
+  **The milestone's trophy VALUE is shown** on the streak display — on the nav
+  band and on the mission card — beside the day count it unlocks at. A milestone
+  a gamer cannot price is a milestone they cannot want.
 
   And it is awarded through the same `userTrophies` path as a won one, so every
   existing report that watches what the platform gives away still sees it.
@@ -3434,6 +3445,8 @@ quest page, and the same button in Discord.
 - A streak that reaches 14 has awarded both the 7-day and the 14-day trophy.
 - A milestone whose trophy an admin has deleted awards nothing and does not
   throw — the streak keeps counting.
+- A $0 milestone trophy is awarded like any other and redeems for nothing.
+- The band and the card show each milestone's day count AND its trophy's value.
 - A day with 500 CP earned entirely outside the mission still extends the
   streak.
 - A missed day resets the streak to zero.
@@ -3575,6 +3588,7 @@ introducing.
 | B61, B56, B57 | "streaks award a trophy; trophies stack; no price on a profile; swap the challenge panes; CP is the big number on the shelf; a new nav band" | **B61 amended, B62 and B63 filed.** The streak now PAYS — admin picks a trophy per milestone — which reverses the "status only" recommendation, so the reason that recommendation existed is written into the item instead of dropped: a trophy redeems for dollars, so a milestone is spend the 500/day cap does not see. Three bounds are requirements now — admin chooses the trophy from the existing shelf, a milestone pays once per gamer and never again on a later streak, and it is awarded through the same `userTrophies` path as a won one so every existing report sees it. Also decided: a day counts when the full 500 is earned **however** it was earned, which is what B61.3 already made true for free. **B62**: the same trophy held three times is one tile with a count, not three pictures; a gamer's own trophies show no price (a price on a profile turns a case into a receipt and puts a number on a gift), while the shelf keeps both figures with the CP price as the big one — deliberately reversing B56's ordering there, because B48 promoted the dollar to prove a trophy is an ASSET and the shelf's job is the PURCHASE. **B63**: the mission/streak band, and the pass over the week band that was already owed. |
 | B62 | the card half is shipped | Duplicate trophies STACK in the data layer, keyed on name+image rather than on the trophy id — two rows can be the same prize re-issued and a gamer does not care which id it was. Four awards of two trophies is two tiles, one carrying `x3`, and the heading still says 4 because that is how many they hold. The dollar figure is off a gamer's own trophies entirely. The shelf swapped its two figures: the CP price is 30px and the redemption value is the 14px line under it — reversing B56's ordering **on that card only**, because B48 promoted the dollar to prove a trophy is an ASSET and the shelf's job is the PURCHASE. And the challenge card's panes swapped: the scoreboard is what a returning gamer came back for. **Still owed on B62:** the same stacking and price rules on the WEB profile (`components/TrophyCase.tsx`), which is where a gamer looks at their own case most. |
 | B61 | "milestones repeat after a reset" | **Corrected: my bound was wrong for the design.** I had written "pays once per gamer, ever"; the streak is a LOOP — day 7 awards, day 14 awards the next, a missed day returns the count to zero, and the climb back to 7 awards the 7-day trophy **again**. A milestone fires once per streak, and a longer streak passes through every milestone below it. Which moves the economic bound from frequency to VALUE — a 7-day trophy is winnable up to 52 times a year by one gamer — and **both controls for it already exist**: `trophies.value` (`schema.ts:632`) is the dollar figure, and `trophies.inMarketplace` (`:651`) already decides whether a trophy is listed for sale, so a milestone trophy can be earned-only with no new field. The admin screen states the annual figure next to the value, because $0.10 reads as nothing and $5.20 a year per gamer reads as a decision. |
+| B61 | "any trophy can be a milestone, $0 or valued; show the value on the milestone" | Checked rather than assumed: `priceOf` (`lib/marketplace.ts:92-103`) floors every price at **500 CP**, so a $0 trophy is non-redeemable but costs a full day's cap to buy — which is what makes it the natural home for the early milestones. Worth stating which way `inMarketplace` cuts, because it is the opposite of the intuition: a milestone trophy left ON the shelf can be **bought** for one day's earnings by somebody who never held a streak, so what makes it feel earned is taking it off. Admin picks any trophy for any milestone, and the day count and the trophy's value are both shown on the band and the card — a milestone a gamer cannot price is a milestone they cannot want. |
 | — | *(next amendment here)* | |
 
 ---
