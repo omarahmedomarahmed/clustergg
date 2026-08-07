@@ -1,12 +1,11 @@
 # ClusterGG — The Live Plan
 
-**Updated 7 August 2026, after four owner decisions were made.** This is the
-whole remaining build, in order, with the gates that stop it.
+**Updated 7 August 2026. All owner decisions are made. This is the whole
+remaining build, in order, with the gates that stop it.**
 
-The 4,700-line `docs/EXECUTION_PLAN.md` is the *record* — every decision and
-every correction since the beginning. This file is the *plan*: what is left, why
-it is in this order, and where we know we are weak. A reader should not have to
-reconstruct the present from an archive.
+`docs/EXECUTION_PLAN.md` (4,700 lines) is the *record* — every decision and
+correction since the beginning. This file is the *plan*: what is left, why it is
+in this order, and where we know we are weak.
 
 ---
 
@@ -14,629 +13,679 @@ reconstruct the present from an archive.
 
 **You are being asked to attack this plan.**
 
-If you are the independent reviewer who wrote `docs/DUE_DILIGENCE_REPORT.md` and
-the two rounds of `docs/DD_RESPONSE_REVIEW.md`: every round you have written has
-been right and has changed what we build. Round 1 killed a business model.
-Round 2 found an arithmetic error inside the very dispute where we claimed to
-understand round 1, and then found a bug our own fix had introduced. Keep that
-standard. Nothing here is written to survive you.
+If you are the reviewer who wrote `docs/DUE_DILIGENCE_REPORT.md` and the two
+rounds of `docs/DD_RESPONSE_REVIEW.md`: every round has been right and every
+round changed the build. Round 1 killed a business model. Round 2 found an
+arithmetic error inside the very dispute where we claimed to understand round 1,
+then found a bug our own fix had introduced. Keep that standard.
 
-If you are new: read `docs/DUE_DILIGENCE_REPORT.md` (the kill verdict),
-`docs/DD_RESPONSE.md` (our reply), then `docs/DD_RESPONSE_REVIEW.md` (both
-rounds of review). Then this. **Do not take a claim in this file on trust** —
-several claims in our documents have been wrong, and every single one was caught
-by someone reading the source instead of the prose.
+If you are new: read `docs/DUE_DILIGENCE_REPORT.md`, then `docs/DD_RESPONSE.md`,
+then both rounds of `docs/DD_RESPONSE_REVIEW.md`. **Do not take a claim in this
+file on trust** — several claims in our documents have been wrong, and every one
+was caught by someone reading the source instead of the prose.
 
-**What is most useful to us, in order:**
+**What is most useful, in order:**
 
-1. **Break something specific.** A finding with a `file:line` beats a paragraph
-   of concern. If a step is out of order, unnecessary, or quietly depends on
-   something that does not exist, name it and name the dependency.
-2. **Where we could do better, give us 2 or 3 REAL PATHS — not one
-   recommendation.** Name the trade-off on each, say which you would take and
-   why, and say what would make you switch. One recommendation is easy to accept
-   without thinking. Three force a choice, and the choosing is where we find out
-   what we actually believe. We would rather have your second-best option written
-   down than never know it existed.
+1. **Break something specific.** A `file:line` beats a paragraph of concern. If a
+   step is out of order, unnecessary, or depends on something that does not
+   exist, name it and name the dependency.
+2. **Where we could do better, give 2 or 3 REAL PATHS — not one recommendation.**
+   Name the trade-off on each, say which you would take, and say what would make
+   you switch. One recommendation is easy to accept without thinking; three force
+   a choice. We would rather have your second-best option written down than never
+   know it existed.
 3. **Tell us what we are not asking.** The expensive mistakes here were never
-   wrong answers. They were questions nobody put on the list — Discord's policy,
-   money transmission, a fill rate missing from an equation — and each time the
-   plan looked complete right up until someone read it who had not written it.
-4. **Say plainly where we are still fooling ourselves.** Better here than from a
-   brand, a regulator, or Discord.
+   wrong answers — they were questions nobody put on the list.
+4. **Say plainly where we are still fooling ourselves.**
 
-**Attack §3 hardest.** It is the new measurement design, it is the direct
-successor to the fabricated ROAS you killed, and it contains an estimate. An
-estimate is exactly how the last lie started.
-
-You do not need to be balanced. If a section is wrong, say it is wrong.
+**Attack §3 (B81/B82) hardest.** It is the direct successor to the fabricated
+ROAS you killed.
 
 ---
 
 ## 1. Where we are
 
-### Fixed and merged to `main` (live)
+### Merged to `main` and live
 
 | Commit | What |
 |---|---|
-| `3a776c0` | `AUTH_SECRET` fails closed outside a demo runtime. Self-serve creative uploads insert `pending_review`, so both portal paths go through the review queue that already existed. `getCardCampaign.live` now checks creative approval, which it claimed to and did not — the portal shows **In review** instead of telling a brand "You're live" while nothing serves. |
-| `a6972d3` | **Money integrity.** `lib/db/tx.ts` opens a pooled connection — the only place a transaction is possible, since `neon-http` cannot open one. The CP ceiling, `buyTrophy` and `requestRedeem` run inside a transaction behind `SELECT … FOR UPDATE` on the gamer's row. The bare `catch {}` is gone. First CI this repository has ever had. |
-| `12c4730` | The three round-2 findings. Real Postgres in CI so the lock is genuinely contended; `engines`/`.nvmrc`/`ws` fallback so a runtime downgrade cannot silently stop all CP earning; and the client-bundle break that adding `pg` caused. |
+| `3a776c0` | `AUTH_SECRET` fails closed. Self-serve creatives insert `pending_review`. `getCardCampaign.live` now checks creative approval — the portal shows **In review** instead of "You're live" while nothing serves. |
+| `a6972d3` | **Money integrity.** `lib/db/tx.ts` opens a pooled connection — the only place a transaction is possible, since `neon-http` cannot open one. The CP ceiling, `buyTrophy` and `requestRedeem` run in a transaction behind `SELECT … FOR UPDATE` on the gamer's row. The bare `catch {}` is gone. First CI this repo has had. |
+| `12c4730` | The three round-2 findings: real Postgres in CI so the lock is genuinely contended; `engines`/`.nvmrc`/`ws` fallback; and the client-bundle break adding `pg` caused. |
+| `4773493` | **Card layout versioning** — see §1.1. |
 
-**The lock is proven, not asserted.** With `FOR UPDATE` removed and the suite run
-against real Postgres, three assertions fail — including *four simultaneous
-claims on one trophy all succeeding*, which is one trophy paid out three times in
-dollars. Put the lock back and it is one.
+**The lock is proven, not asserted.** Remove `FOR UPDATE`, run against real
+Postgres, and three assertions fail — including *four simultaneous claims on one
+trophy all succeeding*, which is one trophy paid out three times in dollars.
 
 *Honest limit:* the five-way `buyTrophy` race did **not** fail in that control
-run, so that assertion is not yet demonstrated to exercise contention. Recorded
-in the test file rather than counted as proven.
+run, so it is not yet demonstrated to exercise contention. Recorded in the test.
+
+### 1.1 A live defect we found ourselves, and it is instructive
+
+The owner sent screenshots of a challenge card that went to **15 servers** with
+its content crammed into the left 55%, the gradient bar back on, and the Cluster
+watermark at 30% opacity in the corner. The redesign looked like it had never
+happened.
+
+**Read from production (read-only): all 12 stored card layouts predate the
+redesign, and every one was overriding it.** `parseLayout`
+(`lib/cards/layout.ts`) merged stored values over the new defaults field by
+field. The challenge card's stored `content.w` was **59.5%** against a new
+default of 92%; `bar` was `true`; `mark` was `{x:87, y:78, opacity:30}` against
+`{x:50, y:63, opacity:7}`.
+
+**The near miss that should have caught it:** `layout.ts` already carried a
+comment explaining that stored layouts predate the redesign — written when
+`bar` was defaulted off. The staleness was spotted for **one field** and the
+obvious next question, *what about `content`, `mark`, `badge`, `plate`?*, was
+never asked.
+
+**Fixed by versioning, not by a database edit** (`4773493`): `LAYOUT_VERSION = 2`,
+and a stored layout without it is discarded rather than merged. No production
+write; it recovers by deploying. The old JSON stays in the row.
+
+> **Why this matters beyond one card:** it is the same failure shape as the
+> fabricated ROAS. Something looked deliberate and was stale. A reviewer should
+> ask what else in this codebase is a merge of old state over new intent.
 
 ### Still live, still wrong
 
-Four Phase-0 defects. Until this week all four were blocked on decisions. **All
-four are now unblocked** by §2 and are the top of the build queue.
-
-| Live defect | Where |
-|---|---|
-| Fabricated ROAS shown to a paying brand | `lib/brand-report.ts:105-115` |
-| Ad beacon is unauthenticated — CP mintable with `curl` | `app/api/ads/beacon/route.ts` |
-| Trophy gifting (money-transmission trigger) | `lib/marketplace.ts:198-217` |
-| No age gate at signup | `app/actions/auth.ts:11-53` |
+| Live defect | Where | Now unblocked by |
+|---|---|---|
+| Fabricated ROAS shown to a paying brand | `lib/brand-report.ts:105-115` | D1 |
+| Ad beacon unauthenticated — CP mintable with `curl` | `app/api/ads/beacon/route.ts` | — |
+| Trophy gifting (money-transmission trigger) | `lib/marketplace.ts:198-217` | D2 |
+| No age gate at signup | `app/actions/auth.ts:11-53` | D3 |
 
 ---
 
-## 2. The four decisions, made
+## 2. The decisions, made
 
-These were the open questions in the previous version of this file. The owner has
-answered all four. Everything in §3 onward follows from them.
+### D1 + D4 — What an ad view IS
 
-### D1 + D4 — What an ad view IS, and what the brand sees
+A campaign runs on **both** surfaces by default: the website and the Discord
+cards. The unit is **a card the bot drew carrying that brand's creative**, plus
+website placement views.
 
-**Decided.** A campaign runs on **both** surfaces by default: the website and the
-Discord cards. The unit we sell and report is **a card the bot drew carrying that
-brand's creative**, plus website placement views.
+| Surface | Counts as |
+|---|---|
+| Bot card, private (ephemeral) | **1 view** |
+| Bot card, public post | **1 view** |
+| Website placement | as today |
 
-| Surface | What one render counts as | Counted or estimated |
-|---|---|---|
-| **Private bot card** (ephemeral — only the person who clicked sees it) | **1 view.** Four button presses is four cards is four views. | **COUNTED** |
-| **Public bot message** (challenge reminder, profile of the week, a gamer sharing their card into a channel) | **5% of that server's member count**, deliberately conservative | **ESTIMATED** |
-| **Website placement** | As today | **COUNTED** |
+**Every card is one view. There is no multiplier and no estimate anywhere on the
+brand report.** An earlier draft counted a public post as 5% of server members;
+that was dropped precisely because it is a modelled number, and a modelled number
+labelled as delivery is the fabricated ROAS in better arithmetic.
 
-**The non-negotiable constraint on this, and the reason §3 exists at all:**
-counted and estimated are **never added into one number**. The fabricated ROAS
-died because a computed figure was labelled "Counted delivery". A 5% assumption
-presented as delivery is the identical error wearing better arithmetic. The brand
-report shows two lines, always, with the method stated on the estimated one.
+**The brand is not told whether a card was public or private** — only which
+server it came from. We store the distinction internally because we need to be
+able to prove our own numbers; we do not report it.
 
-The brand also gets, broken down:
+The brand gets:
 
-- **Discord:** by **card kind** and by **server**. Which cards carried them, where.
-- **Website:** by placement — count and traffic, which already exists.
-- **Audience composition (new):** of the people who saw it, what do they play?
-  *"62% have a League of Legends account, 48% Fortnite, 30% Valorant."* Overlapping
-  by design — one gamer can hold several accounts — so the percentages will sum
-  past 100% and the report must say so, or it looks broken.
+- **Discord:** by **card kind** and by **server**
+- **Website:** by placement — count and traffic (largely exists)
+- **Audience composition (new):** of the gamers who saw it, what do they play?
+  *"62% League of Legends · 48% Fortnite · 30% Valorant."* Overlapping by design —
+  one gamer holds several accounts — so percentages sum past 100% and the copy
+  must say why, or it reads as broken.
+
+> **The consequence, stated plainly:** counting a public post as 1 makes our
+> sellable inventory *much* smaller than the earlier draft. A post seen by 5,000
+> people counts once. That is the honest number and B78 restates the model on it.
+> Understating is the safe side of this line to be on.
 
 ### D2 — Gifting is deleted
 
-**Decided: delete it entirely.** Not disabled, not restricted — removed.
-
-- The gift option in the marketplace checkout
-- The search-for-a-gamer-to-gift flow
-- Every gifting button on Discord cards
-- The `gift_sent` / `gift_received` quest actions
-- The gift notification, the gift order kind, the recipient column's *use*
+Not disabled — removed. The gift checkout, the search-for-a-gamer flow, every
+Discord gift button, the `gift_sent`/`gift_received` actions, the gift
+notification.
 
 **A gamer can only buy a trophy for themselves. Nothing transfers between
-accounts, ever.** That single sentence is the design.
+accounts, ever.**
 
-This is the highest-leverage fix in the entire report: it closes the FinCEN
-money-transmission trigger, the 1099 aggregation hole, and the under-18 cash-out
-bypass simultaneously.
+It closes the FinCEN money-transmission trigger, the 1099 aggregation hole and
+the under-18 cash-out bypass together.
 
-**The consequence nobody had spotted:** two of the four Daily Mission templates
-are built on gifting (`lib/missions.ts:88,103`, 50 CP each). Deleting the actions
-breaks their arithmetic. Rebuilding them is part of the item, not a follow-up.
+**Consequence nobody had spotted:** two of the four Daily Mission templates are
+built on gifting (`lib/missions.ts:88,103`, 50 CP each). Rebuilding them is
+inside the item, not after it.
 
-### D3 — Age range, never a date of birth
+### D3 — Age: a band, never a date of birth
 
-**Decided.** We do not want anybody's birthday. We want one fact: *are we allowed
-to pay this person.*
+**Bands:** **Under 13** · **13–17** · **18 or over**.
+Thirteen, not fourteen — COPPA's line is 13, and this single choice is what the
+whole age defence rests on. **The lawyer confirms the bands and the wording.**
 
-- **Three buttons, an age range.** Not a date picker, not a year.
-- **Two places:** the new-gamer onboarding page, and the profile customization
-  page next to flag, country, currency and payout preference — where a gamer
-  already tells us who they are.
-- **Existing accounts:** the option appears on their profile page, and on the
-  onboarding screen if they sign in again.
-- **Presented as a friendly "complete your profile" checklist** with a red dot —
-  link a game account, pick a flag, set your age range. Smooth. Not invasive.
-  Not a wall.
+| Band | What they get |
+|---|---|
+| **Under 13** | **Read-only.** Browse the site and the bot. No account linking, no challenges, no CP, no trophies, no redemption. Told plainly and kindly. |
+| **13–17** | The full platform and CP earning. Redemption stays blocked by the existing 18+ eligibility check. |
+| **18+** | Everything. |
 
-> **⚠️ Our one addition, flagged for the owner to overrule.** "Not forced" leaves
-> the hole half-open: a gamer who skips it is still an unknown age, which is
-> exactly what a regulator asks about. Our proposal keeps the decision intact —
-> **anyone can browse, play, link accounts and use the entire platform without
-> answering. Earning CP does not begin until they do.** One friendly line:
-> *"Tell us your age range to start earning."* No birthday, no pressure to
-> browse, and the hole closes. **Built this way unless overruled.**
+**How it is asked:**
+
+- **First thing on sign-in.** Three buttons. **The click IS the answer** — no
+  "next", no "confirm" — and the rest of onboarding appears underneath.
+- Navigate away without answering → **a popup on every gamer page**: profile,
+  quests, balance, marketplace, challenges, anywhere an action happens.
+- **The popup IS the onboarding page.** Click a band inside it and it becomes the
+  rest of onboarding immediately.
+- Click anywhere to close.
+- **No age set → popup every page.** Deliberately annoying.
+- **Age set, not unlocked → popup every 5 navigations**, plus on tapping the lock
+  or the nav CTA. Not annoying.
+
+**No CP accrues at all until a band is set**, and there is **no backfill** —
+actions before that earn nothing. They are still **logged**, so nothing appears
+to have vanished.
+
+> **The limit we are not hiding:** a self-declared band is trivially lied about.
+> It gives us a record of having asked and a reasonable basis to act, and it is
+> what almost every platform does. It is not verification. **Ask the lawyer
+> whether it is sufficient.**
 
 ---
 
 ## 3. THE BUILD
 
-In order. An item does not start before the one above it lands, except where
-marked parallel.
-
 ---
 
 ### ▸ B72 — Stop the bleeding *(4 items remain)*
 
-Live defects with a live customer or a live legal exposure. Nothing else moves
-around these.
+#### B72.1 — Kill the fabricated ROAS
 
-#### B72.1 — Kill the fabricated ROAS *(unblocked by D1)*
+`mediaValue` is computed from server headcount and labelled "Counted delivery".
+Remove it from `lib/brand-report.ts:105-120`,
+`components/BrandCampaignReports.tsx:115,288,369`, and the CSV at
+`app/api/brands/report/route.ts:60-67`.
 
-`mediaValue` is computed from **server headcount** and labelled "Counted
-delivery". It is a false statement to a paying customer and it is live now.
+Until B82 lands the panel says **"Delivery measurement is being rebuilt."** A
+blank honest box beats a confident wrong one. `benchmarkCpe` stays — it is B79's
+CPA product and is not what was misrepresented.
 
-Remove it from every surface it reaches:
-
-- `lib/brand-report.ts:105-120` — the `mediaValue` / `roasOf` functions
-- `components/BrandCampaignReports.tsx:115` — the "2.4×" hero figure
-- `components/BrandCampaignReports.tsx:288` — "Return on spend"
-- `components/BrandCampaignReports.tsx:369` — "Media value delivered"
-- `app/api/brands/report/route.ts:60-67` — the CSV export columns
-
-Until B81 lands, the panel says **"Delivery measurement is being rebuilt — see
-your placement counts below."** A blank honest box beats a confident wrong one.
-
-`PRICING_DEFAULTS.benchmarkCpe` stays in the code: it is the CPA product B79
-tests, and it is not what was being misrepresented.
-
-**Verification owed → `tests/db/integrity.mts`:** no field reachable from the
-brand report is derived from a member count; the strings "Return on spend" and
-"Media value" appear nowhere in a brand-facing component.
+**Verification → `tests/db/integrity.mts`:** no brand-report field derives from a
+member count; "Return on spend" and "Media value" appear in no brand-facing
+component.
 
 #### B72.2 — Close the beacon
 
-Not one hole. Reading `app/api/ads/beacon/route.ts` end to end there are three:
+Three holes, not one:
 
-1. The impression branch awards CP for any `ccId` posted by anyone (`:37`).
-2. The `duration` branch updates **any** impression id, with no ownership check (`:41`).
-3. Separately, `profile_views_25` is credited from an unauthenticated public page
-   render (`app/u/[slug]/page.tsx:96-102`) — a second mint the beacon fix does
-   not touch.
+1. The impression branch awards CP for any `ccId` anyone posts (`:37`).
+2. The `duration` branch updates **any** impression id with no ownership check (`:41`).
+3. `profile_views_25` is credited from an unauthenticated public page render
+   (`app/u/[slug]/page.tsx:96-102`) — a second mint the beacon fix does not touch.
 
-A browser-callable beacon cannot hold a shared secret, so "authenticate it" is
-not a design. **The design: a server-issued, single-use nonce, minted when the ad
-is rendered, bound to the session and the campaign-creative, redeemed exactly
-once, expiring in minutes.** Rate-limited and origin-checked on top.
+A browser-callable beacon cannot hold a secret, so "authenticate it" is not a
+design. **Server-issued single-use nonce, minted at render, bound to session and
+campaign-creative, redeemed once, short expiry.** Rate-limited, origin-checked.
 
-**Verification owed → `tests/db/integrity.mts`:** an unsigned call awards nothing;
-a replayed nonce awards nothing; a nonce for another session awards nothing; the
-duration branch refuses an impression the caller does not own.
+**Verification:** unsigned → nothing; replayed nonce → nothing; another session's
+nonce → nothing; duration refuses an impression the caller does not own.
 
 #### B72.3 — Delete gifting *(D2)*
 
-Every trace. Touches 12 files: `lib/marketplace.ts`, `app/actions/marketplace.ts`,
-`components/TrophyCheckout.tsx`, `app/api/discord/interactions/route.ts`,
-`lib/quests.ts` (the two actions), `lib/missions.ts` (the two templates),
-`lib/wallet.ts`, `app/admin/marketplace/page.tsx`, `lib/db/seed-activity.ts`,
-`app/actions/admin-email.ts`, `components/AdminEmailCompose.tsx`, and the schema.
+Twelve files plus the schema. Rules:
 
-Rules:
-
-- `buyTrophy` loses its `recipientSlug` / `message` options entirely.
-- `marketplaceOrders.recipientId` **stays as a column** (historical orders
-  reference it and deleting it destroys the ledger) but is always the buyer.
+- `buyTrophy` loses `recipientSlug` and `message`.
+- `marketplaceOrders.recipientId` **stays as a column** — historical orders
+  reference it and dropping it destroys the ledger — but is always the buyer, and
   `kind` is always `"self"`.
-- `gift_sent` / `gift_received` go to weight 0 like the retired social actions —
-  **kept, not deleted**, so a stored admin weight naming one reads zero instead
-  of throwing. Same pattern B61 used for posts and comments.
-- **Missions 2 and 4 are rebuilt.** Orbit still has the room: `share_card`
-  (25×3), `profile_views_25` (25×3), `follower_gained` (25×2),
-  `profile_vote_received` (25×2). Both blocks must still total exactly 125.
-- `tests/db/missions.mts:90-92` asserts gifts exist and are symmetric. It goes
-  red **on purpose** and is rewritten to assert the opposite.
+- `gift_sent`/`gift_received` go to **weight 0**, kept not deleted, so a stored
+  admin weight naming one reads zero instead of throwing. Same pattern B61 used.
+- **Missions 2 and 4 rebuilt.** Orbit has the room: `share_card` 25×3,
+  `profile_views_25` 25×3, `follower_gained` 25×2, `profile_vote_received` 25×2.
+  Both blocks must still total exactly 125.
+- `tests/db/missions.mts:90-92` asserts gifts exist and are symmetric. It goes red
+  **on purpose** and is rewritten to assert the opposite.
 
-**Verification owed → `tests/db/gifting.mts` (rewritten):** no code path can
-create a `userTrophies` row for a user other than the buyer; every mission
-variation still totals 500 and 125 per quest; no gift UI string survives.
+**Verification → `tests/db/gifting.mts` (rewritten):** no path creates a
+`userTrophies` row for anyone but the buyer; every mission variation still totals
+500 and 125 per quest; no gift UI string survives.
 
-#### B72.4 — Age range at onboarding *(D3)*
+#### B72.4 — The age band *(D3)*
 
-- `users.ageBand` — an enum, not a date. Three values plus unset.
-- Onboarding page: three buttons, part of the "complete your profile" checklist.
-- Profile customization page: the same control, beside flag / country / currency
-  / payout preference.
-- Existing accounts: the control appears on their profile, and on the onboarding
-  screen at next sign-in. A red dot on the profile nav until the checklist is done.
-- **Earning is gated on it** (see the flagged addition in §2 D3). Browsing,
-  playing, linking accounts and everything else are not.
-- The existing cash-out eligibility check (`lib/eligibility.ts`) reads the band
-  instead of computing an age from a birthday. **The `birthDate` column stops
-  being collected** — and B80's purge job deletes what is already stored.
+`users.ageBand`: `unset | under13 | teen | adult`. The minimum that closes the
+legal hole: the three buttons, the popup, no earning before it is set, and the
+under-13 read-only mode. **The beautiful version is B83** — this ships plain and
+fast because it is the piece a regulator asks about.
 
-**Verification owed → `tests/db/eligibility.mts`:** an unset band earns nothing
-and cashes out nothing; an under-band cashes out nothing; nothing anywhere asks
-for a date of birth.
+- `lib/eligibility.ts` reads the band instead of computing from a birthday.
+- **`birthDate` stops being collected**, and B80's purge deletes what is stored.
 
-**Gate 0: none of B72 may be deferred for a feature.** They are the difference
-between "early" and "misleading".
+**Verification → `tests/db/eligibility.mts`:** unset earns nothing and redeems
+nothing; `under13` cannot link an account, join a challenge, or hold CP; `teen`
+earns but cannot redeem; nothing anywhere asks for a date of birth.
+
+**Gate 0: none of B72 may be deferred for a feature.**
 
 ---
 
 ### ▸ B73 — The two questions that decide whether the business exists
 
-**Owner is doing this now. It is not an engineering task.**
+**Owner is doing this now.**
 
 | Question | What we need back |
 |---|---|
-| **Does Discord permit this?** Third-party paid creatives inside bot messages; cash-convertible points paid for engagement; verification at 100 servers forces a human review of exactly this. | A written read of the Developer Policy. If no: a partner conversation, or a product that does not put paid creatives inside bot messages. |
-| **Is paying cash for engagement regulated?** FinCEN CVC administrator status, state money-transmitter licensing, sanctions screening, 1099 thresholds. | A status opinion. **B72.3 deletes gifting specifically so this opinion can come back "no."** |
+| **Does Discord permit this?** Third-party paid creatives in bot messages; cash-convertible points for engagement; verification at 100 servers forces a human review of exactly this. | A written read of the Developer Policy. If no: a partner conversation, or a product with no paid creatives inside bot messages. |
+| **Is paying cash for engagement regulated?** FinCEN CVC status, state MTL, sanctions, 1099. | A status opinion. **B72.3 deletes gifting so this can come back "no."** Also confirm the D3 bands and copy. |
 
 **Gate 1.** If Discord says no, the ad business inside Discord ends and the
 company is the sponsored-challenge business only.
 
-> **The reviewer's fair shot, accepted:** this gate cannot be enforced in code,
-> which makes it the one that most needs to be *evidentiary*. It is not satisfied
-> by having asked. **It is satisfied when a dated written opinion is committed to
-> this repository and referenced by name here.** A gate whose state cannot be
-> observed is a hope.
->
-> Also accepted: our own plan said "B74 through B79 do not start before this
-> answer," and B74 started and shipped. Money integrity is worth doing whatever
-> Discord says — but the first thing we built crossed our own most important
-> gate, and that is worth naming rather than explaining away.
+> **Accepted from the reviewer:** this gate cannot be enforced in code, which is
+> exactly why it must be *evidentiary*. It is not satisfied by having asked. **It
+> is satisfied when a dated written opinion is committed to this repository and
+> named here.** Also accepted: our plan said B74–B79 wait for this answer, and
+> B74 shipped first. Money integrity was worth doing regardless — but the first
+> thing we built crossed our own most important gate, and that is worth naming
+> rather than explaining away.
 
 ---
 
 ### ▸ B74 — Money integrity ✅ **DONE**
 
-Shipped and merged. Gate 2's evidence is real: the lock is empirically contended
-against a real Postgres in CI, and the suite fails when the lock is removed.
-
-**Still owed to close it:** a branch-protection rule requiring the check.
-**Owner is doing this now.** Until then CI reports; it does not block.
+**Still owed:** a branch-protection rule requiring the check. **Owner is doing
+this now.** Until then CI reports; it does not block.
 
 ---
 
-### ▸ B81 — Ad view counting: the measurement layer *(NEW — D1/D4)*
+### ▸ B81 — Ad view counting *(D1/D4)*
 
-**This is the item the whole revenue model rests on, and it must be built before
-anything that counts, prices, paces or reports delivery.** We do not build a
-delivery counter on a unit we have not defined.
+**The revenue model rests on this, and it comes before anything that counts,
+prices, paces or reports delivery.**
 
 #### B81.1 — Write the definition down
 
-A short, plain document — `docs/AD_VIEW.md` — that a brand's agency could read:
+`docs/AD_VIEW.md`, plain enough for a brand's agency:
 
-- What a private card render is, and why it is one view
-- What a public post is, and that its number is **an estimate at 5% of member
-  count**, why we chose 5%, and that we would rather understate
-- That neither is an IAB viewable impression, and we do not claim it is
-- What we cannot see: whether the person scrolled past, how long it was on screen
+- One card carrying a creative = one view. Public or private, the same.
+- Why we do not multiply a public post by an audience estimate.
+- That this is **not** an IAB viewable impression and we never claim it is.
+- What we cannot see: whether anyone scrolled past, or for how long.
 
 **If we cannot write it honestly, we cannot sell it.**
 
-#### B81.2 — Log a render as an ad view
-
-Every card the bot draws carrying a brand creative writes one row.
+#### B81.2 — Log a render as a view
 
 `ad_impressions` already has `guildId` (`schema.ts:556`). It gains:
 
 | Column | Why |
 |---|---|
-| `surface` | `discord_private` / `discord_public` / `web` |
-| `cardKind` | profile, challenge, planet, game-stats, market… — the brand asked for this breakdown |
-| `views` | `1` for a private card or a web slot; the computed number for a public post |
-| `estimated` | **boolean.** The flag that keeps `sum(views) where estimated = false` an honest sentence forever. |
-| `audienceSize` | the server's member count at the time, so the estimate is auditable and re-computable if the 5% ever changes |
+| `surface` | `discord_private` / `discord_public` / `web` — **stored, never shown to a brand** |
+| `cardKind` | profile, challenge, planet, game-stats, market — the brand's requested breakdown |
 
-`cardRenders` (`schema.ts:1381`) already carries `kind` and `hits` — the render
-path is where this hooks in. The private/public distinction is already available:
-the bot marks ephemeral replies with `flags: 64`.
+**No `views` column and no `estimated` flag.** One row is one view; a count is a
+`count(*)`. There is nothing to weight, so there is nothing to get wrong.
 
-**The 5% is a setting, not a constant.** `platform_settings` key
-`ads.publicReachPercent`, admin-editable, versioned — because the day we measure
-it for real, every historical row must remain re-computable from
-`audienceSize`.
+#### B81.3 — No number the rows do not support
 
-#### B81.3 — Never blend the two numbers
+Enforced by a test, not by discipline: **no brand-facing figure is computed from
+anything other than logged rows.**
 
-One rule, enforced by a test rather than by discipline: **any brand-facing total
-is either counted-only, or explicitly split.** No function returns a single
-number that mixes them.
-
-**Verification owed → `tests/db/ad-views.mts` (new):** a private card logs
-exactly 1 view, estimated false; a public post logs `round(members × pct)`,
-estimated true; changing the percentage re-computes historical estimates from
-`audienceSize` and leaves counted rows untouched; **no exported report function
-returns a total that mixes estimated and counted rows**; a cached card re-served
-does not double-count, and does not skip a count.
+**Verification → `tests/db/ad-views.mts` (new):** one card logs exactly one row;
+a public post logs one, not many; a cached card re-served neither double-counts
+nor skips; no exported report function multiplies a count by anything.
 
 ---
 
-### ▸ B82 — What the brand actually sees *(NEW — D1)*
+### ▸ B82 — What the brand sees *(D1)*
 
-Only after B81. The report is a view over logged rows and contains no arithmetic
-the rows do not support.
+Only after B81. A view over logged rows, with no arithmetic the rows do not
+support.
 
-#### B82.1 — The headline
+- **Headline:** `Ad views delivered — 8,412`. One number. Counted.
+- **Discord by card kind:** profile 3,201 · challenge 2,890 · planet 1,504 …
+- **Discord by server:** name, member count *(context only — never multiplied by
+  anything)*, views. Cards from DMs appear under **"Direct message."**
+- **Website by placement:** count and traffic.
+- **Audience composition:** percentages by linked game, with the copy explaining
+  why they exceed 100%. Only for `userId`-attributed rows — an anonymous web view
+  has no games and the denominator must say so rather than quietly shrinking.
 
-```
-Ad views delivered          8,412     ← counted. Cards we drew, one per person.
-Estimated additional reach  12,050    ← public posts, 5% of server members
-```
+**Privacy bound, non-negotiable:** aggregate only, minimum cohort **25 viewers**
+before any percentage is shown, so no brand can re-identify anyone from a small
+server. **No brand, no server owner and no staff department ever reaches a
+gamer's identity through this report.**
 
-Two lines, with a plain-English note under the second explaining the method and
-that we would rather understate.
+**Do not repeat B80's finding:** the old report loads every impression row into
+function heap. This one is aggregate queries.
 
-#### B82.2 — Discord breakdown
+**Verification → `tests/db/brand-report.mts` (new):** every number traces to
+logged rows; a cohort under 25 shows a suppressed label, never a percentage;
+composition may exceed 100% and the copy says why; **no brand-facing query can
+return a user id, name, slug or handle**; no query loads unbounded rows.
 
-- **By card kind** — a table: profile 3,201 · challenge 2,890 · planet 1,504 …
-- **By server** — with each server's name, member count, and the counted/estimated
-  split for that server
-- Public vs private clearly separated in both
+**Registered in `lib/systems.ts`, assignable to a department (B29).**
 
-#### B82.3 — Website breakdown
+---
 
-Per placement — count and traffic. This largely exists; it gets the same
-counted/estimated labelling for consistency, even though everything on the web
-side is counted.
+### ▸ B83 — The gamer onboarding, properly *(D3)*
 
-#### B82.4 — Audience composition *(new capability)*
+B72.4 closes the legal hole plainly. **This is the version that is good.**
 
-Of the gamers who saw this brand's creative, what do they play?
+#### B83.1 — Two steps to unlock, not five
 
-> 62% League of Legends · 48% Fortnite · 30% Valorant
-> *A gamer can link several accounts, so these add to more than 100%.*
+1. **Link a game account**
+2. **Customize your profile** — **and setting a flag from Discord counts.**
 
-Built from `linkedAccounts` joined to the viewers on the logged impressions.
-Only for `userId`-attributed rows — an anonymous web view has no games, and the
-denominator must say so rather than quietly shrinking.
+Sharing the profile card is **removed** as a gate. `share_card` stays a paid
+quest action; it is simply not a lock.
 
-**Privacy bound, non-negotiable:** aggregate only. Minimum cohort size before a
-percentage is shown at all (proposed: 25 viewers), so a brand can never
-re-identify a person from a small server. **No brand, no server owner and no
-staff department ever reaches a gamer's identity through this report** — the
-existing rule that `/admin/users` and `/admin/linked-accounts` are admin-only
-applies here with no exception.
+**Which means the whole path works without leaving Discord:** click a button →
+become a user → pick an age band on a Discord card → link an account (to compete)
+→ tap the flag button → unlocked. They discover what the flag does on their own.
 
-**Verification owed → `tests/db/brand-report.mts` (new):** every number on the
-report traces to logged rows; a cohort under the minimum shows a suppressed
-label, never a percentage; the composition percentages are allowed to exceed
-100% and the copy says why; no brand-facing query can return a user id, name,
-slug or handle.
+#### B83.2 — The locked balance
 
-**Registered as an admin system in `lib/systems.ts`, assignable to a
-department (B29).** Nothing ships that admin cannot edit.
+- Accrues **only after the age band is set**. Caps at **5,000 CP**; earning stops
+  there until they finish.
+- Nav shows it **with a lock and a CTA**. Tapping it opens the onboarding page.
+- **Locked CP cannot be spent or redeemed** — not on trophies either, because a
+  trophy is cash with a picture on it.
+- Trophies won before unlocking are held and locked with everything else.
+- Actions past the cap are still **logged** with "unlock to keep earning", the
+  same pattern as the daily ceiling.
+- **Existing gamers are grandfathered.** They see the checklist and are asked
+  their age band. **Nothing they already earned is ever locked.** Taking back
+  access to a balance someone already had would be the worst thing we could do to
+  our earliest users.
+
+#### B83.3 — The unlock is an achievement
+
+- **Discord card:** **UNLOCKED**, the balance rendered large, and **what they
+  actually did** — "you linked *League of Legends*", "you customized your profile
+  — image, colour, flag".
+- **Web:** a congratulations moment with the same content.
+- **CTA → today's mission**, which is itself full of CTAs, with challenges
+  personalized to their game.
+
+#### B83.4 — The onboarding page and popup
+
+One component, two presentations. Hero section with real visuals: what CP is,
+how you earn it, what unlocking gives you, and one bold **"Free to unlock"**
+button. An expandable **Know more** section carrying the gamer guide (B84).
+
+#### B83.5 — The profile editor shows the real card
+
+The customization editor gains a **switch between the web profile and their
+actual bot card**, driven by the same controls.
+
+**A real Satori render, not an HTML lookalike.** Debounced — on pause and on
+save, not on every keystroke — and cached. The reason is the same one this
+project keeps relearning: a preview that differs from the real thing is a lie
+that looks like a feature. The brand portal's HTML mock is the precedent we are
+deliberately *not* following here.
+
+And the backend must genuinely work: **what they save is what the next bot card
+renders.**
+
+> **Cost flag:** every preview is a render, and `lib/cards/budget.ts` already
+> caps renders (B77). Editor previews need their own budget line, or one gamer
+> fiddling with colours eats the network's daily allowance.
+
+**Verification → `tests/db/onboarding.mts` (new):** unset band earns nothing;
+`under13` is read-only; locked CP cannot be spent or redeemed; the cap holds at
+5,000; a flag set from Discord satisfies the customization step; an existing
+gamer with a balance is never locked; unlocking releases exactly what was
+accrued.
+
+---
+
+### ▸ B84 — The gamer guide, visual only
+
+**Text exists only to name or define a visual.** Built from **real trophies and
+real challenges we actually have**, not lorem.
+
+- **On Discord:** a guide button under each main card. Trophy marketplace →
+  *Trophy guide*. Wallet/CP ledger → its guide. Quests → its guide. One per
+  aspect of the economy — not a card blizzard.
+- **On web:** a collapsible *Know more* on the onboarding page and popup, the
+  trophy marketplace, quests, and the mission/streak band.
+- **The two most important are the onboarding cards:** the **age band** card and
+  the **2-step unlock** card, each with its CTA. Neither shows again once done.
+- The whole gamer-side economy guide is **rewritten** for the new missions,
+  streak, balance, action weights and caps.
+
+---
+
+### ▸ B85 — Card parity, and the admin layout editor
+
+#### B85.1 — The rule
+
+**A bot card showing data shows it in the same visual language as the web
+component that shows the same thing.** Satori's space limits are real; the design
+language is not negotiable because of them.
+
+#### B85.2 — The named bug: the planet card has no planet
+
+`lib/cards/data.ts:203` selects `planetBgUrl` — the space background — and
+**never `planetImageUrl`, the globe itself.** The card is not mis-positioning the
+globe; the data layer never fetches it. `bgSources` even labels the option "The
+globe/space art" (`layout.ts:399`) while only ever resolving the background.
+
+Then an audit of every card kind against its web counterpart, starting with
+planet vs planet-explore, which is the widest gap.
+
+#### B85.3 — The admin layout editor, revamped
+
+`4773493` stopped stale layouts being applied. The editor itself is still built
+for the old frame.
+
+- **The new style is the default**, and the editor opens on it.
+- Controls match the new frame: identity, the fixed ad slot, the pane grid, the
+  stroke, the watermark, the data references (B58).
+- Controls for things the redesign removed — the mascot, the badge, the gradient
+  bar, the heavy plate — **go**, rather than sitting there doing nothing.
+- Saving writes `v: LAYOUT_VERSION`.
+- A visible **"this layout predates the current design and is not being
+  applied"** state, so an admin is never confused about why their tuning does
+  nothing.
 
 ---
 
 ### ▸ B75 — Deliver what was sold
 
-Now, and only now, that a view is defined and logged.
+Only once a view is defined and logged.
 
-1. **Target and delivered per campaign.** `cpm` and `viewsTarget` on the campaign
-   so a floor price is enforceable by the system, not by an email.
-2. **Pacing** — spread delivery across the flight instead of burning it in a day.
-3. **Stop at target.** A campaign that has delivered what it sold stops.
-4. **Frequency cap** — one gamer does not see one brand forty times.
-5. **No silent cutoff (B65).** `maxCreativesInRotation` currently drops paying
-   brands with no warning, and the bot-post surface serves `creatives[0]` only.
-   Both are money we took for delivery we did not make.
-6. **Cache/ad separation.** A cached card must not re-serve one brand's creative
-   or skip its count.
-7. **Under-delivery has a remedy in the system** — make-good or credit — not in
-   an apology email.
+1. Target and delivered per campaign; `cpm` and `viewsTarget` so a floor price is
+   enforceable by the system, not by an email.
+2. Pacing across the flight.
+3. Stop at target.
+4. Frequency cap — one gamer does not see one brand forty times.
+5. **No silent cutoff (B65)**: `maxCreativesInRotation` drops paying brands, and
+   the bot-post surface serves `creatives[0]` only. Both are money taken for
+   delivery not made.
+6. Cache/ad separation — a cached card must not re-serve one brand or skip a count.
+7. Under-delivery gets a remedy **in the system** — make-good or credit.
 
-**Verification owed → `tests/db/ad-delivery.mts` (new):** a campaign at target
-serves nothing further; every active creative appears in rotation; a frequency
-cap holds per gamer per day; under-delivery produces a credit row.
+**Verification → `tests/db/ad-delivery.mts` (new):** a campaign at target serves
+nothing further; every active creative appears in rotation; the frequency cap
+holds per gamer per day; under-delivery produces a credit row.
 
 ---
 
 ### ▸ B76 — Make the 15-screen guarantee real
 
-`COMMERCIAL_MODEL.md` §2 claims a floor the code does not implement. Every item
-here is a gap between a document and the source.
-
-- **Four priced actions have no emitter.** `stat_levelup`, `play_session`,
-  `challenge_progress`, `share_card` are in every mission variation and **nothing
-  fires them.** Build the emitters.
+- **Four priced actions have no emitter** — `stat_levelup`, `play_session`,
+  `challenge_progress`, `share_card`. They are in every mission variation and
+  nothing fires them.
 - **`lib/missions.ts` is imported by nothing but its own test.** Wire it to a
-  surface. A model with no caller is a document, not a feature.
-- **The passive cap.** The active/passive flag and the 125 CP passive ceiling the
-  model claims do not exist in `lib/quests.ts`. Implement, or delete the claim.
-- **The 25-CP rule.** `win_challenge` at 100 and `best_profile_award` at 100 break
-  the bound the guarantee rests on. Enforce it, or restate the guarantee to
-  exclude them and show the resulting floor honestly.
-- **Log over-cap actions** with "max CP for today reached" — decided long ago,
-  still owed.
+  surface.
+- **The passive cap** — the active/passive flag and the 125 CP passive ceiling the
+  model claims are not in `lib/quests.ts`. Implement, or delete the claim.
+- **The 25-CP rule** — `win_challenge` at 100 and `best_profile_award` at 100
+  break the bound the guarantee rests on. Enforce it, or restate the guarantee to
+  exclude them and show the resulting floor.
+- **Log over-cap actions** with "max CP for today reached".
 
-**Verification owed → `tests/db/quests.mts`:** every priced action has an emitter,
-asserted by scanning the callers of `awardQuestAction` rather than the catalogue
-— *the exact mistake that let missions ship on actions that do not fire*; no
-action exceeds 25; the passive subtotal cannot exceed 125 in a day.
+**Verification → `tests/db/quests.mts`:** every priced action has an emitter,
+asserted by scanning the **callers** of `awardQuestAction` rather than the
+catalogue — *the exact mistake that let missions ship on actions that do not
+fire*; no action exceeds 25; the passive subtotal cannot exceed 125 a day.
 
 ---
 
 ### ▸ B77 — The caps our own cost control set
 
-`lib/cards/budget.ts:22` caps rendering at 4,000 renders a day — roughly 200
-active gamers. B46 set it as a spend control without checking it against the
-growth the commercial model assumes. Two of our own documents contradicted each
-other and nobody noticed.
+`lib/cards/budget.ts:22` caps rendering at 4,000/day — roughly 200 active gamers.
+B46 set it without checking it against the growth the model assumes; two of our
+own documents contradicted each other.
 
-- Raise or scale it against the ladder, **and model the render cost first** —
-  raising it re-opens the cost it was capping, which nobody has quantified.
-- Make the ceiling a **configured, admin-visible number**, not a constant.
-- Consider raising it only for instrumented cohorts, so B79's measurement can
-  happen without a network-wide bill.
+Raise or scale it **and model the render cost first**. Make it an
+admin-visible configured number, not a constant. **B83.5's editor previews need
+their own line in this budget.**
 
 ---
 
-### ▸ B78 — The model, restated honestly
+### ▸ B78 — The model, restated
 
-- `revenue = screens × CPM/1000 × fill`. **Fill was missing from our break-even
-  and that is our error, not a dispute.**
-- Every rung of the ladder declares **registered vs daily-active**. The reviewer's
-  0.51 screens/gamer/day divides by registered accounts; ours divided by
-  daily-active. That switch alone is worth ~30× and our table never said which.
-- Cost and revenue use the **same** engagement assumption, in the same paragraph.
-- `COMMERCIAL_MODEL.md` gains a **CURRENT STATE vs TARGET STATE** header, and
-  every unbuilt mechanism is marked **NOT BUILT**. It was written in the present
-  tense for a backlog and a reader with no context reasonably read it as shipped.
-- **Restate the whole model on the D1 view definition** — counted views, not
-  hypothetical screens — because that is now the thing we actually sell.
+- `revenue = screens × CPM/1000 × fill`. **Fill was missing from our break-even —
+  our error, not a dispute.**
+- Every rung declares **registered vs daily-active**. That switch alone is worth
+  ~30× and our table never said which.
+- Cost and revenue use the **same** engagement assumption in the same paragraph.
+- `COMMERCIAL_MODEL.md` gains a **CURRENT STATE vs TARGET STATE** header; every
+  unbuilt mechanism marked **NOT BUILT**.
+- **Restated on the D1 view definition** — one card, one view, no multiplier. The
+  inventory number gets smaller and honest.
 
 ---
 
 ### ▸ B79 — Earn the right to sell
 
-- **Instrument three numbers** and stop arguing about them: real counted views per
-  daily-active gamer per day, real fill against a signed brand, real mission
-  time-on-task.
-- **Test the CPA product.** Price on verified entrants rather than views —
-  `benchmarkCpe = $3.50` carries roughly 70× the headroom of a display view.
+- **Instrument three numbers:** real counted views per daily-active gamer per day,
+  real fill against a signed brand, real mission time-on-task.
+- **Test the CPA product** — verified entrants, `benchmarkCpe = $3.50`, roughly
+  70× the headroom of a display view.
 
 **Gate 4 — one signed insertion order** before **B66** (admin sales console),
-**B67** (brand portal rebuild) and **B69** (public commercial site).
+**B67** (brand portal rebuild), **B69** (public commercial site).
 
-> **Two things the reviewer got right that we still cannot fully answer.**
+> **Two things we still cannot answer.**
 >
 > **A gate cannot block the past.** `app/brands/[slug]`, `app/pricing`,
-> `app/brands`, `app/servers` and `app/discord-bot` are already built and live.
-> Gating the *start* of work that shipped months ago is meaningless. To make
-> Gate 4 real, the already-live commercial surfaces go behind a flag that is off
-> until an IO exists, or they come down. **Undecided. We want paths.**
+> `app/brands`, `app/servers`, `app/discord-bot` are already live. To make Gate 4
+> real, they go behind a flag that is off until an IO exists, or they come down.
+> **Undecided. We want paths.**
 >
-> **Gate 4 is circular.** B79 measures fill "against a signed brand", and the
-> signed brand *is* Gate 4. The measurement meant to justify the first sale can
-> only be taken after it. The only escape we see is selling the first IO
-> explicitly as an unmeasured pilot priced on outcomes — which contradicts
-> `COMMERCIAL_MODEL.md` §7.2's promise of numbers "computed from the real
-> platform right now". **We want paths on this too.**
+> **Gate 4 is circular.** B79 measures fill against a signed brand, and the signed
+> brand *is* Gate 4. The only escape we see is selling the first IO as an
+> unmeasured pilot priced on outcomes — which contradicts `COMMERCIAL_MODEL.md`
+> §7.2's promise of numbers "computed from the real platform right now".
 
 ---
 
-### ▸ B80 — The debt, restated in full
+### ▸ B80 — The debt, in full
 
-**This section was wrong before and is corrected here.** It previously said "the
-remainder of the report's verified findings, none fatal alone" and listed five
-items. It was not the remainder, and it silently contained findings the reviewer
-rated **fatal**.
+**This section was wrong before.** It said "the remainder … none fatal alone" and
+listed five items. It was not the remainder, and it silently contained findings
+the reviewer rated **fatal**.
 
-#### Abuse and identity — the omission that matters most
+**Abuse and identity**
 
-- **Sybil cost per account is $0.00.** No email verification, no captcha, no
-  phone, no device check; the IP-velocity guard is dead code. *(fatal)*
-- **No automated gamer-side abuse detection.** The only detector is guild-scoped,
-  needs 50+ members, and does not enforce. *(severe)*
+- **Sybil cost per account is $0.00** — no email verification, captcha, phone or
+  device check; the IP-velocity guard is dead code. *(fatal)*
+- **No automated gamer-side abuse detection** — the only detector is guild-scoped,
+  needs 50+ members, does not enforce. *(severe)*
 
-> **Why this is worse than the tally suggests:** the **$547,500/yr minted-CP
-> fraud figure comes from free account creation × a public mint.** B72.2 closes
-> the mint. It does nothing about free account creation, and nothing about
-> collusion rings farming follows, votes and profile views, which need no beacon
-> at all. **The fraud economics survive our own Phase-0 fix.**
+> The **$547,500/yr minted-CP fraud figure comes from free account creation × a
+> public mint.** B72.2 closes the mint. It does nothing about free account
+> creation, and nothing about collusion rings farming follows, votes and profile
+> views, which need no beacon at all. **The fraud economics survive our own
+> Phase-0 fix.**
 
-#### Scale — the category that went missing
+**Scale**
 
 - Cold-start DDL replay: 219 raw statements, 108 `ALTER TABLE` (ACCESS
   EXCLUSIVE), 11 full-table `UPDATE`, on every cold boot against production. *(fatal)*
-- Stat sync saturates at ~30 accounts — 60/hr sequential loop, no queue. *(fatal)*
+- Stat sync saturates at ~30 accounts — 60/hr sequential, no queue. *(fatal)*
 - Per-award query cost: ~12 round-trips × 20 actions × 1M gamers = 240M
-  queries/day; `quest_events` and `ad_impressions` unbounded and unpartitioned. *(fatal)*
+  queries/day; `quest_events` and `ad_impressions` unbounded, unpartitioned. *(fatal)*
 - Brand report loads every impression row into function heap. *(severe)*
-  **B82 must not repeat this** — the new report is aggregate queries, not a heap load.
 
-> **The tension we have not resolved, stated rather than hidden:** these are only
-> deferrable if our honest position is "pre-revenue, scale is years away". But
-> then the 1,000,000-gamer ladder in `COMMERCIAL_MODEL.md` cannot also be the
-> reference model B78 restates. **We cannot drop the scale findings as premature
-> while keeping the 1M-gamer ladder as the plan of record.** One has to give and
-> we want a view on which.
+> **The tension we are not hiding:** these are deferrable only if our honest
+> position is "pre-revenue, scale is years away". But then the 1,000,000-gamer
+> ladder in `COMMERCIAL_MODEL.md` cannot also be the reference model B78
+> restates. **One has to give and we want a view on which.**
 
-#### Access and privacy
+**Access and privacy**
 
-- `/api/setup` is public when `SETUP_TOKEN` is unset; the first account becomes
-  superadmin.
+- `/api/setup` public when `SETUP_TOKEN` is unset; first account becomes superadmin.
 - OAuth open redirect (`next` unvalidated); account-merge trusts an unverified
   provider email.
-- Portal brute-force lockout is per-portal, not per-IP — a denial-of-service on
-  every brand and server customer.
-- Session JWT last-16-chars stored in an analytics table, plaintext, indefinitely.
+- Portal brute-force lockout per-portal, not per-IP — a DoS on every customer.
+- Session JWT last-16-chars in an analytics table, plaintext, indefinitely.
 - Open image proxy (`next.config.ts` proxies any HTTPS host).
-- The privacy policy promises a 90-day purge the product does not perform.
+- The 90-day purge the privacy policy promises and the product does not perform.
   **This job now also deletes stored `birthDate` values (D3).**
 - Riot **development** key on a live product whose terms prohibit contests.
-- Cookie consent is decorative; deletion leaves PII; the IP salt defaults.
+- Cookie consent decorative; deletion leaves PII; IP salt defaults.
 
 ---
 
-### ▸ Carried over — real work, not lost, but behind the gates
+### ▸ Carried over — behind the gates
 
 | Item | What |
 |---|---|
-| **B62** (web half) | Trophy stacking and no-price-on-your-own-case on `components/TrophyCase.tsx`. The card half shipped. |
-| **B63** | The nav bands: today's mission and the streak; both on the nav's background art; the week band's profiles become their cards. |
-| **B59** | A gamer can see and control their own card, on the website. |
-| **B56** (remainder) | The card kinds not yet moved onto the new shared layout. |
-| **B68** | The social purge — posts, comments, reactions leave the product. Quest actions already retired to weight 0. |
-| **B66, B67, B69** | Admin sales console, brand portal rebuild, public commercial site — **behind Gate 4**. |
+| **B62** (web half) | Trophy stacking and no-price-on-your-own-case on `components/TrophyCase.tsx`. |
+| **B63** | The nav bands: today's mission and the streak. |
+| **B59** | A gamer can see and control their own card on the website. *(Largely absorbed by B83.5.)* |
+| **B56** (remainder) | Card kinds not yet on the new shared layout. |
+| **B68** | The social purge — posts, comments, reactions leave the product. |
+| **B66, B67, B69** | Admin sales console, brand portal rebuild, public site — **behind Gate 4**. |
 | **B70** | Component screenshots from seeded demo data. |
-| `tests/ui/cards.mjs` | Owed since B54 and still owed. |
+| `tests/ui/cards.mjs` | Owed since B54. |
 
 ---
 
 ## 4. The gates, honestly scored
 
-We keep this table in this shape on purpose: the answer must always be
-**observable**, never asserted.
-
 | Gate | Blocks | Enforced by | Real? |
 |---|---|---|---|
-| **0** | Everything, until the six Phase-0 defects are fixed | `tests/db/integrity.mts` in CI — 2 of 6 today, **and the two least severe** | **1/3** — the reviewer's score, and it is the right one |
-| **1** | B75–B79, until Discord and FinCEN answer | Nothing yet. Needs a **committed, dated written opinion** | **No — owner is doing it now** |
-| **2** | Any CP feature, until the ceiling holds under parallel writes | `tests/db/concurrency.mts`, two CI steps — PGlite *and* a real Postgres with pooled connections; **fails when the lock is removed** | **Evidence: yes. Blocking: not until branch protection — owner is doing it now** |
+| **0** | Everything, until the six Phase-0 defects are fixed | `tests/db/integrity.mts` in CI — 2 of 6, **and the two least severe** | **1/3** — the reviewer's score, and it is right |
+| **1** | B75–B79, until Discord and FinCEN answer | Nothing yet. Needs a **committed, dated opinion** | **No — owner is doing it now** |
+| **2** | Any CP feature | `tests/db/concurrency.mts`, two CI steps — PGlite *and* real Postgres; **fails when the lock is removed** | **Evidence yes. Blocking: not until branch protection — owner is doing it now** |
 | **4** | B66, B67, B69, until one signed IO | Nothing, **and two of the three already shipped** | **No** |
 
 ---
 
-## 5. What we are not doing, and why
+## 5. What we are not doing
 
 | Not doing | Why |
 |---|---|
 | Defending the $5 CPM | We cannot prove it. A signed deal proves it or kills it — and even then it proves one deal, revocable if a verification vendor classifies our traffic as incentivised. |
-| Building the sales console, brand portal or admin rebuild now | They serve a revenue model that has not cleared Gate 1. Building them first is the mistake the report is about. |
+| Building the sales console, brand portal or admin rebuild now | They serve a revenue model that has not cleared Gate 1. |
 | Pivoting to CPA on paper | The strongest constructive idea in the report. A pivot announced without a signed deal is the same error in a new coat. |
-| Chasing the 1,234× number | Three disputed inputs compounded — conceded by the reviewer without reservation. Real numbers arrive within a month of B79. |
+| Chasing the 1,234× number | Three disputed inputs compounded — conceded without reservation. Real numbers arrive within a month of B79. |
 
 ---
 
 ## 6. The questions we most want answered
 
-Ranked by how much the answer changes what we build next.
-
-1. **Attack §3's measurement design.** The 5% public-reach estimate is the direct
-   successor to the fabricated ROAS. We think splitting counted from estimated,
-   with the method printed and the raw `audienceSize` stored, makes it honest.
-   **Is that enough, or is any estimate on a delivery report a mistake?** Give us
-   2–3 paths.
-2. **Is 5% defensible at all?** We picked it to be conservative. What would a
-   media buyer say — and is there a defensible way to measure real public-post
-   reach on Discord, or is the honest answer "we cannot, so we do not sell it"?
-3. **The age-range gate.** We propose earning-blocked-until-answered while
-   browsing stays open. Does that close the COPPA exposure, or is an
-   unverified self-declared band worth nothing legally?
-4. **Gate 4 is circular and gates the past.** Two paths minimum, please.
-5. **Scale vs the ladder.** Which gives: the 1M-gamer model, or the deferral of
-   the fatal scale findings?
-6. **What is missing from this document?** The pattern in this project is that
-   the expensive things were never on the list.
+1. **Does removing every estimate actually fix §2 D1?** One card, one view,
+   nothing multiplied. **Try to break the count** — how does a gamer, a server
+   owner, a bug or the cache inflate it? And is "one view" *meaningful* for a
+   public post nobody may have looked at, or have we swapped overstating for a
+   number that means nothing?
+2. **Audience composition (B82):** aggregate only, cohort floor 25. Can a brand or
+   server owner re-identify anyone? Is 25 the right floor?
+3. **The age design (§2 D3, B72.4, B83):** bands at 13/17, under-13 read-only,
+   no earning before answering, no backfill, self-declared. **Does that close the
+   COPPA exposure, or is a self-declared band worth nothing?** 2–3 paths.
+4. **B83's locked balance:** accrues only after the band is set, caps at 5,000 CP,
+   cannot be spent or redeemed, existing gamers grandfathered. Where is the
+   loophole?
+5. **§1.1 — what else is stale?** Twelve stored card layouts silently overrode a
+   redesign and shipped to 15 servers. Where else does this codebase merge old
+   stored state over new intent?
+6. **Gate 4 gates the past and is circular.** Paths, please.
+7. **Scale vs the ladder.** Which gives?
+8. **What is missing?** The pattern here is that the expensive things were never
+   on the list.
 
 ---
 
