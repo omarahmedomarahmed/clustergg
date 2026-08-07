@@ -5,21 +5,28 @@ import { deliveryTotalsFor, deliveriesFor, type DeliveryTotals } from "@/lib/cha
 import { challengeStandings } from "@/lib/challenges";
 import { type Slot, type Campaign } from "@/lib/sponsored-campaigns";
 
-// What a brand's money bought, measured.
+// What a brand's money bought.
 //
-// This is the reporting half of the media buy, and it is written to survive the
-// only conversation that matters: a brand asking "prove it". So every figure
-// here is either counted from a ledger or derived from counted figures with the
-// benchmark stated alongside it. Nothing is estimated silently.
+// This module was written to survive a brand asking "prove it", and it did not.
+// Its own header used to claim three tiers — counted, derived, modelled — with
+// "media value and therefore ROAS" in the third, described as something a brand
+// "can see and argue with". Then the UI rendered ROAS as a 2.4× hero figure and
+// put the headcount it was computed from under a heading reading **Counted
+// delivery**. A brand does not argue with a number presented that way; they
+// believe it. That was finding #1 of `docs/DUE_DILIGENCE_REPORT.md`.
 //
-// The distinction runs through the whole module:
+// **There is no MODELLED tier any more.** It is deleted, not relabelled,
+// because the honest version of it does not exist until a view is logged (B81).
 //
-//   * COUNTED   — servers reached, members reached, entrants, clicks, standings.
-//                 These come from rows that were written when the thing
-//                 happened, and they never change afterwards.
-//   * DERIVED   — eCPM, cost per entrant. Counted numbers divided by the price.
-//   * MODELLED  — media value and therefore ROAS. Counted delivery priced at a
-//                 benchmark CPM/CPC that the brand can see and argue with.
+//   * COUNTED — servers the announcement landed in, entrants, clicks,
+//     standings. Rows written when the thing happened; they never change.
+//   * AUDIENCE — the member headcount of those servers. **Not delivery.** How
+//     big the rooms were, named that way everywhere it is shown, because
+//     calling it "People reached" is the same false claim one level down from
+//     the one that was deleted.
+//   * DERIVED — cost per thousand members, cost per entrant. Counted or
+//     audience numbers divided by the price, each labelled by what it divides
+//     by.
 //
 // A media buyer who cannot tell which is which has no reason to believe any of
 // it, so the types keep them apart and the UI labels them.
@@ -36,7 +43,19 @@ export type ChallengeReport = {
   spend: number;
   /** The prize money that reached gamers out of that. */
   prizePool: number;
-  /** COUNTED: where it landed and how many people were there. */
+  /**
+   * Where the announcement LANDED, and how many people are in those servers.
+   *
+   * `servers` is counted. **`members` is NOT delivery** — it is the headcount of
+   * the servers we posted in, which is potential audience and nothing more. It
+   * used to be labelled "People reached" underneath a heading that said "Counted
+   * delivery", and `mediaValue` then multiplied it by a CPM to manufacture a
+   * return-on-spend figure for a paying customer. That was the first finding in
+   * `docs/DUE_DILIGENCE_REPORT.md` and it was correct.
+   *
+   * Kept, because a brand genuinely wants to know how big the rooms were. Named
+   * for what it is, everywhere it is shown.
+   */
   reach: DeliveryTotals;
   /** COUNTED: people who actually entered. */
   entrants: number;
@@ -44,14 +63,16 @@ export type ChallengeReport = {
   clicks: number;
   /** COUNTED: the podium. */
   standings: { place: number; name: string; slug: string | null; points: number }[];
-  /** DERIVED: what a thousand people cost. */
+  /**
+   * DERIVED: spend per thousand MEMBERS of the servers reached.
+   *
+   * Not a CPM in the media sense — the denominator is a headcount, not an
+   * impression count. A real cost-per-view is only possible once B81 logs a
+   * view, and this field is labelled for what it divides by until then.
+   */
   ecpm: number;
-  /** DERIVED: what one entrant cost. */
+  /** DERIVED, and genuinely counted on both sides: spend ÷ people who entered. */
   costPerEntrant: number;
-  /** MODELLED: delivery priced at the benchmark. */
-  mediaValue: number;
-  /** MODELLED: mediaValue ÷ spend. */
-  roas: number;
 };
 
 export type CampaignReport = {
@@ -76,48 +97,25 @@ export type CampaignReport = {
     clicks: number;
     ecpm: number;
     costPerEntrant: number;
-    mediaValue: number;
-    roas: number;
   };
-  /** The benchmarks every modelled number above was priced at. */
-  benchmark: { cpm: number; cpc: number; cpe: number };
   /** Set once all four have finished — the end-of-month report is ready. */
   complete: boolean;
 };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/**
- * Media value delivered, at stated benchmarks.
- *
- * Three components, priced separately because they are worth different amounts:
- * everyone who saw it at the benchmark CPM, everyone who clicked at the CPC,
- * and everyone who ENTERED at the cost-per-engagement rate. An entrant linked
- * an account and played a week under the brand's name; valuing them at an
- * impression's rate would understate a challenge as badly as the next omission
- * would overstate it.
- *
- * It deliberately does NOT count the prize money as value returned, even though
- * 70% of the buy reaches gamers: that money is the product, not a discount, and
- * counting it would push every ROAS on the platform above 1 by construction —
- * the fastest way to make the number worthless.
- */
-export function mediaValue(
-  reachMembers: number,
-  clicks: number,
-  cfg: PricingConfig = PRICING_DEFAULTS,
-  entrants = 0,
-): number {
-  return round2(
-    (reachMembers / 1000) * cfg.benchmarkCpm
-    + clicks * cfg.benchmarkCpc
-    + entrants * cfg.benchmarkCpe,
-  );
-}
-
-export function roasOf(value: number, spend: number): number {
-  return spend > 0 ? round2(value / spend) : 0;
-}
+// `mediaValue` and `roasOf` were here, and they are deleted rather than fixed.
+//
+// They priced a SERVER HEADCOUNT at a benchmark CPM and divided by spend, and
+// the result was rendered to a paying brand as "Return on spend: 2.4×" beside a
+// heading that said "Counted delivery". Nobody had counted anything. It is the
+// most serious finding in `docs/DUE_DILIGENCE_REPORT.md`.
+//
+// There is no honest version of the calculation while a view is not logged, so
+// there is no function here. `PRICING_DEFAULTS.benchmarkCpe` survives in
+// `lib/pricing.ts` because B79 prices a CPA product on verified entrants — a
+// number both sides of which are actually counted — and that was never what was
+// being misrepresented.
 
 /**
  * Every sponsored challenge a brand has run, reported.
@@ -178,7 +176,6 @@ export async function brandChallengeReports(
       const n = entrantsBy.get(c.id) ?? 0;
       const clicks = clicksByChallenge.get(c.id) ?? 0;
       const spend = c.price || cfg.challengePrice;
-      const value = mediaValue(r.members, clicks, cfg, n);
       out.set(c.id, {
         challengeId: c.id,
         title: c.title,
@@ -195,8 +192,6 @@ export async function brandChallengeReports(
         standings: podiums.get(c.id) ?? [],
         ecpm: r.members > 0 ? round2((spend / r.members) * 1000) : 0,
         costPerEntrant: n > 0 ? round2(spend / n) : 0,
-        mediaValue: value,
-        roas: roasOf(value, spend),
       });
     }
   } catch { /* an empty map renders as "nothing yet", which is honest */ }
@@ -276,7 +271,6 @@ export async function campaignReport(
   // has run. Dividing delivery by only the weeks that ran would flatter every
   // campaign in progress.
   const spend = campaign.total;
-  const value = mediaValue(members, clicks, cfg, entrants);
 
   return {
     campaign,
@@ -290,10 +284,7 @@ export async function campaignReport(
       clicks,
       ecpm: members > 0 ? round2((spend / members) * 1000) : 0,
       costPerEntrant: entrants > 0 ? round2(spend / entrants) : 0,
-      mediaValue: value,
-      roas: roasOf(value, spend),
     },
-    benchmark: { cpm: cfg.benchmarkCpm, cpc: cfg.benchmarkCpc, cpe: cfg.benchmarkCpe },
     complete: weeks.length > 0 && weeks.every((w) => w.status === "done"),
   };
 }

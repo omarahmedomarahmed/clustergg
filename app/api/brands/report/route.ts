@@ -39,7 +39,12 @@ export async function GET(req: NextRequest) {
   const report = await campaignReport(campaign, reports, cfg);
 
   const rows: (string | number)[][] = [
-    ["Week", "Challenge", "Starts", "Ends", "Status", "Servers", "People reached", "Could enter", "Entrants", "Clicks", "Spend", "Cost per 1,000", "Cost per entrant", "Media value", "ROAS"],
+    // "People reached" is gone, and so are "Media value" and "ROAS". The first
+    // was a server headcount named as delivery; the other two were that
+    // headcount multiplied by a benchmark CPM. A CSV outlives every caveat
+    // around it — a column called ROAS ends up in a deck — so the honest column
+    // names matter more here than anywhere else on the report.
+    ["Week", "Challenge", "Starts", "Ends", "Status", "Servers", "Members in those servers", "Could enter", "Entrants", "Clicks", "Spend", "Cost per 1,000 members", "Cost per entrant"],
   ];
   for (const w of report.weeks) {
     const r = w.report;
@@ -57,20 +62,17 @@ export async function GET(req: NextRequest) {
       r?.spend ?? 0,
       r?.ecpm ?? 0,
       r?.costPerEntrant ?? 0,
-      r?.mediaValue ?? 0,
-      r?.roas ?? 0,
     ]);
   }
   const t = report.totals;
   rows.push([
     "Total", `${campaign.slots} weeks on ${campaign.game}`, "", "", campaign.status,
-    t.servers, t.members, "", t.entrants, t.clicks, t.spend, t.ecpm, t.costPerEntrant, t.mediaValue, t.roas,
+    t.servers, t.members, "", t.entrants, t.clicks, t.spend, t.ecpm, t.costPerEntrant,
   ]);
-  // The benchmark travels WITH the numbers it produced. A ROAS column in
-  // somebody's spreadsheet with no note of what priced it is a number that will
-  // eventually be quoted without its assumption.
   rows.push([]);
-  rows.push(["Media value and ROAS priced at", `$${report.benchmark.cpm} CPM`, `$${report.benchmark.cpc} per click`]);
+  // Say what the numbers are, in the file, because the file travels alone.
+  rows.push(["Members in those servers", "the headcount of the servers this landed in — not a view count"]);
+  rows.push(["Ad views", "not yet measured — per-view delivery reporting is being built"]);
   rows.push(["Prize money paid to players", t.prizePool]);
 
   const csv = rows.map((r) => r.map(cell).join(",")).join("\n");

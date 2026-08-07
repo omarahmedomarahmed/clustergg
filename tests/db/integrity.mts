@@ -93,6 +93,44 @@ console.log("\n== a self-serve creative does NOT go live on upload ==");
     /reviewStatus === "approved"/.test(code("lib/brands.ts")));
 }
 
+console.log("\n== no brand-facing number is derived from a server headcount ==");
+// Finding #1 of the due-diligence report, and the most serious thing in it: the
+// brand report priced a SERVER HEADCOUNT at a benchmark CPM, divided by spend,
+// and rendered the result to a paying customer as "Return on spend: 2.4x" —
+// beside a heading that said "Counted delivery".
+//
+// The assertions read SOURCE rather than a return value on purpose: "no field
+// is derived from a headcount" is a claim about the code. A runtime check would
+// pass happily on a report that happens to have zero servers.
+{
+  const report = code("lib/brand-report.ts");
+  ok("mediaValue is gone from the model", !/function mediaValue/.test(report));
+  ok("…and so is roasOf", !/function roasOf/.test(report));
+  ok("…and the report no longer carries a benchmark it priced things at",
+    !/benchmark:\s*\{\s*cpm/.test(report));
+
+  // The root of the finding, one level below it: `members` is the headcount of
+  // the servers we posted into. Priced, it became ROAS. Unpriced but labelled
+  // "People reached", it is the same false claim in words instead of arithmetic.
+  // Three surfaces, not two. The tier strip carried the same label off the same
+  // headcount and was found only by grepping the whole tree for the words — the
+  // type system could not help, because the number was correct and the NAME was
+  // the lie.
+  for (const f of ["components/BrandCampaignReports.tsx", "app/api/brands/report/route.ts",
+                   "components/BrandTierStrip.tsx"]) {
+    ok(`${f} does not say "People reached"`, !/People reached/.test(code(f)));
+    ok(`…nor "Return on spend"`, !/Return on spend/.test(code(f)));
+    ok(`…nor "Media value"`, !/Media value/i.test(code(f)));
+  }
+  const panel = code("components/BrandCampaignReports.tsx");
+  ok("the headcount is named for what it is", /Members in those servers/.test(panel));
+  ok("…and cost-per-1,000 says what it divides BY", /Cost \/ 1,000 members/.test(panel));
+  // The positive half. Stripping the lie must not leave the report empty: the
+  // number that replaces it has to be one both sides of which are counted.
+  ok("the hero figure is cost per entrant, counted on both sides",
+    /Cost per entrant/.test(panel) && /counted/.test(panel));
+}
+
 console.log("\n== the money paths cannot be broken by a runtime downgrade ==");
 // Round-2 finding, and it was a defect the FIX introduced: the pooled driver
 // needs a WebSocket, Node 20 has none, and every money path would have thrown —
