@@ -63,8 +63,19 @@ honest position is that *nobody knows* until a real IO is signed, which is why
 
 `CPM × fill ≥ $3.31` is arithmetic we accept. But it is only unreachable *given
 their CPM*. Presented as an identity it reads as a law of nature; it is a
-conclusion resting on a disputed input. At $5 × 56% it clears; at $0.80 × 15%
-it does not. **The correct statement is that the model is extremely sensitive to
+conclusion resting on a disputed input.
+
+**Correction — the worked example we first wrote here was wrong, and wrong in
+exactly the way finding #15 says we are.** We wrote "at $5 × 56% it clears".
+$5 × 0.56 = **$2.80** against $3.31 of CP cost — a **loss of $0.51** per 1,000
+screens. Break-even fill at $5 CPM is **66.2%**, above our own A5 assumption of
+56%; put the other way, at 56% fill the required CPM is **$5.90**, above our sell
+price and 48% above our $4 floor. We reproduced our own accepted error inside the
+dispute meant to show we understood it. The reviewer caught it. **The dispute's
+framing point stands — "unreachable" is a conclusion, not an identity — and the
+only number we offered in support of it lands on their side, not ours.**
+
+**The correct statement is that the model is extremely sensitive to
 two numbers nobody has measured** — which is their §7D condition, and we accept
 that condition entirely.
 
