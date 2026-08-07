@@ -133,8 +133,8 @@ export async function portalSaveCommunity(
     const after = await getProfile(guildId);
     return {
       ok: after.complete
-        ? "Profile complete — your share of sponsored challenges is now active."
-        : `Saved. ${after.missing.length} field${after.missing.length === 1 ? "" : "s"} still needed before your share can pay out.`,
+        ? "Profile complete — you can be paid from the weekly server pool."
+        : `Saved. ${after.missing.length} field${after.missing.length === 1 ? "" : "s"} still needed before the pool can pay you.`,
     };
   } catch { return { error: "Couldn't save that. Try again." }; }
 }

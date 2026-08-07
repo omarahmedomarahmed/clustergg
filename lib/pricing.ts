@@ -406,31 +406,39 @@ export type EarnStage = {
   name: string;
   /** Linked gamers required. Linked — not members. */
   threshold: number;
-  /**
-   * The owner's share of a sponsored challenge at this stage, as a % of what
-   * the brand paid. The single number an owner is climbing this ladder for, so
-   * it belongs on the card rather than in a footnote.
-   */
-  ownerPct: number;
+  // `ownerPct` was here — the per-challenge rate this ladder promised. C3
+  // removed it: a rung gates which weekly pool you compete in, and printing a
+  // rate we no longer pay was the loudest of the four places it survived.
   icon: string;
   headline: string;
   detail: string;
   perks: string[];
 };
 
+// The public server ladder. Rewritten by C3.
+//
+// Every rung used to promise a percentage — "5% of every sponsored challenge",
+// "your share doubles to 10%", "you keep 25 of the 30 points Cluster charges".
+// That is the per-challenge rate `docs/COMMERCIAL_MODEL_V2.md` §4 replaced with
+// a weekly pool, and this was the fourth place it lived: delete the other three
+// and the live `/servers` page goes on promising it.
+//
+// What replaces it is not vaguer. A rung says which pool you compete in, what
+// the pool is funded by, and what the tier unlocks that is not money — priority,
+// exclusivity, being named on the broadcast. Those were always the parts a
+// percentage could not buy.
 export const EARN_STAGES_DEFAULT: EarnStage[] = [
   {
     key: "monetized",
     name: "Sponsored",
     threshold: 500,
-    ownerPct: 5,
     icon: "diamond",
     headline: "Brand-sponsored challenges start landing in your server",
     detail:
-      "Link 500 gamers and your server switches on. Brands sponsoring the games your members already play start running their weekly challenges here — every dollar of the prize money is won by your members, and 5% of what the brand paid is yours.",
+      "Link 500 gamers and your server switches on. Brands sponsoring the games your members already play start running their weekly challenges here — every dollar of the prize money is won by your members, and you enter the weekly server pool that every sponsored challenge funds.",
     perks: [
       "Sponsored weekly challenges in your community's games",
-      "5% of every sponsored challenge, paid to you",
+      "A place in the weekly server pool, with a flat share for every week you carry a challenge",
       "Prize money paid straight to your members who win",
       "Owner portal: who linked, who entered, what they won",
       "Your server listed publicly with its own page",
@@ -440,14 +448,13 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     key: "broadcaster",
     name: "Broadcaster",
     threshold: 1000,
-    ownerPct: 10,
     icon: "satellite",
     headline: "More games, more weeks, more money into your community",
     detail:
-      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, so more of your members are playing for real prizes in more games at once — and your share doubles.",
+      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, so more of your members are playing for real prizes in more games at once — and you compete in a bigger tier of the pool, against fewer servers.",
     perks: [
       "Everything in Sponsored",
-      "Your share doubles to 10% of every sponsored challenge",
+      "A bigger tier of the weekly pool, with fewer servers competing for its slots",
       "Network-wide challenges carried in your server",
       "Priority on sponsored challenges in your top game",
       "Featured in the public server directory",
@@ -457,14 +464,13 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     key: "sponsored",
     name: "Flagship",
     threshold: 5000,
-    ownerPct: 25,
     icon: "crown",
     headline: "Brands buy your community by name",
     detail:
-      "At 5,000 linked gamers you are an audience in your own right. Brands ask for challenges in your server specifically, smaller servers carry yours instead of the other way round, and you keep 25 of the 30 points Cluster charges — we keep 5.",
+      "At 5,000 linked gamers you are an audience in your own right. Brands ask for challenges in your server specifically, smaller servers carry yours instead of the other way round, and you compete for the largest slots in the weekly pool.",
     perks: [
       "Everything in Broadcaster",
-      "25% of every sponsored challenge — Cluster keeps 5%",
+      "The largest slots in the weekly server pool",
       "Brands request your community by name",
       "Exclusive challenges only your members can enter",
       "Named on the Sunday broadcast",

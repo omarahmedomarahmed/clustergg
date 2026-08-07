@@ -20,7 +20,7 @@ const eq = (name: string, got: unknown, want: unknown) =>
 const { payoutHold, PAYOUT_HOLD_DAYS, QUALIFY_AFTER_DAYS, QUALIFY_RULE,
   linkedCountsFor, markTierUnlocked, payoutHoldFor, hasBeenPaid, anomalousGrowth } =
   await import("../../lib/abuse.ts");
-const { ownerPctFor } = await import("../../lib/server-earnings.ts");
+const { tierOf } = await import("../../lib/week-close.ts");
 const { getDb, schema } = await import("../../lib/db/index.ts");
 const { eq: sqlEq, and: sqlAnd } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
@@ -83,10 +83,18 @@ ok("…and says the unqualified still show in the member count",
   /still show/.test(QUALIFY_RULE), QUALIFY_RULE);
 
 console.log("\n== the tier reads the qualified count ==");
-// The rate must come from the qualified number, or the whole defence is a
-// display change.
-eq("500 raw but 0 qualified pays nothing", ownerPctFor(0), 0);
-eq("500 qualified pays 5%", ownerPctFor(500), 5);
+// INVERTED BY C3, not deleted. This used to assert that the per-challenge RATE
+// came from the qualified number rather than the raw one — the point being that
+// the defence had to reach the money, not just the display.
+//
+// There is no rate any more: owners are paid from the weekly pool. The property
+// still matters and still has to be checked, so it moved to the thing that now
+// decides money — `tierOf`, which sorts servers into who they compete against —
+// and the ASSERTION IS THE SAME ONE: a raw count buys nothing.
+eq("0 qualified is the bottom tier however many linked rows exist", tierOf(0), "small");
+eq("500 qualified moves up", tierOf(500), "mid");
+ok("…and the rate that used to sit here is gone entirely",
+  !("ownerPctFor" in (await import("../../lib/server-earnings.ts"))));
 
 console.log("\n== the unlock stamp is one-way ==");
 const first = new Date(Date.now() - 40 * DAY);

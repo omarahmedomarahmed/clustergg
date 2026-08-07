@@ -267,8 +267,8 @@ export default async function BillingPage({
                   {/* B35: both counts, always. The tier reads the qualified one;
                       the raw one is what the owner already sees. */}
                   <th className="py-2 text-right">Qualified / linked</th>
-                  <th className="py-2 text-right">Their share</th>
-                  <th className="py-2 text-right">Challenges</th>
+                  <th className="py-2 text-right">Tier</th>
+                  <th className="py-2 text-right">Weeks</th>
                   <th className="py-2 text-right">Owed</th>
                 </tr>
               </thead>
@@ -282,9 +282,10 @@ export default async function BillingPage({
                       <span className={s.qualifiedLinked < s.linked ? "text-amber-300" : ""}>{s.qualifiedLinked.toLocaleString()}</span>
                       <span className="text-muted"> / {s.linked.toLocaleString()}</span>
                     </td>
-                    <td className="py-2.5 text-right tabular-nums">
-                      {s.ownerPct}% <span className="text-muted">/ {s.clusterPct}% us</span>
-                    </td>
+                    {/* The tier is a LABEL now — C3. It used to be this
+                        server's rate, and the column beside it used to be that
+                        rate applied. Owner money comes from the weekly pool. */}
+                    <td className="py-2.5 text-right text-xs uppercase tracking-wider text-muted">{s.tier}</td>
                     <td className="py-2.5 text-right tabular-nums text-muted">{s.challenges}</td>
                     <td className={`py-2.5 text-right tabular-nums font-semibold ${s.owed > 0 ? "text-emerald-300" : "text-muted"}`}>
                       {money(s.owed, cur)}

@@ -596,8 +596,8 @@ function contactEmailSubmit(i: Interaction, guildId: string, email: string) {
       } else {
         const after_ = await getProfile(guildId);
         note = after_.complete
-          ? "Saved — your profile is complete, so your share of sponsored challenges is now active."
-          : `Saved. Still needed before your share pays out: ${PROFILE_FIELDS.filter((f) => after_.missing.includes(f.key)).map((f) => f.label).join(", ")}.`;
+          ? "Saved — your profile is complete, so the weekly server pool can pay you."
+          : `Saved. Still needed before the pool can pay you: ${PROFILE_FIELDS.filter((f) => after_.missing.includes(f.key)).map((f) => f.label).join(", ")}.`;
       }
     } catch { note = "Could not save that just now."; }
     await rerender(i, frame("setup", guildId), [frame("admin", "")], { content: note, ephemeral: true });

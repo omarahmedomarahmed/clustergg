@@ -13,7 +13,9 @@ import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { hqInviteUrl } from "@/lib/discord/hq";
-import { clusterPctFor, nextEarnTier, ownerPctFor } from "@/lib/server-earnings";
+import { nextEarnTier } from "@/lib/server-earnings";
+import { DEFAULT_SPLIT } from "@/lib/vaults";
+import { PARTICIPATION_SHARE } from "@/lib/server-score";
 import { PROFILE_FIELDS, REGIONS, VIBES, completeness, getProfile, regionLabel, vibeLabel } from "@/lib/discord/community";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
@@ -1430,17 +1432,17 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   const filled = Math.round((stats.pct / 100) * 20);
   const bar = `${"█".repeat(filled)}${"░".repeat(20 - filled)}`;
 
-  // The pay rate, in the same message as the counter. An owner asked to recruit
-  // gamers should be able to see, without leaving Discord, what the next
-  // hundred of them are worth.
-  const pct = ownerPctFor(stats.linked);
+  // How the owner is paid, in the same message as the counter. C3 — this used
+  // to quote a per-server RATE ("you keep 25% of every sponsored challenge"),
+  // which is the promise the weekly pool replaced. Quoting both would promise
+  // the same money twice, in the one place an owner is most likely to screenshot.
   const next = nextEarnTier(stats.linked);
-  const rate = pct > 0
-    ? `You keep **${pct}%** of every sponsored challenge that runs here.`
-    : "";
+  const rate = `**${DEFAULT_SPLIT.server}%** of every sponsored challenge goes into the weekly server pool. `
+    + `**${PARTICIPATION_SHARE}%** of it is split evenly between every server that carried a challenge that week; `
+    + "the rest is competed for.";
   const upgrade = next
-    ? `**${(next.threshold - stats.linked).toLocaleString()} more** takes your share to **${next.ownerPct}%**.`
-    : `You are at the top rate — **${pct}%** of every sponsored challenge, and Cluster keeps ${clusterPctFor(stats.linked)}%.`;
+    ? `**${(next.threshold - stats.linked).toLocaleString()} more** moves you into the next tier — a different set of servers to compete against, not a different rate.`
+    : "You are in the top tier, competing for the largest slots in the pool.";
 
   const lines = stats.unlocked
     ? [
@@ -1456,7 +1458,7 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       `**${bar}** ${stats.pct}%`,
       "",
       `**${stats.linked.toLocaleString()} / ${stats.threshold.toLocaleString()}** members have joined Cluster *and* linked a game account.`,
-      `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here — real prize money for the members who win them, and **${next?.ownerPct ?? 5}% of what the brand paid** for you.`,
+      `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here — real prize money for the members who win them, and a place in the **weekly server pool** that ${DEFAULT_SPLIT.server}% of every sponsored challenge funds.`,
       "",
       `${stats.joined.toLocaleString()} have a Cluster profile so far — linking a game is what counts.`,
     ];

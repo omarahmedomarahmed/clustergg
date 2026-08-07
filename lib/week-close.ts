@@ -219,6 +219,30 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
     const thisSnap = new Map(snaps.filter((s) => +s.weekStart === +weekStart).map((s) => [s.guildId, s]));
     const prevSnap = new Map(snaps.filter((s) => +s.weekStart !== +weekStart).map((s) => [s.guildId, s]));
 
+    // ===== B47's gate, carried over =====
+    //
+    // A server that has not described itself is not inventory, it is a number:
+    // a brand buys "PUBG players in MENA", and we cannot sell a community with
+    // no games named, no audience and nobody to email. That gate used to live
+    // inside the per-challenge rate (`earningOwnerPct`), and deleting the rate
+    // in C3 would have silently deleted the gate with it — so it moves here,
+    // where the money is now decided.
+    //
+    // They are dropped from the RUN, not paid zero: leaving them in would let
+    // them take percentile positions off servers that did the work, and a score
+    // beaten by a server that cannot be paid is a score that means nothing.
+    const guildRows = await db.select({
+      guildId: schema.discordGuilds.guildId,
+      name: schema.discordGuilds.name,
+      community: schema.discordGuilds.community,
+      contactEmail: schema.discordGuilds.contactEmail,
+    }).from(schema.discordGuilds).where(inArray(schema.discordGuilds.guildId, guildIds));
+    const { parseCommunity, profileComplete } = await import("@/lib/discord/community");
+    const payable = new Set(guildRows
+      .filter((g) => profileComplete(parseCommunity(g.community), g.contactEmail))
+      .map((g) => g.guildId));
+    const skippedForProfile = guildIds.length - payable.size;
+
     const names = new Map(
       (await db.select({ guildId: schema.discordGuilds.guildId, name: schema.discordGuilds.name })
         .from(schema.discordGuilds).where(inArray(schema.discordGuilds.guildId, guildIds)))
@@ -239,7 +263,7 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
       )).groupBy(schema.serverPayouts.guildId);
     const winsBy = new Map(priorWins.map((r) => [r.guildId, Number(r.n ?? 0)]));
 
-    const base = guildIds.map((guildId) => {
+    const base = guildIds.filter((g) => payable.has(g)).map((guildId) => {
       const now_ = thisSnap.get(guildId);
       const before = prevSnap.get(guildId);
       const qualified = Number(now_?.qualifiedLinked ?? 0);
@@ -272,6 +296,9 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
     const terms: Record<string, number> = {};
     for (const k of live) {
       terms[k] = Math.round((SCORE_WEIGHTS[k as keyof typeof SCORE_WEIGHTS] / liveWeight) * 10000) / 100;
+    }
+    if (!base.length) {
+      return EMPTY(key, `Week of ${key}: ${guildIds.length} server${guildIds.length === 1 ? "" : "s"} carried an entrant, but none has a complete profile, so none can be paid.`);
     }
     if (!live.length) return EMPTY(key, `Week of ${key}: no term had any data to score on.`);
 
@@ -340,6 +367,7 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
         `Week of ${key}: $${pool.toFixed(2)} across ${servers.length} server${servers.length === 1 ? "" : "s"}, `
         + `${opened} payout${opened === 1 ? "" : "s"} opened`
         + (carried > 0 ? `, $${carried.toFixed(2)} held under the floor` : "")
+        + (skippedForProfile > 0 ? `, ${skippedForProfile} skipped for an incomplete server profile` : "")
         + `. Scored on ${live.length} of ${Object.keys(SCORE_WEIGHTS).length} terms `
         + `(${live.join(", ")}) — ${PARTICIPATION_SHARE}% of the pool was paid flat to everyone who took part.`,
     };

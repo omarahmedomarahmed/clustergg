@@ -2,6 +2,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import AddBotButton from "@/components/AddBotButton";
 import { EARN_STAGES_DEFAULT, type EarnStage } from "@/lib/pricing";
+import { DEFAULT_SPLIT } from "@/lib/vaults";
 
 // The other half of the marketplace.
 //
@@ -85,12 +86,15 @@ export default function ServerEarnCards({
                 <span className="text-sm text-muted">linked gamers</span>
               </div>
               <div className="text-[11px] text-muted mt-1">not members — gamers who linked a game account</div>
-              {/* The pay rate, next to the price of admission. These two
-                  numbers together ARE the offer; separating them turns a deal
-                  into a slogan. */}
+              {/* What the rung buys, next to the price of admission. C3 — this
+                  was "25% of every sponsored challenge", the rate the weekly
+                  pool replaced. What is true is that every sponsored challenge
+                  funds the pool, and the rung decides who you compete with in
+                  it. */}
               <div className="mt-3 inline-flex items-baseline gap-1.5 rounded-full border border-emerald-400/35 bg-emerald-500/10 px-3 py-1">
-                <span className="text-lg font-bold text-emerald-300 tabular-nums">{s.ownerPct}%</span>
-                <span className="text-[11px] text-emerald-100/80">of every sponsored challenge</span>
+                <span className="text-[11px] text-emerald-100/80">
+                  {DEFAULT_SPLIT.server}% of every sponsored challenge funds the weekly server pool
+                </span>
               </div>
             </div>
 

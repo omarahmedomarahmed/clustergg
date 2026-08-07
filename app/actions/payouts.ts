@@ -96,67 +96,23 @@ async function guildOwner(guildId: string): Promise<{
 // ===== Staff =====
 
 /**
- * Open a payout for everything a server has earned and not been paid.
+ * `openServerPayout` was here. C3 deleted it.
  *
- * The amount is not typed by anybody: it is the sponsored-challenge share from
- * the earnings ledger, minus what has already gone out. Members' winnings are
- * NOT in it and never will be — that money belongs to the members who won it,
- * and putting it in an owner's payout would be taking a gamer's prize.
+ * It built a payout out of per-challenge owner shares — the tier's percentage
+ * applied to each finished sponsored challenge. That share no longer exists:
+ * `docs/COMMERCIAL_MODEL_V2.md` §4 pays owners out of a weekly competitive pool
+ * instead, and `lib/week-close.ts` opens those payouts already scored, already
+ * apportioned and already netted against the vault.
+ *
+ * Deleted rather than left computing zero. A button that opens an empty payout
+ * every time reads as a bug, and a staff member who found it working would be
+ * paying an owner twice — once from the pool and once from a rate that was
+ * supposed to have been retired.
+ *
+ * `openManualPayout` is untouched: a human raising a cheque for a reason of
+ * their own is a different thing, and the one this never was.
  */
-export async function openServerPayout(guildId: string): Promise<Res> {
-  const admin = await staffGuard();
-  const db = await getDb();
-  const [guild] = await db.select().from(schema.discordGuilds)
-    .where(eq(schema.discordGuilds.guildId, guildId)).limit(1);
-  if (!guild) return { error: "That server isn't on the platform." };
 
-  const stats = await guildStats(guildId);
-  const earnings = await serverEarnings(guildId, stats?.linked ?? 0);
-  const already = await payoutTotals(guildId);
-
-  const lines = earnings.rows
-    .filter((r) => r.ended && r.owner > 0)
-    .map((r) => ({
-      kind: "sponsored_share",
-      label: `${r.title}${r.brandName ? ` · ${r.brandName}` : ""} — ${r.ownerPct}% of $${r.price.toLocaleString()} × ${Math.round(r.serverShare * 100)}% of entrants`,
-      challengeId: r.challengeId,
-      amount: r.owner,
-    }));
-
-  if (!lines.length) return { error: "Nothing has finished earning for this server yet." };
-
-  const gross = lines.reduce((a, l) => a + l.amount, 0);
-  const outstanding = Math.round((gross - already.paid - already.open) * 100) / 100;
-  if (outstanding <= 0) {
-    return { error: `Everything earned here is already paid or in flight ($${already.paid.toLocaleString()} paid, $${already.open.toLocaleString()} open).` };
-  }
-
-  // Already-settled challenges get netted off as one line rather than dropped,
-  // so the owner can see the whole ledger and the arithmetic that got to the
-  // figure — an unexplained smaller number is the fastest way to a dispute.
-  const settled = Math.round((already.paid + already.open) * 100) / 100;
-  if (settled > 0) {
-    lines.push({
-      kind: "adjustment",
-      label: "Already paid or in flight from earlier payouts",
-      challengeId: "",
-      amount: -settled,
-    });
-  }
-
-  const res = await createPayout({
-    guildId,
-    guildName: guild.name,
-    periodEnd: new Date(),
-    requestedBy: admin.id,
-    lines,
-  });
-  if (!res.ok) return { error: res.error };
-
-  await audit(admin.id, "payout.open", res.id, { guildId, amount: outstanding });
-  refresh(guild.slug);
-  return { ok: true, id: res.id, message: `Payout opened for ${guild.name} — $${outstanding.toLocaleString()}.` };
-}
 
 /** A payout staff build by hand: a bonus, a correction, a one-off. */
 export async function openManualPayout(formData: FormData): Promise<Res> {

@@ -8,19 +8,22 @@ import Icon from "@/components/Icon";
 export type TierView = {
   key: string; name: string; threshold: number; icon: string;
   rank: string; tone: string; blurb: string;
-  unlocks: string; detail: string; ownerPct: number;
+  unlocks: string; detail: string;
 };
 
 /**
  * A server's standing, as a LABEL rather than an icon.
  *
  * A tier is the thing an owner screenshots and puts in their own server, so it
- * has to read as a rank on sight: its own colour, its own numeral, the name,
- * and — the part that makes it worth having — what it pays. Four rows sharing
- * one gold star told an owner nothing and gave them nothing to show off.
+ * has to read as a rank on sight: its own colour, its own numeral, the name.
+ * Four rows sharing one gold star told an owner nothing.
+ *
+ * It used to end with "· 25% share". C3 removed the rate — a tier now decides
+ * which pool a server competes in, and printing a percentage that no longer
+ * pays would be the promise we deleted, still on the badge.
  */
 export function TierBadge({ tier, size = "md", earned = true }: {
-  tier: Pick<TierView, "name" | "rank" | "tone" | "icon" | "ownerPct">;
+  tier: Pick<TierView, "name" | "rank" | "tone" | "icon">;
   size?: "sm" | "md" | "lg";
   earned?: boolean;
 }) {
@@ -42,7 +45,7 @@ export function TierBadge({ tier, size = "md", earned = true }: {
       <span className="leading-tight">
         <span className={`block font-black ${nameSize}`} style={{ color: tone }}>{tier.name}</span>
         <span className="block text-[9px] font-bold uppercase tracking-[0.18em] text-muted">
-          {tier.rank}{tier.ownerPct > 0 ? ` · ${tier.ownerPct}% share` : " · no share yet"}
+          {tier.rank}
         </span>
       </span>
     </span>
@@ -289,8 +292,6 @@ export type EarningRowView = {
   totalEntrants: number;
   price: number;
   serverShare: number;
-  ownerPct: number;
-  owner: number;
   membersWon: number;
 };
 
@@ -321,19 +322,16 @@ export type PayoutView = {
  *                at the worst possible moment.
  */
 export function EarningsPanel({
-  tier, ownerPct, clusterPct, nextPct, nextAt, linked, earned, pending, membersWon, rows,
+  tier, nextAt, linked, earned, pending, membersWon, rows,
   paidOut, inFlight, payouts, payoutMethod, payoutStatus, memberWins, winners,
 }: {
-  tier: Pick<TierView, "name" | "rank" | "tone" | "icon" | "ownerPct">;
+  tier: Pick<TierView, "name" | "rank" | "tone" | "icon">;
   memberWins: {
     userId: string; name: string; slug: string | null; avatarUrl: string | null;
     challengeId: string; challengeTitle: string; game: string; brandName: string | null;
     place: number; amount: number; at: string;
   }[];
   winners: number;
-  ownerPct: number;
-  clusterPct: number;
-  nextPct: number | null;
   nextAt: number | null;
   linked: number;
   earned: number;
@@ -351,8 +349,10 @@ export function EarningsPanel({
 
   return (
     <div className="space-y-6">
-      {/* The tier, stated first. An owner opening this tab is asking "what am I
-          worth", and the tier IS the answer — the percentage follows from it. */}
+      {/* The tier, stated first — but as a standing, not a rate. C3: an owner
+          opening this tab used to be told "25% of every sponsored challenge",
+          which is the promise the weekly pool replaced. What is true now is
+          which pool they compete in and what it has actually paid them. */}
       <div className="glass p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -360,27 +360,31 @@ export function EarningsPanel({
             <TierBadge tier={tier} size="lg" />
           </div>
           <div className="text-right">
-            <div className="text-[10px] uppercase tracking-widest text-muted">Your share of every sponsored challenge</div>
-            <div className="text-xl font-black text-emerald-300">{ownerPct}% <span className="text-xs font-bold text-muted">/ {clusterPct}% Cluster</span></div>
+            <div className="text-[10px] uppercase tracking-widest text-muted">Paid to you from the weekly server pool</div>
+            <div className="text-xl font-black text-emerald-300">{usd(earned)}</div>
           </div>
         </div>
-        {nextPct != null && nextAt != null && (
-          <p className="mt-3 text-xs text-amber-200">
-            {(nextAt - linked).toLocaleString()} more linked gamers takes your share from {ownerPct}% to {nextPct}%.
-          </p>
-        )}
+        <p className="mt-3 text-xs text-muted">
+          Every sponsored challenge puts a fixed share into the server pool. A fifth of it is split evenly
+          between every server that carried a challenge that week; the rest is competed for on entrants you
+          brought exclusively, members who newly qualified, and how many of your members enter.
+          {nextAt != null && (
+            <> <b className="text-amber-200">{(nextAt - linked).toLocaleString()} more linked gamers</b> moves you
+            into the next tier — a different set of servers to compete against, not a different rate.</>
+          )}
+        </p>
       </div>
 
       {/* The two types. */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="glass border border-emerald-400/25 p-5">
           <div className="flex items-center gap-2 text-sm font-bold text-emerald-200">
-            <Icon name="diamond" size={15} /> Sponsored challenge share
+            <Icon name="diamond" size={15} /> Weekly server pool
           </div>
           <div className="mt-1 text-3xl font-black text-emerald-300 tabular-nums">{usd(earned)}</div>
           <p className="mt-1.5 text-xs text-muted">
-            Your cut of what brands paid, scaled by how many of a challenge&apos;s entrants came from your
-            server. <b className="text-ink">This is yours</b> and it is what gets paid out.
+            Paid to you out of the pool every sponsored challenge funds — a flat share for every week you
+            carried one, plus what you placed for. <b className="text-ink">This is yours</b>.
           </p>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <Money label="Paid to you" value={usd(paidOut)} />
@@ -389,7 +393,7 @@ export function EarningsPanel({
           </div>
           {pending > 0 && (
             <p className="mt-2 text-[11px] text-amber-200">
-              {usd(pending)} more is still running and isn&apos;t payable until those challenges finish.
+              {usd(pending)} has been scored and opened, and is waiting on release.
             </p>
           )}
         </div>
@@ -525,9 +529,9 @@ export function EarningsPanel({
       <div className="glass p-6">
         <h2 className="font-bold mb-1">The ledger</h2>
         <p className="text-sm text-muted">
-          A challenge runs in more than one server, so its fee is divided by where the entrants came from: your
-          share of a challenge is your share of its players. Every row shows that division, so you can check
-          the total rather than take it on trust.
+          What your server actually contributed, challenge by challenge — how many of the entrants were yours,
+          and what your members took home. This is not the money you are paid: that comes from the weekly pool
+          above, scored on the whole week rather than on any one challenge.
         </p>
       </div>
 
@@ -545,7 +549,7 @@ export function EarningsPanel({
                 <th className="px-4 py-3 text-left">Brand</th>
                 <th className="px-4 py-3 text-right">Brand paid</th>
                 <th className="px-4 py-3 text-right">Your players</th>
-                <th className="px-4 py-3 text-right">Your share</th>
+                <th className="px-4 py-3 text-right">Your share of the field</th>
                 <th className="px-4 py-3 text-right">You earned</th>
               </tr>
             </thead>
@@ -563,11 +567,14 @@ export function EarningsPanel({
                   <td className="px-4 py-3 text-right tabular-nums">
                     {r.entrants.toLocaleString()}<span className="text-muted"> / {r.totalEntrants.toLocaleString()}</span>
                   </td>
+                  {/* Contribution, not a cut. C3 — a challenge no longer pays a
+                      percentage, so this row shows what this server actually
+                      brought to it and what its members took home. */}
                   <td className="px-4 py-3 text-right tabular-nums text-muted">
-                    {r.ownerPct}% × {Math.round(r.serverShare * 100)}%
+                    {Math.round(r.serverShare * 100)}% of the field
                   </td>
-                  <td className={`px-4 py-3 text-right font-bold tabular-nums ${r.ended ? "text-emerald-300" : "text-amber-200"}`}>
-                    {usd(r.owner)}
+                  <td className={`px-4 py-3 text-right font-bold tabular-nums ${r.membersWon > 0 ? "text-emerald-300" : "text-muted"}`}>
+                    {usd(r.membersWon)}
                   </td>
                 </tr>
               ))}
@@ -623,7 +630,7 @@ export function EarningGuide({ tiers, linked, currentKey, inviteUrl, slug }: {
     {
       n: 4,
       title: "You get paid, we never touch your bank",
-      body: "Your share builds up in the ledger on this tab. We open a payout, you can check it line by line, and the money is sent by our payout partner — where it lands is something you tell them, not us.",
+      body: "Every Monday we close the week, score the servers that carried a challenge and open a payout. You can check it line by line, and the money is sent by our payout partner — where it lands is something you tell them, not us.",
       done: false,
     },
   ];
@@ -752,9 +759,9 @@ export function EarningGuide({ tiers, linked, currentKey, inviteUrl, slug }: {
         {next && (
           <p className="mt-5 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-xs text-muted">
             <b className="text-ink">Next up: {next.name}.</b> {(next.threshold - linked).toLocaleString()} more of
-            your members need to link a game account, and your share of every sponsored challenge goes to{" "}
-            <b className="text-emerald-300">{next.ownerPct}%</b>. That is {next.ownerPct}% of what a brand pays,
-            on top of the prize money your members win.
+            your members need to link a game account. A tier decides which servers you compete against for the
+            weekly pool and what your server unlocks — it is not a rate, and moving up does not change what a
+            brand pays.
           </p>
         )}
       </div>

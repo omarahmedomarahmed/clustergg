@@ -121,8 +121,8 @@ export default async function ServerPortalPage({
                 <div className="text-sm text-muted mt-0.5">
                   {community.missing.length} field{community.missing.length === 1 ? "" : "s"} left —{" "}
                   {PROFILE_FIELDS.filter((f) => community.missing.includes(f.key)).map((f) => f.label).join(", ")}.
-                  {" "}Until it is finished your share of sponsored challenges is <b className="text-ink">0%</b>,
-                  whatever your tier says.
+                  {" "}Until it is finished the weekly server pool <b className="text-ink">cannot pay you</b>,
+                  whatever your tier says — a server we cannot describe is one we cannot sell.
                 </div>
               </div>
               <a href="#server-profile" className="glow-btn pressable rounded-full px-4 py-2 text-sm font-semibold text-white shrink-0">
@@ -199,9 +199,6 @@ export default async function ServerPortalPage({
               />
               <EarningsPanel
                 tier={data.tier.current}
-                ownerPct={data.earnings.ownerPct}
-                clusterPct={data.earnings.clusterPct}
-                nextPct={data.earnings.nextPct}
                 nextAt={data.earnings.nextAt}
                 linked={data.stats.linked}
                 earned={data.earnings.earned}
@@ -227,8 +224,7 @@ export default async function ServerPortalPage({
                   challengeId: r.challengeId, title: r.title, game: r.game,
                   brandName: r.brandName, endsAt: r.endsAt.toISOString(), ended: r.ended,
                   entrants: r.entrants, totalEntrants: r.totalEntrants,
-                  price: r.price, serverShare: r.serverShare, ownerPct: r.ownerPct,
-                  owner: r.owner, membersWon: r.membersWon,
+                  price: r.price, serverShare: r.serverShare, membersWon: r.membersWon,
                 }))}
               />
               <PayoutSetup
