@@ -649,8 +649,25 @@ export const adImpressions = pgTable("ad_impressions", {
   // Discord revenue flows through the EXISTING ad analytics rather than a
   // parallel pipeline that would have to be reconciled later.
   guildId: text("guild_id"),
+  /**
+   * One viewer, one creative, one hour. B72.2.
+   *
+   * A unique index rather than a check in the route, because two racing beacon
+   * calls would both pass a SELECT and both insert — the same read-then-write
+   * shape B74 found on the money paths. Here the database refuses the second
+   * one and no transaction is needed to make that true.
+   *
+   * It fixes two things that looked unrelated: an unauthenticated flood padding
+   * a brand's count, and the web slot rotating every five seconds and logging a
+   * fresh impression on each tick, so one idle tab produced twelve views a
+   * minute. Nullable for rows written before this existed.
+   */
+  dedupeKey: text("dedupe_key"),
   createdAt: now("created_at"),
-}, (t) => [index("imp_cc_idx").on(t.campaignCreativeId, t.createdAt)]);
+}, (t) => [
+  index("imp_cc_idx").on(t.campaignCreativeId, t.createdAt),
+  uniqueIndex("imp_dedupe_idx").on(t.dedupeKey),
+]);
 
 export const adClicks = pgTable("ad_clicks", {
   id: id(),

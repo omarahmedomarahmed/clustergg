@@ -131,6 +131,37 @@ console.log("\n== no brand-facing number is derived from a server headcount ==")
     /Cost per entrant/.test(panel) && /counted/.test(panel));
 }
 
+console.log("\n== the ad beacon is not an open mint ==");
+// The reviewer awarded themselves CP here with one curl. Three holes, and the
+// third is not in this file at all — it is a public page render.
+{
+  const beacon = code("app/api/ads/beacon/route.ts");
+  ok("CP requires a session", /if \(session\?\.uid\)/.test(beacon));
+  ok("…and the award is keyed on the day, not the impression id",
+    /awardRef\(payload\.ccId\)/.test(beacon) && !/refId: id\b/.test(beacon));
+  ok("an unknown creative is refused", /status: 404/.test(beacon));
+  ok("duration checks ownership", /adImpressions\.userId, session\.uid/.test(beacon));
+  ok("…and refuses an old impression", /IMPRESSION_WINDOW_MS/.test(beacon));
+  ok("the route is rate limited", /rateLimited\(viewer\)/.test(beacon));
+  ok("…and origin-checked", /originAllowed\(/.test(beacon));
+
+  const guard = code("lib/ads-beacon.ts");
+  ok("dedup is per viewer, per creative, per window", /impressionKey/.test(guard));
+  ok("…and the CP day boundary is UTC, like the ceiling", /toISOString\(\)\.slice\(0, 10\)/.test(guard));
+
+  // A unique index, not a check in the route: two racing calls would both pass
+  // a SELECT and both insert, which is the read-then-write shape B74 found on
+  // the money paths.
+  ok("the impression dedup is enforced by the DATABASE",
+    /uniqueIndex\("imp_dedupe_idx"\)/.test(code("lib/db/schema.ts")));
+
+  // The third mint: a public page render.
+  const profile = code("app/u/[slug]/page.tsx");
+  ok("a profile view pays only a signed-in viewer", /viewer\?\.id && viewer\.id !== user\.id/.test(profile));
+  ok("…once per viewer per day", /refId: `\$\{viewer\.id\}/.test(profile));
+  ok("…and no longer pays on a raw view count", !/Math\.floor\(viewCount \/ 25\)/.test(profile));
+}
+
 console.log("\n== the money paths cannot be broken by a runtime downgrade ==");
 // Round-2 finding, and it was a defect the FIX introduced: the pooled driver
 // needs a WebSocket, Node 20 has none, and every money path would have thrown —

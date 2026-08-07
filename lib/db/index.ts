@@ -811,6 +811,11 @@ const COLUMN_MIGRATIONS = [
   // picture everywhere it appears. The caption and alt text live here too — an
   // admin who can swap the picture but not the sentence under it can only
   // half-fix a stale claim.
+  // B72.2 — one viewer, one creative, one hour. A unique index because two
+  // racing beacon calls would both pass a SELECT and both insert.
+  `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "dedupe_key" text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "imp_dedupe_idx" ON "ad_impressions" ("dedupe_key")`,
+
   // ===== B86: the data with a deadline =====
   //
   // The server pool pays real money for facts nobody was recording. These reach
