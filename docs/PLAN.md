@@ -260,6 +260,10 @@ cannot do. **C4 and C5 are B86.** These are the other two, plus the cleanup.
 | **C10** | `PAYOUT_HOLD_DAYS = 30` vs "weekly pool" — say "earned weekly, paid after the hold", or change the hold. |
 | **C11** | `reachBase`/`challengeBase`/`ultimateBase`/`streamAddon` still price the live `/pricing` page. |
 | **C12** | Define "expected active gamers". It is the denominator of everyone's pay and it does not exist. |
+| **C13** | **A fourth vault: prizes.** 50% of every dollar has no vault, no ledger and no liability tracking. |
+| **C14** | Under-18s cannot redeem, so **"50% to gamers" is partly breakage.** Report it as its own line; never bank it. |
+| **C15** | Reconcile awarded trophy value against the prize pool. Nothing checks it. |
+| **C16** | **No weekly cron exists.** Everything weekly has no scheduler. Run it off the daily job behind a day-of-week check. |
 
 ---
 

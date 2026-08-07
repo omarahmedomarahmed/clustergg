@@ -25,6 +25,24 @@ cannot do. **Nothing here is buildable until these land.**
 **C4 and C5 are collecting data we can never go back and get.** Every week
 without them is a week of history that cannot be reconstructed. They ship first.
 
+### Found on a second sweep — four more, one of them structural
+
+| # | Issue | Severity |
+|---|---|---|
+| **C13** | **There are four pools and three vaults.** Prizes are **50%** — the largest line — and have **no vault, no ledger, and no liability tracking.** A prize is awarded as a trophy (`lib/trophies.ts:102`) and becomes cash only when redeemed, months later or never. The one pool big enough to sink us is the one nothing watches. | **Structural** |
+| **C14** | **"50% goes to gamers" is not true, and cannot be.** A trophy pays out only on redemption, and `MIN_REDEEM_AGE = 18` (`lib/eligibility.ts:27`). Under a global-16 floor, **16–17-year-olds can win $100 and never collect it.** Unredeemed prizes stay with us. There is a fourth, unmeasured line in the split — breakage — and we are currently calling it a payout. | **High** |
+| **C15** | **Nothing reconciles the $175 prize pool to the trophies actually awarded.** The pool is a number in `pricing.ts`; the prizes are trophy IDs chosen per challenge (`challenges.prizes`). Nothing checks they add up. A challenge can promise $175 and award $40 of trophies, or $400. | **High** |
+| **C16** | **The model is weekly and there is no weekly cron.** `vercel.json` has hourly, daily and 5-minute jobs only. The pool, the winners, the payouts and the announced CP number all have no scheduler. *(Cheap fix: run it on the daily cron behind a day-of-week check.)* | Medium |
+
+**C13/C14/C15 together:** the prize half of every dollar is unvaulted,
+unreconciled, and partly never paid. **Add a fourth vault — the prize vault —
+with the same screen as the others**, holding awarded-but-unredeemed value as an
+explicit liability, and reconcile trophy value against the pool at award time.
+
+**One piece of good news from the sweep:** `dailyCpCeiling` is genuinely
+settings-backed (`lib/quests.ts:435-443`), so C1's fix has a real hook and needs
+no new plumbing.
+
 ### Also contradicted, less fatal
 
 | # | Issue |
@@ -121,9 +139,16 @@ No pool pays what it did not receive.
 
 | Vault | Fills | Pays |
 |---|---|---|
+| **Prize vault** | **50%** | challenge winners, **on redemption** |
 | **Server pool** | 15% | 10 winning servers, weekly |
 | **CP vault** | 15% | the daily mission |
 | **Cluster revenue** | 20% | us |
+
+**Four vaults, not three.** The prize pool was left out of the original design
+and it is the biggest line. It behaves differently from the others and that is
+exactly why it needs watching: money enters when a challenge is sold, and leaves
+only when a winner **redeems** — which may be months later, or never, because
+under-18s cannot redeem at all. Its balance is a **liability**, not a surplus.
 
 **Transfers both ways, always logged** — admin, reason, timestamp.
 
@@ -146,6 +171,8 @@ after payout leaves a negative vault with no rule; the hold period is the fix.
 | **Sweep** | CP vault above **8 weeks' runway** returns to Cluster revenue, automatically, as a logged transfer. Without this the vault fills forever and never drains. |
 | **Under-filled slots** | If fewer servers qualify than slots, **redistribute pro-rata among filled slots.** Never leave money with no destination. |
 | **Payout floor** | **$25.** Below it, accrue and carry. A $7.88 payout costs more in fees than it delivers. |
+| **Prize reconciliation** | At award time, the value of the trophies handed out must reconcile to the prize pool that funded them. Nothing checks this today. |
+| **Breakage is named, not banked** | Unredeemed prize value is reported as its own line. It is **not** revenue until a stated expiry, and we do not build the model on it. |
 
 ### The growth law nobody had written down
 
@@ -336,6 +363,7 @@ Purge candidates, to confirm against real staff use: `creative-studio`,
 | Score weights | admin |
 | Daily CP number | admin, **announced a week ahead** |
 | Sweep threshold, payout floor | admin |
+| Prize breakage expiry | admin, **danger zone** |
 | Vault transfers | admin, with a reason |
 
 No number in this document is a constant in the code.
