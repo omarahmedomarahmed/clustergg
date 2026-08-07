@@ -33,13 +33,47 @@ the price raises every downstream pool automatically.
 
 | Line | % | At $350 |
 |---|---|---|
-| Prize pool → gamers | 50% | $175 |
-| **Server pool** | 21.4% | $75 |
-| **CP vault** | 14.3% | $50 |
-| **Cluster revenue** | 14.3% | $50 |
+| Prize pool → gamers | **50** | $175 |
+| **Cluster revenue** | **20** | $70 |
+| **Server pool** | **15** | $52.50 |
+| **CP vault** | **15** | $52.50 |
+| | **100** | $350 |
+
+Round numbers on purpose. The old 21.4 / 14.3 / 14.3 was arithmetic left over
+from fixed dollar amounts, and a number nobody can hold in their head is a
+number nobody notices going wrong.
 
 **The price is a dial.** `challengePrice` moves, every pool moves with it, and
 nothing downstream needs editing.
+
+### Who gets the 20
+
+The prize pool is fixed at 50. The remaining 50 splits three ways, and **one of
+the three holds 20 while the other two hold 15.** Admin switches which.
+
+| Preset | Cluster | Servers | Gamers | Use when |
+|---|---|---|---|---|
+| **Default** | **20** | 15 | 15 | normal running |
+| **Grow servers** | 15 | **20** | 15 | recruiting server owners |
+| **Grow gamers** | 15 | 15 | **20** | the mission needs to pay more |
+
+One switch, three positions. No arithmetic for whoever is operating it.
+
+### Editing it
+
+| | |
+|---|---|
+| Switching the preset | ordinary admin action |
+| **Editing any percentage by hand** | **danger zone** — typed confirmation, audit row, reason required |
+| The rule | **must total 100.** The editor refuses to save otherwise. |
+
+This is a money invariant, not form validation: a split that does not total 100
+either pays out money that never arrived or silently keeps money that was
+promised to somebody.
+
+**Separate from vault transfers.** These percentages decide how *new* challenge
+money is allocated. Loading and unloading a vault is a different action, always
+available, and does not touch the split.
 
 ---
 
@@ -50,9 +84,9 @@ can pay what it has not received.
 
 | Vault | Fills from | Pays out |
 |---|---|---|
-| **Server pool** | 21.4% of each challenge | 10 winning servers, weekly |
-| **CP vault** | 14.3% of each challenge | tomorrow's daily mission |
-| **Cluster revenue** | 14.3% of each challenge | us |
+| **Server pool** | 15% of each challenge | 10 winning servers, weekly |
+| **CP vault** | 15% of each challenge | tomorrow's daily mission |
+| **Cluster revenue** | 20% of each challenge | us |
 
 **Transfers are allowed, both ways, and logged.** Cluster revenue can top up the
 server pool or the CP vault; a vault in surplus can return to revenue. Every
@@ -133,15 +167,15 @@ grow.
 
 | Step | |
 |---|---|
-| Vault fills | 14.3% of every challenge |
+| Vault fills | 15% of every challenge |
 | **Tomorrow's mission CP** | vault balance ÷ expected active gamers |
 | Unclaimed CP | stays in the vault — tomorrow is richer |
 | Spike guard | computed from **yesterday's** active count, plus headroom |
 | Floor | **50 CP/day**, funded from Cluster revenue if the vault is short |
 | Gamers see | the mission number. Never the vault. |
 
-**What $50 per challenge buys:** 500,000 CP = 1,000 gamer-days at 500 CP. Four
-challenges a month ≈ 133 gamers at the old full rate, or 665 at 100/day.
+**What $52.50 per challenge buys:** 525,000 CP = 1,050 gamer-days at 500 CP.
+Four challenges a month ≈ 140 gamers at the old full rate, or 700 at 100/day.
 
 The number now moves with the business instead of being a promise we cannot
 keep. **This is the answer to "do we switch gamer earning off": no — it stops
@@ -214,7 +248,8 @@ linked-account list, ever.
 | Setting | Owner |
 |---|---|
 | Challenge price | admin |
-| The four split percentages | admin |
+| **Which pool holds the 20** | admin, one switch |
+| **The four percentages by hand** | admin, **danger zone**, must total 100 |
 | Slot shape per tier | admin, must total 100% |
 | Engagement score weights | admin |
 | Daily CP floor | admin |
