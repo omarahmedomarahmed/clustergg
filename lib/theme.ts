@@ -6,6 +6,8 @@
 import type { CSSProperties } from "react";
 
 export type ProfileTheme = {
+  /** Schema version. See THEME_VERSION — stamped on read, never used to discard. */
+  v?: number;
   template: string;          // preset key applied as a starting point
   mode: "dark" | "light";
   bg: string;                // page background color
@@ -166,16 +168,52 @@ export const DEFAULT_THEME: ProfileTheme = {
   sectionArt: {},
 };
 
+/**
+ * The theme SCHEMA version.
+ *
+ * An execution review flagged `resolveTheme` as the same bug as the card-layout
+ * one: `{ ...DEFAULT_THEME, ...tmpl, ...t }` with `t` last and no version, so a
+ * stored value overrides any redesigned default. It carried the same tell too —
+ * `order` and `sections` were special-cased for exactly that staleness and
+ * nobody asked about the rest.
+ *
+ * **The shape is the same and the right fix is NOT.** Card layouts were an
+ * admin tuning a frame that no longer existed, so discarding them was correct.
+ * These are a GAMER'S OWN CHOICES. Somebody picked that background. Throwing it
+ * away on our redesign would be us breaking their profile to tidy our code, and
+ * "we applied the same fix" is not a reason a gamer would accept.
+ *
+ * So this version exists to make the NEXT redesign able to decide — per field,
+ * deliberately — rather than to discard anything today. Nothing is stale right
+ * now; what was missing was the ability to know.
+ *
+ * What IS fixed today is narrower and real: the merge now takes only keys that
+ * exist in `DEFAULT_THEME`. A stored theme could previously spread arbitrary
+ * keys — junk, or fields from a schema we have since dropped — straight into a
+ * live object.
+ */
+export const THEME_VERSION = 1;
+
 export function resolveTheme(raw: unknown): ProfileTheme {
-  const t = (raw && typeof raw === "object" ? raw : {}) as Partial<ProfileTheme>;
+  const t = (raw && typeof raw === "object" ? raw : {}) as Partial<ProfileTheme> & { v?: number };
   const tmpl = TEMPLATES.find((x) => x.key === t.template)?.theme ?? {};
-  const merged = { ...DEFAULT_THEME, ...tmpl, ...t };
+  // Iterate the DEFAULTS and pull stored values by key — the shape `lib/pricing.ts`
+  // already uses, and the one that is immune to a new default being clobbered by
+  // old storage. Not a spread of stored-over-default.
+  const merged = { ...DEFAULT_THEME } as ProfileTheme & Record<string, unknown>;
+  for (const key of Object.keys(DEFAULT_THEME) as (keyof ProfileTheme)[]) {
+    const fromTemplate = (tmpl as Record<string, unknown>)[key as string];
+    if (fromTemplate !== undefined) (merged as Record<string, unknown>)[key as string] = fromTemplate;
+    const stored = (t as Record<string, unknown>)[key as string];
+    if (stored !== undefined) (merged as Record<string, unknown>)[key as string] = stored;
+  }
   const savedOrder = Array.isArray(t.order) && t.order.length ? t.order : DEFAULT_THEME.order;
   // Append any newly-added default sections (e.g. "quests") that a saved order
   // predates, so existing gamers still get them (they can then reorder).
   const order = [...savedOrder, ...DEFAULT_THEME.order.filter((k) => !savedOrder.includes(k))];
   return {
     ...merged,
+    v: THEME_VERSION,
     sections: { ...DEFAULT_THEME.sections, ...(t.sections ?? {}) },
     order,
     sectionArt: (t.sectionArt && typeof t.sectionArt === "object" ? t.sectionArt : {}) as Record<string, string>,

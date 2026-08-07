@@ -199,7 +199,9 @@ function keySubmit(i: Interaction, who: Who, challengeId: string, key: string) {
         return;
       }
 
-      const res = await joinChallengeFor(ctx.gamer.userId, challengeId, { source: "discord", accessKey: key });
+      const res = await joinChallengeFor(ctx.gamer.userId, challengeId, {
+        source: "discord", accessKey: key, guildId: i.guild_id ?? null,
+      });
       if (!res.ok) {
         await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: joinFailure(res.reason, res.unmet) }] });
         return;
@@ -871,7 +873,7 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
       || (gate.locked && keyVisibleTo(gate, i.guild_id ?? null) ? gate.accessKey : null);
     const res = await joinChallengeFor(ctx.gamer.userId, id, {
       ...(accountId ? { linkedAccountId: accountId } : {}),
-      source: "discord", accessKey: key,
+      source: "discord", accessKey: key, guildId: i.guild_id ?? null,
     });
     if (!res.ok) {
       await editOriginal(i.token, {

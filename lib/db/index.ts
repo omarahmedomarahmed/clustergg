@@ -811,6 +811,38 @@ const COLUMN_MIGRATIONS = [
   // picture everywhere it appears. The caption and alt text live here too — an
   // admin who can swap the picture but not the sentence under it can only
   // half-fix a stale claim.
+  // ===== B86: the data with a deadline =====
+  //
+  // The server pool pays real money for facts nobody was recording. These reach
+  // production by DEPLOYING, like every other schema change here — never by a
+  // hand-run statement against the live database.
+  `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "guild_id" text`,
+  `CREATE INDEX IF NOT EXISTS "cp_guild_idx" ON "challenge_participants" ("guild_id","challenge_id")`,
+  `CREATE TABLE IF NOT EXISTS "guild_snapshots" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "week_start" timestamp with time zone NOT NULL,
+    "member_count" integer DEFAULT 0 NOT NULL,
+    "linked" integer DEFAULT 0 NOT NULL,
+    "qualified_linked" integer DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "guild_snap_idx" ON "guild_snapshots" ("guild_id","week_start")`,
+  `CREATE TABLE IF NOT EXISTS "vault_ledger" (
+    "id" text PRIMARY KEY NOT NULL,
+    "vault" text NOT NULL,
+    "amount" double precision DEFAULT 0 NOT NULL,
+    "kind" text NOT NULL,
+    "ref_type" text,
+    "ref_id" text,
+    "transfer_id" text,
+    "reason" text,
+    "actor_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "vault_ledger_idx" ON "vault_ledger" ("vault","created_at")`,
+  `CREATE INDEX IF NOT EXISTS "vault_ledger_ref_idx" ON "vault_ledger" ("ref_type","ref_id")`,
+
   `CREATE TABLE IF NOT EXISTS "feature_shots" (
     "key" text PRIMARY KEY NOT NULL,
     "image_url" text,

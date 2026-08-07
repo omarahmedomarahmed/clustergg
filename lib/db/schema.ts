@@ -399,8 +399,103 @@ export const challengeParticipants = pgTable("challenge_participants", {
   // web | discord — the funnel metric that shows whether the bot actually
   // drives participation, rather than just being installed somewhere.
   joinedFrom: text("joined_from").notNull().default("web"),
+  /**
+   * WHICH SERVER this entry came from, recorded at join time.
+   *
+   * B86. The server pool pays real money for "entrants from that server", and
+   * until this column existed there was no such fact: attribution was derived
+   * from current guild membership, so **one entrant counted once for every
+   * server they happened to be in** and the shares summed past 100%.
+   *
+   * Nullable because it cannot be backfilled — a join that already happened
+   * did not record where it came from, and guessing later is the bug this
+   * column exists to remove. Rows before B86 read null and are excluded from
+   * scoring rather than attributed to somebody.
+   *
+   * Not a foreign key to `discordGuilds` on purpose: a server can remove the
+   * bot, and an entrant's history must survive that.
+   */
+  guildId: text("guild_id"),
   joinedAt: now("joined_at"),
-}, (t) => [uniqueIndex("cp_challenge_user_idx").on(t.challengeId, t.userId)]);
+}, (t) => [
+  uniqueIndex("cp_challenge_user_idx").on(t.challengeId, t.userId),
+  index("cp_guild_idx").on(t.guildId, t.challengeId),
+]);
+
+/**
+ * One row per guild per week. B86.
+ *
+ * The server pool scores on things that change over time — how many members a
+ * server has, how many of them are QUALIFIED linked gamers — and none of it was
+ * being written down. `discordGuilds.memberCount` is a single current integer,
+ * so "growth versus last week" had no last week to compare against and could
+ * not be computed at all.
+ *
+ * **This is the unbackfillable one.** Every week that passes without a snapshot
+ * is a week of history nobody can reconstruct, which is why B86 sits ahead of
+ * items that are more urgent but not time-critical.
+ *
+ * `qualifiedLinked` is deliberately separate from `linked`: `lib/abuse.ts`
+ * already refuses to pay on members who have not cleared `QUALIFY_AFTER_DAYS`
+ * with a verified game account, and the scoring formula uses the qualified
+ * figure precisely because the raw one can be bought for about five dollars.
+ */
+export const guildSnapshots = pgTable("guild_snapshots", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  /** The Monday of the week this snapshot describes, UTC. */
+  weekStart: timestamp("week_start", { withTimezone: true, mode: "date" }).notNull(),
+  /** Discord's approximate member count at capture time. Buyable — context only. */
+  memberCount: integer("member_count").notNull().default(0),
+  /** Linked Cluster gamers in this guild. */
+  linked: integer("linked").notNull().default(0),
+  /** …of which have cleared the qualification rule. This is what scores. */
+  qualifiedLinked: integer("qualified_linked").notNull().default(0),
+  createdAt: now("created_at"),
+}, (t) => [uniqueIndex("guild_snap_idx").on(t.guildId, t.weekStart)]);
+
+/**
+ * Every movement of money into and out of a vault. B86.
+ *
+ * The four vaults in `docs/COMMERCIAL_MODEL_V2.md` are only meaningful if their
+ * balance is a SUM OF ROWS rather than a stored number somebody edits. A stored
+ * balance drifts, and there is no way to prove afterwards what it should have
+ * been.
+ *
+ * So there is no balance column anywhere: a vault's balance is
+ * `sum(amount) where vault = ?`, and every row says who moved it and why.
+ * Inflows are positive, outflows negative, and a transfer between vaults is two
+ * rows sharing a `transferId`.
+ */
+export const vaultLedger = pgTable("vault_ledger", {
+  id: id(),
+  /** prize | server | cp | cluster */
+  vault: text("vault").notNull(),
+  /**
+   * Positive in, negative out. Money, not CP — CP converts at the live rate.
+   *
+   * `doublePrecision` to match every other money column in this schema
+   * (`trophies.value:730`, `serverPayouts.amount:822`). A second convention for
+   * money would be worse than the imperfect one already here: reconciling two
+   * types is how a rounding difference becomes an unexplained balance.
+   */
+  amount: doublePrecision("amount").notNull().default(0),
+  /** challenge_sale | payout | transfer | sweep | adjustment | breakage */
+  kind: text("kind").notNull(),
+  /** What caused it: a challenge id, a payout id, a redemption id. */
+  refType: text("ref_type"),
+  refId: text("ref_id"),
+  /** Both halves of a transfer carry the same id, so they can never be read apart. */
+  transferId: text("transfer_id"),
+  /** Required on any manual movement. Null for automatic ones. */
+  reason: text("reason"),
+  /** The admin who did it, when a human did. */
+  actorId: text("actor_id"),
+  createdAt: now("created_at"),
+}, (t) => [
+  index("vault_ledger_idx").on(t.vault, t.createdAt),
+  index("vault_ledger_ref_idx").on(t.refType, t.refId),
+]);
 
 export const challengeEvents = pgTable("challenge_events", {
   id: id(),

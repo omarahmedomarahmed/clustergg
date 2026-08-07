@@ -15,7 +15,7 @@ import { postBotListStats } from "@/lib/botlist-post";
 // Each job must be safe to run repeatedly. Closing challenges is idempotent,
 // and ad posting has its own per-server interval.
 
-export type JobKey = "challenges" | "challenge-reminders" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats";
+export type JobKey = "challenges" | "challenge-reminders" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats" | "guild-snapshots";
 
 export type JobResult = { key: JobKey; ok: boolean; summary: string };
 
@@ -31,6 +31,14 @@ export type JobResult = { key: JobKey; ok: boolean; summary: string };
 export type JobCadence = "hourly" | "daily";
 
 export const JOBS: { key: JobKey; label: string; description: string; cadence: JobCadence }[] = [
+  {
+    // B86. Daily cadence for a weekly row, on purpose: `vercel.json` has no
+    // weekly schedule, and a job that writes the same row seven times is safer
+    // than a cadence nobody has ever watched run.
+    key: "guild-snapshots", cadence: "daily",
+    label: "Snapshot every server's week",
+    description: "Records each server's member count and qualified linked members against this week. The server pool scores on how these CHANGE, and none of it was being written down — a week not captured cannot be reconstructed.",
+  },
   {
     key: "challenges", cadence: "hourly",
     label: "End finished challenges",
@@ -94,6 +102,14 @@ export async function runJob(key: JobKey): Promise<JobResult> {
             : r.considered
               ? `Every one of the ${r.considered} server${r.considered === 1 ? "" : "s"} already had today's update.`
               : "No server has the bot with announcements on yet.",
+        };
+      }
+      case "guild-snapshots": {
+        const { captureGuildSnapshots } = await import("@/lib/guild-snapshot");
+        const r = await captureGuildSnapshots();
+        return {
+          key, ok: true,
+          summary: `week of ${r.week}: ${r.written} of ${r.guilds} server${r.guilds === 1 ? "" : "s"} recorded.`,
         };
       }
       case "botlist-stats": {

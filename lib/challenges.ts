@@ -153,7 +153,20 @@ export async function switchChallengeAccount(
 export async function joinChallengeFor(
   userId: string,
   challengeId: string,
-  opts: { linkedAccountId?: string; source?: "web" | "discord"; accessKey?: string | null } = {},
+  opts: {
+    linkedAccountId?: string;
+    source?: "web" | "discord";
+    accessKey?: string | null;
+    /**
+     * WHICH SERVER this join came from. B86.
+     *
+     * Recorded at join time because it cannot be recovered later: guild
+     * membership changes, and deriving it afterwards is what made one entrant
+     * count for every server they belonged to. A web join has no guild and
+     * stores null rather than a guess.
+     */
+    guildId?: string | null;
+  } = {},
 ): Promise<JoinResult> {
   const db = await getDb();
   const [challenge] = await db.select().from(schema.challenges)
@@ -243,6 +256,7 @@ export async function joinChallengeFor(
   await db.insert(schema.challengeParticipants).values({
     id: uid(), challengeId, userId, linkedAccountId: account.id, baseline,
     joinedFrom: opts.source ?? "web",
+    guildId: opts.guildId ?? null,
   }).onConflictDoNothing();
   await awardQuestAction(db, userId, "join_challenge", { refType: "challenge", refId: challengeId });
 
