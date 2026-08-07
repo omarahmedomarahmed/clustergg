@@ -76,7 +76,14 @@ ok("a part key that is not a part is ignored", !("../../etc" in badPart));
 
 console.log("\n== the layout carries the references through its own validator ==");
 // One definition of valid, which is the lesson `parseLayout` already learned.
-const stored = parseLayout(JSON.stringify({ refs: { world: { source: "world.pick", ids: ["a1", "!!"] } } }), "planet");
+// The stamp matters here and it is not ceremony: references live INSIDE the
+// layout JSON, so a layout discarded as stale takes its references with it.
+// Checked against production before shipping the version gate — none of the
+// twelve stored layouts carries a `refs` key at all, because every one of them
+// predates B58. So nothing real is lost. If that ever stops being true, refs
+// have to move out of the layout blob rather than ride on its version.
+const { LAYOUT_VERSION } = await import("../../lib/cards/layout.ts");
+const stored = parseLayout(JSON.stringify({ v: LAYOUT_VERSION, refs: { world: { source: "world.pick", ids: ["a1", "!!"] } } }), "planet");
 eq("a saved reference survives the round trip", stored.refs?.world?.source, "world.pick");
 eq("…cleaned", stored.refs?.world?.ids, ["a1"]);
 eq("…and the parts nobody touched keep their defaults", stored.refs?.boards?.source, "boards.auto");

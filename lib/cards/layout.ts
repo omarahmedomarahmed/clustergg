@@ -141,7 +141,36 @@ export type CardAsset = {
   front?: boolean;
 };
 
+/**
+ * The layout SCHEMA version. Bump it when a redesign changes what the stored
+ * numbers mean.
+ *
+ * WHY THIS EXISTS, because it cost real cards going out to real servers looking
+ * broken: `parseLayout` merges a stored layout over the defaults field by field.
+ * That is correct while the frame is stable, and catastrophic across a redesign
+ * — B56.0 moved the content box, the watermark, the badge and the plate, and
+ * every one of the twelve stored layouts still carried the OLD values. So the
+ * redesign applied only to card kinds nobody had ever tuned, and an admin had
+ * tuned all twelve. The challenge card shipped to fifteen servers with its
+ * content crammed into 59.5% of the width, the gradient bar back on, and the
+ * watermark at 30% opacity in the corner.
+ *
+ * The near miss that should have caught it: `bar` below already carries a
+ * comment saying stored layouts predate the redesign. The staleness was spotted
+ * for ONE field and the obvious next question — what about `content`, `mark`,
+ * `badge`, `plate`? — was never asked.
+ *
+ * A stored layout whose `v` is missing or older is IGNORED, not migrated: the
+ * old numbers describe a frame that no longer exists, so there is nothing in
+ * them worth carrying forward. The row is left alone rather than deleted, so a
+ * previous tuning can still be read out of the database if anybody wants it,
+ * and no production write is needed to recover — this ships by deploying.
+ */
+export const LAYOUT_VERSION = 2;
+
 export type CardLayout = {
+  /** Schema version. See LAYOUT_VERSION. */
+  v?: number;
   /** The astronaut mascot. */
   mascot: Spot;
   /**
@@ -308,6 +337,7 @@ export const AD_LABEL_H = 22;
 //                       it. Off by default; a card that wants a level or a
 //                       trophy row draws it in its own body, where it belongs.
 export const DEFAULT_LAYOUT: CardLayout = {
+  v: LAYOUT_VERSION,
   // OFF by default. The body is free space edge to edge, and a figure standing
   // in it is exactly the thing that stops a card being laid out properly. An
   // admin who wants it on a particular kind can unhide and place it.
@@ -514,16 +544,23 @@ function bgSources(v: unknown): string[] {
 /** Parse whatever is stored into a layout that is always safe to render. */
 export function parseLayout(raw: string | null | undefined, kind?: string): CardLayout {
   const kindPanes = (kind && KIND_PANES[kind]) || { cols: DEFAULT_LAYOUT.bodyCols ?? 1, rows: DEFAULT_LAYOUT.bodyRows ?? 1 };
-  if (!raw) return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows };
+  const fresh = () => ({ ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows });
+  if (!raw) return fresh();
   let o: Record<string, unknown>;
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows };
+    if (!parsed || typeof parsed !== "object") return fresh();
     o = parsed as Record<string, unknown>;
-  } catch { return { ...DEFAULT_LAYOUT, bodyCols: kindPanes.cols, bodyRows: kindPanes.rows }; }
+  } catch { return fresh(); }
+
+  // A layout saved against an older frame is DISCARDED, not merged. See
+  // LAYOUT_VERSION for what this cost. Merging stale geometry is worse than
+  // ignoring it, because the result looks deliberate.
+  if (Number(o.v) !== LAYOUT_VERSION) return fresh();
 
   const c = (o.content ?? {}) as Partial<ContentBox>;
   return {
+    v: LAYOUT_VERSION,
     mascot: spot(o.mascot, DEFAULT_LAYOUT.mascot),
     gameMark: spot(o.gameMark, DEFAULT_LAYOUT.gameMark),
     mark: spot(o.mark, DEFAULT_LAYOUT.mark),

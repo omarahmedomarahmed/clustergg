@@ -412,9 +412,16 @@ console.log("\n== B57: the body is a GRID, and the grid comes from one helper ==
 
   ok("the kinds that need panes declare them", !!KIND_PANES.planet && !!KIND_PANES.profile);
   // A stored layout overrides the kind default like any other field, so an
-  // admin who wants one column on a profile gets one column.
+  // admin who wants one column on a profile gets one column — as long as it
+  // carries the CURRENT version stamp. Without one it is stale geometry from a
+  // frame that no longer exists and is discarded; this fixture had no `v` and
+  // this assertion is what caught that the change was working.
+  const { LAYOUT_VERSION: V } = await import("../../lib/cards/layout.ts");
   eq("an admin's own choice wins",
-    panes(parseLayout(JSON.stringify({ bodyCols: 1, bodyRows: 1 }), "planet")).length, 1);
+    panes(parseLayout(JSON.stringify({ v: V, bodyCols: 1, bodyRows: 1 }), "planet")).length, 1);
+  eq("…but not one saved against the old frame",
+    panes(parseLayout(JSON.stringify({ bodyCols: 1, bodyRows: 1 }), "planet")).length,
+    KIND_PANES.planet.cols * KIND_PANES.planet.rows);
 
   // A pane with nothing in it is NOT drawn. An empty bordered box reads as a
   // broken card rather than as a gamer with nothing there yet.
@@ -528,6 +535,43 @@ if (!renderCardBuffer) {
     try { await renderCardBuffer(data); } catch (e) { threw = (e as Error).message; }
     ok(`"${name}" renders`, !threw, String(threw).slice(0, 140));
   }
+}
+
+console.log("\n== a layout saved against the OLD frame is DISCARDED, not merged ==");
+const { parseLayout, DEFAULT_LAYOUT, KIND_PANES, LAYOUT_VERSION } = await import("../../lib/cards/layout.ts");
+// This is not a hypothetical. Every one of the twelve layouts stored in
+// production was written before B56.0, and `parseLayout` merged them field by
+// field over the new defaults — so the redesign applied only to card kinds
+// nobody had tuned, and an admin had tuned all twelve. The challenge card went
+// out to fifteen servers with its content in 59.5% of the width, the gradient
+// bar back on, and the watermark at 30% opacity in the corner.
+//
+// The string below is the ACTUAL production value for `card.layout.challenge`,
+// pasted verbatim. A fixture I wrote myself could not have caught this, because
+// the bug was in what real stored data looked like versus what I assumed.
+{
+  const REAL_STALE = '{"mascot":{"x":9,"y":84,"size":200,"hidden":true,"flipX":false,"flipY":false,"rotate":0,"opacity":100},"mark":{"x":87,"y":78,"size":300,"hidden":false,"flipX":false,"flipY":false,"rotate":0,"opacity":30},"badge":{"x":87.2,"y":35.9,"size":250,"hidden":false,"flipX":false,"flipY":false,"rotate":0,"opacity":100},"ad":{"x":81.4,"y":16.9,"size":400,"hidden":false,"flipX":false,"flipY":false,"rotate":0,"opacity":100},"content":{"x":4.7,"y":7,"w":59.5,"h":84},"plate":79,"plateRadius":22,"dim":57,"glows":false,"bar":true,"scrim":false,"badgeShow":"auto","parts":{"trophies":{"hidden":false,"scale":1.08,"opacity":100}},"assets":[],"bgSources":["entity.cover"]}';
+  const got = parseLayout(REAL_STALE, "challenge");
+
+  eq("the stale content box is gone", got.content.w, DEFAULT_LAYOUT.content.w);
+  eq("…and its y with it", got.content.y, DEFAULT_LAYOUT.content.y);
+  // The one the owner asked for twice, by name.
+  ok("the gradient bar stays OFF", got.bar !== true, String(got.bar));
+  eq("the watermark is the faint centred one, not the corner blob", got.mark.opacity, DEFAULT_LAYOUT.mark.opacity);
+  ok("the old badge stays hidden", got.badge.hidden === DEFAULT_LAYOUT.badge.hidden);
+  eq("…and the heavy plate is gone", got.plate, DEFAULT_LAYOUT.plate);
+  eq("the kind still gets its own pane grid", [got.bodyCols, got.bodyRows],
+    [KIND_PANES.challenge.cols, KIND_PANES.challenge.rows]);
+
+  // The other half: a CURRENT layout must still be honoured, or the version
+  // check has simply broken the editor instead of the cards.
+  const tuned = JSON.stringify({ ...DEFAULT_LAYOUT, v: LAYOUT_VERSION, content: { x: 10, y: 40, w: 70, h: 50 } });
+  eq("a layout saved at the CURRENT version is still applied", parseLayout(tuned, "challenge").content.w, 70);
+  // …and what the editor writes must survive its own next read. The trap: a
+  // save path that forgets the stamp writes a layout that discards itself.
+  const saved = JSON.stringify({ ...DEFAULT_LAYOUT, content: { x: 10, y: 40, w: 70, h: 50 } });
+  eq("…because DEFAULT_LAYOUT carries the stamp itself", parseLayout(saved, "challenge").content.w, 70);
+  eq("every parse reports the current version", got.v, LAYOUT_VERSION);
 }
 
 console.log(`\n${pass} passed, ${fails.length} failed`);
