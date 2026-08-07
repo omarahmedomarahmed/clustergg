@@ -30,8 +30,29 @@ import * as schema from "@/lib/db/schema";
  * Long enough to notice manufactured growth and to have a human look; short
  * enough that an honest owner is not being punished for succeeding. It applies
  * once, to the first payout only — after that the server has a track record.
+ *
+ * ===== C10: this and "weekly pool" have to be said together =====
+ *
+ * The model pays a WEEKLY pool, and a new server's first week is therefore
+ * earned in week one and paid in week five. Both statements are true and
+ * quoting only the first is how an owner ends up feeling lied to on day eight.
+ *
+ * The hold is not shortened, because the thing it defends against is exactly a
+ * server that manufactured its way to a tier and wants the money before anybody
+ * looks. What changed is the wording: `PAYOUT_HOLD_PHRASE` is the one sentence
+ * every surface uses, so no page can promise "paid weekly" on its own.
  */
 export const PAYOUT_HOLD_DAYS = 30;
+
+/**
+ * The sentence. One copy, used everywhere the pool is described.
+ *
+ * A shared string rather than four hand-written variants: the review found the
+ * contradiction because two pages said different things, and two pages saying
+ * different things is what a constant prevents.
+ */
+export const PAYOUT_HOLD_PHRASE =
+  `Earned weekly, paid after a ${PAYOUT_HOLD_DAYS}-day hold on your first payout — after that, weekly.`;
 
 /**
  * How long a linked member has to have been linked before they count toward a

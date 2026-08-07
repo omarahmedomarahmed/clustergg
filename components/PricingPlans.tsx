@@ -53,6 +53,7 @@ export default function PricingPlans({
   const qPick = useMemo(() => quote(cfg, { games: n, yearly, addon }), [cfg, n, yearly, addon]);
   const qUltimate = useMemo(() => quote(cfg, { games: max, yearly, addon }), [cfg, max, yearly, addon]);
   const isUltimate = n >= max;
+  const base = isUltimate ? cfg.ultimateBase : cfg.challengeBase;
 
   const rate = (q: ReturnType<typeof quote>) => (yearly ? q.yearlyMonthly : q.monthly);
   const impressions = projectedImpressions(cfg, reach, n);
@@ -156,13 +157,23 @@ export default function PricingPlans({
             <Stat n={selectedGamers > 0 ? selectedGamers.toLocaleString() : "—"} label="verified gamers" accent="text-violet-200" />
           </div>
 
+          {/* The working, shown. C11 retired the tier BASES — one package,
+              priced per challenge, placements included — so a zero base is
+              omitted rather than printed as "$0 base", which reads as a fee
+              somebody forgot to fill in. If a base is ever priced back up it
+              reappears here on its own. */}
           <div className="mt-4 rounded-xl bg-black/25 border border-white/10 p-3 text-xs text-muted leading-relaxed">
-            <span className="text-ink font-semibold">{money(isUltimate ? cfg.ultimateBase : cfg.challengeBase, cfg.currency)}</span> base
-            {" + "}<span className="text-ink font-semibold">{money(perGame(cfg), cfg.currency)}</span> × {n} {n === 1 ? "game" : "games"}
-            {addon && <> {" + "}<span className="text-ink font-semibold">{money(cfg.streamAddon, cfg.currency)}</span> broadcast</>}
-            {isUltimate && (
-              <div className="mt-1.5 text-amber-300 inline-flex items-center gap-1.5">
-                <Icon name="crown" size={12} /> All {max} games — your base drops to {money(cfg.ultimateBase, cfg.currency)}.
+            {base > 0 && (
+              <><span className="text-ink font-semibold">{money(base, cfg.currency)}</span> base{" + "}</>
+            )}
+            <span className="text-ink font-semibold">{money(perGame(cfg), cfg.currency)}</span> × {n} {n === 1 ? "game" : "games"}
+            {addon && cfg.streamAddon > 0 && (
+              <> {" + "}<span className="text-ink font-semibold">{money(cfg.streamAddon, cfg.currency)}</span> broadcast</>
+            )}
+            {base === 0 && (
+              <div className="mt-1.5">
+                Placements across the site and every Discord server running the bot are included — there is no
+                separate media fee.
               </div>
             )}
           </div>

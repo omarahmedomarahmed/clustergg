@@ -70,7 +70,7 @@ export default async function BrandsPage({
               <Link href="/servers" className="ghost-btn pressable rounded-full px-4 py-2 text-sm">The communities</Link>
             </div>
             <p className="text-xs text-muted mt-4">
-              Everything from {money(cfg.reachBase, cfg.currency)}/month to {money(full.monthly, cfg.currency)}/month
+              Everything from {money(cfg.challengePrice, cfg.currency)} for one challenge to {money(full.monthly, cfg.currency)}/month
               for the whole network. Or email{" "}
               <a href={`mailto:${copy["pricing.contact.email"]}`} className="text-cyan-300 hover:underline">
                 {copy["pricing.contact.email"]}

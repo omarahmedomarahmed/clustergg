@@ -92,13 +92,23 @@ ok("every challenge line still quotes list price",
   JSON.stringify(challengeLines.map((l) => l.unitAmount)));
 eq("…and 100% covers exactly the challenge lines", Math.abs(promo!.unitAmount), round2(gross));
 
-console.log("\n== placements are STILL billed ==");
-// The offer is a promotion on the thing we want brands to try, not a month of
-// free everything.
+console.log("\n== what a 100% campaign can and cannot reach ==");
+// INVERTED BY C11, not deleted.
+//
+// This used to assert that the placements BASE kept the bill above zero — "the
+// offer is a promotion on the thing we want brands to try, not a month of free
+// everything". The base is retired: v2 sells one package, priced per challenge,
+// with placements included. So a 100% campaign on a single-game month now DOES
+// produce a $0 invoice, and that is correct rather than a leak.
+//
+// The property that still matters, and that the base was only ever a proxy for:
+// the campaign cannot reach past the challenge lines. It cannot go negative, it
+// cannot discount something that was not bought, and the invoice still exists.
 const base = full.find((l) => l.kind === "base");
-eq("the placements base is on the bill", base?.unitAmount, cfg.reachBase);
+ok("no placements base is billed — placements come with the package", !base);
 const total100 = totalsOf(full).total;
-ok("…so the total is not zero even at 100%", total100 > 0, String(total100));
+ok("a full campaign can take the bill to zero, and no further", total100 >= 0, String(total100));
+ok("…and the invoice still exists as a record of what ran", full.length > 0);
 // The bill also carries the SPONSORED-PLAN base reduction, which is a separate,
 // pre-existing discount — so the total is below list, and comparing it to
 // `reachBase` would be comparing it to a price this bill never had. What the

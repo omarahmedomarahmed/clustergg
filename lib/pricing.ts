@@ -63,15 +63,27 @@ export type PricingConfig = {
   prize1: number;
   prize2: number;
   prize3: number;
-  /** Monthly base for placements only. */
+  /**
+   * THE THREE TIER BASES AND THE ADD-ON ARE RETIRED. C11.
+   *
+   * They priced a three-shape rate card — placements only, placements plus
+   * challenges, the whole network — with a paid Sunday-broadcast add-on on top.
+   * `docs/COMMERCIAL_MODEL_V2.md` merged all of it into ONE package priced per
+   * challenge, with placements included free, and that is the offer the money
+   * paths, the vault split and the brand builder now run on.
+   *
+   * They default to 0 rather than being deleted: they are read in a dozen
+   * places across the marketing pages and the invoice builder, and the full
+   * page rewrite is a later item. Zero is the honest value — a base nobody is
+   * charged — and a zero base is skipped rather than printed, so no page says
+   * "$0/month". When the pages are rewritten these fields go with them.
+   */
   reachBase: number;
-  /** Monthly base once at least one game is sponsored. */
   challengeBase: number;
-  /** Monthly base when every game is sponsored. */
   ultimateBase: number;
   /** Paid annually, this much comes off. */
   yearlyDiscountPct: number;
-  /** The Sunday broadcast sponsorship, addable to any plan. */
+  /** Retired with the bases — the broadcast comes with the package now. */
   streamAddon: number;
   /** Video slots included at the top tier. */
   slotCount: number;
@@ -146,11 +158,12 @@ export const PRICING_DEFAULTS: PricingConfig = derivePrizes({
   prize1: 0,
   prize2: 0,
   prize3: 0,
-  reachBase: 600,
-  challengeBase: 500,
-  ultimateBase: 400,
+  // C11 — retired, see the type above. One package, priced per challenge.
+  reachBase: 0,
+  challengeBase: 0,
+  ultimateBase: 0,
   yearlyDiscountPct: 20,
-  streamAddon: 400,
+  streamAddon: 0,
   slotCount: 2,
   slotSeconds: 5,
   impressionsPerMember: 12,

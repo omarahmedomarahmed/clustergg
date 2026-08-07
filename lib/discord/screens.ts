@@ -16,6 +16,7 @@ import { hqInviteUrl } from "@/lib/discord/hq";
 import { nextEarnTier } from "@/lib/server-earnings";
 import { DEFAULT_SPLIT } from "@/lib/vaults";
 import { PARTICIPATION_SHARE } from "@/lib/server-score";
+import { PAYOUT_HOLD_PHRASE } from "@/lib/abuse";
 import { PROFILE_FIELDS, REGIONS, VIBES, completeness, getProfile, regionLabel, vibeLabel } from "@/lib/discord/community";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
@@ -1439,7 +1440,7 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   const next = nextEarnTier(stats.linked);
   const rate = `**${DEFAULT_SPLIT.server}%** of every sponsored challenge goes into the weekly server pool. `
     + `**${PARTICIPATION_SHARE}%** of it is split evenly between every server that carried a challenge that week; `
-    + "the rest is competed for.";
+    + `the rest is competed for. ${PAYOUT_HOLD_PHRASE}`;
   const upgrade = next
     ? `**${(next.threshold - stats.linked).toLocaleString()} more** moves you into the next tier — a different set of servers to compete against, not a different rate.`
     : "You are in the top tier, competing for the largest slots in the pool.";

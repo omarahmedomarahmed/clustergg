@@ -243,29 +243,32 @@ idempotent on re-run.
 
 ---
 
-### ▸ B87 — The model's four blockers
+### ▸ B87 — The model's blockers · **SHIPPED**
 
-`docs/COMMERCIAL_MODEL_V2.md` §0 lists what the model describes and the code
-cannot do. **C4 and C5 are B86.** These are the other two, plus the cleanup.
+`docs/COMMERCIAL_MODEL_V2.md` §0 listed sixteen things the model described and
+the code could not do. C4 and C5 were B86. All sixteen are closed.
 
-| # | Fix |
-|---|---|
-| **C1** | The daily CP number is delivered by setting `dailyCpCeiling` and scaling **mission-eligible weights only**. Never a mission-completion bonus — `missions.ts:7-9` says why. |
-| **C2** | `prizePool` becomes a **percentage**. It is $175 hard-coded today and the split is derived *from* it, so moving the price silently changes the prize share. |
-| **C3** | Delete the `ownerPctFor` payout path in **all four** places, including the public `/servers` ladder promising "25% of every sponsored challenge". |
-| **C6** | `SLOTS_PER_CAMPAIGN` floor of 4 → allow 1–4. |
-| **C7** | A campaign is one game × 4 weeks. Give mixed-game packages a row shape. |
-| **C8** | `sponsorsUseHouseInventory: true` double-counts $175 per challenge against the new prize funding. Resolve. |
-| **C9** | `cp-rate.ts` justifies the CP rate on ad revenue that is now $0. Restate: **CP is 15% cost of goods.** |
-| **C10** | `PAYOUT_HOLD_DAYS = 30` vs "weekly pool" — say "earned weekly, paid after the hold", or change the hold. |
-| **C11** | `reachBase`/`challengeBase`/`ultimateBase`/`streamAddon` still price the live `/pricing` page. |
-| **C12** | Define "expected active gamers". It is the denominator of everyone's pay and it does not exist. |
-| **C13** | **A fourth vault: prizes.** 50% of every dollar has no vault, no ledger and no liability tracking. |
-| **C14** | Under-18s cannot redeem, so **"50% to gamers" is partly breakage.** Report it as its own line; never bank it. |
-| **C15** | Reconcile awarded trophy value against the prize pool. Nothing checks it. |
-| **C16** | **No weekly cron exists.** Everything weekly has no scheduler. Run it off the daily job behind a day-of-week check. |
+| # | What it was | What was done |
+|---|---|---|
+| **C1** | No CP dial — a mission awards no CP of its own | `lib/cp-dial.ts`. Sets the ceiling and scales **mission-eligible weights only**, uniformly, so the 125-per-quest invariant holds. Never a completion bonus. |
+| **C2** | `prizePool: 175` fixed, the % derived from it | `prizePct` is the source; the pool and the 4:2:1 podium derive from it. Price is a dial again. |
+| **C3** | `ownerPctFor` in four places, incl. the public "25%" promise | Deleted, not zeroed. Owners are paid by the weekly pool. B47's gate moved to `week-close` with it. |
+| **C6** | `Math.max(4, slots)` — 1–3 challenges inexpressible | 1–4, four the default. Explicit 0 clamps to 1, not back to 4. |
+| **C7** | One game × 4 weeks; no mixed shape | The game lives on the slot. No backfill — a slot with none reads as the lead game. |
+| **C8** | Prize funded twice | House funds only unsold challenges. The switch is gone, not re-defaulted. |
+| **C9** | CP rate justified on ad revenue that is now $0 | Restated as cost of goods: 15% of every sale, 1,050 gamer-days per $350 challenge. |
+| **C10** | 30-day hold vs "weekly pool" | `PAYOUT_HOLD_PHRASE` — one sentence, used on every surface. |
+| **C11** | Three tier bases + paid add-on still priced /pricing | Retired to 0, zero-value lines omitted rather than printed. |
+| **C12** | "Expected active gamers" undefined | `lib/active-gamers.ts`. Credited CP that day — narrow on purpose. Measured figure prints beside the calculator's slider. |
+| **C13** | Prizes are 50% and had no vault | `allocateInvoice` on PAID, `commitPrizes` at award. Idempotent against the ledger; reverses, never deletes. |
+| **C14** | "50% to gamers" is partly breakage | `lib/breakage.ts`. Measured and reported; **never banked**. No expiry invented. |
+| **C15** | Nothing reconciled pool to podium | `reconcilePrizes`, written into the ledger row's reason. |
+| **C16** | The model is weekly; no weekly cron | `lib/week-close.ts` on the daily job behind a day check. Payouts are drafts. |
 
----
+**Owner actions still outstanding** (not code): branch protection on the Money
+integrity checks; the Discord Developer Policy read; a FinCEN/state CVC opinion
+that also covers the 16 line, whether we are "directed to children", and whether
+an unredeemed trophy may ever expire.
 
 ### ▸ B72 — Stop the bleeding *(4 items remain)*
 

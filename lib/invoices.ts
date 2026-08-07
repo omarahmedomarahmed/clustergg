@@ -239,12 +239,18 @@ export function draftLines(opts: {
   // reduction takes it off twice, which is a $100 hole per invoice per month
   // that reconciles against nothing. The rule: one line states the price, one
   // line states the discount, and the total is what `quote()` says.
-  out.push({
-    kind: "base",
-    label: "Placements — clustergg.com and every Discord server on the network",
-    quantity: 1,
-    unitAmount: cfg.reachBase,
-  });
+  // C11: the placements base is retired — placements come with the package.
+  // A $0 line is not "free, stated"; it is a row that makes an invoice look
+  // padded and invites a question with no good answer. Included only if
+  // somebody has priced it back up.
+  if (cfg.reachBase > 0) {
+    out.push({
+      kind: "base",
+      label: "Placements — clustergg.com and every Discord server on the network",
+      quantity: 1,
+      unitAmount: cfg.reachBase,
+    });
+  }
 
   if (opts.games > 0) {
     const names = opts.gameNames ?? [];
@@ -273,7 +279,9 @@ export function draftLines(opts: {
     }
   }
 
-  if (opts.addon) {
+  // Retired with the bases (C11) — the broadcast comes with the package. Kept
+  // behind the same "only if priced" guard so a deliberate re-pricing works.
+  if (opts.addon && cfg.streamAddon > 0) {
     out.push({ kind: "addon", label: "Sunday Broadcast — presenting sponsor", quantity: 1, unitAmount: cfg.streamAddon });
   }
 

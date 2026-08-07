@@ -25,7 +25,7 @@ const near = (name: string, got: number, want: number, tol = 0.011) =>
 
 const {
   PRICING_DEFAULTS, buildPricing, derivePrizes, prizeSharePct,
-  marginPerChallenge, PRICING_NUMBER_KEYS,
+  marginPerChallenge, PRICING_NUMBER_KEYS, quote: quoteOf,
 } = await import("../../lib/pricing.ts");
 const { DEFAULT_SPLIT, SPLIT_PRESETS, VAULTS, splitProblems, allocate } =
   await import("../../lib/vaults.ts");
@@ -285,6 +285,131 @@ console.log("\n== C15: a challenge is checked against what it promised ==");
   ok("a dollar of slack is allowed",
     reconcilePrizes({ promised: 166.5, awarded: 166 }).verdict === "matches");
   ok("…but not two", reconcilePrizes({ promised: 166.5, awarded: 164 }).verdict === "under");
+}
+
+console.log("\n== C1: the CP dial, delivered the one safe way ==");
+{
+  const { planCpDial, missionEligibleActions, affordableCeiling } = await import("../../lib/cp-dial.ts");
+  const { ACTION_CATALOG } = await import("../../lib/quests.ts");
+
+  const eligible = new Set(missionEligibleActions());
+  ok("the eligible set is read from the mission templates", eligible.size > 0);
+  // The actions a mission never asks for keep their price. They are paid for
+  // being rare, and scaling them would make a milestone cheaper on a quiet
+  // month.
+  const oneOffs = ACTION_CATALOG.filter((a) => !eligible.has(a.key) && a.defaultWeight > 0);
+  const plan = planCpDial(250);
+  ok("halving the ceiling rescales mission actions", Object.keys(plan.weights).length > 0);
+  ok("…and touches no one-off action",
+    oneOffs.every((a) => !(a.key in plan.weights)), Object.keys(plan.weights).join(","));
+  ok("…and names the ones it left alone", plan.untouched.length === oneOffs.length);
+  ok("the ceiling is the number asked for", plan.ceiling === 250);
+  // The table should be able to REACH the ceiling without wildly overshooting:
+  // a table paying 4x the ceiling means prices stop meaning anything.
+  // The MISSION lands on the ceiling — that is the number a gamer is shown and
+  // chases. The whole table can still pay more, because nobody maxes every
+  // action every day and the ceiling is what bounds the worst case.
+  ok("…and a mission is worth exactly it",
+    Math.abs(plan.missionTotal - 250) <= 12, String(plan.missionTotal));
+  ok("…while the table can still pay more than one mission",
+    plan.eligibleCapSum >= plan.missionTotal, `${plan.eligibleCapSum} vs ${plan.missionTotal}`);
+
+  // Nothing is scaled to zero. A retired action still listed in a mission is a
+  // task worth nothing that a gamer is being asked to do.
+  const tiny = planCpDial(1);
+  ok("no mission action is scaled out of existence",
+    Object.values(tiny.weights).every((w) => w >= 1), JSON.stringify(tiny.weights));
+
+  const same = planCpDial(500);
+  ok("asking for what is already set moves nothing", Object.keys(same.weights).length === 0, JSON.stringify(same.weights));
+  ok("a zero ceiling says plainly that nothing earns", /nothing earns/.test(planCpDial(0).note));
+
+  // The other direction: what the vault can afford.
+  ok("the affordable ceiling divides the vault by gamers and days",
+    affordableCeiling({ vaultDollars: 52.5, cpPerDollar: 10000, dailyActiveGamers: 100, days: 7 }) === 750);
+  ok("…and is null when nobody is measured",
+    affordableCeiling({ vaultDollars: 52.5, cpPerDollar: 10000, dailyActiveGamers: 0, days: 7 }) === null);
+
+  // The mechanism the model rejected, asserted as still rejected.
+  const { readFileSync } = await import("node:fs");
+  const missions = readFileSync(new URL("../../lib/missions.ts", import.meta.url), "utf8");
+  ok("a mission still awards no CP of its own",
+    /a mission awards no CP[\s\S]{0,12}of its own/i.test(missions));
+}
+
+console.log("\n== C10: weekly and the hold are one sentence ==");
+{
+  const { PAYOUT_HOLD_DAYS, PAYOUT_HOLD_PHRASE } = await import("../../lib/abuse.ts");
+  const { readFileSync } = await import("node:fs");
+  const raw = (f: string) => readFileSync(new URL(`../../${f}`, import.meta.url), "utf8");
+
+  ok("the phrase names the hold", PAYOUT_HOLD_PHRASE.includes(String(PAYOUT_HOLD_DAYS)));
+  ok("…and the word weekly", /weekly/i.test(PAYOUT_HOLD_PHRASE));
+  // One constant, not four hand-written variants — the contradiction was found
+  // because two pages said different things.
+  for (const f of ["components/ServerPortal.tsx", "lib/discord/screens.ts", "app/admin/growth-review/page.tsx"]) {
+    ok(`${f} uses the shared sentence`, /PAYOUT_HOLD_PHRASE/.test(raw(f)));
+  }
+}
+
+console.log("\n== C11: the three-tier rate card is retired ==");
+{
+  ok("no placements base is charged", PRICING_DEFAULTS.reachBase === 0);
+  ok("…nor a challenge-tier base", PRICING_DEFAULTS.challengeBase === 0);
+  ok("…nor an ultimate base", PRICING_DEFAULTS.ultimateBase === 0);
+  ok("…and the broadcast comes with the package", PRICING_DEFAULTS.streamAddon === 0);
+
+  // A $0 line is not "free, stated" — it is a row that makes an invoice look
+  // padded. It must be omitted, and must come back if somebody prices it up.
+  const { draftLines } = await import("../../lib/invoices.ts");
+  const free = draftLines({ games: 1, gameNames: ["Chess"], addon: true, cfg: PRICING_DEFAULTS });
+  ok("no zero-value base line is drafted", !free.some((l) => l.kind === "base"));
+  ok("…and no zero-value add-on line", !free.some((l) => l.kind === "addon"));
+  ok("the challenges themselves are still billed", free.some((l) => l.kind === "game"));
+  const priced = draftLines({ games: 1, addon: true, cfg: { ...PRICING_DEFAULTS, reachBase: 600, streamAddon: 400 } });
+  ok("pricing a base back up brings its line back", priced.some((l) => l.kind === "base"));
+  ok("…and the add-on too", priced.some((l) => l.kind === "addon"));
+
+  // The package itself still prices: one to four challenges on a game.
+  const q = quoteOf(PRICING_DEFAULTS, { games: 1 });
+  ok("a one-game month is challenges only",
+    q.monthly === PRICING_DEFAULTS.challengePrice * PRICING_DEFAULTS.challengesPerGame, String(q.monthly));
+}
+
+console.log("\n== C14: breakage is measured, never banked ==");
+{
+  const { measureBreakage, reachedGamersPct, CANNOT_REDEEM } = await import("../../lib/breakage.ts");
+  const { getDb } = await import("../../lib/db/index.ts");
+
+  // Under a 16 floor and an 18 redeem age, teens hold value they cannot collect.
+  ok("under-16 cannot redeem", CANNOT_REDEEM.includes("under16"));
+  ok("…and neither can 16-17", CANNOT_REDEEM.includes("teen"));
+  ok("…but an adult can", !CANNOT_REDEEM.includes("adult"));
+
+  const b = await measureBreakage(await getDb());
+  ok("it runs against a real database", Number.isFinite(b.awarded));
+  ok("outstanding is awarded minus redeemed",
+    Math.abs(b.outstanding - Math.max(0, b.awarded - b.redeemed)) < 0.02, JSON.stringify(b));
+  ok("…and never exceeds what was awarded", b.outstanding <= b.awarded + 0.01);
+  ok("the un-collectable share is part of outstanding, not on top",
+    b.heldByUnderAge <= b.outstanding + 0.01);
+
+  // The honest version of the headline. Null rather than a comfortable number
+  // when nothing has been awarded.
+  ok("the reached-gamers rate is null before anything is awarded",
+    reachedGamersPct({ ...b, awarded: 0 }, 50) === null);
+  ok("…and is the promised share scaled by what was actually collected",
+    reachedGamersPct({ ...b, awarded: 100, redeemed: 50 }, 50) === 25);
+
+  // The rule the module exists to enforce.
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../lib/breakage.ts", import.meta.url), "utf8");
+  ok("the file states that breakage is never banked", /never banked/i.test(src));
+  ok("…and refuses to invent an expiry", /does not today/i.test(src));
+  // Nothing may sweep the prize vault into revenue.
+  const vaults = readFileSync(new URL("../../lib/vaults.ts", import.meta.url), "utf8");
+  ok("no code sweeps prizes into the Cluster vault",
+    !/from: "prize"[\s\S]{0,80}to: "cluster"/.test(vaults));
 }
 
 console.log(`\n${pass} passed, ${fails.length} failed`);

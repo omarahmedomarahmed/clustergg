@@ -1,5 +1,6 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
+import { PAYOUT_HOLD_PHRASE } from "@/lib/abuse";
 
 // Panels for the server-owner portal. Server components — nothing here needs
 // interactivity, and keeping them server-rendered means the owner's numbers
@@ -386,6 +387,10 @@ export function EarningsPanel({
             Paid to you out of the pool every sponsored challenge funds — a flat share for every week you
             carried one, plus what you placed for. <b className="text-ink">This is yours</b>.
           </p>
+          {/* C10: the pool is weekly and the first payout holds for 30 days.
+              Saying only the first is how an owner feels lied to on day eight,
+              so the two are one sentence from one constant. */}
+          <p className="mt-1 text-[11px] text-muted">{PAYOUT_HOLD_PHRASE}</p>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center">
             <Money label="Paid to you" value={usd(paidOut)} />
             <Money label="In flight" value={usd(inFlight)} />
