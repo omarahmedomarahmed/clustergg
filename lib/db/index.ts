@@ -2,7 +2,19 @@ import { sql as dsql } from "drizzle-orm";
 import * as schema from "./schema";
 
 export type DB = ReturnType<typeof import("drizzle-orm/neon-http").drizzle<typeof schema>> |
+  ReturnType<typeof import("drizzle-orm/node-postgres").drizzle<typeof schema>> |
   ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>;
+
+/**
+ * Is this connection string a Neon one?
+ *
+ * Neon's HTTP driver only speaks to Neon. An ordinary Postgres — a CI service
+ * container, a local database, a self-hosted deployment — needs node-postgres.
+ * Deciding by host rather than by an env flag means nobody has to remember to
+ * set the flag, and the wrong answer is a connection error at boot rather than
+ * a subtly different driver at runtime.
+ */
+export const isNeonUrl = (url: string) => /\bneon\.(tech|build)\b/.test(url);
 
 declare global {
   // eslint-disable-next-line no-var
@@ -907,6 +919,24 @@ async function ensureProvisioned(db: DB) {
 }
 
 async function createDb(): Promise<DB> {
+  // An ordinary Postgres. This branch exists because of a due-diligence
+  // finding: `tests/db/concurrency.mts` proved the LOGIC of the row lock but
+  // could never exercise the lock itself, since PGlite is a single in-process
+  // connection and serialises everything for free. Gate 2 was green without
+  // ever having run the failure mode it defends against.
+  //
+  // With this branch, CI stands up a real Postgres service and the same suites
+  // run across real, separate connections — which is the only way `FOR UPDATE`
+  // is actually tested. It is also what a self-hosted deployment needs.
+  if (process.env.DATABASE_URL && !isNeonUrl(process.env.DATABASE_URL)) {
+    const { Pool } = await import("pg");
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    const { perfLogger, perfEnabled } = await import("./perf");
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+    const db = drizzle(pool, { schema, ...(perfEnabled() ? { logger: perfLogger } : {}) }) as DB;
+    await ensureProvisioned(db);
+    return db;
+  }
   if (process.env.DATABASE_URL) {
     const { neon } = await import("@neondatabase/serverless");
     const { drizzle } = await import("drizzle-orm/neon-http");

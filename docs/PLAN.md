@@ -59,7 +59,65 @@ and until this week nothing had moved in code.**
 | Commit | What |
 |---|---|
 | `3a776c0` | `AUTH_SECRET` fails closed outside a demo runtime — the public fallback in `lib/auth.ts` and `middleware.ts` is gone, and a deploy that pastes the old placeholder is refused too. Self-serve creative uploads insert `pending_review` instead of `approved`, so both portal paths now go through the review queue `app/actions/admin.ts:826` already used. `getCardCampaign`'s `live` flag now checks creative approval, which it claimed to and did not; the portal shows **In review** rather than telling a brand "You're live" while nothing serves. New: `tests/db/integrity.mts`. |
-| *(this change)* | **B74, money integrity.** `lib/db/tx.ts` opens a pooled `neon-serverless` connection — the only place on the platform where a transaction is possible, because `neon-http` cannot open one. The CP ceiling, `buyTrophy` and `requestRedeem` now run inside a transaction behind `SELECT … FOR UPDATE` on the gamer's row. The bare `catch {}` around the award path is gone. New: `tests/db/concurrency.mts` (25 assertions) and `.github/workflows/ci.yml` — **the first gate on this project that is a control and not a sentence.** |
+| `a6972d3` | **B74, money integrity.** `lib/db/tx.ts` opens a pooled `neon-serverless` connection — the only place on the platform where a transaction is possible, because `neon-http` cannot open one. The CP ceiling, `buyTrophy` and `requestRedeem` now run inside a transaction behind `SELECT … FOR UPDATE` on the gamer's row. The bare `catch {}` around the award path is gone. New: `tests/db/concurrency.mts` (25 assertions) and `.github/workflows/ci.yml` — **the first gate on this project that is a control and not a sentence.** |
+
+### Round 2 — what the reviewer found in the shipped code
+
+The addendum in `docs/DD_RESPONSE_REVIEW.md` verified B74 as correct (it read the
+lock ordering in all three paths, which is the part that is easy to get wrong)
+and then found three things. **All three were right. All three are now fixed.**
+
+| Finding | Our check | Fix |
+|---|---|---|
+| **The concurrency suite could not reproduce the race it defends against.** PGlite is one in-process connection, so `Promise.all` is serialised for free — Gate 2 was green without ever running the production failure mode. | Confirmed. | `lib/db/index.ts` and `lib/db/tx.ts` now select **node-postgres** for any non-Neon `DATABASE_URL`, so the whole app runs against an ordinary Postgres. CI stands one up as a service and runs the suite **twice** — once on PGlite for the logic, once against real pooled connections where the lock is genuinely contended. |
+| **The money paths depend on a global `WebSocket` with nothing pinning the runtime.** On Node 20 every money path throws — loudly on a purchase, into the logs only on a CP award, which is a silent platform-wide stop to earning. **A defect our own fix introduced.** | Confirmed: no `engines`, no `.nvmrc`, no runtime in `vercel.json`. | `engines.node >= 22`, `.nvmrc`, **and** a `ws` fallback that sets `neonConfig.webSocketConstructor` — because a pin is a project setting somebody can override. Asserted in `tests/db/integrity.mts`. |
+| **Gate 2 reports but does not block** — no branch protection. | Confirmed, and we had already conceded it. | **Still open. It is a repository setting, not a commit.** |
+
+**We proved the first fix rather than asserting it.** With `FOR UPDATE` removed
+from `lockGamer` and the suite run against real Postgres:
+
+```
+FAIL 100 parallel awards stay within the per-action cap — earned 31
+FAIL four simultaneous claims on one trophy produce one — got 3, want 1
+FAIL …and one payout row exists — got 3, want 1
+```
+
+Three simultaneous claims on one trophy all succeeding is **one trophy paid out
+three times, in dollars.** That is the failure mode the reviewer said had never
+been run. It runs now, and it fails when the lock is gone.
+
+**One honest limit:** the five-way `buyTrophy` race did *not* fail in that
+control run, so the purchase assertion is not yet demonstrated to exercise real
+contention. Recorded in the test file rather than counted as proven.
+
+**A finding of our own, from fixing theirs.** Adding node-postgres broke the
+production build in the way `tsc` never catches — §0's oldest trap. Next traces
+the module graph across the client boundary **even for a dynamic
+`await import()`**, so `pg` (and with it `fs`, `net`, `dns`, `tls`) started being
+resolved for the *browser* bundle through three separate legitimate chains:
+`CpCalculator` → `cp-economics` → `marketplace` → `tx` → `pg`, `VerifyAccount` →
+`account-ownership` → `db/index` → `pg`, and `CpCalculator` → `cp-economics` →
+`quests` → `tx` → `pg`. Type-checking stayed green throughout; only the build
+said anything.
+
+Two fixes, and the order matters. First the real one: `DEFAULT_CP_PER_DOLLAR`
+now lives in `lib/cp-rate.ts`, which imports nothing — **a calculator needed one
+number and could only reach it through the database layer.** Then the
+configuration one: `pg` is aliased out of the client bundle in `next.config.ts`.
+Worth writing down that `resolve.fallback` did **not** work and cost a build to
+learn — it only fires for a request webpack cannot resolve, and `pg` resolves
+perfectly well. `resolve.alias` is what actually replaces it.
+
+**The smell we did not chase:** `lib/cp-economics.ts` still imports
+`lib/quests.ts`, so a client calculator still pulls the whole quest engine to
+read `ACTION_CATALOG`. The alias makes it harmless; it is still the wrong shape,
+and the honest reason we left it is that it is a 15-importer refactor and the
+build was red.
+
+**One correction to the addendum, minor:** it says `npm test` excludes
+`concurrency.mts` and `integrity.mts`. `tests/run-all.mjs` globs `tests/db/*.mts`,
+so both are included — `integrity.mts` appears by name in the run output. A
+developer running the suite locally does exercise the gate.
 
 ### Corrected, not shipped
 
@@ -134,6 +192,13 @@ Neither is an engineering task and neither is ours to answer.
   a human review of exactly this.
 - **Is paying cash for engagement regulated?** FinCEN CVC administrator status,
   state money-transmitter licensing, sanctions screening, 1099 thresholds.
+
+**Not started. Nothing here has moved, and it is the whole ballgame.** The
+reviewer's fair shot: our own plan said "B74 through B79 do not start before this
+answer", and B74 started and shipped. Our defensible reading is that money
+integrity is worth doing whatever Discord says — but the first thing we built
+crossed our own most important gate, and that is worth naming rather than
+explaining away.
 
 **Gate 1.** If Discord says no, the ad business inside Discord ends and the
 company is the sponsored-challenge business only. Everything downstream is
@@ -309,9 +374,9 @@ observable rather than asserted.
 
 | Gate | What it blocks | Enforced by | Real? |
 |---|---|---|---|
-| **0** | Everything, until the six Phase-0 defects are fixed | `tests/db/integrity.mts` in CI — covers 2 of 6 today | **Partly** |
+| **0** | Everything, until the six Phase-0 defects are fixed | `tests/db/integrity.mts` in CI — covers 2 of 6 today, **and the two least severe** | **1/3** — the reviewer's score, and it is the right one |
 | **1** | All of B74–B79, until Discord and FinCEN answer | Nothing. Needs a committed, dated written opinion | **No** |
-| **2** | Any CP feature, until the ceiling holds under parallel writes | `tests/db/concurrency.mts`, named step in CI | **Yes** — pending branch protection |
+| **2** | Any CP feature, until the ceiling holds under parallel writes | `tests/db/concurrency.mts`, two named CI steps — PGlite **and** a real Postgres service with pooled connections | **Yes on evidence** — the lock is now empirically contended and the suite fails without it. **Still not a blocking check:** branch protection is unapplied. |
 | **4** | B66, B67, B69, until one signed IO | Nothing, **and two of the three already shipped** | **No** |
 
 ---

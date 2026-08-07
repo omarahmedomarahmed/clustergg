@@ -26,6 +26,28 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 25
+
+    # A REAL Postgres, with real separate connections.
+    #
+    # This service exists because of a due-diligence finding: the concurrency
+    # suite ran only on PGlite, which is one in-process connection and therefore
+    # serialises every writer for free. Gate 2 was green without ever having run
+    # the failure mode it defends against. Against this service the lock is
+    # genuinely contended — with `FOR UPDATE` removed, the suite fails.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: clustertest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v4
 
@@ -58,8 +80,17 @@ jobs:
       #
       # If this step is failing, the daily CP ceiling, the trophy purchase or
       # the cash redemption is racing. None of those may be merged around.
-      - name: Money integrity (Gate 2)
+      #
+      # Run TWICE, and the second run is the one that means something: once on
+      # PGlite for the logic, once against the Postgres service above where the
+      # row lock is actually contended across connections.
+      - name: Money integrity — logic (Gate 2)
         run: DEMO_DB=1 npx tsx tests/db/concurrency.mts
+
+      - name: Money integrity — real Postgres, real lock (Gate 2)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clustertest
+        run: npx tsx tests/db/concurrency.mts
 
       - name: Phase-0 integrity
         run: DEMO_DB=1 npx tsx tests/db/integrity.mts

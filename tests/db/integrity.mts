@@ -93,6 +93,43 @@ console.log("\n== a self-serve creative does NOT go live on upload ==");
     /reviewStatus === "approved"/.test(code("lib/brands.ts")));
 }
 
+console.log("\n== the money paths cannot be broken by a runtime downgrade ==");
+// Round-2 finding, and it was a defect the FIX introduced: the pooled driver
+// needs a WebSocket, Node 20 has none, and every money path would have thrown —
+// loudly on a purchase, and into the logs only on a CP award, which is a silent
+// stop to all earning. One project-settings click away.
+{
+  const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+  ok("package.json pins a Node that has a global WebSocket",
+    /(>=|\^)?2[2-9]/.test(String(pkg.engines?.node ?? "")), JSON.stringify(pkg.engines));
+  ok("…and .nvmrc agrees", /^2[2-9]/.test(src(".nvmrc").trim()), src(".nvmrc").trim());
+  // Belt and braces: the pin states intent, the polyfill survives someone
+  // overriding it.
+  ok("…and the driver polyfills rather than throwing if it is overridden",
+    /webSocketConstructor/.test(code("lib/db/tx.ts")));
+  ok("ws is a real dependency, not an optional import that resolves to nothing",
+    typeof pkg.dependencies?.ws === "string", JSON.stringify(pkg.dependencies?.ws));
+  // The finding under the finding: the suite could not exercise the lock at all.
+  ok("an ordinary Postgres is a supported driver, so the lock can be tested",
+    /node-postgres/.test(code("lib/db/index.ts")) && /node-postgres/.test(code("lib/db/tx.ts")));
+  ok("…and CI runs the concurrency suite against one",
+    /DATABASE_URL: postgresql/.test(src(".github/workflows/ci.yml")));
+}
+
+console.log("\n== the database driver stays out of the browser bundle ==");
+// Caught by a BUILD, not by tsc, and it is §0's oldest trap: Next traces the
+// module graph across the client boundary even for a dynamic `await import()`.
+// Adding node-postgres put `fs`, `net` and `dns` on a path to the browser —
+// `components/CpCalculator.tsx` → `lib/cp-economics.ts` → `lib/marketplace.ts`
+// → `lib/db/tx.ts` → `pg` — and the whole chain existed for ONE constant.
+{
+  const econ = code("lib/cp-economics.ts");
+  ok("cp-economics does not reach the marketplace", !/from "@\/lib\/marketplace"/.test(econ), econ.match(/from "@\/lib\/[a-z-]+"/g)?.join(",") ?? "");
+  ok("…it takes the rate from the pure module", /from "@\/lib\/cp-rate"/.test(econ));
+  const rate = code("lib/cp-rate.ts");
+  ok("…and that module imports NOTHING", !/^\s*import\s/m.test(rate), rate.match(/^\s*import.*/m)?.[0] ?? "");
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);
