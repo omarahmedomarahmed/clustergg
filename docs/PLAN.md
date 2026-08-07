@@ -45,14 +45,20 @@ ROAS you killed.
 
 ## 1. Where we are
 
-### Merged to `main` and live
+### Shipped — and note WHERE, because we got this wrong
+
+The reviewer caught this and was right: an earlier version of this table said
+"merged to `main` and live" for commits that are **branch-only**. `main` is
+`468f71e` and contains only `3a776c0` and `a6972d3`. Everything below marked
+*branch* is green in branch CI and **not in production**.
 
 | Commit | What |
 |---|---|
 | `3a776c0` | `AUTH_SECRET` fails closed. Self-serve creatives insert `pending_review`. `getCardCampaign.live` now checks creative approval — the portal shows **In review** instead of "You're live" while nothing serves. |
 | `a6972d3` | **Money integrity.** `lib/db/tx.ts` opens a pooled connection — the only place a transaction is possible, since `neon-http` cannot open one. The CP ceiling, `buyTrophy` and `requestRedeem` run in a transaction behind `SELECT … FOR UPDATE` on the gamer's row. The bare `catch {}` is gone. First CI this repo has had. |
 | `12c4730` | The three round-2 findings: real Postgres in CI so the lock is genuinely contended; `engines`/`.nvmrc`/`ws` fallback; and the client-bundle break adding `pg` caused. |
-| `4773493` | **Card layout versioning** — see §1.1. |
+| `4773493` **(branch)** | **Card layout versioning** — see §1.1. |
+| `3270baf` **(branch)** | **B72.1** — the fabricated ROAS deleted, and the headcount it was built on renamed across three surfaces. |
 
 **The lock is proven, not asserted.** Remove `FOR UPDATE`, run against real
 Postgres, and three assertions fail — including *four simultaneous claims on one
@@ -102,7 +108,27 @@ write; it recovers by deploying. The old JSON stays in the row.
 
 ## 2. The decisions, made
 
-### D1 + D4 — What an ad view IS
+### ⚠️ SUPERSEDED BY `docs/COMMERCIAL_MODEL_V2.md`
+
+**The model changed again after round 3, and this section is kept only as the
+record of how we got here.** The reviewer's §I asked why we were pouring the
+most engineering into the revenue model we had the least evidence for. The
+answer was that we should not, and the owner's decision goes further than the
+reviewer proposed:
+
+| | |
+|---|---|
+| **One package** | 1–4 challenges/month per brand, any mix of games, **ads included free** |
+| **Priced** | one price per challenge, split by percentage into three vaults |
+| **Server owners** | paid from a weekly competitive pool, not a cut of each challenge |
+| **Gamers** | the daily mission is funded by a CP vault — a budget, not a promise |
+| **Views** | reported as proof of work, never sold |
+
+**Read `docs/COMMERCIAL_MODEL_V2.md`. It is the model.** B75, B78, B81 and B82
+are re-scoped around it, and most of B75 disappears — there is nothing to pace
+or fill when the ads are included rather than metered.
+
+### D1 + D4 — What an ad view IS *(historical)*
 
 A campaign runs on **both** surfaces by default: the website and the Discord
 cards. The unit is **a card the bot drew carrying that brand's creative**, plus
