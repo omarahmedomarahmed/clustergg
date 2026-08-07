@@ -32,11 +32,28 @@
  * which is a trade any gaming company would take. Our worst case and our best
  * case became the same event.
  *
- * The sanity check in the other direction, because a currency that costs
- * nothing is also worth nothing: 20 ad impressions pay 20 CP = $0.002, while at
- * even a $0.50 CPM those same impressions earn more than $0.01. **CP paid for
- * attention stays roughly 5× covered by the revenue that attention generates**
- * — the test this comment set originally, and the only one that matters.
+ * ===== What justifies the rate now — C9 =====
+ *
+ * This paragraph used to argue the rate from AD revenue: 20 impressions pay 20
+ * CP = $0.002, against more than $0.01 earned at even a $0.50 CPM, so CP was
+ * "roughly 5× covered by the revenue that attention generates".
+ *
+ * **That basis is void.** `COMMERCIAL_MODEL_V2` merges ads into the challenge
+ * package and gives them away — ad revenue is $0, and a coverage ratio with
+ * zero on top is not a small number, it is not a number.
+ *
+ * The rate is now a COST OF GOODS, and the model states it: **15% of every
+ * challenge sale funds the CP vault** (§2). At $350 a challenge that is $52.50,
+ * which at 10,000 CP/$1 is 525,000 CP — and at the 500 CP/day ceiling, one
+ * challenge sold funds 1,050 gamer-days of maximal earning. That is the real
+ * constraint, and it is a division anybody can check rather than a CPM nobody
+ * can source.
+ *
+ * The uncomfortable half of the same arithmetic, stated because it decides the
+ * company: at 4,200 daily-active maximal gamers the vault is exhausted and
+ * Cluster's 20% starts subsidising it; at 9,800 the 20% is gone entirely.
+ * **We need roughly one brand per 1,400 daily-active gamers just to hold the
+ * floor.** `docs/COMMERCIAL_MODEL_V2.md` §3.
  *
  * A $5 bronze trophy is 50,000 CP at this rate. That is a hundred days at the
  * ceiling: far, expensive, and reachable, which is what a trophy should be.

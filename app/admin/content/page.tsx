@@ -92,11 +92,9 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
       { key: "finance.techBudget", label: "Infrastructure, APIs & partnerships (whole period)" },
       { key: "finance.hires", label: "People" },
       { key: "finance.hireMonthlyCost", label: "Cost of each person, per month" },
-      {
-        key: "finance.sponsorsUseHouseInventory",
-        label: "A sponsor names an EXISTING challenge — type false if each sponsored challenge is an extra competition with its own extra prize pool",
-        long: true,
-      },
+      // `finance.sponsorsUseHouseInventory` was here. C8: the commercial model
+      // answers it — half of what a brand pays IS the prize pool — so a
+      // checkbox that could contradict the model is one somebody would tick.
     ],
   },
   {

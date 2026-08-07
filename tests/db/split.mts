@@ -110,6 +110,56 @@ console.log("\n== every dollar a brand pays lands in exactly one vault ==");
   near("the prize vault receives exactly the prize pool", a.prize, PRICING_DEFAULTS.prizePool);
 }
 
+console.log("\n== C8: a sold challenge's prize is not funded twice ==");
+{
+  const { finance, FINANCE_DEFAULTS } = await import("../../lib/finance.ts");
+  const f = finance();
+  const prizes = f.lines.find((l) => l.key === "prizes");
+  const cfg = FINANCE_DEFAULTS;
+  const perMonth = cfg.games * cfg.challengesPerGamePerMonth;
+  const sold = Math.min(perMonth, cfg.brandsConverting * cfg.freeChallengesPerBrand);
+  // The house pays for what nobody bought. It used to pay for ALL of them while
+  // the model also took 50% of every sale for prizes — the same dollars twice.
+  ok("the prizes line covers only unsold challenges",
+    Math.abs((prizes?.cash ?? 0) - (perMonth - sold) * PRICING_DEFAULTS.prizePool * cfg.months) < 0.5,
+    String(prizes?.cash));
+  ok("…and it is smaller than funding every challenge",
+    (prizes?.cash ?? 0) < perMonth * PRICING_DEFAULTS.prizePool * cfg.months);
+  // The free first month is the one sponsored case we do fund, and it is now
+  // cash rather than a toggle that could zero it.
+  const brands = f.lines.find((l) => l.key === "brands");
+  ok("the free month's prizes are counted as real cash",
+    (brands?.cash ?? 0) === cfg.targetBrands * cfg.freeChallengesPerBrand * PRICING_DEFAULTS.prizePool,
+    String(brands?.cash));
+  ok("…and the unsent invoices are still shown as foregone, not cash",
+    (brands?.foregone ?? 0) > 0);
+  ok("the switch that hid the double count is gone",
+    !("sponsorsUseHouseInventory" in (FINANCE_DEFAULTS as Record<string, unknown>)));
+}
+
+console.log("\n== C12: an active gamer is a definition, not a slider ==");
+{
+  const { vaultGamerDays, vaultRunwayDays, activeGamers } = await import("../../lib/active-gamers.ts");
+  const { getDb } = await import("../../lib/db/index.ts");
+  // The model's own arithmetic: 15% of $350 = $52.50, at 10,000 CP/$1 and a
+  // 500 CP/day ceiling, funds 1,050 gamer-days.
+  ok("one $350 challenge funds 1,050 maximal gamer-days",
+    vaultGamerDays(52.5, 10000, 500) === 1050, String(vaultGamerDays(52.5, 10000, 500)));
+  ok("a zero ceiling divides by nothing rather than by zero", vaultGamerDays(52.5, 10000, 0) === 0);
+  // Null, never a big number, when there is nobody to divide by — "we are fine"
+  // is the one answer an unmeasured population must not produce.
+  ok("runway is null when the population is unmeasured", vaultRunwayDays(52.5, 10000, 500, 0) === null);
+  ok("…and a real number when it is not", vaultRunwayDays(52.5, 10000, 500, 100) === 10);
+
+  const counts = await activeGamers(await getDb());
+  ok("the count runs against a real database", Number.isFinite(counts.day));
+  ok("…and every window is a subset of the wider one",
+    counts.day <= counts.week && counts.week <= counts.month && counts.month <= counts.everEarned,
+    JSON.stringify(counts));
+  ok("…and the rate is null rather than 0 when nobody has earned",
+    counts.everEarned > 0 ? counts.dailyActiveRate !== null : counts.dailyActiveRate === null);
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);

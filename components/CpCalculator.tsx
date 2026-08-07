@@ -28,7 +28,20 @@ const usd = (n: number) =>
  * They answer different questions and a single blended number would be the most
  * misleading thing on the page.
  */
-export default function CpCalculator({ initial, canSave }: { initial: EconConfig; canSave: boolean }) {
+export default function CpCalculator({ initial, canSave, measured }: {
+  initial: EconConfig;
+  canSave: boolean;
+  /**
+   * What is actually happening, counted. C12.
+   *
+   * The daily-active slider was the only "expected active gamers" number in the
+   * codebase, and it is a guess. Printing the measured one beside it is what
+   * stops the guess being quoted as a finding — see `lib/active-gamers.ts` for
+   * the definition. Null when nothing has been measured yet, which is the
+   * honest state of an empty database and must not read as 0%.
+   */
+  measured?: { day: number; everEarned: number; dailyActiveRate: number | null } | null;
+}) {
   const [state, formAction, pending] = useActionState<SaveState, FormData>(saveCpConfig, undefined);
   const [actions, setActions] = useState<ActionConfig[]>(initial.actions);
   const [rate, setRate] = useState(initial.cpPerDollar);
@@ -191,6 +204,24 @@ export default function CpCalculator({ initial, canSave }: { initial: EconConfig
             <div className="text-xs text-muted mb-1">Daily active {Math.round(assume.dailyActive * 100)}%</div>
             <input type="range" min={0} max={100} value={Math.round(assume.dailyActive * 100)}
               onChange={(e) => setAssume((a) => ({ ...a, dailyActive: Number(e.target.value) / 100 }))} className="w-44" />
+            {/* The measured figure, and the offer to use it. A slider that
+                disagrees with the database while sitting next to it is the
+                shape that turns an assumption into a quoted fact. */}
+            <div className="mt-1 text-[10px] text-muted">
+              {measured?.dailyActiveRate == null ? (
+                <>Nothing measured yet — this is a guess.</>
+              ) : (
+                <>
+                  Measured: <b className="text-ink">{Math.round(measured.dailyActiveRate * 100)}%</b>{" "}
+                  ({measured.day.toLocaleString()} of {measured.everEarned.toLocaleString()} paid yesterday)
+                  {" · "}
+                  <button type="button" className="text-cyan-300 hover:underline"
+                    onClick={() => setAssume((a) => ({ ...a, dailyActive: measured.dailyActiveRate! }))}>
+                    use it
+                  </button>
+                </>
+              )}
+            </div>
           </label>
           <label className="text-sm">
             <div className="text-xs text-muted mb-1">Of their cap, they reach {Math.round(assume.capReach * 100)}%</div>

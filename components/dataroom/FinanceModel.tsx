@@ -105,20 +105,17 @@ export default function FinanceModel({ initial, pricing, accent = "#8b5cf6" }: {
         <Field label="Each, per month" value={cfg.hireMonthlyCost} min={0} max={10_000} step={50}
           fmt={$} onChange={(v) => set("hireMonthlyCost", v)} />
 
-        <label className="flex items-start gap-2 rounded-lg border border-white/10 p-2.5">
-          <input
-            type="checkbox" checked={cfg.sponsorsUseHouseInventory} className="accent-cyan-500 mt-0.5 shrink-0"
-            onChange={(e) => setCfg((c) => ({ ...c, sponsorsUseHouseInventory: e.target.checked }))}
-          />
-          <span>
-            <span className="block text-[11px] font-semibold text-ink">A sponsor names an existing challenge</span>
-            <span className="block text-[10px] leading-snug text-muted mt-0.5">
-              On: selling a challenge adds revenue and no cost, because we were funding that prize anyway.
-              Off: every sponsored challenge is an extra competition with an extra prize pool. This one switch
-              moves the budget by tens of thousands, so it is a choice rather than a silent assumption.
-            </span>
-          </span>
-        </label>
+        {/* A checkbox called "a sponsor names an existing challenge" was here.
+            It is now answered by the commercial model rather than toggled — see
+            the C8 note in `lib/finance.ts`. Left as a statement because a
+            reader who used to flip it deserves to know where it went, and
+            because it is the assumption that moves this budget most. */}
+        <p className="rounded-lg border border-white/10 p-2.5 text-[10px] leading-snug text-muted">
+          <span className="block text-[11px] font-semibold text-ink">Who funds a sponsored prize</span>
+          Half of what a brand pays <b className="text-ink">is</b> the prize pool, so a sold challenge costs
+          us nothing in prizes. The prizes line above is the challenges nobody has bought yet. The one
+          exception is the free first month, which is counted as cash in brand acquisition.
+        </p>
       </aside>
 
       {/* ===== The model ===== */}
