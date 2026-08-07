@@ -1257,8 +1257,20 @@ export const serverEvents = pgTable("server_events", {
 export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
   id: id(),
   brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  /**
+   * The campaign's LEAD game. C7.
+   *
+   * It used to be the only game — a campaign was one game × four weeks, and a
+   * mixed-game package had no row shape at all. The game now lives on each
+   * SLOT, because that is where it is actually decided: a week is one challenge
+   * on one game, and two of the same game in the same week split the field.
+   *
+   * This column stays as the first slot's game so `spc_game_idx`, the admin
+   * lists and every existing read keep working. Anything asking "which games is
+   * this campaign on" must read the slots — `campaignGames()`.
+   */
   game: text("game").notNull(),
-  /** How many weekly challenges were bought. Four is the floor. */
+  /** How many weekly challenges were bought. One to four. */
   slots: integer("slots").notNull().default(4),
   /** What one challenge cost, and the total. Frozen at purchase. */
   pricePerChallenge: doublePrecision("price_per_challenge").notNull().default(250),
@@ -1267,7 +1279,7 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
   status: text("status").notNull().default("submitted"),
   /** Monday of the first week. Every slot is seven days from here. */
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
-  /** One cover for all four, unless a slot overrides it. */
+  /** One cover for every week, unless a slot overrides it. */
   coverUrl: text("cover_url"),
   /**
    * Per-slot state: the cover, the request, the challenge it became.
@@ -1280,6 +1292,11 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
     index: number;
     startAt: string;
     endAt: string;
+    /**
+     * This week's game. C7. Absent on campaigns bought before mixed packages
+     * existed, which read as the campaign's lead game rather than as a gap.
+     */
+    game?: string | null;
     coverUrl?: string | null;
     requestId?: string | null;
     challengeId?: string | null;

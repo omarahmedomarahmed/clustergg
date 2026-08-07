@@ -160,6 +160,40 @@ console.log("\n== C12: an active gamer is a definition, not a slider ==");
     counts.everEarned > 0 ? counts.dailyActiveRate !== null : counts.dailyActiveRate === null);
 }
 
+console.log("\n== C6: one to four challenges, and four is a default not a floor ==");
+{
+  const { campaignQuote, clampSlots, slotWindows, freshSlots, MIN_SLOTS, MAX_SLOTS } =
+    await import("../../lib/sponsored-campaigns.ts");
+  // The defect: `Math.max(4, slots)` meant asking for two sold and BILLED four.
+  for (const n of [1, 2, 3, 4]) {
+    const q = campaignQuote(PRICING_DEFAULTS, n);
+    ok(`${n} week${n === 1 ? "" : "s"} quotes ${n}`, q.slots === n, String(q.slots));
+    ok("…and the bill is that many challenges", q.total === PRICING_DEFAULTS.challengePrice * n, String(q.total));
+    ok("…and that many windows are drawn", slotWindows(new Date(Date.UTC(2026, 0, 5)), n).length === n);
+    ok("…and that many slots are created", freshSlots(new Date(Date.UTC(2026, 0, 5)), n).length === n);
+  }
+  ok("zero is not a package", clampSlots(0) === MIN_SLOTS);
+  ok("…and neither is nine", clampSlots(9) === MAX_SLOTS);
+  ok("junk falls back rather than clamping upward from NaN", clampSlots(NaN as number) === 4);
+}
+
+console.log("\n== C7: a package can be a mix of games ==");
+{
+  const { freshSlots, gameOfSlot, campaignGames } = await import("../../lib/sponsored-campaigns.ts");
+  const slots = freshSlots(new Date(Date.UTC(2026, 0, 5)), 3, null, ["Chess", null, "Dota 2"]);
+  ok("each week carries its own game", slots[0].game === "Chess" && slots[2].game === "Dota 2");
+  // A blank week is the lead game, not a gap — which is also every campaign
+  // bought before mixed packages existed.
+  ok("a blank week falls back to the lead game", gameOfSlot(slots[1], "Chess") === "Chess");
+  ok("…and so does a slot with no game field at all",
+    gameOfSlot({ index: 0, startAt: "", endAt: "", status: "waiting" }, "Chess") === "Chess");
+  const games = campaignGames({ game: "Chess", slotState: slots });
+  ok("the campaign lists its distinct games in week order",
+    JSON.stringify(games) === JSON.stringify(["Chess", "Dota 2"]), JSON.stringify(games));
+  ok("a campaign with no slots still names its game",
+    JSON.stringify(campaignGames({ game: "Chess", slotState: [] })) === JSON.stringify(["Chess"]));
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);

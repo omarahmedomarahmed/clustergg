@@ -13,22 +13,49 @@ import { DEFAULT_UNLOCK_THRESHOLD } from "@/lib/discord/guilds";
 // they don't, and nothing has to be cancelled. A first campaign that requires a
 // standing commitment is a first campaign that doesn't happen.
 //
-// Four is the floor because one challenge is a post and four is a campaign —
-// a brand needs the second week to see whether the first one meant anything,
-// and the Sunday show features each of the four in turn.
+// ONE TO FOUR challenges, and four is the default rather than the floor. C6.
 //
-// The four are NOT created at once. Only the first becomes a live challenge;
+// The floor used to be four, argued as "one challenge is a post and four is a
+// campaign". The argument is good and the floor was still wrong: v2 sells a
+// package of 1–4 challenges a month, so a brand buying two had no expressible
+// shape at all — `Math.max(4, slots)` silently sold them four and billed for
+// four. A minimum nobody can see is not a minimum, it is a surprise on an
+// invoice.
+//
+// Four is still what the builder opens on, and the reasoning is still printed
+// where a brand chooses: they need the second week to see whether the first one
+// meant anything, and the Sunday show features each of the four in turn.
+//
+// The slots are NOT created at once. Only the first becomes a live challenge;
 // the next opens when it ends. A game runs ONE sponsored challenge at a time,
 // because two competing on the same game in the same week split the field and
 // make both look empty. Buying a second game runs a second, independent queue.
 
+/** What the builder opens on. Not a floor — see `MIN_SLOTS`. */
 export const SLOTS_PER_CAMPAIGN = 4;
+export const MIN_SLOTS = 1;
+export const MAX_SLOTS = 4;
+
+/**
+ * Clamp a requested slot count into what can actually be sold.
+ *
+ * Zero clamps DOWN to one rather than falling back to four. `Number(n) || 4`
+ * would treat an explicit 0 as "unset" and quietly sell a full month — which is
+ * the exact shape of the defect C6 exists to fix. Only a non-number defaults.
+ */
+export const clampSlots = (n: number): number => {
+  const raw = Number(n);
+  if (!Number.isFinite(raw)) return SLOTS_PER_CAMPAIGN;
+  return Math.max(MIN_SLOTS, Math.min(MAX_SLOTS, Math.round(raw)));
+};
 export const SLOT_DAYS = 7;
 
 export type Slot = {
   index: number;
   startAt: string;
   endAt: string;
+  /** This week's game. C7. Absent on pre-mixed campaigns — read `gameOfSlot`. */
+  game?: string | null;
   coverUrl?: string | null;
   requestId?: string | null;
   challengeId?: string | null;
@@ -39,7 +66,7 @@ export type Campaign = typeof schema.sponsoredCampaigns.$inferSelect;
 
 /** What one game costs for a month, and what the money does. */
 export function campaignQuote(cfg: PricingConfig = PRICING_DEFAULTS, slots = SLOTS_PER_CAMPAIGN) {
-  const n = Math.max(SLOTS_PER_CAMPAIGN, Math.round(slots));
+  const n = clampSlots(slots);
   return {
     slots: n,
     pricePerChallenge: cfg.challengePrice,
@@ -66,24 +93,51 @@ export function nextMonday(from = new Date()): Date {
   return d;
 }
 
-/** The four weekly windows a brand is buying, as dates they can read. */
+/** The weekly windows a brand is buying, as dates they can read. One to four. */
 export function slotWindows(startAt: Date, slots = SLOTS_PER_CAMPAIGN): { startAt: Date; endAt: Date }[] {
-  return Array.from({ length: slots }, (_, i) => {
+  return Array.from({ length: clampSlots(slots) }, (_, i) => {
     const s = new Date(startAt.getTime() + i * SLOT_DAYS * 86400000);
     return { startAt: s, endAt: new Date(s.getTime() + SLOT_DAYS * 86400000) };
   });
 }
 
-export function freshSlots(startAt: Date, slots = SLOTS_PER_CAMPAIGN, coverUrl?: string | null): Slot[] {
+export function freshSlots(
+  startAt: Date,
+  slots = SLOTS_PER_CAMPAIGN,
+  coverUrl?: string | null,
+  games?: (string | null | undefined)[],
+): Slot[] {
   return slotWindows(startAt, slots).map((w, i) => ({
     index: i,
     startAt: w.startAt.toISOString(),
     endAt: w.endAt.toISOString(),
+    game: games?.[i] ?? null,
     coverUrl: coverUrl ?? null,
     requestId: null,
     challengeId: null,
     status: "waiting",
   }));
+}
+
+/**
+ * Which game a given week is on. C7.
+ *
+ * A slot with no game of its own is a campaign bought before mixed packages
+ * existed, and its week runs on the campaign's lead game. Falling back rather
+ * than backfilling means no migration can get a historical week wrong.
+ */
+export const gameOfSlot = (slot: Slot | undefined, campaignGame: string): string =>
+  (slot?.game ?? "").trim() || campaignGame;
+
+/** Every distinct game a campaign runs on, in slot order. */
+export function campaignGames(campaign: { game: string; slotState?: unknown }): string[] {
+  const slots = ((campaign.slotState ?? []) as Slot[]);
+  const out: string[] = [];
+  for (const s of slots.slice().sort((a, b) => a.index - b.index)) {
+    const g = gameOfSlot(s, campaign.game);
+    if (g && !out.includes(g)) out.push(g);
+  }
+  return out.length ? out : [campaign.game];
 }
 
 // ===== Reach =====
@@ -227,16 +281,33 @@ export type BuyResult =
  * Buy a month of challenges on one game.
  *
  * Creates the campaign and opens the FIRST slot as a challenge request that
- * admin reviews. The other three sit visible and waiting: the brand can see
- * their dates and change their covers, and each opens as the one before it
- * finishes.
+ * admin reviews. Any others sit visible and waiting: the brand can see their
+ * dates and change their covers, and each opens as the one before it finishes.
  */
 export async function buyCampaign(input: {
   brandId: string;
   game: string;
+  /**
+   * How many weekly challenges. 1–4, defaulting to 4. C6.
+   *
+   * It was not a parameter at all, and the quote floored it at four — so a
+   * brand buying two challenges was silently sold and billed for four. The
+   * clamp is in `clampSlots`, applied by the quote, so the number that reaches
+   * the invoice and the number that reaches `slotState` cannot diverge.
+   */
+  slots?: number;
+  /**
+   * One game per week, when the package is mixed. C7.
+   *
+   * A campaign was one game × four weeks and a mixed package had no row shape,
+   * so a brand buying PUBG then Chess then PUBG could not be expressed. Index i
+   * is week i; a blank entry falls back to `game`, which is also what every
+   * campaign bought before this does.
+   */
+  games?: (string | null | undefined)[];
   startAt?: Date;
   coverUrl?: string | null;
-  /** One cover per slot, when a brand wants four different ones. */
+  /** One cover per slot, when a brand wants a different one each week. */
   slotCovers?: (string | null)[];
   targeting?: { regions?: string[]; countries?: string[]; guildIds?: string[] };
   cfg?: PricingConfig;
@@ -245,9 +316,27 @@ export async function buyCampaign(input: {
   if (!game) return { ok: false, reason: "no_game", message: "Pick a game first." };
   try {
     const db = await getDb();
-    const [row] = await db.select({ name: schema.games.name }).from(schema.games)
-      .where(and(eq(schema.games.name, game), eq(schema.games.isActive, true))).limit(1);
-    if (!row) return { ok: false, reason: "unknown_game", message: "That game isn't one we sync stats for." };
+    const q = campaignQuote(input.cfg ?? PRICING_DEFAULTS, input.slots ?? SLOTS_PER_CAMPAIGN);
+
+    // Every game in the package, checked. C7 — validating only the lead game
+    // would let week three run on something we cannot score, and the slot would
+    // discover that weeks after the money arrived.
+    const perSlot = Array.from({ length: q.slots }, (_, i) =>
+      (input.games?.[i] ?? "").toString().trim() || game);
+    const distinct = [...new Set(perSlot)];
+
+    const rows = await db.select({ name: schema.games.name }).from(schema.games)
+      .where(and(inArray(schema.games.name, distinct), eq(schema.games.isActive, true)));
+    const known = new Set(rows.map((r) => r.name));
+    const unknown = distinct.filter((g) => !known.has(g));
+    if (unknown.length) {
+      return {
+        ok: false, reason: "unknown_game",
+        message: unknown.length === 1
+          ? `${unknown[0]} isn't one we sync stats for.`
+          : `These aren't games we sync stats for: ${unknown.join(", ")}.`,
+      };
+    }
 
     // Being in the catalogue is not enough to be sellable.
     //
@@ -257,34 +346,42 @@ export async function buyCampaign(input: {
     // Checked HERE, before any money or any row, and not left to the slot to
     // discover.
     const { providerForGame } = await import("@/lib/challenge-requests");
-    if (!providerForGame(game)) {
+    const unscorable = distinct.filter((g) => !providerForGame(g));
+    if (unscorable.length) {
       return {
         ok: false, reason: "unknown_game",
-        message: `We can identify ${game} players but can't score them yet, so it can't carry a challenge. Pick another game.`,
+        message: `We can identify ${unscorable.join(" and ")} players but can't score them yet, so ${unscorable.length === 1 ? "it can't" : "they can't"} carry a challenge. Pick another game.`,
       };
     }
 
     // One campaign at a time per brand per game. A second one bought while the
     // first is still running would put two of the same brand's challenges on
     // the same game — the exact thing the one-at-a-time rule exists to stop.
-    const [running] = await db.select({ id: schema.sponsoredCampaigns.id })
-      .from(schema.sponsoredCampaigns)
+    // The one-at-a-time rule now reads the SLOTS, not the lead game. C7 — a
+    // mixed package whose week three is Chess must still collide with a Chess
+    // campaign that is already running, and comparing lead games would have let
+    // both through.
+    const live = await db.select({
+      id: schema.sponsoredCampaigns.id,
+      game: schema.sponsoredCampaigns.game,
+      slotState: schema.sponsoredCampaigns.slotState,
+    }).from(schema.sponsoredCampaigns)
       .where(and(
         eq(schema.sponsoredCampaigns.brandId, input.brandId),
-        eq(schema.sponsoredCampaigns.game, game),
         inArray(schema.sponsoredCampaigns.status, ["submitted", "running"]),
-      )).limit(1);
-    if (running) {
+      ));
+    const busy = new Set(live.flatMap((c) => campaignGames(c)));
+    const clash = distinct.filter((g) => busy.has(g));
+    if (clash.length) {
       return {
         ok: false, reason: "already_running",
-        message: `You already have a month of ${game} challenges running. Buy another game, or wait for this one to finish.`,
+        message: `You already have ${clash.join(" and ")} challenges running. Pick another game, or wait for those to finish.`,
       };
     }
 
     const cfg = input.cfg ?? PRICING_DEFAULTS;
-    const q = campaignQuote(cfg);
     const startAt = input.startAt ?? nextMonday();
-    const slots = freshSlots(startAt, q.slots, input.coverUrl).map((s) => ({
+    const slots = freshSlots(startAt, q.slots, input.coverUrl, perSlot).map((s) => ({
       ...s,
       coverUrl: input.slotCovers?.[s.index] ?? input.coverUrl ?? null,
     }));
@@ -339,8 +436,12 @@ export async function openSlot(campaignId: string, index: number): Promise<strin
 
     const [brand] = await db.select({ name: schema.brands.name }).from(schema.brands)
       .where(eq(schema.brands.id, c.brandId)).limit(1);
+    // This WEEK's game, not the campaign's. C7 — a mixed package's week three
+    // is a different game from week one, and reading the campaign column would
+    // have opened every week on the lead game while the brand paid for a mix.
+    const slotGame = gameOfSlot(slot, c.game);
     const { providerForGame } = await import("@/lib/challenge-requests");
-    const provider = providerForGame(c.game);
+    const provider = providerForGame(slotGame);
     if (!provider) return null;
 
     const cfg = PRICING_DEFAULTS;
@@ -353,9 +454,9 @@ export async function openSlot(campaignId: string, index: number): Promise<strin
       brandId: c.brandId,
       campaignId: c.id,
       slotIndex: index,
-      game: c.game,
+      game: slotGame,
       provider: provider.id,
-      title: `${brand?.name ?? "Sponsored"} ${c.game} Challenge — week ${index + 1}`,
+      title: `${brand?.name ?? "Sponsored"} ${slotGame} Challenge — week ${index + 1}`,
       description: `Week ${index + 1} of ${c.slots}, sponsored by ${brand?.name ?? "a brand"}.`,
       days: SLOT_DAYS,
       prizeValue: Math.round(cfg.prizePool),
