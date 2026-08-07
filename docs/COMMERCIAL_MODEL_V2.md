@@ -1,4 +1,4 @@
-# The Commercial Model, v2 — one package, three vaults
+# The Commercial Model, v2 — one package, four vaults
 
 **Decided 7 August 2026. Supersedes `docs/COMMERCIAL_MODEL.md` entirely.**
 **Revised after an execution review that checked every claim against the code.**
@@ -133,7 +133,7 @@ what is already there.
 
 ---
 
-## 3. The three vaults
+## 3. The four vaults
 
 No pool pays what it did not receive.
 

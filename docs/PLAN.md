@@ -119,7 +119,7 @@ reviewer proposed:
 | | |
 |---|---|
 | **One package** | 1–4 challenges/month per brand, any mix of games, **ads included free** |
-| **Priced** | one price per challenge, split by percentage into three vaults |
+| **Priced** | one price per challenge, split by percentage into four vaults |
 | **Server owners** | paid from a weekly competitive pool, not a cut of each challenge |
 | **Gamers** | the daily mission is funded by a CP vault — a budget, not a promise |
 | **Views** | reported as proof of work, never sold |
