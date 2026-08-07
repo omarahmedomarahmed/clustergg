@@ -294,6 +294,26 @@ export async function anomalousGrowth(db: DB): Promise<GrowthFlag[]> {
 export const SIGNUP_LIMIT = 10;
 export const SIGNUP_WINDOW_HOURS = 24;
 
+/**
+ * The IP limit. B80.
+ *
+ * THE FINDING: sybil cost per account was $0.00, and the IP half of this guard
+ * was never reached — `signup()` called `signupVelocity(db, { email })` and
+ * passed no address, so the only thing that could ever trip was a disposable
+ * email domain. An attacker using gmail aliases paid nothing at all.
+ *
+ * Deliberately FAR higher than `SIGNUP_LIMIT`, and that is the whole design.
+ * The email-domain limit is 10 because a disposable domain is a source. An IP
+ * is not: a university NAT, a mobile carrier CGNAT or an office is hundreds of
+ * real people behind one address, and refusing the eleventh of those is
+ * refusing a real gamer for somebody else's behaviour. Fifty in a day from one
+ * address is not a busy campus, it is a script.
+ *
+ * It stays a friction rather than a wall for the same reason as the rest of
+ * this file: the person it inconveniences most is always the honest one.
+ */
+export const SIGNUP_IP_LIMIT = 50;
+
 /** A Discord account younger than this is not, by itself, a refusal. */
 export const YOUNG_DISCORD_DAYS = 7;
 
@@ -346,6 +366,17 @@ export async function signupVelocity(
     // The count that decides. A disposable domain is a source; a mainstream one
     // is not, because "ten gmail signups today" is a Tuesday.
     let seen = 0;
+    // The IP, which until B80 was never passed in and therefore never checked.
+    // Counted for ANY domain — that is the point: gmail aliases were free.
+    let fromIp = 0;
+    if (input.ip) {
+      const [row] = await db.select({ n: sql<number>`count(*)` }).from(schema.users)
+        .where(and(gte(schema.users.createdAt, since), eq(schema.users.signupIp, input.ip)));
+      fromIp = Number(row?.n ?? 0);
+      if (fromIp >= SIGNUP_IP_LIMIT) {
+        reasons.push(`${fromIp} accounts from one address in ${SIGNUP_WINDOW_HOURS}h`);
+      }
+    }
     if (disposable && domain) {
       const [row] = await db.select({ n: sql<number>`count(*)` }).from(schema.users)
         .where(and(gte(schema.users.createdAt, since), ilike(schema.users.email, `%@${domain}`)));
@@ -362,17 +393,19 @@ export async function signupVelocity(
 
     // Refuse only when the COUNT trips. The other signals ride along for the
     // admin review queue; on their own they describe a new gamer.
-    const tripped = disposable && seen >= SIGNUP_LIMIT;
+    const tripped = (disposable && seen >= SIGNUP_LIMIT) || fromIp >= SIGNUP_IP_LIMIT;
     return {
       ok: !tripped,
-      seen,
+      seen: Math.max(seen, fromIp),
       limit: SIGNUP_LIMIT,
       reasons,
       message: tripped
         // Never accuses. The person reading this is usually not the one the
         // limit is for, and telling somebody they look like a bot is how you
         // lose the one real gamer it caught.
-        ? "We've had a lot of signups from that email provider today. Use a different address, or come back tomorrow — nothing is wrong with your account."
+        ? (fromIp >= SIGNUP_IP_LIMIT
+          ? "We've had an unusual number of signups from your network today. Try again tomorrow, or from another connection — nothing is wrong with your account."
+          : "We've had a lot of signups from that email provider today. Use a different address, or come back tomorrow — nothing is wrong with your account.")
         : "",
     };
   } catch { return open; }

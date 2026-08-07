@@ -1,10 +1,29 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { count, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { createSession, destroySession, hashPassword, verifyPassword } from "@/lib/auth";
 import { slugify, uid } from "@/lib/utils";
+
+/**
+ * The address a signup came from. B80.
+ *
+ * Read from the proxy headers Vercel sets, first entry of `x-forwarded-for`
+ * only — the rest of that header is whatever the client sent and is trivially
+ * forged, so trusting it would hand an attacker a fresh "address" per request.
+ * Null on any failure: a velocity guard that cannot read an address must let
+ * the signup through, the same way the rest of `lib/abuse.ts` fails open.
+ */
+async function signupAddress(): Promise<string | null> {
+  try {
+    const h = await headers();
+    const fwd = h.get("x-forwarded-for");
+    const first = fwd?.split(",")[0]?.trim();
+    return first || h.get("x-real-ip") || null;
+  } catch { return null; }
+}
 
 export type FormState = { error?: string } | undefined;
 
@@ -34,9 +53,13 @@ export async function register(_prev: FormState, formData: FormData): Promise<Fo
   // signups today" is a Tuesday and refusing the eleventh refuses a real gamer
   // for somebody else's behaviour. It also fails open: what it protects is
   // tidiness, and what failing closed costs is customers.
+  //
+  // B80: the ADDRESS is passed now. It was not, so the guard's IP branch could
+  // never trip and an attacker using gmail aliases paid nothing per account.
+  const ip = await signupAddress();
   {
     const { signupVelocity } = await import("@/lib/abuse");
-    const v = await signupVelocity(db, { email });
+    const v = await signupVelocity(db, { email, ip });
     if (!v.ok) return { error: v.message };
   }
 
@@ -48,6 +71,7 @@ export async function register(_prev: FormState, formData: FormData): Promise<Fo
   await db.insert(schema.users).values({
     id, email, passwordHash: hashPassword(password), displayName, slug,
     role, primarySignupProvider: "email", lastLoginAt: new Date(),
+    signupIp: ip,
   });
   await createSession(id, role);
   redirect("/onboarding");

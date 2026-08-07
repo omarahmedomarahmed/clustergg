@@ -869,6 +869,8 @@ const COLUMN_MIGRATIONS = [
     "updated_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
 
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "signup_ip" text`,
+  `CREATE INDEX IF NOT EXISTS "users_signup_ip_idx" ON "users" ("signup_ip", "created_at")`,
   `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "provider_key" text`,
   `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "provider_ref" text`,
   `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "collect_url" text`,
@@ -896,7 +898,74 @@ const COLUMN_MIGRATIONS = [
      WHERE "payout_method" IS NOT NULL AND "payout_method"->>'method' IN ('ach','instapay')`,
 ];
 
+/**
+ * A fingerprint of the migration list. B80.
+ *
+ * THE DEFECT: every cold boot replayed the whole list — 219 statements, 108 of
+ * them `ALTER TABLE` (which takes ACCESS EXCLUSIVE even when the column already
+ * exists) and 11 full-table `UPDATE`s — against production. `IF NOT EXISTS`
+ * makes them harmless in effect and does nothing about the cost: on a serverless
+ * runtime a cold boot happens constantly, and every one of them queued behind a
+ * lock on `users`.
+ *
+ * The fix is a marker, not a rewrite of the list. If the fingerprint stored in
+ * the database matches the list we are holding, the list has already run to
+ * completion against this database and there is nothing to do. Steady state
+ * becomes ONE tiny read.
+ *
+ * A hash rather than a hand-maintained version number, deliberately: a number
+ * somebody has to remember to bump is a number somebody will forget to bump,
+ * and the failure mode is a migration that silently never runs. Adding,
+ * removing or editing any statement changes the hash by construction.
+ */
+function migrationsFingerprint(): string {
+  // FNV-1a. Not cryptographic — it is a change detector, and a 32-bit collision
+  // between two versions of a list we wrote ourselves is not a risk worth a
+  // dependency.
+  let h = 0x811c9dc5;
+  const joined = COLUMN_MIGRATIONS.join("\u0000");
+  for (let i = 0; i < joined.length; i++) {
+    h ^= joined.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${COLUMN_MIGRATIONS.length}-${h.toString(16)}`;
+}
+
+/**
+ * Has this exact list already run against this database?
+ *
+ * Its own tiny table rather than `platform_settings`, because this has to work
+ * on a boot where `platform_settings` does not exist yet — and because a row
+ * that controls whether migrations run should not sit in a table an admin
+ * screen can edit.
+ */
+async function migrationsAlreadyRun(db: DB, fingerprint: string): Promise<boolean> {
+  try {
+    await db.execute(dsql.raw(
+      `CREATE TABLE IF NOT EXISTS "schema_state" ("key" text PRIMARY KEY, "value" text NOT NULL, "updated_at" timestamp with time zone DEFAULT now() NOT NULL)`,
+    ));
+    const r = await db.execute(dsql`SELECT "value" FROM "schema_state" WHERE "key" = 'column_migrations'`);
+    return rowsOf(r).some((row) => row.value === fingerprint);
+  } catch { return false; }
+}
+
+async function markMigrationsRun(db: DB, fingerprint: string): Promise<void> {
+  try {
+    await db.execute(dsql`
+      INSERT INTO "schema_state" ("key", "value", "updated_at")
+      VALUES ('column_migrations', ${fingerprint}, now())
+      ON CONFLICT ("key") DO UPDATE SET "value" = ${fingerprint}, "updated_at" = now()
+    `);
+  } catch { /* the marker is an optimisation; failing to write it costs a replay */ }
+}
+
 async function runColumnMigrations(db: DB) {
+  // The marker is written only after the whole list has run without throwing.
+  // A partial run must replay: skipping the rest because we got most of the way
+  // is how a column goes missing and nobody finds out until a query fails.
+  const fingerprint = migrationsFingerprint();
+  if (await migrationsAlreadyRun(db, fingerprint)) return;
+
   for (const stmt of COLUMN_MIGRATIONS) {
     try { await db.execute(dsql.raw(stmt)); }
     catch (e) {
@@ -913,6 +982,7 @@ async function runColumnMigrations(db: DB) {
       console.warn(`[migrate] skipped: ${stmt.slice(0, 70).replace(/\s+/g, " ")}… — ${String(e).slice(0, 120)}`);
     }
   }
+  await markMigrationsRun(db, fingerprint);
 }
 
 async function ensureProvisioned(db: DB) {

@@ -63,6 +63,19 @@ export const users = pgTable("users", {
    * counted, because a band that can change without limit means nothing.
    */
   ageBandChanges: integer("age_band_changes").notNull().default(0),
+  /**
+   * The address this account was created from. B80.
+   *
+   * Stored so account-creation velocity can be counted per address at all — the
+   * guard had an IP branch that nothing ever reached, because there was nothing
+   * to compare against. Fifty accounts from one address in a day is a script;
+   * ten is a university.
+   *
+   * It is the only network identifier we keep, it is written once at signup and
+   * never updated, and B80's purge removes it with the account. It is NOT used
+   * to identify or track a gamer anywhere else in the product.
+   */
+  signupIp: text("signup_ip"),
   discordViews: integer("discord_views").notNull().default(0), // views that came from someone showing this profile in Discord
   voteCount: integer("vote_count").notNull().default(0),       // Best Profile votes, denormalized for cheap sorting
   /**

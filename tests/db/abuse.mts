@@ -96,6 +96,48 @@ eq("500 qualified moves up", tierOf(500), "mid");
 ok("…and the rate that used to sit here is gone entirely",
   !("ownerPctFor" in (await import("../../lib/server-earnings.ts"))));
 
+console.log("\n== B80: an address is finally counted ==");
+{
+  const { signupVelocity, SIGNUP_IP_LIMIT, SIGNUP_LIMIT } = await import("../../lib/abuse.ts");
+  const { readFileSync } = await import("node:fs");
+
+  // THE DEFECT: `signup()` called this with `{ email }` and no address, so the
+  // IP branch could never trip and gmail aliases cost an attacker nothing.
+  const auth = readFileSync(new URL("../../app/actions/auth.ts", import.meta.url), "utf8");
+  ok("signup passes the address", /signupVelocity\(db, \{ email, ip \}\)/.test(auth));
+  ok("…and records it on the account", /signupIp: ip/.test(auth));
+  // Only the FIRST x-forwarded-for entry. The rest is client-supplied and would
+  // hand an attacker a fresh address per request.
+  ok("…taking only the first forwarded entry", /split\(","\)\[0\]/.test(auth));
+
+  const tag = uid().slice(0, 8);
+  const ip = `203.0.113.${Math.floor(Math.random() * 200)}-${tag}`;
+  const clean = await signupVelocity(db, { email: `a@gmail.com`, ip });
+  ok("an unused address is allowed", clean.ok);
+
+  // The IP limit is far above the domain limit on purpose: an address is a
+  // university NAT or a carrier, not a source.
+  ok("the address limit is much higher than the domain limit", SIGNUP_IP_LIMIT > SIGNUP_LIMIT * 3,
+    `${SIGNUP_IP_LIMIT} vs ${SIGNUP_LIMIT}`);
+
+  for (let i = 0; i < SIGNUP_IP_LIMIT; i++) {
+    await db.insert(schema.users).values({
+      id: uid(), email: `sybil-${tag}-${i}@gmail.com`, displayName: `S${i}`,
+      slug: `sybil-${tag}-${i}`, passwordHash: "x", signupIp: ip,
+    });
+  }
+  const tripped = await signupVelocity(db, { email: "b@gmail.com", ip });
+  ok("…and a script's worth from one address is refused", !tripped.ok, JSON.stringify(tripped));
+  ok("…with a message that accuses nobody",
+    /nothing is wrong with your account/.test(tripped.message), tripped.message);
+  ok("…and says which network, not which person", /network/i.test(tripped.message));
+
+  // A mainstream domain on a fresh address is still fine — the refusal must be
+  // about the address, not about gmail.
+  const other = await signupVelocity(db, { email: "c@gmail.com", ip: `${ip}-other` });
+  ok("another address is unaffected", other.ok);
+}
+
 console.log("\n== the unlock stamp is one-way ==");
 const first = new Date(Date.now() - 40 * DAY);
 await markTierUnlocked(db, guildId, first);
@@ -215,7 +257,10 @@ console.log("\n== defence 3: velocity is a friction, not a wall ==");
   console.log("\n== it is wired into the real signup path ==");
   const { readFile } = await import("node:fs/promises");
   const auth = await readFile(new URL("../../app/actions/auth.ts", import.meta.url), "utf8");
-  ok("signup consults it", /signupVelocity\(db, \{ email \}\)/.test(auth));
+  // Widened by B80: the call now carries the address as well as the email.
+  // The old pattern matched `{ email }` exactly, which is precisely why nobody
+  // noticed the address was never being passed.
+  ok("signup consults it", /signupVelocity\(db, \{ email, ip \}\)/.test(auth));
   ok("…and refuses with its own message rather than a generic one",
     /if \(!v\.ok\) return \{ error: v\.message \}/.test(auth));
   ok("…before the account row is written",

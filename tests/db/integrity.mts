@@ -199,6 +199,46 @@ console.log("\n== the database driver stays out of the browser bundle ==");
   ok("…and that module imports NOTHING", !/^\s*import\s/m.test(rate), rate.match(/^\s*import.*/m)?.[0] ?? "");
 }
 
+console.log("\n== B80: the migration list does not replay on every cold boot ==");
+{
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("../../lib/db/index.ts", import.meta.url), "utf8");
+
+  // THE DEFECT: 219 statements, 108 of them ALTER TABLE (ACCESS EXCLUSIVE even
+  // when the column exists) and 11 full-table UPDATEs, replayed against
+  // production on every cold boot. `IF NOT EXISTS` made them harmless in effect
+  // and did nothing about the lock queue.
+  ok("there is a fingerprint of the list", /function migrationsFingerprint/.test(src));
+  ok("…checked before the list runs", /if \(await migrationsAlreadyRun\(db, fingerprint\)\) return;/.test(src));
+  // A hash, not a hand-bumped version number: a number somebody must remember
+  // to bump is a migration that silently never runs.
+  ok("…derived from the statements themselves", /COLUMN_MIGRATIONS\.join/.test(src));
+  // The marker is written only after the WHOLE list ran. A partial run must
+  // replay — skipping the rest because we got most of the way is how a column
+  // goes missing and nobody finds out until a query fails.
+  const runner = src.slice(src.indexOf("async function runColumnMigrations"));
+  const body = runner.slice(0, runner.indexOf("\n}\n"));
+  ok("the marker is written last", body.lastIndexOf("markMigrationsRun") > body.indexOf("for (const stmt"));
+
+  // It must survive a database where the marker table does not exist yet.
+  const { getDb } = await import("../../lib/db/index.ts");
+  const db = await getDb();
+  const probe = await db.execute(
+    (await import("drizzle-orm")).sql`SELECT to_regclass('public.schema_state') AS t`,
+  );
+  const rows = (probe as unknown as { rows?: { t: string | null }[] }).rows
+    ?? (probe as unknown as { t: string | null }[]);
+  ok("…and the marker table exists after a boot",
+    Array.isArray(rows) && rows.some((r) => r.t), JSON.stringify(rows));
+
+  // Its own table, not `platform_settings`: this has to work on a boot where
+  // that table does not exist, and a row deciding whether migrations run should
+  // not sit somewhere an admin screen can edit.
+  ok("the marker lives in its own table", /CREATE TABLE IF NOT EXISTS "schema_state"/.test(src));
+  ok("…and is not an admin-editable setting",
+    !/platform_settings[\s\S]{0,80}column_migrations/.test(src));
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);
