@@ -1,0 +1,76 @@
+# B74 / Gate 2 — the first gate on this project that is a control rather than a
+# sentence.
+#
+# The due-diligence review's sharpest point was that every gate in our plan was
+# a paragraph in a markdown file: nothing in the repository prevented the gated
+# work from proceeding. This file is the answer to that for the money paths. A
+# push that breaks the ceiling, the double-spend guard or the redemption claim
+# fails here, visibly, before anybody has to notice it in production.
+#
+# It runs on every push and every pull request, and nothing in it needs a
+# database: the suites stand up PGlite in-process (DEMO_DB=1).
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  # A newer push supersedes an in-flight run on the same branch. Green on stale
+  # code is worse than no signal, because somebody will read it as current.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # tsx runs every suite. It was not in package.json at all, so CI would
+      # have fetched an unpinned copy on each run — a test runner that can
+      # change under you between two green builds. Pinned as a devDependency
+      # instead; `npm ci` installs it above.
+
+      # Types first: it is the fastest thing that can be wrong, and a type error
+      # makes every failure after it harder to read.
+      - name: Type-check
+        run: npx tsc --noEmit
+
+      # No lint step, on purpose. This project has no ESLint configuration, so
+      # `npm run lint` drops into an interactive setup prompt — a CI runner
+      # hangs on it rather than failing. Found by running it, not by reading it.
+      # Adding a real config is worth doing; shipping a workflow that stalls is
+      # not.
+
+      # THE GATE. Named as its own step rather than folded into `npm test` so
+      # that a red X on this repository says which invariant broke, and so a
+      # branch-protection rule can require this specific check.
+      #
+      # If this step is failing, the daily CP ceiling, the trophy purchase or
+      # the cash redemption is racing. None of those may be merged around.
+      - name: Money integrity (Gate 2)
+        run: DEMO_DB=1 npx tsx tests/db/concurrency.mts
+
+      - name: Phase-0 integrity
+        run: DEMO_DB=1 npx tsx tests/db/integrity.mts
+
+      - name: Full database suite
+        run: npm test
+
+      # A build catches the whole class of failure `tsc` does not: Next traces
+      # the module graph across the client boundary even for type-only and
+      # dynamic imports, so a server-only module reached from a client component
+      # fails HERE while the type-check stays green. It has cost this project
+      # days more than once.
+      - name: Build
+        run: DEMO_DB=1 npm run build

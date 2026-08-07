@@ -18,7 +18,7 @@ const ok = (name: string, cond: boolean, detail = "") => {
 const eq = (name: string, got: unknown, want: unknown) =>
   ok(name, JSON.stringify(got) === JSON.stringify(want), `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 
-const { awardQuestAction, capsToday, cpEarnedToday, getUserQuests } = await import("../../lib/quests.ts");
+const { ACTION_CATALOG, awardQuestAction, capsToday, cpEarnedToday, getUserQuests } = await import("../../lib/quests.ts");
 const { getDb, schema } = await import("../../lib/db/index.ts");
 const { eq: sqlEq } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
@@ -30,13 +30,17 @@ await db.insert(schema.users).values({
 } as never);
 
 console.log("== past the cap, the action still works ==");
-// join_planet pays 10 and caps at 1.
+// join_planet caps at 1. Its weight is read from ACTION_CATALOG rather than
+// written down here: B61's reprice moved it from 10 to 25 and this file went
+// red with a stale fixture, which is a test failing for the one reason a test
+// must not — it was asserting a copy of the number instead of the number.
 let threw = false;
 try {
   for (let i = 0; i < 4; i++) await awardQuestAction(db, id, "join_planet", { refType: "pl", refId: `p${i}` });
 } catch { threw = true; }
 ok("awarding past the cap does not throw", !threw);
-eq("…and pays exactly the cap, not four times it", await cpEarnedToday(db, id), 10);
+const PLANET_CP = ACTION_CATALOG.find((a) => a.key === "join_planet")!.defaultWeight;
+eq("…and pays exactly the cap, not four times it", await cpEarnedToday(db, id), PLANET_CP);
 
 console.log("\n== and it is disclosed, exactly ==");
 const caps = await capsToday(db, id);
@@ -45,7 +49,7 @@ ok("the maxed action is listed", !!planet);
 eq("…with the real figure", [planet?.used, planet?.cap], [1, 1]);
 ok("…and marked maxed", !!planet?.maxed);
 ok("maxed actions sort first", caps.actions[0]?.maxed !== false);
-eq("what has been earned today is stated", caps.earned, 10);
+eq("what has been earned today is stated", caps.earned, PLANET_CP);
 eq("…against the ceiling", caps.ceiling, 500);
 ok("the ceiling is not hit on ten points", !caps.ceilingHit);
 

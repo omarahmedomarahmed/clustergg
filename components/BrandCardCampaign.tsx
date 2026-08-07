@@ -23,6 +23,8 @@ export type CardCreativeView = {
   clickUrl: string | null;
   impressions: number;
   clicks: number;
+  /** `pending_review` until an admin approves it. Nothing serves before then. */
+  reviewStatus: string;
 };
 
 export default function BrandCardCampaign({
@@ -45,6 +47,10 @@ export default function BrandCardCampaign({
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const hero = creatives[0]?.fileUrl ?? null;
+  // Uploaded, not yet approved. The brand is owed this on the screen: without
+  // it they see art in the rotation list, nothing being served, and no reason.
+  const inReview = !live && creatives.some((c) => c.reviewStatus === "pending_review");
+  const rejected = creatives.filter((c) => c.reviewStatus === "rejected");
 
   // Exactly what Discord will render, composed the same way the bot composes
   // it. A brand should never have to publish something to find out how it reads
@@ -74,7 +80,11 @@ export default function BrandCardCampaign({
         fd.set("clickUrl", clickUrl);
         fd.set("ctaLabel", ctaLabel);
         const r = await portalLaunchCardCreative(brandId, keyStr, fd);
-        setMsg(r?.error ?? (creatives.length ? "Added to the rotation." : "You're live. The next card the bot draws can carry it."));
+        // NOT "you're live" any more. A self-serve upload waits for review
+        // (`app/actions/brand-portal.ts`), and telling a brand they are live
+        // when nothing is serving is the small version of the same lie the
+        // fabricated ROAS was.
+        setMsg(r?.error ?? "Uploaded — in review. We check every creative before it serves; usually within a working day, and you'll see it flip to Live here.");
       });
     } catch (e) {
       // Say WHY. "Upload failed" on a brand's own creative, with no reason, is
@@ -107,13 +117,13 @@ export default function BrandCardCampaign({
             Cluster renders a card whenever a gamer opens their profile, a leaderboard, a challenge or a
             planet inside Discord. Your creative sits in that card
             {reach.servers > 0 && <> — across <b className="text-ink">{n(reach.servers)}</b> servers and <b className="text-ink">{n(reach.gamers)}</b> gamers</>}.
-            Upload one image and it starts serving.
+            Upload one image; it serves as soon as we've reviewed it.
           </p>
         </div>
         <span className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold ${
           live ? "border-emerald-400/40 bg-emerald-500/10 text-emerald-300" : "border-white/15 text-muted"
         }`}>
-          {live ? "● Live" : status ? `○ ${status}` : "○ Not running"}
+          {live ? "● Live" : inReview ? "○ In review" : status ? `○ ${status}` : "○ Not running"}
         </span>
       </div>
 
@@ -208,6 +218,26 @@ export default function BrandCardCampaign({
           {msg && <div className="text-[11px] text-violet-200">{msg}</div>}
         </div>
       </div>
+
+      {(inReview || rejected.length > 0) && (
+        <div className={`mt-5 rounded-xl border px-4 py-3 text-sm ${
+          rejected.length
+            ? "border-rose-400/30 bg-rose-500/10 text-rose-100"
+            : "border-amber-400/30 bg-amber-500/10 text-amber-100"
+        }`}>
+          {rejected.length > 0 ? (
+            <>
+              <b>{rejected.length === 1 ? "A creative was" : `${rejected.length} creatives were`} not approved.</b>{" "}
+              Replace the art or the destination and upload again — message us on the Messages tab if you want the reason.
+            </>
+          ) : (
+            <>
+              <b>In review.</b> Every creative is checked by a human before it renders inside somebody&apos;s
+              Discord server — usually within a working day. Nothing is served, and nothing is billed, until it clears.
+            </>
+          )}
+        </div>
+      )}
 
       {creatives.length > 0 && (
         <div className="mt-5">

@@ -32,6 +32,18 @@ export type CardCreative = {
   createdAt: Date;
   impressions: number;
   clicks: number;
+  /**
+   * The creative's OWN review state, separate from the campaign's.
+   *
+   * A self-serve upload is born `pending_review` (`app/actions/brand-portal.ts`)
+   * and `serveAds` refuses anything that is not `approved` (`lib/ads.ts:67`).
+   * Before that gate was restored every creative from this path was born
+   * approved, so this field would always have read the same thing and the
+   * portal never showed it. Now a brand can upload art and correctly see
+   * nothing being served, and they are owed the reason on the screen rather
+   * than left to conclude the product is broken.
+   */
+  reviewStatus: string;
 };
 
 export type CardCampaign = {
@@ -60,6 +72,7 @@ export async function getCardCampaign(db: DB, brandId: string, placementKey: str
     clickUrl: schema.adCreatives.clickUrl,
     ctaLabel: schema.adCreatives.ctaLabel,
     createdAt: schema.adCreatives.createdAt,
+    reviewStatus: schema.adCreatives.status,
     retiredAt: schema.adCampaignCreatives.retiredAt,
     campaignId: schema.adCampaigns.id,
     campaignName: schema.adCampaigns.name,
@@ -107,6 +120,7 @@ export async function getCardCampaign(db: DB, brandId: string, placementKey: str
     creatives: liveRows.map((r) => ({
       campaignCreativeId: r.ccId, creativeId: r.creativeId, fileUrl: r.fileUrl,
       clickUrl: r.clickUrl, ctaLabel: r.ctaLabel, createdAt: r.createdAt,
+      reviewStatus: r.reviewStatus,
       impressions: impBy.get(r.ccId) ?? 0, clicks: clickBy.get(r.ccId) ?? 0,
     })),
     // …but the placement's totals span everything that ever ran in it,
@@ -116,7 +130,13 @@ export async function getCardCampaign(db: DB, brandId: string, placementKey: str
     clicks: [...clickBy.values()].reduce((a, b) => a + b, 0),
     // What the rotation engine actually requires — stated here so the portal
     // can say "live" or "not live" for the same reasons `serveAds` does.
-    live: liveRows.some((r) => r.status === "active" && r.startDate.getTime() <= now && r.endDate.getTime() >= now),
+    // Includes the CREATIVE's approval, which this check used to omit. It was
+    // invisible while the portal minted approved creatives; with the review gate
+    // restored, an active campaign whose only art is pending is NOT live, and
+    // saying otherwise here would be the same class of false statement to a
+    // customer that the fabricated ROAS was.
+    live: liveRows.some((r) => r.status === "active" && r.reviewStatus === "approved"
+      && r.startDate.getTime() <= now && r.endDate.getTime() >= now),
   };
 }
 

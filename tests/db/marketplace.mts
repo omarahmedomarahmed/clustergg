@@ -22,7 +22,7 @@ const { getDb, schema } = await import("../../lib/db/index.ts");
 const { and, eq } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
 const {
-  priceOf, cpWallet, buyTrophy, marketplaceCatalog, marketplaceWallet, marketplaceOrders,
+  priceOf, cpWallet, cpSpent, buyTrophy, marketplaceCatalog, marketplaceWallet, marketplaceOrders,
   DEFAULT_CP_PER_DOLLAR, TIER_MULTIPLIER,
 } = await import("../../lib/marketplace.ts");
 const { getTotalCp } = await import("../../lib/quests.ts");
@@ -145,7 +145,18 @@ try {
   ok("their balance is spent", left < priced.cpPrice, `${left} vs ${priced.cpPrice}`);
   const again = await buyTrophy(nova.id, priced.id);
   ok("a second purchase is refused on the SERVER, not by the page", !again.ok);
-  ok("the balance never went negative", (await cpWallet(db, nova.id)).balance >= 0);
+  // NOT `balance >= 0`. That was the assertion the due-diligence report called
+  // vacuous and it was right: `cpWallet` returns `Math.max(0, earned - spent)`
+  // (`lib/marketplace.ts:141`), so the number it hands back cannot be negative
+  // whatever the ledger says. It asserted the clamp, not the money.
+  //
+  // The real invariant is on the UNCLAMPED difference: CP spent must never
+  // exceed CP earned. Overspending is visible there and nowhere else.
+  {
+    const earned = await getTotalCp(db, nova.id);
+    const spent = await cpSpent(db, nova.id);
+    ok("no CP was spent that was never earned", spent <= earned, `spent ${spent} of ${earned}`);
+  }
 
   // Two of the same trophy is legitimate — they are worth cash, and a gamer
   // saving up for two is not a bug. Worth proving, because `user_trophies` has
