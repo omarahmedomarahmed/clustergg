@@ -16,7 +16,7 @@ import { portalBuyCampaign } from "@/app/actions/brand-portal";
 // Two things are said plainly rather than buried, because both are unusual and
 // both are the reason to buy:
 //
-//   * 70% of the money is prize money. A brand is not renting attention, it is
+//   * Half the money is prize money. A brand is not renting attention, it is
 //     paying gamers to play — inside the servers they already live in.
 //   * There are no setup fees, no ad ops and no staff. The whole month is the
 //     number on the button.

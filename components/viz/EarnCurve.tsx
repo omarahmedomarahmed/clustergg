@@ -3,7 +3,7 @@ import { money, type PricingConfig } from "@/lib/pricing";
 
 // What a server's community plays for as more of it connects.
 //
-// This curve is about the PRIZE money — the 70% that gamers win, not the
+// This curve is about the PRIZE money — the share gamers win, not the
 // owner's own share of the platform fee. The two are separate and are shown
 // separately: an owner's cut rises in steps at 500 / 1,000 / 5,000 linked
 // gamers (see `lib/server-earnings.ts` and the ladder), while this rises

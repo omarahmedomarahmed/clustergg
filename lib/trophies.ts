@@ -95,13 +95,20 @@ export async function awardChallengeTrophies(db: DB, challengeId: string) {
   const winners = await db.select({ userId: schema.challengeParticipants.userId, place: schema.challengeParticipants.finalPlacement })
     .from(schema.challengeParticipants)
     .where(and(eq(schema.challengeParticipants.challengeId, challengeId), inArray(schema.challengeParticipants.finalPlacement, [1, 2, 3])));
+  const awardedTrophyIds: string[] = [];
   for (const w of winners) {
     const place = Number(w.place);
     for (const trophyId of byPlace[place] ?? []) {
       try {
-        await db.insert(schema.userTrophies)
+        const rows = await db.insert(schema.userTrophies)
           .values({ id: uid(), userId: w.userId, trophyId, challengeId, placement: place })
-          .onConflictDoNothing();
+          .onConflictDoNothing()
+          .returning();
+        // Only trophies that were actually INSERTED count toward the value
+        // awarded. This function is idempotent and gets re-run; counting the
+        // ones a conflict skipped would commit the prize vault twice for the
+        // same podium.
+        if (rows.length) awardedTrophyIds.push(trophyId);
         await db.insert(schema.notifications).values({
           id: uid(), userId: w.userId, type: "trophy",
           title: `You won a trophy in ${c.title}!`,
@@ -111,4 +118,76 @@ export async function awardChallengeTrophies(db: DB, challengeId: string) {
       } catch { /* non-fatal */ }
     }
   }
+  await commitPrizes(db, { challengeId, title: c.title, sponsorPrice: Number(c.sponsorPrice ?? 0), awardedTrophyIds });
+}
+
+/**
+ * The prize percentage, read through the CALLER'S handle.
+ *
+ * Not `pricingConfig()`, which goes through `lib/cms.ts` → `getDb()`. This runs
+ * inside challenge completion, which runs during the demo bootstrap — and a
+ * fresh `getDb()` there awaits the very bootstrap that is calling it. That
+ * deadlock has now appeared twice in this codebase, both times through a
+ * convenience helper that opens its own connection, so the rule is written
+ * where the next person will hit it: **anything reachable from a seed or a
+ * transaction takes the handle it was given.**
+ */
+async function prizePctOn(db: DB): Promise<number> {
+  const { PRICING_DEFAULTS } = await import("@/lib/pricing");
+  try {
+    const [row] = await db.select({ value: schema.platformSettings.value })
+      .from(schema.platformSettings)
+      .where(eq(schema.platformSettings.key, "pricing.prizePct")).limit(1);
+    const n = Number(String(row?.value ?? "").replace(/"/g, ""));
+    return Number.isFinite(n) && n > 0 && n <= 100 ? n : PRICING_DEFAULTS.prizePct;
+  } catch { return PRICING_DEFAULTS.prizePct; }
+}
+
+/**
+ * Move the awarded value out of the prize vault, and check it against the pool.
+ * C13 + C15.
+ *
+ * A prize becomes a LIABILITY the moment it is awarded, not the moment it is
+ * redeemed — the gamer holds something we owe them, and a vault that only
+ * moves on redemption would show money we do not have. So the commitment is
+ * posted here, at award time, and redemption later is a settlement of it rather
+ * than a new event.
+ *
+ * Nothing here is allowed to fail the award. A gamer who won a trophy has won
+ * it whether or not our bookkeeping worked, and throwing from inside the awards
+ * loop would leave a podium half-given.
+ */
+async function commitPrizes(db: DB, opts: {
+  challengeId: string;
+  title: string;
+  sponsorPrice: number;
+  awardedTrophyIds: string[];
+}): Promise<void> {
+  if (!opts.awardedTrophyIds.length) return;
+  try {
+    const { postToLedger } = await import("@/lib/vaults");
+    const { promisedPool, reconcilePrizes, needsAttention } = await import("@/lib/prize-reconcile");
+
+    const ids = [...new Set(opts.awardedTrophyIds)];
+    const rows = await db.select({ id: schema.trophies.id, value: schema.trophies.value })
+      .from(schema.trophies).where(inArray(schema.trophies.id, ids));
+    const valueOf = new Map(rows.map((r) => [r.id, Number(r.value ?? 0)]));
+    // Summed over the AWARDS, not over the distinct trophies — the same trophy
+    // can go to three people, and it is worth its value three times.
+    const awarded = Math.round(opts.awardedTrophyIds.reduce((s, id) => s + (valueOf.get(id) ?? 0), 0) * 100) / 100;
+
+    const promised = promisedPool(opts.sponsorPrice, await prizePctOn(db));
+    const r = reconcilePrizes({ promised, awarded });
+
+    await postToLedger(db, [{
+      vault: "prize",
+      amount: -awarded,
+      kind: "payout",
+      refType: "challenge",
+      refId: opts.challengeId,
+      // The discrepancy is written into the row itself rather than to a log.
+      // A reconciliation you have to go and look for is one nobody looks for.
+      reason: needsAttention(r) ? `${opts.title} — ${r.note}` : `${opts.title} — podium awarded.`,
+    }]);
+  } catch { /* bookkeeping must never cost a gamer their trophy */ }
 }

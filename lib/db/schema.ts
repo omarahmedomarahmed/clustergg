@@ -382,9 +382,11 @@ export const challenges = pgTable("challenges", {
   // ===== Sponsorship =====
   //
   // A sponsored challenge is one a brand bought. It is the unit of the whole
-  // business — the brand's money enters here, 70% of it leaves as prize money
-  // to gamers, and the rest is split between the servers that carried it and
-  // Cluster. None of that arithmetic can be done without knowing which brand
+  // business — the brand's money enters here, and `pricing.prizePct` of it (50%
+  // under COMMERCIAL_MODEL_V2 §2) leaves as prize money to gamers, with the
+  // rest split between the server pool, the CP vault and Cluster. The figure
+  // used to be written here as 70%, which stopped being true and could not be
+  // noticed, which is exactly why it is a percentage in one place now. None of that arithmetic can be done without knowing which brand
   // paid and how much, so it is recorded on the challenge itself rather than
   // inferred from a campaign later.
   /**

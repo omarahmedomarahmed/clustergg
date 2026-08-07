@@ -11,6 +11,10 @@ import {
   nextInvoiceNumber, payToken,
 } from "@/lib/invoices";
 import { uid } from "@/lib/utils";
+import {
+  allocateInvoice as allocatePaidInvoice,
+  reverseInvoiceAllocation as reverseAllocation,
+} from "@/lib/vaults";
 
 // Everything staff can do to a bill.
 //
@@ -317,6 +321,10 @@ export async function markInvoicePaid(invoiceId: string, formData: FormData): Pr
     .set({ status: "paid", paidAt: new Date(), paidVia, paidRef })
     .where(eq(schema.brandInvoices.id, invoiceId));
   await audit(admin.id, "invoice.paid", invoiceId, { paidVia, paidRef });
+  // C13. The vaults hold money that has ARRIVED, so this is the moment the
+  // four shares are posted — idempotent, because `setInvoiceStatus` can reach
+  // the same state and a webhook may reach it a third time.
+  await allocatePaidInvoice(db, invoiceId);
   await emailBrandAboutInvoice(db, invoiceId, "invoice.paid");
   refresh();
   return { ok: true, message: `${inv.number} marked paid.` };
@@ -335,6 +343,11 @@ export async function setInvoiceStatus(invoiceId: string, status: string): Promi
   // and forth internally is not.
   if (status === "sent") await emailBrandAboutInvoice(db, invoiceId, "invoice.issued");
   if (status === "paid") await emailBrandAboutInvoice(db, invoiceId, "invoice.paid");
+  // C13. Both directions. An invoice moved back out of "paid" had money in the
+  // vaults that never arrived, and leaving it there would have every payout
+  // below drawing on a promise.
+  if (status === "paid") await allocatePaidInvoice(db, invoiceId);
+  else await reverseAllocation(db, invoiceId);
   refresh();
   return { ok: true };
 }

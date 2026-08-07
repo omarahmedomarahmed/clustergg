@@ -194,6 +194,99 @@ console.log("\n== C7: a package can be a mix of games ==");
     JSON.stringify(campaignGames({ game: "Chess", slotState: [] })) === JSON.stringify(["Chess"]));
 }
 
+console.log("\n== C13: money reaches a vault only when it has ARRIVED ==");
+{
+  const { getDb, schema } = await import("../../lib/db/index.ts");
+  const { allocateInvoice, reverseInvoiceAllocation, balances, currentSplit } =
+    await import("../../lib/vaults.ts");
+  const { eq: sqlEq, and: sqlAnd } = await import("drizzle-orm");
+  const { uid } = await import("../../lib/utils.ts");
+  const db = await getDb();
+
+  const mkInvoice = async (status: string, qty: number, unit: number) => {
+    const [brand] = await db.select({ id: schema.brands.id }).from(schema.brands).limit(1);
+    const id = uid();
+    await db.insert(schema.brandInvoices).values({
+      id, brandId: brand.id, number: `T-${id.slice(0, 6)}`, status,
+      currency: "USD", periodLabel: "test", issuedAt: new Date(), dueAt: new Date(),
+      payToken: uid(), ...(status === "paid" ? { paidAt: new Date() } : {}),
+    });
+    await db.insert(schema.invoiceLines).values({
+      id: uid(), invoiceId: id, kind: "campaign", label: "test",
+      quantity: qty, unitAmount: unit, sortOrder: 0,
+    });
+    return id;
+  };
+  const rowsFor = (id: string) => db.select({ vault: schema.vaultLedger.vault, amount: schema.vaultLedger.amount })
+    .from(schema.vaultLedger)
+    .where(sqlAnd(sqlEq(schema.vaultLedger.refType, "invoice"), sqlEq(schema.vaultLedger.refId, id)));
+
+  // An invoice that has been SENT is a promise. Allocating it would fill the
+  // vaults with money nobody sent, and every payout would draw on that.
+  const unpaid = await mkInvoice("sent", 4, 350);
+  ok("an unpaid invoice allocates nothing", (await allocateInvoice(db, unpaid)) === null);
+  ok("…and writes no rows", (await rowsFor(unpaid)).length === 0);
+
+  const before = await balances(db);
+  const paid = await mkInvoice("paid", 4, 350);
+  const res = await allocateInvoice(db, paid);
+  ok("a paid invoice allocates", !!res);
+  ok("…at its LINES, not a stored total", res?.total === 1400, String(res?.total));
+  const rows = await rowsFor(paid);
+  ok("…as one row per vault", rows.length === 4, String(rows.length));
+  const sum = rows.reduce((a, r) => a + Number(r.amount), 0);
+  near("…summing to every cent of the invoice", sum, 1400, 0.005);
+
+  const split = await currentSplit(db);
+  const prizeRow = rows.find((r) => r.vault === "prize");
+  near("the prize vault gets its share", Number(prizeRow?.amount), 1400 * (split.prize / 100));
+
+  const after = await balances(db);
+  near("balances moved by exactly that", after.prize - before.prize, 1400 * (split.prize / 100));
+
+  // Two admin actions and a webhook can all mark the same invoice paid.
+  ok("a second allocation is refused", (await allocateInvoice(db, paid)) === null);
+  ok("…and no fifth row appeared", (await rowsFor(paid)).length === 4);
+
+  // Un-paying REVERSES, never deletes — a ledger you can delete from is one
+  // nobody can reconcile.
+  ok("reversing works", (await reverseInvoiceAllocation(db, paid)) === true);
+  const reversed = await rowsFor(paid);
+  ok("…by adding rows rather than removing them", reversed.length === 8, String(reversed.length));
+  near("…leaving a net of zero", reversed.reduce((a, r) => a + Number(r.amount), 0), 0, 0.005);
+  ok("…and reversing twice does nothing", (await reverseInvoiceAllocation(db, paid)) === false);
+}
+
+console.log("\n== C15: a challenge is checked against what it promised ==");
+{
+  const { promisedPool, reconcilePrizes, needsAttention } = await import("../../lib/prize-reconcile.ts");
+  // The pool is a percentage of what the brand paid for THIS challenge.
+  near("a $350 challenge promises $175", promisedPool(350, 50), 175);
+  near("…and an unsponsored one promises nothing", promisedPool(0, 50), 0);
+
+  const good = reconcilePrizes({ promised: 175, awarded: 175 });
+  ok("a matching podium is quiet", good.verdict === "matches" && !needsAttention(good));
+  // The two failures that had no detector at all.
+  const under = reconcilePrizes({ promised: 175, awarded: 40 });
+  ok("under-awarding is caught", under.verdict === "under" && needsAttention(under));
+  ok("…and the note names both numbers", /175/.test(under.note) && /40/.test(under.note), under.note);
+  const over = reconcilePrizes({ promised: 175, awarded: 400 });
+  ok("over-awarding is caught", over.verdict === "over" && needsAttention(over));
+  ok("…and says the vault was not funded for it", /vault/.test(over.note), over.note);
+
+  // A house-funded challenge has no brand money to reconcile against, which is
+  // not the same as promising zero and awarding zero.
+  const house = reconcilePrizes({ promised: 0, awarded: 25 });
+  ok("an unsponsored challenge is not a discrepancy",
+    house.verdict === "unfunded" && !needsAttention(house));
+
+  // Trophies are whole dollars; a pool is a percentage of a price. $333 × 50%
+  // is $166.50 and no set of dollar trophies lands on it.
+  ok("a dollar of slack is allowed",
+    reconcilePrizes({ promised: 166.5, awarded: 166 }).verdict === "matches");
+  ok("…but not two", reconcilePrizes({ promised: 166.5, awarded: 164 }).verdict === "under");
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);
