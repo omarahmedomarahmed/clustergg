@@ -219,6 +219,50 @@ to have vanished.
 
 ---
 
+### ▸ B86 — Start the clock on data we cannot backfill · **DO THIS WEEK**
+
+**Ahead of everything, including B72.** Not because it is more urgent than a
+live defect, but because it is the only item with a **deadline that has already
+started running.** Every week without it is a week of history that cannot be
+reconstructed, and the server competition cannot score its first week without
+it.
+
+| Add | Why |
+|---|---|
+| `challenge_participants.guildId` | Today one entrant counts for **every** server they belong to. Σ shares > 1. |
+| Weekly guild snapshot — member count + qualified-linked count | There is **no history**, so "growth vs last week" cannot be computed at all. |
+| Vault ledger table | Every inflow, outflow and transfer, from day one. |
+| Exclusive-entrant weighting (1/k) | The dedup the scoring rests on. |
+
+Purely additive. One migration, one nightly job, breaks nothing.
+
+**Verification owed → `tests/db/attribution.mts` (new):** an entrant in three
+participating servers contributes 1/3 to each; Σ across servers never exceeds
+the true entrant count; a snapshot is written once per guild per week and is
+idempotent on re-run.
+
+---
+
+### ▸ B87 — The model's four blockers
+
+`docs/COMMERCIAL_MODEL_V2.md` §0 lists what the model describes and the code
+cannot do. **C4 and C5 are B86.** These are the other two, plus the cleanup.
+
+| # | Fix |
+|---|---|
+| **C1** | The daily CP number is delivered by setting `dailyCpCeiling` and scaling **mission-eligible weights only**. Never a mission-completion bonus — `missions.ts:7-9` says why. |
+| **C2** | `prizePool` becomes a **percentage**. It is $175 hard-coded today and the split is derived *from* it, so moving the price silently changes the prize share. |
+| **C3** | Delete the `ownerPctFor` payout path in **all four** places, including the public `/servers` ladder promising "25% of every sponsored challenge". |
+| **C6** | `SLOTS_PER_CAMPAIGN` floor of 4 → allow 1–4. |
+| **C7** | A campaign is one game × 4 weeks. Give mixed-game packages a row shape. |
+| **C8** | `sponsorsUseHouseInventory: true` double-counts $175 per challenge against the new prize funding. Resolve. |
+| **C9** | `cp-rate.ts` justifies the CP rate on ad revenue that is now $0. Restate: **CP is 15% cost of goods.** |
+| **C10** | `PAYOUT_HOLD_DAYS = 30` vs "weekly pool" — say "earned weekly, paid after the hold", or change the hold. |
+| **C11** | `reachBase`/`challengeBase`/`ultimateBase`/`streamAddon` still price the live `/pricing` page. |
+| **C12** | Define "expected active gamers". It is the denominator of everyone's pay and it does not exist. |
+
+---
+
 ### ▸ B72 — Stop the bleeding *(4 items remain)*
 
 #### B72.1 — Kill the fabricated ROAS
@@ -435,7 +479,12 @@ One component, two presentations. Hero section with real visuals: what CP is,
 how you earn it, what unlocking gives you, and one bold **"Free to unlock"**
 button. An expandable **Know more** section carrying the gamer guide (B84).
 
-#### B83.5 — The profile editor shows the real card
+#### B83.5 — The profile editor shows the real card · **DEFERRED**
+
+Genuinely expensive: every preview is a render against a 4,000/day cap
+(`lib/cards/budget.ts:22`). Right feature, wrong quarter — it needs its own
+budget line, which is B77.
+
 
 The customization editor gains a **switch between the web profile and their
 actual bot card**, driven by the same controls.
@@ -461,7 +510,11 @@ accrued.
 
 ---
 
-### ▸ B84 — The gamer guide, visual only
+### ▸ B84 — The gamer guide, visual only · **DEFERRED**
+
+Guide the new economy **once, after it stops moving.** Writing a visual guide to
+a CP number that is about to change is work we would throw away.
+
 
 **Text exists only to name or define a visual.** Built from **real trophies and
 real challenges we actually have**, not lorem.
@@ -496,7 +549,10 @@ globe/space art" (`layout.ts:399`) while only ever resolving the background.
 Then an audit of every card kind against its web counterpart, starting with
 planet vs planet-explore, which is the widest gap.
 
-#### B85.3 — The admin layout editor, revamped
+#### B85.3 — The admin layout editor, revamped · **DEFERRED**
+
+§8 says do not build admin for an unvalidated model. This is admin.
+
 
 `4773493` stopped stale layouts being applied. The editor itself is still built
 for the old frame.
@@ -513,15 +569,24 @@ for the old frame.
 
 ---
 
-### ▸ B75 — Deliver what was sold
+### ▸ B75 — Deliver what was sold · **CUT TO THREE ITEMS**
 
-Only once a view is defined and logged.
+**Ads are included free now, so there is nothing to pace, target, or make good
+on.** Items 1, 2, 3 and 7 below are deleted. What survives is what keeps the
+*reporting* honest — and it still matters, because we report ad views as proof
+of work: if only `creatives[0]` ever serves, the report is wrong for every other
+brand.
 
-1. Target and delivered per campaign; `cpm` and `viewsTarget` so a floor price is
-   enforceable by the system, not by an email.
-2. Pacing across the flight.
-3. Stop at target.
-4. Frequency cap — one gamer does not see one brand forty times.
+**Moved AHEAD of B82.** A brand report that can be padded ships before the
+control that stops padding, otherwise.
+
+~~1. Target and delivered per campaign.~~ **Deleted — nothing is sold by volume.**
+~~2. Pacing across the flight.~~ **Deleted.**
+~~3. Stop at target.~~ **Deleted.**
+
+4. **Frequency cap** — and it is now an *anti-fraud* control, not a courtesy:
+   every bot render logs an impression with no per-gamer cap, so anyone who can
+   make the bot draw a card can inflate a brand's report.
 5. **No silent cutoff (B65)**: `maxCreativesInRotation` drops paying brands, and
    the bot-post surface serves `creatives[0]` only. Both are money taken for
    delivery not made.
@@ -581,6 +646,10 @@ their own line in this budget.**
 
 ---
 
+</details>
+
+---
+
 ### ▸ B79 — Earn the right to sell
 
 - **Instrument three numbers:** real counted views per daily-active gamer per day,
@@ -610,6 +679,11 @@ their own line in this budget.**
 **This section was wrong before.** It said "the remainder … none fatal alone" and
 listed five items. It was not the remainder, and it silently contained findings
 the reviewer rated **fatal**.
+
+> **PROMOTED OUT OF DEBT.** The weekly server pool is the **first mechanism on
+> this platform that pays cash directly for member counts.** Sybil defence was
+> tolerable as debt when nothing paid for growth. It is load-bearing now and
+> becomes a build item ahead of the first payout.
 
 **Abuse and identity**
 
@@ -663,7 +737,7 @@ the reviewer rated **fatal**.
 | **B56** (remainder) | Card kinds not yet on the new shared layout. |
 | **B68** | The social purge — posts, comments, reactions leave the product. |
 | **B66, B67, B69** | Admin sales console, brand portal rebuild, public site — **behind Gate 4**. |
-| **B70** | Component screenshots from seeded demo data. |
+| **B70** | Component screenshots — **deferred**, the surfaces are all about to change. |
 | `tests/ui/cards.mjs` | Owed since B54. |
 
 ---
