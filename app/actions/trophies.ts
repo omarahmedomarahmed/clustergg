@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { lockGamer, withTx } from "@/lib/db/tx";
 import { getCurrentUser, requireStaff } from "@/lib/auth";
 import { payer } from "@/lib/payments";
 import { METHOD_OPTIONS, savePayoutPreference } from "@/lib/payouts";
@@ -138,20 +139,43 @@ export async function requestRedeem(input: {
   // Lock the awards + compute the amount from the live trophy values.
   const ids = [...new Set(input.awardIds)].slice(0, 50);
   if (ids.length === 0) return { error: "Select at least one trophy." };
-  const awards = await db.select({ id: schema.userTrophies.id, value: schema.trophies.value })
-    .from(schema.userTrophies)
-    .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
-    .where(and(inArray(schema.userTrophies.id, ids), eq(schema.userTrophies.userId, user.id), eq(schema.userTrophies.status, "held")));
-  if (awards.length !== ids.length) return { error: "Some trophies are no longer available to redeem." };
-  const amount = awards.reduce((s, a) => s + Number(a.value ?? 0), 0);
-  if (amount <= 0) return { error: "These trophies have no redeemable value yet." };
-
   const redeemId = uid();
-  await db.insert(schema.trophyRedeems).values({
-    id: redeemId, userId: user.id, awardIds: ids, amount,
-    currency, method: input.method, status: "pending",
+
+  // B74 — the "are these still held?" check and the claim on them, in ONE
+  // transaction behind a lock on this gamer.
+  //
+  // This is the worst of the three races because it is the one denominated in
+  // DOLLARS. Two submissions of the same trophies — a double-click, a retried
+  // request, two tabs — both read status "held", both passed the check, and both
+  // created a redemption. Staff would then see two pending payouts for one
+  // trophy, and the honest ones get paid twice.
+  //
+  // The status update is also narrowed to rows still `held`, so even without the
+  // lock the second writer would claim nothing. Belt and braces on purpose: the
+  // lock is the correctness argument, the narrowed WHERE is what makes the
+  // failure visible instead of silent if somebody later moves this off the
+  // pooled driver.
+  const claim = await withTx(db, async (tx) => {
+    await lockGamer(tx, user.id);
+
+    const awards = await tx.select({ id: schema.userTrophies.id, value: schema.trophies.value })
+      .from(schema.userTrophies)
+      .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
+      .where(and(inArray(schema.userTrophies.id, ids), eq(schema.userTrophies.userId, user.id), eq(schema.userTrophies.status, "held")));
+    if (awards.length !== ids.length) return { error: "Some trophies are no longer available to redeem." as const };
+    const amount = awards.reduce((s, a) => s + Number(a.value ?? 0), 0);
+    if (amount <= 0) return { error: "These trophies have no redeemable value yet." as const };
+
+    await tx.insert(schema.trophyRedeems).values({
+      id: redeemId, userId: user.id, awardIds: ids, amount,
+      currency, method: input.method, status: "pending",
+    });
+    await tx.update(schema.userTrophies).set({ status: "pending" })
+      .where(and(inArray(schema.userTrophies.id, ids), eq(schema.userTrophies.status, "held")));
+    return { amount };
   });
-  await db.update(schema.userTrophies).set({ status: "pending" }).where(inArray(schema.userTrophies.id, ids));
+  if ("error" in claim) return { error: claim.error };
+  const { amount } = claim;
 
   // Cashing out earns on the ascension quest (B15).
   //

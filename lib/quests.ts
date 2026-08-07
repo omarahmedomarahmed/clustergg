@@ -4,6 +4,7 @@ import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
 import type { MissionConfig, QuestGameUi, QuestRule, StarterMissions } from "@/lib/quest-game";
+import { lockGamer, withTx } from "@/lib/db/tx";
 
 // ===== Action catalog =====
 // The set of trackable actions the engine knows how to emit. A quest "listens"
@@ -479,7 +480,40 @@ export async function cpEarnedToday(db: DB, userId: string): Promise<number> {
 export async function awardQuestAction(
   db: DB, userId: string, actionKey: QuestActionKey, ref?: { refType?: string; refId?: string },
 ): Promise<void> {
+  // B74. The ceiling used to be read here and written to a few lines later on
+  // the HTTP driver, which cannot hold a transaction — so two awards landing
+  // together both read the same "already earned today", both found the same
+  // room under 500, and both paid. The daily ceiling IS the cost model, so a
+  // race on it is a race on the only number that keeps a gamer's cost bounded.
+  //
+  // Everything below now runs inside one transaction on the pooled driver,
+  // behind a lock on this gamer's own row. Two gamers never wait on each other;
+  // two awards for the SAME gamer are serialized, which is exactly the scope of
+  // the invariant being protected.
+  //
+  // `db` is the caller's handle. In production the work moves to the pooled
+  // connection; in demo mode `withTx` transacts on this very handle, because
+  // PGlite is one in-process database and re-entering `getDb()` here deadlocks
+  // against the boot seed that awards CP while `getDb()` is still resolving.
   try {
+    await withTx(db, async (tx) => {
+      await lockGamer(tx, userId);
+      await awardQuestActionLocked(tx, userId, actionKey, ref);
+    });
+  } catch (e) {
+    // Gamification must never block the real action underneath it — a gamer who
+    // joined a challenge joined it, whatever the ledger did. But the report's
+    // finding was that a bare `catch {}` made a failed write indistinguishable
+    // from a successful one, so this one is narrow and it SAYS SO.
+    console.error(`[cp] award failed: user=${userId} action=${actionKey}`, e);
+  }
+}
+
+/** The body, with the lock already held. Every read below is inside the transaction. */
+async function awardQuestActionLocked(
+  db: DB, userId: string, actionKey: QuestActionKey, ref?: { refType?: string; refId?: string },
+): Promise<void> {
+  {
     const activeQuests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true));
     const listening = activeQuests.filter((q) => Number((q.actionWeights as Record<string, number>)[actionKey] ?? 0) > 0)
       // Stable order, so "the quest that gets paid" is the same on every run and
@@ -530,7 +564,7 @@ export async function awardQuestAction(
       await unlockTiers(db, userId, quest.id, quest.name);
       await maybeCompleteQuest(db, userId, quest.id, quest.name);
     }
-  } catch { /* gamification is non-fatal — never block the underlying action */ }
+  }
 }
 
 // When current-cycle QP passes the top tier, the quest is "completed": award a

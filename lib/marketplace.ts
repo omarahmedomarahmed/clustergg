@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema, type DB } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { awardQuestAction, getTotalCp } from "@/lib/quests";
+import { lockGamer, withTx } from "@/lib/db/tx";
 
 // The trophy marketplace: what Cluster Points are FOR.
 //
@@ -219,32 +220,56 @@ export async function buyTrophy(
   const rate = await cpPerDollar(db);
   const price = priceOf(trophy, rate);
 
-  // Re-read the balance here, never trust the page.
-  const wallet = await cpWallet(db, buyerId);
-  if (wallet.balance < price) {
-    return {
-      ok: false,
-      error: `That costs ${price.toLocaleString()} CP and you have ${wallet.balance.toLocaleString()}. Keep playing — every quest action earns, whether or not you win the challenge.`,
-    };
-  }
-
   const orderId = uid();
   const awardId = uid();
 
-  await db.insert(schema.marketplaceOrders).values({
-    id: orderId, buyerId, recipientId, trophyId,
-    awardId, cpSpent: price, value: Number(trophy.value ?? 0),
-    kind: giftedTo ? "gift" : "self",
-    message: (opts.message ?? "").trim().slice(0, 200) || null,
+  // B74 — the balance read and the spend, in ONE transaction, behind a lock on
+  // the buyer's own row.
+  //
+  // Before this, "re-read the balance here, never trust the page" was as far as
+  // it went — and re-reading is exactly the half of the pattern that does not
+  // help. Two purchases submitted together both re-read the same balance, both
+  // found it sufficient, and both inserted: one balance, spent twice. The
+  // comment was right that the page cannot be trusted and wrong that a fresh
+  // read fixes it.
+  //
+  // The lock is on the GAMER, not on the wallet row, because there is no wallet
+  // row — a balance is a sum over `quest_events` and orders, and you cannot lock
+  // a sum. Serializing the gamer serializes every path that can move it.
+  const balance = await withTx(db, async (tx) => {
+    await lockGamer(tx, buyerId);
+
+    const wallet = await cpWallet(tx, buyerId);
+    if (wallet.balance < price) return null;
+
+    await tx.insert(schema.marketplaceOrders).values({
+      id: orderId, buyerId, recipientId, trophyId,
+      awardId, cpSpent: price, value: Number(trophy.value ?? 0),
+      kind: giftedTo ? "gift" : "self",
+      message: (opts.message ?? "").trim().slice(0, 200) || null,
+    });
+
+    // The award is an ordinary held trophy: it shows on the profile and it is
+    // redeemable for cash through the flow that already exists. `challengeId`
+    // stays null, which is what marks it as bought rather than won.
+    await tx.insert(schema.userTrophies).values({
+      id: awardId, userId: recipientId, trophyId,
+      challengeId: null, placement: 1, status: "held",
+    }).onConflictDoNothing();
+
+    return wallet.balance;
   });
 
-  // The award is an ordinary held trophy: it shows on the profile and it is
-  // redeemable for cash through the flow that already exists. `challengeId`
-  // stays null, which is what marks it as bought rather than won.
-  await db.insert(schema.userTrophies).values({
-    id: awardId, userId: recipientId, trophyId,
-    challengeId: null, placement: 1, status: "held",
-  }).onConflictDoNothing();
+  if (balance === null) {
+    // Read again for the message only. The decision was made under the lock;
+    // this is just so the number a gamer is shown is not stale by the time
+    // they read it.
+    const now = await cpWallet(db, buyerId);
+    return {
+      ok: false,
+      error: `That costs ${price.toLocaleString()} CP and you have ${now.balance.toLocaleString()}. Keep playing — every quest action earns, whether or not you win the challenge.`,
+    };
+  }
 
   // Tell the recipient, if it was a gift.
   if (giftedTo) {
@@ -277,7 +302,7 @@ export async function buyTrophy(
 
   return {
     ok: true, orderId, awardId, cpSpent: price,
-    balance: wallet.balance - price, trophy: trophy.name, gifted: giftedTo,
+    balance: balance - price, trophy: trophy.name, gifted: giftedTo,
   };
 }
 
