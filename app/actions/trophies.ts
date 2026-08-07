@@ -69,8 +69,17 @@ export async function requestRedeem(input: {
   method: string;
   /** ISO-3166 alpha-2, so the provider offers methods that exist where they live. */
   country?: string;
-  /** yyyy-mm-dd. Asked for at the first redemption and only there (B37). */
-  birthDate?: string;
+  /**
+   * The age BAND, if they are answering it here. B72.4.
+   *
+   * Was `birthDate`, a yyyy-mm-dd asked for at the first redemption — which is
+   * the worst possible moment, because by then we hold a child's identity,
+   * their linked accounts and their activity, and the answer converts all of it
+   * into COPPA "actual knowledge". The band is now asked on sign-in; this
+   * remains only so a gamer who somehow reaches redemption without one can
+   * answer without being sent away.
+   */
+  ageBand?: string;
 }): Promise<{ ok?: true; error?: string; needs?: ("age" | "country")[] }> {
   const user = await getCurrentUser();
   if (!user) return { error: "Sign in first." };
@@ -84,14 +93,16 @@ export async function requestRedeem(input: {
   // your country" after the trophies have moved to `pending` is the failure this
   // exists to prevent.
   {
-    const { eligibilityFor, eligibilityOf, ageFrom } = await import("@/lib/eligibility");
+    const { eligibilityFor, eligibilityOf, ageForBand } = await import("@/lib/eligibility");
     // Anything supplied on this submission is saved first, so a gamer answering
     // the question is not refused for not having answered it.
     const patch: Record<string, unknown> = {};
-    if (input.birthDate) {
-      const d = new Date(input.birthDate);
-      if (Number.isNaN(d.getTime())) return { error: "That date of birth doesn't look right." };
-      patch.birthDate = d;
+    if (input.ageBand) {
+      const { parseBand } = await import("@/lib/age");
+      const band = parseBand(input.ageBand);
+      if (!band) return { error: "Pick one of the three age ranges." };
+      patch.ageBand = band;
+      patch.ageBandSetAt = new Date();
     }
     if (input.country) patch.country = input.country.trim().toUpperCase().slice(0, 2);
     if (Object.keys(patch).length) {
@@ -99,7 +110,7 @@ export async function requestRedeem(input: {
     }
     const elig = Object.keys(patch).length
       ? eligibilityOf(
-          ageFrom((patch.birthDate as Date) ?? null) ?? (await eligibilityFor(db, user.id)).age,
+          ageForBand((patch.ageBand as string) ?? null) ?? (await eligibilityFor(db, user.id)).age,
           (patch.country as string) ?? user.country ?? null,
         )
       : await eligibilityFor(db, user.id);

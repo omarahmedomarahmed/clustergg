@@ -54,7 +54,7 @@ await db.insert(schema.discordGuilds).values({ guildId, name: "Test Guild", stat
 const mkMember = async (linkedDaysAgo: number | null, proven: boolean) => {
   const id = uid();
   await db.insert(schema.users).values({
-    id, slug: `ab-${id.slice(0, 8)}`, displayName: "Ab", email: `${id}@test.invalid`, passwordHash: "x",
+    id, slug: `ab-${id.slice(0, 8)}`, displayName: "Ab", email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
   } as never);
   await db.insert(schema.discordGuildMembers).values({
     guildId, userId: id,
@@ -150,7 +150,7 @@ console.log("\n== defence 3: velocity is a friction, not a wall ==");
     const id = uid();
     await db.insert(schema.users).values({
       id, slug: `v-${id.slice(0, 8)}`, displayName: "V", email,
-      passwordHash: "x", createdAt: new Date(Date.now() - ageDays * 86400_000),
+      passwordHash: "x", ageBand: "adult", createdAt: new Date(Date.now() - ageDays * 86400_000),
     } as never);
   };
 

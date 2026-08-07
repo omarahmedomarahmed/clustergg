@@ -322,16 +322,25 @@ Twelve files plus the schema. Rules:
 
 #### B72.4 — The age band *(D3)*
 
-`users.ageBand`: `unset | under13 | teen | adult`. The minimum that closes the
-legal hole: the three buttons, the popup, no earning before it is set, and the
-under-13 read-only mode. **The beautiful version is B83** — this ships plain and
-fast because it is the piece a regulator asks about.
+`users.ageBand`: `unset | under16 | teen | adult`. **SHIPPED.** The line is 16,
+not 13 — GDPR-K's default is 16 and a flat 13 processes the EU 13–15 cohort
+without valid consent. `lib/age.ts` carries the reasoning and the caveat that a
+self-declared band is a record of having asked, not verification.
 
 - `lib/eligibility.ts` reads the band instead of computing from a birthday.
 - **`birthDate` stops being collected**, and B80's purge deletes what is stored.
+- The gate lives in ONE place — `mayEarn()` inside `awardQuestActionLocked` — not
+  per emitter, because a gate repeated at twelve call sites is a gate missing
+  from the thirteenth.
+- **Editable, and counted.** The band is asked in one click with no confirm, so a
+  mis-tap onto "Under 16" is inevitable and would lock somebody out of the whole
+  product. `/settings/earning` corrects it, `MAX_BAND_CHANGES = 3` then locks —
+  same shape and number as the payout preference.
+- **Asked by the root layout**, not by `/onboarding`. Onboarding is skippable,
+  and skipping it meant earning nothing forever without ever seeing the question.
 
 **Verification → `tests/db/eligibility.mts`:** unset earns nothing and redeems
-nothing; `under13` cannot link an account, join a challenge, or hold CP; `teen`
+nothing; `under16` cannot link an account, join a challenge, or hold CP; `teen`
 earns but cannot redeem; nothing anywhere asks for a date of birth.
 
 **Gate 0: none of B72 may be deferred for a feature.**

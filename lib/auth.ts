@@ -80,6 +80,15 @@ const LIGHT_USER_COLUMNS = {
   emailNotifications: schema.users.emailNotifications,
   createdAt: schema.users.createdAt,
   lastLoginAt: schema.users.lastLoginAt,
+  // B72.4. Carried on the per-request fetch, unlike every other B72.4 column,
+  // because the layout asks "has this gamer answered?" on EVERY page and the
+  // alternative is a second query on every page to read one short text column.
+  //
+  // It also closes a trap: `CurrentUser` is `$inferSelect`, so a column left out
+  // of this projection still TYPES as present and reads `undefined` at runtime.
+  // An unset band earns nothing, so a caller reading `user.ageBand` off this
+  // object would have silently seen every gamer as unanswered.
+  ageBand: schema.users.ageBand,
 } as const;
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {

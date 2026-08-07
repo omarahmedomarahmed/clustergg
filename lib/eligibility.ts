@@ -68,6 +68,20 @@ export type Eligibility = {
 };
 
 /** Whole years between a birth date and now. Nothing clever, and no timezone. */
+/**
+ * The lowest age a band could mean.
+ *
+ * Lowest, always. A range is not a number, and rounding it upward would pay
+ * somebody on the strength of an age they never claimed — "16 or 17" must fail
+ * the 18 test, not scrape past it.
+ */
+export function ageForBand(band: string | null | undefined): number | null {
+  if (band === "adult") return MIN_REDEEM_AGE;
+  if (band === "teen") return 16;
+  if (band === "under16") return 0;
+  return null;
+}
+
 export function ageFrom(birthDate: Date | string | null | undefined, now = new Date()): number | null {
   if (!birthDate) return null;
   const b = new Date(birthDate);
@@ -85,6 +99,10 @@ export function ageFrom(birthDate: Date | string | null | undefined, now = new D
  * so the same rule can be applied to a form the gamer is still filling in.
  */
 export function eligibilityOf(age: number | null, country: string | null): Eligibility {
+  // `age` is now derived from a BAND, not a birthday (B72.4). The signature is
+  // unchanged so every caller and every message below still works, but the only
+  // thing this function ever needed was "is this person old enough", and a band
+  // answers that without us holding a date we have no use for.
   const cc = (country ?? "").trim().toUpperCase() || null;
   const missing: ("age" | "country")[] = [];
   if (age === null) missing.push("age");
@@ -92,7 +110,7 @@ export function eligibilityOf(age: number | null, country: string | null): Eligi
 
   if (age === null) {
     return { ok: false, reason: "no_age", missing, age, country: cc,
-      message: "We need your date of birth before we can pay out. Points and trophies are unaffected — this is only about cashing out." };
+      message: "Tell us your age range before we can pay out. Points and trophies are unaffected — this is only about cashing out." };
   }
   if (!cc) {
     return { ok: false, reason: "no_country", missing, age, country: cc,
@@ -112,9 +130,16 @@ export function eligibilityOf(age: number | null, country: string | null): Eligi
 /** The same rule, against the account on file. */
 export async function eligibilityFor(db: DB, userId: string): Promise<Eligibility> {
   try {
-    const [u] = await db.select({ birthDate: schema.users.birthDate, country: schema.users.country })
+    const [u] = await db.select({ band: schema.users.ageBand, country: schema.users.country })
       .from(schema.users).where(eq(schema.users.id, userId)).limit(1);
-    return eligibilityOf(ageFrom(u?.birthDate), u?.country ?? null);
+    // The BAND decides, not a stored birthday. `birthDate` is no longer
+    // collected and B80's purge removes what is there; reading it here would
+    // keep a column alive that we have told a regulator we stopped using.
+    //
+    // A band maps to the LOWEST age it could mean, which is the only safe
+    // direction: "16 or 17" becomes 16, so it fails the 18 test, and nobody is
+    // paid on the strength of a range that merely might have contained an adult.
+    return eligibilityOf(ageForBand(u?.band), u?.country ?? null);
   } catch {
     // Fail CLOSED. This gate decides whether money leaves, and B35 settled the
     // principle: a guard that opens when the database hiccups is not a guard.

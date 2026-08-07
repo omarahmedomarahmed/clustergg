@@ -42,7 +42,7 @@ export default async function RedeemPage({
       payoutMethod: schema.users.payoutMethod,
       payoutChanges: schema.users.payoutChanges,
       country: schema.users.country,
-      birthDate: schema.users.birthDate,
+      ageBand: schema.users.ageBand,
     }).from(schema.users).where(eq(schema.users.id, user.id)).limit(1).then((r) => r[0]),
   ]);
 
@@ -75,7 +75,7 @@ export default async function RedeemPage({
         savedMethod={(me?.payoutMethod as { currency: string; method: string } | null) ?? null}
         changesUsed={Number(me?.payoutChanges ?? 0)}
         knownCountry={me?.country ?? null}
-        knowsAge={!!me?.birthDate}
+        knowsAge={!!me?.ageBand}
       />
     </div>
   );

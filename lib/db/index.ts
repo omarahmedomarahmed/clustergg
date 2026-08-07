@@ -811,6 +811,12 @@ const COLUMN_MIGRATIONS = [
   // picture everywhere it appears. The caption and alt text live here too — an
   // admin who can swap the picture but not the sentence under it can only
   // half-fix a stale claim.
+  // B72.4 — the age band. Never a date of birth; `birth_date` stops being
+  // collected and B80's purge deletes what is already stored.
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band" text`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band_set_at" timestamp with time zone`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band_changes" integer DEFAULT 0 NOT NULL`,
+
   // B72.2 — one viewer, one creative, one hour. A unique index because two
   // racing beacon calls would both pass a SELECT and both insert.
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "dedupe_key" text`,

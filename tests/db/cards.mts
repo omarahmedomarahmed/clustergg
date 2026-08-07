@@ -74,7 +74,7 @@ const [space] = await db.select().from(schema.spaces).limit(1);
 const userId = uid();
 await db.insert(schema.users).values({
   id: userId, slug: `card-${tag}`, displayName: `Cluster Name ${tag}`,
-  email: `${userId}@test.invalid`, passwordHash: "x",
+  email: `${userId}@test.invalid`, passwordHash: "x", ageBand: "adult",
 } as never);
 const acct = uid();
 await db.insert(schema.linkedGameAccounts).values({
@@ -105,7 +105,7 @@ eq("…and carries the Cluster name as the second line", rows[0]?.alt, `Cluster 
 const plainId = uid();
 await db.insert(schema.users).values({
   id: plainId, slug: `plain-${tag}`, displayName: `SameName${tag}`,
-  email: `${plainId}@test.invalid`, passwordHash: "x",
+  email: `${plainId}@test.invalid`, passwordHash: "x", ageBand: "adult",
 } as never);
 const plainAcct = uid();
 await db.insert(schema.linkedGameAccounts).values({
@@ -302,7 +302,7 @@ console.log("\n== B62: a trophy is a thing you own, not a price tag ==");
   const stackId = uid();
   await db.insert(schema.users).values({
     id: stackId, slug: `stack-${tag}`, displayName: `Stacker ${tag}`,
-    email: `${stackId}@test.invalid`, passwordHash: "x",
+    email: `${stackId}@test.invalid`, passwordHash: "x", ageBand: "adult",
   } as never);
   for (const n of [0, 0, 0, 1]) {
     await db.insert(schema.userTrophies).values({

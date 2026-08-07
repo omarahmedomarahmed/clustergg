@@ -40,7 +40,7 @@ const mkUser = async (name: string) => {
   const id = uid();
   const slug = `wk-${name}-${tag}`;
   await db.insert(schema.users).values({
-    id, slug, displayName: `WK ${name}`, email: `${id}@test.invalid`, passwordHash: "x",
+    id, slug, displayName: `WK ${name}`, email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
   } as never);
   return { id, slug };
 };

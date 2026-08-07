@@ -3,6 +3,9 @@ import { getT } from "@/lib/i18n/t-server";
 
 const TABS = [
   { key: "account", href: "/settings/account", label: "Account" },
+  // B72.4. Its own tab because the age band decides whether the whole economy
+  // applies to a gamer — a row on the account page would understate it.
+  { key: "earning", href: "/settings/earning", label: "Earning" },
   { key: "connections", href: "/profile", label: "Game accounts" },
   { key: "notifications", href: "/settings/notifications", label: "Notifications" },
   { key: "privacy", href: "/settings/privacy", label: "Privacy" },

@@ -45,6 +45,24 @@ export const users = pgTable("users", {
   primarySignupProvider: text("primary_signup_provider"),
   discordUsername: text("discord_username"), // Discord handle — the gamer's universal identity, shown everywhere
   profileViews: integer("profile_views").notNull().default(0), // public view counter (brag number)
+  /**
+   * The age BAND. B72.4. Never a date of birth.
+   *
+   * `under16` | `teen` | `adult`, or null when nobody has answered. Null earns
+   * nothing — see `lib/age.ts` for what each band may do and why the line is 16
+   * rather than 13.
+   */
+  ageBand: text("age_band"),
+  /** When they answered. A record of having asked, which is half the point. */
+  ageBandSetAt: timestamp("age_band_set_at", { withTimezone: true, mode: "date" }),
+  /**
+   * How many times they have changed it. Locks at `MAX_BAND_CHANGES`.
+   *
+   * A band asked in one click with no confirm WILL be mis-tapped, and a mis-tap
+   * onto "Under 16" locks somebody out of everything. So it is editable — and
+   * counted, because a band that can change without limit means nothing.
+   */
+  ageBandChanges: integer("age_band_changes").notNull().default(0),
   discordViews: integer("discord_views").notNull().default(0), // views that came from someone showing this profile in Discord
   voteCount: integer("vote_count").notNull().default(0),       // Best Profile votes, denormalized for cheap sorting
   /**
