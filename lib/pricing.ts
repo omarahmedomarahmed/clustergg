@@ -24,13 +24,40 @@ export type PricingConfig = {
   /** What a brand pays for one sponsored weekly challenge. */
   challengePrice: number;
   /**
-   * What that challenge pays out, and its split. Every cent of it reaches a
-   * gamer, as three trophies carrying the sponsor's brand.
+   * The prize share, as a PERCENTAGE of the price. C2.
    *
-   * `challengePrice - prizePool` is the gross margin on a challenge. It is the
-   * only place the two numbers meet, which is deliberate: the prize is a
-   * commitment to the players and the price is a commitment to the brand, and
-   * neither should move because someone edited the other.
+   * This used to be `prizePool: 175`, a fixed dollar figure, with the percentage
+   * *derived* from it — which made the price a dial that silently changed what
+   * we promise players. $350 gave 50% by coincidence; $400 would have given 44%
+   * with no warning, on a page that says "half of what a brand pays reaches the
+   * players who win".
+   *
+   * A percentage inverts that: move the price and the promise holds. It is also
+   * the only shape `lib/vaults.ts` can allocate against, since a vault split has
+   * to total 100 and a dollar figure has no share to add up.
+   */
+  prizePct: number;
+  /**
+   * How the pool divides between the three places, as WEIGHTS rather than
+   * dollars or percentages.
+   *
+   * 4 : 2 : 1 is the current podium ($100 / $50 / $25 out of $175) and it stays
+   * exact at every price, which neither dollars nor rounded percentages do —
+   * three percentages that each round to the nearest whole number do not add
+   * back to the pool, and the missing cents come out of a prize.
+   */
+  prizeW1: number;
+  prizeW2: number;
+  prizeW3: number;
+  /**
+   * DERIVED, never stored. `prizePct` × `challengePrice`, and the three places
+   * from the weights.
+   *
+   * They stay on the config because thirty call sites read `cfg.prizePool` and
+   * `cfg.prize1` to print a number, and those call sites are right — what was
+   * wrong was where the number came from. `derivePrizes()` is the single place
+   * that computes them, and `buildPricing` runs it last so a stale CMS row for
+   * `pricing.prizePool` cannot override it.
    */
   prizePool: number;
   prize1: number;
@@ -83,14 +110,42 @@ export type PricingConfig = {
   currency: string;
 };
 
-export const PRICING_DEFAULTS: PricingConfig = {
+/** The fields nobody sets — they are computed from the ones above them. */
+export const DERIVED_PRICING_KEYS = ["prizePool", "prize1", "prize2", "prize3"] as const;
+
+/**
+ * Fill the derived prize fields from the price and the percentage. C2.
+ *
+ * The three places are apportioned by weight and the LAST one takes the
+ * remainder, so the podium always adds back to the pool exactly. Rounding each
+ * place independently loses cents, and a prize pool that does not equal the sum
+ * of its prizes is exactly what C15 has to reconcile.
+ */
+export function derivePrizes<T extends PricingConfig>(cfg: T): T {
+  const pool = round2(cfg.challengePrice * (Math.max(0, Math.min(100, cfg.prizePct)) / 100));
+  const w = [cfg.prizeW1, cfg.prizeW2, cfg.prizeW3].map((n) => Math.max(0, n));
+  const sum = w[0] + w[1] + w[2];
+  const p1 = sum > 0 ? round2(pool * (w[0] / sum)) : 0;
+  const p2 = sum > 0 ? round2(pool * (w[1] / sum)) : 0;
+  return { ...cfg, prizePool: pool, prize1: p1, prize2: p2, prize3: round2(pool - p1 - p2) };
+}
+
+export const PRICING_DEFAULTS: PricingConfig = derivePrizes({
   games: 6,
   challengesPerGame: 4,
-  challengePrice: 250,
-  prizePool: 175,
-  prize1: 100,
-  prize2: 50,
-  prize3: 25,
+  // $350, per `docs/COMMERCIAL_MODEL_V2.md` §2 — one merged package, priced per
+  // challenge, of which half is prize money.
+  challengePrice: 350,
+  prizePct: 50,
+  prizeW1: 4,
+  prizeW2: 2,
+  prizeW3: 1,
+  // Overwritten by `derivePrizes` immediately. Present because the type says so;
+  // never read from here.
+  prizePool: 0,
+  prize1: 0,
+  prize2: 0,
+  prize3: 0,
   reachBase: 600,
   challengeBase: 500,
   ultimateBase: 400,
@@ -103,11 +158,13 @@ export const PRICING_DEFAULTS: PricingConfig = {
   benchmarkCpc: 0.6,
   benchmarkCpe: 3.5,
   currency: "USD",
-};
+});
 
-// The numeric keys, as stored in the CMS.
+// The numeric keys an admin may actually set. The derived prize fields are
+// excluded on purpose: an input that accepts a value and then silently
+// overwrites it is worse than no input at all.
 export const PRICING_NUMBER_KEYS = Object.keys(PRICING_DEFAULTS)
-  .filter((k) => k !== "currency")
+  .filter((k) => k !== "currency" && !(DERIVED_PRICING_KEYS as readonly string[]).includes(k))
   .map((k) => `pricing.${k}`);
 
 // Copy keys. Feature lists are newline-separated, the same convention the
@@ -174,7 +231,11 @@ export function buildPricing(content: Record<string, string> = {}): PricingConfi
   out.games = Math.max(1, Math.min(24, Math.round(out.games)));
   out.challengesPerGame = Math.max(1, Math.min(31, Math.round(out.challengesPerGame)));
   out.yearlyDiscountPct = Math.max(0, Math.min(90, out.yearlyDiscountPct));
-  return out;
+  out.prizePct = Math.max(0, Math.min(100, out.prizePct));
+  // LAST, and unconditionally. A CMS row left over from when `pricing.prizePool`
+  // was editable would otherwise win over the percentage, and the page would go
+  // on showing a prize that no longer matches the price.
+  return derivePrizes(out);
 }
 
 // A newline-separated CMS list → array, blank lines dropped.
@@ -228,14 +289,13 @@ export function marginPerChallenge(cfg: PricingConfig): number {
 /**
  * The share of challenge revenue that reaches gamers.
  *
- * Not a policy we chose to publish — an arithmetic consequence of charging
- * `challengePrice` and paying out `prizePool`. It is stated everywhere as
- * "70% of what a brand pays goes to the players", and it stays true by
- * construction rather than by someone remembering to update it.
+ * Now the SOURCE, not a derivation. It used to divide the pool by the price and
+ * round — which is why a price change quietly changed the promise. Reading the
+ * configured percentage back means the sentence on the pricing page and the
+ * money in the prize vault come from the same number.
  */
 export function prizeSharePct(cfg: PricingConfig): number {
-  if (cfg.challengePrice <= 0) return 0;
-  return Math.round((cfg.prizePool / cfg.challengePrice) * 100);
+  return Math.round(Math.max(0, Math.min(100, cfg.prizePct)));
 }
 
 export type Quote = {

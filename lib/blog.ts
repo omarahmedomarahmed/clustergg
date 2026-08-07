@@ -20,7 +20,7 @@
 // easiest place in a document to state a number nobody checked.
 
 import { EARN_TIERS, platformFeePct, ownerPctFor } from "@/lib/server-earnings";
-import { money, type PricingConfig } from "@/lib/pricing";
+import { money, PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing";
 import type { NetworkStats } from "@/lib/network";
 
 /** Where a chart's numbers come from. There is no fourth option on purpose. */
@@ -80,8 +80,8 @@ export type BlogVars = Record<string, string>;
 
 export function blogVars(net: NetworkStats | null, cfg: PricingConfig | null): BlogVars {
   const c = cfg;
-  const price = c?.challengePrice ?? 250;
-  const prize = c?.prizePool ?? 175;
+  const price = c?.challengePrice ?? PRICING_DEFAULTS.challengePrice;
+  const prize = c?.prizePool ?? PRICING_DEFAULTS.prizePool;
   const n = (v: number | undefined) => (v ?? 0).toLocaleString();
   return {
     price: money(price, c?.currency),
@@ -142,8 +142,8 @@ export function chartData(
   ctx: { cfg: PricingConfig | null; net: NetworkStats | null },
 ): Chart {
   const cfg = ctx.cfg;
-  const price = cfg?.challengePrice ?? 250;
-  const prize = cfg?.prizePool ?? 175;
+  const price = cfg?.challengePrice ?? PRICING_DEFAULTS.challengePrice;
+  const prize = cfg?.prizePool ?? PRICING_DEFAULTS.prizePool;
   const cur = cfg?.currency;
 
   switch (from) {

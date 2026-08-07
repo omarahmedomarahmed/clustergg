@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { pricingConfig } from "@/lib/pricing-live";
+import { PRICING_DEFAULTS } from "@/lib/pricing";
 import { PROVIDERS, isProviderLive } from "@/lib/providers/registry";
 import type {
   BuilderBrand, BuilderGuild, BuilderPricing, BuilderProvider, BuilderReach, BuilderTrophy,
@@ -85,8 +86,8 @@ export async function builderContext(): Promise<BuilderContext> {
       .filter((b) => b.status !== "archived")
       .map((b) => ({ id: b.id, name: b.name, campaigns: byBrand.get(b.id) ?? [] })),
     pricing: {
-      challengePrice: cfg?.challengePrice ?? 250,
-      prizePool: cfg?.prizePool ?? 175,
+      challengePrice: cfg?.challengePrice ?? PRICING_DEFAULTS.challengePrice,
+      prizePool: cfg?.prizePool ?? PRICING_DEFAULTS.prizePool,
       currency: cfg?.currency ?? "USD",
     },
     // Where a public challenge lands. Counted from the servers that would

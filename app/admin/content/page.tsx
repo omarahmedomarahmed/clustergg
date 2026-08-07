@@ -43,10 +43,14 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
     keys: [
       { key: "pricing.games", label: "Commercialised games (slider max)" },
       { key: "pricing.challengesPerGame", label: "Sponsored challenges per game, per month" },
-      { key: "pricing.prizePool", label: "Prize pool per challenge (paid to winners)" },
-      { key: "pricing.prize1", label: "1st place prize" },
-      { key: "pricing.prize2", label: "2nd place prize" },
-      { key: "pricing.prize3", label: "3rd place prize" },
+      // C2. The pool and the three prizes are DERIVED from these — they used to
+      // be four dollar fields, which meant raising the price quietly cut the
+      // share we promise players. Setting the percentage instead keeps the
+      // promise fixed while the price moves.
+      { key: "pricing.prizePct", label: "Prize pool — % of what the brand pays (the pool and the three prizes follow)" },
+      { key: "pricing.prizeW1", label: "1st place weight (4 : 2 : 1 gives 100 / 50 / 25 at a $175 pool)" },
+      { key: "pricing.prizeW2", label: "2nd place weight" },
+      { key: "pricing.prizeW3", label: "3rd place weight" },
       { key: "pricing.reachBase", label: "Reach tier — monthly base" },
       { key: "pricing.challengeBase", label: "Challenge tier — monthly base" },
       { key: "pricing.ultimateBase", label: "Ultimate tier — monthly base (all games)" },

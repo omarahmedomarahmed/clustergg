@@ -6,6 +6,10 @@ import CoverFramer from "@/components/CoverFramer";
 import MetricsGuide from "@/components/MetricsGuide";
 import { saveChallenge, type ChallengeSaveState } from "@/app/actions/admin";
 import { RULE_OPS, isRanked, ruleSentence, valueChoices, OPEN_TO_EVERYONE } from "@/lib/challenge-rules";
+// Pure module, safe on the client — and the only copy of these numbers. A
+// second literal fallback is the one that is wrong the first time the price
+// moves. (C2)
+import { PRICING_DEFAULTS } from "@/lib/pricing";
 import type { MetricDef } from "@/lib/providers/registry";
 
 // How long one run of each cadence lasts. Mirrors lib/challenge-series so the
@@ -117,7 +121,7 @@ export default function ChallengeBuilder({
   pricing?: BuilderPricing; reach?: BuilderReach; challenge?: ChallengeEdit;
 }) {
   const editing = !!challenge;
-  const rate = pricing ?? { challengePrice: 250, prizePool: 175, currency: "USD" };
+  const rate = pricing ?? PRICING_DEFAULTS;
 
   const [providerId, setProviderId] = useState(challenge?.provider ?? providers[0]?.id ?? "");
   const [cadence, setCadence] = useState(challenge?.cadence ?? "weekly");
@@ -205,7 +209,9 @@ export default function ChallengeBuilder({
   // ===== The money, as the model has it =====
   const podiumValue = [...prizeFirst, ...prizeSecond, ...prizeThird]
     .reduce((sum, id) => sum + (trophies.find((t) => t.id === id)?.value ?? 0), 0);
-  const prizeShare = rate.challengePrice > 0 ? rate.prizePool / rate.challengePrice : 0.7;
+  const prizeShare = rate.challengePrice > 0
+    ? rate.prizePool / rate.challengePrice
+    : PRICING_DEFAULTS.prizePct / 100;
   const prizeTarget = Math.round(sponsorPrice * prizeShare);
   const shortfall = sponsorPrice > 0 ? prizeTarget - podiumValue : 0;
 
