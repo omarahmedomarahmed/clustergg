@@ -93,6 +93,112 @@ console.log("\n== a self-serve creative does NOT go live on upload ==");
     /reviewStatus === "approved"/.test(code("lib/brands.ts")));
 }
 
+console.log("\n== no brand-facing number is derived from a server headcount ==");
+// Finding #1 of the due-diligence report, and the most serious thing in it: the
+// brand report priced a SERVER HEADCOUNT at a benchmark CPM, divided by spend,
+// and rendered the result to a paying customer as "Return on spend: 2.4x" —
+// beside a heading that said "Counted delivery".
+//
+// The assertions read SOURCE rather than a return value on purpose: "no field
+// is derived from a headcount" is a claim about the code. A runtime check would
+// pass happily on a report that happens to have zero servers.
+{
+  const report = code("lib/brand-report.ts");
+  ok("mediaValue is gone from the model", !/function mediaValue/.test(report));
+  ok("…and so is roasOf", !/function roasOf/.test(report));
+  ok("…and the report no longer carries a benchmark it priced things at",
+    !/benchmark:\s*\{\s*cpm/.test(report));
+
+  // The root of the finding, one level below it: `members` is the headcount of
+  // the servers we posted into. Priced, it became ROAS. Unpriced but labelled
+  // "People reached", it is the same false claim in words instead of arithmetic.
+  // Three surfaces, not two. The tier strip carried the same label off the same
+  // headcount and was found only by grepping the whole tree for the words — the
+  // type system could not help, because the number was correct and the NAME was
+  // the lie.
+  for (const f of ["components/BrandCampaignReports.tsx", "app/api/brands/report/route.ts",
+                   "components/BrandTierStrip.tsx"]) {
+    ok(`${f} does not say "People reached"`, !/People reached/.test(code(f)));
+    ok(`…nor "Return on spend"`, !/Return on spend/.test(code(f)));
+    ok(`…nor "Media value"`, !/Media value/i.test(code(f)));
+  }
+  const panel = code("components/BrandCampaignReports.tsx");
+  ok("the headcount is named for what it is", /Members in those servers/.test(panel));
+  ok("…and cost-per-1,000 says what it divides BY", /Cost \/ 1,000 members/.test(panel));
+  // The positive half. Stripping the lie must not leave the report empty: the
+  // number that replaces it has to be one both sides of which are counted.
+  ok("the hero figure is cost per entrant, counted on both sides",
+    /Cost per entrant/.test(panel) && /counted/.test(panel));
+}
+
+console.log("\n== the ad beacon is not an open mint ==");
+// The reviewer awarded themselves CP here with one curl. Three holes, and the
+// third is not in this file at all — it is a public page render.
+{
+  const beacon = code("app/api/ads/beacon/route.ts");
+  ok("CP requires a session", /if \(session\?\.uid\)/.test(beacon));
+  ok("…and the award is keyed on the day, not the impression id",
+    /awardRef\(payload\.ccId\)/.test(beacon) && !/refId: id\b/.test(beacon));
+  ok("an unknown creative is refused", /status: 404/.test(beacon));
+  ok("duration checks ownership", /adImpressions\.userId, session\.uid/.test(beacon));
+  ok("…and refuses an old impression", /IMPRESSION_WINDOW_MS/.test(beacon));
+  ok("the route is rate limited", /rateLimited\(viewer\)/.test(beacon));
+  ok("…and origin-checked", /originAllowed\(/.test(beacon));
+
+  const guard = code("lib/ads-beacon.ts");
+  ok("dedup is per viewer, per creative, per window", /impressionKey/.test(guard));
+  ok("…and the CP day boundary is UTC, like the ceiling", /toISOString\(\)\.slice\(0, 10\)/.test(guard));
+
+  // A unique index, not a check in the route: two racing calls would both pass
+  // a SELECT and both insert, which is the read-then-write shape B74 found on
+  // the money paths.
+  ok("the impression dedup is enforced by the DATABASE",
+    /uniqueIndex\("imp_dedupe_idx"\)/.test(code("lib/db/schema.ts")));
+
+  // The third mint: a public page render.
+  const profile = code("app/u/[slug]/page.tsx");
+  ok("a profile view pays only a signed-in viewer", /viewer\?\.id && viewer\.id !== user\.id/.test(profile));
+  ok("…once per viewer per day", /refId: `\$\{viewer\.id\}/.test(profile));
+  ok("…and no longer pays on a raw view count", !/Math\.floor\(viewCount \/ 25\)/.test(profile));
+}
+
+console.log("\n== the money paths cannot be broken by a runtime downgrade ==");
+// Round-2 finding, and it was a defect the FIX introduced: the pooled driver
+// needs a WebSocket, Node 20 has none, and every money path would have thrown —
+// loudly on a purchase, and into the logs only on a CP award, which is a silent
+// stop to all earning. One project-settings click away.
+{
+  const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8"));
+  ok("package.json pins a Node that has a global WebSocket",
+    /(>=|\^)?2[2-9]/.test(String(pkg.engines?.node ?? "")), JSON.stringify(pkg.engines));
+  ok("…and .nvmrc agrees", /^2[2-9]/.test(src(".nvmrc").trim()), src(".nvmrc").trim());
+  // Belt and braces: the pin states intent, the polyfill survives someone
+  // overriding it.
+  ok("…and the driver polyfills rather than throwing if it is overridden",
+    /webSocketConstructor/.test(code("lib/db/tx.ts")));
+  ok("ws is a real dependency, not an optional import that resolves to nothing",
+    typeof pkg.dependencies?.ws === "string", JSON.stringify(pkg.dependencies?.ws));
+  // The finding under the finding: the suite could not exercise the lock at all.
+  ok("an ordinary Postgres is a supported driver, so the lock can be tested",
+    /node-postgres/.test(code("lib/db/index.ts")) && /node-postgres/.test(code("lib/db/tx.ts")));
+  ok("…and CI runs the concurrency suite against one",
+    /DATABASE_URL: postgresql/.test(src(".github/workflows/ci.yml")));
+}
+
+console.log("\n== the database driver stays out of the browser bundle ==");
+// Caught by a BUILD, not by tsc, and it is §0's oldest trap: Next traces the
+// module graph across the client boundary even for a dynamic `await import()`.
+// Adding node-postgres put `fs`, `net` and `dns` on a path to the browser —
+// `components/CpCalculator.tsx` → `lib/cp-economics.ts` → `lib/marketplace.ts`
+// → `lib/db/tx.ts` → `pg` — and the whole chain existed for ONE constant.
+{
+  const econ = code("lib/cp-economics.ts");
+  ok("cp-economics does not reach the marketplace", !/from "@\/lib\/marketplace"/.test(econ), econ.match(/from "@\/lib\/[a-z-]+"/g)?.join(",") ?? "");
+  ok("…it takes the rate from the pure module", /from "@\/lib\/cp-rate"/.test(econ));
+  const rate = code("lib/cp-rate.ts");
+  ok("…and that module imports NOTHING", !/^\s*import\s/m.test(rate), rate.match(/^\s*import.*/m)?.[0] ?? "");
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);

@@ -87,9 +87,23 @@ for (const k of ["challenge_progress", "play_session", "share_card"]) {
   ok(`${k} exists and pays`, (WEIGHT.get(k) ?? 0) > 0, String(WEIGHT.get(k)));
 }
 eq("share_card is ORBIT, not ascension", ACTION_CATALOG.find((a) => a.key === "share_card")?.group, "orbit");
-eq("gifts are priced the same in both directions", WEIGHT.get("gift_sent"), WEIGHT.get("gift_received"));
-eq("…and capped the same", CAP.get("gift_sent"), CAP.get("gift_received"));
-ok("…low enough that a pair of accounts is not a business", (CAP.get("gift_sent") ?? 9) <= 2);
+// These used to assert gifts were priced symmetrically and capped low, because
+// any gap between giving and receiving is an arbitrage a pair of accounts can
+// farm. Gifting is deleted (B72.3), so the assertions are INVERTED rather than
+// removed — and they had to be, because at weight 0 the old ones still passed:
+// 0 === 0 and 1 === 1 are true of a feature that no longer exists. That is the
+// vacuous-assertion shape the due-diligence report found in marketplace.mts.
+for (const k of ["gift_sent", "gift_received"]) {
+  eq(`${k} pays nothing`, WEIGHT.get(k), 0);
+  ok(`…and is labelled retired`, /retired/i.test(ACTION_CATALOG.find((a) => a.key === k)?.label ?? ""));
+}
+ok("no mission variation asks for a gift",
+  MISSION_TEMPLATES.every((m) => m.tasks.every((t) => !t.action.startsWith("gift_"))));
+// The rebuilt orbit blocks must still total exactly 125 — asserted above for
+// every variation, but stated here too because THIS is the change that could
+// have broken it.
+ok("every rebuilt mission still totals the ceiling",
+  MISSION_TEMPLATES.every((m) => missionTotal(m) === DEFAULT_DAILY_CP_CEILING));
 ok("adding the bot is repeatable now", (CAP.get("bot_added") ?? 0) >= 2);
 
 console.log("\n== a week picks the mission, and the cycle comes back round ==");

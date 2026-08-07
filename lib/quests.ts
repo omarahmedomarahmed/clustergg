@@ -89,13 +89,23 @@ export const ACTION_CATALOG: { key: QuestActionKey; label: string; group: string
   // Followers, votes and gifts stay at 2 because they ARE farmable by a pair of
   // accounts, which is B35's problem arriving through a new door.
   { key: "share_card",       label: "Share a Cluster card in a server", group: "orbit", defaultWeight: 25, defaultCap: 3 },
-  { key: "profile_views_25", label: "Every 25 profile views",  group: "orbit",     defaultWeight: 25, defaultCap: 3 },
+  // Renamed with its rule (B72.2). It used to pay on every 25 RAW views of a
+  // public page, which anybody could produce by reloading — no account, no
+  // cost, and not even their own profile. It now pays once per signed-in
+  // viewer per day, so the cap of 3 means three real gamers looked.
+  { key: "profile_views_25", label: "A gamer views your profile", group: "orbit", defaultWeight: 25, defaultCap: 3 },
   { key: "follower_gained",  label: "Gain a follower",         group: "orbit",     defaultWeight: 25, defaultCap: 2 },
   { key: "profile_vote_received", label: "Someone votes for your profile", group: "orbit", defaultWeight: 25, defaultCap: 2 },
-  // Giving and receiving are priced the SAME and capped low, because any gap
-  // between them is an arbitrage a pair of accounts can farm.
-  { key: "gift_sent",        label: "Send a gift",             group: "orbit",     defaultWeight: 25, defaultCap: 2 },
-  { key: "gift_received",    label: "Receive a gift",          group: "orbit",     defaultWeight: 25, defaultCap: 2 },
+  // RETIRED with the feature (B72.3), not deleted — same treatment as posts and
+  // comments. A quest whose stored `actionWeights` still names one reads zero
+  // instead of throwing, and an admin who had tuned them sees a 0 rather than a
+  // crash. Weight 0 means no path can pay for them.
+  //
+  // They were priced identically and capped at 2 precisely because any gap
+  // between giving and receiving is an arbitrage a pair of accounts can farm.
+  // Deleting gifting removes the arbitrage instead of bounding it.
+  { key: "gift_sent",        label: "Send a gift (retired)",    group: "orbit",     defaultWeight: 0, defaultCap: 1 },
+  { key: "gift_received",    label: "Receive a gift (retired)", group: "orbit",     defaultWeight: 0, defaultCap: 1 },
   { key: "message_new",      label: "Message a new gamer",     group: "orbit",     defaultWeight: 10, defaultCap: 3 },
   { key: "join_planet",      label: "Join a planet",           group: "orbit",     defaultWeight: 25, defaultCap: 1 },
   { key: "best_profile_award",    label: "Place in Best Profile",          group: "orbit", defaultWeight: 100, defaultCap: 1 },

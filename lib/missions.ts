@@ -85,7 +85,11 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
       { action: "finish_challenge", count: 1 },      // 25
       { action: "challenge_progress", count: 4 },    // 100
       { action: "share_card", count: 3 },            // 75
-      { action: "gift_sent", count: 2 },             // 50
+      // Was `gift_sent`. Gifting is deleted (B72.3), so the orbit block is
+      // rebuilt from an action that still exists and still fires — and the
+      // block must still total exactly 125, which is what makes the mission
+      // arithmetic safe to write down.
+      { action: "follower_gained", count: 2 },       // 50
       { action: "stat_levelup", count: 3 },          // 75
       { action: "redeem_trophy", count: 2 },         // 50
       { action: "ad_click", count: 3 },              // 75
@@ -100,7 +104,8 @@ export const MISSION_TEMPLATES: MissionTemplate[] = [
       { action: "finish_challenge", count: 2 },      // 50
       { action: "challenge_progress", count: 3 },    // 75
       { action: "profile_views_25", count: 3 },      // 75
-      { action: "gift_received", count: 2 },         // 50
+      // Was `gift_received`. Same rebuild, same 125.
+      { action: "profile_vote_received", count: 2 }, // 50
       { action: "play_session", count: 3 },          // 75
       { action: "stat_levelup", count: 2 },          // 50
       { action: "ad_click", count: 3 },              // 75

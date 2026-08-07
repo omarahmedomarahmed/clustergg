@@ -20,11 +20,19 @@ const BLURB: Record<string, string> = {
 };
 
 export default function BrandTierStrip({
-  tier, spend, reached, entrants, pastGames = 0, currency = "USD",
+  tier, membersInServers, entrants, spend, pastGames = 0, currency = "USD",
 }: {
   tier: BrandTier;
   spend: number;
-  reached: number;
+  /**
+   * The member headcount of the servers this brand's challenges posted into.
+   *
+   * Was named `reached` and labelled "People reached" — the same false claim as
+   * the deleted ROAS figure, in a third place nobody had checked. Renamed at the
+   * prop as well as the label, because a prop called `reached` invites the wrong
+   * label back the next time somebody touches this file.
+   */
+  membersInServers: number;
   entrants: number;
   /** Games they have run a month on before, whether or not one is live now. */
   pastGames?: number;
@@ -64,7 +72,7 @@ export default function BrandTierStrip({
 
         <div className="grid shrink-0 grid-cols-3 gap-2 text-right">
           <Figure label="Invested" value={money(spend, currency)} />
-          <Figure label="People reached" value={reached.toLocaleString()} />
+          <Figure label="Members in those servers" value={membersInServers.toLocaleString()} />
           <Figure label="Competed" value={entrants.toLocaleString()} />
         </div>
       </div>

@@ -2,7 +2,19 @@ import { sql as dsql } from "drizzle-orm";
 import * as schema from "./schema";
 
 export type DB = ReturnType<typeof import("drizzle-orm/neon-http").drizzle<typeof schema>> |
+  ReturnType<typeof import("drizzle-orm/node-postgres").drizzle<typeof schema>> |
   ReturnType<typeof import("drizzle-orm/pglite").drizzle<typeof schema>>;
+
+/**
+ * Is this connection string a Neon one?
+ *
+ * Neon's HTTP driver only speaks to Neon. An ordinary Postgres — a CI service
+ * container, a local database, a self-hosted deployment — needs node-postgres.
+ * Deciding by host rather than by an env flag means nobody has to remember to
+ * set the flag, and the wrong answer is a connection error at boot rather than
+ * a subtly different driver at runtime.
+ */
+export const isNeonUrl = (url: string) => /\bneon\.(tech|build)\b/.test(url);
 
 declare global {
   // eslint-disable-next-line no-var
@@ -799,6 +811,43 @@ const COLUMN_MIGRATIONS = [
   // picture everywhere it appears. The caption and alt text live here too — an
   // admin who can swap the picture but not the sentence under it can only
   // half-fix a stale claim.
+  // B72.2 — one viewer, one creative, one hour. A unique index because two
+  // racing beacon calls would both pass a SELECT and both insert.
+  `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "dedupe_key" text`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "imp_dedupe_idx" ON "ad_impressions" ("dedupe_key")`,
+
+  // ===== B86: the data with a deadline =====
+  //
+  // The server pool pays real money for facts nobody was recording. These reach
+  // production by DEPLOYING, like every other schema change here — never by a
+  // hand-run statement against the live database.
+  `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "guild_id" text`,
+  `CREATE INDEX IF NOT EXISTS "cp_guild_idx" ON "challenge_participants" ("guild_id","challenge_id")`,
+  `CREATE TABLE IF NOT EXISTS "guild_snapshots" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "week_start" timestamp with time zone NOT NULL,
+    "member_count" integer DEFAULT 0 NOT NULL,
+    "linked" integer DEFAULT 0 NOT NULL,
+    "qualified_linked" integer DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "guild_snap_idx" ON "guild_snapshots" ("guild_id","week_start")`,
+  `CREATE TABLE IF NOT EXISTS "vault_ledger" (
+    "id" text PRIMARY KEY NOT NULL,
+    "vault" text NOT NULL,
+    "amount" double precision DEFAULT 0 NOT NULL,
+    "kind" text NOT NULL,
+    "ref_type" text,
+    "ref_id" text,
+    "transfer_id" text,
+    "reason" text,
+    "actor_id" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "vault_ledger_idx" ON "vault_ledger" ("vault","created_at")`,
+  `CREATE INDEX IF NOT EXISTS "vault_ledger_ref_idx" ON "vault_ledger" ("ref_type","ref_id")`,
+
   `CREATE TABLE IF NOT EXISTS "feature_shots" (
     "key" text PRIMARY KEY NOT NULL,
     "image_url" text,
@@ -907,6 +956,24 @@ async function ensureProvisioned(db: DB) {
 }
 
 async function createDb(): Promise<DB> {
+  // An ordinary Postgres. This branch exists because of a due-diligence
+  // finding: `tests/db/concurrency.mts` proved the LOGIC of the row lock but
+  // could never exercise the lock itself, since PGlite is a single in-process
+  // connection and serialises everything for free. Gate 2 was green without
+  // ever having run the failure mode it defends against.
+  //
+  // With this branch, CI stands up a real Postgres service and the same suites
+  // run across real, separate connections — which is the only way `FOR UPDATE`
+  // is actually tested. It is also what a self-hosted deployment needs.
+  if (process.env.DATABASE_URL && !isNeonUrl(process.env.DATABASE_URL)) {
+    const { Pool } = await import("pg");
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    const { perfLogger, perfEnabled } = await import("./perf");
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
+    const db = drizzle(pool, { schema, ...(perfEnabled() ? { logger: perfLogger } : {}) }) as DB;
+    await ensureProvisioned(db);
+    return db;
+  }
   if (process.env.DATABASE_URL) {
     const { neon } = await import("@neondatabase/serverless");
     const { drizzle } = await import("drizzle-orm/neon-http");

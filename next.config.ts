@@ -26,7 +26,40 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  serverExternalPackages: ["@electric-sql/pglite"],
+  // `pg` is a SERVER-ONLY driver, and Next has to be told so explicitly.
+  //
+  // Adding node-postgres (so the money paths can be tested against a real
+  // Postgres with real connections) broke the build, and the reason is §0's
+  // oldest trap: Next traces the module graph across the client boundary even
+  // for a dynamic `await import()`. `lib/db/index.ts` is legitimately reachable
+  // from many client components, so `fs`, `net`, `dns` and `tls` all started
+  // being resolved for the BROWSER bundle. `tsc` stayed green throughout.
+  //
+  // Chasing each import chain would be the wrong fix — the chains are
+  // legitimate. The right one is that a Postgres socket driver must not resolve
+  // in a browser bundle at all. It is never called there: the code path is
+  // behind `process.env.DATABASE_URL`, which does not exist in the client.
+  serverExternalPackages: ["@electric-sql/pglite", "pg", "ws"],
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve = config.resolve ?? {};
+      // ALIAS, not `fallback`. `fallback` only fires for a request webpack
+      // cannot resolve, and `pg` resolves perfectly well — it is right there in
+      // node_modules. Aliasing it to `false` is what actually replaces it with
+      // an empty module in the browser bundle. Tried fallback first; the build
+      // stayed red and named `util/types`, which is the giveaway that the
+      // package was still being followed.
+      config.resolve.alias = {
+        ...(config.resolve.alias ?? {}),
+        pg: false, "pg-native": false, "pg-cloudflare": false, ws: false,
+      };
+      config.resolve.fallback = {
+        ...(config.resolve.fallback ?? {}),
+        fs: false, net: false, dns: false, tls: false, "util/types": false,
+      };
+    }
+    return config;
+  },
   outputFileTracingIncludes: {
     "/**": ["./node_modules/@electric-sql/pglite/dist/**"],
   },

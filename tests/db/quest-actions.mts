@@ -30,7 +30,10 @@ const { uid } = await import("../../lib/utils.ts");
 const { readFile } = await import("node:fs/promises");
 
 const db = await getDb();
-const NEW_ACTIONS = ["redeem_trophy", "gift_sent", "gift_received", "bot_added"] as const;
+// Gifts left this list in B72.3 — they are retired at weight 0, so "some quest
+// pays for it" is false of them by design and asserting it would be asserting
+// the feature still exists.
+const NEW_ACTIONS = ["redeem_trophy", "bot_added"] as const;
 
 const mkUser = async (tag: string) => {
   const id = uid();
@@ -112,48 +115,30 @@ for (let i = 0; i < cap + 3; i++) {
 const redAll = await events(redeemer.id, "redeem_trophy");
 ok(`no more than ${cap} a day`, redAll.length <= cap, `${redAll.length} events, cap ${cap}`);
 
-console.log("\n== a gift pays BOTH sides, through buyTrophy ==");
-const giver = await mkUser("giver");
-const friend = await mkUser("friend");
-await grant(giver.id, priceOf(t1, rate) * 4);
-const bought = await buyTrophy(giver.id, t1.id, { recipientSlug: friend.slug, message: "gg" });
-ok("the gift went through", bought.ok, JSON.stringify(bought));
-const sent = await events(giver.id, "gift_sent");
-const got = await events(friend.id, "gift_received");
-eq("the giver earned gift_sent", sent.length, 1);
-eq("the receiver earned gift_received", got.length, 1);
-eq("both key on the same order", [sent[0].refId, got[0].refId], [bought.orderId, bought.orderId]);
-ok("…and both actually paid", Number(sent[0].cpAwarded) > 0 && Number(got[0].cpAwarded) > 0,
-  JSON.stringify([sent[0].cpAwarded, got[0].cpAwarded]));
+console.log("\n== nothing pays for moving a trophy between accounts ==");
+// This block used to prove a gift paid BOTH sides, keyed on the same order.
+// Gifting is deleted (B72.3): a trophy redeems for cash, so handing one to
+// another account moved real value between two people.
+//
+// Inverted rather than removed, and the difference matters — a deleted test
+// proves nothing, while this one fails the moment somebody re-adds a path.
+{
+  const giver = await mkUser("giver");
+  await grant(giver.id, priceOf(t1, rate) * 4);
+  const bought = await buyTrophy(giver.id, t1.id);
+  ok("a purchase still works", bought.ok, JSON.stringify(bought));
+  eq("…and pays no gift_sent", (await events(giver.id, "gift_sent")).length, 0);
+  eq("…nor gift_received", (await events(giver.id, "gift_received")).length, 0);
+}
 
 console.log("\n== buying for yourself is NOT a gift ==");
 // Paying CP for the act of spending CP would be a loop that funds itself.
 const selfBuyer = await mkUser("self");
 await grant(selfBuyer.id, priceOf(t2, rate) * 3);
-const own = await buyTrophy(selfBuyer.id, t2.id, {});
+const own = await buyTrophy(selfBuyer.id, t2.id);
 ok("the purchase went through", own.ok, JSON.stringify(own));
 eq("nothing was earned for sending", (await events(selfBuyer.id, "gift_sent")).length, 0);
 eq("nothing was earned for receiving", (await events(selfBuyer.id, "gift_received")).length, 0);
-
-console.log("\n== gifting the same trophy twice is two orders, and the cap stops it ==");
-const giftCap = ACTION_CATALOG.find((a) => a.key === "gift_sent")!.defaultCap;
-await grant(giver.id, priceOf(t1, rate) * 6);
-for (let i = 0; i < giftCap + 2; i++) {
-  await buyTrophy(giver.id, t1.id, { recipientSlug: friend.slug });
-}
-const sentAll = await events(giver.id, "gift_sent");
-ok(`the giver is capped at ${giftCap} a day`, sentAll.length <= giftCap,
-  `${sentAll.length} events, cap ${giftCap}`);
-// The orders themselves are NOT capped — the cap is on the points, not on
-// somebody's right to buy their friend a trophy.
-const orders = await db.select().from(schema.marketplaceOrders)
-  .where(sqlEq(schema.marketplaceOrders.buyerId, giver.id));
-ok("…but the purchases themselves were not blocked", orders.length > sentAll.length,
-  `${orders.length} orders vs ${sentAll.length} awards`);
-
-console.log("\n== the awards land in the wallet, not just the events table ==");
-const before = await getTotalCp(db, friend.id);
-ok("the receiver's CP total includes the gift", before > 0, String(before));
 
 console.log("\n== the emitters are awaited, not floated ==");
 // A floating promise in a server action is killed when the response is sent
@@ -161,10 +146,14 @@ console.log("\n== the emitters are awaited, not floated ==");
 // because that is where the defect lives.
 const mkt = await readFile(new URL("../../lib/marketplace.ts", import.meta.url), "utf8");
 const tro = await readFile(new URL("../../app/actions/trophies.ts", import.meta.url), "utf8");
-ok("gift_sent is awaited", /await awardQuestAction\(db, buyerId, "gift_sent"/.test(mkt));
-ok("gift_received is awaited", /await awardQuestAction\(db, recipientId, "gift_received"/.test(mkt));
+// The gift emitters were checked here too. Gone with the feature; what the
+// assertion was PROTECTING is not, so it moves to the ones that remain.
 ok("redeem_trophy is awaited", /await awardQuestAction\(db, user\.id, "redeem_trophy"/.test(tro));
-ok("…none of the three is a floating void", !/void awardQuestAction/.test(mkt + tro));
+ok("…and is not a floating void", !/void awardQuestAction/.test(mkt + tro));
+// B72.3's new emitter gets the same treatment, because it is the one most
+// recently added and therefore the one most likely to be got wrong.
+const disc = await readFile(new URL("../../app/api/discord/interactions/route.ts", import.meta.url), "utf8");
+ok("share_card is awaited", /await awardQuestAction\([\s\S]{0,140}"share_card"/.test(disc));
 // Awarded at REQUEST: a gamer's points must not depend on how fast a human got
 // to a queue.
 const reqBody = tro.slice(tro.indexOf("export async function requestRedeem"),

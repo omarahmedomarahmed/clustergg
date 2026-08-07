@@ -349,7 +349,7 @@ export default async function BrandPortalPage({
                 <BrandTierStrip
                   tier={tier}
                   spend={campaignViews.reduce((a, c) => a + c.totals.spend, 0)}
-                  reached={campaignViews.reduce((a, c) => a + c.totals.members, 0)}
+                  membersInServers={campaignViews.reduce((a, c) => a + c.totals.members, 0)}
                   entrants={campaignViews.reduce((a, c) => a + c.totals.entrants, 0)}
                   pastGames={new Set(sponsored.map((c) => c.game)).size}
                   currency={cfg.currency}
@@ -373,14 +373,13 @@ export default async function BrandPortalPage({
                         servers: w.report.reach.servers, members: w.report.reach.members, linked: w.report.reach.linked,
                         entrants: w.report.entrants, clicks: w.report.clicks,
                         ecpm: w.report.ecpm, costPerEntrant: w.report.costPerEntrant,
-                        mediaValue: w.report.mediaValue, roas: w.report.roas, spend: w.report.spend,
+                        spend: w.report.spend,
                         standings: w.report.standings,
                         servers_list: (serversByChallenge.get(w.report.challengeId) ?? [])
                           .map((s) => ({ name: s.name || "A Discord server", members: s.members, linked: s.linked })),
                       } : null,
                     })),
                     totals: r.totals,
-                    benchmark: r.benchmark,
                     complete: r.complete,
                     // A quote belongs to the month it came from; ones staff recorded
                     // without a campaign are shown on the brand's latest.

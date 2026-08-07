@@ -27,7 +27,7 @@
 // concurrency test meaningful at all.
 
 import type { DB } from "./index";
-import { isDemoMode, schema } from "./index";
+import { isDemoMode, isNeonUrl, schema } from "./index";
 import { eq, sql } from "drizzle-orm";
 
 /**
@@ -48,17 +48,37 @@ declare global {
 }
 
 async function createTxDb(): Promise<DB> {
-  const { Pool } = await import("@neondatabase/serverless");
+  // An ordinary Postgres (CI, local, self-hosted). node-postgres pools real
+  // connections, so `FOR UPDATE` here is a genuine cross-connection lock — this
+  // is the driver under which `tests/db/concurrency.mts` actually exercises the
+  // contention it claims to test, rather than getting serialisation for free
+  // from PGlite.
+  if (process.env.DATABASE_URL && !isNeonUrl(process.env.DATABASE_URL)) {
+    const { Pool: PgPool } = await import("pg");
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    return drizzle(new PgPool({ connectionString: process.env.DATABASE_URL, max: 8 }),
+      { schema }) as unknown as DB;
+  }
+
+  const { Pool, neonConfig } = await import("@neondatabase/serverless");
   const { drizzle } = await import("drizzle-orm/neon-serverless");
-  // The pooled driver speaks WebSocket. Node 22+ (our runtime — see `engines`)
-  // and every edge runtime we deploy to provide one globally. Saying so here
-  // means a runtime that does not turns into this sentence instead of a
-  // connection error nobody can place.
+
+  // The pooled driver speaks WebSocket, and this is the sharpest thing the
+  // round-2 review found — a defect introduced BY the fix above.
+  //
+  // Node 22+ (see `engines`, and `.nvmrc`) provides a global WebSocket and
+  // every edge runtime we deploy to does too. On Node 20 there is none, so
+  // every money path on the platform would throw: loudly on a purchase or a
+  // redemption, and on a CP award only into the logs, because that path
+  // deliberately does not block the action underneath it. A silent total stop
+  // to CP earning is the worst failure mode in this file, and it would have
+  // been one project-settings click away.
+  //
+  // So: pinned AND polyfilled. The pin is the intent; this is what happens when
+  // somebody overrides it.
   if (typeof globalThis.WebSocket === "undefined") {
-    throw new Error(
-      "No global WebSocket, which the pooled database driver requires. Node 22+ provides one; " +
-        "on an older runtime set neonConfig.webSocketConstructor before calling getTxDb().",
-    );
+    const ws = await import("ws");
+    neonConfig.webSocketConstructor = (ws.default ?? ws) as unknown as typeof WebSocket;
   }
   // Small on purpose: this pool serves money paths only, and a serverless
   // function that holds ten idle sockets is a bill, not a feature.

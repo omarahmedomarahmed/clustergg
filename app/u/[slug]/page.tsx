@@ -95,12 +95,30 @@ export default async function ProfilePage({ params }: Props) {
   // number the gamer can show off. Owners viewing their own page don't count.
   let viewCount = user.profileViews ?? 0;
   if (!isOwner) {
-    const before = viewCount;
     viewCount += 1;
     try { await db.update(schema.users).set({ profileViews: viewCount }).where(eq(schema.users.id, user.id)); } catch { /* non-fatal */ }
-    // Every 25 views feeds the owner's Orbit quest (one award per 25-bucket).
-    if (Math.floor(viewCount / 25) > Math.floor(before / 25)) {
-      try { const { awardQuestAction } = await import("@/lib/quests"); await awardQuestAction(db, user.id, "profile_views_25", { refType: "views", refId: `${Math.floor(viewCount / 25)}` }); } catch { /* non-fatal */ }
+
+    // CP for a profile view requires a SIGNED-IN viewer, and pays once per
+    // viewer per day. B72.2, and it is the third mint the beacon fix does not
+    // reach.
+    //
+    // This page is public and uncached-per-visitor, so the old rule — award the
+    // owner every time the raw counter crossed a multiple of 25 — meant anybody
+    // could reload a stranger's profile twenty-five times and hand them points.
+    // No account, no cost, and it did not even have to be their own profile.
+    //
+    // The counter above still counts everyone, because it is a vanity number
+    // and always was. The MONEY now needs a real gamer behind it: the award is
+    // keyed on (viewer, day), so a second look the same day pays nothing, and
+    // the catalogue's daily cap does the rest. Farming it means running several
+    // real accounts, which is exactly the cost we want the platform to have.
+    if (viewer?.id && viewer.id !== user.id) {
+      try {
+        const { awardQuestAction } = await import("@/lib/quests");
+        await awardQuestAction(db, user.id, "profile_views_25", {
+          refType: "view", refId: `${viewer.id}:${new Date().toISOString().slice(0, 10)}`,
+        });
+      } catch { /* non-fatal */ }
     }
   }
 

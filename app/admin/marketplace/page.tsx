@@ -37,7 +37,10 @@ export default async function AdminMarketplacePage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         <Stat label="CP taken in" value={num(wallet.cpTaken)} accent="#22d3ee" />
         <Stat label="Trophies sold" value={num(wallet.orders)} />
-        <Stat label="Sent as gifts" value={num(wallet.gifts)} />
+        {/* Historical only. Gifting was deleted in B72.3 — the number can
+            never rise again, and the label says so rather than implying a
+            feature staff could still be asked about. */}
+        <Stat label="Gifts (retired)" value={num(wallet.gifts)} />
         <Stat label="Buyers" value={num(wallet.buyers)} />
         <Stat label="Redeemable liability" value={`$${num(Math.round(wallet.liability))}`} accent="#fbbf24" />
       </div>

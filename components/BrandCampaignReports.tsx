@@ -11,12 +11,18 @@ import { portalSetSlotCover } from "@/app/actions/brand-portal";
 // did. It is built around one rule that decides whether any of it is worth
 // reading: a number is either COUNTED or it is LABELLED.
 //
-//   * Counted — servers, people reached, entrants, clicks, the podium. Written
-//     down when it happened, never recalculated.
-//   * Derived — eCPM and cost per entrant. Counted numbers over the price.
-//   * Modelled — media value and ROAS, priced at a benchmark that is printed
-//     next to them. A return figure whose benchmark is hidden is one no media
-//     buyer should accept, so ours is always visible and always arguable.
+//   * Counted — servers the announcement landed in, entrants, clicks, the
+//     podium. Written down when it happened, never recalculated.
+//   * Audience — the member headcount of those servers. NOT delivery, and no
+//     longer labelled "People reached", which is what it said while sitting
+//     under a heading reading "Counted delivery".
+//   * Derived — cost per thousand members, cost per entrant. Each labelled by
+//     what it divides by.
+//
+// There is no MODELLED tier any more. It held media value and ROAS, priced from
+// that headcount, rendered as a 2.4× hero figure to a paying customer. The old
+// version of this comment defended it as "always visible and always arguable" —
+// which is exactly the sentence a team writes when it has stopped noticing.
 //
 // Upcoming weeks are editable and finished weeks are not, because a live week's
 // cover is already sitting in a message in hundreds of servers.
@@ -39,8 +45,6 @@ export type WeekReport = {
     clicks: number;
     ecpm: number;
     costPerEntrant: number;
-    mediaValue: number;
-    roas: number;
     spend: number;
     standings: { place: number; name: string; slug: string | null; points: number }[];
     /** The servers it landed in, biggest first. */
@@ -59,9 +63,7 @@ export type CampaignView = {
   totals: {
     spend: number; prizePool: number; servers: number; members: number;
     entrants: number; clicks: number; ecpm: number; costPerEntrant: number;
-    mediaValue: number; roas: number;
   };
-  benchmark: { cpm: number; cpc: number; cpe: number };
   complete: boolean;
   testimonials: { name: string; quote: string; slug: string | null; avatarUrl: string | null }[];
 };
@@ -110,17 +112,35 @@ function CampaignCard({ brandId, keyStr, c }: { brandId: string; keyStr: string;
             {" · "}{done} of {c.slots} weeks run{" · "}{money(c.total)} paid
           </div>
         </div>
+        {/*
+          A "Return on spend: 2.4×" hero used to sit here, computed from server
+          headcount × a benchmark CPM. It was the most serious finding in the
+          due-diligence report and it is deleted rather than corrected: there is
+          no honest version of it until a view is logged.
+
+          What replaces it is the strongest number on this report that is
+          genuinely counted on BOTH sides — people who actually entered, and
+          what each one cost. Nothing here is derived from a headcount.
+        */}
         <div className="shrink-0 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2 text-right">
-          <div className="text-[10px] uppercase tracking-widest text-emerald-200/80">Return on spend</div>
-          <div className="text-2xl font-bold tabular-nums text-emerald-200">{c.totals.roas.toFixed(2)}×</div>
-          <div className="text-[10px] text-muted">at ${c.benchmark.cpm} CPM · ${c.benchmark.cpe}/entrant</div>
+          <div className="text-[10px] uppercase tracking-widest text-emerald-200/80">Cost per entrant</div>
+          <div className="text-2xl font-bold tabular-nums text-emerald-200">
+            {c.totals.costPerEntrant ? money(c.totals.costPerEntrant) : "—"}
+          </div>
+          <div className="text-[10px] text-muted">{n(c.totals.entrants)} entered · counted</div>
         </div>
       </div>
 
-      {/* ===== Counted delivery ===== */}
+      {/* ===== What is counted, and what is only audience size ===== */}
       <div className="grid grid-cols-2 gap-px bg-white/8 sm:grid-cols-3 lg:grid-cols-6">
         <Cell label="Servers reached" value={n(c.totals.servers)} />
-        <Cell label="People reached" value={n(c.totals.members)} />
+        {/*
+          NOT "People reached". This is the member headcount of the servers the
+          announcement landed in — how big the rooms were, not how many people
+          saw anything. Under the old label it was the same false claim as the
+          ROAS figure above it, one level down and harder to spot.
+        */}
+        <Cell label="Members in those servers" value={n(c.totals.members)} />
         <Cell label="Entrants" value={n(c.totals.entrants)} />
         <Cell label="Clicks" value={n(c.totals.clicks)} />
         <Cell label="Your cost / 1,000" value={c.totals.ecpm ? money(c.totals.ecpm) : "—"} />
@@ -139,7 +159,7 @@ function CampaignCard({ brandId, keyStr, c }: { brandId: string; keyStr: string;
 
       {/* ===== The open week, in full ===== */}
       {open !== null && c.weeks[open]?.report && (
-        <WeekDetail w={c.weeks[open]} benchmark={c.benchmark} />
+        <WeekDetail w={c.weeks[open]} />
       )}
 
       {/* ===== End of month ===== */}
@@ -265,7 +285,7 @@ function WeekChip({ status }: { status: WeekReport["status"] }) {
   return <span className={`text-[9px] uppercase tracking-widest ${cls}`}>{text}</span>;
 }
 
-function WeekDetail({ w, benchmark }: { w: WeekReport; benchmark: { cpm: number; cpc: number; cpe: number } }) {
+function WeekDetail({ w }: { w: WeekReport }) {
   const r = w.report!;
   return (
     <div className="border-t border-white/10 bg-black/25 p-5">
@@ -283,9 +303,10 @@ function WeekDetail({ w, benchmark }: { w: WeekReport; benchmark: { cpm: number;
 
       <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Box label="Clicks while it ran" value={n(r.clicks)} />
-        <Box label="Your cost / 1,000" value={r.ecpm ? money(r.ecpm) : "—"} />
-        <Box label="Cost / entrant" value={r.costPerEntrant ? money(r.costPerEntrant) : "—"} />
-        <Box label="Return on spend" value={`${r.roas.toFixed(2)}×`} accent />
+        {/* Labelled by what it divides BY. The denominator is a headcount, so
+            calling it a CPM would import a meaning it has not earned. */}
+        <Box label="Cost / 1,000 members" value={r.ecpm ? money(r.ecpm) : "—"} />
+        <Box label="Cost / entrant" value={r.costPerEntrant ? money(r.costPerEntrant) : "—"} accent />
       </div>
 
       {r.servers_list.length > 0 && (
@@ -328,14 +349,22 @@ function WeekDetail({ w, benchmark }: { w: WeekReport; benchmark: { cpm: number;
         </div>
       )}
 
+      {/*
+        The old version of this paragraph is worth remembering: it said "People
+        reached is counted at the moment the challenge posted — the servers it
+        landed in and how many members each had". It described a headcount and
+        called it reach, in the same sentence, and nobody noticed for months.
+      */}
       <p className="mt-4 text-[11px] leading-relaxed text-muted">
-        People reached is counted at the moment the challenge posted — the servers it landed in and how many
-        members each had — and never recalculated. Return on spend prices that delivery at the going rate for
-        gaming inventory: <b className="text-ink">${benchmark.cpm} per thousand reached</b>,{" "}
-        <b className="text-ink">${benchmark.cpc} per click</b>, and{" "}
-        <b className="text-ink">${benchmark.cpe} per entrant</b> — an entrant linked an account and played a
-        week under your name, which is worth more than a view. It does not count the prize money that reached
-        players, which is the product rather than a rebate.
+        <b className="text-ink">Members in those servers</b> is the headcount of the servers this
+        challenge posted into, recorded at the moment it posted and never recalculated. It is how
+        big the rooms were — <b className="text-ink">not</b> how many people saw it. We do not yet
+        measure per-view delivery, and we would rather say so than price a headcount and call the
+        result a return.
+        {" "}
+        <b className="text-ink">Entrants</b> is counted on both sides: a person who linked a real
+        game account and played a week under your name. It is the number on this page we would
+        defend to anybody.
       </p>
     </div>
   );
@@ -366,8 +395,8 @@ function MonthReport({ c }: { c: CampaignView }) {
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Box label="Paid" value={money(c.totals.spend)} />
-        <Box label="Media value delivered" value={money(c.totals.mediaValue)} note={`at $${c.benchmark.cpm} CPM`} />
-        <Box label="Return on spend" value={`${c.totals.roas.toFixed(2)}×`} accent />
+        <Box label="Entrants" value={n(c.totals.entrants)} />
+        <Box label="Cost / entrant" value={c.totals.costPerEntrant ? money(c.totals.costPerEntrant) : "—"} accent />
         <Box label="To players" value={money(c.totals.prizePool)} />
       </div>
 

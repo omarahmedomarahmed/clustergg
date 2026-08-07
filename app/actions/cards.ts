@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/auth";
 import { setContent } from "@/lib/cms";
 import {
-  DEFAULT_LAYOUT, LAYOUT_KINDS, layoutKey, parseLayout, type CardLayout,
+  DEFAULT_LAYOUT, LAYOUT_KINDS, LAYOUT_VERSION, layoutKey, parseLayout, type CardLayout,
 } from "@/lib/cards/layout";
 import { forgetLayouts } from "@/lib/cards/layout-store";
 import { invalidateCards } from "@/lib/cards/cache";
@@ -87,7 +87,8 @@ export async function saveCardLayout(_prev: CardActionState, fd: FormData): Prom
   const kind = String(fd.get("kind") ?? "");
   if (!LAYOUT_KINDS.includes(kind as never)) return { error: "Unknown card kind." };
 
-  await setContent(layoutKey(kind), JSON.stringify(readLayout(fd)));
+  // Stamped, or the next read discards what was just saved.
+  await setContent(layoutKey(kind), JSON.stringify({ ...readLayout(fd), v: LAYOUT_VERSION }));
   forgetLayouts();
   const dropped = await invalidateCards(kind);
 
@@ -144,7 +145,7 @@ export async function applyFurnitureEverywhere(_prev: CardActionState, fd: FormD
     const next: CardLayout = { ...current };
     for (const k of which) next[k] = source[k];
     if (JSON.stringify(next) === JSON.stringify(current)) continue;
-    await setContent(layoutKey(kind), JSON.stringify(next));
+    await setContent(layoutKey(kind), JSON.stringify({ ...next, v: LAYOUT_VERSION }));
     changed++;
   }
 

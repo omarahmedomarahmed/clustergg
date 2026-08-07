@@ -11,7 +11,7 @@
 // quietly changes the first.
 
 import { ACTION_CATALOG, ACTION_CAP_SUM, DEFAULT_DAILY_CP_CEILING, type QuestActionKey } from "@/lib/quests";
-import { DEFAULT_CP_PER_DOLLAR } from "@/lib/marketplace";
+import { DEFAULT_CP_PER_DOLLAR } from "@/lib/cp-rate";
 
 /** One action's economics, as configured right now. */
 export type ActionConfig = {

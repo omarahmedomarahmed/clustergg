@@ -1,13 +1,27 @@
-// B5/B49 — resolving the person, and who is allowed to be found.
+// B72.3 — gifting is DELETED, and this file exists to keep it deleted.
 //
-// The browser half is `tests/ui/checkout.mjs`. This is the half a browser
-// cannot see: which accounts the type-ahead is willing to name, what fields
-// leave the server, and the property the whole gift flow rests on — that a
-// second tab cannot spend the same points twice.
+// It used to test the gift flow: which accounts the type-ahead would name, what
+// fields left the server, and that a second tab could not spend the same points
+// twice. That last one is not lost — it moved to `tests/db/concurrency.mts`,
+// where it is checked against a real Postgres under real contention rather than
+// as a side effect of a gift.
+//
+// What replaces it is the opposite assertion. A trophy redeems for cash, so
+// handing one to another account moved real value between two people: a
+// money-transmission trigger, a 1099 aggregation hole, and a way for an
+// under-18 who cannot redeem to pass value to somebody who can. One deletion
+// closed all three, and this file is what stops any of it coming back through
+// a helpful re-addition.
+//
+// Several assertions read SOURCE rather than call a function, deliberately.
+// "There is no way to give a trophy to somebody else" is a claim about the
+// code; a runtime check can only prove that one path refuses.
 //
 //   DEMO_DB=1 npx tsx tests/db/gifting.mts
 
 process.env.DEMO_DB = "1";
+
+import { readFileSync } from "node:fs";
 
 let pass = 0;
 const fails: string[] = [];
@@ -18,8 +32,13 @@ const ok = (name: string, cond: boolean, detail = "") => {
 const eq = (name: string, got: unknown, want: unknown) =>
   ok(name, JSON.stringify(got) === JSON.stringify(want), `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 
-const { giftSearch, giftRecipient, MIN_QUERY, MAX_RESULTS } = await import("../../lib/gift-search.ts");
+const exists = (p: string) => { try { readFileSync(new URL(`../../${p}`, import.meta.url)); return true; } catch { return false; } };
+const code = (p: string) =>
+  readFileSync(new URL(`../../${p}`, import.meta.url), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
+
 const { buyTrophy, cpPerDollar, priceOf } = await import("../../lib/marketplace.ts");
+const { ACTION_CATALOG } = await import("../../lib/quests.ts");
 const { getDb, schema } = await import("../../lib/db/index.ts");
 const { eq: sqlEq } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
@@ -27,163 +46,112 @@ const { uid } = await import("../../lib/utils.ts");
 const db = await getDb();
 const rate = await cpPerDollar(db);
 
-const tag = uid().slice(0, 6);
-const mkUser = async (name: string, extra: Record<string, unknown> = {}) => {
-  const id = uid();
-  const slug = `gift-${name}-${tag}`;
-  await db.insert(schema.users).values({
-    id, slug, displayName: name, email: `${id}@test.invalid`, passwordHash: "x", ...extra,
-  } as never);
-  return { id, slug, name };
-};
-const grant = async (userId: string, cp: number) => {
-  const [q] = await db.select({ id: schema.quests.id }).from(schema.quests).limit(1);
+console.log("== a purchase cannot name anybody but the buyer ==");
+{
+  // The signature, not the behaviour. `buyTrophy` used to take
+  // `{ recipientSlug, message }`; removing the parameter is what makes it
+  // impossible to reintroduce gifting by passing an argument, and means no
+  // reviewer has to check whether some caller does.
+  eq("buyTrophy takes exactly two arguments", buyTrophy.length, 2);
+  const src = code("lib/marketplace.ts");
+  // Narrowed on purpose after this failed as first written. `recipientSlug`
+  // DOES survive in this file — on `MarketOrder`, the admin ledger's read
+  // model, because orders written before the deletion have a recipient who is
+  // not the buyer. Rewriting those as self-purchases would be falsifying
+  // history to make the present look tidy. What must not survive is any way to
+  // pass one IN.
+  ok("…and buyTrophy accepts no recipient",
+    !/recipientSlug\??:/.test(src.slice(src.indexOf("export async function buyTrophy"), src.indexOf("export type MarketOrder"))));
+  ok("the order is always kind:self", /kind: "self"/.test(src) && !/kind: giftedTo/.test(src));
+  ok("no gift notification is written", !/trophy_gift/.test(src));
+}
+
+console.log("\n== a bought trophy lands on the BUYER, whatever the caller wants ==");
+{
+  const tag = uid().slice(0, 6);
+  const buyer = uid();
+  const other = uid();
+  for (const [id, n] of [[buyer, "Buyer"], [other, "Other"]] as const) {
+    await db.insert(schema.users).values({
+      id, email: `${id}@gift.test`, displayName: `${n} ${tag}`, slug: `${n.toLowerCase()}-${tag}`,
+      passwordHash: "x", role: "user", status: "active",
+    });
+  }
+  const trophyId = uid();
+  await db.insert(schema.trophies).values({
+    id: trophyId, name: `Gift Test ${tag}`, imageUrl: "/x.png", value: "0", inMarketplace: true,
+  });
+  const price = priceOf({ value: "0" } as never, rate);
+  const [quest] = await db.select().from(schema.quests).limit(1);
   await db.insert(schema.questEvents).values({
-    id: uid(), userId, questId: q.id, actionKey: "win_challenge",
-    qpAwarded: 0, cpAwarded: cp, refType: "gift-seed", refId: uid(),
-    // Backdated: B34's 500 CP/day ceiling counts anything stamped today, and a
-    // fixture that funds a wallet today eats the whole day's room.
-    createdAt: new Date(Date.now() - 2 * 86400_000),
-  } as never);
-};
+    id: uid(), userId: buyer, questId: quest.id, actionKey: "manual",
+    qpAwarded: 0, cpAwarded: price, refType: "seed", refId: "funding",
+  });
 
-const zephyrine = await mkUser(`Zephyrine${tag}`);
-const zeph2 = await mkUser(`Zephyrina${tag}`, { discordUsername: `zephyr_disc_${tag}` });
-const hidden = await mkUser(`Zephyrhidden${tag}`, { profileVisibility: "private" });
-const followersOnly = await mkUser(`Zephyrfoll${tag}`, { profileVisibility: "followers" });
-const banned = await mkUser(`Zephyrbanned${tag}`, { status: "banned" });
+  const res = await buyTrophy(buyer, trophyId);
+  ok("the purchase succeeds", res.ok === true, JSON.stringify(res));
 
-console.log("== a query too short means nothing ==");
-for (const q of ["", "z", " z "]) {
-  eq(`"${q}" returns nothing`, (await giftSearch(q)).length, 0);
+  const held = await db.select({ userId: schema.userTrophies.userId })
+    .from(schema.userTrophies).where(sqlEq(schema.userTrophies.trophyId, trophyId));
+  eq("exactly one trophy was awarded", held.length, 1);
+  eq("…to the buyer", held[0].userId, buyer);
+
+  const orders = await db.select({ recipientId: schema.marketplaceOrders.recipientId, kind: schema.marketplaceOrders.kind })
+    .from(schema.marketplaceOrders).where(sqlEq(schema.marketplaceOrders.buyerId, buyer));
+  eq("the order names the buyer as recipient", orders[0]?.recipientId, buyer);
+  eq("…and is a self purchase", orders[0]?.kind, "self");
+
+  // The other account must be untouched. Not "was not given this trophy" —
+  // holds nothing at all, because the point is that no path exists.
+  const theirs = await db.select({ id: schema.userTrophies.id })
+    .from(schema.userTrophies).where(sqlEq(schema.userTrophies.userId, other));
+  eq("nothing reached the other account", theirs.length, 0);
 }
-ok(`the floor is ${MIN_QUERY} characters`, MIN_QUERY === 2);
 
-console.log("\n== it finds people by the things a human types ==");
-const byName = await giftSearch(`Zephyrine${tag}`);
-ok("by display name", byName.some((g) => g.slug === zephyrine.slug), JSON.stringify(byName.map((g) => g.slug)));
-const bySlug = await giftSearch(zeph2.slug);
-ok("by @profile", bySlug.some((g) => g.slug === zeph2.slug));
-const byDiscord = await giftSearch(`zephyr_disc_${tag}`);
-ok("by Discord handle", byDiscord.some((g) => g.slug === zeph2.slug), JSON.stringify(byDiscord.map((g) => g.slug)));
-const atPrefixed = await giftSearch(`@${zeph2.slug}`);
-ok("a leading @ is not a typo", atPrefixed.some((g) => g.slug === zeph2.slug));
-
-console.log("\n== who is NOT in the directory ==");
-const all = await giftSearch(`Zephyr${tag}`, { limit: MAX_RESULTS });
-const slugs = all.map((g) => g.slug);
-ok("a private profile is not enumerable", !slugs.includes(hidden.slug), JSON.stringify(slugs));
-ok("nor a followers-only one", !slugs.includes(followersOnly.slug), JSON.stringify(slugs));
-ok("nor a banned account", !slugs.includes(banned.slug), JSON.stringify(slugs));
-const self = await giftSearch(`Zephyrine${tag}`, { excludeUserId: zephyrine.id });
-ok("and you never find yourself", !self.some((g) => g.slug === zephyrine.slug));
-
-console.log("\n== …but a private profile can still be gifted by someone who has the link ==");
-// Deliberate, and the reason it is safe: an exact @profile is the thing you
-// only have if they gave it to you. Opting out of a search box is not opting
-// out of presents.
-const direct = await giftRecipient(hidden.slug);
-eq("an exact slug resolves them", direct?.slug, hidden.slug);
-eq("…with a leading @ too", (await giftRecipient(`@${hidden.slug}`))?.slug, hidden.slug);
-eq("a banned account never resolves", await giftRecipient(banned.slug), null);
-eq("nor a slug that does not exist", await giftRecipient(`nobody-${tag}`), null);
-
-console.log("\n== only public fields ever leave ==");
-// docs/PAYMENTS.md and the standing rule: /admin/users is the gamer directory,
-// and this is not it. Nothing here is anything a profile page does not already
-// show a signed-out visitor.
-const blob = JSON.stringify(all);
-for (const bad of ["email", "passwordHash", "password_hash", "userId", '"id"', "payoutMethod", "country"]) {
-  ok(`no "${bad}" in a result`, !blob.includes(bad), blob.slice(0, 200));
+console.log("\n== the quest actions are retired, not merely unused ==");
+for (const k of ["gift_sent", "gift_received"]) {
+  const a = ACTION_CATALOG.find((x) => x.key === k);
+  ok(`${k} still EXISTS in the catalogue`, !!a);
+  eq(`…and pays nothing`, a?.defaultWeight, 0);
+  ok(`…and says it is retired`, /retired/i.test(a?.label ?? ""));
 }
-ok("every result carries a name, a slug and a reason it matched",
-  all.every((g) => !!g.displayName && !!g.slug && !!g.matchedOn));
+// Kept rather than deleted on purpose: a quest whose stored `actionWeights`
+// still names one reads zero instead of throwing, and an admin who had tuned
+// them sees a 0 rather than a crash.
+ok("no code path awards a gift action",
+  !/awardQuestAction\([^)]*"gift_(sent|received)"/.test(code("lib/marketplace.ts")));
 
-console.log("\n== never more than a screenful ==");
-ok(`capped at ${MAX_RESULTS}`, all.length <= MAX_RESULTS, String(all.length));
-ok("…and a caller cannot ask for more",
-  (await giftSearch(`Zephyr${tag}`, { limit: 500 })).length <= MAX_RESULTS);
+console.log("\n== every surface is gone, not just the server one ==");
+{
+  ok("the gift search module is deleted", !exists("lib/gift-search.ts"));
+  ok("…and the gamer-search endpoint with it", !exists("app/api/gamers/search/route.ts"));
+  ok("…and the Discord gift id helper", !exists("lib/discord/gift-id.ts"));
 
-console.log("\n== an exact prefix outranks a substring ==");
-// Typing somebody's actual name should not put them third.
-const ranked = await giftSearch(`Zephyrine${tag}`.slice(0, 9));
-ok("the prefix match comes first",
-  ranked.length === 0 || ranked[0].displayName.toLowerCase().startsWith("zephyri"),
-  JSON.stringify(ranked.map((g) => g.displayName)));
+  const checkout = code("components/TrophyCheckout.tsx");
+  ok("the checkout has no gift mode", !/"gift"/.test(checkout));
+  ok("…and no recipient input", !/recipientSlug/.test(checkout));
 
-console.log("\n== the balance is checked at CONFIRM, not at open ==");
-// The two-tab problem: open the shelf twice, buy in one, then confirm in the
-// other. `buyTrophy` re-reads the wallet rather than trusting the page, so the
-// second confirm fails instead of overdrawing.
-const [trophy] = await db.select().from(schema.trophies).limit(1);
-const price = priceOf(trophy, rate);
-const buyer = await mkUser(`Buyer${tag}`);
-await grant(buyer.id, price + Math.floor(price / 2));   // enough for ONE
-const first = await buyTrophy(buyer.id, trophy.id, { recipientSlug: zephyrine.slug });
-ok("the first purchase goes through", first.ok, JSON.stringify(first));
-const second = await buyTrophy(buyer.id, trophy.id, { recipientSlug: zephyrine.slug });
-eq("the second is refused, not overdrawn", second.ok, false);
-ok("…and it says what they have", /have/.test(second.ok ? "" : second.error ?? ""), JSON.stringify(second));
+  const screens = code("lib/discord/screens.ts");
+  ok("the Discord card has no gift button", !/open-gift\|/.test(screens));
+  ok("…and no gift modal", !/giftModal/.test(screens));
 
-console.log("\n== a gift lands once, on the right person ==");
-const orders = await db.select().from(schema.marketplaceOrders)
-  .where(sqlEq(schema.marketplaceOrders.buyerId, buyer.id));
-eq("one order", orders.length, 1);
-eq("…recorded as a gift", orders[0].kind, "gift");
-eq("…charged to the giver", orders[0].buyerId, buyer.id);
-eq("…and awarded to the recipient", orders[0].recipientId, zephyrine.id);
-const landed = await db.select().from(schema.userTrophies)
-  .where(sqlEq(schema.userTrophies.userId, zephyrine.id));
-eq("one trophy on their profile", landed.length, 1);
-eq("…held, so it is redeemable exactly like a won one", landed[0].status, "held");
-eq("…and not attached to a challenge, which is what marks it bought", landed[0].challengeId, null);
-const notMine = await db.select().from(schema.userTrophies)
-  .where(sqlEq(schema.userTrophies.userId, buyer.id));
-eq("the giver keeps nothing", notMine.length, 0);
+  const route = code("app/api/discord/interactions/route.ts");
+  ok("the interaction router has no gift handler", !/giftSubmit|giftConfirm/.test(route));
+}
 
-console.log("\n== gifting a banned or missing account is refused before points move ==");
-const rich = await mkUser(`Rich${tag}`);
-await grant(rich.id, price * 3);
-const toBanned = await buyTrophy(rich.id, trophy.id, { recipientSlug: banned.slug });
-eq("a banned recipient is refused", toBanned.ok, false);
-const toGhost = await buyTrophy(rich.id, trophy.id, { recipientSlug: `nobody-${tag}` });
-eq("an unknown recipient is refused", toGhost.ok, false);
-eq("…and nothing was charged",
-  (await db.select().from(schema.marketplaceOrders)
-    .where(sqlEq(schema.marketplaceOrders.buyerId, rich.id))).length, 0);
-
-console.log("\n== in the bot: a Discord handle is what a gamer actually knows (B5.2) ==");
-// `users.discord_username` is populated at OAuth, and it is the identifier
-// somebody has for their friend — they do not know their Cluster slug.
-const { findByDiscordName } = await import("../../lib/gamer-lookup.ts");
-const found = await findByDiscordName(`zephyr_disc_${tag}`);
-eq("a Discord handle resolves to the person", found?.slug, zeph2.slug);
-eq("…and then to a giftable recipient", (await giftRecipient(found!.slug))?.slug, zeph2.slug);
-eq("a handle nobody has resolves to nothing", await findByDiscordName(`nope_${tag}`), null);
-
-console.log("\n== the confirm button can never name the wrong person ==");
-// Discord truncates a custom_id at 100 characters SILENTLY. The id carries the
-// trophy, the recipient and the note in that order, so a naive slice clips the
-// note — harmless — until a long slug pushes the boundary left and it starts
-// clipping the SLUG. At that point the press that exists to make gifting safe
-// is the thing that sends a trophy to somebody else.
-const { giftConfirmId, parseGiftConfirmId, MAX_CUSTOM_ID } = await import("../../lib/discord/gift-id.ts");
-const tid = uid();
-const longNote = "x".repeat(300);
-const built = giftConfirmId(tid, zeph2.slug, longNote)!;
-ok("it fits inside Discord's limit", built.length <= MAX_CUSTOM_ID, `${built.length}`);
-const back = parseGiftConfirmId(built)!;
-eq("the trophy survives intact", back.trophyId, tid);
-eq("THE SLUG SURVIVES INTACT", back.slug, zeph2.slug);
-ok("…and the note is what gave way", back.note.length < longNote.length);
-// A note containing the separator must not be read as extra fields.
-const piped = parseGiftConfirmId(giftConfirmId(tid, zeph2.slug, "a|b|c")!)!;
-eq("a note with separators in it does not shift the fields", [piped.trophyId, piped.slug], [tid, zeph2.slug]);
-eq("…and the note comes back whole", piped.note, "a|b|c");
-// The honest refusal: ids that cannot fit produce no button at all.
-eq("an impossible id is null, not a truncated one", giftConfirmId(tid, "s".repeat(120)), null);
-eq("a missing recipient is null", giftConfirmId(tid, ""), null);
-eq("something that is not ours parses to nothing", parseGiftConfirmId("buy|abc|def"), null);
+console.log("\n== share_card finally fires ==");
+// The reviewer caught that rebuilding a mission on `share_card` would recreate
+// the defect B76 exists to fix: it has been priced and named in mission
+// templates since B61 with NOTHING firing it. Built inside this item because
+// this item is what needed it.
+{
+  const route = code("app/api/discord/interactions/route.ts");
+  ok("something awards share_card", /awardQuestAction\([\s\S]{0,120}"share_card"/.test(route));
+  ok("…after the card is posted, not on the button press",
+    route.indexOf('"share_card"') > route.indexOf("if (asFollowUp)"));
+  ok("…keyed on the day, so sharing five times pays once",
+    /refType: "share"/.test(route));
+}
 
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }

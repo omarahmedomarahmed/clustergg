@@ -407,8 +407,10 @@ async function seedMarketplace(db: any, gamers: { id: string; slug: string }[]) 
   const bronze = trophies.find((t: { tier: string }) => t.tier === "bronze") ?? trophies[0];
   const silver = trophies.find((t: { tier: string }) => t.tier === "silver") ?? trophies[0];
 
-  // One bought for themselves, one gifted — the two kinds the marketplace
-  // supports, so neither branch of the orders list is an empty state.
+  // Two self-purchases. There used to be a gifted one here "so neither branch
+  // of the orders list is an empty state" — but gifting is deleted (B72.3), and
+  // demo data is what we SHOW people. Seeding a gift would put a feature we
+  // removed in front of anybody looking at the marketplace ledger.
   const mkOrder = async (buyer: string, recipient: string, t: any, kind: string, message: string | null, daysAgo: number) => {
     const awardId = uid();
     await db.insert(schema.userTrophies).values({
@@ -421,8 +423,8 @@ async function seedMarketplace(db: any, gamers: { id: string; slug: string }[]) 
     }).onConflictDoNothing();
     return awardId;
   };
-  await mkOrder(orion.id, orion.id, bronze, "purchase", null, 9);
-  await mkOrder(nova.id, lyra.id, silver, "gift", "gg on the endgame run 🏆", 4);
+  await mkOrder(orion.id, orion.id, bronze, "self", null, 9);
+  await mkOrder(nova.id, nova.id, silver, "self", null, 4);
 
   // A redeem in every state the payout pipeline has, so the gamer's "cash out"
   // tab and the admin queue both show a real workflow instead of one row.

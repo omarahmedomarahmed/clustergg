@@ -195,3 +195,93 @@ One closing note, in the spirit of the brief: the thing I was engaged to catch i
 - No CI (`.github/workflows/` absent); owed test files `tests/db/concurrency.mts`, `tests/db/integrity.mts`, `tests/db/quests.mts` do not exist.
 - Dispute-2.2 arithmetic: $5 × 0.56 = $2.80 < $3.31 → loss of $0.51/1,000 screens; break-even fill at $5 CPM = 66.2%.
 - Omissions cross-checked: each finding in §A.3 present in `DUE_DILIGENCE_REPORT.md` (line refs above) and absent from B72–B80 (zero grep hits for sybil/captcha/email-verification/abuse-detection/cold-start/stat-sync/240/OOM/`/api/setup`/image-proxy/open-redirect/brute-force in the plan additions).
+
+---
+
+# Addendum — Round 2: the first shipped code
+
+**Date:** 7 August 2026 · **Reviewing:** commits `d34af09`, `3a776c0`, `a6972d3` on `claude/clustergg-platform-build-mfkzaa`, all merged to `main` via PR #100 (`468f71e`) and therefore **live on clustergg.com**, plus the new `docs/PLAN.md`.
+
+**The one-line update:** last round the response was 389 lines of markdown and zero code, and I called it an honest plan that was only a plan. This round, code shipped — and the part that shipped is real, competent, and independently verified green in CI three times. **The verdict does not move, because the things that shipped are not the things that were fatal.** But the honest answer to "real or theatre?" is now split: the *engineering-integrity* track is real; the *existential* and *live-customer* tracks have not moved at all.
+
+## 1. What actually shipped, and is correct (verified against source, not the changelog)
+
+- **Money integrity (B74) is a real, correct fix.** `lib/db/tx.ts` opens a pooled `neon-serverless` connection — the only driver on the platform that can hold a transaction, since `neon-http` genuinely cannot — and `awardQuestAction`, `buyTrophy` and `requestRedeem` now run inside `withTx` behind `lockGamer` (`SELECT … FOR UPDATE` on the gamer's own `users` row). I checked the ordering, which is the part that is easy to get wrong: in all three paths the lock is taken **first**, the balance/ceiling is re-read **on the transaction handle inside the lock**, and the write happens before commit (`lib/quests.ts:503-520` via `awardQuestActionLocked`, `lib/marketplace.ts:239-268`, `app/actions/trophies.ts:161-181`). Locking the user row rather than a "wallet row" is the correct call — the balance is a sum over `quest_events` and orders, and you cannot lock a sum. This is the item I named last round as the single highest-leverage thing they could ship, and they shipped it correctly.
+- **The bare `catch {}` is gone** from the award path (`lib/quests.ts:533` removed; the outer catch now `console.error`s — narrow and loud, `lib/quests.ts:498`). This was half the finding and it is genuinely closed.
+- **The vacuous test is replaced with a real one.** `tests/db/concurrency.mts` (25 assertions) asserts on the **unclamped** `earned − spent`, which is exactly the ledger property the old `marketplace.mts:148` could not see behind `Math.max(0, …)`. Its "five simultaneous `buyTrophy` calls leave exactly one buyer, one order, and `earned − spent = 0`" is the assertion that would actually have failed before B74.
+- **CI exists and is green.** `.github/workflows/ci.yml` runs type-check → concurrency suite (named "Money integrity (Gate 2)") → integrity suite → full suite → build, on every push and PR. I confirmed via the Actions API that all three runs (`a6972d3` push, PR #100, and the `main` merge `468f71e`) concluded **success**. This is the first thing in the entire engagement that converts a gate from a sentence into a green check.
+- **`AUTH_SECRET` fails closed (B72, partial).** `lib/secret.ts` throws when the variable is unset outside a demo/test runtime, rejects the old public placeholder by value, and rejects keys under 16 chars; called at module scope so it fails the first request, not the first login. The fallback is gone from both `lib/auth.ts:7` and `middleware.ts:19`. Correct.
+- **Self-serve creative approval gate restored (B72, partial).** Both portal upload paths now insert `status: "pending_review"` instead of `"approved"` (`app/actions/brand-portal.ts:51,146`), `serveAds` already refuses non-approved, and `getCardCampaign.live` now requires `reviewStatus === "approved"` (`lib/brands.ts:132`) so the portal stops telling a brand "you're live" while nothing serves. Correct, and the `live`-flag fix is the kind of second-order honesty the last round was missing.
+
+**`docs/PLAN.md` itself is a genuine response, not spin.** It adopts my review's criticisms by name, marks the gate table honestly (Gate 0 "Partly", Gate 1/4 "No", Gate 2 "Yes — pending branch protection"), restores the ~12 findings B80 had dropped — including the three I rated fatal and the sybil finding — and states plainly that "the fraud economics survive our own Phase-0 fix." It also concedes the two things I said it could not answer (Gate 4 gates already-shipped surfaces; Gate 4 is circular against the fill measurement) rather than papering over them. A team that writes down the tension it has not resolved is doing the opposite of theatre.
+
+## 2. What is still live on `main` — including the two that matter most
+
+`main` is byte-identical in code to `a6972d3` (verified: empty diff). Four of the six Phase-0 defects the response called "off immediately" are **still live in production**:
+
+| Still live on `main` | Evidence | Blocked on (per PLAN.md) |
+|---|---|---|
+| **Fabricated ROAS** shown to the one paying brand | `lib/brand-report.ts:105-115` intact | Decision **D1** |
+| **Open, forgeable ad beacon** (mints CP by `curl`) | `app/api/ads/beacon/route.ts` — no signature/nonce/rate-limit | "design below" (nonce), not built |
+| **Trophy gifting** (the money-transmission trigger) | `lib/marketplace.ts:198-217,274-275` intact | Decision **D2** |
+| **No age gate at signup** (paying children / COPPA) | `app/actions/auth.ts:11-53` — no DOB collected | Decision **D3** |
+
+This is the crux of the round. The two Phase-0 items they *did* ship (AUTH_SECRET, approval gate) are real but are the **least severe** two on the list. The two most serious — **the false ROAS statement to a live customer, and paying children with no age gate** — are still live, now gated behind "open decisions" (D1–D3) that are, by their own framing, *product/legal choices they have not made*. So the single most reputationally and legally dangerous defects in the original report remain in production a full round later. Crediting the money-integrity work is fair; letting it distract from that fact is not. **Nothing fatal has been closed.** Discord policy (Gate 1) — unanswered. Money-transmission trigger — still live. Paying children — still live. Fabricated measurement to an advertiser — still live.
+
+## 3. Where the shipped work is weaker than it reads
+
+Three specific things, in the spirit PLAN.md asked for — a `file:line`, not a paragraph of concern:
+
+1. **The concurrency test cannot reproduce the race it defends against, and this is load-bearing.** The suite runs on PGlite (`tests/db/concurrency.mts:25`), which is one in-process connection, so `Promise.all` of N transactions is serialized by the single connection regardless of whether the row lock works. The test therefore proves the *logic is correct under serialization* and — via its source-assertions at `:183-209` — that the code is *wired* to the pooled driver with a `FOR UPDATE`. It does **not** empirically prove that `FOR UPDATE` serializes concurrent transactions on real multi-connection Neon. The file says exactly this itself (`:9-21`), which is to their credit, but the consequence stands: **Gate 2 is green without ever having run the production failure mode.** The missing piece is a CI job that runs the same suite against a real Postgres (a Neon test branch or a `postgres` service container) with the pooled driver and ≥2 connections. Until that exists, "the ceiling holds under parallel writes" is asserted of PGlite, not of production.
+
+2. **The money paths now silently depend on the production runtime being Node 22+, and nothing in the repo pins it.** `lib/db/tx.ts:57-62` throws if `globalThis.WebSocket` is undefined, which is the case on Node 20 (global `WebSocket` is unflagged only from Node 21 and stable in 22), and the code does not set `neonConfig.webSocketConstructor` as a fallback. There is **no `engines` field in `package.json`** and **no Node runtime pinned in `vercel.json`** — CI hard-codes Node 22, but the *deployment* version is a Vercel project setting the repo does not control. If that setting is (or becomes) Node 20, every money path throws: loud on `buyTrophy`/`requestRedeem` (the user sees an error), and **silent on `awardQuestAction`**, whose outer catch swallows-and-logs — so CP would quietly stop being awarded platform-wide. Fix is one line (`"engines": { "node": ">=22" }`) plus a `webSocketConstructor` fallback. This is a new finding, not in the report or the plan.
+
+3. **Gate 2 reports; it does not yet block.** CI being green is necessary but not sufficient to be a "control": a control is a *required* status check under branch protection, and PLAN.md §5 concedes that rule is not applied ("**Yes** — pending branch protection"). PR #100 merged with CI green, so the gap didn't bite this time, but a red concurrency check could still be merged today. The gate is a green light on the dashboard, not a lock on the door, until the owner sets branch protection requiring the "Money integrity (Gate 2)" check. That is a repository setting, not a commit — so it is verifiable, and it is not done.
+
+Minor: `npm test` (`tests/run-all.mjs`) does not include `concurrency.mts` or `integrity.mts` — they run only as separate CI steps — so a developer running the suite locally does not exercise the gate.
+
+## 4. The gate table, re-scored against code
+
+| Gate | Claim | Real? (my score) | Why |
+|---|---|---|---|
+| **0** | Six Phase-0 defects fixed before anything else | **1/3** | 2 of 6 shipped (AUTH_SECRET, approval gate); the 4 most serious are live on `main`, gated behind unmade decisions D1–D3 |
+| **1** | Discord + FinCEN answers before B74–B79 | **No** | No committed opinion exists; and B74 shipped *ahead* of it, so the gate's own ordering was not followed |
+| **2** | Ceiling holds under parallel writes | **Partly-real** | Test + CI + wiring assertions exist and are green; but proven only on PGlite, and not yet a required check (no branch protection) |
+| **4** | One signed IO before the storefront | **No** | Storefront (`app/brands/[slug]`, `app/pricing`, …) already live; gate still cannot block the past; still circular against B79's fill measurement, which PLAN.md concedes |
+
+Note on Gate 1: the plan says "B74 through B79 do not start before this answer," and B74 started and shipped. The team's defensible reading is that B74 is money-integrity hardening worth doing regardless of the Discord answer — which is true — but it means the *first* thing they built crossed their own most important gate, which is worth naming.
+
+## 5. Revised verdict
+
+**DO NOT INVEST — unchanged.** But the reason is now more precise, and one sentence of it is new and positive.
+
+The positive, stated without hedging: **this is the first evidence the team can convert a finding into correct, tested, merged code under adversarial pressure** — the exact capability the whole response was asking to be trusted on. The money-integrity layer is the single most reassuring artifact in the engagement, and if I were pricing the *team*, it moves them up a notch.
+
+But the investment question is not about the team's competence, which was never the issue — my own §6 said they build carefully. It is about whether the fatal risks have closed, and **none of them has.** Restated as true/false against `main`, today:
+
+| Condition | T/F on `main` (7 Aug 2026) |
+|---|---|
+| The money ledger is transactional and the race is closed in code | **TRUE** (verified; empirical proof under real concurrency still owed) |
+| CI exists and runs the money-integrity suite green | **TRUE** |
+| `AUTH_SECRET` fails closed; self-serve uploads await review | **TRUE** |
+| Fabricated ROAS is removed from the live brand report | **FALSE** — live, `lib/brand-report.ts:105` |
+| The ad beacon is authenticated / CP is no longer `curl`-mintable | **FALSE** — live, unauth |
+| Trophy gifting (money-transmission trigger) is deleted | **FALSE** — live, `lib/marketplace.ts:198` |
+| An age gate exists at signup (children not paid/collected-from) | **FALSE** — live, none |
+| A committed Discord policy opinion exists (Gate 1) | **FALSE** |
+| A committed FinCEN/CVC opinion exists (Gate 1) | **FALSE** |
+| Gate 2 is a *required* check that blocks a merge | **FALSE** — reports only, no branch protection |
+| Node runtime is pinned so the money paths cannot break on deploy | **FALSE** — no `engines`, no `vercel.json` runtime |
+| A signed IO for a measured product exists (Gate 4) | **FALSE** |
+
+Eight of twelve still false, and the four that flipped to true are the engineering-hygiene tier, not the existential tier. **Re-open the file when the four Phase-0 items still live on `main` are fixed in code and the two legal opinions are committed artifacts.** Those are binary and cheap to check. Until then: a real and encouraging start on the one track that was always within their control, and no movement on the three findings that can each end the company.
+
+The test I was engaged to apply is whether a remediation is a list of intentions. Last round it was entirely intentions. This round it is intentions **plus** a correctly-built money-integrity layer and a green CI — which is genuine progress, and is still not a reason to wire money, because the money-integrity layer was never the thing that made this a "do not invest."
+
+### Addendum verifications
+- Commits `d34af09`/`3a776c0`/`a6972d3` merged to `main` via PR #100 (`468f71e`); `main` code == `a6972d3` (empty diff).
+- CI (Actions API): runs `31135578615`, `31158824551`, `31158857034` all `conclusion: success`.
+- Money-path ordering read in `lib/db/tx.ts`, `lib/quests.ts:480-520`, `lib/marketplace.ts:239-268`, `app/actions/trophies.ts:161-181`.
+- Still-live defects: `lib/brand-report.ts:105`, `app/api/ads/beacon/route.ts` (no auth), `lib/marketplace.ts:198`, `app/actions/auth.ts:11-53`.
+- Node-version gap: no `engines` in `package.json`; `vercel.json` sets no runtime; `lib/db/tx.ts:57-62` throws without global `WebSocket`.
+- Branch protection: not applied per `docs/PLAN.md` §5; PR #100 merged with CI green.

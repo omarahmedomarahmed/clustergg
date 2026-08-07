@@ -83,7 +83,7 @@ export const CAPTURED_SHOT_KEYS = new Set<string>([
   "bot.card.challenge",
   "bot.card.market",
   "bot.card.profile",
-  "brand.analytics.roas",
+  "brand.analytics.delivery",
   "brand.campaign.builder",
   "brand.invoice",
   "brand.reach.perserver",
@@ -151,7 +151,10 @@ export const SHOT_REGISTRY: ShotDef[] = [
   { key: "brand.reach.perserver", group: "brand", claim: "Counted reach, not projections", capturedFrom: "/brands/nebulatech?key=DEMO-NEBULATECH", as: "brand", openText: "Challenges" },
   { key: "brand.invoice", group: "brand", claim: "One invoice a month, every line itemised", capturedFrom: "/brands/nebulatech?key=DEMO-NEBULATECH", as: "brand", openText: "Billing" },
   { key: "brand.campaign.builder", group: "brand", claim: "Buy a sponsored challenge like a media placement", capturedFrom: "/brands/astrofuel?key=DEMO-ASTROFUEL", as: "brand" },
-  { key: "brand.analytics.roas", group: "brand", claim: "See what it returned", capturedFrom: "/brands/nebulatech?key=DEMO-NEBULATECH", as: "brand", openText: "Analytics" },
+  // Was `brand.analytics.roas`, claiming "See what it returned". The figure it
+  // pointed at was a server headcount priced at a benchmark CPM, so the claim
+  // was a claim about a number we had invented. Renamed with the figure.
+  { key: "brand.analytics.delivery", group: "brand", claim: "See exactly what it delivered, counted", capturedFrom: "/brands/nebulatech?key=DEMO-NEBULATECH", as: "brand", openText: "Analytics" },
 
   // ---- Admin ----
   { key: "admin.challenge.rules", group: "admin", claim: "Rules in the game's own ladder", capturedFrom: "/admin/challenges", as: "admin" },

@@ -36,14 +36,21 @@ eq("no action lacks a cap", uncapped, []);
 // nobody can progress and nothing about it looks wrong.
 const RETIRED = ACTION_CATALOG.filter((a) => a.label.includes("(retired)")).map((a) => a.key);
 eq("the retired actions are the ones we retired", RETIRED,
-  ["write_post", "write_comment", "reaction_given", "reaction_received"]);
+  // Gifts joined the list in B72.3. Kept in the catalogue at weight 0 rather
+  // than deleted, for the same reason posts and comments were: a quest whose
+  // stored `actionWeights` still names one reads zero instead of throwing.
+  ["gift_sent", "gift_received", "write_post", "write_comment", "reaction_given", "reaction_received"]);
 ok("no LIVE action pays nothing",
   ACTION_CATALOG.filter((a) => !RETIRED.includes(a.key)).every((a) => a.defaultWeight > 0));
 ok("…and every retired one pays exactly nothing",
   ACTION_CATALOG.filter((a) => RETIRED.includes(a.key)).every((a) => a.defaultWeight === 0));
 // The fixture. If this fails, somebody moved a weight — read the diff and decide
 // whether they meant to, then change this number in the same commit.
-eq("the per-action caps sum to exactly 1330", ACTION_CAP_SUM, 1330);
+//
+// 1330 → 1230 in B72.3: `gift_sent` and `gift_received` were 25 × cap 2 each,
+// and retiring them removed exactly 100 CP of daily headroom. This suite is the
+// thing that made that visible, which is what it is for.
+eq("the per-action caps sum to exactly 1230", ACTION_CAP_SUM, 1230);
 eq("the ceiling is 500", DEFAULT_DAILY_CP_CEILING, 500);
 ok("the ceiling is below the cap sum — the guarantee does not depend on the table",
   DEFAULT_DAILY_CP_CEILING < ACTION_CAP_SUM);
@@ -188,7 +195,7 @@ eq("…and the shipped rate", cfg.cpPerDollar, 10000);
 eq("…and the shipped ceiling", cfg.ceiling, 500);
 
 const max = maxDailyCp(cfg);
-eq("the per-action table sums to 1330", max.table, 1330);
+eq("the per-action table sums to 1230", max.table, 1230);
 eq("the ceiling is what a gamer can actually be credited", max.capped, 500);
 ok("nothing is uncapped", !max.uncapped);
 ok("the ceiling is doing work — it is below the table", exposure(cfg).ceilingHolds);
