@@ -562,6 +562,7 @@ export default async function BrandPortalPage({
                     campaignCreativeId: c.campaignCreativeId, fileUrl: c.fileUrl,
                     ctaLabel: c.ctaLabel, clickUrl: c.clickUrl,
                     impressions: c.impressions, clicks: c.clicks,
+                    reviewStatus: c.reviewStatus,
                   }))}
                   live={cardCampaign.live}
                   status={cardCampaign.campaign?.status ?? null}

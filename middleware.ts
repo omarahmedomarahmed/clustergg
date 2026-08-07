@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
+import { authSecretKey } from "@/lib/secret";
 
 // The admin gate, moved in front of rendering.
 //
@@ -18,9 +19,7 @@ import { jwtVerify } from "jose";
 // stopped by the layout's live database check. Both layers stay.
 
 const COOKIE = "cluster_session";
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "cluster-demo-secret-set-AUTH_SECRET-in-production",
-);
+const SECRET = authSecretKey();
 const STAFF = new Set(["staff", "admin", "superadmin"]);
 
 /** The header a layout reads to know it is rendering inside our own iframe. */

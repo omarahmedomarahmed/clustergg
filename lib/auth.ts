@@ -3,10 +3,11 @@ import { cookies } from "next/headers";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { authSecretKey } from "@/lib/secret";
 
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET ?? "cluster-demo-secret-set-AUTH_SECRET-in-production"
-);
+// Module scope on purpose: an unset AUTH_SECRET fails the first request rather
+// than the first login. See lib/secret.ts.
+const SECRET = authSecretKey();
 const COOKIE = "cluster_session";
 
 export { hashPassword, verifyPassword } from "@/lib/password";

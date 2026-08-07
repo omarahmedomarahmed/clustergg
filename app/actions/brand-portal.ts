@@ -48,7 +48,8 @@ export async function portalUploadCreative(brandId: string, key: string, formDat
   await db.insert(schema.adCreatives).values({
     id: creativeId, brandId, name: `${brand.name} · ${placement.key}`, type,
     fileUrl, clickUrl, width: placement.width, height: placement.height,
-    durationSeconds: type === "video" ? 5 : null, status: "approved",
+    // Same gate as the card upload below: review before it serves.
+    durationSeconds: type === "video" ? 5 : null, status: "pending_review",
   });
   // One creative per placement per campaign — retire any existing assignment.
   //
@@ -138,7 +139,12 @@ export async function portalLaunchCardCreative(brandId: string, key: string, for
   await db.insert(schema.adCreatives).values({
     id: creativeId, brandId, name: `${brand.name} · card ${new Date().toISOString().slice(0, 10)}`,
     type: "image", fileUrl, clickUrl, ctaLabel,
-    width: placement.width, height: placement.height, status: "approved",
+    // NOT "approved". A self-serve upload goes into the same review queue an
+    // admin-created creative goes into (`app/actions/admin.ts:826`), and the
+    // serving query already refuses anything that is not approved
+    // (`lib/ads.ts:67`) — so this one word is the whole gate. Our own docs
+    // promised this queue existed; the portal was the one path around it.
+    width: placement.width, height: placement.height, status: "pending_review",
   });
   await db.insert(schema.adCampaignCreatives).values({
     id: uid(), campaignId, creativeId, placementId: placement.id, weight: 1, priority: 0,
