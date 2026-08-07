@@ -107,9 +107,7 @@ export default function TrophyMarket({
       {state?.ok && (
         <div className="rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200">
           <Icon name="check" size={14} className="mr-1.5 inline" />
-          {state.gifted
-            ? <><b>{state.trophy}</b> is on {state.gifted}&apos;s profile. They&apos;ve been told it came from you.</>
-            : <><b>{state.trophy}</b> is yours. It&apos;s on your profile now, and it can be redeemed for cash.</>}
+          <><b>{state.trophy}</b> is yours. It&apos;s on your profile now, and it can be redeemed for cash.</>
         </div>
       )}
       {state?.error && (

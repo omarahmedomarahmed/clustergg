@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema, type DB } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { awardQuestAction, getTotalCp } from "@/lib/quests";
@@ -161,7 +161,7 @@ export async function marketplaceCatalog(
 }
 
 export type BuyResult =
-  | { ok: true; orderId: string; awardId: string; cpSpent: number; balance: number; trophy: string; gifted: string | null }
+  | { ok: true; orderId: string; awardId: string; cpSpent: number; balance: number; trophy: string }
   | { ok: false; error: string };
 
 /**
@@ -173,10 +173,21 @@ export type BuyResult =
  * than trusted from the page that rendered the button — a stale page is the
  * ordinary way this would be abused.
  */
+/**
+ * A gamer buys a trophy FOR THEMSELVES. That is the only shape.
+ *
+ * B72.3 deleted gifting outright rather than restricting it. A transfer of
+ * redeemable value between two people is a money-transmission trigger, a 1099
+ * aggregation hole and an under-18 cash-out bypass at once, and one deletion
+ * closes all three.
+ *
+ * The `recipientSlug` and `message` options are gone from the SIGNATURE, not
+ * merely ignored, so no caller can reintroduce gifting by passing an argument
+ * and no reviewer has to check whether one does.
+ */
 export async function buyTrophy(
   buyerId: string,
   trophyId: string,
-  opts: { recipientSlug?: string; message?: string } = {},
 ): Promise<BuyResult> {
   const db = await getDb();
 
@@ -185,17 +196,8 @@ export async function buyTrophy(
   if (!trophy) return { ok: false, error: "That trophy doesn't exist." };
   if (!trophy.inMarketplace) return { ok: false, error: "That trophy isn't for sale right now." };
 
-  // Who gets it.
-  let recipientId = buyerId;
-  let giftedTo: string | null = null;
-  const slug = (opts.recipientSlug ?? "").trim().replace(/^@/, "");
-  if (slug) {
-    const [to] = await db.select({ id: schema.users.id, name: schema.users.displayName, status: schema.users.status })
-      .from(schema.users).where(eq(schema.users.slug, slug)).limit(1);
-    if (!to) return { ok: false, error: `No gamer with the profile “${slug}”. Check the spelling of their profile link.` };
-    if (to.status !== "active") return { ok: false, error: "That gamer's account isn't active." };
-    if (to.id !== buyerId) { recipientId = to.id; giftedTo = to.name; }
-  }
+  // The buyer is the recipient. Always, with no path to anything else.
+  const recipientId = buyerId;
 
   const rate = await cpPerDollar(db);
   const price = priceOf(trophy, rate);
@@ -225,8 +227,11 @@ export async function buyTrophy(
     await tx.insert(schema.marketplaceOrders).values({
       id: orderId, buyerId, recipientId, trophyId,
       awardId, cpSpent: price, value: Number(trophy.value ?? 0),
-      kind: giftedTo ? "gift" : "self",
-      message: (opts.message ?? "").trim().slice(0, 200) || null,
+      // `recipientId` stays on the row and is always the buyer. The COLUMN is
+      // kept because historical orders reference it and dropping it would
+      // destroy the ledger; the FEATURE is gone.
+      kind: "self",
+      message: null,
     });
 
     // The award is an ordinary held trophy: it shows on the profile and it is
@@ -251,38 +256,17 @@ export async function buyTrophy(
     };
   }
 
-  // Tell the recipient, if it was a gift.
-  if (giftedTo) {
-    try {
-      const [from] = await db.select({ name: schema.users.displayName, slug: schema.users.slug })
-        .from(schema.users).where(eq(schema.users.id, buyerId)).limit(1);
-      await db.insert(schema.notifications).values({
-        id: uid(), userId: recipientId, type: "trophy_gift",
-        title: `${from?.name ?? "A gamer"} sent you a trophy`,
-        body: `${trophy.name} is on your profile.${opts.message ? ` “${opts.message.slice(0, 120)}”` : ""}`,
-        href: from?.slug ? `/u/${from.slug}` : "/profile",
-      });
-    } catch { /* a failed notification must not fail a purchase */ }
-
-    // Giving and receiving both earn on the orbit quest (B15).
-    //
-    // Only on a GIFT. Buying a trophy for yourself is already its own reward and
-    // paying CP for the act of spending CP would be a loop that pays for itself.
-    // Both sides key on the order, so one gift is one award each however many
-    // times this is retried, and the buyer's daily cap is what stops a pair of
-    // accounts gifting the same trophy back and forth all afternoon.
-    //
-    // `awardQuestAction` swallows its own errors by design — gamification must
-    // never fail the purchase that triggered it — but these are awaited rather
-    // than floated: a floating promise in a server action is killed when the
-    // response is sent (§0), which is how an award silently never happens.
-    await awardQuestAction(db, buyerId, "gift_sent", { refType: "order", refId: orderId });
-    await awardQuestAction(db, recipientId, "gift_received", { refType: "order", refId: orderId });
-  }
+  // The gift notification and the gift_sent / gift_received awards were here.
+  //
+  // Both are gone with the feature. The awards are worth a note because they
+  // were the one place CP was paid for MOVING value rather than creating it,
+  // and a pair of accounts passing the same trophy back and forth was the
+  // arbitrage the equal pricing and the cap of 2 existed to bound. Deleting
+  // gifting removes the arbitrage rather than bounding it.
 
   return {
     ok: true, orderId, awardId, cpSpent: price,
-    balance: balance - price, trophy: trophy.name, gifted: giftedTo,
+    balance: balance - price, trophy: trophy.name,
   };
 }
 
@@ -318,11 +302,21 @@ export async function marketplaceOrders(db: DB, limit = 200): Promise<MarketOrde
 
   // Recipients in one more pass rather than a second join on the same table,
   // which Drizzle would need an alias for and which nobody would enjoy reading.
+  //
+  // Kept even though gifting is deleted (B72.3): orders written before the
+  // deletion have a recipient who is not the buyer, and an admin ledger that
+  // silently rewrote them as self-purchases would be falsifying history to make
+  // the present look tidy.
+  //
+  // Scoped with `inArray`, which it was not: this used to `select()` EVERY user
+  // in the database to resolve a page of orders. Same shape as the brand report
+  // loading every impression row into heap — it works until it is the thing
+  // that falls over.
   const recipientIds = [...new Set(rows.map((r) => r.o.recipientId))];
   const recipients = new Map<string, { name: string; slug: string }>();
   if (recipientIds.length) {
     const rs = await db.select({ id: schema.users.id, name: schema.users.displayName, slug: schema.users.slug })
-      .from(schema.users);
+      .from(schema.users).where(inArray(schema.users.id, recipientIds));
     for (const r of rs) recipients.set(r.id, { name: r.name, slug: r.slug });
   }
 

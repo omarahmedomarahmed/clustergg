@@ -6,9 +6,8 @@ import {
   actor, readCommand, isGuildManager, ButtonStyle, type Interaction,
 } from "@/lib/discord/types";
 import { parseId, frame, rows, button, navButton, linkButton, actionId, type Frame } from "@/lib/discord/components";
-import { giftConfirmId, parseGiftConfirmId } from "@/lib/discord/gift-id";
 import { openChoices } from "@/lib/discord/catalog";
-import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, giftModal, requestModal, aboutModal, contactEmailModal, contactModal } from "@/lib/discord/screens";
+import { renderScreen, screenForCommand, loadCtx, linkModal, keyModal, requestModal, aboutModal, contactEmailModal, contactModal } from "@/lib/discord/screens";
 import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
@@ -118,7 +117,6 @@ function modalSubmit(i: Interaction) {
   if (kind === "about") return aboutSubmit(i, arg, (fields.get("about") ?? "").trim());
   if (kind === "contactemail") return contactEmailSubmit(i, arg, (fields.get("email") ?? "").trim());
   if (kind === "msg") return contactSubmit(i, who, arg, (fields.get("body") ?? "").trim());
-  if (kind === "gift") return giftSubmit(i, who, arg.split(",").filter(Boolean), fields);
   return json({ type: InteractionResponseType.DeferredUpdateMessage });
 }
 
@@ -468,21 +466,16 @@ function componentPress(i: Interaction) {
   // Gifting a trophy (B5.2). Same rule — a modal must be the immediate answer,
   // so nothing is read or charged here. The trophy ids ride in the custom_id
   // because a modal submit arrives with no memory of the message it came from.
-  if (customId.startsWith("open-gift|")) {
-    const ids = customId.slice("open-gift|".length).split(",").filter(Boolean);
-    if (!ids.length) return json({ type: InteractionResponseType.DeferredUpdateMessage });
-    return json(giftModal(ids));
-  }
+  // The gift buttons and the confirm press were here, and are gone with the
+  // feature (B72.3). A trophy is redeemable for cash, so handing one to another
+  // account is a transfer of value between two people — the money-transmission
+  // trigger, the 1099 hole and the under-18 cash-out bypass, all in one button.
+  //
+  // Old `open-gift|` and gift-confirm custom ids simply fall through to the
+  // unknown-interaction path now. A card posted before this deploy still exists
+  // in somebody's channel; pressing its button does nothing rather than
+  // reaching a handler that no longer has a recipient to resolve.
 
-  // The confirm step. THIS is the one that spends, and it exists because the
-  // step before it showed a face: a gift has no refund path, so "did you mean
-  // this person" has to be a separate press from "send it".
-  if (customId.startsWith("gconf|")) {
-    const parsed = parseGiftConfirmId(customId);
-    if (!parsed) return json({ type: InteractionResponseType.DeferredUpdateMessage });
-    after(() => giftConfirm(i, parsed.trophyId, parsed.slug, parsed.note));
-    return json({ type: InteractionResponseType.DeferredUpdateMessage });
-  }
 
   // An owner writing to us. A modal has to be the immediate answer to a fresh
   // interaction, so authority is re-checked on submit where there is time.
@@ -552,137 +545,14 @@ function componentPress(i: Interaction) {
  * staff answering it would be answering the wrong person about somebody else's
  * community.
  */
-/**
- * The gift modal came back. Resolve, and ASK AGAIN with a face attached (B5.2).
- *
- * Nothing is charged here. The whole point of this step is that a Discord
- * handle is a string somebody typed, and the thing it decides — a
- * cash-redeemable trophy landing on a stranger's profile — has no undo.
- *
- * Not-found gets a message that says how to find the right name rather than
- * just failing, because "no such gamer" on a handle you are sure about is the
- * most annoying possible answer.
- */
-function giftSubmit(i: Interaction, who: Who, trophyIds: string[], fields: Map<string, string>) {
-  after(async () => {
-    try {
-      const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
-      if (!ctx.gamer) {
-        await editOriginal(i.token, { content: `Continue with Discord first and your balance is waiting: ${siteUrl()}/login` });
-        return;
-      }
-
-      const pick = Number((fields.get("pick") ?? "1").replace(/\D/g, "")) || 1;
-      const trophyId = trophyIds[pick - 1];
-      if (!trophyId) {
-        await editOriginal(i.token, {
-          embeds: [{ color: 0xf59e0b, description: `Pick a number between 1 and ${trophyIds.length} — it is the number printed on the tile.` }],
-        });
-        return;
-      }
-
-      const typed = (fields.get("who") ?? "").trim();
-      const note = (fields.get("note") ?? "").trim().slice(0, 120);
-
-      // Discord handle first: it is the identifier a gamer actually knows here.
-      // @profile second, for somebody whose friend sent them their link.
-      const { findByDiscordName } = await import("@/lib/gamer-lookup");
-      const { giftRecipient } = await import("@/lib/gift-search");
-      const byDiscord = await findByDiscordName(typed);
-      const person = byDiscord
-        ? await giftRecipient(byDiscord.slug)
-        : await giftRecipient(typed);
-
-      if (!person) {
-        await editOriginal(i.token, {
-          embeds: [{
-            color: 0xf59e0b,
-            description:
-              `I couldn't find **${typed.slice(0, 40)}** on Cluster.\n\n`
-              + `Their Discord username only works once they have signed in here at least once — ask them to hit **Continue with Discord** at ${siteUrl()}/login.\n`
-              + `Or paste their profile link: it looks like \`@nova\`, and it is at the top of their Cluster profile.`,
-          }],
-        });
-        return;
-      }
-
-      if (person.slug === ctx.gamer.slug) {
-        await editOriginal(i.token, {
-          embeds: [{ color: 0xf59e0b, description: "That is you — buying one for yourself is the green button on the card." }],
-        });
-        return;
-      }
-
-      // The price, in CP, on the confirm (B5.3). It is what the gift costs THEM
-      // and it is the number the card is priced in.
-      const { priceOf, cpPerDollar } = await import("@/lib/marketplace");
-      const db = await getDb();
-      const [trophy] = await db.select().from(schema.trophies).where(eq(schema.trophies.id, trophyId)).limit(1);
-      if (!trophy) {
-        await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: "That trophy is no longer on the shelf." }] });
-        return;
-      }
-      const rate = await cpPerDollar(db);
-      const price = priceOf(trophy, rate);
-      const confirmId = giftConfirmId(trophyId, person.slug, note);
-
-      await editOriginal(i.token, {
-        embeds: [{
-          color: 0x8b5cf6,
-          title: `Send ${trophy.name} to ${person.displayName}?`,
-          description:
-            `**@${person.slug}**${person.discordUsername ? ` · ${person.discordUsername}` : ""}\n\n`
-            + `Costs you **${price.toLocaleString()} CP**. It lands on their profile immediately and it is theirs to cash out — `
-            + `there is no undo.`
-            + (note ? `\n\n> ${note}` : ""),
-          thumbnail: person.avatarUrl ? { url: person.avatarUrl } : undefined,
-        }],
-        components: rows([
-          // `giftConfirmId` drops the note before it would ever clip the slug —
-          // a button that cannot name its recipient is not rendered at all.
-          confirmId
-            ? button(`Send it to ${person.displayName}`.slice(0, 80), confirmId, ButtonStyle.Success)
-            : null,
-        ]),
-      });
-    } catch {
-      await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: "Something went wrong. Nothing was sent." }] });
-    }
-  });
-  return json({ type: InteractionResponseType.DeferredChannelMessageWithSource, data: { flags: MessageFlags.Ephemeral } });
-}
-
-/** The press that actually spends. Everything is re-resolved server-side. */
-async function giftConfirm(i: Interaction, trophyId: string, slug: string, note: string) {
-  try {
-    const who = actor(i);
-    if (!who || !trophyId || !slug) return;
-    const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
-    if (!ctx.gamer) {
-      await editOriginal(i.token, { content: `Continue with Discord first: ${siteUrl()}/login` });
-      return;
-    }
-    // `buyTrophy` re-reads the balance, re-resolves the recipient and refuses a
-    // non-active account. Nothing on the button is trusted — a card posted an
-    // hour ago carries an hour-old balance on its face.
-    const { buyTrophy } = await import("@/lib/marketplace");
-    const res = await buyTrophy(ctx.gamer.userId, trophyId, { recipientSlug: slug, message: note });
-    if (!res.ok) {
-      await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: res.error }], components: [] });
-      return;
-    }
-    await editOriginal(i.token, {
-      embeds: [{
-        color: 0x22c55e,
-        description: `**${res.trophy}** is on ${res.gifted}'s profile — ${res.cpSpent.toLocaleString()} CP spent, `
-          + `${res.balance.toLocaleString()} left. They have been told it came from you.`,
-      }],
-      components: [],
-    });
-  } catch {
-    await editOriginal(i.token, { embeds: [{ color: 0xf59e0b, description: "That didn't go through. Nothing was spent." }], components: [] });
-  }
-}
+// `giftSubmit` and `giftConfirm` were here — the search-for-a-gamer modal, the
+// confirm-with-a-face step, and the press that spent. All deleted with the
+// feature (B72.3).
+//
+// Worth keeping the reason the confirm step existed, because it was a good
+// instinct that no longer has anything to guard: a gift had no refund path, so
+// the flow deliberately showed the recipient's actual face before spending.
+// Nothing transfers between accounts now, so there is nothing to mis-address.
 
 function contactSubmit(i: Interaction, who: Who, guildId: string, body: string) {
   after(async () => {
@@ -1070,4 +940,29 @@ async function share(token: string, ctx: Awaited<ReturnType<typeof loadCtx>>, as
   };
   if (asFollowUp) await followUp(token, payload);
   else await editOriginal(token, payload);
+
+  // THE `share_card` EMITTER. B72.3.
+  //
+  // `share_card` has been priced in the catalogue and named in mission
+  // templates since B61, and until now NOTHING FIRED IT — a task nobody could
+  // ever complete, sitting in a mission that claimed to total the daily
+  // ceiling. The execution review caught that B72.3's mission rebuild was about
+  // to lean on it too, which would have recreated the same defect while fixing
+  // another. So it is built here, inside the item that needs it.
+  //
+  // Awarded AFTER the post, because the action being paid for is the card
+  // landing in a channel, not a button being pressed. Keyed on the day so the
+  // same gamer sharing five times pays once per day up to the catalogue cap —
+  // sharing is free to do and free to repeat, and a per-post award would be a
+  // loop that pays for itself.
+  //
+  // Errors are not swallowed silently: `awardQuestAction` logs its own, and a
+  // failed award must never fail the share that a gamer just made publicly.
+  if (ctx.gamer) {
+    const { awardQuestAction } = await import("@/lib/quests");
+    const { getDb } = await import("@/lib/db");
+    await awardQuestAction(await getDb(), ctx.gamer.userId, "share_card", {
+      refType: "share", refId: new Date().toISOString().slice(0, 10),
+    });
+  }
 }

@@ -170,37 +170,37 @@ try {
   ok("and they hold two of them — the CP bought something both times",
     owned.length === 2, `${owned.length} awards`);
 
-  console.log("\n== Gifting ==");
+  console.log("\n== Gifting is DELETED ==");
+  // This block used to prove a gift worked end to end: the recipient named, the
+  // trophy on THEIR profile, the giver paying, the friend notified, and a
+  // misspelt handle refused. Gifting is gone (B72.3) — a trophy redeems for
+  // cash, so handing one over moved real value between two accounts.
+  //
+  // Inverted rather than deleted. `tests/db/gifting.mts` is the full proof; what
+  // stays here is the one thing THIS file is about: a purchase reaches exactly
+  // one profile, and it is the buyer's.
   const giver = await mkUser("Giver");
   const friend = await mkUser("Friend");
-  // Derived from what the trophy actually costs, not a fixed 200,000 — that
-  // figure came from the pre-B34 rate and is now less than half the price. Same
-  // class of drift as the hardcoded 5,000 above: a fixture that restates a
-  // number the calculator owns.
   await grantCp(giver.id, priced.cpPrice);
-  const gift = await buyTrophy(giver.id, priced.id, { recipientSlug: friend.slug, message: "gg" });
-  ok("a gift succeeds", gift.ok, gift.ok ? "" : gift.error);
-  ok("and names who it went to", gift.ok && gift.gifted === "Friend", gift.ok ? String(gift.gifted) : "");
+  const bought2 = await buyTrophy(giver.id, priced.id);
+  ok("a purchase succeeds", bought2.ok, bought2.ok ? "" : bought2.error);
   const friendAward = await db.select().from(schema.userTrophies)
     .where(eq(schema.userTrophies.userId, friend.id));
-  ok("the trophy lands on THEIR profile", friendAward.length === 1);
-  ok("the giver paid, not the friend",
+  ok("nothing reaches anybody else's profile", friendAward.length === 0);
+  ok("the buyer paid, and only the buyer",
     (await cpWallet(db, friend.id)).spent === 0 && (await cpWallet(db, giver.id)).spent > 0);
   const notif = await db.select().from(schema.notifications)
     .where(eq(schema.notifications.userId, friend.id));
-  ok("the friend is told, and by whom", notif.some((n) => /sent you a trophy/i.test(n.title)),
+  ok("no gift notification is written to anybody", !notif.some((n) => /sent you a trophy/i.test(n.title)),
     notif.map((n) => n.title).join(" | "));
-
-  const bad = await buyTrophy(giver.id, priced.id, { recipientSlug: "nobody-with-this-name" });
-  ok("gifting to a name that doesn't exist is refused", !bad.ok);
-  ok("with a message that says to check the spelling",
-    !bad.ok && /spelling|profile/i.test(bad.error), bad.ok ? "" : bad.error);
 
   console.log("\n== The marketplace wallet ==");
   const mw = await marketplaceWallet(db);
   ok("it counts the CP taken in", mw.cpTaken > 0, String(mw.cpTaken));
   ok("and the orders", mw.orders >= 2, String(mw.orders));
-  ok("and the gifts separately", mw.gifts >= 1, String(mw.gifts));
+  // Historical only now — the number can never rise again, so it is asserted as
+  // a number rather than as a number that grows.
+  ok("gifts are still counted, for the orders that predate the deletion", typeof mw.gifts === "number");
   ok("and the buyers", mw.buyers >= 2, String(mw.buyers));
   // The number nobody thinks to compute: every trophy sold is redeemable.
   ok("and what we OWE if every trophy is cashed out",
@@ -208,10 +208,10 @@ try {
 
   const ledger = await marketplaceOrders(db);
   ok("every transaction is in the ledger", ledger.length >= 2, String(ledger.length));
-  ok("a gift shows both the buyer and the recipient",
-    ledger.some((o) => o.kind === "gift" && o.buyerName === "Giver" && o.recipientName === "Friend"),
-    ledger.map((o) => `${o.buyerName}→${o.recipientName}`).join(", "));
-  ok("a self-purchase shows the buyer as the recipient",
+  ok("no new order is a gift",
+    ledger.every((o) => o.kind === "self"),
+    ledger.map((o) => `${o.buyerName}→${o.recipientName} (${o.kind})`).join(", "));
+  ok("a purchase shows the buyer as the recipient",
     ledger.some((o) => o.kind === "self" && o.buyerName === o.recipientName));
 
   console.log("\n== A hidden trophy can't be bought, even by id ==");
