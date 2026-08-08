@@ -870,6 +870,10 @@ const COLUMN_MIGRATIONS = [
   )`,
 
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "signup_ip" text`,
+  `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "surface" text`,
+  `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "card_kind" text`,
+  `CREATE INDEX IF NOT EXISTS "imp_kind_idx" ON "ad_impressions" ("campaign_creative_id", "card_kind")`,
+  `CREATE INDEX IF NOT EXISTS "imp_guild_idx" ON "ad_impressions" ("campaign_creative_id", "guild_id")`,
   `CREATE INDEX IF NOT EXISTS "users_signup_ip_idx" ON "users" ("signup_ip", "created_at")`,
   `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "provider_key" text`,
   `ALTER TABLE "trophy_redeems" ADD COLUMN IF NOT EXISTS "provider_ref" text`,

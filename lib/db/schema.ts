@@ -696,10 +696,31 @@ export const adImpressions = pgTable("ad_impressions", {
    * minute. Nullable for rows written before this existed.
    */
   dedupeKey: text("dedupe_key"),
+  /**
+   * WHERE the card was delivered. B81.2.
+   *
+   * `discord_private` | `discord_public` | `web`. Stored, and **never shown to
+   * a brand.** A brand knowing which of its views came from private DMs versus
+   * public channels is a step toward inferring who saw it in a small server;
+   * we need the split for our own operations and pacing, and they do not.
+   */
+  surface: text("surface"),
+  /**
+   * WHAT card it was — profile, challenge, planet, game-stats, market.
+   *
+   * This one IS shown: it is the breakdown a brand actually asks for, and it
+   * says something about placement quality without saying anything about a
+   * person.
+   */
+  cardKind: text("card_kind"),
   createdAt: now("created_at"),
 }, (t) => [
   index("imp_cc_idx").on(t.campaignCreativeId, t.createdAt),
   uniqueIndex("imp_dedupe_idx").on(t.dedupeKey),
+  // The report groups by these. Without the index a brand's dashboard is a
+  // sequential scan over every impression ever logged.
+  index("imp_kind_idx").on(t.campaignCreativeId, t.cardKind),
+  index("imp_guild_idx").on(t.campaignCreativeId, t.guildId),
 ]);
 
 export const adClicks = pgTable("ad_clicks", {

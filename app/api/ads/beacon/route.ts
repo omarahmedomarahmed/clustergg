@@ -72,6 +72,11 @@ export async function POST(req: NextRequest) {
       geoCountry: req.headers.get("x-vercel-ip-country"),
       geoCity: req.headers.get("x-vercel-ip-city"),
       dedupeKey,
+      // B81.2. A web placement is one surface and one card kind; the two
+      // columns exist so every row can say where it came from, and a row that
+      // cannot is a row the report has to guess about.
+      surface: "web",
+      cardKind: "web",
     }).onConflictDoNothing().returning();
 
     // Already counted this hour. Hand back the existing id so the client can

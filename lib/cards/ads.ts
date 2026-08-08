@@ -199,7 +199,7 @@ export async function withCardAd<T extends CardData>(
  */
 export function logCardAdImpression(
   campaignCreativeId: string,
-  meta: { kind: string; guildId?: string | null },
+  meta: { kind: string; guildId?: string | null; ephemeral?: boolean },
 ): void {
   void (async () => {
     try {
@@ -210,6 +210,14 @@ export function logCardAdImpression(
         pagePath: `discord:card:${meta.kind}`,
         deviceType: "discord",
         guildId: meta.guildId ?? null,
+        // B81.2. `surface` is stored and never shown to a brand: knowing which
+        // views came from private replies rather than public channels is a step
+        // toward inferring WHO saw one in a small server. `cardKind` is shown —
+        // it describes the placement, not the person.
+        //
+        // A card with no guild came from a DM, which is private by definition.
+        surface: meta.ephemeral || !meta.guildId ? "discord_private" : "discord_public",
+        cardKind: meta.kind,
       });
     } catch { /* analytics must never break a card */ }
   })();
