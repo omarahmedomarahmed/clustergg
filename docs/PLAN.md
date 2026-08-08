@@ -371,7 +371,16 @@ working surface:
 `serverShare` per challenge and the portal prints "% of the field", which is the
 per-challenge cut C3 deleted. Two models are live on one screen.
 
-#### B89.1 — The server owner's wallet
+#### B89.1 — The server owner's wallet — SHIPPED (418e8da, f121808, ebadd23)
+
+> Built as `lib/server-wallet.ts` + the Wallet tab, which is also the billing
+> page (B90.9). Two design failures the tests caught: counting a `draft` payout
+> as committed made `available` identically 0 for every owner forever, and
+> summing every payout into `paid` made a goodwill cheque eat the balance it
+> was added to. The minimum withdrawal shipped at **$20**, not the $25 written
+> below. Spending the balance on a private challenge is `chargeWallet`, which
+> is built and tested; the challenge that spends it is B90.4 and is not.
+
 
 An owner cannot see money they are owed, only challenges they ran.
 
@@ -478,7 +487,13 @@ side of that line. It was not designed for that reason and it does it anyway.
 | Under-18 profiled ads barred in 9 regimes | Ad serving to under-18s must be **contextual, never profiled**. One change clears more jurisdictions than any other | Ad serving |
 | 30% NRA withholding, **no de-minimis**, on non-US prize payouts | **Pre-launch blocker for the international population.** Unresolved in the research — the largest open question in it | Redemption |
 
-#### B90.1 — Brand self-signup
+#### B90.1 — Brand self-signup — SHIPPED (12eb0c6)
+
+> `lib/brand-signup.ts` + the form on `/brands`, above the enquiry form. The
+> gate below is one column: a self-signed-up brand lands `pending` and
+> `lib/ads.ts` serves `active` only. Free-mail addresses sign up fine — a real
+> four-person studio runs on Gmail — and are flagged for the reviewer instead.
+
 
 Create a brand → automated email with a portal link and key → build a campaign.
 
@@ -490,6 +505,14 @@ first counsel question is exactly that.
 challenges by other brands"; that is a competitor's performance data. What ships
 is **aggregate platform benchmarks** — median entrants per challenge, typical
 reach — with no brand named and the 25-cohort floor applied.
+
+#### B89.2b — Country mandatory, language selector gone — SHIPPED (dd5331e)
+
+> Country is a third unlock step with its own key, not folded into "make your
+> profile yours" — that step is generous by design and an avatar satisfies it,
+> which tells us nothing about redemption eligibility. The grandfather rule is
+> untouched: `unlockState` returns early for anybody already unlocked. The
+> language selector is removed until the translation registry is finished.
 
 #### B90.2 — The campaign builder
 
@@ -585,7 +608,11 @@ is a bill somebody disputes.
 happens when an admin presses announce — which may be mid-week — and the message
 carries the start date. Nothing starts mid-week; announcements do.
 
-#### B90.9 — The server owner's wallet IS their billing page
+#### B90.9 — The server owner's wallet IS their billing page — SHIPPED (ebadd23)
+
+> One tab, both directions, with the payout-route form moved onto it. The bills
+> half is real (`chargeWallet`) and has nothing to bill until B90.4 ships.
+
 
 Earnings, balance, and every bill for their own challenges, in one place.
 
@@ -614,7 +641,10 @@ mechanism that can claw back a fraud, which is why anybody can be paid at all".
 One console: every brand, every campaign, every challenge, filterable by status.
 A `draft` campaign is a **sales signal**, not clutter.
 
-#### B90.6 — BETA
+#### B90.6 — BETA — SHIPPED (80dc936)
+
+> On the lockup in `BrandHeader` (nav + footer) and in the mobile drawer.
+
 
 A `BETA` badge beside the wordmark, in the desktop nav and the mobile nav.
 
