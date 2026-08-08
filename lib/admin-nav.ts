@@ -197,6 +197,11 @@ export const ADMIN_NAV: AdminGroup[] = [
     area: "ads",
     blurb: "Offline sales, run through the platform.",
     items: [
+      // The two screens the commercial model needed and the console never had.
+      // Ahead of billing on purpose: "where is every dollar" is the question,
+      // and "which invoices are outstanding" is a detail of it.
+      { href: "/admin/vaults", label: "Vaults", desc: "Where every dollar is — prizes, the server pool, the CP vault and ours. Balances summed from the ledger, the split that divides new sales, and what actually reached gamers.", system: "billing" },
+      { href: "/admin/week", label: "The week", desc: "The weekly close: who carried a challenge, how they scored, and what the server pool paid them. Runs Monday; re-runnable safely.", system: "billing" },
       { href: "/admin/billing", label: "Billing & revenue", desc: "Brand invoices, what came in, what we owe gamers and servers, and what's left." , system: "billing" },
       { href: "/admin/offers", label: "Founding offers", desc: "The two promotional campaigns — off by default. Switch them on, set what percentage of a bill they cover, and see what they have cost and returned.", system: "billing" },
       { href: "/admin/payouts", label: "Payouts", desc: "What server owners earned, and releasing it to them." , system: "billing" },
