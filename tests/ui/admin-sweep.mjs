@@ -121,6 +121,15 @@ for (const [old, dest] of [
   ["/admin/brands/testimonials", "/admin/brands"],
 ]) {
   await page.goto(`${BASE}${old}`, { waitUntil: "domcontentloaded" });
+  // The redirect is CLIENT-side, and reading page.url() straight after goto
+  // reports the old path every time — which is what this assertion did on its
+  // first run, failing all nine while every redirect worked. The admin layout
+  // streams, so by the time the stub calls redirect() the shell has already
+  // flushed and Next can no longer answer with a 307; it finishes the
+  // navigation in the browser instead. Same family as the waitForURL note in
+  // the other suites: with a streamed page, the URL is not settled at
+  // domcontentloaded.
+  await page.waitForFunction((from) => location.pathname !== from, old, { timeout: 8000 }).catch(() => {});
   ok(`${old} lands on ${dest}`, new URL(page.url()).pathname === dest, page.url());
 }
 
