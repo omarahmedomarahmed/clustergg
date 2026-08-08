@@ -148,7 +148,6 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/brand-kit", label: "Logos & brand kit", desc: "Wordmark, mark, favicon, orbs and framing." , system: "brand" },
       { href: "/admin/chrome", label: "Nav & footer", desc: "Show or hide every top-bar item — guests and members separately — and every footer link." , system: "brand" },
       { href: "/admin/mobile", label: "Mobile chrome", desc: "Bottom nav and side drawer on phones." , system: "brand" },
-      { href: "/admin/creative-studio", label: "Creative studio", desc: "Build social creatives from platform art." , system: "brand" },
       { href: "/admin/partners", label: "Partners", desc: "The logos in the trusted-by strip." , system: "brand" },
     ],
   },
@@ -174,6 +173,12 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/cp-calculator", label: "CP calculator", desc: "What every action pays, what it costs at a million gamers, and what a second account would farm first.", system: "quests" },
       { href: "/admin/leaderboards", label: "Leaderboards", desc: "Every board on every game — a game can run several.", metric: "leaderboards" , system: "challenges" },
       { href: "/admin/trophies", label: "Trophies", desc: "The prize catalogue and what each is worth.", metric: "trophies" , system: "trophies" },
+      // Registered rather than deleted. This is the badge CATALOGUE — the rules
+      // that decide who earns what. `lib/badges.ts` grants them; nothing here
+      // hands one out. It was reachable by URL and linked from nothing, which
+      // is how a page nobody maintains gets edited by somebody who assumed it
+      // was a hand-grant screen.
+      { href: "/admin/badges", label: "Badges", desc: "The badge catalogue: what each one is, and the rule that earns it. Grants are automatic — this defines the rule, it does not award anything.", system: "trophies" },
       { href: "/admin/redeems", label: "Trophy redemptions", desc: "Winners cashing in. Pay out or reject.", metric: "redeems", queue: true , system: "trophies" },
       { href: "/admin/growth-review", label: "Growth review", desc: "Servers whose linked-member growth is worth a look before a payout goes out.", queue: true, system: "billing" },
       { href: "/admin/stuck", label: "Stuck money", desc: "Every state where a prize has nowhere to go — what is stuck, why, and what unsticks it.", queue: true, system: "trophies" },

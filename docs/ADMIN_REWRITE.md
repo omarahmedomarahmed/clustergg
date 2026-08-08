@@ -64,12 +64,12 @@ left behind after earlier merges. Those stay.
 
 ## 4. Page by page
 
-### DELETE (3)
+### DELETE (2 — was 3, see the correction)
 
 | Page | Why |
 |---|---|
 | `/admin/ads` | A second ad dashboard. Everything on it is on `/admin/ads/schedule` and `/admin/ads/analytics`, and it is not in the nav — the one link to it calls it "the master dashboard", which is exactly the confusion two dashboards create. |
-| `/admin/badges` | Orphaned and unreachable. Badges are granted by rules in `lib/badges.ts`; the page hand-grants them, which is a path around the rules nobody is using. |
+| ~~`/admin/badges`~~ | **CORRECTED — kept and registered instead.** I wrote it up as "hand-grants around the rules". It is not: it is the badge CATALOGUE editor (`saveBadge` / `deleteBadge` define badges, and `lib/badges.ts` grants them by rule). Deleting it would have removed the only way to manage badge definitions. Orphaned from the nav was the real bug; the fix is a nav entry. |
 | `/admin/creative-studio` | 70 lines wrapping an image tool that duplicates `/admin/shots` and `/admin/brand-kit`. Three places to put an image is three places to look for one. |
 
 ### MERGE (14 pages → 4)

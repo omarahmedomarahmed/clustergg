@@ -89,7 +89,7 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
           </select>
           <div><button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Create campaign</button></div>
         </form>
-        <p className="text-xs text-muted mt-2">Tip: create as a draft, then upload one creative per placement (here or from the brand portal) and launch from the <a href="/admin/ads" className="text-cyan-300 underline">master dashboard</a>.</p>
+        <p className="text-xs text-muted mt-2">Tip: create as a draft, then upload one creative per placement (here or from the brand portal) and launch from the <a href="/admin/ads/schedule" className="text-cyan-300 underline">ad schedule</a>.</p>
       </div>
 
       <div className="glass overflow-x-auto">

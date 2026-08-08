@@ -36,7 +36,7 @@ const ADMIN_PATHS: Record<ThreadKind, string[]> = {
   // read and answered. Either is enough — a desk that can open the conversation
   // can reload it.
   server: ["/admin/messages", "/admin/discord"],
-  brand: ["/admin/messages", "/admin/brands", "/admin/ads"],
+  brand: ["/admin/messages", "/admin/brands", "/admin/ads/schedule"],
 };
 
 export async function refreshThread(

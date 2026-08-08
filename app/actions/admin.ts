@@ -5,6 +5,7 @@ import { and, eq, isNull, count } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin, requireStaff, hashPassword } from "@/lib/auth";
 import { requireArea, setStaffGrants } from "@/lib/permissions";
+import { requireSystemFor } from "@/lib/departments";
 import { uid, slugify } from "@/lib/utils";
 import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
 import { syncAccount } from "@/lib/sync";
@@ -229,8 +230,12 @@ export async function adminResyncAccount(accountId: string) {
 }
 
 // ---------- Badges ----------
+//
+// Guarded by the page they belong to, not by "is staff". Defining what earns a
+// badge is the trophies desk's job; before this, anybody with a staff account
+// could rewrite the criteria of every badge on the platform.
 export async function saveBadge(formData: FormData) {
-  const admin = await requireStaff();
+  const { user: admin } = await requireSystemFor("/admin/badges");
   const db = await getDb();
   const badgeId = String(formData.get("badgeId") ?? "");
   let criteria: Record<string, unknown> = {};
@@ -256,7 +261,7 @@ export async function saveBadge(formData: FormData) {
 }
 
 export async function deleteBadge(badgeId: string) {
-  const admin = await requireStaff();
+  const { user: admin } = await requireSystemFor("/admin/badges");
   const db = await getDb();
   await db.delete(schema.badges).where(eq(schema.badges.id, badgeId));
   await audit(admin.id, "badge.delete", "badge", badgeId);
@@ -681,7 +686,7 @@ export async function saveBrand(formData: FormData) {
     await audit(admin.id, "brand.create", "brand", values.name);
   }
   revalidatePath("/admin/brands");
-  revalidatePath("/admin/ads");
+  revalidatePath("/admin/ads/schedule");
 }
 
 // Admin saves the chart dashboard layout for a brand's portal (same chart_prefs
@@ -707,7 +712,7 @@ export async function regenerateBrandKey(brandId: string) {
   await db.update(schema.brands).set({ accessKey: key }).where(eq(schema.brands.id, brandId));
   await audit(admin.id, "brand.key_reset", "brand", brandId);
   revalidatePath(`/admin/brands/${brandId}`);
-  revalidatePath("/admin/ads");
+  revalidatePath("/admin/ads/schedule");
   return key;
 }
 
@@ -719,7 +724,7 @@ export async function launchCampaign(campaignId: string) {
   if (!ready) return { error: "Every placement needs a creative before launch." };
   await db.update(schema.adCampaigns).set({ status: "active", launchedAt: new Date() }).where(eq(schema.adCampaigns.id, campaignId));
   await audit(admin.id, "campaign.launch", "campaign", campaignId);
-  revalidatePath("/admin/ads");
+  revalidatePath("/admin/ads/schedule");
   return { ok: true };
 }
 
@@ -728,7 +733,7 @@ export async function setCampaignStatus(campaignId: string, status: "active" | "
   const db = await getDb();
   await db.update(schema.adCampaigns).set({ status }).where(eq(schema.adCampaigns.id, campaignId));
   await audit(admin.id, `campaign.${status}`, "campaign", campaignId);
-  revalidatePath("/admin/ads");
+  revalidatePath("/admin/ads/schedule");
 }
 
 // Admin reply in the shared brand inbox.
@@ -740,7 +745,7 @@ export async function adminSendBrandMessage(brandId: string, formData: FormData)
   await db.insert(schema.brandMessages).values({ id: uid(), brandId, sender: "admin", body, readByAdmin: true });
   await audit(admin.id, "brand.message", "brand", brandId);
   revalidatePath(`/admin/brands/${brandId}`);
-  revalidatePath("/admin/ads");
+  revalidatePath("/admin/ads/schedule");
 }
 
 export async function saveCampaign(brandId: string, formData: FormData) {
