@@ -39,7 +39,7 @@ const mkUser = async (tag: string) => {
   const id = uid();
   await db.insert(schema.users).values({
     id, slug: `qa-${tag}-${id.slice(0, 6)}`, displayName: `QA ${tag}`,
-    email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
+    email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult", unlockedAt: new Date(),
   } as never);
   return { id, slug: `qa-${tag}-${id.slice(0, 6)}` };
 };
@@ -174,6 +174,102 @@ ok("…and an uncapped action is excluded rather than guessed at",
 ok("the page passes the platform rate, not a constant",
   /cpPerDollar: market\.rate/.test(
     await readFile(new URL("../../app/quests/[key]/page.tsx", import.meta.url), "utf8")));
+
+console.log("\n== B76: every priced action has something that fires it ==");
+{
+  const { readdirSync, readFileSync, statSync } = await import("node:fs");
+  const {
+    ACTION_CATALOG: CATALOG, MAX_ACTION_CP, EXEMPT_FROM_ACTION_CAP,
+    PASSIVE_ACTIONS, DEFAULT_PASSIVE_CP_CEILING, DEFAULT_DAILY_CP_CEILING,
+  } = await import("../../lib/quests.ts");
+
+  // SCANNED FROM THE CALLERS, not from the catalogue.
+  //
+  // This is the exact mistake that let four priced actions ship inside every
+  // mission template with nothing on the platform firing them: the catalogue
+  // says an action exists, the missions say it is worth 25 CP, and a gamer
+  // trying to complete the task could not, however hard they played. Reading
+  // the catalogue would have agreed with itself all the way down.
+  const roots = ["lib", "app", "components"];
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(new URL(`../../${dir}`, import.meta.url))) {
+      const rel = `${dir}/${e}`;
+      const url = new URL(`../../${rel}`, import.meta.url);
+      if (statSync(url).isDirectory()) walk(rel);
+      else if (/\.(ts|tsx)$/.test(e)) files.push(rel);
+    }
+  };
+  roots.forEach(walk);
+  const emittersRaw = files
+    // The catalogue, the mission templates and the economics model NAME every
+    // action. None of them fires one.
+    .filter((f) => !/lib\/(quests|missions|cp-economics|cp-dial)\.ts$/.test(f))
+    .map((f) => readFileSync(new URL(`../../${f}`, import.meta.url), "utf8"))
+    .join("\n");
+
+  // One level of constant indirection, resolved ACROSS files.
+  //
+  // `install-credit.ts` and `botlists.ts` both do
+  // `export const X = "action" as const` and pass `X` to `awardQuestAction` —
+  // and `botlists.ts` exports it to a route in another directory entirely. A
+  // per-file substitution missed that one, which is worth recording: the scan
+  // has to follow the same import a reader would.
+  //
+  // Substituting every such constant to its value keeps the scan honest without
+  // demanding a style. It is one level deep on purpose — a scan that chases
+  // arbitrary indirection is a scan nobody can reason about, and two levels has
+  // never appeared here.
+  const resolved = (() => {
+    let out = emittersRaw;
+    for (const m of emittersRaw.matchAll(/const\s+([A-Z_][A-Z0-9_]*)\s*=\s*"([a-z_]+)"\s*as const/g)) {
+      out = out.split(m[1]).join(`"${m[2]}"`);
+    }
+    return out;
+  })();
+
+
+  for (const a of CATALOG.filter((x) => x.defaultWeight > 0)) {
+    ok(`${a.key} is fired by something`,
+      new RegExp(`awardQuestAction\\([\\s\\S]{0,160}["']${a.key}["']`).test(resolved)
+      || new RegExp(`["']${a.key}["'][\\s\\S]{0,80}awardQuestAction`).test(resolved),
+      "priced, and nothing on the platform fires it");
+  }
+
+  console.log("\n== the 25-CP bound the guarantee rests on ==");
+  for (const a of CATALOG) {
+    if (EXEMPT_FROM_ACTION_CAP.includes(a.key)) continue;
+    ok(`${a.key} pays no more than ${MAX_ACTION_CP}`, a.defaultWeight <= MAX_ACTION_CP,
+      String(a.defaultWeight));
+  }
+  // The two exemptions are NAMED, not inferred from being large — so a third
+  // one has to be a decision somebody makes rather than a weight somebody
+  // types.
+  // FOUR, not the two the review named — writing this against the catalogue
+  // rather than against two remembered names is what found the other two.
+  ok("the exemptions are an explicit list", EXEMPT_FROM_ACTION_CAP.length === 4);
+  for (const key of EXEMPT_FROM_ACTION_CAP) {
+    const a = CATALOG.find((x) => x.key === key);
+    ok(`${key} is exempt and rare`, (a?.defaultCap ?? 0) === 1,
+      `cap ${a?.defaultCap}`);
+  }
+
+  console.log("\n== the passive ceiling the model claimed and the code lacked ==");
+  ok("there is a passive list", PASSIVE_ACTIONS.length > 0);
+  ok("…and it is smaller than the daily ceiling",
+    DEFAULT_PASSIVE_CP_CEILING < DEFAULT_DAILY_CP_CEILING);
+  // The point of the ceiling: passive CP is the half a collusion ring can farm
+  // without playing anything.
+  for (const k of ["profile_views_25", "profile_vote_received", "follower_gained"]) {
+    ok(`${k} counts as passive`, PASSIVE_ACTIONS.includes(k));
+  }
+  ok("…and something a gamer chooses does not",
+    !PASSIVE_ACTIONS.includes("join_challenge") && !PASSIVE_ACTIONS.includes("share_card"));
+  const quests = readFileSync(new URL("../../lib/quests.ts", import.meta.url), "utf8");
+  ok("the ceiling is enforced in the award path", /passiveCpToday\(db, userId\)/.test(quests));
+  ok("…by narrowing the same room the daily ceiling uses",
+    /room = Math\.min\(room, passiveRoom\)/.test(quests));
+}
 
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }

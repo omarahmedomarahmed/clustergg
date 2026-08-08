@@ -487,6 +487,22 @@ export async function closeWeek(weekKey: string, actorId?: string | null): Promi
       } catch { /* a missing trophy row shouldn't stop the announcement */ }
     }
 
+    // B76. `best_profile_award` was PRICED at 100 CP, named in mission
+    // templates, and fired by nothing but the demo seed — so placing in the
+    // one weekly ceremony the platform runs paid nothing at all. This is the
+    // function that decides the podium, so this is where it belongs.
+    //
+    // Keyed on the WEEK, so a re-close of the same week pays once and a gamer
+    // winning again in a later week is paid again.
+    for (const p of podium) {
+      try {
+        const { awardQuestAction } = await import("@/lib/quests");
+        await awardQuestAction(db, p.userId, "best_profile_award", {
+          refType: "week", refId: weekKey,
+        });
+      } catch { /* the ceremony matters more than the points */ }
+    }
+
     for (const [i, p] of podium.entries()) {
       try {
         await db.insert(schema.notifications).values({

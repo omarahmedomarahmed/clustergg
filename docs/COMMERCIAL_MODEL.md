@@ -1,4 +1,39 @@
-# ClusterGG — The Commercial Model
+# ClusterGG — The Commercial Model *(SUPERSEDED)*
+
+> # ⚠ THIS DOCUMENT IS SUPERSEDED
+>
+> **`docs/COMMERCIAL_MODEL_V2.md` is the model. This one is kept as a record of
+> what we used to believe, and of five specific errors — because a document that
+> is quietly deleted teaches nobody anything, and the errors below are the exact
+> shape of mistake this company is most likely to make again.**
+>
+> B78. Every figure in this file should be read as **HISTORICAL**.
+>
+> ## What was wrong with it
+>
+> | # | The error | What v2 does |
+> |---|---|---|
+> | 1 | **Fill was missing from break-even.** `revenue = screens × CPM/1000 × fill` — and the fill term was simply absent from our arithmetic. Ours, not a dispute. Every revenue figure below is therefore an upper bound that assumed we sold 100% of inventory. | v2 does not sell inventory by volume at all. |
+> | 2 | **Registered vs daily-active was never declared.** Rungs quoted "1,000 gamers" without saying which, and the switch between the two readings is worth roughly **30×**. Every table in this file is ambiguous in the direction that flatters it. | `lib/active-gamers.ts` defines it — credited CP that day — and measures it. |
+> | 3 | **Cost and revenue used different engagement assumptions**, in the same paragraph. Cost was modelled on a maximal gamer; revenue on an average one. | v2 states the worst case and the forecast as two numbers and never reports them as one. |
+> | 4 | **Unbuilt mechanisms were described in the present tense.** A reader could not tell which parts existed. | v2 §0 lists all sixteen, each with the file and line that contradicted it. |
+> | 5 | **The view definition was a multiplier.** A card in a 4,000-member server counted as 4,000 views. | `docs/AD_VIEW.md`: one card, one view, no multiplier. **The inventory number gets much smaller, and honest.** |
+>
+> ## What the numbers become on the honest definition
+>
+> The headline below reads "$500/month for 100,000 views" at a $5 CPM. Under
+> one-card-one-view, 100,000 views is 100,000 delivered cards — not 25 public
+> posts into 4,000-member servers. At 1,000 daily-active gamers opening 15
+> screens a day that is ~450,000 cards a month, so the inventory claim survives
+> the redefinition; **what does not survive is any figure that reached its total
+> by multiplying a post by an audience.**
+>
+> That is the one thing worth carrying forward from this document: it was not
+> wrong because the ambition was wrong. It was wrong because five assumptions
+> each moved a number in the flattering direction, and nothing in the file made
+> any of them visible.
+
+---
 
 **Status: the pivot.** Everything before this document treated the bot, the
 quests and the ad slot as three features. This document treats them as one

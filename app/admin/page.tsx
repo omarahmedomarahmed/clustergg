@@ -6,6 +6,13 @@ import { currentAccess } from "@/lib/departments";
 import { pathAllowedFor, systemBy } from "@/lib/systems";
 import { loadMetrics, attentionOf, type Metrics } from "@/lib/admin-metrics";
 import Icon from "@/components/Icon";
+import { getDb } from "@/lib/db";
+import { balances } from "@/lib/vaults";
+import { weekStartOf } from "@/lib/guild-snapshot";
+import { weekKey } from "@/lib/week-close";
+// `AdminLink` is a TYPE in lib/admin-nav and a component in the kit. Aliased
+// rather than renamed either — the type name is right and so is the component.
+import { StatRow, Stat, Note, AdminLink as KitLink } from "@/components/admin/kit";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Command centre" };
@@ -35,6 +42,17 @@ export default async function AdminCommandCentre() {
   const attention = attentionOf(metrics);
   const mine = (access?.systems ?? []).map((k) => systemBy(k)?.name ?? k).filter(Boolean);
 
+  // WHERE THE MONEY IS, on the front door. Only for whoever runs billing —
+  // this is not a number every department needs, and a console that shows
+  // everybody the bank balance is a console nobody can give a new hire.
+  //
+  // The command centre used to open on queues alone, which answers "what needs
+  // me" and not "is anything wrong". Four vault balances and whether Monday ran
+  // is the second question, and it is the one that has no other home.
+  const seesMoney = admin || (access?.systems ?? []).includes("billing");
+  const vault = seesMoney ? await balances(await getDb()) : null;
+  const lastWeek = weekKey(new Date(weekStartOf().getTime() - 7 * 86400_000));
+
   return (
     <div>
       <div className="mb-7">
@@ -50,6 +68,43 @@ export default async function AdminCommandCentre() {
               : "You're not in a department yet, so there's nothing here to run. Ask a super admin to place you."}
         </p>
       </div>
+
+      {vault && (
+        <section className="mb-8">
+          <h2 className="mb-2.5 text-[11px] uppercase tracking-widest text-muted">The money, right now</h2>
+          <StatRow>
+            <Stat
+              label="Prize vault"
+              value={vault.prize.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+              note="Owed to gamers as trophies"
+              tone="warn"
+            />
+            <Stat
+              label="Server pool"
+              value={vault.server.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+              note="Divided on Monday"
+            />
+            <Stat
+              label="CP vault"
+              value={vault.cp.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+              note="Funds every point a gamer earns"
+            />
+            <Stat
+              label="Cluster revenue"
+              value={vault.cluster.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+              note="Ours. The other three are not."
+              tone="good"
+            />
+          </StatRow>
+          <div className="mt-2">
+            <Note tone="info">
+              Balances are summed from the ledger — there is no stored number here for anything to drift
+              from. <KitLink href="/admin/vaults">The vaults</KitLink> ·{" "}
+              <KitLink href="/admin/week">the week of {lastWeek}</KitLink>
+            </Note>
+          </div>
+        </section>
+      )}
 
       {/* Needs you — the reason to open this page at all. */}
       <section className="mb-8">

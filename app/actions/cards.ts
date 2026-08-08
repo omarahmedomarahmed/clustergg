@@ -92,7 +92,7 @@ export async function saveCardLayout(_prev: CardActionState, fd: FormData): Prom
   forgetLayouts();
   const dropped = await invalidateCards(kind);
 
-  revalidatePath("/admin/cards/guide");
+  revalidatePath("/admin/art");
   return {
     ok: dropped > 0
       ? `Layout saved. ${dropped} cached card${dropped === 1 ? "" : "s"} cleared — they re-render on next use.`
@@ -159,7 +159,7 @@ export async function applyFurnitureEverywhere(_prev: CardActionState, fd: FormD
     mascot: "Astronaut", gameMark: "Game logo", mark: "Logo", badge: "Badge", ad: "Sponsor box",
   };
   const label = which.length === 1 ? NAMES[which[0]] : "Astronaut, game logo, logo, badge and sponsor box";
-  revalidatePath("/admin/cards/guide");
+  revalidatePath("/admin/art");
   return {
     ok: `${label} copied to ${changed} card kind${changed === 1 ? "" : "s"}.`
       + (dropped > 0 ? ` ${dropped} cached card${dropped === 1 ? "" : "s"} cleared.` : ""),
@@ -200,7 +200,7 @@ export async function saveBotButtons(_prev: CardActionState, fd: FormData): Prom
   await setContent(BUTTON_COPY_KEY, JSON.stringify(copy));
   forgetButtonCopy();
 
-  revalidatePath("/admin/cards/guide");
+  revalidatePath("/admin/art");
   const n = Object.keys(copy).length;
   return {
     ok: n
@@ -219,6 +219,6 @@ export async function resetCardLayout(_prev: CardActionState, fd: FormData): Pro
   await setContent(layoutKey(kind), JSON.stringify(DEFAULT_LAYOUT));
   forgetLayouts();
   await invalidateCards(kind);
-  revalidatePath("/admin/cards/guide");
+  revalidatePath("/admin/art");
   return { ok: "Back to the default layout." };
 }

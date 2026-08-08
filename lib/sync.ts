@@ -65,6 +65,9 @@ export async function syncAccount(db: DB, account: Account): Promise<{ ok: boole
   }
 
   const game = provider.game;
+  // What moved this sync. B76 — see the emitters below the loop.
+  const levelled = new Set<string>();
+  let changed = false;
   for (const [metricKey, metric] of Object.entries(result.metrics)) {
     const [existing] = await db.select().from(schema.statCurrent).where(and(
       eq(schema.statCurrent.linkedAccountId, account.id),
@@ -80,6 +83,7 @@ export async function syncAccount(db: DB, account: Account): Promise<{ ok: boole
       await db.insert(schema.statSnapshots).values({
         id: uid(), linkedAccountId: account.id, game, metricKey, metricValue: metric.value,
       });
+      changed = true;
     } else if (existing.metricValue !== metric.value || existing.rankLabel !== (metric.rankLabel ?? null)) {
       await db.update(schema.statCurrent)
         .set({ metricValue: metric.value, rankLabel: metric.rankLabel ?? null, updatedAt: new Date() })
@@ -87,7 +91,40 @@ export async function syncAccount(db: DB, account: Account): Promise<{ ok: boole
       await db.insert(schema.statSnapshots).values({
         id: uid(), linkedAccountId: account.id, game, metricKey, metricValue: metric.value,
       });
+      // B76. `stat_levelup` was PRICED and named in three mission templates
+      // with nothing on the platform firing it — a task a gamer could not
+      // complete however hard they played.
+      //
+      // A stat that went UP is the emitter. Not any change: a rank that fell is
+      // not a level-up, and paying for movement in either direction would pay
+      // for a bad week. Capped per gamer per day by B17 like everything else,
+      // and keyed on the metric so six metrics moving is not six payouts of the
+      // same thing on the same sync.
+      if (metric.value > existing.metricValue) {
+        levelled.add(metricKey);
+      }
     }
+  }
+
+  // One award per sync, whatever moved. `refId` carries the day so the cap is
+  // legible in the ledger rather than only in the code.
+  if (levelled.size > 0) {
+    await awardQuestAction(db, account.userId, "stat_levelup", {
+      refType: "stat", refId: `${account.id}:${new Date().toISOString().slice(0, 10)}`,
+    });
+  }
+
+  // B76. `play_session` — priced, in every mission, fired by nothing.
+  //
+  // A SESSION is a sync that found new activity. That is the honest definition
+  // available to us: we cannot see somebody playing, we can see that the numbers
+  // a game reports about them changed since we last looked. Anything stronger
+  // would be a claim we cannot support, which is the same rule `docs/AD_VIEW.md`
+  // applies to a view.
+  if (levelled.size > 0 || changed) {
+    await awardQuestAction(db, account.userId, "play_session", {
+      refType: "session", refId: `${account.id}:${new Date().toISOString().slice(0, 10)}`,
+    });
   }
 
   // NOTE: `verified` is deliberately NOT touched here.
@@ -166,6 +203,17 @@ export async function scoreChallengesForAccount(db: DB, linkedAccountId: string)
       for (const [metric, pts] of Object.entries(challenge.pointsEngine ?? {})) {
         points += Math.floor(delta[metric] ?? 0) * pts;
       }
+    }
+    // B76. `challenge_progress` — priced, in every mission template, fired by
+    // nothing at all. This is the only place on the platform that knows a
+    // gamer's score in a live challenge went up, so this is where it belongs.
+    //
+    // Only UP. A score that fell is not progress, and a re-sync that produced
+    // the same number is not either.
+    if (points > participant.currentPoints) {
+      await awardQuestAction(db, participant.userId, "challenge_progress", {
+        refType: "challenge", refId: `${challenge.id}:${new Date().toISOString().slice(0, 10)}`,
+      });
     }
     if (points !== participant.currentPoints) {
       await db.update(schema.challengeParticipants)

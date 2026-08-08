@@ -74,7 +74,7 @@ console.log("\n== a bought trophy lands on the BUYER, whatever the caller wants 
   for (const [id, n] of [[buyer, "Buyer"], [other, "Other"]] as const) {
     await db.insert(schema.users).values({
       id, email: `${id}@gift.test`, displayName: `${n} ${tag}`, slug: `${n.toLowerCase()}-${tag}`,
-      passwordHash: "x", ageBand: "adult", role: "user", status: "active",
+      passwordHash: "x", ageBand: "adult", unlockedAt: new Date(), role: "user", status: "active",
     });
   }
   const trophyId = uid();

@@ -197,14 +197,47 @@ export async function withCardAd<T extends CardData>(
  * slightly low on a dashboard, while an impression that blocks is a card that
  * arrives late in Discord's 3-second budget.
  */
+/**
+ * The frequency cap. B75.4.
+ *
+ * Not a courtesy — an ANTI-FRAUD control. Every bot render logged an impression
+ * with no per-gamer limit at all, so anybody who could make the bot draw a card
+ * could inflate a brand's report by spamming a command. The report is what we
+ * sell as proof of work, so padding it is not a cosmetic problem.
+ *
+ * One gamer, one creative, one day. Deliberately a DAY rather than the web
+ * beacon's hour: a Discord card is a deliberate act by a person who typed
+ * something, and a hand-typed command twice in an evening is a real second
+ * delivery — but forty of them is somebody holding down a key.
+ */
+export const CARD_IMPRESSION_WINDOW_HOURS = 24;
+
+export const cardImpressionKey = (
+  campaignCreativeId: string,
+  viewer: string,
+  at = new Date(),
+): string => `card:${campaignCreativeId}:${viewer}:${at.toISOString().slice(0, 10)}`;
+
 export function logCardAdImpression(
   campaignCreativeId: string,
-  meta: { kind: string; guildId?: string | null; ephemeral?: boolean },
+  meta: { kind: string; guildId?: string | null; ephemeral?: boolean; viewerId?: string | null },
 ): void {
   void (async () => {
     try {
       const db = await getDb();
       await db.insert(schema.adImpressions).values({
+        // B75.4. The unique index on `dedupeKey` refuses the second one — the
+        // same mechanism B72.2 used for the web beacon, and for the same
+        // reason: two racing writes would both pass a SELECT.
+        //
+        // A render we cannot attribute to a person still logs, keyed on the
+        // card and the day rather than on a viewer. It is a real delivery and
+        // dropping it would UNDER-report, which is the other way to be wrong.
+        dedupeKey: cardImpressionKey(
+          campaignCreativeId,
+          meta.viewerId || `anon:${meta.guildId ?? "dm"}:${meta.kind}`,
+        ),
+        userId: meta.viewerId ?? null,
         id: uid(),
         campaignCreativeId,
         pagePath: `discord:card:${meta.kind}`,
@@ -218,7 +251,7 @@ export function logCardAdImpression(
         // A card with no guild came from a DM, which is private by definition.
         surface: meta.ephemeral || !meta.guildId ? "discord_private" : "discord_public",
         cardKind: meta.kind,
-      });
+      }).onConflictDoNothing();
     } catch { /* analytics must never break a card */ }
   })();
 }

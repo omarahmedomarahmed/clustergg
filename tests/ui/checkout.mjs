@@ -33,13 +33,32 @@ const tap = async (loc) => {
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: 1400, height: 1100 } });
 
+/**
+ * Open a shelf page and wait for the shelf, rather than for the network.
+ *
+ * `waitUntil: "networkidle"` is the wrong tool on any page in this app: link
+ * prefetching and the analytics scripts keep the connection busy indefinitely,
+ * so it waits the full timeout and then throws on a page that painted in under
+ * a second. Waiting for a `[data-trophy]` tile says the same thing and says it
+ * about the DOM the assertions actually read.
+ */
+const shelf = async (url = `${BASE}/marketplace`) => {
+  await page.goto(url, { waitUntil: "domcontentloaded" });
+  await page.waitForSelector("[data-trophy]", { timeout: 20000 }).catch(() => {});
+};
+
 try {
   await page.goto(`${BASE}/login`, { waitUntil: "domcontentloaded" });
   await page.fill('input[name="email"]', "nova@demo.gg");
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await page.waitForLoadState("networkidle");
-  await page.goto(`${BASE}/marketplace`, { waitUntil: "networkidle" });
+  await page.waitForFunction(() => !location.pathname.startsWith("/login"), null, { timeout: 15000 });
+  // NOT `networkidle`. Next prefetches every link in the viewport and the two
+  // analytics scripts load on their own schedule, so the network on a real page
+  // never goes quiet for 500ms — this timed out at 30s and took the whole
+  // browser band down with it, on a page that had already rendered. Wait for
+  // the thing the test is about instead: the shelf.
+  await shelf();
   await page.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await page.waitForTimeout(500);
 
@@ -61,73 +80,79 @@ try {
   ok("…and the two trust claims are here, where the money moves",
     /never lowers your level/i.test(inModal) && /never see your bank details/i.test(inModal));
 
-  console.log("\n== gifting cannot be confirmed without a person ==");
-  await tap(modal.locator('button:has-text("Gift it")'));
-  await page.waitForTimeout(250);
-  const confirm = modal.locator("[data-confirm]");
-  ok("the confirm button is disabled with nobody chosen", await confirm.isDisabled());
-  ok("…and it says what is missing",
-    /Pick who it/i.test(await confirm.textContent()), await confirm.textContent());
+  // ===== The gift half is GONE (B72.3) =====
+  //
+  // This block used to drive it: tap "Gift it", type into #gift-search, pick a
+  // candidate from the type-ahead, assert the confirm button only arms once a
+  // real person is chosen. All of that was deleted with the feature, and the
+  // /api/gamers/search endpoint went with it — with nothing to gift, a
+  // signed-in gamer-name lookup is a member directory with no purpose, and the
+  // standing rule is that the gamer directory is admin-only.
+  //
+  // Inverted rather than deleted, because the assertions that matter now are
+  // the negative ones: the surface is gone AND the endpoint behind it is gone.
+  // A stale positive test would have failed loudly; a deleted one would have
+  // let the search endpoint come back unnoticed.
+  //
+  // (These never ran until now. The suite timed out one line into it, on a
+  // `networkidle` that a page with link prefetching can never reach, and took
+  // the whole browser band down before reaching this point.)
+  console.log("\n== the gift half is gone, and so is the directory behind it ==");
+  {
+    const text = await modal.textContent();
+    ok("no gift button in the checkout", !/Gift it/i.test(text), text.slice(0, 200));
+    ok("no recipient search box", await modal.locator("#gift-search").count() === 0);
+    ok("nothing to pick from", await modal.locator("[data-candidate]").count() === 0);
+    ok("and one confirm, which is the purchase",
+      await modal.locator("[data-confirm]").count() <= 1);
 
-  // A typed string is not a person: typing a name and stopping must not arm it.
-  await page.fill("#gift-search", "ly");
-  await page.waitForTimeout(900);   // debounce + fetch
-  ok("typing alone does not arm the button", await confirm.isDisabled());
-
-  console.log("\n== the type-ahead finds real gamers ==");
-  const candidates = modal.locator("[data-candidate]");
-  const n = await candidates.count();
-  ok("a two-letter query returns candidates", n > 0, `${n} results`);
-  const firstText = n ? await candidates.first().textContent() : "";
-  ok("…each showing a name and an @profile", /@/.test(firstText), firstText);
-  ok("…and never an email address", !/@[a-z0-9.-]+\.[a-z]{2,}/i.test(firstText), firstText);
-  ok("you cannot pick yourself", !/@nova\b/.test(await modal.textContent()));
-
-  console.log("\n== picking one confirms the PERSON ==");
-  await tap(candidates.first());
-  await page.waitForTimeout(300);
-  const card = modal.locator("[data-recipient]");
-  ok("a recipient card appears", await card.count() === 1);
-  ok("…with their avatar", await card.locator("img").count() > 0);
-  const cardText = await card.textContent();
-  ok("…their display name and @profile", /@/.test(cardText), cardText);
-  ok("…and that it cannot be undone", /no undo/i.test(cardText), cardText);
-  ok("only now is the confirm armed", !(await confirm.isDisabled()));
-  ok("…and it names who it is going to",
-    /Send it to /i.test(await confirm.textContent()), await confirm.textContent());
-
-  console.log("\n== you can change your mind about the person ==");
-  await tap(card.locator('button:has-text("Change")'));
-  await page.waitForTimeout(250);
-  ok("the recipient clears", await modal.locator("[data-recipient]").count() === 0);
-  ok("…and the button locks again", await confirm.isDisabled());
+    // The endpoint, not just the button. A UI that stopped calling it is not
+    // the same as an endpoint that stopped existing.
+    const res = await page.evaluate(async (b) => {
+      const r = await fetch(`${b}/api/gamers/search?q=ly`);
+      return r.status;
+    }, BASE);
+    ok("the gamer-name lookup is gone entirely", res === 404 || res === 405 || res >= 400, `HTTP ${res}`);
+  }
 
   console.log("\n== escape leaves without spending ==");
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
   ok("the checkout closes", await page.locator("[data-checkout]").count() === 0);
 
-  console.log("\n== the search endpoint is not an open member directory ==");
-  const signedOut = await browser.newContext();
-  const anon = await signedOut.newPage();
-  const res = await anon.goto(`${BASE}/api/gamers/search?q=no`);
-  ok("signed out, it refuses", res.status() === 401, String(res.status()));
-  ok("…and returns nobody", /"results":\s*\[\s*\]/.test(await res.text()));
-  const short = await page.evaluate(async (b) =>
-    (await (await fetch(`${b}/api/gamers/search?q=n`)).json()).results.length, BASE);
-  ok("a one-character query returns nothing", short === 0, String(short));
-  const shape = await page.evaluate(async (b) =>
-    (await (await fetch(`${b}/api/gamers/search?q=ly`)).json()).results, BASE);
-  ok("results carry no email field", shape.every((r) => !("email" in r)), JSON.stringify(shape[0] ?? {}));
-  ok("…and no id", shape.every((r) => !("id" in r) && !("userId" in r)));
-  await signedOut.close();
+  // This block used to check that /api/gamers/search refused a signed-out
+  // caller, refused a one-character query, and leaked neither an email nor an
+  // id. Every one of those was a guard on an endpoint that no longer exists —
+  // B72.3 deleted it with the gift feature. Inverted to the stronger claim:
+  // there is no signed-in gamer-name lookup at all, for anybody.
+  //
+  // Worth keeping as an assertion rather than dropping, because "the directory
+  // is admin-only" is a standing rule and this is the one endpoint that ever
+  // bent it.
+  console.log("\n== there is no member directory endpoint, signed in or out ==");
+  {
+    const signedOut = await browser.newContext();
+    const anon = await signedOut.newPage();
+    const anonRes = await anon.goto(`${BASE}/api/gamers/search?q=no`);
+    ok("signed out, there is nothing there", anonRes.status() >= 400, String(anonRes.status()));
+    ok("…and it is not serving a list", !/"results"/.test(await anonRes.text()));
+    await signedOut.close();
+
+    const signedIn = await page.evaluate(async (b) => {
+      const r = await fetch(`${b}/api/gamers/search?q=ly`);
+      return { status: r.status, body: (await r.text()).slice(0, 120) };
+    }, BASE);
+    ok("signed in, the same", signedIn.status >= 400, `HTTP ${signedIn.status}`);
+    ok("…and no results array comes back", !/"results"/.test(signedIn.body), signedIn.body);
+  }
+
   console.log("\n== B19: the shelf prices the same trophy the same way everywhere ==");
   // Two surfaces read `marketplaceCatalog`, and the two numbers on every tile —
   // CP to buy, dollars to redeem — are two views of ONE number at the platform
   // rate. If they can disagree between the marketplace page and the quests-page
   // section, one of them is lying to somebody about what their points are worth.
   const priceMap = async (url) => {
-    await page.goto(url, { waitUntil: "networkidle" });
+    await shelf(url);
     return page.evaluate(() => {
       const out = {};
       for (const card of document.querySelectorAll("[data-trophy]")) {
@@ -157,7 +182,7 @@ try {
     JSON.stringify(disagree.slice(0, 2).map((id) => [id, onMarket[id], onQuest[id]])));
 
   console.log("\n== affordability is computed against the real balance ==");
-  await page.goto(`${BASE}/marketplace`, { waitUntil: "networkidle" });
+  await shelf();
   const reach = await page.evaluate(() => {
     const cards = [...document.querySelectorAll("[data-trophy]")];
     return cards.map((c) => {

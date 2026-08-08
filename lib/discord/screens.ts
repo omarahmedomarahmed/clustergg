@@ -72,6 +72,11 @@ export async function loadCtx(
   // nothing — the interaction is signed and carries everything the OAuth
   // callback would have given us.
   const gamer = await ensureGamerForDiscord(discordId, discordName, discordAvatarUrl(discordId, avatar));
+  // B75.4. Re-declared now that we know WHO, so the frequency cap has somebody
+  // to key on. Set twice on purpose: the guild has to be in scope before this
+  // line in case resolving the gamer renders anything, and the viewer cannot
+  // be known until after it.
+  setCardGuild(guildId, gamer?.userId ?? null);
   // Using the bot inside a server is the moment we know which server a gamer
   // came from — so that's where attribution is recorded. It's insert-if-absent,
   // so the first server they use it in gets the credit.

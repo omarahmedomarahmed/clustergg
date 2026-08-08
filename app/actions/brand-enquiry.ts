@@ -46,7 +46,7 @@ export async function sendEnquiry(_prev: EnquiryState, fd: FormData): Promise<En
     };
     return { error: msg[res.reason] ?? msg.error };
   }
-  revalidatePath("/admin/brand-enquiries");
+  revalidatePath("/admin/brands");
   return { ok: "Got it. We'll come back to you within one business day." };
 }
 
@@ -65,6 +65,6 @@ export async function updateEnquiry(_prev: EnquiryState, fd: FormData): Promise<
       note: str(fd, "note").slice(0, 4000) || null,
     })
     .where(eq(schema.brandEnquiries.id, id));
-  revalidatePath("/admin/brand-enquiries");
+  revalidatePath("/admin/brands");
   return { ok: "Saved." };
 }

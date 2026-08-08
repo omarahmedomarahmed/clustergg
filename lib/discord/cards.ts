@@ -62,15 +62,35 @@ export function liveCardUrl(kind: string, args: Record<string, string>): string 
 // it counts toward what their community earned. Rather than thread a guild id
 // through thirty signatures, the interaction handler declares it once for the
 // request and anything rendered inside that request inherits it.
-const guildScope = new AsyncLocalStorage<{ guildId: string | null; sponsor: PickedAd | null }>();
+const guildScope = new AsyncLocalStorage<{
+  guildId: string | null;
+  /** Who asked. B75.4 — the frequency cap keys on it. */
+  viewerId: string | null;
+  sponsor: PickedAd | null;
+}>();
 
 /** Declare the guild for the rest of this request. Called once, in `loadCtx`. */
-export function setCardGuild(guildId: string | null | undefined): void {
-  try { guildScope.enterWith({ guildId: guildId ?? null, sponsor: null }); } catch { /* not fatal — impressions just lose the guild */ }
+export function setCardGuild(guildId: string | null | undefined, viewerId?: string | null): void {
+  try {
+    guildScope.enterWith({ guildId: guildId ?? null, viewerId: viewerId ?? null, sponsor: null });
+  } catch { /* not fatal — impressions just lose the guild */ }
 }
 
 export function currentCardGuild(): string | null {
   return guildScope.getStore()?.guildId ?? null;
+}
+
+/**
+ * Who this render is for. B75.4.
+ *
+ * Rides the same request scope as the guild, for the same reason: threading a
+ * viewer through thirty card signatures to satisfy one anti-fraud check is how
+ * a check ends up half-applied. Null when we do not know, and a null viewer
+ * still logs — keyed on the card and the day — because an unattributable
+ * delivery is still a delivery and dropping it would under-report.
+ */
+export function currentCardViewer(): string | null {
+  return guildScope.getStore()?.viewerId ?? null;
 }
 
 /**
@@ -118,7 +138,12 @@ export async function cardRef(kind: string, args: Record<string, string>): Promi
     // Serving the card IS the impression: this is the moment the image goes
     // into a Discord message somebody is about to look at.
     if (ad) {
-      logCardAdImpression(ad.campaignCreativeId, { kind, guildId: currentCardGuild() });
+      // B75.4. The VIEWER is passed so the frequency cap can key on them —
+      // without it every render from the same person counted, and anybody who
+      // could make the bot draw a card could pad a brand's report.
+      logCardAdImpression(ad.campaignCreativeId, {
+        kind, guildId: currentCardGuild(), viewerId: currentCardViewer(),
+      });
       noteSponsor(ad);
     }
 

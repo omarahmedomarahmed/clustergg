@@ -1,34 +1,36 @@
-import Link from "next/link";
-import { desc, eq, inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireSystemFor } from "@/lib/departments";
 import { billingSummary } from "@/lib/billing";
 import { pricingConfig } from "@/lib/pricing-live";
-import { money } from "@/lib/pricing";
 import { listPayouts, OPEN_STATUSES } from "@/lib/payouts";
 import { payer } from "@/lib/payments";
 import { vendorBy } from "@/lib/payments/vendors";
+import { PAYOUT_HOLD_PHRASE } from "@/lib/abuse";
 import PayoutQueue from "@/components/PayoutQueue";
-import Icon from "@/components/Icon";
+import {
+  Page, Section, StatRow, Stat, Table, Tr, Td, Money, Note, Pill, num, AdminLink, LinkButton, Toolbar,
+} from "@/components/admin/kit";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Payouts" };
 
 // Money out to server owners.
 //
-// The page is deliberately two halves. On the left, what every server has
-// EARNED and not been paid — computed from the challenge ledger, never typed.
-// On the right, what has actually been sent. The gap between them is the only
-// number that matters here, and an owner chasing us about it should find that
-// we already knew.
+// Two halves, and the gap between them is the only number that matters: what
+// the weekly close says a server has earned, and what has actually been sent.
+// An owner chasing us about that gap should find we already knew.
 //
-// Members' winnings are not on this page at all. They are paid to the gamers
-// who won them, through the trophy redemption queue, and mixing the two would
-// eventually put a gamer's prize into an owner's bank account.
+// MEMBERS' WINNINGS ARE NOT ON THIS PAGE. They belong to the gamers who won
+// them and go out through the trophy redemption queue. Mixing the two would
+// eventually put a gamer's prize into an owner's bank account, which is the one
+// mistake on this screen nobody could apologise for.
+
 export default async function AdminPayoutsPage() {
   await requireSystemFor("/admin/payouts");
   const db = await getDb();
   const cfg = await pricingConfig();
+
   const [b, payouts, guilds, pay] = await Promise.all([
     billingSummary(cfg),
     listPayouts({ limit: 200 }),
@@ -41,14 +43,12 @@ export default async function AdminPayoutsPage() {
   ]);
   const vendor = vendorBy(pay.adapter.key);
 
-  // Payout accounts, so staff can see who is actually payable before releasing.
   const accounts = guilds.length
     ? await db.select().from(schema.payoutAccounts)
-        .where(inArray(schema.payoutAccounts.ownerId, guilds.map((g) => g.guildId)))
+      .where(inArray(schema.payoutAccounts.ownerId, guilds.map((g) => g.guildId)))
     : [];
   const accountBy = new Map(accounts.filter((a) => a.ownerType === "server").map((a) => [a.ownerId, a]));
 
-  // What each server has been paid, and what is moving.
   const settled = new Map<string, { paid: number; open: number }>();
   for (const p of payouts) {
     const cur = settled.get(p.guildId) ?? { paid: 0, open: 0 };
@@ -68,108 +68,101 @@ export default async function AdminPayoutsPage() {
   const totalOpen = payouts.filter((p) => OPEN_STATUSES.includes(p.status)).reduce((a, p) => a + p.total, 0);
   const totalPaid = payouts.filter((p) => p.status === "paid").reduce((a, p) => a + p.total, 0);
   const recentPayouts = [...payouts].sort((x, y) => +y.createdAt - +x.createdAt).slice(0, 60);
+  const cur = cfg.currency;
 
   return (
-    <div className="max-w-5xl">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-bold">Payouts</h1>
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/admin/redeems" className="text-cyan-300 hover:underline">Trophy redemptions →</Link>
-          <Link href="/admin/billing" className="text-cyan-300 hover:underline">Billing →</Link>
-          <Link href="/admin/payments" className="text-cyan-300 hover:underline">Providers →</Link>
-        </div>
-      </div>
-      <p className="mb-6 max-w-3xl text-sm text-muted">
-        What server owners have earned out of the platform fee, and what has been sent. Amounts are computed
-        from the challenge ledger — nobody types them. <b className="text-ink">Prize money is not here</b>: it
-        belongs to the gamers who won it and goes out through trophy redemptions.
-      </p>
+    <Page
+      title="Payouts"
+      lede="What server owners have earned from the weekly pool, and what has been sent. Amounts are computed by the Monday close — nobody types them. Prize money is not here: it belongs to the gamers who won it and goes out through trophy redemptions."
+      actions={
+        <Toolbar>
+          <LinkButton href="/admin/week">The week</LinkButton>
+          <LinkButton href="/admin/redeems">Trophy redemptions</LinkButton>
+          <LinkButton href="/admin/payments">Providers</LinkButton>
+        </Toolbar>
+      }
+    >
+      <StatRow>
+        <Stat
+          label="Owed, not yet opened"
+          value={totalUnpaid.toLocaleString("en-US", { style: "currency", currency: cur, maximumFractionDigits: 0 })}
+          note="Scored by a close and waiting for a payout row"
+          tone={totalUnpaid > 0 ? "warn" : "plain"}
+        />
+        <Stat
+          label="Open payouts"
+          value={totalOpen.toLocaleString("en-US", { style: "currency", currency: cur, maximumFractionDigits: 0 })}
+          note="Filed and not yet released"
+        />
+        <Stat
+          label="Paid all time"
+          value={totalPaid.toLocaleString("en-US", { style: "currency", currency: cur, maximumFractionDigits: 0 })}
+          note="Actually sent to an owner"
+          tone="good"
+        />
+        <Stat
+          label="Servers earning"
+          value={num(owing.filter((s) => s.owed > 0).length)}
+          note="Carried a challenge and can be paid"
+        />
+      </StatRow>
 
-      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm">
-        <span className="text-muted">Paying through</span>
-        <b>{vendor?.name ?? pay.adapter.key}</b>
-        {pay.reason
-          ? <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-0.5 text-[11px] text-amber-200">{pay.reason}</span>
-          : <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-200">connected</span>}
-      </div>
+      <Note tone={pay.reason ? "warn" : "info"}>
+        Paying through <b>{vendor?.name ?? pay.adapter.key}</b>
+        {pay.reason ? <> — <b>{pay.reason}</b></> : " — connected"}. {PAYOUT_HOLD_PHRASE}
+      </Note>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Owed, not yet opened" value={money(totalUnpaid, cfg.currency)} tone="amber" />
-        <Stat label="Open payouts" value={money(totalOpen, cfg.currency)} />
-        <Stat label="Paid all time" value={money(totalPaid, cfg.currency)} tone="emerald" />
-        <Stat label="Servers earning" value={String(owing.filter((s) => s.owed > 0).length)} />
-      </div>
+      <Section
+        title="Earned and unpaid"
+        note="Opened by the weekly close, already scored and already netted against the server vault. There is no button here to open one by hand: that path existed, applied a per-challenge rate that no longer exists, and would have paid an owner twice."
+      >
+        <Table
+          cols={[
+            { key: "server", label: "Server" },
+            { key: "linked", label: "Linked", align: "right", secondary: true },
+            { key: "tier", label: "Tier", align: "right", secondary: true },
+            { key: "owed", label: "Earned", align: "right" },
+            { key: "paid", label: "Paid", align: "right" },
+            { key: "unpaid", label: "Unpaid", align: "right" },
+            { key: "acct", label: "Payout account", secondary: true },
+          ]}
+          empty="No server has been paid by a weekly close yet. A close needs money in the server pool and at least one server that carried a challenge with an entrant attributed to it."
+        >
+          {owing.map((s) => {
+            const acct = accountBy.get(s.guildId);
+            return (
+              <Tr key={s.guildId} tone={s.unpaid > 0 && !acct?.methodPreference ? "warn" : undefined}>
+                <Td>
+                  <AdminLink href={`/admin/discord/${s.guildId}`}>{s.name}</AdminLink>
+                </Td>
+                <Td align="right" mono secondary>{num(s.linked)}</Td>
+                {/* C3: a LABEL, not a rate. It decides who this server competes
+                    against in the weekly pool and nothing else. */}
+                <Td align="right" secondary>
+                  <Pill>{s.tier}</Pill>
+                </Td>
+                <Td align="right" mono><Money value={s.owed} currency={cur} /></Td>
+                <Td align="right" mono><Money value={s.paid} currency={cur} /></Td>
+                <Td align="right" mono bold><Money value={Math.max(0, s.unpaid)} currency={cur} /></Td>
+                <Td secondary>
+                  {acct?.methodPreference
+                    ? <Pill tone={acct.status === "ready" ? "good" : "warn"}>
+                      {acct.methodPreference}{acct.country ? ` · ${acct.country}` : ""}
+                    </Pill>
+                    // An owner owed money with nowhere to send it is the row
+                    // worth flagging, which is why this one tints the whole row.
+                    : <Pill tone={s.unpaid > 0 ? "warn" : "plain"}>not set up</Pill>}
+                </Td>
+              </Tr>
+            );
+          })}
+        </Table>
+      </Section>
 
-      {/* ===== What each server is owed ===== */}
-      <section className="glass mt-8 p-6">
-        <h2 className="font-bold">Earned and unpaid</h2>
-        <p className="mt-1 text-sm text-muted">
-          Opening a payout gathers every finished sponsored challenge this server earned on, nets off what has
-          already gone out, and files it for release. It does not send anything — that&apos;s the next step,
-          on purpose.
-        </p>
-        {owing.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">No server has earned anything yet.</p>
-        ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-[10px] uppercase tracking-widest text-muted">
-                <tr className="border-b border-white/10">
-                  <th className="py-2 text-left">Server</th>
-                  <th className="py-2 text-right">Linked</th>
-                  <th className="py-2 text-right">Tier</th>
-                  <th className="py-2 text-right">Earned</th>
-                  <th className="py-2 text-right">Paid</th>
-                  <th className="py-2 text-right">Unpaid</th>
-                  <th className="py-2 text-left">Payout account</th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {owing.map((s) => {
-                  const acct = accountBy.get(s.guildId);
-                  return (
-                    <tr key={s.guildId} className="border-b border-white/6 last:border-0">
-                      <td className="py-2.5">
-                        <Link href={`/admin/discord/${s.guildId}`} className="hover:text-cyan-300">{s.name}</Link>
-                      </td>
-                      <td className="py-2.5 text-right tabular-nums text-muted">{s.linked.toLocaleString()}</td>
-                      {/* C3: a label, not a rate. */}
-                      <td className="py-2.5 text-right text-xs uppercase tracking-wider text-muted">{s.tier}</td>
-                      <td className="py-2.5 text-right tabular-nums">{money(s.owed, cfg.currency)}</td>
-                      <td className="py-2.5 text-right tabular-nums text-emerald-300">{money(s.paid, cfg.currency)}</td>
-                      <td className={`py-2.5 text-right font-semibold tabular-nums ${s.unpaid > 0 ? "text-amber-200" : "text-muted"}`}>
-                        {money(Math.max(0, s.unpaid), cfg.currency)}
-                      </td>
-                      <td className="py-2.5 text-xs">
-                        {acct?.methodPreference
-                          ? <span className={acct.status === "ready" ? "text-emerald-300" : "text-amber-200"}>{acct.methodPreference}{acct.country ? ` · ${acct.country}` : ""}</span>
-                          : <span className="text-muted">not set up</span>}
-                      </td>
-                      {/* An "Open payout" button was here. C3 — the weekly
-                          close already opens these, scored and netted against
-                          the vault, so the queue above is where they are
-                          released. Opening one here would pay twice. */}
-                      <td className="py-2.5 text-right text-[11px] text-muted">
-                        {s.unpaid > 0 ? "in the queue above" : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* ===== The queue ===== */}
-      <section className="glass mt-6 p-6">
-        <h2 className="font-bold">Payout queue</h2>
-        <p className="mt-1 text-sm text-muted">
-          Review the lines, then release. Every release is attributed to whoever pressed it and written to the
-          audit log — &quot;who authorised this payment&quot; should never be a question this platform
-          can&apos;t answer.
-        </p>
+      <Section
+        title="Payout queue"
+        note="Review the lines, then release. Every release is attributed to whoever pressed it and written to the audit log — 'who authorised this payment' should never be a question this platform cannot answer."
+      >
         <PayoutQueue
           payouts={recentPayouts.map((p) => ({
             id: p.id, guildId: p.guildId, guildName: p.guildName, status: p.status,
@@ -183,24 +176,13 @@ export default async function AdminPayoutsPage() {
           providerLabel={vendor?.name ?? pay.adapter.key}
           manual={pay.adapter.key === "manual"}
         />
-      </section>
+      </Section>
 
-      <p className="mt-8 flex items-start gap-2 text-xs text-muted">
-        <Icon name="alert" size={12} className="mt-0.5 shrink-0 text-amber-300" />
-        A server owner disputing what they earned goes to a founder, not into a manual adjustment.
-      </p>
-    </div>
+      <Note tone="warn">
+        A server owner disputing what they earned goes to a founder, not into a manual adjustment. The
+        weekly close can be re-run and its working is on <AdminLink href="/admin/week">the week</AdminLink>;
+        a hand-typed correction is a number nobody can reconstruct.
+      </Note>
+    </Page>
   );
 }
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "amber" | "emerald" }) {
-  const cls = tone === "amber" ? "text-amber-200" : tone === "emerald" ? "text-emerald-300" : "";
-  return (
-    <div className="glass p-4">
-      <div className={`text-xl font-bold tabular-nums ${cls}`}>{value}</div>
-      <div className="text-[10px] uppercase tracking-widest text-muted">{label}</div>
-    </div>
-  );
-}
-
-void desc;

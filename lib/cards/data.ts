@@ -425,6 +425,10 @@ export async function planetCard(game: string): Promise<CardData | null> {
     
     game: g.name,
     logoUrl: g.logoUrl,
+    // B85.2. The globe, at last. Separate from `theme.bgUrl` on purpose: the
+    // background is the space behind it and the globe is the subject, and
+    // collapsing the two is how the card lost its planet in the first place.
+    globeUrl: g.planetImageUrl || null,
     description: g.description || null,
     challenges: live.map((c, i) => ({
       title: c.title,

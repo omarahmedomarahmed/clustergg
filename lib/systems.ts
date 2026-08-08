@@ -25,7 +25,7 @@
 // once, and read back here. A page that appears in the console has an owner by
 // construction; a page nobody claimed is admin-only, which is the safe default.
 
-import { ownersOfPath, pagesOfSystem } from "@/lib/admin-nav";
+import { ownersOfPath, pagesOfSystem, movedTo } from "@/lib/admin-nav";
 
 export type SystemKey =
   | "ad"
@@ -309,8 +309,13 @@ export function systemBy(key: string): SystemDef | null {
  *
  * Longest prefix wins, and `except` is checked first, so a page nested inside
  * another system's prefix can belong to a different department —
- * `/admin/brands/testimonials` is content work, not billing work, even though
- * it lives under `/admin/brands`.
+ * `/admin/discord/broadcast` is ad work, not bot work, even though it lives
+ * under `/admin/discord`.
+ *
+ * (The example used to be `/admin/brands/testimonials`. It stopped being one
+ * when testimonials became a TAB of `/admin/brands` — a page that no longer
+ * exists cannot demonstrate a rule, and a comment pointing at one is how the
+ * next person concludes the rule was removed too.)
  */
 export function systemForPath(path: string): SystemDef | null {
   const owners = ownersOfPath(path);
@@ -360,6 +365,12 @@ export const ADMIN_ONLY = ["/admin/users", "/admin/linked-accounts", "/admin/pay
 
 export function pathAllowedFor(systems: string[], path: string): boolean {
   if (ADMIN_ONLY.some((p) => path === p || path.startsWith(`${p}/`))) return false;
+  // A page that MOVED is judged by where it lands. The stub itself owns
+  // nothing, so without this a staff member's bookmark 404s at the guard before
+  // the redirect runs — telling them a page they may open no longer exists.
+  // Checked after ADMIN_ONLY so a redirect can never be a way around it.
+  const moved = movedTo(path);
+  if (moved) return pathAllowedFor(systems, moved);
   if (ALWAYS_OPEN_EXACT.includes(path)) return true;
   if (ALWAYS_OPEN_UNDER.some((p) => path === p || path.startsWith(`${p}/`))) return true;
   // Any owning desk is enough. A page can legitimately have two — the unified

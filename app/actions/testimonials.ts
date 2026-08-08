@@ -50,7 +50,7 @@ export async function saveTestimonial(formData: FormData) {
     await db.insert(schema.brandTestimonials).values({ id: newId, ...values });
     await audit(staff.id, "testimonial.create", newId);
   }
-  revalidatePath("/admin/brands/testimonials");
+  revalidatePath("/admin/brands");
 }
 
 export async function deleteTestimonial(id: string) {
@@ -58,5 +58,5 @@ export async function deleteTestimonial(id: string) {
   const db = await getDb();
   await db.delete(schema.brandTestimonials).where(eq(schema.brandTestimonials.id, id));
   await audit(staff.id, "testimonial.delete", id);
-  revalidatePath("/admin/brands/testimonials");
+  revalidatePath("/admin/brands");
 }

@@ -24,7 +24,8 @@ const ok = (name: string, cond: boolean, extra = "") => {
   else { fail++; console.log(`  ✗ ${name}${extra ? ` — ${extra}` : ""}`); }
 };
 
-const { ADMIN_NAV, ownersOfPath, pagesOfSystem, accessOf } = await import("../../lib/admin-nav.ts");
+const { ADMIN_NAV, ownersOfPath, pagesOfSystem, accessOf, MOVED_ROUTES, movedTo } =
+  await import("../../lib/admin-nav.ts");
 const { SYSTEMS, pathAllowedFor, ALWAYS_OPEN_EXACT, ALWAYS_OPEN_UNDER, ADMIN_ONLY, systemForPath } =
   await import("../../lib/systems.ts");
 
@@ -61,7 +62,17 @@ try {
     ["/admin/discord/requests", "challenges"],
     ["/admin/discord/broadcast", "ad"],
     ["/admin/brands", "billing"],
-    ["/admin/brands/testimonials", "brand"],
+    // Was ["/admin/brands/testimonials", "brand"] — a page the content desk
+    // owned inside a prefix billing owned, which is the exact shape the old
+    // `except` lists existed for. It stopped being that when testimonials
+    // became a TAB of /admin/brands: there is no page there any more, only a
+    // redirect stub, so it inherits billing like everything else under the
+    // prefix. Inverted rather than deleted, because the fact it now asserts —
+    // the content desk can NOT reach /admin/brands/[id] through a tab — is the
+    // one worth holding. `ownersOfPath` matches by prefix, so filing the merged
+    // page under both desks would have handed the content desk campaign
+    // management and portal-key rotation.
+    ["/admin/brands/testimonials", "billing"],
     ["/admin/games", "planets"],
     ["/admin/challenges", "challenges"],
     ["/admin/trophies", "trophies"],
@@ -109,6 +120,54 @@ try {
   }
   ok("no department can reach /admin/users or /admin/linked-accounts",
     SYSTEMS.every((s) => ADMIN_ONLY.every((p) => !pathAllowedFor([s.key], p))));
+
+  console.log("\n== A page that moved is judged by where it lands ==");
+  {
+    // Every merge leaves a stub at the old URL, and a stub owns nothing — so
+    // without `movedTo` in the guard, a staff member clicking a bookmark got a
+    // 404 BEFORE the redirect ran. A 404 on a page that still exists under a
+    // different name is the worst answer available: it says "gone" when the
+    // truth is "moved".
+    const dangling = Object.entries(MOVED_ROUTES)
+      .filter(([, to]) => ownersOfPath(to.split("?")[0]).length === 0
+        && !alwaysOpen(to.split("?")[0]) && !adminOnlyPath(to.split("?")[0]));
+    ok("every moved route lands somewhere a desk owns", dangling.length === 0,
+      dangling.map(([from, to]) => `${from} → ${to}`).join(", "));
+
+    // The specific case each merge created.
+    ok("the content desk can still open its old bookmarks",
+      pathAllowedFor(["brand"], "/admin/chrome")
+      && pathAllowedFor(["brand"], "/admin/mobile")
+      && pathAllowedFor(["brand"], "/admin/cards/guide")
+      && pathAllowedFor(["brand"], "/admin/translations"));
+    ok("billing can still open the old enquiries URL", pathAllowedFor(["billing"], "/admin/brand-enquiries"));
+
+    // …and a redirect is not a way in. The destination's rule is the rule.
+    ok("a moved route does not widen access",
+      !pathAllowedFor(["trophies"], "/admin/chrome")
+      && !pathAllowedFor(["bot"], "/admin/brand-enquiries"));
+
+    // The merge that could have leaked. Testimonials were the content desk's,
+    // and /admin/brands is billing's — so filing the merged page under both
+    // would have given the content desk everything under the prefix, including
+    // the campaign controls and the portal-key reset on /admin/brands/[id].
+    ok("merging testimonials in did not hand the content desk a brand's keys",
+      !pathAllowedFor(["brand"], "/admin/brands/some-brand-id")
+      && !pathAllowedFor(["brand"], "/admin/brands"));
+
+    // The stub files and this map must not drift. Each stub reads its
+    // destination from MOVED_ROUTES, so a key that no stub uses is a redirect
+    // nobody serves, and a stub whose key is missing is a crash.
+    const { readFileSync } = await import("node:fs");
+    const missing = Object.keys(MOVED_ROUTES).filter((from) => {
+      try { return !readFileSync(`app${from}/page.tsx`, "utf8").includes(`MOVED_ROUTES["${from}"]`); }
+      catch { return true; }
+    });
+    ok("every moved route has a stub that reads this map", missing.length === 0, missing.join(", "));
+
+    eq("movedTo strips the query", movedTo("/admin/cards/guide"), "/admin/art");
+    eq("and returns null for a page that did not move", movedTo("/admin/challenges"), null);
+  }
 
   console.log("\n== systemForPath still answers ==");
   ok("it resolves a page to a desk", systemForPath("/admin/challenges")?.key === "challenges",

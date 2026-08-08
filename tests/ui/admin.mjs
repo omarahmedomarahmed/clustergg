@@ -23,6 +23,41 @@ const ok = (name, cond, extra = "") => {
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
 const page = await browser.newPage({ viewport: { width: 1500, height: 1100 } });
 
+/**
+ * Open an admin page and wait for the console, not for the network.
+ *
+ * `waitUntil: "networkidle"` was used here because the shell paints a loading
+ * screen first and reading at DOM-ready is a race. That reasoning was right and
+ * the tool was wrong: Next prefetches every link in the viewport, so the
+ * network on this app never goes quiet for 500ms — it waited the full 30s and
+ * then threw, on a page that had rendered in under a second. It took the whole
+ * browser band down twice.
+ *
+ * Waiting for the loading screen to LEAVE says the same thing and says it about
+ * the DOM the assertions read.
+ */
+const open = async (pg, path) => {
+  const res = await pg.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+  await pg.waitForFunction(
+    () => !/Traversing the cluster/i.test(document.body.innerText),
+    null, { timeout: 20000 },
+  ).catch(() => {});
+  return res;
+};
+
+/**
+ * Open a path that is expected to REDIRECT, and wait for it to land.
+ *
+ * The admin layout streams, so by the time a stub calls `redirect()` the shell
+ * has flushed and Next can no longer answer with a 307 — it finishes the
+ * navigation in the browser. Reading `page.url()` straight after `goto` reports
+ * the old path every time, on a redirect that worked.
+ */
+const openMoved = async (pg, path) => {
+  await pg.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+  await pg.waitForFunction((from) => location.pathname !== from, path, { timeout: 15000 }).catch(() => {});
+};
+
 const railLinks = () => page.locator("aside a");
 const tabLinks = () => page.locator('nav a, [data-tabs] a');
 
@@ -32,40 +67,61 @@ try {
   await page.fill('input[name="email"]', "admin@clustergg.com");
   await page.fill('input[name="password"]', "cluster-admin");
   await page.click('button:has-text("Log in with email")');
-  await page.waitForLoadState("networkidle");
-  await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+  await page.waitForFunction(() => !location.pathname.startsWith("/login"), null, { timeout: 15000 });
+  await open(page, `/admin`);
   ok("the console opens", !/\/login/.test(page.url()), page.url());
 
   console.log("\n== The rail is sections, not pages ==");
   const rail = await railLinks().count();
   ok("the rail is a short list", rail > 3 && rail <= 12, `${rail} links`);
   const railText = await page.locator("aside").first().innerText();
-  for (const section of ["Overview", "Discord", "Design & content", "Games & planets", "Competition"]) {
+  // The groups regrouped: by JOB, not by thing. "Design & content" became
+  // "Content", "Games & planets" folded into Competition, and Money split off
+  // from "Ads & revenue" because closing the books and running campaigns are
+  // two jobs. Updated rather than loosened to a substring — the point of this
+  // assertion is that the rail shows the sections somebody actually sits at.
+  for (const section of ["Overview", "Money", "Brands & ads", "Discord", "Competition", "Content"]) {
     ok(`it lists "${section}"`, railText.includes(section));
   }
   ok("and does NOT list individual pages", !/Card backgrounds|Page backgrounds|Trophy redemptions/.test(railText),
     railText.replace(/\n/g, " | ").slice(0, 200));
 
   console.log("\n== A section's pages are tabs on the page ==");
-  await page.goto(`${BASE}/admin/content`, { waitUntil: "networkidle" });
+  await open(page, `/admin/content`);
   const body = await page.locator("main, body").first().innerText();
-  for (const tab of ["Site content", "Card backgrounds", "Logos & brand kit", "Nav & footer", "Partners"]) {
-    ok(`the Design & content bar offers "${tab}"`, body.includes(tab), body.slice(0, 200));
+  // "Nav & footer" and "Partners" are no longer pages in this bar — they are
+  // tabs INSIDE Site content now. What the section bar offers is the five pages
+  // the content desk still has.
+  for (const tab of ["Site content", "Language", "Art", "Logos & brand kit", "Screenshots"]) {
+    ok(`the Content bar offers "${tab}"`, body.includes(tab), body.slice(0, 200));
   }
   const current = await page.locator('a[aria-current="page"]').allInnerTexts();
   ok("the page you're on is marked current", current.some((t) => /Site content/.test(t)), current.join(" | "));
 
   // Moving between tabs must not change section.
-  await page.locator('a[href="/admin/cards"]:visible').first().click();
-  await page.waitForURL("**/admin/cards");
-  await page.waitForLoadState("networkidle");
+  await page.locator('a[href="/admin/art"]:visible').first().click();
+  await page.waitForURL("**/admin/art");
+  await page.waitForFunction(() => !/Traversing the cluster/i.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
   const after = await page.locator("main, body").first().innerText();
-  ok("switching tab keeps the same bar", after.includes("Site content") && after.includes("Partners"));
+  ok("switching tab keeps the same bar", after.includes("Site content") && after.includes("Screenshots"));
   ok("and the new tab is the current one",
-    (await page.locator('a[aria-current="page"]').allInnerTexts()).some((t) => /Card backgrounds/.test(t)));
+    (await page.locator('a[aria-current="page"]').allInnerTexts()).some((t) => /^Art$/m.test(t.trim())));
+
+  console.log("\n== The merged page's own tabs are in the URL ==");
+  {
+    // A tab that lived in React state would be unbookmarkable and would reset
+    // every time a server action revalidated the page. It is in `?tab=`, so
+    // these two navigations are the whole contract.
+    await open(page, `/admin/content?tab=partners`);
+    ok("?tab=partners renders the partner editor",
+      /Add a partner|trusted-by/i.test(await page.locator("body").innerText()));
+    await open(page, `/admin/art?tab=layouts`);
+    ok("?tab=layouts renders the card studio",
+      /Four things worth knowing|card kind/i.test(await page.locator("body").innerText()));
+  }
 
   console.log("\n== One message queue ==");
-  await page.goto(`${BASE}/admin/messages`, { waitUntil: "networkidle" });
+  await open(page, `/admin/messages`);
   const inbox = await page.locator("body").innerText();
   ok("the unified inbox exists", /Messages/.test(inbox) && !/404/.test(inbox));
   ok("it filters by side", /Server owners/.test(inbox) && /Brands/.test(inbox), inbox.slice(0, 200));
@@ -85,11 +141,11 @@ try {
   ok("so does the server filter", /Server owners/.test(serverFilter));
 
   console.log("\n== The old bookmark still works ==");
-  await page.goto(`${BASE}/admin/discord/messages`, { waitUntil: "networkidle" });
+  await openMoved(page, `/admin/discord/messages`);
   ok("the retired inbox redirects into the new one", /\/admin\/messages/.test(page.url()), page.url());
 
   console.log("\n== Games and planets are one page ==");
-  await page.goto(`${BASE}/admin/games`, { waitUntil: "networkidle" });
+  await open(page, `/admin/games`);
   const gp = await page.locator("body").innerText();
   ok("the page owns both", /Games & planets/.test(gp), gp.slice(0, 120));
   ok("the section no longer has a separate Planets tab", !/\bPlanets\b(?!\s*with)/.test(
@@ -106,7 +162,7 @@ try {
     `edit forms ${planetForm}, create forms ${createForm}`);
 
   console.log("\n== The old planets bookmark still works ==");
-  await page.goto(`${BASE}/admin/spaces`, { waitUntil: "networkidle" });
+  await openMoved(page, `/admin/spaces`);
   ok("it redirects into games", /\/admin\/games/.test(page.url()), page.url());
   const req = await page.goto(`${BASE}/admin/spaces/requests`, { waitUntil: "domcontentloaded" });
   ok("but the requests queue is untouched", !!req && req.status() < 400 && /requests/.test(page.url()),
@@ -121,18 +177,21 @@ try {
   await staff.fill('input[name="email"]', "ops@clustergg.com");
   await staff.fill('input[name="password"]', "cluster-demo");
   await staff.click('button:has-text("Log in with email")');
-  await staff.waitForLoadState("networkidle");
-  await staff.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+  await staff.waitForFunction(() => !location.pathname.startsWith("/login"), null, { timeout: 15000 });
+  await open(staff, `/admin`);
   const staffRail = await staff.locator("aside").first().innerText().catch(() => "");
   ok("their rail loads", staffRail.length > 0, staffRail.slice(0, 80));
   ok("it offers their section", /Competition/i.test(staffRail), staffRail.replace(/\n/g, " | "));
-  ok("and not the ad desk's", !/Ads & revenue/i.test(staffRail), staffRail.replace(/\n/g, " | "));
-  ok("nor the community", !/Community/i.test(staffRail), staffRail.replace(/\n/g, " | "));
+  // The group names changed with the regrouping. "Ads & revenue" is now
+  // "Brands & ads", and "Community" split into "Gamers" (the directory, which
+  // no desk may ever reach) and staff administration under Platform.
+  ok("and not the ad desk's", !/Brands & ads/i.test(staffRail), staffRail.replace(/\n/g, " | "));
+  ok("nor the gamer directory", !/Gamers/i.test(staffRail), staffRail.replace(/\n/g, " | "));
 
-  // `networkidle`, not `domcontentloaded`: the console shell paints its loading
-  // screen first, so reading at DOM-ready is a race that the not-found page
-  // loses whenever the page behind it got heavier.
-  await staff.goto(`${BASE}/admin/creatives`, { waitUntil: "networkidle" });
+  // Via `open`, which waits for the loading screen to leave — reading at plain
+  // DOM-ready is a race the not-found page loses whenever the page behind it
+  // got heavier.
+  await open(staff, `/admin/creatives`);
   const deniedBody = await staff.locator("body").innerText();
   // The layout calls notFound(), so what arrives is the not-found page rather
   // than the creatives list. The status stays 200 because a layout and its page
@@ -156,7 +215,7 @@ try {
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow", overflow <= 0, String(overflow));
-  await page.goto(`${BASE}/admin/content`, { waitUntil: "networkidle" });
+  await open(page, `/admin/content`);
   await page.screenshot({ path: `${SHOTS}/admin.png` });
 } catch (e) {
   fail++;

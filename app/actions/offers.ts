@@ -108,7 +108,7 @@ export async function askServersForGames(_prev: OfferActionState): Promise<Offer
  * exactly the ones you cannot afford to teach that.
  */
 export async function grantFounderCredit(_prev: OfferActionState): Promise<OfferActionState> {
-  await requireSystemFor("/admin/ads");
+  await requireSystemFor("/admin/offers");
   const db = await getDb();
   const state = await offers();
   // OFF means off (B44). The counters keep counting — switching a campaign off
@@ -132,7 +132,7 @@ export async function grantFounderCredit(_prev: OfferActionState): Promise<Offer
       .where(eq(schema.brands.id, b.id));
   }
 
-  revalidatePath("/admin/ads");
+  revalidatePath("/admin/offers");
   revalidatePath("/admin/brands");
   return {
     ok: pending.length
@@ -144,7 +144,7 @@ export async function grantFounderCredit(_prev: OfferActionState): Promise<Offer
 
 /** One brand, by hand. */
 export async function grantOneFounderCredit(_prev: OfferActionState, fd: FormData): Promise<OfferActionState> {
-  await requireSystemFor("/admin/ads");
+  await requireSystemFor("/admin/offers");
   const brandId = String(fd.get("brandId") ?? "");
   if (!brandId) return { error: "No brand named." };
   const db = await getDb();

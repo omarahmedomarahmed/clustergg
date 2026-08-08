@@ -12,6 +12,10 @@ import { money } from "@/lib/pricing";
 import InvoiceEditor from "@/components/InvoiceEditor";
 import { InvoiceStatus, DueLine } from "@/components/InvoiceView";
 import Icon from "@/components/Icon";
+import {
+  Page, StatRow, Stat as KitStat, Note, Money as KitMoney, LinkButton, Toolbar, AdminLink,
+} from "@/components/admin/kit";
+import { balances } from "@/lib/vaults";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Billing & revenue" };
@@ -30,13 +34,16 @@ export default async function BillingPage({
   const { invoice: openId = "" } = await searchParams;
   const cfg = await pricingConfig();
   const db = await getDb();
-  const [b, invoices, balances, brandList, pay] = await Promise.all([
+  const [b, invoices, brandBal, brandList, pay, vault] = await Promise.all([
     billingSummary(cfg),
     listInvoices({ limit: 200 }),
     brandBalances(),
     db.select({ id: schema.brands.id, name: schema.brands.name, slug: schema.brands.slug })
       .from(schema.brands).orderBy(asc(schema.brands.name)).limit(300),
     collector(),
+    // B87/C13. Billing used to end at "Cluster keeps", which is a margin and
+    // not a bank balance — the four vaults are where the money actually is.
+    balances(db),
   ]);
   const cur = cfg.currency;
   const open = invoices.find((i) => i.id === openId) ?? null;
@@ -46,29 +53,39 @@ export default async function BillingPage({
     .reduce((a, i) => a + i.total, 0);
   const overdue = invoices.filter((i) => i.overdue).reduce((a, i) => a + i.total, 0);
 
-  return (
-    <div className="max-w-5xl">
-      <div className="mb-2 flex items-baseline justify-between gap-3 flex-wrap">
-        <h1 className="text-2xl font-bold">Billing & revenue</h1>
-        <div className="flex items-center gap-4 text-sm">
-          <Link href="/admin/payouts" className="text-cyan-300 hover:underline">Payouts →</Link>
-          <Link href="/admin/payments" className="text-cyan-300 hover:underline">Providers →</Link>
-          <Link href="/admin/systems/billing" className="text-cyan-300 hover:underline">What this system is for →</Link>
-        </div>
-      </div>
-      <p className="mb-8 max-w-3xl text-sm text-muted">
-        Last 90 days. <b className="text-ink">Booked</b> is what brands committed to;{" "}
-        <b className="text-ink">delivered</b> is the part whose weeks actually ran. The gap between them is
-        work we owe, not revenue we earned.
-      </p>
+  const vaultTotal = vault.prize + vault.server + vault.cp + vault.cluster;
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <Stat label="Booked" value={money(b.totals.booked, cur)} />
-        <Stat label="Delivered" value={money(b.totals.delivered, cur)} />
-        <Stat label="Owed to gamers" value={money(b.totals.toGamers, cur)} tone="amber" />
-        <Stat label="Owed to servers" value={money(b.totals.toServers, cur)} tone="amber" />
-        <Stat label="Cluster keeps" value={money(b.totals.kept, cur)} tone="emerald" />
-      </div>
+  return (
+    <Page
+      title="Billing & revenue"
+      lede="Last 90 days. Booked is what brands committed to; delivered is the part whose weeks actually ran. The gap between them is work we owe, not revenue we earned."
+      actions={
+        <Toolbar>
+          <LinkButton href="/admin/vaults">Vaults</LinkButton>
+          <LinkButton href="/admin/payouts">Payouts</LinkButton>
+          <LinkButton href="/admin/payments">Providers</LinkButton>
+        </Toolbar>
+      }
+    >
+      <StatRow>
+        <KitStat label="Booked" value={money(b.totals.booked, cur)} note="Committed by brands" />
+        <KitStat label="Delivered" value={money(b.totals.delivered, cur)} note="Weeks that actually ran" />
+        <KitStat label="Owed to gamers" value={money(b.totals.toGamers, cur)} note="Prize money committed" tone="warn" />
+        <KitStat label="Owed to servers" value={money(b.totals.toServers, cur)} note="Opened by a weekly close, not yet released" tone="warn" />
+      </StatRow>
+
+      {/* ===== Where the money actually IS =====
+          Billing used to end at "Cluster keeps", which is a margin. A margin is
+          not a bank balance, and an operator reading one as the other is how a
+          company spends money it is holding for somebody else. */}
+      <Note tone="info">
+        <b>{money(vaultTotal, cur)}</b> has arrived across the four vaults —{" "}
+        <KitMoney value={vault.prize} currency={cur} /> prizes,{" "}
+        <KitMoney value={vault.server} currency={cur} /> server pool,{" "}
+        <KitMoney value={vault.cp} currency={cur} /> CP,{" "}
+        <KitMoney value={vault.cluster} currency={cur} /> ours. Three of those four are somebody
+        else&apos;s money we are holding. <AdminLink href="/admin/vaults">Open the vaults</AdminLink>.
+      </Note>
 
       {/* ===== Invoices =====
           The section that turns "what a brand bought" into "what a brand owes".
@@ -168,7 +185,7 @@ export default async function BillingPage({
       </section>
 
       {/* ===== What each brand owes ===== */}
-      {balances.length > 0 && (
+      {brandBal.length > 0 && (
         <section className="glass mt-6 p-6">
           <h2 className="font-bold">Balances by brand</h2>
           <p className="mt-1 text-sm text-muted">
@@ -188,7 +205,7 @@ export default async function BillingPage({
                 </tr>
               </thead>
               <tbody>
-                {balances.map((bal) => (
+                {brandBal.map((bal) => (
                   <tr key={bal.brandId} className="border-b border-white/6 last:border-0">
                     <td className="py-2.5">{bal.brandName}</td>
                     <td className="py-2.5 text-right tabular-nums text-muted">{bal.invoices}</td>
@@ -347,20 +364,9 @@ export default async function BillingPage({
         )}
       </section>
 
-      <p className="mt-8 flex items-start gap-2 text-xs text-muted">
-        <Icon name="alert" size={12} className="mt-0.5 shrink-0 text-amber-300" />
+      <Note tone="warn">
         Discounts, refunds and waived fees are not yours to grant alone — take them to a founder first.
-      </p>
-    </div>
-  );
-}
-
-function Stat({ label, value, tone }: { label: string; value: string; tone?: "amber" | "emerald" }) {
-  const cls = tone === "amber" ? "text-amber-200" : tone === "emerald" ? "text-emerald-300" : "";
-  return (
-    <div className="glass p-4">
-      <div className={`text-xl font-bold tabular-nums ${cls}`}>{value}</div>
-      <div className="text-[10px] uppercase tracking-widest text-muted">{label}</div>
-    </div>
+      </Note>
+    </Page>
   );
 }

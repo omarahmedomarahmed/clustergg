@@ -12,6 +12,8 @@ import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
 import MobileHud from "@/components/MobileHud";
+import UnlockChecklist from "@/components/UnlockChecklist";
+import { unlockState } from "@/lib/unlock";
 import WeekBand, { type BandData } from "@/components/WeekBand";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { weekBoard } from "@/lib/profile-week";
@@ -87,6 +89,9 @@ export default async function Nav() {
   // Quest cards fill the nav between the game logos and the right-hand controls.
   const navQuests = await getNavQuests(db, user?.id ?? null, 4);
   const totalCp = user ? await getTotalCp(db, user.id) : 0;
+  // B83. Locked gamers see their balance with a lock on it and a way through,
+  // on every page. An unlocked one gets nothing extra — this renders null.
+  const unlock = user ? await unlockState(db, user.id) : null;
 
   // Profile of the Week rides under the nav on every page, so it's read here
   // with the rest of the chrome rather than by each page separately.
@@ -298,6 +303,14 @@ export default async function Nav() {
 
       {/* Native-mobile-game HUD strip (level bar + red-dot alerts), members only */}
       <div className="relative z-10">
+      {/* The lock, wherever they are. Tapping it opens the onboarding page —
+          the plan's rule is that the CTA is the balance itself, because a
+          balance you cannot spend is the only prompt that needs no copy. */}
+      {unlock && !unlock.unlocked && (
+        <div className="flex justify-center px-4 py-1.5">
+          <UnlockChecklist state={unlock} compact />
+        </div>
+      )}
       {user && show("mobileHud") && (
         <MobileHud
           displayName={user.displayName}
