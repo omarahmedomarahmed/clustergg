@@ -107,7 +107,7 @@ export default async function WeekPage() {
 
       <Section
         title="How a server is scored"
-        note="Every term is percentile-ranked WITHIN a tier, so one outlier cannot own the pool, and a term with no data anywhere in the week is dropped rather than scored as zero for everybody."
+        note="Every term is percentile-ranked WITHIN a bracket, so one outlier cannot own the pool, and a term with no data anywhere in the week is dropped rather than scored as zero for everybody. Your share of the pool is your share of the score — there are no places and no cliff."
       >
         <Table
           cols={[
@@ -144,9 +144,11 @@ export default async function WeekPage() {
           ))}
         </div>
         <Note tone="info">
-          A tier decides who a server competes against and <b>nothing else</b>. It is not a rate — the
-          per-challenge owner percentage was deleted in C3, and running both would have paid owners
-          twice out of one 15% line.
+          A bracket decides who a server competes against and <b>nothing else</b>. It is not a rate —
+          the per-challenge owner percentage was deleted in C3, and running both would have paid owners
+          twice out of one 15% line. The pool is split <b>60 / 25 / 15</b> across small, mid and large,
+          so four big servers can never take the small bracket&apos;s share. An empty bracket gives its
+          share to the others rather than stranding money nobody can be paid.
         </Note>
       </Section>
 

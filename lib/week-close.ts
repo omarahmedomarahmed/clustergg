@@ -38,7 +38,7 @@ import { and, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { weekStartOf } from "@/lib/guild-snapshot";
 import {
-  SCORE_WEIGHTS, exclusiveEntrants, percentile, decayFor, weekPayouts,
+  SCORE_WEIGHTS, exclusiveEntrants, percentile, weekPayouts, bracketOf, BRACKETS,
   PARTICIPATION_SHARE, type Payout,
 } from "@/lib/server-score";
 import { createPayout } from "@/lib/payouts";
@@ -76,36 +76,37 @@ export const tierOf = (qualified: number): TierKey => {
   return k;
 };
 
-/**
- * How the competition half of a tier's pool is cut into places.
- *
- * Slots are proportional to how many servers are in the tier — pay the top 20%
- * — because a fixed count creates the boundary problem the model names: a
- * 499-member server competing with twenty peers for six slots against a
- * 501-member one competing with three for two bigger ones. Crossing a boundary
- * would beat any amount of in-tier effort.
- *
- * The shares are front-loaded but not winner-take-all. First place taking
- * everything makes second place worthless to chase.
- */
-export function slotsFor(entrants: number): { share: number }[] {
-  const n = Math.max(1, Math.round(entrants * 0.2));
-  // Weight 1/(i+1), normalised. Simple, monotonic, and it never sums to
-  // anything but 100 no matter how many slots there are.
-  const raw = Array.from({ length: n }, (_, i) => 1 / (i + 1));
-  const sum = raw.reduce((a, b) => a + b, 0);
-  return raw.map((w) => ({ share: w / sum }));
-}
+// `slotsFor` lived here and is DELETED, not stubbed.
+//
+// It cut a tier's pool into places on a 1/(rank+1) ladder and paid the top 20%.
+// That put a cliff at #21 — twentieth got a cheque and twenty-first got nothing,
+// over one entrant — and it needed a second rule, empty-slot redistribution, to
+// patch the case where a network had fewer servers than slots.
+//
+// Every server that scores is now paid in proportion to its score. No cliff, no
+// leftovers, and no second rule to keep in step with the first. A stub was
+// considered and rejected: an exported function nobody calls is one somebody
+// calls again.
+
 
 export type ScoredServer = {
   guildId: string;
   name: string;
+  /** The LABEL. Decides nothing about money — see `bracket`. */
   tier: TierKey;
+  /** Qualified linked members, the number both the tier and the bracket read. */
+  qualified: number;
   exclusiveEntrants: number;
   newlyQualified: number;
   entrants: number;
   linked: number;
   score: number;
+  /**
+   * Always 1 now. Repeat-winner decay is retired — it punished a server for
+   * being good, and score-proportional shares already give everyone below the
+   * leader a real slice. Kept on the type so eight weeks of stored results
+   * still read, rather than being deleted and leaving a hole in the history.
+   */
   decay: number;
   final: number;
 };
@@ -176,9 +177,34 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
         eq(schema.serverPayouts.requestedBy, WEEK_CLOSE_ACTOR),
         sql`${schema.serverPayouts.status} <> 'cancelled'`,
       ));
-    const pool = Math.round((Number(inflow?.n ?? 0) - Number(committed?.n ?? 0)) * 100) / 100;
+    const unpaidVault = Math.round((Number(inflow?.n ?? 0) - Number(committed?.n ?? 0)) * 100) / 100;
+
+    // ===== B88.2: THE POOL IS AN ALLOCATION, NOT THE WHOLE VAULT =====
+    //
+    // What an admin RELEASED for this week is the pool. What they did not
+    // release is the reserve, and the reserve is the point: it is what pays
+    // owners through a week when nothing sold.
+    //
+    // Bounded by the vault as well, always. An allocation can only be released
+    // against money that has arrived, but a week closed long after the fact
+    // could still name more than is left once earlier weeks were paid — and
+    // paying out money that is not there is the one failure this whole ledger
+    // exists to make impossible.
+    //
+    // NO ALLOCATION AT ALL still means the old behaviour: the unpaid vault is
+    // the pool. Same migration rule as the CP ceiling — a deploy must not
+    // silently stop paying server owners because a screen nobody has seen has
+    // not been used yet.
+    const { allocationFor } = await import("@/lib/allocations");
+    const alloc = await allocationFor(db, "server", key);
+    const pool = alloc.exists
+      ? Math.min(alloc.amount, unpaidVault)
+      : unpaidVault;
+
     if (!(pool > 0)) {
-      return EMPTY(key, `Week of ${key}: nothing in the server pool to divide.`);
+      return EMPTY(key, alloc.exists && alloc.amount <= 0
+        ? `Week of ${key}: nothing was released for the server pool, so there is nothing to divide. The money is still in the vault.`
+        : `Week of ${key}: nothing in the server pool to divide.`);
     }
 
     // ===== Who took part =====
@@ -298,6 +324,10 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
         guildId,
         name: names.get(guildId) ?? guildId,
         tier: tierOf(qualified),
+        // Carried so the bracket can be computed from the same number the tier
+        // label was. Deriving it twice from different sources is how a server
+        // ends up labelled "Small" and paid out of the mid bracket.
+        qualified,
         exclusiveEntrants: exclusive.get(guildId) ?? 0,
         // A first-ever week has no "before", so everyone qualified in it is
         // newly qualified. Treating an absent prior week as zero growth would
@@ -329,33 +359,36 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
     }
     if (!live.length) return EMPTY(key, `Week of ${key}: no term had any data to score on.`);
 
-    // ===== Score, within tier =====
+    // ===== Score, within bracket =====
+    //
+    // Percentile-ranked against the servers you actually compete with, so one
+    // enormous server cannot flatten everybody else's terms to zero.
+    //
+    // NO DECAY. It used to multiply a repeat winner's score down to a floor of
+    // 0.5 over eight weeks, which punished a server for being good — the
+    // opposite of what a network wants from its best server. Score-proportional
+    // shares mean a dominant server is already sharing with everyone below it,
+    // so the mechanism decay existed to soften no longer exists.
     const servers: ScoredServer[] = base.map((s) => {
-      const peers = base.filter((p) => p.tier === s.tier);
+      const peers = base.filter((p) => bracketOf(p.qualified) === bracketOf(s.qualified));
       const score = Math.round(live.reduce((a, k) =>
         a + percentile(TERM_VALUE[k](s), peers.map(TERM_VALUE[k])) * terms[k], 0) * 100) / 100;
-      const decay = decayFor(winsBy.get(s.guildId) ?? 0);
-      return { ...s, score, decay, final: Math.round(score * decay * 100) / 100 };
+      return { ...s, score, decay: 1, final: score };
     });
 
-    // ===== Divide, per tier, proportionally to who is in it =====
-    const payouts: Payout[] = [];
-    let carried = 0;
-    for (const t of TIERS) {
-      const inTier = servers.filter((s) => s.tier === t.key);
-      if (!inTier.length) continue;
-      // A tier's share of the pool is its share of the PARTICIPANTS. A tier with
-      // three servers in it cannot hold a third of the money because there are
-      // three tiers.
-      const tierPool = Math.round(pool * (inTier.length / servers.length) * 100) / 100;
-      const r = weekPayouts(
-        tierPool,
-        inTier.map((s) => ({ guildId: s.guildId, score: s.final })),
-        slotsFor(inTier.length),
-      );
-      payouts.push(...r.payouts);
-      carried += r.carried;
-    }
+    // ===== Divide: your share of the pool is your share of the score =====
+    //
+    // One call. The bracket split, the flat participation share and the
+    // score-proportional remainder all live in `weekPayouts`, so there is one
+    // place that decides what a server is owed rather than a loop here and a
+    // function there.
+    const { payouts: paid, carried } = weekPayouts(
+      pool,
+      servers.map((s) => ({
+        guildId: s.guildId, score: s.final, bracket: bracketOf(s.qualified),
+      })),
+    );
+    const payouts: Payout[] = paid;
 
     // ===== Write them, as DRAFTS =====
     //
