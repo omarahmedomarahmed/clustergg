@@ -19,8 +19,9 @@
 // live ladder or the live network. That rule exists because a bar chart is the
 // easiest place in a document to state a number nobody checked.
 
-import { EARN_TIERS, platformFeePct, ownerPctFor } from "@/lib/server-earnings";
-import { money, type PricingConfig } from "@/lib/pricing";
+import { EARN_TIERS, platformFeePct } from "@/lib/server-earnings";
+import { DEFAULT_SPLIT } from "@/lib/vaults";
+import { money, PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing";
 import type { NetworkStats } from "@/lib/network";
 
 /** Where a chart's numbers come from. There is no fourth option on purpose. */
@@ -80,8 +81,8 @@ export type BlogVars = Record<string, string>;
 
 export function blogVars(net: NetworkStats | null, cfg: PricingConfig | null): BlogVars {
   const c = cfg;
-  const price = c?.challengePrice ?? 250;
-  const prize = c?.prizePool ?? 175;
+  const price = c?.challengePrice ?? PRICING_DEFAULTS.challengePrice;
+  const prize = c?.prizePool ?? PRICING_DEFAULTS.prizePool;
   const n = (v: number | undefined) => (v ?? 0).toLocaleString();
   return {
     price: money(price, c?.currency),
@@ -95,7 +96,13 @@ export function blogVars(net: NetworkStats | null, cfg: PricingConfig | null): B
     games: n(net?.games),
     live: n(net?.challenges),
     unlock: (EARN_TIERS[1]?.threshold ?? 500).toLocaleString(),
-    ownerPct: `${ownerPctFor(EARN_TIERS[1]?.threshold ?? 500)}%`,
+    // The share of every sale that funds the weekly server pool.
+    poolPct: `${DEFAULT_SPLIT.server}%`,
+    // C3: `{ownerPct}` used to be a per-server TIER RATE. It is kept only so a
+    // post written before the change still renders a number instead of a raw
+    // `{ownerPct}`, and it now resolves to the same pool share — there is no
+    // per-server rate for it to mean any more. New copy should use `{poolPct}`.
+    ownerPct: `${DEFAULT_SPLIT.server}%`,
   };
 }
 
@@ -142,42 +149,48 @@ export function chartData(
   ctx: { cfg: PricingConfig | null; net: NetworkStats | null },
 ): Chart {
   const cfg = ctx.cfg;
-  const price = cfg?.challengePrice ?? 250;
-  const prize = cfg?.prizePool ?? 175;
+  const price = cfg?.challengePrice ?? PRICING_DEFAULTS.challengePrice;
+  const prize = cfg?.prizePool ?? PRICING_DEFAULTS.prizePool;
   const cur = cfg?.currency;
 
   switch (from) {
     case "split": {
-      // Where one sponsored challenge goes. The owner's cut comes out of the
-      // platform fee, not out of the prize — so it is drawn inside the fee.
-      const fee = Math.max(0, price - prize);
-      const ownerPct = ownerPctFor(EARN_TIERS[1]?.threshold ?? 500);
-      const owner = Math.round((price * ownerPct) / 100);
+      // Where one sponsored challenge goes. C3 — this used to draw the owner's
+      // TIER RATE out of the platform fee. There is no per-server rate now, so
+      // it draws the four vaults, which is what actually happens to the money.
+      const server = Math.round(price * (DEFAULT_SPLIT.server / 100));
+      const cp = Math.round(price * (DEFAULT_SPLIT.cp / 100));
       return {
         source: "The live rate card at /pricing",
         bars: [
           { label: "To the players", value: prize, display: money(prize, cur), accent: "emerald",
-            hint: `${Math.round((prize / price) * 100)}% of what a brand pays, won as prizes` },
-          { label: "To the server it ran in", value: owner, display: money(owner, cur), accent: "cyan",
-            hint: `${ownerPct}% at ${(EARN_TIERS[1]?.threshold ?? 500).toLocaleString()} linked gamers, taken out of our fee` },
-          { label: "Cluster keeps", value: Math.max(0, fee - owner), display: money(Math.max(0, fee - owner), cur), accent: "violet",
+            hint: `${DEFAULT_SPLIT.prize}% of what a brand pays, won as prizes` },
+          { label: "To the weekly server pool", value: server, display: money(server, cur), accent: "cyan",
+            hint: `${DEFAULT_SPLIT.server}% of every sale, competed for by the servers that carried a challenge` },
+          { label: "To the points gamers earn", value: cp, display: money(cp, cur), accent: "amber",
+            hint: `${DEFAULT_SPLIT.cp}% funds Cluster Points — what a gamer earns for playing at all` },
+          { label: "Cluster keeps", value: Math.round(price * (DEFAULT_SPLIT.cluster / 100)),
+            display: money(Math.round(price * (DEFAULT_SPLIT.cluster / 100)), cur), accent: "violet",
             hint: "What's left. There is no operations line under it" },
         ],
       };
     }
     case "ladder": {
-      // What each rung is worth per challenge, so the ladder is money and not
-      // a percentage nobody can picture.
+      // C3 — the rungs used to be RATES: 5%, 10%, 25% of every challenge. They
+      // are size labels now, and what they gate is which servers you compete
+      // against for the weekly pool. Drawn on the threshold, which is the only
+      // number a rung still carries.
+      const top = EARN_TIERS[EARN_TIERS.length - 1]?.threshold || 1;
       return {
         source: "lib/server-earnings.ts · the same table the owner portal reads",
-        bars: EARN_TIERS.map((t) => ({
+        bars: EARN_TIERS.map((t, i) => ({
           label: t.threshold === 0 ? "From day one" : `${t.threshold.toLocaleString()} linked`,
-          value: Math.max(t.ownerPct, 0.6),
-          display: t.ownerPct === 0 ? "—" : money(Math.round((price * t.ownerPct) / 100), cur),
-          hint: t.ownerPct === 0
-            ? "Private challenges and a public server page, but no share yet"
-            : `${t.ownerPct}% of every sponsored challenge that runs in your server`,
-          accent: t.ownerPct >= 25 ? "emerald" : t.ownerPct >= 10 ? "cyan" : "violet",
+          value: Math.max((t.threshold / top) * 100, 0.6),
+          display: t.threshold === 0 ? "—" : t.threshold.toLocaleString(),
+          hint: t.threshold === 0
+            ? "Private challenges and a public server page — the pool opens once challenges run here"
+            : "A bigger tier of the weekly server pool, and fewer servers competing for its slots",
+          accent: i >= 3 ? "emerald" : i >= 2 ? "cyan" : "violet",
         })),
       };
     }
@@ -370,7 +383,7 @@ export const POSTS: BlogPost[] = [
       "Every real revenue model for a Discord community — server subscriptions, sponsorships, affiliate deals, paid roles and ad revenue share — with what each one requires and roughly what it pays.",
     question: "How can I make money from my Discord server?",
     answer:
-      "Five models work: Discord's own Server Subscriptions, direct brand sponsorships, affiliate links, paid roles for perks, and revenue share from a platform that monetises your audience for you. Sponsorships pay the most but need a media kit and numbers you can prove. Revenue share pays less and requires nothing beyond keeping the community active — on Cluster it starts at {unlock} linked gamers and pays {ownerPct} of every sponsored challenge that runs in your server.",
+      "Five models work: Discord's own Server Subscriptions, direct brand sponsorships, affiliate links, paid roles for perks, and revenue share from a platform that monetises your audience for you. Sponsorships pay the most but need a media kit and numbers you can prove. Revenue share pays less and requires nothing beyond keeping the community active — on Cluster it starts at {unlock} linked gamers, and {poolPct} of every sponsored challenge funds a weekly pool the servers that carried one compete for.",
     published: "2026-07-21",
     readMinutes: 9,
     tags: ["discord", "monetization", "community"],

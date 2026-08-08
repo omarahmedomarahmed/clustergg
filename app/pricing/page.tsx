@@ -121,7 +121,7 @@ export default async function PricingPage() {
           <div className="mt-6 glass rounded-3xl p-6 md:p-8 grid md:grid-cols-[1.4fr_1fr] gap-8 items-center border border-amber-400/20">
             <div>
               <div className="inline-flex items-center gap-2 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-full px-3 py-1.5">
-                <Icon name="play" size={12} /> Add-on · any plan
+                <Icon name="play" size={12} /> {cfg.streamAddon > 0 ? "Add-on · any plan" : "Included with every package"}
               </div>
               <h3 className="text-2xl font-bold mt-4">{copy["pricing.addon.name"]}</h3>
               <p className="text-muted mt-2 leading-relaxed">
@@ -137,11 +137,19 @@ export default async function PricingPage() {
                 ))}
               </ul>
             </div>
+            {/* C11: the broadcast was a paid add-on on the old three-tier rate
+                card. v2 merged it into the one package. Priced back up, it
+                shows its price again — at zero it says what it now is rather
+                than printing "$0 per month". */}
             <div className="text-center rounded-3xl bg-black/30 border border-white/10 p-8">
-              <div className="text-5xl font-bold text-amber-300 leading-none">{money(cfg.streamAddon, cfg.currency)}</div>
-              <div className="text-xs uppercase tracking-widest text-muted mt-3">per month</div>
+              <div className="text-5xl font-bold text-amber-300 leading-none">
+                {cfg.streamAddon > 0 ? money(cfg.streamAddon, cfg.currency) : "Included"}
+              </div>
+              <div className="text-xs uppercase tracking-widest text-muted mt-3">
+                {cfg.streamAddon > 0 ? "per month" : "with every package"}
+              </div>
               <Link href="/brands" className="pressable mt-6 block rounded-full px-6 py-3 font-semibold bg-amber-500 text-[#1a1200]">
-                Add it to a plan
+                {cfg.streamAddon > 0 ? "Add it to a plan" : "See the package"}
               </Link>
             </div>
           </div>
@@ -228,7 +236,7 @@ export default async function PricingPage() {
       <section className="mx-auto max-w-4xl px-4 pb-24">
         <div className="glass rounded-3xl p-10 md:p-12 text-center glow-sweep">
           <h2 className="text-3xl md:text-4xl font-bold">
-            Start at <span className="brand-text">{money(cfg.reachBase, cfg.currency)}</span>. Own a game from <span className="brand-text">{money(entry.monthly, cfg.currency)}</span>.
+            One package. <span className="brand-text">{money(cfg.challengePrice, cfg.currency)}</span> a challenge, own a game from <span className="brand-text">{money(entry.monthly, cfg.currency)}</span>.
           </h2>
           <p className="text-muted mt-4 max-w-xl mx-auto leading-relaxed">
             Take the whole network for {money(full.monthly, cfg.currency)} a month — {nf(full.challengesPerMonth)} challenges,

@@ -64,7 +64,7 @@ export const SYSTEMS: SystemDef[] = [
     key: "ad",
     name: "Ad system",
     icon: "zap",
-    outcome: "Every creative a brand paid for is running, in the right place, and counted.",
+    outcome: "Every creative a brand paid for is running, in the right place, and counted — counted meaning one delivered card, one row, never an estimate.",
     brief: {
       role: "You are the ad operator. Nothing a brand bought reaches a gamer without passing through you.",
       doing: [
@@ -72,6 +72,8 @@ export const SYSTEMS: SystemDef[] = [
         "Check every campaign has a creative for each placement it bought. A paid placement running house art is money we took for nothing.",
         "Watch the schedule: what runs where, this week and next.",
         "Read the analytics daily. A placement whose click rate collapses overnight is usually a broken image, not a bored audience.",
+        "Own the delivery report a brand sees (B82). Every figure on it is a count of delivered cards — if anybody asks you to add a number that is not, the answer is no, and `docs/AD_VIEW.md` is why.",
+        "Hold the privacy bound: aggregate only, nothing reported below 25 viewers. It is not a setting and it is not negotiable for a big spender.",
         "Run staff broadcasts into servers when we have something worth saying — sparingly, because the bot's welcome is the thing we spend when we post.",
       ],
       bigger:

@@ -95,7 +95,7 @@ const meId = uid();
 const themId = uid();
 for (const [id, slug] of [[meId, `refs-me-${tag}`], [themId, `refs-them-${tag}`]] as [string, string][]) {
   await db.insert(schema.users).values({
-    id, slug, displayName: slug, email: `${id}@test.invalid`, passwordHash: "x",
+    id, slug, displayName: slug, email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
   } as never);
 }
 const mine = [{ id: "acc-mine-1" }, { id: "acc-mine-2" }, { id: "acc-mine-3" }];

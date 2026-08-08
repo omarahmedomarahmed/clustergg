@@ -199,6 +199,11 @@ export async function seed(db: DB, opts: { demo: boolean }) {
       displayName: u.displayName, slug: u.slug, bio: u.bio, country: u.country,
       role: u.role ?? "user", isVerified: true, primarySignupProvider: "email",
       bannerUrl: BANNER_ART.profileDefault,
+      // B72.4. Earning is gated on the age band and an UNSET band earns nothing,
+      // so a demo gamer without one is a gamer whose wallet, quests, trophies
+      // and leaderboard rows would all render empty — the demo would show a
+      // working economy as a broken one. Demo people are adults who answered.
+      ageBand: "adult", ageBandSetAt: new Date(),
     });
     return id;
   };

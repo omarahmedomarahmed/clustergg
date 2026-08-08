@@ -117,7 +117,7 @@ ok("…with the reason a human can act on",
 const winner = uid();
 await db.insert(schema.users).values({
   id: winner, slug: `pw-${winner.slice(0, 8)}`, displayName: "Winner",
-  email: `${winner}@test.invalid`, passwordHash: "x",
+  email: `${winner}@test.invalid`, passwordHash: "x", ageBand: "adult",
 } as never);
 const [trophy] = await db.select().from(schema.trophies).limit(1);
 if (trophy) {

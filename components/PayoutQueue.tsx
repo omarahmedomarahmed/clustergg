@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Icon from "@/components/Icon";
 import {
-  cancelPayout, confirmPayoutPaid, openManualPayout, openServerPayout, releasePayout,
+  cancelPayout, confirmPayoutPaid, openManualPayout, releasePayout,
 } from "@/app/actions/payouts";
 
 // Staff working the payout queue.
@@ -44,23 +44,13 @@ function useRun() {
 }
 
 /**
- * The per-row button on the "earned and unpaid" table.
+ * `OpenButton` was here. C3 removed it with `openServerPayout`.
  *
- * A NAMED export, not a property hung off the default one. Attaching
- * `PayoutQueue.OpenButton = OpenButton` looks tidy and renders as `undefined`
- * from a server component: what a server component imports across the client
- * boundary is a reference proxy, not the function object, so properties added
- * to it simply are not there.
+ * It opened a payout built from per-challenge owner shares. Owners are paid out
+ * of the weekly pool now, and `lib/week-close.ts` opens those payouts already
+ * scored and already netted against the vault — so the button's job is done
+ * before anybody could press it, and pressing it would have paid twice.
  */
-export function OpenButton({ guildId, disabled }: { guildId: string; disabled?: boolean }) {
-  const { pending, run } = useRun();
-  return (
-    <button onClick={() => run(() => openServerPayout(guildId))} disabled={pending || disabled}
-      className="rounded-full bg-cyan-500/20 px-3 py-1 text-xs font-bold text-cyan-100 disabled:opacity-40">
-      Open payout
-    </button>
-  );
-}
 
 export default function PayoutQueue({ payouts, guilds, providerLabel, manual }: {
   payouts: P[];

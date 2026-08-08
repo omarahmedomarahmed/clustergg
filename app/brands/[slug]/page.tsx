@@ -14,6 +14,8 @@ import { listInvoices } from "@/lib/invoices";
 import { money } from "@/lib/pricing";
 import InvoiceView, { InvoiceStatus, DueLine, PayBlock } from "@/components/InvoiceView";
 import BrandCampaignReports from "@/components/BrandCampaignReports";
+import AdDelivery from "@/components/AdDelivery";
+import { brandCreativeIds, deliveryFor } from "@/lib/ad-delivery";
 import BrandTierStrip from "@/components/BrandTierStrip";
 import BrandInbox from "@/components/BrandInbox";
 import ContactUs from "@/components/ContactUs";
@@ -221,6 +223,11 @@ export default async function BrandPortalPage({
     listInvoices({ brandId: brand.id, limit: 60 }),
   ]);
 
+  // B82. Delivery, from logged rows only. Scoped by resolving the brand's
+  // creative ids FIRST and handing those to the report — the report takes ids
+  // and never a brand id, so no argument reaches another brand's rows.
+  const delivery = await deliveryFor(db, await brandCreativeIds(db, brand.id));
+
   // Drafts are ours, not theirs. A brand seeing a bill that staff are still
   // building is a conversation nobody wanted to have yet.
   const bills = invoices.filter((i) => i.status !== "draft");
@@ -354,6 +361,11 @@ export default async function BrandPortalPage({
                   pastGames={new Set(sponsored.map((c) => c.game)).size}
                   currency={cfg.currency}
                 />
+
+                {/* B82. Delivery, counted. This panel said "measurement is
+                    being rebuilt" from B72.1 until now — the old one priced a
+                    server headcount and called the result a return. */}
+                <AdDelivery delivery={delivery} />
 
                 {/* What the last month did, before what the next one costs. */}
                 <BrandCampaignReports

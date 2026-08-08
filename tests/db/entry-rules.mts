@@ -44,7 +44,7 @@ const mkGamer = async (tag: string, accounts: string[]) => {
   const id = uid();
   await db.insert(schema.users).values({
     id, slug: `er-${tag}-${id.slice(0, 6)}`, displayName: `ER ${tag}`,
-    email: `${id}@test.invalid`, passwordHash: "x",
+    email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
   } as never);
   const ids: string[] = [];
   for (const name of accounts) {

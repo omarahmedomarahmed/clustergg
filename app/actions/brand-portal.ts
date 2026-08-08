@@ -308,8 +308,8 @@ export async function portalSendMessage(brandId: string, key: string, formData: 
 // ===== The media buy: a month of sponsored challenges on one game =====
 //
 // This is the product the whole platform exists to sell, and it is one action:
-// a brand picks a game and four weekly challenges appear in the review queue
-// with their money behind them. No proposal, no insertion order, no account
+// a brand picks a game and how many weeks, and that many weekly challenges
+// appear in the review queue with their money behind them. No proposal, no insertion order, no account
 // manager. Cluster's whole claim is that Discord advertising can be bought like
 // advertising, and an "enquiry form" here would falsify that claim on the page
 // that makes it.
@@ -333,8 +333,22 @@ export async function portalBuyCampaign(brandId: string, key: string, formData: 
     if (raw && typeof raw === "object") targeting = raw as typeof targeting;
   } catch { targeting = {}; }
 
+  // How many weeks. 1–4. C6 — the floor used to be four and a brand asking for
+  // two was silently sold four, so an absent or junk value defaults rather than
+  // being clamped upward from whatever arrived.
+  const rawSlots = Number(formData.get("slots"));
+  const slots = Number.isFinite(rawSlots) && rawSlots > 0 ? rawSlots : undefined;
+
+  // One game per week, when the brand mixed them. C7. Same shape as
+  // `slotCovers`: index i is week i, and a blank falls back to the lead game.
+  let games: (string | null)[] = [];
+  try {
+    const raw = JSON.parse(String(formData.get("games") ?? "[]"));
+    if (Array.isArray(raw)) games = raw.map((v) => (typeof v === "string" && v.trim() ? v.trim() : null));
+  } catch { games = []; }
+
   const { buyCampaign } = await import("@/lib/sponsored-campaigns");
-  const res = await buyCampaign({ brandId, game, coverUrl, slotCovers, targeting });
+  const res = await buyCampaign({ brandId, game, slots, games, coverUrl, slotCovers, targeting });
   if (!res.ok) return { error: res.message };
 
   revalidatePath(`/brands/${brand.slug}`);

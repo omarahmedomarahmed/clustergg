@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { requireSystemFor } from "@/lib/departments";
-import { anomalousGrowth, linkedCounts, payoutHoldFor, PAYOUT_HOLD_DAYS, QUALIFY_RULE } from "@/lib/abuse";
+import { anomalousGrowth, linkedCounts, payoutHoldFor, PAYOUT_HOLD_PHRASE, QUALIFY_RULE } from "@/lib/abuse";
 import Icon from "@/components/Icon";
 import FeatureShot from "@/components/FeatureShot";
 
@@ -52,7 +52,7 @@ export default async function GrowthReviewPage() {
           <b className="text-ink">The rule:</b> {QUALIFY_RULE}
         </div>
         <div className="ml-auto text-xs text-muted">
-          First payouts hold for <b className="text-ink">{PAYOUT_HOLD_DAYS} days</b> after a tier unlocks.
+          <b className="text-ink">{PAYOUT_HOLD_PHRASE}</b>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ import { money } from "@/lib/pricing";
 import { listPayouts, OPEN_STATUSES } from "@/lib/payouts";
 import { payer } from "@/lib/payments";
 import { vendorBy } from "@/lib/payments/vendors";
-import PayoutQueue, { OpenButton } from "@/components/PayoutQueue";
+import PayoutQueue from "@/components/PayoutQueue";
 import Icon from "@/components/Icon";
 
 export const dynamic = "force-dynamic";
@@ -117,7 +117,7 @@ export default async function AdminPayoutsPage() {
                 <tr className="border-b border-white/10">
                   <th className="py-2 text-left">Server</th>
                   <th className="py-2 text-right">Linked</th>
-                  <th className="py-2 text-right">Share</th>
+                  <th className="py-2 text-right">Tier</th>
                   <th className="py-2 text-right">Earned</th>
                   <th className="py-2 text-right">Paid</th>
                   <th className="py-2 text-right">Unpaid</th>
@@ -134,7 +134,8 @@ export default async function AdminPayoutsPage() {
                         <Link href={`/admin/discord/${s.guildId}`} className="hover:text-cyan-300">{s.name}</Link>
                       </td>
                       <td className="py-2.5 text-right tabular-nums text-muted">{s.linked.toLocaleString()}</td>
-                      <td className="py-2.5 text-right tabular-nums text-muted">{s.ownerPct}%</td>
+                      {/* C3: a label, not a rate. */}
+                      <td className="py-2.5 text-right text-xs uppercase tracking-wider text-muted">{s.tier}</td>
                       <td className="py-2.5 text-right tabular-nums">{money(s.owed, cfg.currency)}</td>
                       <td className="py-2.5 text-right tabular-nums text-emerald-300">{money(s.paid, cfg.currency)}</td>
                       <td className={`py-2.5 text-right font-semibold tabular-nums ${s.unpaid > 0 ? "text-amber-200" : "text-muted"}`}>
@@ -145,8 +146,12 @@ export default async function AdminPayoutsPage() {
                           ? <span className={acct.status === "ready" ? "text-emerald-300" : "text-amber-200"}>{acct.methodPreference}{acct.country ? ` · ${acct.country}` : ""}</span>
                           : <span className="text-muted">not set up</span>}
                       </td>
-                      <td className="py-2.5 text-right">
-                        <OpenButton guildId={s.guildId} disabled={s.unpaid <= 0} />
+                      {/* An "Open payout" button was here. C3 — the weekly
+                          close already opens these, scored and netted against
+                          the vault, so the queue above is where they are
+                          released. Opening one here would pay twice. */}
+                      <td className="py-2.5 text-right text-[11px] text-muted">
+                        {s.unpaid > 0 ? "in the queue above" : "—"}
                       </td>
                     </tr>
                   );

@@ -48,6 +48,15 @@ export type Assumptions = {
   capReach: number;
 };
 
+/**
+ * The slider's starting position. NOT a measurement — C12.
+ *
+ * `dailyActive: 0.35` was the only number in the codebase resembling "expected
+ * active gamers", which is the denominator of the CP vault's runway and of
+ * everyone's pay. It is a plausible opening guess for a calculator and nothing
+ * more. The measured definition, and the count that goes with it, is
+ * `lib/active-gamers.ts` — use that anywhere a decision depends on the answer.
+ */
 export const DEFAULT_ASSUMPTIONS: Assumptions = { dailyActive: 0.35, capReach: 0.30 };
 
 /** The shipped configuration, before an admin has touched anything. */

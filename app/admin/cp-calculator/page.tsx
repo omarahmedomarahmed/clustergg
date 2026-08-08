@@ -3,6 +3,7 @@ import { requireSystemFor } from "@/lib/departments";
 import { ACTION_CATALOG, dailyCpCeiling } from "@/lib/quests";
 import { cpPerDollar } from "@/lib/marketplace";
 import type { ActionConfig, EconConfig } from "@/lib/cp-economics";
+import { activeGamers } from "@/lib/active-gamers";
 import CpCalculator from "@/components/CpCalculator";
 import FeatureShot from "@/components/FeatureShot";
 
@@ -21,10 +22,13 @@ export default async function CpCalculatorPage() {
   const access = await requireSystemFor("/admin/cp-calculator");
   const db = await getDb();
 
-  const [quests, rate, ceiling] = await Promise.all([
+  const [quests, rate, ceiling, measured] = await Promise.all([
     db.select().from(schema.quests),
     cpPerDollar(db),
     dailyCpCeiling(db),
+    // C12. The calculator's daily-active slider was the only "expected active
+    // gamers" figure anywhere, and it is a guess. This is the counted one.
+    activeGamers(db),
   ]);
 
   // One row per action, carrying every quest that listens to it. Where two
@@ -64,7 +68,7 @@ export default async function CpCalculatorPage() {
 
       <FeatureShot shotKey="admin.cp.calculator" className="mb-6" />
 
-      <CpCalculator initial={initial} canSave={access.isAdmin} />
+      <CpCalculator initial={initial} canSave={access.isAdmin} measured={measured} />
     </div>
   );
 }

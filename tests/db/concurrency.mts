@@ -78,7 +78,7 @@ const newGamer = async (name: string) => {
   const id = uid();
   await db.insert(schema.users).values({
     id, email: `${id}@conc.test`, displayName: name, slug: `conc-${id.slice(0, 8)}`,
-    passwordHash: "x", role: "user", status: "active",
+    passwordHash: "x", ageBand: "adult", role: "user", status: "active",
   });
   return id;
 };

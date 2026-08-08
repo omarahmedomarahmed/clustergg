@@ -3,7 +3,8 @@ import { getDb, schema } from "@/lib/db";
 import { uid, slugify } from "@/lib/utils";
 import { newPortalKey } from "@/lib/portal-auth";
 import { guildStats, type GuildStats } from "@/lib/discord/guilds";
-import { challengeEarning, clusterPctFor, nextEarnTier, ownerPctFor } from "@/lib/server-earnings";
+import { challengeEarning, nextEarnTier } from "@/lib/server-earnings";
+import { WEEK_CLOSE_ACTOR } from "@/lib/week-close";
 import { PRICING_DEFAULTS } from "@/lib/pricing";
 
 // The server-owner portal.
@@ -42,8 +43,12 @@ export type Tier = {
    * The owner's share of a sponsored challenge at this tier, as a % of what the
    * brand paid. Read from `lib/server-earnings.ts` so the ladder, the portal
    * and the payout arithmetic can never quote three different numbers.
+   *
+   * C3 removed `ownerPct` from here. A tier decides who a server competes
+   * against in the weekly pool and what it unlocks — never a rate. The field
+   * was deleted rather than zeroed so no surface can print "0% share" and read
+   * as something taken away.
    */
-  ownerPct: number;
 };
 
 export const TIERS: Tier[] = [
@@ -57,7 +62,6 @@ export const TIERS: Tier[] = [
     blurb: "You're on the map.",
     unlocks: "Private challenges for your community",
     detail: "Request challenges, run them for your members, and appear on Cluster with your own logo and invite.",
-    ownerPct: ownerPctFor(0),
   },
   {
     key: "monetized",
@@ -70,8 +74,7 @@ export const TIERS: Tier[] = [
     unlocks: "Brand-sponsored challenges, with real prize money",
     detail:
       "Brands sponsoring the games your members play start running their weekly challenges here. Every dollar "
-      + "of the prize money is won by your members, and 5% of what the brand paid is yours.",
-    ownerPct: ownerPctFor(500),
+      + "of the prize money is won by your members, and you enter the weekly server pool that every sponsored challenge funds.",
   },
   {
     key: "broadcaster",
@@ -84,8 +87,7 @@ export const TIERS: Tier[] = [
     unlocks: "Carry the whole network's challenges",
     detail:
       "Challenges from across the network run in your server, so more of your members are playing for real "
-      + "prizes in more games at once — and your share of every sponsored challenge doubles to 10%.",
-    ownerPct: ownerPctFor(1000),
+      + "prizes in more games at once — and you compete in a bigger tier of the weekly pool.",
   },
   {
     key: "sponsored",
@@ -98,8 +100,7 @@ export const TIERS: Tier[] = [
     unlocks: "Brands ask for your community by name",
     detail:
       "Brands buy challenges in your server specifically, and smaller servers carry yours instead of the "
-      + "other way round. You keep 25% of every sponsored challenge; Cluster keeps 5%.",
-    ownerPct: ownerPctFor(5000),
+      + "other way round, and you compete for the largest slots in the weekly pool.",
   },
 ];
 
@@ -241,12 +242,11 @@ export type EarningRow = {
   totalEntrants: number;
   /** How many servers carried this challenge, for the no-entrants split. */
   serversCarrying: number;
-  /** What the brand paid, what the pool was, and what this server earned. */
+  /** What the brand paid and what the pool was. C3 removed the owner cut:
+   *  a challenge no longer pays a percentage, the WEEK does. */
   price: number;
   prizePool: number;
   serverShare: number;
-  ownerPct: number;
-  owner: number;
   /** Prize money this server's own members took home. */
   membersWon: number;
 };
@@ -278,11 +278,16 @@ export type MemberWin = {
 };
 
 export type Earnings = {
-  ownerPct: number;
-  clusterPct: number;
-  nextPct: number | null;
+  /**
+   * Where the money comes from now. C3.
+   *
+   * `earned` is what the weekly pool has already PAID this server; `pending` is
+   * what it has opened and not yet released. Both are read from the payout rows
+   * `lib/week-close.ts` writes, so the portal and the admin console cannot give
+   * an owner two different answers.
+   */
   nextAt: number | null;
-  /** Paid so far, and still running. */
+  /** Paid so far, and opened but not yet released. */
   earned: number;
   pending: number;
   membersWon: number;
@@ -294,23 +299,41 @@ export type Earnings = {
 };
 
 /**
- * What this server has earned from sponsored challenges, challenge by challenge.
+ * What this server got out of sponsored challenges, challenge by challenge.
  *
- * An owner should be able to reconstruct every figure here from the challenge
- * itself: the brand paid X, our members were N of M entrants, our tier is P%,
- * so we earned X × P% × N/M. That is why each row carries its own working
- * rather than a total somebody has to take on trust.
+ * The rows are the CONTRIBUTION — the brand paid X, our members were N of M
+ * entrants, our members won Y. The MONEY is the weekly pool, read from the
+ * payout rows above. Splitting them apart is C3: an owner used to be shown a
+ * per-challenge cut that no longer exists, and showing a number the payout
+ * screen disagrees with is how an owner stops believing either.
  */
 export async function serverEarnings(guildId: string, linked: number): Promise<Earnings> {
-  const ownerPct = ownerPctFor(linked);
   const next = nextEarnTier(linked);
   const empty: Earnings = {
-    ownerPct, clusterPct: clusterPctFor(linked),
-    nextPct: next?.ownerPct ?? null, nextAt: next?.threshold ?? null,
+    nextAt: next?.threshold ?? null,
     earned: 0, pending: 0, membersWon: 0, rows: [], memberWins: [], winners: 0,
   };
   try {
     const db = await getDb();
+
+    // What the weekly pool has actually done for this server. C3 — this used to
+    // be a percentage applied to each challenge, which meant the portal was
+    // computing money rather than reporting it.
+    const pool = await db.select({
+      status: schema.serverPayouts.status,
+      amount: sql<number>`coalesce(sum(${schema.serverPayoutLines.amount}), 0)`,
+    }).from(schema.serverPayouts)
+      .innerJoin(schema.serverPayoutLines, eq(schema.serverPayoutLines.payoutId, schema.serverPayouts.id))
+      .where(and(
+        eq(schema.serverPayouts.guildId, guildId),
+        eq(schema.serverPayouts.requestedBy, WEEK_CLOSE_ACTOR),
+      ))
+      .groupBy(schema.serverPayouts.status);
+    const paid = round2(pool.filter((r) => r.status === "paid").reduce((a, r) => a + Number(r.amount ?? 0), 0));
+    const open = round2(pool.filter((r) => !["paid", "cancelled"].includes(r.status))
+      .reduce((a, r) => a + Number(r.amount ?? 0), 0));
+    empty.earned = paid;
+    empty.pending = open;
 
     // Everyone this server brought to Cluster. A challenge's entrants "from
     // here" are the ones who are members of this server.
@@ -379,7 +402,6 @@ export async function serverEarnings(guildId: string, linked: number): Promise<E
       if (!ours.length && !carried.includes(guildId)) continue;
 
       const earning = challengeEarning({
-        linked,
         entrants: ours.length,
         totalEntrants: entries.length,
         serversCarrying: carried.length || 1,
@@ -418,8 +440,6 @@ export async function serverEarnings(guildId: string, linked: number): Promise<E
         price: earning.price,
         prizePool: earning.prizePool,
         serverShare: earning.serverShare,
-        ownerPct: earning.ownerPct,
-        owner: earning.owner,
         membersWon: earning.membersWon,
       });
     }
@@ -427,10 +447,9 @@ export async function serverEarnings(guildId: string, linked: number): Promise<E
     return {
       ...empty,
       rows,
-      // Only a finished challenge has been earned. A running one is pending,
-      // because its entrant split — and therefore the share — is still moving.
-      earned: round2(rows.filter((r) => r.ended).reduce((s, r) => s + r.owner, 0)),
-      pending: round2(rows.filter((r) => !r.ended).reduce((s, r) => s + r.owner, 0)),
+      // `earned` and `pending` are the POOL's, set above from real payout rows.
+      // They are deliberately not re-derived from these challenge rows: a
+      // challenge no longer carries an owner cut to sum.
       membersWon: round2(rows.reduce((s, r) => s + r.membersWon, 0)),
       // Newest first — the win an owner wants to shout about is the last one.
       memberWins: memberWins.sort((a, b) => +b.at - +a.at),

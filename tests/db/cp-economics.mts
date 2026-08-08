@@ -86,7 +86,7 @@ async function newGamer(tag: string): Promise<string> {
   const id = uid();
   await db.insert(schema.users).values({
     id, slug: `t-${tag}-${id.slice(0, 6)}`, displayName: `Test ${tag}`,
-    email: `${id}@test.invalid`, passwordHash: "x",
+    email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
   } as never);
   return id;
 }

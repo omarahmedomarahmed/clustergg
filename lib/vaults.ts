@@ -10,10 +10,12 @@
 // The due-diligence report found a platform whose numbers could not be
 // reconstructed; this is the shape that stops that happening to the money.
 //
-// Nothing here writes yet — the ledger table exists so history starts
-// accumulating from the first challenge sold. The payout paths land in B87.
+// B87/C13 turned this on. `allocateInvoice` posts the four rows the moment a
+// brand's invoice is marked paid, so the vaults hold money that has ARRIVED
+// rather than money that has been promised — the distinction the whole design
+// rests on, and the reason allocation hangs off "paid" and not off "invoiced".
 
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
@@ -143,4 +145,121 @@ export async function balances(db: DB): Promise<Record<Vault, number>> {
     }
   } catch { /* no table yet reads as zero, which is the truth */ }
   return out;
+}
+
+// ===== Money arriving, and money being promised =====
+//
+// C13. Prizes are 50% of every dollar — the largest line — and had no vault, no
+// ledger and no liability tracking at all. A prize is awarded as a TROPHY and
+// becomes cash only when it is redeemed, months later or never, so the one pool
+// big enough to sink us was the one nothing watched.
+//
+// Two events, deliberately separate:
+//
+//   * ALLOCATION happens when an invoice is PAID. Money in.
+//   * COMMITMENT happens when a challenge awards its podium. The prize vault
+//     now owes that value to a gamer, whether or not they ever redeem it.
+//
+// Hanging allocation off "invoiced" instead would fill the vaults with money
+// nobody has sent, and every payout below would be drawing on a promise.
+
+/** The split in force, from settings, falling back to the model's default. */
+export async function currentSplit(db: DB): Promise<Record<Vault, number>> {
+  try {
+    const [row] = await db.select({ value: schema.platformSettings.value })
+      .from(schema.platformSettings)
+      .where(eq(schema.platformSettings.key, "vaults.split")).limit(1);
+    const raw = row?.value as Record<string, number> | null;
+    if (!raw) return DEFAULT_SPLIT;
+    // A stored split that does not total 100 is not applied. It would invent or
+    // lose money silently, and the default is at least a number we can defend.
+    if (splitProblems(raw).length) return DEFAULT_SPLIT;
+    return { prize: raw.prize, server: raw.server, cp: raw.cp, cluster: raw.cluster };
+  } catch { return DEFAULT_SPLIT; }
+}
+
+/**
+ * Post a paid invoice's four allocation rows. C13.
+ *
+ * IDEMPOTENT, because two different admin actions can mark the same invoice
+ * paid and a webhook may do it a third time. The guard is a read of the ledger
+ * itself rather than a flag on the invoice — a flag is a second place the truth
+ * can live, and the ledger is the thing that must be right.
+ *
+ * Returns what was allocated, or null when there was nothing to do.
+ */
+export async function allocateInvoice(
+  db: DB,
+  invoiceId: string,
+): Promise<{ total: number; allocated: Record<Vault, number> } | null> {
+  const [inv] = await db.select({
+    id: schema.brandInvoices.id,
+    status: schema.brandInvoices.status,
+  }).from(schema.brandInvoices).where(eq(schema.brandInvoices.id, invoiceId)).limit(1);
+  if (!inv || inv.status !== "paid") return null;
+
+  const [seen] = await db.select({ id: schema.vaultLedger.id }).from(schema.vaultLedger)
+    .where(and(eq(schema.vaultLedger.refType, "invoice"), eq(schema.vaultLedger.refId, invoiceId)))
+    .limit(1);
+  if (seen) return null;
+
+  // The invoice TOTAL is its lines, summed here rather than read from a stored
+  // column, for the same reason `balances()` sums rows: a total that can drift
+  // from its lines is a total that will.
+  const lines = await db.select({
+    quantity: schema.invoiceLines.quantity,
+    unitAmount: schema.invoiceLines.unitAmount,
+  }).from(schema.invoiceLines).where(eq(schema.invoiceLines.invoiceId, invoiceId));
+  const total = Math.round(lines.reduce((s, l) => s + Number(l.quantity ?? 0) * Number(l.unitAmount ?? 0), 0) * 100) / 100;
+  if (!(total > 0)) return null;
+
+  const split = await currentSplit(db);
+  const allocated = allocate(total, split);
+
+  // Rounding is absorbed by the CLUSTER vault, never by prizes or by the two
+  // pools we pay out of. Four independently rounded shares can miss the total
+  // by a cent, and the only honest place for that cent is our own line.
+  const sum = VAULTS.reduce((a, v) => a + allocated[v], 0);
+  allocated.cluster = Math.round((allocated.cluster + (total - sum)) * 100) / 100;
+
+  await postToLedger(db, VAULTS.map((v) => ({
+    vault: v,
+    amount: allocated[v],
+    kind: "challenge_sale" as const,
+    refType: "invoice",
+    refId: invoiceId,
+    reason: `${split[v]}% of invoice ${invoiceId}`,
+  })));
+  return { total, allocated };
+}
+
+/**
+ * Undo an allocation when an invoice stops being paid.
+ *
+ * REVERSING ROWS, never a delete. Money that was recorded as arrived and then
+ * was not is a fact about the week, and a ledger you can delete from is a
+ * ledger nobody can reconcile. The balance returns to where it was; the history
+ * says why.
+ */
+export async function reverseInvoiceAllocation(db: DB, invoiceId: string): Promise<boolean> {
+  const rows = await db.select({
+    vault: schema.vaultLedger.vault,
+    amount: schema.vaultLedger.amount,
+    kind: schema.vaultLedger.kind,
+  }).from(schema.vaultLedger)
+    .where(and(eq(schema.vaultLedger.refType, "invoice"), eq(schema.vaultLedger.refId, invoiceId)));
+  if (!rows.length) return false;
+  // Already reversed: the rows for this invoice sum to zero.
+  const net = rows.reduce((a, r) => a + Number(r.amount ?? 0), 0);
+  if (Math.abs(net) < 0.005) return false;
+
+  await postToLedger(db, rows.filter((r) => r.kind === "challenge_sale").map((r) => ({
+    vault: r.vault as Vault,
+    amount: -Number(r.amount ?? 0),
+    kind: "adjustment" as const,
+    refType: "invoice",
+    refId: invoiceId,
+    reason: "Invoice no longer paid — allocation reversed.",
+  })));
+  return true;
 }

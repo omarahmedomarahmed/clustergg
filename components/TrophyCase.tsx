@@ -50,7 +50,7 @@ export default function TrophyCase({
   // all of them resent. The fields appear only when the server says it needs
   // them, so a gamer who has already answered never sees them again.
   const [needs, setNeeds] = useState<("age" | "country")[]>([]);
-  const [birthDate, setBirthDate] = useState("");
+  const [ageBand, setAgeBand] = useState("");
   const [country, setCountry] = useState("");
   const [method, setMethod] = useState<string>(
     METHODS.some((m) => m.key === savedMethod?.method) ? savedMethod!.method : "bank",
@@ -74,7 +74,7 @@ export default function TrophyCase({
     setError(null);
     const res = await requestRedeem({
       awardIds: selected.map((a) => a.id), currency, method,
-      birthDate: birthDate || undefined, country: country || undefined,
+      ageBand: ageBand || undefined, country: country || undefined,
     });
     if (res.error) { setError(res.error); setNeeds(res.needs ?? []); return; }
     setNeeds([]);
@@ -301,11 +301,29 @@ export default function TrophyCase({
                 <p className="text-[11px] text-muted">
                   {tr("Being paid is a contract, so we need your age and where you live. We ask once, and only here — your points and trophies were never affected by this.")}
                 </p>
+                {/* Was a `type="date"`. B72.4 made the server take a BAND, and
+                    leaving the date input here would have shipped a field that
+                    posts "2003-04-11" to something that only accepts one of
+                    three words — a redemption that fails on a value the gamer
+                    typed correctly. A range answers the only question a payout
+                    asks. */}
                 {needs.includes("age") && (
-                  <label className="block text-xs text-muted">{tr("Date of birth")}
-                    <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)}
-                      className="input-cosmic mt-1 w-full" />
-                  </label>
+                  <fieldset className="block">
+                    <legend className="mb-1 block text-xs text-muted">{tr("Your age range")}</legend>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[["under16", "Under 16"], ["teen", "16–17"], ["adult", "18+"]].map(([v, label]) => (
+                        <button key={v} type="button" onClick={() => setAgeBand(v)}
+                          className={`rounded-xl border px-2 py-2 text-xs font-bold transition ${
+                            ageBand === v ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-100"
+                              : "border-white/12 bg-white/5 text-muted hover:text-ink"}`}>
+                          {tr(label)}
+                        </button>
+                      ))}
+                    </div>
+                    <span className="mt-1 block text-[10px] text-muted">
+                      {tr("We never ask for your date of birth — only which range you are in.")}
+                    </span>
+                  </fieldset>
                 )}
                 {needs.includes("country") && (
                   <label className="block text-xs text-muted">{tr("Country you live in")}

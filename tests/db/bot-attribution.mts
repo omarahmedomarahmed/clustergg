@@ -38,7 +38,7 @@ const mkUser = async (tag: string, status = "active") => {
   const id = uid();
   await db.insert(schema.users).values({
     id, slug: `ba-${tag}-${id.slice(0, 6)}`, displayName: `BA ${tag}`,
-    email: `${id}@test.invalid`, passwordHash: "x", status,
+    email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult", status,
   } as never);
   return id;
 };

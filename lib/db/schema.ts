@@ -45,6 +45,37 @@ export const users = pgTable("users", {
   primarySignupProvider: text("primary_signup_provider"),
   discordUsername: text("discord_username"), // Discord handle — the gamer's universal identity, shown everywhere
   profileViews: integer("profile_views").notNull().default(0), // public view counter (brag number)
+  /**
+   * The age BAND. B72.4. Never a date of birth.
+   *
+   * `under16` | `teen` | `adult`, or null when nobody has answered. Null earns
+   * nothing — see `lib/age.ts` for what each band may do and why the line is 16
+   * rather than 13.
+   */
+  ageBand: text("age_band"),
+  /** When they answered. A record of having asked, which is half the point. */
+  ageBandSetAt: timestamp("age_band_set_at", { withTimezone: true, mode: "date" }),
+  /**
+   * How many times they have changed it. Locks at `MAX_BAND_CHANGES`.
+   *
+   * A band asked in one click with no confirm WILL be mis-tapped, and a mis-tap
+   * onto "Under 16" locks somebody out of everything. So it is editable — and
+   * counted, because a band that can change without limit means nothing.
+   */
+  ageBandChanges: integer("age_band_changes").notNull().default(0),
+  /**
+   * The address this account was created from. B80.
+   *
+   * Stored so account-creation velocity can be counted per address at all — the
+   * guard had an IP branch that nothing ever reached, because there was nothing
+   * to compare against. Fifty accounts from one address in a day is a script;
+   * ten is a university.
+   *
+   * It is the only network identifier we keep, it is written once at signup and
+   * never updated, and B80's purge removes it with the account. It is NOT used
+   * to identify or track a gamer anywhere else in the product.
+   */
+  signupIp: text("signup_ip"),
   discordViews: integer("discord_views").notNull().default(0), // views that came from someone showing this profile in Discord
   voteCount: integer("vote_count").notNull().default(0),       // Best Profile votes, denormalized for cheap sorting
   /**
@@ -364,9 +395,11 @@ export const challenges = pgTable("challenges", {
   // ===== Sponsorship =====
   //
   // A sponsored challenge is one a brand bought. It is the unit of the whole
-  // business — the brand's money enters here, 70% of it leaves as prize money
-  // to gamers, and the rest is split between the servers that carried it and
-  // Cluster. None of that arithmetic can be done without knowing which brand
+  // business — the brand's money enters here, and `pricing.prizePct` of it (50%
+  // under COMMERCIAL_MODEL_V2 §2) leaves as prize money to gamers, with the
+  // rest split between the server pool, the CP vault and Cluster. The figure
+  // used to be written here as 70%, which stopped being true and could not be
+  // noticed, which is exactly why it is a percentage in one place now. None of that arithmetic can be done without knowing which brand
   // paid and how much, so it is recorded on the challenge itself rather than
   // inferred from a campaign later.
   /**
@@ -663,10 +696,31 @@ export const adImpressions = pgTable("ad_impressions", {
    * minute. Nullable for rows written before this existed.
    */
   dedupeKey: text("dedupe_key"),
+  /**
+   * WHERE the card was delivered. B81.2.
+   *
+   * `discord_private` | `discord_public` | `web`. Stored, and **never shown to
+   * a brand.** A brand knowing which of its views came from private DMs versus
+   * public channels is a step toward inferring who saw it in a small server;
+   * we need the split for our own operations and pacing, and they do not.
+   */
+  surface: text("surface"),
+  /**
+   * WHAT card it was — profile, challenge, planet, game-stats, market.
+   *
+   * This one IS shown: it is the breakdown a brand actually asks for, and it
+   * says something about placement quality without saying anything about a
+   * person.
+   */
+  cardKind: text("card_kind"),
   createdAt: now("created_at"),
 }, (t) => [
   index("imp_cc_idx").on(t.campaignCreativeId, t.createdAt),
   uniqueIndex("imp_dedupe_idx").on(t.dedupeKey),
+  // The report groups by these. Without the index a brand's dashboard is a
+  // sequential scan over every impression ever logged.
+  index("imp_kind_idx").on(t.campaignCreativeId, t.cardKind),
+  index("imp_guild_idx").on(t.campaignCreativeId, t.guildId),
 ]);
 
 export const adClicks = pgTable("ad_clicks", {
@@ -1239,8 +1293,20 @@ export const serverEvents = pgTable("server_events", {
 export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
   id: id(),
   brandId: text("brand_id").notNull().references(() => brands.id, { onDelete: "cascade" }),
+  /**
+   * The campaign's LEAD game. C7.
+   *
+   * It used to be the only game — a campaign was one game × four weeks, and a
+   * mixed-game package had no row shape at all. The game now lives on each
+   * SLOT, because that is where it is actually decided: a week is one challenge
+   * on one game, and two of the same game in the same week split the field.
+   *
+   * This column stays as the first slot's game so `spc_game_idx`, the admin
+   * lists and every existing read keep working. Anything asking "which games is
+   * this campaign on" must read the slots — `campaignGames()`.
+   */
   game: text("game").notNull(),
-  /** How many weekly challenges were bought. Four is the floor. */
+  /** How many weekly challenges were bought. One to four. */
   slots: integer("slots").notNull().default(4),
   /** What one challenge cost, and the total. Frozen at purchase. */
   pricePerChallenge: doublePrecision("price_per_challenge").notNull().default(250),
@@ -1249,7 +1315,7 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
   status: text("status").notNull().default("submitted"),
   /** Monday of the first week. Every slot is seven days from here. */
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
-  /** One cover for all four, unless a slot overrides it. */
+  /** One cover for every week, unless a slot overrides it. */
   coverUrl: text("cover_url"),
   /**
    * Per-slot state: the cover, the request, the challenge it became.
@@ -1262,6 +1328,11 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
     index: number;
     startAt: string;
     endAt: string;
+    /**
+     * This week's game. C7. Absent on campaigns bought before mixed packages
+     * existed, which read as the campaign's lead game rather than as a gap.
+     */
+    game?: string | null;
     coverUrl?: string | null;
     requestId?: string | null;
     challengeId?: string | null;

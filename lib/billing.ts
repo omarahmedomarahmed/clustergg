@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing";
-import { challengeEarning, ownerPctFor, earningOwnerPct, clusterPctFor } from "@/lib/server-earnings";
+import { tierOf, WEEK_CLOSE_ACTOR } from "@/lib/week-close";
 
 // The books.
 //
@@ -66,12 +66,15 @@ export type ServerEarningRow = {
    * not being paid. The rule is not a secret — see `QUALIFY_RULE`.
    */
   qualifiedLinked: number;
-  /** What this server's TIER pays. Shown so the ladder still means something. */
-  ownerPct: number;
-  /** What it is actually earning — 0 until the profile is complete (B47). */
-  earningPct: number;
+  /**
+   * The size tier. A LABEL — C3.
+   *
+   * It used to carry a rate (5/10/25% of every sponsored challenge) and that
+   * rate used to be this row's `owed`. The weekly pool replaced it, and running
+   * both would have paid owners twice out of a 15% line.
+   */
+  tier: string;
   profileComplete: boolean;
-  clusterPct: number;
   challenges: number;
   owed: number;
 };
@@ -251,22 +254,26 @@ export async function billingSummary(
       guilds.map((g) => [g.guildId, profileComplete(parseCommunity(g.community), g.contactEmail)]),
     );
 
-    const owedBy = new Map<string, { owed: number; challenges: number }>();
-    for (const e of entrantsByGuild) {
-      // The QUALIFIED count decides the rate here too — the split and the table
-      // must not disagree about what tier a server is on.
-      const linked = linkedBy.get(e.guildId)?.qualified ?? 0;
-      const share = challengeEarning({
-        linked,
-        entrants: Number(e.n ?? 0),
-        totalEntrants: totalEntrants.get(e.challengeId) ?? 0,
-        cfg,
-        profileComplete: completeBy.get(e.guildId) ?? false,
-      });
-      if (share.owner <= 0) continue;
-      const prev = owedBy.get(e.guildId) ?? { owed: 0, challenges: 0 };
-      owedBy.set(e.guildId, { owed: round2(prev.owed + share.owner), challenges: prev.challenges + 1 });
-    }
+    // What a server is owed is what the WEEKLY POOL says it is. C3.
+    //
+    // This used to be computed here, per challenge, from the tier's percentage
+    // and the entrant share. That number no longer exists — `lib/week-close.ts`
+    // scores each week and opens a payout, and reading anything else would give
+    // an owner two different answers on two different screens.
+    const poolOwed = await db.select({
+      guildId: schema.serverPayouts.guildId,
+      owed: sql<number>`coalesce(sum(${schema.serverPayoutLines.amount}), 0)`,
+      weeks: sql<number>`count(distinct ${schema.serverPayouts.id})`,
+    }).from(schema.serverPayouts)
+      .innerJoin(schema.serverPayoutLines, eq(schema.serverPayoutLines.payoutId, schema.serverPayouts.id))
+      .where(and(
+        eq(schema.serverPayouts.requestedBy, WEEK_CLOSE_ACTOR),
+        sql`${schema.serverPayouts.status} not in ('paid', 'cancelled')`,
+      ))
+      .groupBy(schema.serverPayouts.guildId);
+    const owedBy = new Map(poolOwed.map((r) => [r.guildId, {
+      owed: round2(Number(r.owed ?? 0)), challenges: Number(r.weeks ?? 0),
+    }]));
 
     const servers: ServerEarningRow[] = guilds
       .map((g) => {
@@ -281,14 +288,8 @@ export async function billingSummary(
           name: g.name || g.guildId,
           linked: c.raw,
           qualifiedLinked: c.qualified,
-          // The tier's rate, so the table still shows what the server has
-          // reached — and `earning` beside it, which is what it is actually
-          // being paid. Showing only the gated number would read as the tier
-          // having been taken away.
-          ownerPct: ownerPctFor(linked),
-          earningPct: earningOwnerPct(linked, completeBy.get(g.guildId) ?? false),
+          tier: tierOf(linked),
           profileComplete: completeBy.get(g.guildId) ?? false,
-          clusterPct: clusterPctFor(linked),
           challenges: o?.challenges ?? 0,
           owed: o?.owed ?? 0,
         };

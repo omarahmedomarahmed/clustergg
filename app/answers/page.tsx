@@ -4,6 +4,7 @@ import AdSlot from "@/components/AdSlot";
 import { FaqSchema, SEARCH_FAQ } from "@/components/StructuredData";
 import { cardMeta } from "@/lib/og";
 import { pricingConfig } from "@/lib/pricing-live";
+import { PRICING_DEFAULTS } from "@/lib/pricing";
 import { networkStats } from "@/lib/network";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,10 @@ export default async function AnswersPage() {
     pricingConfig().catch(() => null),
     networkStats().catch(() => null),
   ]);
+  // One fallback, from the config module rather than a literal. Three literal
+  // 250s and 175s in one paragraph is three places to forget. (C2)
+  const price = Math.round(cfg?.challengePrice ?? PRICING_DEFAULTS.challengePrice);
+  const prize = Math.round(cfg?.prizePool ?? PRICING_DEFAULTS.prizePool);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
@@ -65,11 +70,11 @@ export default async function AnswersPage() {
       <section className="glass mt-8 p-6">
         <h2 className="font-bold">The whole model, in one line</h2>
         <p className="mt-2 text-sm leading-relaxed text-muted">
-          A brand pays <b className="text-ink">${cfg?.challengePrice ?? 250}</b> for a sponsored weekly
-          challenge. <b className="text-ink">${cfg?.prizePool ?? 175}</b> of that becomes the prize pool and
-          reaches a gamer. The remaining <b className="text-ink">${(cfg?.challengePrice ?? 250) - (cfg?.prizePool ?? 175)}</b>{" "}
-          is the platform fee, and the server it ran in takes a share of it. That is the entire business —
-          there is no second price list.
+          A brand pays <b className="text-ink">${price}</b> for a sponsored weekly
+          challenge. <b className="text-ink">${prize}</b> of that becomes the prize pool and
+          reaches a gamer. The remaining <b className="text-ink">${price - prize}</b>{" "}
+          is the platform fee, split between the server pool, the CP vault and us. That is the entire
+          business — there is no second price list.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/pricing" className="cta-btn pressable rounded-full px-5 py-2 text-sm font-semibold">

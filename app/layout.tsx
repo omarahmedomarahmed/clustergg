@@ -18,6 +18,7 @@ import FloatingOrbs from "@/components/FloatingOrbs";
 import EmbedMode from "@/components/EmbedMode";
 import RouteProgress from "@/components/RouteProgress";
 import PageBackground from "@/components/PageBackground";
+import AgeGate from "@/components/AgeGate";
 import { getContent } from "@/lib/cms";
 import { parseBottomTabs } from "@/lib/mobile-nav";
 import { getCurrentUser } from "@/lib/auth";
@@ -121,6 +122,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {/* The global top ad now lives *inside* each page's hero (over the
               hero artwork) via <TopBannerAd>, so it blends with the page rather
               than sitting on the plain site backdrop. */}
+          {/* B72.4. Asked here rather than on `/onboarding` because onboarding
+              is skippable and skipping it used to mean earning nothing forever
+              without ever being asked why. Never inside an embed — a framed
+              profile is somebody else's page. */}
+          {me && !me.ageBand && !embedded && <AgeGate />}
           <main className="flex-1 pb-20 md:pb-0">{children}</main>
           <Footer />
         </div>

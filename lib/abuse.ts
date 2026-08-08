@@ -30,8 +30,29 @@ import * as schema from "@/lib/db/schema";
  * Long enough to notice manufactured growth and to have a human look; short
  * enough that an honest owner is not being punished for succeeding. It applies
  * once, to the first payout only — after that the server has a track record.
+ *
+ * ===== C10: this and "weekly pool" have to be said together =====
+ *
+ * The model pays a WEEKLY pool, and a new server's first week is therefore
+ * earned in week one and paid in week five. Both statements are true and
+ * quoting only the first is how an owner ends up feeling lied to on day eight.
+ *
+ * The hold is not shortened, because the thing it defends against is exactly a
+ * server that manufactured its way to a tier and wants the money before anybody
+ * looks. What changed is the wording: `PAYOUT_HOLD_PHRASE` is the one sentence
+ * every surface uses, so no page can promise "paid weekly" on its own.
  */
 export const PAYOUT_HOLD_DAYS = 30;
+
+/**
+ * The sentence. One copy, used everywhere the pool is described.
+ *
+ * A shared string rather than four hand-written variants: the review found the
+ * contradiction because two pages said different things, and two pages saying
+ * different things is what a constant prevents.
+ */
+export const PAYOUT_HOLD_PHRASE =
+  `Earned weekly, paid after a ${PAYOUT_HOLD_DAYS}-day hold on your first payout — after that, weekly.`;
 
 /**
  * How long a linked member has to have been linked before they count toward a
@@ -273,6 +294,26 @@ export async function anomalousGrowth(db: DB): Promise<GrowthFlag[]> {
 export const SIGNUP_LIMIT = 10;
 export const SIGNUP_WINDOW_HOURS = 24;
 
+/**
+ * The IP limit. B80.
+ *
+ * THE FINDING: sybil cost per account was $0.00, and the IP half of this guard
+ * was never reached — `signup()` called `signupVelocity(db, { email })` and
+ * passed no address, so the only thing that could ever trip was a disposable
+ * email domain. An attacker using gmail aliases paid nothing at all.
+ *
+ * Deliberately FAR higher than `SIGNUP_LIMIT`, and that is the whole design.
+ * The email-domain limit is 10 because a disposable domain is a source. An IP
+ * is not: a university NAT, a mobile carrier CGNAT or an office is hundreds of
+ * real people behind one address, and refusing the eleventh of those is
+ * refusing a real gamer for somebody else's behaviour. Fifty in a day from one
+ * address is not a busy campus, it is a script.
+ *
+ * It stays a friction rather than a wall for the same reason as the rest of
+ * this file: the person it inconveniences most is always the honest one.
+ */
+export const SIGNUP_IP_LIMIT = 50;
+
 /** A Discord account younger than this is not, by itself, a refusal. */
 export const YOUNG_DISCORD_DAYS = 7;
 
@@ -325,6 +366,17 @@ export async function signupVelocity(
     // The count that decides. A disposable domain is a source; a mainstream one
     // is not, because "ten gmail signups today" is a Tuesday.
     let seen = 0;
+    // The IP, which until B80 was never passed in and therefore never checked.
+    // Counted for ANY domain — that is the point: gmail aliases were free.
+    let fromIp = 0;
+    if (input.ip) {
+      const [row] = await db.select({ n: sql<number>`count(*)` }).from(schema.users)
+        .where(and(gte(schema.users.createdAt, since), eq(schema.users.signupIp, input.ip)));
+      fromIp = Number(row?.n ?? 0);
+      if (fromIp >= SIGNUP_IP_LIMIT) {
+        reasons.push(`${fromIp} accounts from one address in ${SIGNUP_WINDOW_HOURS}h`);
+      }
+    }
     if (disposable && domain) {
       const [row] = await db.select({ n: sql<number>`count(*)` }).from(schema.users)
         .where(and(gte(schema.users.createdAt, since), ilike(schema.users.email, `%@${domain}`)));
@@ -341,17 +393,19 @@ export async function signupVelocity(
 
     // Refuse only when the COUNT trips. The other signals ride along for the
     // admin review queue; on their own they describe a new gamer.
-    const tripped = disposable && seen >= SIGNUP_LIMIT;
+    const tripped = (disposable && seen >= SIGNUP_LIMIT) || fromIp >= SIGNUP_IP_LIMIT;
     return {
       ok: !tripped,
-      seen,
+      seen: Math.max(seen, fromIp),
       limit: SIGNUP_LIMIT,
       reasons,
       message: tripped
         // Never accuses. The person reading this is usually not the one the
         // limit is for, and telling somebody they look like a bot is how you
         // lose the one real gamer it caught.
-        ? "We've had a lot of signups from that email provider today. Use a different address, or come back tomorrow — nothing is wrong with your account."
+        ? (fromIp >= SIGNUP_IP_LIMIT
+          ? "We've had an unusual number of signups from your network today. Try again tomorrow, or from another connection — nothing is wrong with your account."
+          : "We've had a lot of signups from that email provider today. Use a different address, or come back tomorrow — nothing is wrong with your account.")
         : "",
     };
   } catch { return open; }

@@ -360,7 +360,7 @@ export default async function LandingPage() {
             <div className="grid gap-4 md:grid-cols-3">
               <DoorCard
                 icon="target" tone="violet" title="I want to reach gamers"
-                body={`Sponsored challenges and placements from ${money(pricing.cfg.reachBase, pricing.cfg.currency)} a month, on a published rate card. Your name on the competition, not a banner they scroll past.`}
+                body={`Sponsored challenges from ${money(pricing.cfg.challengePrice, pricing.cfg.currency)} each, placements included, on a published rate card. Your name on the competition, not a banner they scroll past.`}
                 href="#brands" cta="What it costs"
               />
               <DoorCard
@@ -552,7 +552,7 @@ export default async function LandingPage() {
         <div className="grid md:grid-cols-3 gap-5">
           <DoorCard
             icon="target" tone="violet" title="I'm a brand"
-            body={`Placements and sponsored challenges from ${money(pricing.cfg.reachBase, pricing.cfg.currency)} a month. Your name on the competition, not a banner they scroll past.`}
+            body={`Sponsored challenges from ${money(pricing.cfg.challengePrice, pricing.cfg.currency)} each, with placements included. Your name on the competition, not a banner they scroll past.`}
             href="/pricing" cta="See pricing"
           />
           <DoorCard

@@ -171,8 +171,9 @@ export function PrizeSection({ c, cfg, bg }: { c: Copy; cfg: PricingConfig; bg?:
             <h2 className="text-3xl md:text-4xl font-bold mt-4 leading-tight">{c["brand.prize.title"]}</h2>
             <p className="text-muted mt-3 leading-relaxed">{c["brand.prize.body"]}</p>
 
-            {/* The split, as a bar. A sentence claiming "70% goes to players"
-                is a claim; a bar that is visibly 70% long is the argument. */}
+            {/* The split, as a bar. A sentence claiming a share goes to players
+                is a claim; a bar drawn at that share is the argument — and it is
+                drawn from `prizeSharePct`, so it cannot disagree with the price. */}
             <div className="mt-7">
               <div className="flex items-baseline justify-between text-xs mb-2">
                 <span className="text-muted">One sponsored challenge</span>

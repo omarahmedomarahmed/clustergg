@@ -1,9 +1,17 @@
-// B47 — the server profile gates the revenue share.
+// B47 — the server profile gates whether an owner can be paid.
 //
 // Written WITH the item, not deferred to Part II, because this decides whether
 // somebody gets paid (§1.1's exception). A gate that wrongly pays is cash that
-// has already left; a gate that wrongly withholds is a server owner who was
-// promised 5%, reached 500 linked members and got nothing with no explanation.
+// has already left; a gate that wrongly withholds is a server owner who did the
+// work and got nothing with no explanation.
+//
+// C3 MOVED THE GATE. It used to live inside the per-challenge rate
+// (`earningOwnerPct` zeroed a tier's percentage until the profile was
+// complete). There is no rate any more — owners are paid from the weekly pool —
+// so the gate moved to `lib/week-close.ts`, which is where money is decided
+// now. These assertions moved with it rather than being deleted: the rate
+// disappearing must not take the gate with it, and that is exactly the kind of
+// silent loss a deleted test would have hidden.
 //
 //   DEMO_DB=1 npx tsx tests/db/server-profile.mts
 
@@ -20,7 +28,7 @@ const eq = (name: string, got: unknown, want: unknown) =>
 
 const { missingFields, profileComplete, completeness, PROFILE_FIELDS, EMPTY_PROFILE } =
   await import("../../lib/discord/community.ts");
-const { ownerPctFor, earningOwnerPct, challengeEarning } = await import("../../lib/server-earnings.ts");
+const { challengeEarning } = await import("../../lib/server-earnings.ts");
 
 const FULL = { games: ["Chess"], regions: ["mena"], vibes: ["competitive"], about: "Ranked chess, MENA.", answeredAt: new Date().toISOString() };
 const EMAIL = "owner@example.com";
@@ -47,30 +55,45 @@ eq("completeness is 100 when complete", completeness(FULL, EMAIL), 100);
 eq("completeness is 0 when empty", completeness(EMPTY_PROFILE, null), 0);
 
 console.log("\n== the gate ==");
-eq("the TIER still pays 5% at 500 linked", ownerPctFor(500), 5);
-eq("…and 10% at 1,000", ownerPctFor(1000), 10);
-eq("…and 25% at 5,000", ownerPctFor(5000), 25);
-// The ladder must be unaffected: hiding the reward is the wrong way to ask for
-// the form, and an owner has to be able to see what they are working toward.
-eq("ownerPctFor is unchanged by completeness — it has no such argument",
-  ownerPctFor.length, 1);
+// INVERTED BY C3. These four used to assert a tier's RATE (5% at 500, 10% at
+// 1,000, 25% at 5,000) and that an incomplete profile zeroed it. The rate is
+// gone; what must still be true is that a tier is a LABEL and an incomplete
+// server cannot be paid.
+const earnings = await import("../../lib/server-earnings.ts");
+for (const fn of ["ownerPctFor", "earningOwnerPct", "clusterPctFor", "monthlyCeiling"]) {
+  ok(`${fn} no longer exists to be gated`, !(fn in earnings));
+}
+ok("a tier carries no rate at all",
+  !earnings.EARN_TIERS.some((t: Record<string, unknown>) => "ownerPct" in t));
 
-eq("a COMPLETE server at 500 linked earns 5%", earningOwnerPct(500, true), 5);
-eq("an INCOMPLETE server at 500 linked earns 0%", earningOwnerPct(500, false), 0);
-eq("an incomplete server at 5,000 linked still earns 0%", earningOwnerPct(5000, false), 0);
-eq("an incomplete server below any tier earns 0% either way", earningOwnerPct(10, false), 0);
+// The gate itself, where it lives now. Read from source rather than run,
+// because running it needs a whole week of fixtures — and what is being checked
+// is that the rule EXISTS in the path that decides money, which is precisely
+// what a deleted rate could have quietly taken away.
+{
+  const { readFileSync } = await import("node:fs");
+  const wc = readFileSync(new URL("../../lib/week-close.ts", import.meta.url), "utf8");
+  ok("the weekly close consults the server profile", /profileComplete\(/.test(wc));
+  ok("…and drops the incomplete from the run rather than paying them zero",
+    /payable\.has\(g\)/.test(wc));
+  ok("…and says how many it skipped", /skippedForProfile/.test(wc));
+}
 
 console.log("\n== the money it actually splits ==");
-const args = { linked: 500, entrants: 10, totalEntrants: 10 };
-const complete = challengeEarning({ ...args, profileComplete: true });
-const incomplete = challengeEarning({ ...args, profileComplete: false });
-ok("a complete server is owed something", complete.owner > 0, `owner=${complete.owner}`);
-eq("an incomplete server is owed nothing", incomplete.owner, 0);
-eq("…and its ownerPct reads 0, not the tier rate", incomplete.ownerPct, 0);
-// Projections must keep showing the real number, or every "what you could earn"
-// figure on the site silently becomes zero.
-eq("omitting the flag defaults to complete, so projections are unaffected",
-  challengeEarning(args).owner, complete.owner);
+// `challengeEarning` still exists and still apportions a challenge by entrant
+// share — that arithmetic was never wrong. What it no longer does is turn that
+// share into an owner's money.
+const args = { entrants: 10, totalEntrants: 10 };
+const share = challengeEarning(args);
+eq("a server that supplied the whole field has the whole share", share.serverShare, 1);
+eq("…and half the field is half the share",
+  challengeEarning({ entrants: 5, totalEntrants: 10 }).serverShare, 0.5);
+ok("but a challenge no longer carries an owner cut", !("owner" in share));
+ok("…nor a rate", !("ownerPct" in share));
+// With no entrants anywhere, the split is even across the servers that carried
+// it — the only fair answer when there is no participation to weigh.
+eq("no entrants splits evenly across carriers",
+  challengeEarning({ entrants: 0, totalEntrants: 0, serversCarrying: 4 }).serverShare, 0.25);
 
 // ---- The manual mail (B47.4) ----
 //

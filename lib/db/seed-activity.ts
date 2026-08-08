@@ -217,6 +217,10 @@ async function seedServerScale(db: any) {
     users.push({
       id, slug: `member-${i}`, displayName: `Member ${i}`,
       email: `${id}@demo.gg`, passwordHash: "x",
+      // B72.4 — see `mkUser` in seed.ts. An unset band earns nothing, and these
+      // 520 are the population every count, cap and payout demo is computed
+      // from.
+      ageBand: "adult", ageBandSetAt: new Date(),
     });
     members.push({
       guildId: guild.guildId, userId: id,

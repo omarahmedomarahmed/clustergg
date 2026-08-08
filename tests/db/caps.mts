@@ -9,6 +9,15 @@
 
 process.env.DEMO_DB = "1";
 
+// Every gamer fixture in this suite (and in sixteen others) now states
+// `ageBand: "adult"`. B72.4 gates earning on the band and an unset one earns
+// NOTHING, so a fixture that omits it is a gamer who cannot earn — and every
+// assertion about earning would pass for the wrong reason.
+//
+// Stated in the fixture rather than defaulted in a test helper on purpose: it
+// is a precondition of the thing under test, and a precondition that is
+// invisible is one somebody removes.
+
 let pass = 0;
 const fails: string[] = [];
 const ok = (name: string, cond: boolean, detail = "") => {
@@ -26,7 +35,7 @@ const { uid } = await import("../../lib/utils.ts");
 const db = await getDb();
 const id = uid();
 await db.insert(schema.users).values({
-  id, slug: `caps-${id.slice(0, 6)}`, displayName: "Caps", email: `${id}@test.invalid`, passwordHash: "x",
+  id, slug: `caps-${id.slice(0, 6)}`, displayName: "Caps", email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
 } as never);
 
 console.log("== past the cap, the action still works ==");
@@ -85,7 +94,7 @@ console.log("\n== the ceiling is disclosed too ==");
 const heavy = uid();
 await db.insert(schema.users).values({
   id: heavy, slug: `caps2-${heavy.slice(0, 6)}`, displayName: "Heavy",
-  email: `${heavy}@test.invalid`, passwordHash: "x",
+  email: `${heavy}@test.invalid`, passwordHash: "x", ageBand: "adult",
 } as never);
 const [wide] = await db.select().from(schema.quests).where(sqlEq(schema.quests.key, "orbit")).limit(1);
 const wW = { ...(wide.actionWeights as Record<string, number>) };

@@ -16,7 +16,7 @@ import { portalBuyCampaign } from "@/app/actions/brand-portal";
 // Two things are said plainly rather than buried, because both are unusual and
 // both are the reason to buy:
 //
-//   * 70% of the money is prize money. A brand is not renting attention, it is
+//   * Half the money is prize money. A brand is not renting attention, it is
 //     paying gamers to play — inside the servers they already live in.
 //   * There are no setup fees, no ad ops and no staff. The whole month is the
 //     number on the button.
@@ -61,6 +61,14 @@ export default function CampaignBuilder({
   const [cover, setCover] = useState<string | null>(null);
   const [perWeek, setPerWeek] = useState<(string | null)[]>([null, null, null, null]);
   const [split, setSplit] = useState(false);
+  // How many weeks. C6 — this had no control at all and the server floored it
+  // at four, so a brand who wanted two was sold and billed for four.
+  const [slots, setSlots] = useState(quote.slots);
+  // One game per week. C7 — a campaign was one game × four weeks, so a brand
+  // who wanted a mix had no way to say so. Null means "the game picked above",
+  // which is what every week is until somebody changes one.
+  const [perWeekGame, setPerWeekGame] = useState<(string | null)[]>([null, null, null, null]);
+  const [mixed, setMixed] = useState(false);
   const [regions, setRegions] = useState<string[]>([]);
   const [busy, setBusy] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -68,6 +76,13 @@ export default function CampaignBuilder({
   const [pending, start] = useTransition();
 
   const picked = useMemo(() => games.find((g) => g.game === game) ?? null, [games, game]);
+  // The bill, recomputed from the PER-CHALLENGE figures the server sent rather
+  // than from `quote.total` — a total is only right for the slot count it was
+  // quoted at, and this one moves.
+  const bill = useMemo(() => ({
+    total: quote.pricePerChallenge * slots,
+    prizeTotal: quote.prizePerChallenge * slots,
+  }), [quote.pricePerChallenge, quote.prizePerChallenge, slots]);
   const n = (v: number) => v.toLocaleString("en-US");
   const money = (v: number) => `$${n(Math.round(v))}`;
   const day = (iso: string) =>
@@ -104,8 +119,10 @@ export default function CampaignBuilder({
     start(async () => {
       const fd = new FormData();
       fd.set("game", game);
+      fd.set("slots", String(slots));
+      fd.set("games", JSON.stringify(mixed ? perWeekGame.slice(0, slots) : []));
       fd.set("coverUrl", cover ?? "");
-      fd.set("slotCovers", JSON.stringify(split ? perWeek : []));
+      fd.set("slotCovers", JSON.stringify(split ? perWeek.slice(0, slots) : []));
       fd.set("targeting", JSON.stringify({ regions }));
       const r = await portalBuyCampaign(brandId, keyStr, fd);
       if (r?.error) { setMsg(r.error); return; }
@@ -233,11 +250,36 @@ export default function CampaignBuilder({
             )}
           </div>
 
-          {/* ===== 3. The four weeks ===== */}
+          {/* ===== 3. How many weeks ===== */}
           <div className="mt-6">
-            <Step n={3} label="Your four weeks" />
+            <Step n={3} label="How many weeks" />
+            <div className="mt-3 flex flex-wrap gap-2">
+              {[1, 2, 3, 4].map((k) => (
+                <button
+                  key={k} type="button" onClick={() => setSlots(k)}
+                  className={`rounded-xl border px-4 py-2.5 text-sm font-bold transition ${
+                    slots === k
+                      ? "border-cyan-400/60 bg-cyan-500/15 text-cyan-100"
+                      : "border-white/12 bg-white/5 text-muted hover:text-ink"}`}
+                >
+                  {k} week{k === 1 ? "" : "s"}
+                </button>
+              ))}
+            </div>
+            {/* The old floor's argument, kept — it was right, it just should
+                never have been enforced silently. */}
+            <p className="mt-2 text-[11px] text-muted">
+              {slots >= 4
+                ? "Four is the full month, and the one we'd pick: you need the second week to see whether the first meant anything, and the Sunday show features each week in turn."
+                : `${slots} week${slots === 1 ? "" : "s"}. Shorter runs read as a post rather than a campaign — four gives you a second week to judge the first by.`}
+            </p>
+          </div>
+
+          {/* ===== 4. The weeks themselves ===== */}
+          <div className="mt-6">
+            <Step n={4} label={slots === 1 ? "Your week" : `Your ${slots} weeks`} />
             <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {weeks.map((w, i) => (
+              {weeks.slice(0, slots).map((w, i) => (
                 <div key={i} className="rounded-xl border border-white/12 bg-black/20 p-3">
                   <div className="flex items-baseline justify-between">
                     <span className="text-xs font-bold">Week {i + 1}</span>
@@ -246,6 +288,15 @@ export default function CampaignBuilder({
                     </span>
                   </div>
                   <div className="mt-1 text-sm tabular-nums">{day(w.startAt)} — {day(w.endAt)}</div>
+                  {mixed && (
+                    <select
+                      value={perWeekGame[i] ?? game ?? ""}
+                      onChange={(e) => setPerWeekGame((a) => a.map((v, k) => (k === i ? e.target.value : v)))}
+                      className="input-cosmic mt-2 w-full text-[11px]"
+                    >
+                      {games.map((g) => <option key={g.game} value={g.game}>{g.game}</option>)}
+                    </select>
+                  )}
                   <div className="mt-2 aspect-[1200/630] overflow-hidden rounded-lg border border-white/10 bg-black/40">
                     {(split ? perWeek[i] : cover)
                       ? /* eslint-disable-next-line @next/next/no-img-element */ (
@@ -263,19 +314,24 @@ export default function CampaignBuilder({
                 </div>
               ))}
             </div>
+            <label className="mt-3 flex items-center gap-2 text-xs text-muted">
+              <input type="checkbox" checked={mixed} onChange={(e) => setMixed(e.target.checked)} className="accent-cyan-500" />
+              Run a different game each week
+            </label>
             <p className="mt-2 text-[11px] text-muted">
               One challenge runs at a time on a game. Week one starts on the date above; each week after it
               opens as the one before it ends — so your brand is never competing with itself for the same players.
+              {mixed && " Mixing games keeps that rule: each week is still one game, and we'll refuse a game you already have running."}
             </p>
           </div>
 
-          {/* ===== 4. The creative ===== */}
+          {/* ===== 5. The creative ===== */}
           <div className="mt-6">
-            <Step n={4} label="Your cover" />
+            <Step n={5} label="Your cover" />
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <label className={`flex items-center gap-2 rounded-xl border border-dashed border-cyan-400/40 bg-cyan-500/[0.06] px-5 py-3 text-sm font-semibold cursor-pointer transition hover:border-cyan-300/70 ${busy === -1 ? "opacity-60 pointer-events-none" : ""}`}>
                 <Icon name="plus" size={14} />
-                {busy === -1 ? "Uploading…" : cover ? "Replace the cover" : "Upload one cover for all four"}
+                {busy === -1 ? "Uploading…" : cover ? "Replace the cover" : `Upload one cover for all ${slots}`}
                 <input type="file" accept="image/*" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f, "shared"); }} />
               </label>
@@ -290,24 +346,24 @@ export default function CampaignBuilder({
             </p>
           </div>
 
-          {/* ===== 5. The bill ===== */}
+          {/* ===== 6. The bill ===== */}
           <div className="mt-6 rounded-2xl border border-white/12 bg-black/25 p-4">
-            <Step n={5} label="What it costs" />
+            <Step n={6} label="What it costs" />
             <div className="mt-3 space-y-1.5 text-sm">
-              <Line label={`${quote.slots} weekly challenges on ${picked.game}`} value={money(quote.total)} />
-              <Line label={`Prize money to your audience (${quote.prizeSharePct}%)`} value={money(quote.prizeTotal)} sub />
-              <Line label="Platform fee" value={money(quote.total - quote.prizeTotal)} sub />
+              <Line label={`${slots} weekly challenge${slots === 1 ? "" : "s"} on ${picked.game}`} value={money(bill.total)} />
+              <Line label={`Prize money to your audience (${quote.prizeSharePct}%)`} value={money(bill.prizeTotal)} sub />
+              <Line label="Platform fee" value={money(bill.total - bill.prizeTotal)} sub />
               <Line label="Setup, ad ops, account management" value="$0" sub />
               <div className="border-t border-white/10 pt-2 mt-2 flex items-baseline justify-between">
                 <span className="font-bold">Total for the month</span>
-                <span className="text-2xl font-bold tabular-nums">{money(quote.total)} <span className="text-xs font-normal text-muted">{currency}</span></span>
+                <span className="text-2xl font-bold tabular-nums">{money(bill.total)} <span className="text-xs font-normal text-muted">{currency}</span></span>
               </div>
             </div>
             <button
               type="button" onClick={buy} disabled={working}
               className="brand-btn pressable mt-4 w-full rounded-full px-6 py-3 font-bold disabled:opacity-60"
             >
-              {pending ? "Sending…" : `Buy ${quote.slots} challenges on ${picked.game}`}
+              {pending ? "Sending…" : `Buy ${slots} challenge${slots === 1 ? "" : "s"} on ${picked.game}`}
             </button>
             <p className="mt-2 text-center text-[11px] text-muted">
               Goes to our team for review, then live. You are billed for the month, once.

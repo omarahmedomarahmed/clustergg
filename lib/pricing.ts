@@ -24,27 +24,66 @@ export type PricingConfig = {
   /** What a brand pays for one sponsored weekly challenge. */
   challengePrice: number;
   /**
-   * What that challenge pays out, and its split. Every cent of it reaches a
-   * gamer, as three trophies carrying the sponsor's brand.
+   * The prize share, as a PERCENTAGE of the price. C2.
    *
-   * `challengePrice - prizePool` is the gross margin on a challenge. It is the
-   * only place the two numbers meet, which is deliberate: the prize is a
-   * commitment to the players and the price is a commitment to the brand, and
-   * neither should move because someone edited the other.
+   * This used to be `prizePool: 175`, a fixed dollar figure, with the percentage
+   * *derived* from it — which made the price a dial that silently changed what
+   * we promise players. $350 gave 50% by coincidence; $400 would have given 44%
+   * with no warning, on a page that says "half of what a brand pays reaches the
+   * players who win".
+   *
+   * A percentage inverts that: move the price and the promise holds. It is also
+   * the only shape `lib/vaults.ts` can allocate against, since a vault split has
+   * to total 100 and a dollar figure has no share to add up.
+   */
+  prizePct: number;
+  /**
+   * How the pool divides between the three places, as WEIGHTS rather than
+   * dollars or percentages.
+   *
+   * 4 : 2 : 1 is the current podium ($100 / $50 / $25 out of $175) and it stays
+   * exact at every price, which neither dollars nor rounded percentages do —
+   * three percentages that each round to the nearest whole number do not add
+   * back to the pool, and the missing cents come out of a prize.
+   */
+  prizeW1: number;
+  prizeW2: number;
+  prizeW3: number;
+  /**
+   * DERIVED, never stored. `prizePct` × `challengePrice`, and the three places
+   * from the weights.
+   *
+   * They stay on the config because thirty call sites read `cfg.prizePool` and
+   * `cfg.prize1` to print a number, and those call sites are right — what was
+   * wrong was where the number came from. `derivePrizes()` is the single place
+   * that computes them, and `buildPricing` runs it last so a stale CMS row for
+   * `pricing.prizePool` cannot override it.
    */
   prizePool: number;
   prize1: number;
   prize2: number;
   prize3: number;
-  /** Monthly base for placements only. */
+  /**
+   * THE THREE TIER BASES AND THE ADD-ON ARE RETIRED. C11.
+   *
+   * They priced a three-shape rate card — placements only, placements plus
+   * challenges, the whole network — with a paid Sunday-broadcast add-on on top.
+   * `docs/COMMERCIAL_MODEL_V2.md` merged all of it into ONE package priced per
+   * challenge, with placements included free, and that is the offer the money
+   * paths, the vault split and the brand builder now run on.
+   *
+   * They default to 0 rather than being deleted: they are read in a dozen
+   * places across the marketing pages and the invoice builder, and the full
+   * page rewrite is a later item. Zero is the honest value — a base nobody is
+   * charged — and a zero base is skipped rather than printed, so no page says
+   * "$0/month". When the pages are rewritten these fields go with them.
+   */
   reachBase: number;
-  /** Monthly base once at least one game is sponsored. */
   challengeBase: number;
-  /** Monthly base when every game is sponsored. */
   ultimateBase: number;
   /** Paid annually, this much comes off. */
   yearlyDiscountPct: number;
-  /** The Sunday broadcast sponsorship, addable to any plan. */
+  /** Retired with the bases — the broadcast comes with the package now. */
   streamAddon: number;
   /** Video slots included at the top tier. */
   slotCount: number;
@@ -83,19 +122,48 @@ export type PricingConfig = {
   currency: string;
 };
 
-export const PRICING_DEFAULTS: PricingConfig = {
+/** The fields nobody sets — they are computed from the ones above them. */
+export const DERIVED_PRICING_KEYS = ["prizePool", "prize1", "prize2", "prize3"] as const;
+
+/**
+ * Fill the derived prize fields from the price and the percentage. C2.
+ *
+ * The three places are apportioned by weight and the LAST one takes the
+ * remainder, so the podium always adds back to the pool exactly. Rounding each
+ * place independently loses cents, and a prize pool that does not equal the sum
+ * of its prizes is exactly what C15 has to reconcile.
+ */
+export function derivePrizes<T extends PricingConfig>(cfg: T): T {
+  const pool = round2(cfg.challengePrice * (Math.max(0, Math.min(100, cfg.prizePct)) / 100));
+  const w = [cfg.prizeW1, cfg.prizeW2, cfg.prizeW3].map((n) => Math.max(0, n));
+  const sum = w[0] + w[1] + w[2];
+  const p1 = sum > 0 ? round2(pool * (w[0] / sum)) : 0;
+  const p2 = sum > 0 ? round2(pool * (w[1] / sum)) : 0;
+  return { ...cfg, prizePool: pool, prize1: p1, prize2: p2, prize3: round2(pool - p1 - p2) };
+}
+
+export const PRICING_DEFAULTS: PricingConfig = derivePrizes({
   games: 6,
   challengesPerGame: 4,
-  challengePrice: 250,
-  prizePool: 175,
-  prize1: 100,
-  prize2: 50,
-  prize3: 25,
-  reachBase: 600,
-  challengeBase: 500,
-  ultimateBase: 400,
+  // $350, per `docs/COMMERCIAL_MODEL_V2.md` §2 — one merged package, priced per
+  // challenge, of which half is prize money.
+  challengePrice: 350,
+  prizePct: 50,
+  prizeW1: 4,
+  prizeW2: 2,
+  prizeW3: 1,
+  // Overwritten by `derivePrizes` immediately. Present because the type says so;
+  // never read from here.
+  prizePool: 0,
+  prize1: 0,
+  prize2: 0,
+  prize3: 0,
+  // C11 — retired, see the type above. One package, priced per challenge.
+  reachBase: 0,
+  challengeBase: 0,
+  ultimateBase: 0,
   yearlyDiscountPct: 20,
-  streamAddon: 400,
+  streamAddon: 0,
   slotCount: 2,
   slotSeconds: 5,
   impressionsPerMember: 12,
@@ -103,11 +171,13 @@ export const PRICING_DEFAULTS: PricingConfig = {
   benchmarkCpc: 0.6,
   benchmarkCpe: 3.5,
   currency: "USD",
-};
+});
 
-// The numeric keys, as stored in the CMS.
+// The numeric keys an admin may actually set. The derived prize fields are
+// excluded on purpose: an input that accepts a value and then silently
+// overwrites it is worse than no input at all.
 export const PRICING_NUMBER_KEYS = Object.keys(PRICING_DEFAULTS)
-  .filter((k) => k !== "currency")
+  .filter((k) => k !== "currency" && !(DERIVED_PRICING_KEYS as readonly string[]).includes(k))
   .map((k) => `pricing.${k}`);
 
 // Copy keys. Feature lists are newline-separated, the same convention the
@@ -174,7 +244,11 @@ export function buildPricing(content: Record<string, string> = {}): PricingConfi
   out.games = Math.max(1, Math.min(24, Math.round(out.games)));
   out.challengesPerGame = Math.max(1, Math.min(31, Math.round(out.challengesPerGame)));
   out.yearlyDiscountPct = Math.max(0, Math.min(90, out.yearlyDiscountPct));
-  return out;
+  out.prizePct = Math.max(0, Math.min(100, out.prizePct));
+  // LAST, and unconditionally. A CMS row left over from when `pricing.prizePool`
+  // was editable would otherwise win over the percentage, and the page would go
+  // on showing a prize that no longer matches the price.
+  return derivePrizes(out);
 }
 
 // A newline-separated CMS list → array, blank lines dropped.
@@ -228,14 +302,13 @@ export function marginPerChallenge(cfg: PricingConfig): number {
 /**
  * The share of challenge revenue that reaches gamers.
  *
- * Not a policy we chose to publish — an arithmetic consequence of charging
- * `challengePrice` and paying out `prizePool`. It is stated everywhere as
- * "70% of what a brand pays goes to the players", and it stays true by
- * construction rather than by someone remembering to update it.
+ * Now the SOURCE, not a derivation. It used to divide the pool by the price and
+ * round — which is why a price change quietly changed the promise. Reading the
+ * configured percentage back means the sentence on the pricing page and the
+ * money in the prize vault come from the same number.
  */
 export function prizeSharePct(cfg: PricingConfig): number {
-  if (cfg.challengePrice <= 0) return 0;
-  return Math.round((cfg.prizePool / cfg.challengePrice) * 100);
+  return Math.round(Math.max(0, Math.min(100, cfg.prizePct)));
 }
 
 export type Quote = {
@@ -346,31 +419,39 @@ export type EarnStage = {
   name: string;
   /** Linked gamers required. Linked — not members. */
   threshold: number;
-  /**
-   * The owner's share of a sponsored challenge at this stage, as a % of what
-   * the brand paid. The single number an owner is climbing this ladder for, so
-   * it belongs on the card rather than in a footnote.
-   */
-  ownerPct: number;
+  // `ownerPct` was here — the per-challenge rate this ladder promised. C3
+  // removed it: a rung gates which weekly pool you compete in, and printing a
+  // rate we no longer pay was the loudest of the four places it survived.
   icon: string;
   headline: string;
   detail: string;
   perks: string[];
 };
 
+// The public server ladder. Rewritten by C3.
+//
+// Every rung used to promise a percentage — "5% of every sponsored challenge",
+// "your share doubles to 10%", "you keep 25 of the 30 points Cluster charges".
+// That is the per-challenge rate `docs/COMMERCIAL_MODEL_V2.md` §4 replaced with
+// a weekly pool, and this was the fourth place it lived: delete the other three
+// and the live `/servers` page goes on promising it.
+//
+// What replaces it is not vaguer. A rung says which pool you compete in, what
+// the pool is funded by, and what the tier unlocks that is not money — priority,
+// exclusivity, being named on the broadcast. Those were always the parts a
+// percentage could not buy.
 export const EARN_STAGES_DEFAULT: EarnStage[] = [
   {
     key: "monetized",
     name: "Sponsored",
     threshold: 500,
-    ownerPct: 5,
     icon: "diamond",
     headline: "Brand-sponsored challenges start landing in your server",
     detail:
-      "Link 500 gamers and your server switches on. Brands sponsoring the games your members already play start running their weekly challenges here — every dollar of the prize money is won by your members, and 5% of what the brand paid is yours.",
+      "Link 500 gamers and your server switches on. Brands sponsoring the games your members already play start running their weekly challenges here — every dollar of the prize money is won by your members, and you enter the weekly server pool that every sponsored challenge funds.",
     perks: [
       "Sponsored weekly challenges in your community's games",
-      "5% of every sponsored challenge, paid to you",
+      "A place in the weekly server pool, with a flat share for every week you carry a challenge",
       "Prize money paid straight to your members who win",
       "Owner portal: who linked, who entered, what they won",
       "Your server listed publicly with its own page",
@@ -380,14 +461,13 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     key: "broadcaster",
     name: "Broadcaster",
     threshold: 1000,
-    ownerPct: 10,
     icon: "satellite",
     headline: "More games, more weeks, more money into your community",
     detail:
-      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, so more of your members are playing for real prizes in more games at once — and your share doubles.",
+      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, so more of your members are playing for real prizes in more games at once — and you compete in a bigger tier of the pool, against fewer servers.",
     perks: [
       "Everything in Sponsored",
-      "Your share doubles to 10% of every sponsored challenge",
+      "A bigger tier of the weekly pool, with fewer servers competing for its slots",
       "Network-wide challenges carried in your server",
       "Priority on sponsored challenges in your top game",
       "Featured in the public server directory",
@@ -397,14 +477,13 @@ export const EARN_STAGES_DEFAULT: EarnStage[] = [
     key: "sponsored",
     name: "Flagship",
     threshold: 5000,
-    ownerPct: 25,
     icon: "crown",
     headline: "Brands buy your community by name",
     detail:
-      "At 5,000 linked gamers you are an audience in your own right. Brands ask for challenges in your server specifically, smaller servers carry yours instead of the other way round, and you keep 25 of the 30 points Cluster charges — we keep 5.",
+      "At 5,000 linked gamers you are an audience in your own right. Brands ask for challenges in your server specifically, smaller servers carry yours instead of the other way round, and you compete for the largest slots in the weekly pool.",
     perks: [
       "Everything in Broadcaster",
-      "25% of every sponsored challenge — Cluster keeps 5%",
+      "The largest slots in the weekly server pool",
       "Brands request your community by name",
       "Exclusive challenges only your members can enter",
       "Named on the Sunday broadcast",

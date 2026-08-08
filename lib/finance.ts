@@ -59,16 +59,19 @@ export type FinanceConfig = {
   games: number;
   /** Challenges per game per month. One a week. */
   challengesPerGamePerMonth: number;
-  /**
-   * Does a brand's sponsored challenge REPLACE one we were running anyway?
-   *
-   * The pricing calls it naming rights: that game's weekly challenge carries
-   * your brand. Read that way, selling a challenge adds revenue and no cost —
-   * the prize was already funded. If instead every sponsored challenge is an
-   * extra competition, each one adds a prize pool. The answer moves the budget
-   * by tens of thousands, so it is a switch rather than a silent assumption.
-   */
-  sponsorsUseHouseInventory: boolean;
+  // A switch called `sponsorsUseHouseInventory` was here. C8.
+  //
+  // It asked whether a sponsored challenge REPLACES one we were running anyway,
+  // and set to true it said the prize "was already funded" — while the prizes
+  // line below charged the house for every challenge on the network, sponsored
+  // or not. The same $175 was funded twice, once out of the raise and once out
+  // of the brand's payment.
+  //
+  // COMMERCIAL_MODEL_V2 §2 answers the question, so it stops being a switch:
+  // half of what a brand pays IS the prize pool. A sold challenge's prize comes
+  // out of the sale; the house funds only the challenges nobody bought. That is
+  // computed below rather than toggled, because a checkbox that contradicts the
+  // commercial model is a checkbox somebody will eventually tick.
 
   // ===== Everything else =====
   /** Infrastructure, game-API access, partnerships, tooling — for the period. */
@@ -95,7 +98,6 @@ export const FINANCE_DEFAULTS: FinanceConfig = {
 
   games: 6,
   challengesPerGamePerMonth: 4,
-  sponsorsUseHouseInventory: true,
 
   techBudget: 10_000,
   hires: 4,
@@ -103,10 +105,9 @@ export const FINANCE_DEFAULTS: FinanceConfig = {
 };
 
 export const FINANCE_NUMBER_KEYS = (Object.keys(FINANCE_DEFAULTS) as (keyof FinanceConfig)[])
-  .filter((k) => k !== "sponsorsUseHouseInventory")
   .map((k) => `finance.${k}`);
 
-export const FINANCE_CMS_KEYS = [...FINANCE_NUMBER_KEYS, "finance.sponsorsUseHouseInventory"];
+export const FINANCE_CMS_KEYS = [...FINANCE_NUMBER_KEYS];
 
 /** Read a CMS content map into a config. Anything missing or unparseable keeps
  *  its default rather than rendering a NaN on an investor's screen. */
@@ -115,10 +116,6 @@ export function buildFinance(content: Record<string, string> = {}): FinanceConfi
   for (const key of Object.keys(FINANCE_DEFAULTS) as (keyof FinanceConfig)[]) {
     const raw = content[`finance.${key}`];
     if (raw === undefined || raw === "") continue;
-    if (key === "sponsorsUseHouseInventory") {
-      out[key] = raw !== "false" && raw !== "0";
-      continue;
-    }
     const n = Number(raw);
     if (Number.isFinite(n) && n >= 0) (out[key] as number) = n;
   }
@@ -246,15 +243,23 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
   // the same whether or not anybody has bought it.
   const challengesPerMonth = cfg.games * cfg.challengesPerGamePerMonth;
   const challengesTotal = challengesPerMonth * cfg.months;
-  const prizeCostPerMonth = challengesPerMonth * prize;
-  const prizeCostTotal = challengesTotal * prize;
 
-  // The free first month. Under naming rights the challenge was already funded,
-  // so what it costs is the invoice we don't send. If instead each sponsored
-  // challenge is an additional competition, the prize money is additional too.
+  // C8. A SOLD challenge's prize comes out of the sale — half of what the brand
+  // pays IS the prize pool. So the house funds the prizes on challenges nobody
+  // bought, and only those. Charging the house for all of them while also taking
+  // 50% of every sale for prizes funded the same money twice.
+  const soldPerMonth = Math.min(challengesPerMonth, cfg.brandsConverting * cfg.freeChallengesPerBrand);
+  const housePrizeChallengesPerMonth = Math.max(0, challengesPerMonth - soldPerMonth);
+  const prizeCostPerMonth = housePrizeChallengesPerMonth * prize;
+  const prizeCostTotal = prizeCostPerMonth * cfg.months;
+
+  // The free first month is the one case where a sponsored challenge's prize IS
+  // ours: the brand's name is on it and no invoice went out, so nothing funded
+  // the pool. That is a real cash cost, and with the switch gone it is stated
+  // rather than hidden behind a default.
   const freeChallenges = cfg.targetBrands * cfg.freeChallengesPerBrand;
   const brandOfferForegone = freeChallenges * price;
-  const brandOfferCash = cfg.sponsorsUseHouseInventory ? 0 : freeChallenges * prize;
+  const brandOfferCash = freeChallenges * prize;
 
   const serverCash = cfg.targetServers * cfg.welcomeChallengeCost;
   const teamCash = cfg.hires * cfg.hireMonthlyCost * cfg.months;
@@ -263,10 +268,10 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
     {
       key: "prizes",
       label: "Prize pools — the competitions themselves",
-      formula: `${cfg.games} games × ${cfg.challengesPerGamePerMonth} challenges × ${cfg.months} months × $${prize}`,
+      formula: `${housePrizeChallengesPerMonth} unsold of ${challengesPerMonth} challenges/mo × ${cfg.months} months × $${prize}`,
       cash: prizeCostTotal,
       foregone: 0,
-      note: "Every challenge on the network pays out, sponsored or not. This is what keeps something worth entering live in every game, every week — the inventory a brand is later sold.",
+      note: "The challenges nobody has bought yet. They still pay out — that is what keeps something worth entering live in every game, every week, and it is the inventory a brand is later sold. A SOLD challenge is not in this line: half of what the brand paid is its prize pool.",
     },
     {
       key: "servers",
@@ -282,9 +287,7 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
       formula: `${cfg.targetBrands} brands × ${cfg.freeChallengesPerBrand} challenges × $${price}`,
       cash: brandOfferCash,
       foregone: brandOfferForegone,
-      note: cfg.sponsorsUseHouseInventory
-        ? "Naming rights on challenges we were already running and already paying for, so the cost is the invoice we don't send rather than money out."
-        : "Each sponsored challenge runs as an additional competition, so its prize pool is additional cash as well as an unsent invoice.",
+      note: "The first month on us. The brand's name is on the challenge and no invoice goes out, so nothing funds the prize pool — it is real cash as well as an unsent invoice. This is the only case where we pay for a sponsored challenge's prizes.",
     },
     {
       key: "tech",
@@ -319,12 +322,12 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
 
   // ===== Breakeven =====
   //
-  // Contribution per brand is revenue minus the cost of serving that brand.
-  // Under naming rights there is no per-brand prize cost — the challenge runs
-  // either way — so the whole invoice contributes, and prize money sits in the
-  // fixed cost base above. That is the honest structure, and it is also why
-  // breakeven is reached with a normal conversion rate rather than a heroic one.
-  const perBrandPrizeCost = cfg.sponsorsUseHouseInventory ? 0 : cfg.freeChallengesPerBrand * prize;
+  // Contribution per brand is revenue minus the cost of serving that brand, and
+  // under v2 that cost is real: half of what they pay leaves as prize money.
+  // The old model set this to zero on the "the challenge runs either way"
+  // argument, which flattered breakeven by exactly the prize line — the same
+  // money the prizes row above was already spending.
+  const perBrandPrizeCost = cfg.freeChallengesPerBrand * prize;
   const contributionPerBrand = Math.max(1, cfg.revenuePerBrand - perBrandPrizeCost);
   const brandsNeeded = Math.ceil(steadyMonthlyCost / contributionPerBrand);
   const conversionNeededPct = cfg.targetBrands > 0 ? (brandsNeeded / cfg.targetBrands) * 100 : 0;
@@ -351,7 +354,8 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
       + serversAdded * cfg.welcomeChallengeCost
       + (cfg.techBudget / cfg.months)
       + cfg.hires * cfg.hireMonthlyCost
-      + (brandsOnboardedByNow - brandsOnboardedLastMonth) * (cfg.sponsorsUseHouseInventory ? 0 : cfg.freeChallengesPerBrand * prize);
+      // The free month's prizes, which nothing else funds.
+      + (brandsOnboardedByNow - brandsOnboardedLastMonth) * cfg.freeChallengesPerBrand * prize;
 
     cashLeft = cashLeft - spend + monthMrr;
     if (breakevenMonth === null && monthMrr >= spend) breakevenMonth = m;

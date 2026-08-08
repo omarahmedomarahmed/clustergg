@@ -519,11 +519,34 @@ export async function awardQuestAction(
   }
 }
 
+/**
+ * May this gamer earn at all? B72.4.
+ *
+ * Checked INSIDE the lock, with everything else, rather than at each of the
+ * twenty-odd call sites — a gate that has to be remembered at every emitter is
+ * a gate that will be forgotten at one of them, and the one it is forgotten at
+ * will be the one that pays a child.
+ *
+ * Unset earns nothing and there is NO BACKFILL: actions taken before somebody
+ * answers pay zero, permanently. That is the incentive to answer early, and it
+ * is why the action is still logged below — nothing should look like it
+ * vanished.
+ */
+async function mayEarn(db: DB, userId: string): Promise<boolean> {
+  const [u] = await db.select({ band: schema.users.ageBand })
+    .from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+  const { rulesFor, parseBand } = await import("@/lib/age");
+  return rulesFor(parseBand(u?.band)).earn;
+}
+
 /** The body, with the lock already held. Every read below is inside the transaction. */
 async function awardQuestActionLocked(
   db: DB, userId: string, actionKey: QuestActionKey, ref?: { refType?: string; refId?: string },
 ): Promise<void> {
   {
+    // The age gate, before anything is computed. B72.4.
+    if (!(await mayEarn(db, userId))) return;
+
     const activeQuests = await db.select().from(schema.quests).where(eq(schema.quests.isActive, true));
     const listening = activeQuests.filter((q) => Number((q.actionWeights as Record<string, number>)[actionKey] ?? 0) > 0)
       // Stable order, so "the quest that gets paid" is the same on every run and

@@ -57,21 +57,29 @@ eq("garbage is not an age", ageFrom("not-a-date"), null);
 eq("nothing is not an age", ageFrom(null), null);
 
 console.log("\n== against the account on file ==");
-const mk = async (birth: Date | null, country: string | null) => {
+// The fixture takes a BAND now, not a birthday (B72.4). `birthDate` is no
+// longer collected and nothing reads it, so seeding one would be testing a
+// column we have told a regulator we stopped using.
+const mk = async (band: string | null, country: string | null) => {
   const id = uid();
   await db.insert(schema.users).values({
     id, slug: `el-${id.slice(0, 8)}`, displayName: "El", email: `${id}@test.invalid`,
-    passwordHash: "x", birthDate: birth, country,
+    passwordHash: "x", ageBand: band, country,
   } as never);
   return id;
 };
 const blank = await mk(null, null);
 eq("a fresh account cannot be paid", (await eligibilityFor(db, blank)).reason, "no_age");
-const kid = await mk(yearsAgo(14), "EG");
-eq("a 14-year-old cannot be paid", (await eligibilityFor(db, kid)).reason, "underage");
-const sanctioned = await mk(yearsAgo(30), blocked);
+const kid = await mk("under16", "EG");
+eq("an under-16 cannot be paid", (await eligibilityFor(db, kid)).reason, "underage");
+// The band that is old enough to earn and not old enough to be paid. This is
+// the one a range could get wrong, and the reason a band maps to its LOWEST
+// possible age rather than its highest.
+const teen = await mk("teen", "EG");
+eq("a 16-17-year-old cannot be paid either", (await eligibilityFor(db, teen)).reason, "underage");
+const sanctioned = await mk("adult", blocked);
 eq("a sanctioned country cannot be paid", (await eligibilityFor(db, sanctioned)).reason, "blocked_country");
-const good = await mk(yearsAgo(30), "EG");
+const good = await mk("adult", "EG");
 ok("an eligible adult can", (await eligibilityFor(db, good)).ok);
 
 console.log("\n== refused BEFORE anything is committed ==");
@@ -86,7 +94,7 @@ const prefs = await db.select({ pm: schema.users.payoutMethod }).from(schema.use
 eq("…and no payout preference was written for them", prefs[0]?.pm ?? null, null);
 
 console.log("\n== the annual total ==");
-const paid = await mk(yearsAgo(30), "US");
+const paid = await mk("adult", "US");
 const redeem = async (amount: number, paidAt: Date, status = "paid") => {
   await db.insert(schema.trophyRedeems).values({
     id: uid(), userId: paid, awardIds: [], amount, currency: "USD",
@@ -103,7 +111,7 @@ eq("the annual total counts only what was paid, in that year", await annualPayou
 eq("…and last year is its own number", await annualPayout(db, paid, Y - 1), 1000);
 // The year boundary is the thing that gets this wrong in practice: a request
 // approved in December and paid in January belongs to January.
-const crosser = await mk(yearsAgo(30), "US");
+const crosser = await mk("adult", "US");
 await db.insert(schema.trophyRedeems).values({
   id: uid(), userId: crosser, awardIds: [], amount: 300, currency: "USD", method: "bank",
   status: "paid",
@@ -123,6 +131,93 @@ const under = list.find((r) => r.userId === crosser);
 ok("somebody under the line is still LISTED, not filtered out", !!under);
 ok("…and not flagged", under?.overThreshold === false);
 ok("the list is sorted by what we paid", list.every((r, i) => i === 0 || list[i - 1].total >= r.total));
+
+console.log("\n== the age BAND, and what each one may do (B72.4) ==");
+{
+  const { AGE_BANDS, BAND_RULES, rulesFor, parseBand, changeBand, MAX_BAND_CHANGES } =
+    await import("../../lib/age.ts");
+  const { ageForBand } = await import("../../lib/eligibility.ts");
+
+  eq("three bands, and the line is 16", [...AGE_BANDS], ["under16", "teen", "adult"]);
+
+  // THE assertion. An unanswered band is not a permissive default.
+  const unset = rulesFor(null);
+  ok("nobody who has not answered can earn", !unset.earn && !unset.play && !unset.redeem);
+
+  ok("under 16 is read-only", !BAND_RULES.under16.play && !BAND_RULES.under16.earn && !BAND_RULES.under16.redeem);
+  ok("16-17 plays and earns", BAND_RULES.teen.play && BAND_RULES.teen.earn);
+  ok("…but cannot cash out", !BAND_RULES.teen.redeem);
+  ok("18+ can do everything", Object.values(BAND_RULES.adult).every(Boolean));
+
+  // A band maps to the LOWEST age it could mean. Rounding up would pay somebody
+  // on the strength of an age they never claimed.
+  eq("a band becomes its lowest possible age", [ageForBand("under16"), ageForBand("teen"), ageForBand("adult")], [0, 16, 18]);
+  eq("…and an unset band is not an age at all", ageForBand(null), null);
+  ok("16-17 therefore FAILS the redeem check", !eligibilityOf(ageForBand("teen"), "US").ok);
+  ok("…and 18+ passes it", eligibilityOf(ageForBand("adult"), "US").ok);
+
+  eq("junk is not a band", parseBand("nineteen"), null);
+
+  // The correction path. A band asked in one click WILL be mis-tapped, and a
+  // mis-tap onto under-16 turns off the whole product.
+  ok("answering for the first time is allowed", changeBand(null, 0, "under16").ok);
+  ok("…and does not count as a change", changeBand(null, 0, "under16").ok
+    && (changeBand(null, 0, "under16") as { locked: boolean }).locked === false);
+  ok("a correction is allowed", changeBand("under16", 0, "adult").ok);
+  ok("…and so is the third", changeBand("under16", MAX_BAND_CHANGES - 1, "adult").ok);
+  ok("the fourth is refused", !changeBand("under16", MAX_BAND_CHANGES, "adult").ok);
+  ok("…with a message that says what to do",
+    /support/i.test((changeBand("under16", MAX_BAND_CHANGES, "adult") as { error: string }).error));
+  // Re-picking what you already have is not a change, so a locked gamer is not
+  // shown an error for touching their own current answer.
+  ok("re-picking the same band is not refused when locked",
+    changeBand("adult", MAX_BAND_CHANGES, "adult").ok);
+}
+
+console.log("\n== a date of birth is no longer asked for anywhere ==");
+{
+  const { readFileSync } = await import("node:fs");
+  const code = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
+  ok("eligibility reads the band, not a stored birthday",
+    /ageForBand\(u\?\.band\)/.test(code("lib/eligibility.ts")));
+  ok("…and the redeem action no longer collects one",
+    !/birthDate/.test(code("app/actions/trophies.ts")));
+  // The gate is inside awardQuestAction, not at each emitter. A rule that has to
+  // be remembered at twenty call sites is one that will be forgotten at one.
+  ok("earning is gated once, centrally", /mayEarn\(db, userId\)/.test(code("lib/quests.ts")));
+  // No `type="date"` may come back on the two surfaces that used to have one.
+  // The server takes a band now, so a date input here would post "2003-04-11"
+  // to something that only accepts one of three words — a redemption that fails
+  // on a value the gamer typed correctly.
+  for (const f of ["components/TrophyCase.tsx", "components/RedeemStepper.tsx"]) {
+    ok(`${f} has no date-of-birth input`, !/type="date"/.test(code(f)));
+  }
+}
+
+console.log("\n== somebody is actually ASKED ==");
+{
+  const { readFileSync } = await import("node:fs");
+  const raw = (p: string) => readFileSync(new URL(`../../${p}`, import.meta.url), "utf8");
+  // A gate whose question is optional only fires on people who went looking for
+  // it. The picker sat in `/settings/earning` alone until this assertion; a
+  // gamer could link accounts, run challenges and earn NOTHING while never
+  // seeing the question. The root layout asks, so skipping onboarding cannot
+  // skip it.
+  const layout = raw("app/layout.tsx");
+  ok("the root layout renders the gate", /<AgeGate \/>/.test(layout));
+  ok("…only when the band is unset", /!me\.ageBand/.test(layout));
+  ok("…and never inside an embed", /!embedded && <AgeGate/.test(layout));
+  ok("the gate is answerable in place", /AgeBandPicker/.test(raw("components/AgeGate.tsx")));
+  // Answering revalidates the LAYOUT, not a list of pages — otherwise the
+  // "nothing is earning" bar survives on every other page after they answered.
+  ok("answering clears it everywhere", /revalidatePath\("\/", "layout"\)/.test(raw("app/actions/age.ts")));
+  // The layout reads the band off `getCurrentUser`, whose projection is partial
+  // while its TYPE is the full row — a column left out reads `undefined` and
+  // would make every gamer look unanswered forever.
+  ok("the per-request user fetch carries the band",
+    /ageBand: schema\.users\.ageBand/.test(raw("lib/auth.ts")));
+}
 
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }

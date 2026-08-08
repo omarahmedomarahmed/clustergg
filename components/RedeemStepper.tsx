@@ -94,7 +94,7 @@ export default function RedeemStepper({
     METHODS.some((m) => m.key === savedMethod?.method) ? savedMethod!.method : "bank");
   const [currency, setCurrency] = useState(savedMethod?.currency || "USD");
   const [country, setCountry] = useState(knownCountry ?? "");
-  const [birthDate, setBirthDate] = useState("");
+  const [ageBand, setAgeBand] = useState("");
   const [needs, setNeeds] = useState<("age" | "country")[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -126,7 +126,7 @@ export default function RedeemStepper({
       const res = await requestRedeem({
         awardIds: selected, currency, method,
         ...(country ? { country } : {}),
-        ...(birthDate ? { birthDate } : {}),
+        ...(ageBand ? { ageBand } : {}),
       });
       if (res.error) {
         setError(res.error);
@@ -278,14 +278,29 @@ export default function RedeemStepper({
                   className="input-cosmic w-full text-sm uppercase" />
               </label>
             )}
+            {/* A date-of-birth field was here. B72.4 replaced it with a RANGE:
+                paying somebody out has an age limit, and a range answers that
+                while a birthday answers far more than we need. Almost nobody
+                should ever see this — the band is asked on sign-in — and it
+                stays only so a gamer who somehow reaches this step without one
+                can answer rather than be sent away. */}
             {(needs.includes("age") || !knowsAge) && (
-              <label className="block">
-                <span className="mb-1 block text-[11px] font-semibold text-muted">Date of birth</span>
-                <input name="birthDate" type="date" value={birthDate}
-                  onChange={(e) => setBirthDate(e.target.value)}
-                  className="input-cosmic w-full text-sm" />
-                <span className="mt-1 block text-[10px] text-muted">Asked once, only because paying you out has an age limit.</span>
-              </label>
+              <fieldset className="block">
+                <legend className="mb-1 block text-[11px] font-semibold text-muted">Your age range</legend>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[["under16", "Under 16"], ["teen", "16–17"], ["adult", "18+"]].map(([v, label]) => (
+                    <button key={v} type="button" onClick={() => setAgeBand(v)}
+                      className={`rounded-xl border px-2 py-2 text-xs font-bold transition ${
+                        ageBand === v ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-100"
+                          : "border-white/12 bg-white/5 text-muted hover:text-ink"}`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <span className="mt-1 block text-[10px] text-muted">
+                  We never ask for your date of birth — only which range you are in.
+                </span>
+              </fieldset>
             )}
           </div>
 

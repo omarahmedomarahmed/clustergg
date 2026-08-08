@@ -72,7 +72,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
 
   "brand.prize.title": "Most of it isn't ad spend. It's prize money.",
   "brand.prize.body":
-    "70% of what you pay goes to the players as prizes, on trophies carrying your logo. No setup fee, no admin fee, no agency. That's why the rest buys reach instead of overhead.",
+    "Half of what you pay goes to the players as prizes, on trophies carrying your logo. No setup fee, no admin fee, no agency. That's why the rest buys reach instead of overhead.",
 
   // ===== The Discord section: the server-owner pitch =====
   // The other side of the marketplace. Brands pay in; servers get paid out.

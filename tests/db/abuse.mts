@@ -20,7 +20,7 @@ const eq = (name: string, got: unknown, want: unknown) =>
 const { payoutHold, PAYOUT_HOLD_DAYS, QUALIFY_AFTER_DAYS, QUALIFY_RULE,
   linkedCountsFor, markTierUnlocked, payoutHoldFor, hasBeenPaid, anomalousGrowth } =
   await import("../../lib/abuse.ts");
-const { ownerPctFor } = await import("../../lib/server-earnings.ts");
+const { tierOf } = await import("../../lib/week-close.ts");
 const { getDb, schema } = await import("../../lib/db/index.ts");
 const { eq: sqlEq, and: sqlAnd } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
@@ -54,7 +54,7 @@ await db.insert(schema.discordGuilds).values({ guildId, name: "Test Guild", stat
 const mkMember = async (linkedDaysAgo: number | null, proven: boolean) => {
   const id = uid();
   await db.insert(schema.users).values({
-    id, slug: `ab-${id.slice(0, 8)}`, displayName: "Ab", email: `${id}@test.invalid`, passwordHash: "x",
+    id, slug: `ab-${id.slice(0, 8)}`, displayName: "Ab", email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
   } as never);
   await db.insert(schema.discordGuildMembers).values({
     guildId, userId: id,
@@ -83,10 +83,60 @@ ok("…and says the unqualified still show in the member count",
   /still show/.test(QUALIFY_RULE), QUALIFY_RULE);
 
 console.log("\n== the tier reads the qualified count ==");
-// The rate must come from the qualified number, or the whole defence is a
-// display change.
-eq("500 raw but 0 qualified pays nothing", ownerPctFor(0), 0);
-eq("500 qualified pays 5%", ownerPctFor(500), 5);
+// INVERTED BY C3, not deleted. This used to assert that the per-challenge RATE
+// came from the qualified number rather than the raw one — the point being that
+// the defence had to reach the money, not just the display.
+//
+// There is no rate any more: owners are paid from the weekly pool. The property
+// still matters and still has to be checked, so it moved to the thing that now
+// decides money — `tierOf`, which sorts servers into who they compete against —
+// and the ASSERTION IS THE SAME ONE: a raw count buys nothing.
+eq("0 qualified is the bottom tier however many linked rows exist", tierOf(0), "small");
+eq("500 qualified moves up", tierOf(500), "mid");
+ok("…and the rate that used to sit here is gone entirely",
+  !("ownerPctFor" in (await import("../../lib/server-earnings.ts"))));
+
+console.log("\n== B80: an address is finally counted ==");
+{
+  const { signupVelocity, SIGNUP_IP_LIMIT, SIGNUP_LIMIT } = await import("../../lib/abuse.ts");
+  const { readFileSync } = await import("node:fs");
+
+  // THE DEFECT: `signup()` called this with `{ email }` and no address, so the
+  // IP branch could never trip and gmail aliases cost an attacker nothing.
+  const auth = readFileSync(new URL("../../app/actions/auth.ts", import.meta.url), "utf8");
+  ok("signup passes the address", /signupVelocity\(db, \{ email, ip \}\)/.test(auth));
+  ok("…and records it on the account", /signupIp: ip/.test(auth));
+  // Only the FIRST x-forwarded-for entry. The rest is client-supplied and would
+  // hand an attacker a fresh address per request.
+  ok("…taking only the first forwarded entry", /split\(","\)\[0\]/.test(auth));
+
+  const tag = uid().slice(0, 8);
+  const ip = `203.0.113.${Math.floor(Math.random() * 200)}-${tag}`;
+  const clean = await signupVelocity(db, { email: `a@gmail.com`, ip });
+  ok("an unused address is allowed", clean.ok);
+
+  // The IP limit is far above the domain limit on purpose: an address is a
+  // university NAT or a carrier, not a source.
+  ok("the address limit is much higher than the domain limit", SIGNUP_IP_LIMIT > SIGNUP_LIMIT * 3,
+    `${SIGNUP_IP_LIMIT} vs ${SIGNUP_LIMIT}`);
+
+  for (let i = 0; i < SIGNUP_IP_LIMIT; i++) {
+    await db.insert(schema.users).values({
+      id: uid(), email: `sybil-${tag}-${i}@gmail.com`, displayName: `S${i}`,
+      slug: `sybil-${tag}-${i}`, passwordHash: "x", signupIp: ip,
+    });
+  }
+  const tripped = await signupVelocity(db, { email: "b@gmail.com", ip });
+  ok("…and a script's worth from one address is refused", !tripped.ok, JSON.stringify(tripped));
+  ok("…with a message that accuses nobody",
+    /nothing is wrong with your account/.test(tripped.message), tripped.message);
+  ok("…and says which network, not which person", /network/i.test(tripped.message));
+
+  // A mainstream domain on a fresh address is still fine — the refusal must be
+  // about the address, not about gmail.
+  const other = await signupVelocity(db, { email: "c@gmail.com", ip: `${ip}-other` });
+  ok("another address is unaffected", other.ok);
+}
 
 console.log("\n== the unlock stamp is one-way ==");
 const first = new Date(Date.now() - 40 * DAY);
@@ -150,7 +200,7 @@ console.log("\n== defence 3: velocity is a friction, not a wall ==");
     const id = uid();
     await db.insert(schema.users).values({
       id, slug: `v-${id.slice(0, 8)}`, displayName: "V", email,
-      passwordHash: "x", createdAt: new Date(Date.now() - ageDays * 86400_000),
+      passwordHash: "x", ageBand: "adult", createdAt: new Date(Date.now() - ageDays * 86400_000),
     } as never);
   };
 
@@ -207,7 +257,10 @@ console.log("\n== defence 3: velocity is a friction, not a wall ==");
   console.log("\n== it is wired into the real signup path ==");
   const { readFile } = await import("node:fs/promises");
   const auth = await readFile(new URL("../../app/actions/auth.ts", import.meta.url), "utf8");
-  ok("signup consults it", /signupVelocity\(db, \{ email \}\)/.test(auth));
+  // Widened by B80: the call now carries the address as well as the email.
+  // The old pattern matched `{ email }` exactly, which is precisely why nobody
+  // noticed the address was never being passed.
+  ok("signup consults it", /signupVelocity\(db, \{ email, ip \}\)/.test(auth));
   ok("…and refuses with its own message rather than a generic one",
     /if \(!v\.ok\) return \{ error: v\.message \}/.test(auth));
   ok("…before the account row is written",

@@ -62,7 +62,7 @@ const userId = uid();
 const slug = `pe-${tag}`;
 await db.insert(schema.users).values({
   id: userId, slug, displayName: `Planet Explorer ${tag}`,
-  email: `${userId}@test.invalid`, passwordHash: "x", status: "active",
+  email: `${userId}@test.invalid`, passwordHash: "x", ageBand: "adult", status: "active",
 } as never);
 
 const mkAccount = async (ign: string) => {
