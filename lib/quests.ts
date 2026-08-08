@@ -676,6 +676,11 @@ async function awardQuestActionLocked(
     // Set the moment any quest records this action, so the second listener pays
     // nothing however it is ordered.
     let paid = false;
+    // B88.1: what this action costs the CP vault, collected as we go and posted
+    // once at the end. One write per action rather than one per listening quest,
+    // and outside the loop so a ledger failure can never sit between a credit
+    // and the progress bump that follows it.
+    const debits: { userId: string; cp: number; actionKey: string; rate: number }[] = [];
 
     for (const quest of listening) {
       const weight = Number((quest.actionWeights as Record<string, number>)[actionKey] ?? 0);
@@ -711,8 +716,29 @@ async function awardQuestActionLocked(
           set: { qp: sql`${schema.userQuestProgress.qp} + ${weight}`, updatedAt: new Date() },
         });
 
+      if (cp > 0) debits.push({ userId, cp, actionKey, rate: 0 });
+
       await unlockTiers(db, userId, quest.id, quest.name);
       await maybeCompleteQuest(db, userId, quest.id, quest.name);
+    }
+
+    // ===== The money leaves the vault. B88.1 =====
+    //
+    // Until this existed the CP vault only ever GREW: sales credited it and
+    // nothing took anything out, so its balance was a running total of what we
+    // had sold rather than what was left. The whole gamer economy is derived
+    // from that number, and a ceiling computed against a balance that only
+    // grows is a ceiling that grows forever.
+    //
+    // Last, and after the credit is safely written. A gamer who earned CP has
+    // earned it; `debitCpVault` never throws for the same reason.
+    if (debits.length) {
+      const { debitCpVault } = await import("@/lib/vaults");
+      const { cpPerDollar } = await import("@/lib/marketplace");
+      // The handle we were given, never a new one — this runs inside the award
+      // transaction and a helper that opens its own deadlocks. Twice now.
+      const rate = await cpPerDollar(db);
+      await debitCpVault(db, debits.map((d) => ({ ...d, rate })));
     }
   }
 }

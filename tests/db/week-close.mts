@@ -104,7 +104,11 @@ console.log("\n== a week with money and entrants pays out ==");
     }).onConflictDoNothing();
   }
 
-  const [challenge] = await db.select({ id: schema.challenges.id }).from(schema.challenges).limit(1);
+  // Explicitly a PUBLIC challenge. The fixture used to take whatever came
+  // first, which passed by luck and would have kept passing if the
+  // public/private filter were deleted.
+  const [challenge] = await db.select({ id: schema.challenges.id, spaceId: schema.challenges.spaceId })
+    .from(schema.challenges).where(eq(schema.challenges.visibility, "public")).limit(1);
   const [account] = await db.select({ id: schema.linkedGameAccounts.id, userId: schema.linkedGameAccounts.userId })
     .from(schema.linkedGameAccounts).limit(1);
   const joinAt = new Date(weekStart.getTime() + 2 * 86400_000);
@@ -149,6 +153,38 @@ console.log("\n== a week with money and entrants pays out ==");
     }).onConflictDoNothing();
   }
 
+  // ===== A PRIVATE challenge, whose entrants must NOT count =====
+  //
+  // A private challenge is one a server owner bought for their own members. It
+  // puts nothing into the pool, so entering one must not earn a share of it —
+  // otherwise an owner buys a cheap private challenge, has their own members
+  // enter, and takes a slice of money that other servers' sponsored work paid
+  // in. The whole guard is `sponsorBrandId is not null` on one join, which is
+  // exactly the kind of line that gets "simplified" away.
+  //
+  // Given to the FIRST guild, generously: if the filter breaks, that guild's
+  // entrant count jumps and its share moves, so the assertion below fails loudly
+  // rather than drifting.
+  const privateChallengeId = uid();
+  await db.insert(schema.challenges).values({
+    id: privateChallengeId, spaceId: challenge.spaceId, game: "Chess", provider: "chesscom",
+    title: `Private ${tag}`, status: "active",
+    startAt: weekStart, endAt: new Date(weekStart.getTime() + 6 * 86400_000),
+    // `visibility: private` is the whole point of this fixture.
+    visibility: "private", guildId: guilds[0],
+  } as never).onConflictDoNothing();
+  for (let i = 0; i < 5; i++) {
+    const userId = uid();
+    await db.insert(schema.users).values({
+      id: userId, email: `${userId}@wc.test`, displayName: `WC priv ${i}`, slug: `wc-${tag}-p${i}`,
+      passwordHash: "x", ageBand: "adult", role: "user", status: "active",
+    });
+    await db.insert(schema.challengeParticipants).values({
+      id: uid(), challengeId: privateChallengeId, userId,
+      linkedAccountId: account.id, guildId: guilds[0], joinedAt: joinAt,
+    }).onConflictDoNothing();
+  }
+
   // Money into the server vault, DATED INSIDE the week. `postToLedger` stamps
   // now, and now is after the week it is meant to fund — a week's pool is what
   // had arrived by the time that week ended, which is the property that stops
@@ -175,11 +211,27 @@ console.log("\n== a week with money and entrants pays out ==");
   ok("the shares never exceed the true entrant count", total <= truth + 1e-9, `${total} vs ${truth}`);
 
   // The term with no data is dropped, not scored as zero for everybody.
-  ok("engaged opens did not score — nothing records them",
+  // B73 / Discord Developer Policy §13: a cash pool scored on card opens is a
+  // standing incentive to manufacture activity in somebody else's product. The
+  // term is not "dropped for lack of data" any more — it is GONE.
+  // The private challenge gave `guilds[0]` five extra entrants. If the
+  // sponsored-only filter is ever removed they land here, so this is the
+  // assertion that fails rather than a share quietly moving.
+  {
+    const first = r.servers.find((x) => x.guildId === guilds[0]);
+    eq("private-challenge entrants are not counted", first?.entrants, 2);
+    ok("…so the private challenge did not buy a bigger share",
+      (first?.exclusiveEntrants ?? 0) <= 2, JSON.stringify(first));
+  }
+
+  ok("engaged opens are not a term at all",
     !("engagedOpens" in r.terms), JSON.stringify(r.terms));
+  ok("…and every surviving term measures an outcome, not activity",
+    Object.keys(r.terms).every((k) => ["exclusiveEntrants", "newlyQualified", "conversion"].includes(k)),
+    Object.keys(r.terms).join(","));
   near("…and the surviving terms still total 100",
     Object.values(r.terms).reduce((a, b) => a + b, 0), 100, 0.05);
-  ok("the summary says which terms ran", /Scored on \d+ of 4 terms/.test(r.summary), r.summary);
+  ok("the summary says which terms ran", /Scored on \d+ of 3 terms/.test(r.summary), r.summary);
 
   // Everything that took part is paid something — the participation floor is
   // what makes a pool a ladder rather than a taunt.

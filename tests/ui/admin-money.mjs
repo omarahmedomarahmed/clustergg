@@ -50,7 +50,16 @@ for (const [path, heading] of [["/admin/vaults", "Vaults"], ["/admin/week", "The
 
 console.log("\n== the vault page states where its numbers come from ==");
 {
-  await page.goto(`${BASE}/admin/vaults`, { waitUntil: "domcontentloaded" });
+  // `open`, and then wait for the LAST thing this block reads. The vault page
+  // streams: `settle` clears the loading screen, but under a three-lane run the
+  // sections below the fold are still arriving, and reading the body then
+  // failed all eight assertions on a page that was about to render every one of
+  // them. Waiting for a needle costs nothing when the page is fast.
+  await open(page, `${BASE}/admin/vaults`);
+  await page.waitForFunction(
+    () => /never banked/i.test(document.body.innerText),
+    null, { timeout: 20000 },
+  ).catch(() => {});
   const body = await page.locator("body").innerText();
   for (const v of ["Prize vault", "Server pool", "CP vault", "Cluster revenue"]) {
     ok(`${v} is shown`, body.includes(v));
@@ -68,7 +77,13 @@ console.log("\n== the vault page states where its numbers come from ==");
 
 console.log("\n== the week page explains a payout before anybody disputes one ==");
 {
-  await page.goto(`${BASE}/admin/week`, { waitUntil: "domcontentloaded" });
+  // Same streaming race as the vault page — fixed here before it costs a run
+  // rather than after.
+  await open(page, `${BASE}/admin/week`);
+  await page.waitForFunction(
+    () => /Exclusive-weighted entrants/.test(document.body.innerText),
+    null, { timeout: 20000 },
+  ).catch(() => {});
   const body = await page.locator("body").innerText();
   ok("the four score terms are listed", /Exclusive-weighted entrants/.test(body));
   ok("…including the one with no data, named as dropped", /DROPPED|dropped/.test(body));

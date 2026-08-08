@@ -219,6 +219,416 @@ to have vanished.
 
 ---
 
+### ▸ B88 — The vaults actually run the economy · **BUILDING**
+
+**The finding, from the owner and it is correct:** the daily CP ceiling is a
+number a human types (500) with no connection to the money in the CP vault, and
+the server pool is the whole server vault with no reserve. Both should be
+**derived from an amount somebody deliberately allocated**, and both should
+**move as the week is spent**.
+
+Underneath it is a defect neither of us had named: **nothing debits the CP
+vault.** `lib/vaults.ts` has `allocateInvoice` and `transfer` and no outflow for
+a CP credit at all, so the vault only ever grows and "what is left this week"
+cannot be asked. Every part of this item rests on fixing that first.
+
+#### B88.1 — A CP credit is money leaving a vault
+
+| Change | Why |
+|---|---|
+| `awardQuestAction` posts a `cp` outflow for every credit, at the live rate | The balance on `/admin/vaults` becomes a real remaining balance rather than a running total of sales |
+| The outflow carries the gamer, the action and the CP | "Where did the vault go" is answerable without a second system |
+| Zero-CP events write nothing | A gamer at their ceiling did not drain anything |
+
+**Verification owed → `tests/db/cp-vault.mts` (new):** N credits reduce the CP
+vault by exactly Σ(CP)÷rate; a credit of 0 CP writes no row; the balance equals
+inflows minus outflows and never drifts.
+
+#### B88.2 — The week is an ALLOCATION, not the whole vault
+
+One new table: an allocation per week, per vault.
+
+| Field | Meaning |
+|---|---|
+| `week` | The Monday it applies to |
+| `vault` | `cp` or `server` |
+| `amount` | What an admin released for that week |
+| `lockedAt` | Set when the week starts; before that it is freely editable |
+
+Rules, and they are the point:
+
+1. **Admin sets it, never the software.** A percentage picker is a convenience
+   over the top; the stored value is dollars.
+2. **It can be raised mid-week, never lowered.** Gamers have already been shown
+   a ceiling computed from it and servers have been shown a pool.
+3. **What is not allocated is a RESERVE.** A week with no sales still pays,
+   which is the whole reason to hold one back.
+4. **Owners see the allocation, never the vault.** The reserve is ours to
+   manage and showing it invites "why am I not paid out of that".
+
+#### B88.3 — The daily ceiling, derived and recomputed
+
+```
+today's ceiling = remaining allocation ÷ eligible gamers ÷ days left in week
+```
+
+| Term | Definition | Why not the obvious thing |
+|---|---|---|
+| remaining allocation | allocated − credited so far this week | Unspent CP rolls forward automatically; no separate rollover to get wrong |
+| eligible gamers | unlocked, not banned, active in 7 days, **plus** everyone who joined today | "All registered" drags in dormant accounts and makes the ceiling meaninglessly small |
+| days left | including today | Spends the week evenly rather than emptying it on Monday |
+
+Recomputed **once a day**, not per request: a ceiling that moves while a gamer
+is mid-mission is a ceiling that takes something away mid-task.
+
+**Bounded both ways.** Admin sets a floor and a cap. Without a floor a growth
+spike makes a mission worth 4 CP, which reads as the product breaking; without a
+cap a quiet week hands one gamer a fortune.
+
+**The mission total IS the ceiling.** Already true in `lib/cp-dial.ts`; what
+changes is that the number now comes from the vault instead of from a form.
+
+**Verification owed → `tests/db/cp-ceiling.mts` (new):** more gamers, same
+money → lower ceiling; unspent CP raises tomorrow's; the floor holds when the
+maths says 3 CP; the cap holds when it says 90,000; a zero allocation stops
+earning without deleting anything; the ceiling recomputed twice in one day is
+the same number.
+
+#### B88.4 — The server pool, simplified to one sentence
+
+**Delete** slots, `1/(rank+1)`, repeat-winner decay, empty-slot redistribution,
+and the 500-linked earn threshold.
+
+**Replace with:** *your share of the pool is your share of the score.*
+
+| Before | After |
+|---|---|
+| Top 20% place; #1 gets 2× #2 | Everyone who qualified is paid, in proportion to their score |
+| Decay ×1/(1+0.25·wins) | Gone. Winning often is what we want |
+| Empty slot redistributed | No slots, nothing to redistribute |
+| Unlock at 500 linked | **0.** A server earns from its first week |
+| Participation 20% flat | **Kept** — it is the floor that makes a small server's first cheque real |
+
+Tiers stay as **labels** and never become rates. C3 deleted `ownerPct` for a
+reason and this does not bring it back: a per-server rate on top of a pool pays
+twice, and a published percentage is a promise we are held to.
+
+**What counts, and it must be visible:** only **public sponsored challenges
+live this week**. A private challenge a server runs for itself earns nothing —
+it is not inventory a brand paid for, and counting it would pay owners for
+talking to themselves.
+
+**Verification owed → `tests/db/pool-share.mts` (new):** shares sum to the pool
+exactly; a server with 12% of the score gets 12% of the competitive half; a
+private challenge contributes nothing to any KPI; a server under 500 linked is
+paid.
+
+#### B88.5 — The week is the dashboard
+
+`/admin/week` becomes the operating screen for both vaults.
+
+| Shows | For |
+|---|---|
+| Allocated / spent / remaining, per vault | Whether this week is on track |
+| Today's ceiling, its inputs, and yesterday's | Why a gamer's mission changed |
+| The pool, the standings, every server's four KPIs | The number an owner will ring about |
+| Next week's allocation, editable until it locks | The one decision this screen exists for |
+
+**New challenges wait for the boundary.** A challenge sold mid-week is billed
+and its money splits into the vaults immediately, but it **launches next
+Monday** — an allocation that grew mid-week would mean a pool an owner had
+already been shown going up, and a race to sell before Sunday.
+
+#### B88.6 — The KPIs, said in the owner's words
+
+The four terms are shown to owners as **KPIs with a target and a delta**, on the
+portal and on a public board: what it counts, what it counted for you, what
+moves it. A weight nobody can act on is a number that reads as arbitrary.
+
+> **What we are NOT doing.** No per-server percentage rate. No paying for
+> private challenges. No showing an owner the reserve. No lowering an allocation
+> after a week has started.
+
+---
+
+### ▸ B89 — The full cycle, then the storefront that shows it · **PLANNED**
+
+**Verified before planning.** What already exists, so nothing here rebuilds a
+working surface:
+
+| Exists | State |
+|---|---|
+| `/pay/[token]` — a brand's finance dept pays a hosted checkout | ✅ Works. No field on it could collect a card |
+| `payout_accounts` — preference word + opaque provider handle | ✅ Works. No bank details stored anywhere |
+| Server portal, Earnings tab | ⚠️ Exists, but **no wallet**: no balance, no history, no withdraw |
+| `/servers/[slug]` public server page, 517 lines | ⚠️ Exists, thin |
+| `/pricing`, 260 lines | ⚠️ Three-tier scaffolding around a one-package model (B78 follow-up) |
+| Live pool page | ❌ Does not exist |
+| Gamer segments for brands | ❌ Does not exist |
+| Self-serve brand purchase | ❌ Staff must raise every invoice by hand |
+
+**The stale thing verification found:** `lib/server-earnings.ts` still computes
+`serverShare` per challenge and the portal prints "% of the field", which is the
+per-challenge cut C3 deleted. Two models are live on one screen.
+
+#### B89.1 — The server owner's wallet
+
+An owner cannot see money they are owed, only challenges they ran.
+
+| Build | Rule |
+|---|---|
+| Balance: earned − paid | Summed from payout rows, never stored |
+| History: every week's pool share, every payout, every reference | An owner reconciling a number must not need to email us |
+| Withdraw | Requests a payout. **Never** takes bank details — the provider's link does |
+| The $25 floor, stated | Below it, it accrues. Said before they press, not after |
+| The 30-day first-payout hold, stated with its date | B35. A hold discovered at withdrawal reads as a refusal |
+
+**Delete `serverShare` and every surface printing "% of the field".** One model.
+
+#### B89.2 — The brand's buying cycle, end to end
+
+| Step | Today | After |
+|---|---|---|
+| Choose | `/pricing` calculator | Same, with a **Start** that creates a real enquiry |
+| Agree | Email | Staff turn the enquiry into a campaign |
+| Bill | Staff open an invoice | Unchanged — a human still prices a deal |
+| Pay | `/pay/[token]` | Unchanged. It already works |
+| Money splits | On PAID | Unchanged |
+| Launch | Immediate | **Next Monday.** B88 — the week is the unit |
+| Report | Brand portal | Unchanged |
+
+**Not building self-serve checkout.** A brand that can buy without talking to
+anybody is a brand nobody qualified, on a platform whose first question from
+counsel is who our customers are.
+
+#### B89.3 — The public pool page
+
+`/pool` — the live weekly server pool, open to anybody.
+
+| Shows | Why |
+|---|---|
+| This week's pool, in dollars | The number that makes an owner install the bot |
+| Which challenges it counts | Public sponsored only. Private earns nothing, said plainly |
+| The board: every competing server, its four KPIs, its share | An owner must see how to move up, not just where they are |
+| The bracket split | Why a 200-member server is not competing with a 5,000-member one |
+| Last week's result | A pool with no history reads as a promise |
+
+**Honest when empty.** No challenge sold means "$0 — the pool opens with the
+first sponsored challenge", never a placeholder.
+
+#### B89.4 — The public server profile
+
+`/servers/[slug]`, rebuilt, editable from the portal.
+
+Top members · challenges they joined · trophies their members won · featured
+gamers · who appears on which game leaderboard · the pool standing.
+
+**Every one of those is already public** on `/u/[slug]` and the boards. This
+page aggregates what a gamer has already chosen to show, and adds nothing.
+
+#### B89.5 — Gamer segments for brands ⚠️ **NEEDS A DECISION**
+
+"Show them as segments for brands" runs straight at B82's boundary: **aggregate
+only, no identity, nothing under 25 viewers.**
+
+| Build | Do not build |
+|---|---|
+| "18,000 gamers play Valorant, 40% also play Apex" | A list of who they are |
+| Reach estimates per game, per region, per server size | Any row a person could be picked out of |
+| The floor applies to every slice | An export |
+
+Owner decision, written down before it is built.
+
+#### B89.6 — The website, rewritten around real components
+
+Home · `/pricing` (with server earnings on the same page) · `/brands` ·
+`/servers` · `/discord-bot`.
+
+**Sections render the real component, not a screenshot.** A live bot card, a
+live pool board, a live trophy shelf. A screenshot is a claim; a component is
+the product.
+
+**Order: last.** Every page here is a storefront for a model whose numbers come
+from B88 and B89.1–B89.4. Written first, it is fiction we then have to correct.
+
+> **Gate 4 says this waits for one signed IO** and two of its three pages already
+> shipped. Building the rest is a deliberate owner decision, and it is recorded
+> here as one rather than quietly taken.
+
+---
+
+### ▸ B90 — The campaign is the product · **PLANNED**
+
+**Read `docs/B73_RESEARCH.md` first.** It is now on this branch. The single most
+important thing in it, for this item: **Discord Developer Policy §6 probably
+prohibits a third-party brand's paid creative inside a bot message, and the
+sponsored-CHALLENGE business survives that.** The owner's redesign — sell
+campaigns of weekly challenges, not ad placements — moves us onto the surviving
+side of that line. It was not designed for that reason and it does it anyway.
+
+#### B90.0 — What the legal read changes, immediately
+
+| Finding | Change | Where |
+|---|---|---|
+| §6: paid creatives in bot messages | Discord surfaces become **name-and-mention only** — the challenge's own title carries the sponsor ("The AstroFuel 24h Bullet Marathon"). Brand imagery lives on OUR domain, which the card links to. Web placements keep images | `lib/cards/`, `adPlacements` surface flag |
+| §13: "do not fraudulently manipulate engagement" | The owner pool scored on raw activity is **a bounty on server messages**. Rescore on challenge OUTCOMES — entrants, completion — not on card opens | B88.4's KPIs |
+| §17: no API data to ad networks | Already our rule. A brand never sees a per-server or per-user Discord datum | `lib/ad-delivery.ts` |
+| 1099 threshold is **$2,000**, not $600 | Defect. `lib/eligibility.ts:55` over-reports | Fix now |
+| Sanctions list wrong **both ways** | Syria's program was revoked; Crimea/Donetsk/Luhansk are missing | `lib/eligibility.ts:41` |
+| Under-18 profiled ads barred in 9 regimes | Ad serving to under-18s must be **contextual, never profiled**. One change clears more jurisdictions than any other | Ad serving |
+| 30% NRA withholding, **no de-minimis**, on non-US prize payouts | **Pre-launch blocker for the international population.** Unresolved in the research — the largest open question in it | Redemption |
+
+#### B90.1 — Brand self-signup
+
+Create a brand → automated email with a portal link and key → build a campaign.
+
+**Admin approves before a brand appears anywhere public.** Self-signup with no
+gate is a spam surface and a "who are our customers" problem on a platform whose
+first counsel question is exactly that.
+
+**A brand never sees another brand's numbers.** The owner asked for "numbers on
+challenges by other brands"; that is a competitor's performance data. What ships
+is **aggregate platform benchmarks** — median entrants per challenge, typical
+reach — with no brand named and the 25-cohort floor applied.
+
+#### B90.2 — The campaign builder
+
+| Step | Rule |
+|---|---|
+| Pick 1–4 challenges | Each is **one week**. Four is a month, said in those words |
+| Weeks are consecutive | Never two in one week. Start dates shown before payment, all fixed to a Monday |
+| Prize pool | **Read-only.** It is 50% of the price and not a field |
+| Creatives, cover, logo | Plus light-background and dark-background logo variants — we render three branded trophies from them |
+| Estimated reach | Total gamers and total servers, labelled **estimate, not guaranteed** |
+| Pay | The whole campaign, once. Nothing queues until it clears |
+
+#### B90.3 — The status ladder
+
+`draft` → `queued` → `announced` → `live` → `ended`
+
+| Status | Means | Set by |
+|---|---|---|
+| **draft** | Built, **not paid**. Visible to admin as "a brand is buying and still thinking" | Brand |
+| **queued** | Paid. Starts the following Monday | Payment |
+| **announced** | Admin has set the three trophies, the rules and the game-API metric. The bot tells every server it opens next week. **Tracking starts here** | Admin |
+| **live** | Running | Cron, Monday |
+| **ended** | Scored, prizes awarded | Cron |
+
+**Nothing queues before payment clears.** A challenge in `draft` is a lead.
+
+#### B90.4 — Every challenge has somebody who paid for it
+
+| Kind | Who pays | Split | Cut |
+|---|---|---|---|
+| Sponsored | A brand | Normal 50/20/15/15 | Yes |
+| House | The Cluster house brand, billed to itself | Normal | Nominal — it is our own promo |
+| **Private** | A server owner, from their wallet balance | ⚠️ **See below** | ⚠️ |
+
+> **DECIDED — private challenges are a PRODUCT WE SELL, not a transfer.**
+>
+> An owner requests one → we send a bill for **the prize pool plus 5%** (per-bill
+> editable, and settable to 0 as a normal invoice adjustment or a discount) →
+> they pay → it queues → admin sets the game metric and the rules → it announces
+> **on that server only**.
+>
+> The 5% is what makes it a sale. A pass-through with no margin is the version
+> that reads as receiving money from person A to pay person B — the
+> money-transmitter trigger at `B73_RESEARCH.md` Q3, and the thing deleting
+> gifting closed. The owner buys a product; we then owe the prize as our own
+> obligation.
+>
+> | Rule | Value |
+> |---|---|
+> | Split | prize pool → prize vault · 5% → cluster. **No server or CP allocation** |
+> | Pool | Does **not** count. It is not brand inventory |
+> | Announce | That server only, and **only after payment clears** |
+> | Draft | Cancellable and editable by the owner. Visible to admin as a lead |
+
+#### B90.7 — What counts, and what does not · **B88.4 KPIs, settled**
+
+| KPI | Counts | Does NOT count |
+|---|---|---|
+| **Entrants you brought** | Entrants into **public** challenges, each ÷ how many servers they are in | A private challenge. It put nothing into the pool |
+| **New members linked** | Every linked account, **whatever prompted it** | — |
+| **Conversion** | **Public** entrants ÷ **all** linked members | Private entries in the numerator |
+
+The asymmetry is deliberate and worth saying to owners in these words: **a
+private challenge grows you, it does not pay you twice.** Linking is linking
+whatever brought somebody in, so it earns growth and it raises the conversion
+denominator. Entering an event the owner bought for their own members does not
+earn a share of money other servers' sponsored work paid in.
+
+Implemented on `visibility`, which already existed and already means exactly
+this. No new column. It also correctly excludes a WELCOME challenge, which is
+private to one guild.
+
+#### B90.8 — The admin challenge builder, revamped
+
+Every challenge now belongs to something that was billed.
+
+| Kind | Built by | Billed to | Announced |
+|---|---|---|---|
+| **Campaign challenge** | Brand, 1–4 per campaign | The brand, one bill | Everywhere |
+| **Private** | Server owner | That owner, prize pool + 5% | That server only |
+| **House** | Admin | The Cluster brand | Everywhere |
+| **Custom** | **Admin only** | 1 or 2 brands, **max 2** | Everywhere |
+
+**Custom keeps what the old builder could do** — monthly, daily, any cadence —
+and gains a bill. Admin sets a prize pool and the fee equals it, so a custom
+challenge is priced like every other: half the money is the prize.
+
+**Co-sponsorship, max two brands.** Each gets a partial bill that says on its
+face that a co-sponsor is paying the other half. A bill that hides a co-sponsor
+is a bill somebody disputes.
+
+**The start date is always the following Monday**, for every kind. Announcement
+happens when an admin presses announce — which may be mid-week — and the message
+carries the start date. Nothing starts mid-week; announcements do.
+
+#### B90.9 — The server owner's wallet IS their billing page
+
+Earnings, balance, and every bill for their own challenges, in one place.
+
+**Any bill can be paid from the balance.** That is the loop the whole
+server-owner product rests on: earn from the pool, spend it back into your own
+server. It is a purchase, not a transfer — see B90.4.
+
+#### B90.10 — Every rule, with its reason, to the audience it binds
+
+Three guides: **gamer**, **server owner**, **brand**. Every rule that touches
+that audience, stated visually, and **each one carries WHY it exists in terms of
+what it gets them.**
+
+A rule with no reason reads as an obstacle and gets worked around. A rule whose
+reason is about US ("so we can measure") is worse. The daily ceiling is not "a
+limit we impose", it is "the reason the points are still worth something in six
+months". The 30-day first-payout hold is not "we distrust you", it is "the only
+mechanism that can claw back a fraud, which is why anybody can be paid at all".
+
+> **A drafting note that is not optional.** Every one of these is a promise. A
+> guide that overstates a rule is a term we are held to — the same reason C3
+> deleted the tier percentage.
+
+#### B90.5 — Admin sees every campaign, including the unpaid ones
+
+One console: every brand, every campaign, every challenge, filterable by status.
+A `draft` campaign is a **sales signal**, not clutter.
+
+#### B90.6 — BETA
+
+A `BETA` badge beside the wordmark, in the desktop nav and the mobile nav.
+
+Not decoration: it is the honest label for a platform whose Gate 1 opinion is
+not yet written, and it sets the expectation that things move.
+
+> **What the owner should know, said once.** Billing your own company proves the
+> software works. It does not prove anyone will pay — that is what Gate 4's
+> signed insertion order was for. Running the full cycle against a friendly
+> brand is a good test and a poor market signal, and the plan should not record
+> it as the second thing.
+
+---
+
 ### ▸ B86 — Start the clock on data we cannot backfill · **DO THIS WEEK**
 
 **Ahead of everything, including B72.** Not because it is more urgent than a

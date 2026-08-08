@@ -77,11 +77,17 @@ export async function applyCpDial(_prev: DialState, formData: FormData): Promise
   const plan = planCpDial(target, current);
 
   // ===== Write the ceiling =====
+  //
+  // `{ cp }`, not a bare number. `dailyCpCeiling` reads `value.cp`, so writing
+  // the number directly stored something the reader could not read: the setting
+  // changed, the audit log recorded a change, and the ceiling silently stayed
+  // at the default. A write whose reader disagrees with it is worse than no
+  // write, because everything downstream reports success.
   await db.insert(schema.platformSettings)
-    .values({ key: "quests.dailyCpCeiling", value: plan.ceiling, updatedAt: new Date() })
+    .values({ key: "quests.dailyCpCeiling", value: { cp: plan.ceiling }, updatedAt: new Date() })
     .onConflictDoUpdate({
       target: schema.platformSettings.key,
-      set: { value: plan.ceiling, updatedAt: new Date() },
+      set: { value: { cp: plan.ceiling }, updatedAt: new Date() },
     });
 
   // ===== Write the weights =====

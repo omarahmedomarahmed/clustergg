@@ -15,7 +15,7 @@
 // rather than money that has been promised — the distinction the whole design
 // rests on, and the reason allocation hangs off "paid" and not off "invoiced".
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
@@ -86,7 +86,7 @@ export type LedgerEntry = {
   vault: Vault;
   /** Positive in, negative out. */
   amount: number;
-  kind: "challenge_sale" | "payout" | "transfer" | "sweep" | "adjustment" | "breakage";
+  kind: "challenge_sale" | "payout" | "transfer" | "sweep" | "adjustment" | "breakage" | "cp_credit";
   refType?: string;
   refId?: string;
   transferId?: string;
@@ -262,4 +262,77 @@ export async function reverseInvoiceAllocation(db: DB, invoiceId: string): Promi
     reason: "Invoice no longer paid — allocation reversed.",
   })));
   return true;
+}
+
+// ===== CP leaving the vault. B88.1 =====
+//
+// THE DEFECT THIS CLOSES: nothing debited the CP vault. Sales credited it and
+// nothing ever took anything out, so the balance on /admin/vaults was a running
+// total of what we had SOLD rather than what was LEFT — and "how much of this
+// week's allocation is still available" could not be asked at all.
+//
+// It matters because the whole gamer economy is about to be derived from that
+// number. A ceiling computed against a balance that only grows is a ceiling
+// that grows forever.
+//
+// WHY IT IS WRITTEN HERE AND NOT AT THE EMITTER. Every credit goes through
+// `awardQuestAction`, so one call site covers every action, every quest and
+// every future emitter. A debit added per-emitter is a debit somebody forgets
+// on the next one.
+
+/**
+ * Record CP credited to a gamer as money leaving the CP vault.
+ *
+ * Takes the handle it was given and never opens its own — this runs inside the
+ * award transaction, and a helper that calls `getDb()` from inside one
+ * deadlocks. That has happened twice on this project.
+ *
+ * Never throws. A gamer who earned CP has earned it; failing the award because
+ * the bookkeeping row would not write turns an accounting problem into a
+ * product one. A missing row shows up as a vault that reconciles high, which is
+ * visible; a refused award shows up as a gamer who thinks the site is broken.
+ */
+export async function debitCpVault(
+  db: DB,
+  entries: { userId: string; cp: number; actionKey: string; rate: number }[],
+): Promise<void> {
+  // A zero-CP event drains nothing. `awardQuestAction` writes a row whenever an
+  // action fires, including at the ceiling, and those must not appear here or
+  // the ledger fills with rows worth $0.00.
+  const real = entries.filter((e) => e.cp > 0 && e.rate > 0);
+  if (!real.length) return;
+  try {
+    await postToLedger(db, real.map((e) => ({
+      vault: "cp" as const,
+      // Negative: money out. Rounded to the cent the ledger stores, so the sum
+      // of the rows is exactly the balance rather than nearly it.
+      amount: -(Math.round((e.cp / e.rate) * 100) / 100),
+      kind: "cp_credit" as const,
+      refType: "user",
+      refId: e.userId,
+      // The action and the CP, so "where did the vault go" is answerable from
+      // the ledger alone without joining quest_events.
+      reason: `${e.cp} CP · ${e.actionKey}`,
+    })));
+  } catch { /* see above: bookkeeping must not fail an award */ }
+}
+
+/**
+ * What has been credited out of the CP vault since a moment.
+ *
+ * Positive dollars. The counterpart to an allocation: allocated minus this is
+ * what is left to spend this week.
+ */
+export async function cpSpentSince(db: DB, since: Date): Promise<number> {
+  try {
+    const [row] = await db.select({
+      total: sql<number>`coalesce(sum(${schema.vaultLedger.amount}), 0)`,
+    }).from(schema.vaultLedger)
+      .where(and(
+        eq(schema.vaultLedger.vault, "cp"),
+        eq(schema.vaultLedger.kind, "cp_credit"),
+        gte(schema.vaultLedger.createdAt, since),
+      ));
+    return Math.abs(Number(row?.total ?? 0));
+  } catch { return 0; }
 }

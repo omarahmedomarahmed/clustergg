@@ -38,9 +38,36 @@ export const MIN_REDEEM_AGE = 18;
  * against the current OFAC/EU/UK lists before launch, and on a schedule after.
  */
 export const BLOCKED_COUNTRIES: Record<string, string> = {
-  CU: "Cuba", IR: "Iran", KP: "North Korea", SY: "Syria",
-  RU: "Russia", BY: "Belarus",
+  // Comprehensively sanctioned. These are the OFAC country programs where the
+  // embargo covers the whole jurisdiction rather than named persons.
+  CU: "Cuba", IR: "Iran", KP: "North Korea",
+  // The three Ukrainian regions. Restricted by their own OFAC programs and
+  // ABSENT from this list until B73 found them — the list was wrong in BOTH
+  // directions, which is the failure mode a "placeholder for counsel" reaches
+  // when nobody revisits it.
+  //
+  // ISO 3166-2 subdivisions, not countries. A gamer selecting Ukraine is not
+  // blocked; this catches a payout provider or a form that reports the region.
+  "UA-43": "Crimea", "UA-14": "Donetsk", "UA-09": "Luhansk",
 };
+
+/**
+ * Removed from the block list by B73, and worth recording rather than
+ * silently dropping.
+ *
+ *   SYRIA — the comprehensive program was REVOKED by Executive Order 14312.
+ *   RUSSIA, BELARUS — never comprehensive embargoes. Sectoral and
+ *   list-based, which is a screening question, not a country block.
+ *
+ * Blocking a country that is not embargoed is not "extra safety": it refuses
+ * money to people entitled to it, and it hides the fact that nobody is doing
+ * the screening that IS required.
+ *
+ * ⚠ Sanctions move monthly. B73 §5 Q10 asks counsel to confirm this list and,
+ * more importantly, to name an owner and a review cadence. A list with neither
+ * is the list this one just was.
+ */
+export const UNBLOCKED_BY_B73 = ["SY", "RU", "BY"] as const;
 
 /**
  * The US information-reporting line that arrives first.
@@ -49,12 +76,44 @@ export const BLOCKED_COUNTRIES: Record<string, string> = {
  * question answerable: which recipients crossed it this year, so the people who
  * do file have the list rather than a database and a hope.
  *
- * ⚠ Thresholds vary by country and change by year. Counsel decides who reports
- * what; this is the trigger for asking.
+ * **$2,000, not $600.** This said 600 and presented it as the current line.
+ * Per the Instructions for Forms 1099-MISC and 1099-NEC (Rev. 12/2026), IRC
+ * §6041(a) as amended by P.L. 119-21 §70433 sets the threshold for payments
+ * made after 2025-12-31 at $2,000, indexed from 2027. Found by B73.
+ *
+ * The old value OVER-reported, so it was never a compliance risk — it was a
+ * comment that stated a fact confidently and was wrong, which is the kind of
+ * error that survives review because nobody re-checks a number that looks
+ * familiar.
+ *
+ * ⚠ Thresholds vary by country and change by year, and this one is now indexed
+ * — it moves again in 2027. Counsel decides who reports what; this is the
+ * trigger for asking.
  */
-export const US_REPORT_THRESHOLD = 600;
+export const US_REPORT_THRESHOLD = 2000;
 
-export type EligibilityReason = "ok" | "no_age" | "no_country" | "underage" | "blocked_country";
+export type EligibilityReason =
+  | "ok" | "no_age" | "no_country" | "underage" | "blocked_country" | "outside_payout_region";
+
+/**
+ * Where cash redemption is open. B73 §5 Q4.
+ *
+ * THE FINDING: prize payments to non-US gamers may be US-source FDAP income
+ * requiring **30% withholding and a Form 1042-S, with no de-minimis threshold**
+ * — and the research could not locate a primary source settling the sourcing
+ * rule. It is the largest unanswered question in the whole document, and for a
+ * platform whose gamers are concentrated in MENA it is a pre-launch blocker
+ * rather than a cleanup item.
+ *
+ * So cash redemption opens where we can pay correctly today, and nowhere else.
+ * A gamer outside it keeps every trophy and every point; what is closed is the
+ * conversion to money, and the reason is said plainly rather than dressed as a
+ * technical limitation.
+ *
+ * This is a BETA position, not a permanent one. It opens the moment counsel
+ * answers Q4 and the withholding path exists.
+ */
+export const PAYOUT_REGIONS: Record<string, string> = { US: "the United States" };
 
 export type Eligibility = {
   ok: boolean;
@@ -123,6 +182,17 @@ export function eligibilityOf(age: number | null, country: string | null): Eligi
   if (BLOCKED_COUNTRIES[cc]) {
     return { ok: false, reason: "blocked_country", missing, age, country: cc,
       message: `We cannot send payments to ${BLOCKED_COUNTRIES[cc]}. Our payout partner will not process them, so we are telling you now rather than after your trophies are locked into a request that fails. You keep the trophies.` };
+  }
+  // Checked LAST, so a gamer in a sanctioned country gets the sanctions message
+  // rather than this one — the two are not the same thing and must not read as
+  // if they were.
+  if (!PAYOUT_REGIONS[cc]) {
+    return { ok: false, reason: "outside_payout_region", missing, age, country: cc,
+      message:
+        "Cash redemption is open in the United States only while we are in beta. "
+        + "This is a tax-withholding question we are getting answered properly rather than guessing at, "
+        + "and it is the honest reason rather than a technical one. "
+        + "Every point and every trophy you have is yours and keeps — nothing expires while you wait." };
   }
   return { ok: true, reason: "ok", missing: [], age, country: cc, message: "" };
 }

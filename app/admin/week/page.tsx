@@ -127,11 +127,6 @@ export default async function WeekPage() {
             <Td align="right" mono>{SCORE_WEIGHTS.newlyQualified}</Td>
             <Td secondary>Linked a week AND proved ownership of a game account. Cannot be bought. Replaces growth %.</Td>
           </Tr>
-          <Tr key="op">
-            <Td>Engaged card opens</Td>
-            <Td align="right" mono>{SCORE_WEIGHTS.engagedOpens}</Td>
-            <Td secondary>Nothing records this per server yet, so it is DROPPED from the score and its weight redistributed. The close says so when it runs.</Td>
-          </Tr>
           <Tr key="cv">
             <Td>Entrant conversion</Td>
             <Td align="right" mono>{SCORE_WEIGHTS.conversion}</Td>
