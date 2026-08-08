@@ -85,6 +85,26 @@ export async function requestRedeem(input: {
   if (!user) return { error: "Sign in first." };
   const db = await getDb();
 
+  // Locked trophies cannot be cashed out. B83.
+  //
+  // Before the age and country checks, because this one is the cheapest to
+  // answer and the least ambiguous — and because a gamer told "we need your
+  // country" and THEN told "actually you also have to finish onboarding" has
+  // been asked twice for two different things.
+  //
+  // Trophies won before unlocking are held with everything else. They are not
+  // taken: the message says the points are safe, because they are, and the
+  // release is two taps away.
+  {
+    const { unlockState } = await import("@/lib/unlock");
+    const state = await unlockState(db, user.id);
+    if (!state.unlocked) {
+      return {
+        error: "Finish setting up your account before cashing out — link a game and make your profile yours. Everything you've won is held safely until you do.",
+      };
+    }
+  }
+
   // B37: age and country, before anything else happens.
   //
   // FIRST, ahead of the payout-preference write and well ahead of any provider

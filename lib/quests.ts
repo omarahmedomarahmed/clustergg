@@ -556,6 +556,23 @@ async function awardQuestActionLocked(
 
     const [ceiling, already] = await Promise.all([dailyCpCeiling(db), cpEarnedToday(db, userId)]);
     let room = Math.max(0, ceiling - already);
+
+    // The onboarding cap. B83.
+    //
+    // A gamer who has not finished onboarding accrues up to `LOCKED_CP_CAP` and
+    // stops. It narrows `room` rather than refusing the action, for the same
+    // reason the daily ceiling does: the event is still WRITTEN, so nothing
+    // looks like it vanished, and a gamer sitting at 4,990 gets their last 10
+    // CP instead of a 25-CP action being refused outright and the number
+    // reading 4,990 forever.
+    //
+    // Applied here, once, beside the ceiling — not at each emitter. Same rule
+    // as B72.4's age gate, same reason.
+    {
+      const { unlockState, creditableWhileLocked } = await import("@/lib/unlock");
+      const state = await unlockState(db, userId);
+      if (!state.unlocked) room = Math.min(room, creditableWhileLocked(state, room));
+    }
     // Set the moment any quest records this action, so the second listener pays
     // nothing however it is ordered.
     let paid = false;

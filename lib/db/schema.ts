@@ -76,6 +76,19 @@ export const users = pgTable("users", {
    * to identify or track a gamer anywhere else in the product.
    */
   signupIp: text("signup_ip"),
+  /**
+   * When this gamer finished onboarding. B83.
+   *
+   * Null means locked: CP accrues to a cap and cannot be spent or redeemed
+   * until they link a game account and customize their profile.
+   *
+   * **Backfilled from `created_at` for every account that existed before this
+   * shipped.** Nothing anybody already earned is ever locked — see the
+   * grandfather rule in `lib/unlock.ts`. That backfill is the whole of the
+   * promise, and it lives in the migration rather than in a runtime check
+   * precisely so it cannot be forgotten on a later read path.
+   */
+  unlockedAt: timestamp("unlocked_at", { withTimezone: true, mode: "date" }),
   discordViews: integer("discord_views").notNull().default(0), // views that came from someone showing this profile in Discord
   voteCount: integer("vote_count").notNull().default(0),       // Best Profile votes, denormalized for cheap sorting
   /**

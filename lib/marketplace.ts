@@ -196,6 +196,23 @@ export async function buyTrophy(
   if (!trophy) return { ok: false, error: "That trophy doesn't exist." };
   if (!trophy.inMarketplace) return { ok: false, error: "That trophy isn't for sale right now." };
 
+  // Locked CP cannot be spent. B83.
+  //
+  // Including on a trophy — a trophy is cash with a picture on it, and letting
+  // a locked balance buy one would turn the lock into a formality that costs us
+  // real money. Refused before the transaction opens, because a refusal after a
+  // row lock is a lock held for nothing.
+  {
+    const { unlockState } = await import("@/lib/unlock");
+    const state = await unlockState(db, buyerId);
+    if (!state.unlocked) {
+      return {
+        ok: false,
+        error: "Finish setting up your account first — link a game and make your profile yours. Your points are safe and they're waiting.",
+      };
+    }
+  }
+
   // The buyer is the recipient. Always, with no path to anything else.
   const recipientId = buyerId;
 

@@ -9,9 +9,12 @@ import { getContent } from "@/lib/cms";
 import LinkAccountForm from "@/components/LinkAccountForm";
 import FollowButton from "@/components/FollowButton";
 import Avatar from "@/components/Avatar";
+import Icon from "@/components/Icon";
 import DiscordTag from "@/components/DiscordTag";
 import OAuthButtons from "@/components/OAuthButtons";
 import { getT } from "@/lib/i18n/t-server";
+import UnlockChecklist from "@/components/UnlockChecklist";
+import { tryUnlock } from "@/lib/unlock";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +36,10 @@ export default async function OnboardingPage() {
   for (const info of providers) { gameLogos[info.id] = resolveGameLogo(games, info.game); gameCovers[info.id] = resolveGameCover(games, info.game); }
   const linkedAccounts = accounts.map((a) => ({ provider: a.provider, name: a.inGameName }));
   const { tr } = await getT();
+  // B83. `tryUnlock` reads the state, promotes anybody who has finished, and
+  // returns what they DID — so landing here after linking an account both
+  // unlocks and produces the congratulations.
+  const unlock = await tryUnlock(db, user.id);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -53,6 +60,35 @@ export default async function OnboardingPage() {
           )}
         </div>
       </div>
+
+      {/* B83. The balance first, because the number is the argument — a
+          checklist on its own is a chore. */}
+      {!unlock.unlocked && (
+        <div className="mb-6"><UnlockChecklist state={unlock} /></div>
+      )}
+
+      {unlock.unlocked && unlock.achieved.length > 0 && (
+        <section className="glass mb-6 border border-emerald-400/35 bg-emerald-500/[0.07] p-6">
+          <div className="flex items-center gap-2 text-lg font-black text-emerald-200">
+            <Icon name="check" size={18} /> Unlocked
+          </div>
+          {/* What they actually DID. "You completed onboarding" congratulates
+              somebody for filling in a form. */}
+          <ul className="mt-3 space-y-1.5 text-sm">
+            {unlock.achieved.map((a) => (
+              <li key={a} className="flex items-center gap-2 text-muted">
+                <Icon name="check" size={13} className="text-emerald-300" /> {a}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-muted">
+            Your points are yours to spend, and anything you win can be cashed out.
+          </p>
+          <Link href="/quests" className="glow-btn pressable mt-4 inline-block rounded-full px-6 py-2.5 text-sm font-semibold text-white">
+            {tr("See today's mission")}
+          </Link>
+        </section>
+      )}
 
       <section className="glass p-6 mb-6">
         <div className="flex items-center gap-3 mb-1">

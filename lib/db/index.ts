@@ -870,6 +870,18 @@ const COLUMN_MIGRATIONS = [
   )`,
 
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "signup_ip" text`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "unlocked_at" timestamp with time zone`,
+  // B83's grandfather rule, as a migration rather than a runtime check.
+  //
+  // Every account that existed before onboarding gained a lock is unlocked, at
+  // the moment it was created. It runs once (the marker in
+  // `runColumnMigrations` sees to that) and it is the entire promise that
+  // nothing anybody already earned is ever taken away.
+  //
+  // Guarded on `created_at` being older than the deploy is NOT what this does,
+  // deliberately: an account created between the column landing and this
+  // statement running is also an account nobody told about a lock.
+  `UPDATE "users" SET "unlocked_at" = "created_at" WHERE "unlocked_at" IS NULL`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "surface" text`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "card_kind" text`,
   `CREATE INDEX IF NOT EXISTS "imp_kind_idx" ON "ad_impressions" ("campaign_creative_id", "card_kind")`,

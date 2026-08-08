@@ -33,6 +33,11 @@ const mkUser = async (name: string) => {
   const id = uid();
   await db.insert(schema.users).values({
     id, displayName: name, slug: `${name.toLowerCase()}-${id.slice(0, 5)}`, role: "user",
+    // B72.4 and B83: a gamer with no age band earns nothing, and one who has
+    // not finished onboarding cannot spend. A fixture missing either is a
+    // gamer who cannot do the thing this suite is about, and every assertion
+    // would pass for the wrong reason.
+    ageBand: "adult", unlockedAt: new Date(),
   });
   return { id, slug: `${name.toLowerCase()}-${id.slice(0, 5)}` };
 };

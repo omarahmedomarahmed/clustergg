@@ -204,6 +204,9 @@ export async function seed(db: DB, opts: { demo: boolean }) {
       // and leaderboard rows would all render empty — the demo would show a
       // working economy as a broken one. Demo people are adults who answered.
       ageBand: "adult", ageBandSetAt: new Date(),
+      // B83. A demo gamer who has not finished onboarding cannot spend or cash
+      // out, and the demo exists to show a working economy.
+      unlockedAt: new Date(),
     });
     return id;
   };
