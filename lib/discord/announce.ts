@@ -345,8 +345,20 @@ export async function announceChallengeUpcoming(
   // The guard is the shared derivation, not a hand-rolled copy of it. A second
   // opinion about what "queued" means is how a screen and an action end up
   // disagreeing about the same row.
-  const { canAnnounce } = await import("@/lib/challenge-stage");
-  if (!canAnnounce(ch)) return { ok: false, reason: "not_queued" };
+  //
+  // And it is asked WITH THE BILL. "Nothing queues before payment clears" is
+  // the rule the whole ladder exists for, and the only place it can actually be
+  // enforced is here: this is the moment a challenge stops being an internal
+  // record and starts being a promise to every server on the network.
+  const [{ canAnnounce }, { billFor }] = await Promise.all([
+    import("@/lib/challenge-stage"),
+    import("@/lib/challenge-billing"),
+  ]);
+  const bill = await billFor(db, ch);
+  if (!bill.paid && bill.kind !== "house") return { ok: false, reason: "not_paid" };
+  if (!canAnnounce({ ...ch, paid: bill.paid || bill.kind === "house" })) {
+    return { ok: false, reason: "not_queued" };
+  }
 
   const [card, url] = await Promise.all([
     cardRef("challenge", { id: challengeId }),
@@ -375,8 +387,15 @@ export async function announceChallengeUpcoming(
   // announced that reached nobody is one nobody will think to announce again.
   if (!reached) return { ok: false, reason: "reached_nobody" };
 
+  // ANNOUNCING IS WHAT PUBLISHES IT.
+  //
+  // A later run of a series is written as a draft so it does not appear on the
+  // homepage weeks early. This is the moment that changes: the servers have
+  // been told, so gamers can find it and enter it. Scoring is still gated on
+  // the start date — `scoreChallengesForAccount` rebaselines at the gun — so an
+  // early entrant gains nothing but a place in the queue.
   await db.update(schema.challenges)
-    .set({ announcedAt: new Date() })
+    .set({ announcedAt: new Date(), status: "active" })
     .where(eq(schema.challenges.id, challengeId));
   return { ok: true, reached };
 }

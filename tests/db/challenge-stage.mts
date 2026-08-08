@@ -51,6 +51,25 @@ console.log("\n== ended beats everything ==");
     stageOf({ status: "draft", startAt: day(-14), endAt: day(-7) }, NOW), "draft");
 }
 
+console.log("\n== a paid draft is QUEUED, not a draft ==");
+{
+  // Later runs of a series are written as drafts on purpose — a dozen queries
+  // across the gamer-facing product read "status = active" as "live", so
+  // materialising week 4 as active would put it on the homepage three weeks
+  // early. What moves a run out of draft is the announcement.
+  //
+  // So a draft is not one thing: unpaid is a lead, paid is a challenge waiting
+  // to be announced, and calling both "draft" hides the only work left on one.
+  eq("a paid, unannounced run is queued",
+    stageOf({ status: "draft", startAt: day(7), endAt: day(14), paid: true }, NOW), "queued");
+  eq("…and an unpaid one is still a draft",
+    stageOf({ status: "draft", startAt: day(7), endAt: day(14), paid: false }, NOW), "draft");
+  eq("…and one we know nothing about is still a draft",
+    stageOf({ status: "draft", startAt: day(7), endAt: day(14) }, NOW), "draft");
+  ok("a paid draft can be announced",
+    canAnnounce({ status: "draft", startAt: day(7), endAt: day(14), paid: true }, NOW));
+}
+
 console.log("\n== unpaid beats every date ==");
 {
   // The rule this ladder exists for: nothing queues before payment clears.

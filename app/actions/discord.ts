@@ -151,6 +151,9 @@ export async function announceUpcoming(_prev: BotActionState, formData: FormData
   const res = await announceChallengeUpcoming(id);
   if (!res.ok) {
     const why: Record<string, string> = {
+      not_paid: "Nothing is announced before its bill is paid. The challenge page shows who owes it "
+        + "and which invoice — a challenge announced on nobody's money pays its prizes out of the prize "
+        + "vault, which is other brands'.",
       not_queued: "Only a challenge that is paid, dated and has not started can be announced ahead. "
         + "A draft has nothing to announce; one that is already live has been announced.",
       reached_nobody: "It reached no server, so nothing was marked announced — check the bot can post "

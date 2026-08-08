@@ -17,6 +17,8 @@ import Countdown from "@/components/Countdown";
 import LiveChallengeBoard from "@/components/LiveChallengeBoard";
 import { joinChallenge, switchEntryAccount } from "@/app/actions/social";
 import { joinLocked, unmetEntryRules } from "@/lib/challenges";
+import { stageOf } from "@/lib/challenge-stage";
+import { runsOfSeries } from "@/lib/series-plan";
 import { recordServerEvent } from "@/lib/server-portal";
 import { getQuestCompletions } from "@/lib/quests";
 
@@ -64,6 +66,12 @@ export default async function ChallengePage({
   const [challenge] = await db.select().from(schema.challenges)
     .where(eq(schema.challenges.id, challengeId)).limit(1);
   if (!challenge) notFound();
+
+  // B91.3. The stage, not the raw status: an ANNOUNCED challenge is published
+  // and joinable and has not started, and every badge on this page used to
+  // call that "live".
+  const stage = stageOf(challenge);
+  const seriesRuns = challenge.seriesId ? await runsOfSeries(db, challenge.seriesId) : [];
 
   const viewer = await getCurrentUser();
   const { tr, te } = await getT(viewer?.locale);
@@ -202,17 +210,37 @@ export default async function ChallengePage({
           </Link>
           <div className="flex items-center gap-2 sm:gap-3 mb-3 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible [scrollbar-width:none]">
             <span className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] uppercase tracking-widest border ${
-              challenge.status === "active" ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10" : "border-violet-400/40 text-muted bg-black/40"}`}>
-              {challenge.status === "active" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-              {challenge.status === "active" ? tr("Live event") : challenge.status}
+              stage === "live" ? "border-emerald-400/50 text-emerald-300 bg-emerald-500/10"
+                : stage === "announced" ? "border-cyan-400/50 text-cyan-200 bg-cyan-500/10"
+                  : "border-violet-400/40 text-muted bg-black/40"}`}>
+              {stage === "live" && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+              {/* B91.3. This said "Live event" for a challenge that starts next
+                  week — announcing publishes it so people can enter early, and
+                  a countdown reading "ends in 11 days" over a race that has not
+                  started is the same lie in the other direction. */}
+              {stage === "live" ? tr("Live event")
+                : stage === "announced" ? tr("Opens soon")
+                  : stage === "ended" ? tr("Finished") : challenge.status}
             </span>
             <span className="shrink-0 whitespace-nowrap text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1 capitalize">{challenge.cadence} {tr("challenge")}</span>
             <span className="shrink-0 whitespace-nowrap text-[11px] uppercase tracking-widest text-muted border border-violet-400/25 rounded-full px-3 py-1">
               {challenge.format === "top1" ? tr("Winner takes all") : challenge.format === "top3" ? tr("Top 3 podium") : tr("Threshold race")}
             </span>
-            {challenge.status === "active" && (
+            {stage === "live" && (
               <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-amber-200 border border-amber-400/50 bg-amber-500/10 rounded-full px-3 py-1">
                 <Icon name="clock" size={12} /> <Countdown endsAt={challenge.endAt.toISOString()} prefix={`${tr("ends in")} `} />
+              </span>
+            )}
+            {stage === "announced" && (
+              <span className="shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-cyan-200 border border-cyan-400/50 bg-cyan-500/10 rounded-full px-3 py-1">
+                <Icon name="clock" size={12} /> <Countdown endsAt={challenge.startAt.toISOString()} prefix={`${tr("starts in")} `} />
+              </span>
+            )}
+            {seriesRuns.length > 1 && (
+              /* Said to the gamer, because it changes what entering means: this
+                 is one week of several, and the next one opens when it ends. */
+              <span className="shrink-0 whitespace-nowrap text-[11px] uppercase tracking-widest text-violet-200 border border-violet-400/40 bg-violet-500/10 rounded-full px-3 py-1">
+                {tr("Week")} {challenge.runIndex} {tr("of")} {seriesRuns.length}
               </span>
             )}
           </div>

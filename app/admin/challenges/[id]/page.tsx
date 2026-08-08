@@ -100,10 +100,13 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             and different jobs. */}
         <BillPanel bill={bill} />
 
+        {/* The bill is passed IN, not looked up again: an unpaid challenge must
+            read as a draft on the ladder and offer no announce button, and the
+            only way the stage can know that is if the caller tells it. */}
         <StageLadder
           challengeId={id}
-          stage={stageOf(challenge)}
-          canAnnounce={canAnnounce(challenge)}
+          stage={stageOf({ ...challenge, paid: bill.paid || bill.kind === "house" })}
+          canAnnounce={canAnnounce({ ...challenge, paid: bill.paid || bill.kind === "house" })}
         />
 
         {challenge.status === "active" && reach.servers === 0 && (

@@ -590,6 +590,30 @@ export async function saveChallenge(
         seriesId: id, runIndex: 1, runsPlanned, baseTitle,
         title: runTitle(baseTitle, cadence, 1),
       });
+
+      // B91.3: WRITE THE WHOLE SERIES NOW.
+      //
+      // It used to be a chain — run 1 exists, run 2 is created when run 1
+      // finishes — which is fine for a machine and useless for everybody else.
+      // The month a brand bought did not exist yet, so nobody could look at it,
+      // announce week 2 early, or tell a gamer this is week 2 of 8.
+      //
+      // Every later run is a DRAFT, which `stageOf` reads as queued once the
+      // bill is paid. Writing them active would put week 8 on the homepage
+      // today — a dozen gamer-facing queries read "active" as "live now".
+      if (runsPlanned > 1) {
+        const { planRuns, materialiseSeries } = await import("@/lib/series-plan");
+        const windows = planRuns(startAt, cadence, runsPlanned);
+        // Skip run 1: it was just written above, with whatever status the
+        // operator chose.
+        await materialiseSeries(db, {
+          seriesId: id,
+          createdBy: admin.id,
+          template: { ...values, baseTitle, cadence },
+          windows: windows.slice(1),
+        });
+      }
+
       if (values.status === "active") await launchChallenge(id);
       await audit(admin.id, "challenge.create", "challenge", values.title);
       challengeId = id;

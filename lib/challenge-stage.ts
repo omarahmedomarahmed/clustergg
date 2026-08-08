@@ -105,7 +105,20 @@ export function stageOf(c: StageInput, now: Date = new Date()): Stage {
 
   // Unpaid beats every date. A challenge whose start date has arrived and whose
   // bill has not is not live — it is a draft somebody needs to chase.
-  if (c.status === "draft" || c.paid === false) return "draft";
+  if (c.paid === false) return "draft";
+
+  // A PAID DRAFT IS QUEUED, and this is the rung the ladder was missing.
+  //
+  // Later runs of a series are written as drafts on purpose: a dozen queries
+  // across the gamer-facing product mean "status = active" when they say
+  // "live", and materialising week 4 as active would put it on the homepage
+  // three weeks early. So the row stays a draft, and what moves it is the
+  // ANNOUNCEMENT — which is also what makes it joinable.
+  //
+  // Which means a draft is not one thing. A draft nobody has paid for is a
+  // lead; a draft somebody HAS paid for is a challenge waiting to be announced,
+  // and calling that one "draft" hides the only work left on it.
+  if (c.status === "draft") return c.paid === true ? "queued" : "draft";
 
   if (start !== null && start > t) {
     return at(c.announcedAt) !== null ? "announced" : "queued";
