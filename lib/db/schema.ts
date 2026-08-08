@@ -1865,6 +1865,37 @@ export const invoiceLines = pgTable("invoice_lines", {
  * Always initiated by an admin — an owner cannot press a button and make money
  * leave. They can see what they are owed and ask about it; the release is ours.
  */
+/**
+ * What a server owner SPENT out of their earnings. B89.1.
+ *
+ * The other side of the wallet. Pool earnings are credits, computed from the
+ * weekly close's payout lines; withdrawals are payouts. This is the third
+ * movement: an owner buying a private challenge for their own members and
+ * paying for it out of what they earned.
+ *
+ * It is a CHARGE and not a transfer, and that distinction is the whole reason
+ * the table looks like this. The owner buys a product from us at a price; we
+ * then owe the prize as our own obligation out of our own revenue. A row here
+ * reduces what we owe the owner and increases what we owe their members — it
+ * never moves value from one person to another, which is the thing that would
+ * make us a money transmitter (`docs/B73_RESEARCH.md` Q3).
+ */
+export const serverCharges = pgTable("server_charges", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  /** Positive dollars. What was taken out of the wallet. */
+  amount: doublePrecision("amount").notNull().default(0),
+  /** `private_challenge` today. Named so a second kind cannot be confused with it. */
+  kind: text("kind").notNull().default("private_challenge"),
+  /** The challenge this bought, so the charge and the thing are one click apart. */
+  challengeId: text("challenge_id"),
+  /** What the owner reads on their statement. */
+  label: text("label").notNull().default(""),
+  /** Our margin on it, recorded separately so "what did we make" is a query. */
+  feeAmount: doublePrecision("fee_amount").notNull().default(0),
+  createdAt: now("created_at"),
+}, (t) => [index("server_charge_idx").on(t.guildId, t.createdAt)]);
+
 export const serverPayouts = pgTable("server_payouts", {
   id: id(),
   guildId: text("guild_id").notNull(),

@@ -871,6 +871,19 @@ const COLUMN_MIGRATIONS = [
   // budgets for the same week.
   `CREATE UNIQUE INDEX IF NOT EXISTS "week_alloc_once_idx" ON "week_allocations" ("week","vault")`,
 
+  // B89.1 — what a server owner spent out of their earnings.
+  `CREATE TABLE IF NOT EXISTS "server_charges" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "amount" double precision DEFAULT 0 NOT NULL,
+    "kind" text DEFAULT 'private_challenge' NOT NULL,
+    "challenge_id" text,
+    "label" text DEFAULT '' NOT NULL,
+    "fee_amount" double precision DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "server_charge_idx" ON "server_charges" ("guild_id","created_at")`,
+
   `CREATE TABLE IF NOT EXISTS "feature_shots" (
     "key" text PRIMARY KEY NOT NULL,
     "image_url" text,
