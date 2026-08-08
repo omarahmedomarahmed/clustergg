@@ -34,11 +34,11 @@ eq("no country is refused", eligibilityOf(30, null).reason, "no_country");
 eq("…and the form is told exactly what is missing", eligibilityOf(30, null).missing, ["country"]);
 eq("both missing asks for both", eligibilityOf(null, null).missing, ["age", "country"]);
 
-eq(`under ${MIN_REDEEM_AGE} is refused`, eligibilityOf(MIN_REDEEM_AGE - 1, "EG").reason, "underage");
+eq(`under ${MIN_REDEEM_AGE} is refused`, eligibilityOf(MIN_REDEEM_AGE - 1, "US").reason, "underage");
 ok("…and is told the trophies keep",
-  /keep/.test(eligibilityOf(MIN_REDEEM_AGE - 1, "EG").message), eligibilityOf(MIN_REDEEM_AGE - 1, "EG").message);
+  /keep/.test(eligibilityOf(MIN_REDEEM_AGE - 1, "US").message), eligibilityOf(MIN_REDEEM_AGE - 1, "US").message);
 ok(`exactly ${MIN_REDEEM_AGE} is allowed — the boundary is not off by one`,
-  eligibilityOf(MIN_REDEEM_AGE, "EG").ok);
+  eligibilityOf(MIN_REDEEM_AGE, "US").ok);
 
 const blocked = Object.keys(BLOCKED_COUNTRIES)[0];
 eq("a sanctioned country is refused", eligibilityOf(30, blocked).reason, "blocked_country");
@@ -46,7 +46,23 @@ ok("…by name, not by code", eligibilityOf(30, blocked).message.includes(BLOCKE
 ok("…and says the trophies are kept", /keep the trophies/i.test(eligibilityOf(30, blocked).message));
 eq("lowercase is normalised, so a country is not accidentally allowed",
   eligibilityOf(30, blocked.toLowerCase()).reason, "blocked_country");
-ok("an eligible adult in an open country passes", eligibilityOf(30, "EG").ok);
+ok("an eligible adult in an open country passes", eligibilityOf(30, "US").ok);
+
+// B73 §5 Q4. Prize payments to non-US gamers may be US-source FDAP income
+// needing 30% withholding and a 1042-S with NO de-minimis, and the research
+// could not settle the sourcing rule. For a MENA-concentrated platform that is a
+// pre-launch blocker, so cash redemption is US-only during beta.
+//
+// Asserted as its OWN reason, not folded into blocked_country: a gamer in Egypt
+// is not sanctioned, and a message implying they are would be both false and
+// insulting.
+eq("outside the payout region is its own refusal, not a sanctions one",
+  eligibilityOf(30, "EG").reason, "outside_payout_region");
+ok("…and the reason given is the real one",
+  /withholding|beta/i.test(eligibilityOf(30, "EG").message), eligibilityOf(30, "EG").message);
+ok("…and it says the trophies keep", /keeps|yours/i.test(eligibilityOf(30, "EG").message));
+ok("a sanctioned country still reports as sanctioned, not as out-of-region",
+  eligibilityOf(30, blocked).reason === "blocked_country");
 
 console.log("\n== the age arithmetic ==");
 eq("a birthday that has not happened this year does not count",
@@ -79,7 +95,7 @@ const teen = await mk("teen", "EG");
 eq("a 16-17-year-old cannot be paid either", (await eligibilityFor(db, teen)).reason, "underage");
 const sanctioned = await mk("adult", blocked);
 eq("a sanctioned country cannot be paid", (await eligibilityFor(db, sanctioned)).reason, "blocked_country");
-const good = await mk("adult", "EG");
+const good = await mk("adult", "US");
 ok("an eligible adult can", (await eligibilityFor(db, good)).ok);
 
 console.log("\n== refused BEFORE anything is committed ==");
@@ -126,7 +142,13 @@ const list = await annualRecipients(db, Y);
 const mine = list.find((r) => r.userId === paid);
 ok("the recipient appears", !!mine);
 eq("…with the right total", mine?.total, 650);
-ok("…and is flagged over the line", !!mine?.overThreshold, `threshold=${US_REPORT_THRESHOLD}`);
+// $650 is UNDER the line now. The threshold was $600 in this file and in the
+// code, and B73 found the real figure is $2,000 (IRC §6041(a) as amended by
+// P.L. 119-21 §70433, for payments after 2025-12-31). Asserted against the
+// constant rather than a literal, so the next indexation moves one number.
+eq("…and is not flagged, because $650 is under the line",
+  mine?.overThreshold, false);
+ok("the line is the current one", US_REPORT_THRESHOLD === 2000, String(US_REPORT_THRESHOLD));
 const under = list.find((r) => r.userId === crosser);
 ok("somebody under the line is still LISTED, not filtered out", !!under);
 ok("…and not flagged", under?.overThreshold === false);

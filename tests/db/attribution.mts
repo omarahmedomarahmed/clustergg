@@ -68,8 +68,8 @@ console.log("\n== scoring cannot be bought ==");
 }
 {
   const tier = [
-    { guildId: "small", exclusiveEntrants: 5, newlyQualified: 3, engagedOpens: 40, linked: 10, entrants: 5, recentWins: 0 },
-    { guildId: "big", exclusiveEntrants: 50, newlyQualified: 3, engagedOpens: 40, linked: 500, entrants: 50, recentWins: 0 },
+    { guildId: "small", exclusiveEntrants: 5, newlyQualified: 3, linked: 10, entrants: 5, recentWins: 0 },
+    { guildId: "big", exclusiveEntrants: 50, newlyQualified: 3, linked: 500, entrants: 50, recentWins: 0 },
   ];
   const small = scoreWeek(tier[0], tier);
   const big = scoreWeek(tier[1], tier);
@@ -81,8 +81,8 @@ console.log("\n== scoring cannot be bought ==");
 {
   // Per-capita is what lets a small server beat a big one.
   const tier = [
-    { guildId: "sharp", exclusiveEntrants: 8, newlyQualified: 9, engagedOpens: 90, linked: 10, entrants: 8, recentWins: 0 },
-    { guildId: "lazy", exclusiveEntrants: 10, newlyQualified: 1, engagedOpens: 20, linked: 500, entrants: 10, recentWins: 0 },
+    { guildId: "sharp", exclusiveEntrants: 8, newlyQualified: 9, linked: 10, entrants: 8, recentWins: 0 },
+    { guildId: "lazy", exclusiveEntrants: 10, newlyQualified: 1, linked: 500, entrants: 10, recentWins: 0 },
   ];
   ok("a small, engaged server beats a big, idle one",
     scoreWeek(tier[0], tier) > scoreWeek(tier[1], tier));

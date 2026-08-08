@@ -20,23 +20,55 @@
 // So: every term is either DEDUPLICATED, QUALIFIED, or PER-CAPITA, and the raw
 // member count scores nothing at all.
 
-/** Each term is percentile-ranked within tier, so one outlier cannot own the pool. */
+/**
+ * Each term is percentile-ranked within its bracket, so one outlier cannot own
+ * the pool.
+ *
+ * ===== `engagedOpens` IS GONE. B73, Discord Developer Policy §13 =====
+ *
+ * "Do not misrepresent or fraudulently manipulate engagement … This also
+ * includes automating messages to be sent for the purpose of maintaining
+ * activity in a Discord server."
+ *
+ * A weekly cash pool scored on how many cards a server's members OPENED is a
+ * standing financial incentive to manufacture Discord activity. It does not
+ * matter that our own count was per-capita and daily-capped: the thing being
+ * paid for was attention inside somebody else's product, and that is the clause
+ * word for word.
+ *
+ * The three terms that remain all measure an OUTCOME rather than activity —
+ * somebody entered a competition, somebody linked a game account, and how
+ * efficiently a server turns the second into the first. A server owner cannot
+ * inflate any of them by posting more.
+ *
+ * ===== WHERE THE 20 POINTS WENT, AND WHY NOT IN PROPORTION =====
+ *
+ * Redistributing proportionally was the obvious move and it was wrong. It put
+ * `exclusiveEntrants` — a RAW COUNT, and the one term that rewards being big —
+ * at half the score, and a test caught the consequence immediately: a 10-member
+ * server with 8 entrants tied with a 500-member server with 10. The small one
+ * had eight times the conversion and nine times the growth and still could not
+ * win.
+ *
+ * Deleting a term must not quietly change who the system favours. So the 20
+ * points went to the two SIZE-NEUTRAL terms instead, and `exclusiveEntrants`
+ * stayed where it was. A small server that converts its members now beats a
+ * large one that does not, which is the outcome the bracket split exists to
+ * protect and which proportional redistribution would have undone.
+ */
 export const SCORE_WEIGHTS = {
   /** Entrants, each divided by how many participating servers they belong to. */
   exclusiveEntrants: 40,
   /** Members who cleared the qualification rule THIS WEEK. Cannot be bought. */
-  newlyQualified: 25,
-  /** Card opens that led to an action, per active member. Capped per gamer per day. */
-  engagedOpens: 20,
+  newlyQualified: 30,
   /** Entrants ÷ linked members. The genuinely size-neutral term. */
-  conversion: 15,
+  conversion: 30,
 } as const;
 
 export type ServerWeek = {
   guildId: string;
   exclusiveEntrants: number;
   newlyQualified: number;
-  engagedOpens: number;
   linked: number;
   entrants: number;
   /** Wins in the last 8 weeks, for the decay multiplier. */
@@ -95,7 +127,6 @@ export function scoreWeek(me: ServerWeek, tier: ServerWeek[]): number {
   return Math.round((
     p((s) => s.exclusiveEntrants) * SCORE_WEIGHTS.exclusiveEntrants +
     p((s) => s.newlyQualified) * SCORE_WEIGHTS.newlyQualified +
-    p((s) => s.linked > 0 ? s.engagedOpens / s.linked : 0) * SCORE_WEIGHTS.engagedOpens +
     p((s) => s.linked > 0 ? s.entrants / s.linked : 0) * SCORE_WEIGHTS.conversion
   ) * 100) / 100;
 }

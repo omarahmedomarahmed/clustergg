@@ -524,22 +524,25 @@ reach — with no brand named and the 25-cohort floor applied.
 | House | The Cluster house brand, billed to itself | Normal | Nominal — it is our own promo |
 | **Private** | A server owner, from their wallet balance | ⚠️ **See below** | ⚠️ |
 
-> **⚠️ PRIVATE CHALLENGES NEED COUNSEL BEFORE THEY ARE BUILT.**
+> **DECIDED — private challenges are a PRODUCT WE SELL, not a transfer.**
 >
-> As described — the owner's balance funds a prize we pay to their members —
-> ClusterGG receives value from person A and pays it to person B. **That is the
-> money-transmitter trigger `B73_RESEARCH.md` Q3 flags**, and it re-opens
-> precisely what deleting gifting closed (§28: the Dutch line is
-> transferability).
+> An owner requests one → we send a bill for **the prize pool plus 5%** (per-bill
+> editable, and settable to 0 as a normal invoice adjustment or a discount) →
+> they pay → it queues → admin sets the game metric and the rules → it announces
+> **on that server only**.
 >
-> **The safer structure, and it is barely different to build:** the owner BUYS a
-> challenge from us, at a price, like any other customer. We then owe the prize
-> as **our own obligation out of our own revenue** — the "principal, not
-> conduit" characterisation the research says is defensible. That means it runs
-> through the normal split and takes a cut, however small. A pass-through with
-> no cut is the version that looks like transmission.
+> The 5% is what makes it a sale. A pass-through with no margin is the version
+> that reads as receiving money from person A to pay person B — the
+> money-transmitter trigger at `B73_RESEARCH.md` Q3, and the thing deleting
+> gifting closed. The owner buys a product; we then owe the prize as our own
+> obligation.
 >
-> Not built until this is decided.
+> | Rule | Value |
+> |---|---|
+> | Split | prize pool → prize vault · 5% → cluster. **No server or CP allocation** |
+> | Pool | Does **not** count. It is not brand inventory |
+> | Announce | That server only, and **only after payment clears** |
+> | Draft | Cancellable and editable by the owner. Visible to admin as a lead |
 
 #### B90.5 — Admin sees every campaign, including the unpaid ones
 

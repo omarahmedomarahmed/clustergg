@@ -288,7 +288,6 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
       // No per-guild card-open source exists. Left here, reading zero, so the
       // redistribution below drops it visibly instead of it being absent from
       // the file and forgotten.
-      engagedOpens: () => 0,
       conversion: (s) => (s.linked > 0 ? s.entrants / s.linked : 0),
     };
     const live = Object.keys(SCORE_WEIGHTS).filter((k) => base.some((s) => TERM_VALUE[k](s) > 0));

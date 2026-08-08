@@ -175,11 +175,17 @@ console.log("\n== a week with money and entrants pays out ==");
   ok("the shares never exceed the true entrant count", total <= truth + 1e-9, `${total} vs ${truth}`);
 
   // The term with no data is dropped, not scored as zero for everybody.
-  ok("engaged opens did not score — nothing records them",
+  // B73 / Discord Developer Policy §13: a cash pool scored on card opens is a
+  // standing incentive to manufacture activity in somebody else's product. The
+  // term is not "dropped for lack of data" any more — it is GONE.
+  ok("engaged opens are not a term at all",
     !("engagedOpens" in r.terms), JSON.stringify(r.terms));
+  ok("…and every surviving term measures an outcome, not activity",
+    Object.keys(r.terms).every((k) => ["exclusiveEntrants", "newlyQualified", "conversion"].includes(k)),
+    Object.keys(r.terms).join(","));
   near("…and the surviving terms still total 100",
     Object.values(r.terms).reduce((a, b) => a + b, 0), 100, 0.05);
-  ok("the summary says which terms ran", /Scored on \d+ of 4 terms/.test(r.summary), r.summary);
+  ok("the summary says which terms ran", /Scored on \d+ of 3 terms/.test(r.summary), r.summary);
 
   // Everything that took part is paid something — the participation floor is
   // what makes a pool a ladder rather than a taunt.
