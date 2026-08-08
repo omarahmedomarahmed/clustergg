@@ -69,6 +69,33 @@ export async function createInvoice(formData: FormData): Promise<Res> {
 
   const cfg = await pricingConfig();
   const games = await liveGamesFor(db, brandId);
+
+  // ===== Nothing to bill is a REFUSAL, not a $0 draft =====
+  //
+  // The lines come from the brand's live campaigns. A brand with none produces
+  // no lines at all — and since C11 retired the placements base to $0, "no
+  // lines" is now the ordinary outcome rather than an edge case. Before this
+  // check, pressing "Open this month's bill" on such a brand silently minted a
+  // draft reading Subtotal $0.00 / Total $0.00, which could then be attached to
+  // a payment link and SENT.
+  //
+  // An invoice for nothing is worse than no invoice: it consumes a number from
+  // the sequence, it looks like a bill somebody forgot to fill in, and if it
+  // reaches a brand it is a question we cannot answer well. So the refusal
+  // names the cause — there is no campaign — because "cannot open" without a
+  // reason is how somebody concludes billing is broken and does it by hand.
+  //
+  // Found by a browser test that had been asserting the retired $600 base line.
+  // When C11 removed that line the assertion went stale, and the stale
+  // assertion was the only thing standing between this and production.
+  if (games.length === 0) {
+    return {
+      error: `${brand.name} has no submitted or running campaign, so there is nothing to bill. `
+        + "Launch a campaign first, or add the lines by hand to an existing draft — an invoice for $0 is "
+        + "not a bill, it is a number burned out of the sequence.",
+    };
+  }
+
   const issued = new Date();
   const id = uid();
 

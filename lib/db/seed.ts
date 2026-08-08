@@ -663,6 +663,25 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     targeting: { regions: ["mena", "eu"] },
   });
 
+  // ===== A campaign that is actually RUNNING =====
+  //
+  // Every sponsored campaign in the demo was `completed`, and `liveGamesFor`
+  // only counts `submitted` or `running` — so no brand had anything billable,
+  // every invoice opened from /admin/billing had zero lines, and the whole
+  // billing flow could not be demonstrated or tested end to end. A demo where
+  // the only campaign is finished is a demo of the archive.
+  //
+  // AstroFuel, so the two brands show two different states side by side:
+  // NebulaTech's campaign is done and reportable, AstroFuel's is live and
+  // billable.
+  await db.insert(schema.sponsoredCampaigns).values({
+    id: uid(), brandId: brand2, game: "Valorant",
+    slots: 4, pricePerChallenge: 350, total: 1400, status: "running",
+    startAt: monthStart, coverUrl: BANNER_ART.arena,
+    slotState: [],
+    targeting: { regions: ["mena", "eu"] },
+  });
+
   // The report's last page: what a player said, recorded by staff.
   await db.insert(schema.brandTestimonials).values({
     id: uid(), brandId: brand1, campaignId: sponsoredCampaignId, userId: nova,

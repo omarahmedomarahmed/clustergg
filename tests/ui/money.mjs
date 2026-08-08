@@ -9,6 +9,7 @@
  * asks anybody for a bank account.
  */
 import { chromium } from "playwright-core";
+import { after, open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -37,10 +38,10 @@ try {
   await boss.fill('input[name="email"]', "admin@clustergg.com");
   await boss.fill('input[name="password"]', "cluster-admin");
   await boss.click('button:has-text("Log in with email")');
-  await boss.waitForLoadState("networkidle");
+  await after(boss);
 
   console.log("\n== The providers console ==");
-  let res = await boss.goto(`${BASE}/admin/payments`, { waitUntil: "networkidle" });
+  let res = await open(boss, `${BASE}/admin/payments`);
   let body = await boss.locator("body").innerText();
   ok("it opens", !!res && res.status() < 400 && !/could not be found/i.test(body), String(res?.status()));
   ok("all three money flows are named",
@@ -65,7 +66,7 @@ try {
     /keys are not set|no API|entered by hand/i.test(body));
 
   console.log("\n== Opening a bill ==");
-  res = await boss.goto(`${BASE}/admin/billing`, { waitUntil: "networkidle" });
+  res = await open(boss, `${BASE}/admin/billing`);
   body = await boss.locator("body").innerText();
   ok("the billing page opens", !!res && res.status() < 400, String(res?.status()));
   ok("it has an invoices section", /invoices/i.test(body));
@@ -73,10 +74,35 @@ try {
 
   const brandOpts = await boss.locator('select[name="brandId"] option').count();
   ok("there are brands to bill", brandOpts > 1, `${brandOpts} options`);
-  await boss.selectOption('select[name="brandId"]', { index: 1 });
-  const brandName = await boss.locator('select[name="brandId"] option').nth(1).innerText();
+
+  // ===== A brand with nothing running cannot be billed =====
+  //
+  // Found by this suite, after its stale $600 assertion was replaced. The lines
+  // on an invoice come from the brand's LIVE campaigns, and since C11 retired
+  // the placements base to $0 a brand with none produces no lines at all — so
+  // "Open this month's bill" minted a draft reading Total $0.00, which could
+  // then be attached to a payment link and SENT. An invoice for nothing burns a
+  // number out of the sequence and, if it reaches a brand, is a question we
+  // cannot answer well.
+  const optionTexts = await boss.locator('select[name="brandId"] option').allInnerTexts();
+  const idle = optionTexts.findIndex((t, i) => i > 0 && /nebulatech/i.test(t));
+  if (idle > 0) {
+    await boss.selectOption('select[name="brandId"]', { index: idle });
+    await tap(boss.locator('button:has-text("Open this month")'));
+    await boss.waitForTimeout(900);
+    const refusal = await boss.locator("body").innerText();
+    ok("a brand with no live campaign is refused, not given a $0 draft",
+      /nothing to bill/i.test(refusal), refusal.slice(0, 300).replace(/\n/g, " | "));
+    ok("…and the refusal says what is missing",
+      /no submitted or running campaign/i.test(refusal), refusal.slice(0, 300).replace(/\n/g, " | "));
+  }
+
+  // The brand that DOES have one running.
+  const billable = optionTexts.findIndex((t, i) => i > 0 && /astrofuel/i.test(t));
+  await boss.selectOption('select[name="brandId"]', { index: billable > 0 ? billable : 1 });
+  const brandName = await boss.locator('select[name="brandId"] option').nth(billable > 0 ? billable : 1).innerText();
   await tap(boss.locator('button:has-text("Open this month")'));
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   await boss.waitForTimeout(600);
 
   body = await boss.locator("body").innerText();
@@ -85,25 +111,56 @@ try {
 
   // Open it.
   await tap(boss.locator(`a:has-text("${number}")`).first());
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   body = await boss.locator("body").innerText();
   ok("the editor opens on the invoice", body.includes(number) && /placements/i.test(body));
   ok("it is billed to the brand we picked", body.includes(brandName.trim()), brandName);
   ok("it starts as a draft", /draft/i.test(body));
-  ok("the base line quotes the placements price", /\$600|600\.00/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+  // C11 retired the placements base to $0, and a $0 line is OMITTED rather
+  // than printed — a zero row makes an invoice look padded and invites a
+  // question with no good answer. This used to assert the $600 base line; it
+  // now asserts the opposite, which is the fact worth holding: one package,
+  // priced per challenge, and no phantom row.
+  ok("no retired base line is printed", !/Placements — clustergg\.com/.test(body),
+    body.slice(0, 400).replace(/\n/g, " | "));
+  ok("…and no $0 line at all", !/\$0\.00/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+  ok("the invoice quotes the challenge price", /sponsored weekly challenges|weekly challenges/i.test(body),
+    body.slice(0, 400).replace(/\n/g, " | "));
+
+  // The total, read rather than assumed. Hard-coding it is what made the line
+  // above go stale the moment the commercial model changed.
+  // Read off the rendered text. A locator chained through the DOM breaks the
+  // moment somebody wraps the row in another div; the words "Total $8,400.00"
+  // are what an operator actually reads, and that is what this should assert on.
+  const totalOf = async () => {
+    const t = await boss.locator("body").innerText();
+    const m = t.match(/Total\s*\$([\d,]+(?:\.\d{2})?)/);
+    return m ? Number(m[1].replace(/,/g, "")) : null;
+  };
+  // The editor renders after the click that opened it; reading immediately got
+  // null on a page that was about to show $1,400.
+  await boss.waitForFunction(() => /Total\s*\$[\d,]/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+  const totalBefore = await totalOf();
+  ok("the invoice states a total, and it is not zero",
+    totalBefore !== null && totalBefore > 0, String(totalBefore));
 
   console.log("\n== Editing every line, including a discount ==");
   await boss.fill('input[name="label"]', "Negotiated launch discount");
   await boss.selectOption('select[name="kind"]', "discount");
   await boss.fill('input[name="unitAmount"]', "50");
   await tap(boss.locator('button:has-text("Add line")'));
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   await boss.waitForTimeout(600);
   body = await boss.locator("body").innerText();
   ok("staff can add a line", /negotiated launch discount/i.test(body));
   // Typed positive, stored negative: nobody should have to remember the sign.
   ok("a discount typed positive comes out negative", /−\$50|-\$50/.test(body), body.slice(0, 500).replace(/\n/g, " | "));
-  ok("and the total moved by exactly that", /\$550|550\.00/.test(body));
+  // Read, not assumed: a discount of 50 must move the total by exactly 50,
+  // whatever the package costs this month.
+  const totalAfter = await totalOf();
+  ok("and the total moved by exactly that",
+    totalBefore !== null && totalAfter !== null && Math.abs((totalBefore - totalAfter) - 50) < 0.01,
+    `${totalBefore} → ${totalAfter}`);
 
   console.log("\n== It can't be sent with nowhere to pay ==");
   await tap(boss.locator('button:has-text("Send to brand")'));
@@ -115,7 +172,7 @@ try {
   await boss.fill('input[name="payLinkUrl"]', "https://pay.example.com/inv/abc123");
   await boss.fill('input[name="provider"]', "payoneer");
   await tap(boss.locator('button:has-text("Attach")'));
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   await boss.waitForTimeout(600);
   body = await boss.locator("body").innerText();
   ok("a pasted link attaches", /pay\.example\.com/.test(body));
@@ -125,7 +182,7 @@ try {
   ok("we have a public pay URL", !!payHref, String(payHref));
 
   await tap(boss.locator('button:has-text("Send to brand")'));
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   await boss.waitForTimeout(700);
   body = await boss.locator("body").innerText();
   ok("now it sends", /is live on the brand/i.test(body) || /awaiting payment/i.test(body),
@@ -133,7 +190,7 @@ try {
 
   console.log("\n== The pay page, for somebody with no login ==");
   const stranger = await browser.newPage({ viewport: { width: 1100, height: 1000 } });
-  res = await stranger.goto(`${BASE}${payHref}`, { waitUntil: "networkidle" });
+  res = await open(stranger, `${BASE}${payHref}`);
   const payBody = await stranger.locator("body").innerText();
   ok("it opens with no session at all", !!res && res.status() < 400, String(res?.status()));
   ok("it shows the invoice number", payBody.includes(number));
@@ -147,17 +204,17 @@ try {
   await stranger.screenshot({ path: `${SHOTS}/pay-page.png`, fullPage: true });
 
   // A draft must not be reachable by anybody.
-  await boss.goto(`${BASE}/admin/billing`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/billing`);
   // Read the HEADING, not the body: the not-found page still renders the site
   // chrome, so a body-text match passes or fails on whether the nav happened to
   // contain the word "found" that day.
-  await stranger.goto(`${BASE}/pay/nonsense-token-that-is-long-enough`, { waitUntil: "networkidle" });
+  await open(stranger, `${BASE}/pay/nonsense-token-that-is-long-enough`);
   const missingH1 = (await stranger.locator("h1").first().innerText().catch(() => "")).trim();
   ok("a wrong token shows nothing", /404|lost in space|not found/i.test(missingH1), missingH1);
   await stranger.close();
 
   console.log("\n== Payouts ==");
-  res = await boss.goto(`${BASE}/admin/payouts`, { waitUntil: "networkidle" });
+  res = await open(boss, `${BASE}/admin/payouts`);
   body = await boss.locator("body").innerText();
   ok("the payouts page opens", !!res && res.status() < 400 && !/could not be found/i.test(body), String(res?.status()));
   ok("it separates prize money out explicitly",
@@ -178,7 +235,7 @@ try {
     await boss.fill('input[name="label"]', "Launch bonus — first 100 servers");
     await boss.fill('input[name="amount"]', "125");
     await tap(boss.locator('form button:has-text("Open")'));
-    await boss.waitForLoadState("networkidle");
+    await settle(boss);
     await boss.waitForTimeout(800);
     body = await boss.locator("body").innerText();
     ok("a manual payout opens", /launch bonus|\$125/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
@@ -186,23 +243,54 @@ try {
 
     // Release, then mark paid. Two clicks, deliberately.
     await tap(boss.locator('button:has-text("Approve for manual transfer")').first());
-    await boss.waitForLoadState("networkidle");
-    await boss.waitForTimeout(800);
+    // Wait for the STATE CHANGE, not for a timer: either the reference field
+    // (released) or the queue's message strip (refused). A fixed 800ms was a
+    // guess that held until the page got heavier.
+    // Wait for the marked outcome, not for a word. "held" appears in the page's
+    // own standing copy about the holding period, so a text match returned
+    // instantly and the body was read before the refusal had rendered.
+    await boss.waitForFunction(
+      () => !!document.querySelector('input[name="ref"]') || !!document.querySelector("[data-queue-msg]"),
+      null, { timeout: 20000 },
+    ).catch(() => {});
     body = await boss.locator("body").innerText();
-    ok("releasing tells staff to send it by hand rather than pretending",
-      /send \$125.*by hand|approved/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+    const released = await boss.locator('input[name="ref"]').count() > 0;
 
-    await boss.fill('input[name="ref"]', "WIRE-2026-001");
-    await tap(boss.locator('button:has-text("Mark paid")').first());
-    await boss.waitForLoadState("networkidle");
-    await boss.waitForTimeout(800);
-    body = await boss.locator("body").innerText();
-    ok("and marking paid records the reference", /WIRE-2026-001/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+    if (released) {
+      ok("releasing tells staff to send it by hand rather than pretending",
+        /approved|mark paid/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+      await boss.fill('input[name="ref"]', "WIRE-2026-001");
+      await tap(boss.locator('button:has-text("Mark paid")').first());
+      await boss.waitForFunction(() => /WIRE-2026-001/.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
+      body = await boss.locator("body").innerText();
+      ok("and marking paid records the reference", /WIRE-2026-001/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+    } else {
+      // B35's holding period, doing its job. It is checked at RELEASE rather
+      // than at open, because opening is bookkeeping and reversible while
+      // releasing hands money to a provider — and money that has left a
+      // provider cannot be brought back. It is the only reversal mechanism this
+      // product has, so a refusal here is the assertion worth keeping.
+      //
+      // This branch is why the test no longer insists on a release: it used to,
+      // and it was asserting that a control which now correctly refuses would
+      // let the money out.
+      const strip = await boss.locator("[data-queue-msg]").innerText().catch(() => "");
+      ok("a held payout is refused rather than released",
+        /held|hold/i.test(strip), strip || body.slice(0, 300).replace(/\n/g, " | "));
+      // Either branch of the hold, and both must EXPLAIN. The demo server has
+      // no recorded unlock date, which is its own refusal — "we do not know
+      // when this tier unlocked, so a human confirms the growth first" — and a
+      // guard that refuses without saying why is one an operator routes around.
+      ok("…and the refusal says why, not just that it cannot",
+        /\b\d+\s*day|no record of when its tier unlocked|human confirms/i.test(strip), strip);
+      ok("…and no reference field appeared, so nothing can be marked paid",
+        await boss.locator('input[name="ref"]').count() === 0);
+    }
   }
   await boss.screenshot({ path: `${SHOTS}/admin-payouts.png`, fullPage: true });
 
   console.log("\n== Trophy redemptions ==");
-  res = await boss.goto(`${BASE}/admin/redeems`, { waitUntil: "networkidle" });
+  res = await open(boss, `${BASE}/admin/redeems`);
   body = await boss.locator("body").innerText();
   ok("the redeems page opens", !!res && res.status() < 400 && !/could not be found/i.test(body), String(res?.status()));
   ok("it states that we never hold their bank details",
@@ -218,8 +306,8 @@ try {
   await gamer.fill('input[name="email"]', "nova@demo.gg");
   await gamer.fill('input[name="password"]', "cluster-demo");
   await gamer.click('button:has-text("Log in with email")');
-  await gamer.waitForLoadState("networkidle");
-  await gamer.goto(`${BASE}/feed`, { waitUntil: "networkidle" });
+  await after(gamer);
+  await open(gamer, `${BASE}/feed`);
   await gamer.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await gamer.waitForTimeout(500);
 
@@ -243,13 +331,13 @@ try {
   console.log("\n== The brand sees the bill ==");
   // The admin list links to /admin/brands/<id>; the live portal link (with the
   // access key on it) is on the detail page. Walk detail pages to collect them.
-  await boss.goto(`${BASE}/admin/brands`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/brands`);
   const adminBrandHrefs = await boss.locator('a[href^="/admin/brands/"]').evaluateAll((els) =>
     [...new Set(els.map((e) => e.getAttribute("href")))]
       .filter((h) => h && !h.includes("testimonials")));
   const portalLinks = [];
   for (const href of adminBrandHrefs.slice(0, 6)) {
-    await boss.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
+    await open(boss, `${BASE}${href}`);
     const live = await boss.locator('a[href^="/brands/"]').first().getAttribute("href").catch(() => null);
     if (live) portalLinks.push(live);
   }
@@ -257,7 +345,7 @@ try {
 
   let sawBilling = false;
   for (const href of portalLinks.slice(0, 6)) {
-    await boss.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
+    await open(boss, `${BASE}${href}`);
     const t = await boss.locator("body").innerText();
     if (/billing/i.test(t)) {
       sawBilling = true;
@@ -275,7 +363,7 @@ try {
 
   console.log("\n== The server owner sees two earning types, and their tier ==");
   // Same shape as brands: the live portal link lives on the per-guild admin page.
-  await boss.goto(`${BASE}/admin/discord`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/discord`);
   // /admin/discord/<x> is mostly SUB-PAGES (analytics, requests, broadcast, hq)
   // and only sometimes a guild. Taking the first few finds none of the guilds,
   // which is how this quietly asserted nothing the first time it ran.
@@ -291,7 +379,7 @@ try {
   let sawEarnings = false;
   let portalUrl = null;
   for (const href of guildOnly.slice(0, 6)) {
-    await boss.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
+    await open(boss, `${BASE}${href}`);
     // Rotate FIRST. A server that has never needed a portal has no slug and no
     // /servers/ link yet — rotating is what creates both, so looking for the
     // link before rotating skips every guild on a fresh install.
@@ -302,7 +390,7 @@ try {
     const shown = await boss.locator("body").innerText();
     const key = (shown.match(/New key:\s*(\S+)/) ?? [])[1];
     if (!key) continue;
-    await boss.reload({ waitUntil: "networkidle" });
+    await boss.reload({ waitUntil: "domcontentloaded" }); await settle(boss);
     const slugLink = await boss.locator('a[href^="/servers/"]').first().getAttribute("href").catch(() => null);
     if (!slugLink) continue;
     portalUrl = `${BASE}${slugLink}?key=${encodeURIComponent(key)}`;
@@ -311,7 +399,7 @@ try {
   ok("staff can get into a server portal the way they really do", !!portalUrl, String(portalUrl));
 
   for (const url of portalUrl ? [portalUrl] : []) {
-    await boss.goto(url, { waitUntil: "networkidle" });
+    await open(boss, url);
     // The key handoff posts a form and lands back on the portal with a session.
     await boss.waitForTimeout(1200);
     const t = await boss.locator("body").innerText();
@@ -319,10 +407,18 @@ try {
     await tap(boss.locator('button:has-text("Earnings")').first());
     await boss.waitForTimeout(700);
     const earn = await boss.locator("body").innerText();
-    if (!/sponsored challenge share/i.test(earn)) continue;
+    // "Sponsored challenge share" was the OLD per-challenge rate. C3 removed it:
+    // an owner is paid out of the weekly server pool, and a tier decides which
+    // servers they compete against in it rather than what percentage they get.
+    //
+    // This guard is why the whole block was silently skipped and `sawEarnings`
+    // stayed false — a `continue` on a stale phrase reads in the output as one
+    // failed assertion at the end, not as eight that never ran.
+    if (!/weekly pool|server pool/i.test(earn)) continue;
     sawEarnings = true;
     ok("the tier is stated first", /your tier/i.test(earn));
-    ok("earning type 1: the sponsored share", /sponsored challenge share/i.test(earn));
+    ok("earning type 1: what the weekly pool pays them",
+      /weekly pool|server pool/i.test(earn));
     ok("earning type 2: their members' winnings", /members.{0,3} winnings/i.test(earn));
     // The line that stops an owner budgeting the prize pool as revenue.
     // The wording moved from a footnote to a banner — assert the claim, not
@@ -345,11 +441,11 @@ try {
   await staff.fill('input[name="email"]', "ops@clustergg.com");
   await staff.fill('input[name="password"]', "cluster-demo");
   await staff.click('button:has-text("Log in with email")');
-  await staff.waitForLoadState("networkidle");
+  await after(staff);
   // The console shell renders first, so read the heading after the page settles
   // rather than the loading screen — otherwise this passes or fails on timing.
   const staffSees = async (path) => {
-    await staff.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+    await open(staff, `${BASE}${path}`);
     return (await staff.locator("h1").first().innerText().catch(() => "")).trim();
   };
   ok("a staff member cannot open the provider settings",
@@ -361,7 +457,7 @@ try {
   await staff.close();
 
   console.log("\n== Layout ==");
-  await boss.goto(`${BASE}/admin/billing`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/billing`);
   const overflow = await boss.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow on billing", overflow <= 0, String(overflow));

@@ -134,6 +134,11 @@ export const ADMIN_NAV: AdminGroup[] = [
     items: [
       { href: "/admin/vaults", label: "Vaults", desc: "Where every dollar is — prizes, the server pool, the CP vault and ours. Balances summed from the ledger, the split that divides new sales, and what actually reached gamers.", system: "billing" },
       { href: "/admin/week", label: "The week", desc: "The weekly close: who carried a challenge, how they scored, and what the server pool paid them. Runs Monday; re-runnable safely.", system: "billing" },
+      // Two desks, deliberately. Whoever runs the points economy needs to see
+      // what a ceiling does to a mission; whoever runs billing needs to see what
+      // it does to the vault. Moving it is admin-only regardless — that check is
+      // in the action, not here.
+      { href: "/admin/cp", label: "The CP dial", desc: "The ceiling on what the gamer economy costs: CP per gamer per day, what it does to a mission, and how long the vault lasts at it.", systems: ["billing", "quests"] },
       { href: "/admin/billing", label: "Billing & revenue", desc: "Brand invoices, what came in, what we owe gamers and servers, and what's left." , system: "billing" },
       { href: "/admin/payouts", label: "Payouts", desc: "What server owners earned, and releasing it to them." , system: "billing" },
       { href: "/admin/redeems", label: "Trophy redemptions", desc: "Winners cashing in. Pay out or reject.", metric: "redeems", queue: true , system: "trophies" },
@@ -159,6 +164,7 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/placements", label: "Placements", desc: "Where creatives can appear.", metric: "placements" , system: "ad" },
       { href: "/admin/ads/schedule", label: "Ad schedule", desc: "What runs when." , system: "ad" },
       { href: "/admin/ads/analytics", label: "Ad analytics", desc: "Impressions, clicks and earnings by campaign.", metric: "adImpressions" , system: "ad" },
+      { href: "/admin/delivery", label: "Delivery", desc: "What every brand's creatives actually delivered — counted cards, never estimates. The brands delivering nothing are at the top.", system: "ad" },
     ],
   },
   {

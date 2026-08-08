@@ -10,6 +10,7 @@
  * one they were.
  */
 import { chromium } from "playwright-core";
+import { open } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -23,7 +24,7 @@ const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromi
 const page = await browser.newPage({ viewport: { width: 1400, height: 1000 } });
 
 try {
-  await page.goto(BASE, { waitUntil: "networkidle" });
+  await open(page, BASE);
   await page.waitForTimeout(800);
   const text = await page.locator("body").innerText();
 
@@ -94,7 +95,7 @@ try {
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow at 1400", overflow <= 0, String(overflow));
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 } });
-  await phone.goto(BASE, { waitUntil: "networkidle" });
+  await open(phone, BASE);
   await phone.waitForTimeout(600);
   const po = await phone.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -108,7 +109,7 @@ try {
   if (broken.length) console.log(`      (${broken.length} off-site images blocked by the sandbox proxy)`);
   await phone.close();
 
-  await page.goto(BASE, { waitUntil: "networkidle" });
+  await open(page, BASE);
   await page.screenshot({ path: `${SHOTS}/landing.png` });
 } catch (e) {
   fail++;

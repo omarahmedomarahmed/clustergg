@@ -16,6 +16,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/quests.mjs
  */
 import { chromium } from "playwright-core";
+import { after, open } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -55,7 +56,7 @@ try {
   console.log("\n== the guide is on the page, signed out ==");
   // Somebody deciding whether to sign up is exactly who this is for, so it must
   // not be behind a login.
-  await page.goto(`${BASE}/quests`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/quests`);
   await page.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await page.waitForTimeout(400);
   ok("a signed-out visitor sees it", await page.locator("[data-quest-guide]").count() === 1);
@@ -99,7 +100,7 @@ try {
   // renders of one dataset. A hardcoded figure in either makes them diverge
   // here, rather than in production three months after somebody edits the
   // calculator.
-  await page.goto(`${BASE}/quests/${firstKey}`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/quests/${firstKey}`);
   await page.waitForTimeout(600);
   const onDetail = await readPanel(page);
   ok("the single-quest page carries the same guide", !!onDetail, String(firstKey));
@@ -119,8 +120,8 @@ try {
   await page.fill('input[name="email"]', "nova@demo.gg");
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await page.waitForLoadState("networkidle");
-  await page.goto(`${BASE}/quests`, { waitUntil: "networkidle" });
+  await after(page);
+  await open(page, `${BASE}/quests`);
   await page.waitForTimeout(500);
   const guide = page.locator("[data-quest-guide]");
   const guideText = await guide.textContent();

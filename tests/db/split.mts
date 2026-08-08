@@ -337,6 +337,53 @@ console.log("\n== C1: the CP dial, delivered the one safe way ==");
     /a mission awards no CP[\s\S]{0,12}of its own/i.test(missions));
 }
 
+console.log("\n== C1: the dial is now connected to something ==");
+{
+  // `lib/cp-dial.ts` shipped with C1 and nothing called it, so the ceiling was
+  // only movable by editing a settings row by hand. `applyCpDial` is the caller.
+  // These assertions are on the ACTION's source, matching how every other
+  // server action in this suite is checked — the action itself needs a session
+  // and a request, which is a browser test's job, not this one's.
+  const { readFileSync } = await import("node:fs");
+  const dial = readFileSync(new URL("../../app/actions/cp-dial.ts", import.meta.url), "utf8");
+
+  ok("something applies the plan", /export async function applyCpDial/.test(dial));
+  ok("moving the ceiling is admin-only, not staff",
+    /requireSystemFor\("\/admin\/cp"\)/.test(dial) && /access\.isAdmin/.test(dial));
+
+  // The C6 defect, in the one place it would be most expensive: `Number(x) || d`
+  // treats 0 as unset, and 0 is a REAL target here — it is how you stop the
+  // economy without deleting it. A fallback would have silently reopened it.
+  ok("a ceiling of zero is a target, not a missing value",
+    /Number\.isFinite\(target\)/.test(dial) && !/Number\(formData\.get\("ceiling"\)\)\s*\|\|/.test(dial));
+  ok("…and a change needs a stated reason", /Say why/.test(dial));
+
+  // The plan is recomputed on the server from the LIVE quest weights. A form
+  // that posted its own weights is a form somebody can post different ones
+  // through, and a plan computed from ACTION_CATALOG defaults would be a plan
+  // for a configuration nobody is running.
+  ok("the plan is recomputed server-side", /planCpDial\(target, current\)/.test(dial));
+  ok("…from the quests, not the catalogue defaults",
+    /db\.select\(\)\.from\(schema\.quests\)/.test(dial));
+  ok("…and no weight is read out of the form",
+    !/formData\.get\("weight/.test(dial) && !/plan\s*=\s*JSON\.parse/.test(dial));
+
+  // A quest that does not pay an action must not START paying it because the
+  // dial moved. Writing the whole plan onto every quest would do exactly that.
+  ok("a quest that does not pay an action is not given one",
+    /this quest does not pay it/.test(dial));
+  ok("…and only mission-eligible actions are written",
+    /missionEligibleActions/.test(dial));
+
+  // Both halves in one call. Either alone breaks the model.
+  ok("the ceiling and the weights move together",
+    /quests\.dailyCpCeiling/.test(dial) && /schema\.quests\)\.set\(\{ actionWeights/.test(dial));
+  ok("the change is audited with its before and after", /auditChange\(/.test(dial));
+  // The gamer-facing page reads the ceiling. Revalidating only the admin pages
+  // would leave a gamer looking at yesterday's number.
+  ok("the gamer's quests page is revalidated too", /revalidatePath\("\/quests"\)/.test(dial));
+}
+
 console.log("\n== C10: weekly and the hold are one sentence ==");
 {
   const { PAYOUT_HOLD_DAYS, PAYOUT_HOLD_PHRASE } = await import("../../lib/abuse.ts");

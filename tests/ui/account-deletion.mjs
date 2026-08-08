@@ -10,6 +10,9 @@
  *   scripts/with-server.sh 3031 node tests/ui/account-deletion.mjs
  */
 import { chromium } from "playwright-core";
+// This suite has its own `login` (it signs in as several fixtures), so only
+// the navigation helpers come from the shared file.
+import { after, open } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -23,7 +26,7 @@ const login = async (page, email) => {
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await page.waitForLoadState("networkidle");
+  await after(page);
 };
 
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });
@@ -32,7 +35,7 @@ try {
   // ---- a gamer with a balance and trophies ----
   const nova = await browser.newPage({ viewport: { width: 1400, height: 1100 } });
   await login(nova, "nova@demo.gg");
-  await nova.goto(`${BASE}/settings/account`, { waitUntil: "networkidle" });
+  await open(nova, `${BASE}/settings/account`);
 
   // `textContent`, not `innerText`: the panel's labels are uppercased in CSS,
   // and `innerText` returns the TRANSFORMED text, so a case-sensitive check
@@ -63,7 +66,7 @@ try {
   // ---- a gamer with money already moving ----
   const lyra = await browser.newPage({ viewport: { width: 1400, height: 1100 } });
   await login(lyra, "lyra@demo.gg");
-  await lyra.goto(`${BASE}/settings/account`, { waitUntil: "networkidle" });
+  await open(lyra, `${BASE}/settings/account`);
   const lbody = await lyra.locator("body").textContent();
   ok("a payout in flight is explained, not silently blocked",
     /already being paid out/i.test(lbody), lbody.slice(0, 300));

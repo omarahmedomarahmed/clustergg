@@ -18,6 +18,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/age-band.mjs
  */
 import { chromium } from "playwright-core";
+import { after } from "./_nav.mjs";
 
 const BASE = process.env.BASE_URL || "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -55,7 +56,7 @@ console.log("== a brand-new gamer is asked, without going looking ==");
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', "cluster-demo");
   await page.locator('form button').first().click();
-  await page.waitForLoadState("networkidle");
+  await after(page);
   ok("signup lands somewhere signed in", !/\/signup/.test(page.url()), page.url());
 
   ok("the gate is on the page they landed on", await gate(page).isVisible());
