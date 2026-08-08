@@ -287,6 +287,51 @@ export function AdminLink({ href, children }: { href: string; children: React.Re
   return <Link href={href} className="text-cyan-300 hover:underline">{children}</Link>;
 }
 
+// ===== Tabs =====
+//
+// Merged pages, not a widget. Four screens that were each "edit some site text"
+// became one page with four tabs, and the tab lives in the URL rather than in
+// React state for three reasons that all matter to staff: a tab is bookmarkable,
+// a server action's `revalidatePath` puts you back where you were, and the
+// panels stay SERVER components — only the active tab's data is fetched, so a
+// merge does not make the page four times as expensive to open.
+//
+// `desc` is required. A tab strip whose labels are one word each is a strip
+// where the difference between "Nav & footer" and "Mobile" is a guess.
+export type Tab = { key: string; label: string; desc: string };
+
+/** The active tab, resolved safely. An unknown `?tab=` falls back to the first. */
+export function activeTab(tabs: Tab[], value: string | undefined): Tab {
+  return tabs.find((t) => t.key === value) ?? tabs[0];
+}
+
+export function Tabs({ tabs, active, base }: { tabs: Tab[]; active: string; base: string }) {
+  const current = activeTab(tabs, active);
+  return (
+    <div>
+      <nav className="flex flex-wrap gap-1.5 border-b border-white/10 pb-2">
+        {tabs.map((t) => {
+          const on = t.key === current.key;
+          return (
+            <Link
+              key={t.key}
+              href={`${base}?tab=${t.key}`}
+              className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
+                on
+                  ? "bg-cyan-500/15 text-cyan-200 ring-1 ring-cyan-400/40"
+                  : "text-muted hover:bg-white/5 hover:text-ink"
+              }`}
+            >
+              {t.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <p className="mt-2 text-xs text-muted">{current.desc}</p>
+    </div>
+  );
+}
+
 export function Toolbar({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-wrap items-center gap-2">{children}</div>;
 }

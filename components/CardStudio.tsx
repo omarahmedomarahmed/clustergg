@@ -150,7 +150,7 @@ export default function CardStudio({ cards, library, buttonCopy = {} }: {
             <p className="text-xs bg-black/40 border border-white/10 rounded-lg p-3 select-all leading-relaxed">{card.brief}</p>
             <p className="text-[11px] text-muted mt-2">
               Background art lives in{" "}
-              <Link href="/admin/cards" className="text-cyan-300 hover:underline">Card backgrounds</Link>
+              <Link href="/admin/art?tab=cards" className="text-cyan-300 hover:underline">Card backgrounds</Link>
               {" "}→ <code className="text-cyan-300">{card.bgKey}</code>.
             </p>
           </div>

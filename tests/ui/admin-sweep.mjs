@@ -58,6 +58,72 @@ for (const route of routes) {
 }
 ok(`every route renders`, broken.length === 0, broken.join("; "));
 
+// Merged pages hide most of themselves behind a tab, and only the default tab
+// is on the route the nav registers. A sweep that stopped at the nav would have
+// opened /admin/content and never rendered three of its four panels — which is
+// exactly the "reachable by URL only" problem the merge was supposed to end.
+//
+// The tab keys are read out of each page's own TABS literal for the same reason
+// the routes are read out of the nav: a hand-kept list here would agree with
+// itself and miss the tab nobody added.
+console.log("\n== every tab of every merged page ==");
+{
+  const { readdirSync } = await import("node:fs");
+  const tabbed = [];
+  for (const dir of readdirSync(new URL("../../app/admin", import.meta.url), { withFileTypes: true })) {
+    if (!dir.isDirectory()) continue;
+    let src = "";
+    try { src = readFileSync(new URL(`../../app/admin/${dir.name}/page.tsx`, import.meta.url), "utf8"); }
+    catch { continue; }
+    const block = src.match(/const TABS: Tab\[\] = \[([\s\S]*?)\n\];/);
+    if (!block) continue;
+    const keys = [...block[1].matchAll(/key:\s*"([^"]+)"/g)].map((m) => m[1]);
+    if (keys.length) tabbed.push([`/admin/${dir.name}`, keys]);
+  }
+  ok("merged pages were found to sweep", tabbed.length >= 4, `found ${tabbed.length}`);
+
+  const badTabs = [];
+  for (const [route, keys] of tabbed) {
+    for (const key of keys) {
+      const url = `${BASE}${route}?tab=${key}`;
+      try {
+        const res = await page.goto(url, { waitUntil: "domcontentloaded", timeout: 25000 });
+        const body = await page.locator("body").innerText();
+        const errored = /application error|something went wrong|unhandled runtime|digest:/i.test(body);
+        if (res?.status() !== 200 || errored) badTabs.push(`${route}?tab=${key} — ${res?.status()}${errored ? " (error boundary)" : ""}`);
+      } catch (e) {
+        badTabs.push(`${route}?tab=${key} — threw: ${String(e).slice(0, 80)}`);
+      }
+    }
+  }
+  ok("every tab renders", badTabs.length === 0, badTabs.join("; "));
+
+  // An unknown tab must fall back, not blank. `?tab=` is in a URL staff paste
+  // to each other, and a typo that renders nothing looks like a broken page.
+  await page.goto(`${BASE}/admin/content?tab=nonsense`, { waitUntil: "domcontentloaded" });
+  const fallback = await page.locator("body").innerText();
+  ok("an unknown ?tab= falls back to the first tab", /Homepage hero|Site content/i.test(fallback));
+}
+
+console.log("\n== merged routes still answer at their old URLs ==");
+for (const [old, dest] of [
+  ["/admin/chrome", "/admin/content"],
+  ["/admin/mobile", "/admin/content"],
+  ["/admin/partners", "/admin/content"],
+  ["/admin/backgrounds", "/admin/art"],
+  ["/admin/cards", "/admin/art"],
+  ["/admin/cards/guide", "/admin/art"],
+  ["/admin/translations", "/admin/language"],
+  ["/admin/brand-enquiries", "/admin/brands"],
+  // The one that would fail silently: without its own stub this falls through
+  // to /admin/brands/[id] and renders a brand detail page for a brand called
+  // "testimonials" — a 200 that looks like a broken brand, not a moved page.
+  ["/admin/brands/testimonials", "/admin/brands"],
+]) {
+  await page.goto(`${BASE}${old}`, { waitUntil: "domcontentloaded" });
+  ok(`${old} lands on ${dest}`, new URL(page.url()).pathname === dest, page.url());
+}
+
 console.log("\n== the money pages carry the kit's vocabulary ==");
 for (const [route, must] of [
   ["/admin/payouts", ["Owed, not yet opened", "Payout queue"]],

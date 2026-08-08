@@ -60,6 +60,26 @@ only:**
 Two more (`/admin/spaces`, `/admin/discord/messages`) are deliberate redirects
 left behind after earlier merges. Those stay.
 
+**All three orphans are closed.** `/admin/ads` was deleted, `/admin/badges` is
+registered under Competition, and `/admin/dataroom/team` is fine as it was.
+
+### The bug the redirects were hiding
+
+Writing the merges surfaced something the two *earlier* merges already had, and
+nobody had hit: **a redirect stub is a page like any other, and an unregistered
+page is admin-only.** So `pathAllowedFor` denied `/admin/spaces` outright — a
+staff member clicking an old bookmark got a 404 from the layout guard before the
+redirect ever ran. A 404 on a page that still exists under a different name is
+the worst answer available: it says "gone" when the truth is "moved".
+
+Fixed with one map, `MOVED_ROUTES` in `lib/admin-nav.ts`. The guard resolves a
+moved path to its destination and applies the destination's rule; every stub
+reads its target from the same map, so the redirect and the guard cannot
+disagree. Checked after `ADMIN_ONLY`, so a redirect can never become a way
+around it — and `tests/db/taxonomy.mts` asserts both halves: that the old
+bookmark opens for the desk that owns the new page, and that it does not open
+for a desk that never owned the old one.
+
 ---
 
 ## 4. Page by page
@@ -72,18 +92,28 @@ left behind after earlier merges. Those stay.
 | ~~`/admin/badges`~~ | **CORRECTED — kept and registered instead.** I wrote it up as "hand-grants around the rules". It is not: it is the badge CATALOGUE editor (`saveBadge` / `deleteBadge` define badges, and `lib/badges.ts` grants them by rule). Deleting it would have removed the only way to manage badge definitions. Orphaned from the nav was the real bug; the fix is a nav entry. |
 | `/admin/creative-studio` | 70 lines wrapping an image tool that duplicates `/admin/shots` and `/admin/brand-kit`. Three places to put an image is three places to look for one. |
 
-### MERGE (14 pages → 4)
+### MERGE (14 pages → 4) ✅ done
 
-Nothing is lost. Every merge target keeps the same controls, as tabs.
+Nothing is lost. Every merge target keeps the same controls, as tabs, and every
+old URL redirects to the tab that replaced it.
 
-| These | Become | Why |
+| These | Became | Why |
 |---|---|---|
 | `content`, `chrome`, `mobile`, `partners` | **`/admin/content`** — tabs: Copy · Nav & footer · Mobile · Partners | All four are "edit some site text/links". Three of them are under 60 lines. |
-| `backgrounds`, `cards`, `cards/guide` | **`/admin/art`** — tabs: Page backgrounds · Card backgrounds · Card layouts | All three are "pick the art for a surface". `cards` and `backgrounds` are 26 lines each. |
-| `language`, `translations` | **`/admin/language`** — tabs: Locales · Translations | One is the switch, the other is the strings. Nobody uses one without the other. |
+| `backgrounds`, `cards`, `cards/guide` | **`/admin/art`** — tabs: Page backgrounds · Card backgrounds · Card layouts | All three are "pick the art for a surface". `cards` and `backgrounds` are 26 lines each, and the card guide already opened with a hand-written back-link to `cards` — a tab bar somebody had built by accident. |
+| `language`, `translations` | **`/admin/language`** — tabs: Interface · Marketing copy · Content · Countries & flags | Four tabs rather than the two planned: the old language page stacked three large editors down one column, and splitting them costs nothing once the shell exists. |
 | `brand-enquiries`, `brands/testimonials` | **`/admin/brands`** — tabs: Brands · Enquiries · Testimonials | Three views of the same relationship. An enquiry becomes a brand becomes a testimonial. |
 
-That is **13 → 4** in "Design & content", which is the group you were right to
+The tab lives in the URL (`?tab=`), not in React state, and that is load-bearing
+three ways: a tab is bookmarkable, `revalidatePath` puts an operator back where
+they were, and **the panels stay server components** — only the active tab's
+queries run. A merge that fetched all four panels would have made one page
+slower to open than the four it replaced. The card studio is the proof: it loads
+every layout, the brand art, the asset library, the button copy and several real
+samples per card kind, and none of that is paid for by somebody opening "page
+backgrounds".
+
+That is **13 → 5** in "Design & content", which is the group you were right to
 call badly organised.
 
 ### NEW (2 already shipped, 2 proposed)
@@ -111,21 +141,28 @@ Ordered by whether being wrong costs money.
 
 ---
 
-## 5. The regrouping
+## 5. The regrouping ✅ done
 
-Current groups are by **thing**. The proposal groups by **job** — which desk
-you sit at.
+Groups were by **thing**. They are now by **job** — which desk you sit at.
 
-| Now | Proposed | Change |
+| Was | Is | Change |
 |---|---|---|
-| Overview (6) | **Overview** (5) | Analytics moves to Platform |
-| Ads & revenue (13) | **Money** (8) + **Brands & ads** (5) | One group was doing two unrelated jobs: closing the books, and running campaigns |
-| Design & content (13) | **Content** (5) | The merges above |
-| Competition (10) | **Competition** (7) | `redeems` and `stuck` move to Money — they are payouts |
+| Overview (6) | **Overview** (5) | Analytics moved to Platform |
+| Ads & revenue (13) | **Money** (9) + **Brands & ads** (5) | One group was doing two unrelated jobs: closing the books, and running campaigns |
+| Design & content (13) | **Content** (5) | The merges above; `email` moved to Platform |
+| Competition (11) | **Competition** (12) | `redeems`, `stuck` and `growth-review` moved to Money — they are payouts — and Games & planets folded in |
 | Games & planets (4) | folded into **Competition** | Four pages is not a section |
 | Community (4) | **Gamers** (2) + Platform (2) | `roles` and `departments` are staff administration, not community |
-| Discord (5) | **Discord** (6) | unchanged, plus `discord/hq` |
-| Platform (2) | **Platform** (~12) | Everything that is "run the company" rather than "run the product" |
+| Discord (5) | **Discord** (5) | unchanged |
+| Platform (2) | **Platform** (6) | Everything that is "run the company" rather than "run the product" |
+
+Money is second, ahead of everything except the front door, and it is the only
+group whose blurb says what being wrong costs.
+
+**No permission changed.** The group-level `area` gate only ever applied on the
+`navFor` path, and both callers take that path solely for super admins — staff
+go through `navForSystems`, which reads the per-page `system` field. Moving a
+page between groups moves where it is listed and nothing else.
 
 ---
 
@@ -133,11 +170,32 @@ you sit at.
 
 1. ~~The kit, `/admin/vaults`, `/admin/week`~~ ✅
 2. ~~Money pages: billing, payouts, redeems, command centre~~ ✅
-3. **Deletes and merges** — before any more conversion, so no deleted page is
-   ever converted.
-4. Regroup the nav.
+3. ~~**Deletes and merges**~~ ✅ — 2 deleted, 14 → 4 merged, every old URL kept
+   as a redirect.
+4. ~~Regroup the nav~~ ✅ — eight groups, by job.
 5. Convert the rest, money-first order above.
 6. `/admin/delivery` and `/admin/cp`.
+
+### What shipping 3 and 4 actually cost
+
+Deleting a page is not deleting its references, and the ones left behind were
+the whole job:
+
+- `requireSystemFor("/admin/ads")` in two offer actions. `pathAllowedFor` denies
+  any path no desk claims, so deleting the page would have made both actions
+  fail for every staff member — silently, at the moment somebody pressed the
+  button. Repointed to `/admin/offers`.
+- Ten `revalidatePath` calls across five action files pointing at routes that no
+  longer exist.
+- `/admin/brands/testimonials` needed a redirect **stub**, not just a nav
+  removal: without a static file at that path Next falls through to
+  `/admin/brands/[id]` and renders a brand detail page for a brand whose id is
+  the word "testimonials". A 200 that looks like a broken brand.
+
+And the sweep needed extending. It discovers routes from the nav, and a merged
+page only registers its default tab — so without the tab pass, three of
+`/admin/content`'s four panels would have been exactly as unreachable-by-test as
+the orphans this document was written to find.
 
 **Every step keeps the sweep green.** `tests/ui/admin-sweep.mjs` opens every
 route in the nav and fails on a 500 *or* an error boundary — the boundary being
