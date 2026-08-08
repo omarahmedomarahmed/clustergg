@@ -281,6 +281,16 @@ export async function chargeWallet(
       feeAmount: round2(Number(opts.fee) || 0),
       label: opts.label, challengeId: opts.challengeId ?? null,
     });
+    // B91.4. An owner just spent their balance on a challenge for their own
+    // members. It needs a metric and rules before it can be announced, and the
+    // owner is now waiting on us.
+    const { raiseAlert } = await import("@/lib/staff-alerts");
+    await raiseAlert(db, {
+      kind: "server.charge", desk: "ops",
+      title: `A server bought a private challenge`,
+      body: `${opts.label} — ${money(amount)} from their wallet. It cannot be announced until it has a metric and rules.`,
+      href: `/admin/discord/${opts.guildId}`, refType: "charge", refId: id, once: true,
+    });
     return { ok: true, id };
   } catch { return { ok: false, error: "Could not take the payment. Nothing was charged." }; }
 }

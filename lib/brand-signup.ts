@@ -130,6 +130,16 @@ export async function signUpBrand(input: SignupInput): Promise<SignupResult> {
       status: "pending",
       about: clip(input.website, 300) ? `Website: ${clip(input.website, 300)}` : null,
     });
+    // Somebody just opened an account at whatever hour it is. Sales should be
+    // reading that inside the hour, not finding it in a list next week.
+    const { raiseAlert } = await import("@/lib/staff-alerts");
+    await raiseAlert(db, {
+      kind: "brand.signup", desk: "sales",
+      title: `${company} opened a brand account`,
+      body: `${email}${isFreeMail(email) ? " · free-mail address, worth a look before it goes live" : ""}. `
+        + "It is PENDING, so nothing of theirs serves until somebody here approves it.",
+      href: `/admin/brands/${id}`, refType: "brand", refId: id, once: true,
+    });
     return { ok: true, brandId: id, slug, key };
   } catch {
     return { ok: false, reason: "error", message: "Something went wrong our end. Email partners@clustergg.com and we'll sort it." };

@@ -351,6 +351,20 @@ export async function portalBuyCampaign(brandId: string, key: string, formData: 
   const res = await buyCampaign({ brandId, game, slots, games, coverUrl, slotCovers, targeting });
   if (!res.ok) return { error: res.message };
 
+  // B91.4. A brand just built a campaign in their own portal. Whether or not
+  // it is paid yet, somebody here has work to do on it — the metric, the rules,
+  // the trophies — and nobody would otherwise know it existed until a report.
+  {
+    const { getDb } = await import("@/lib/db");
+    const { raiseAlert } = await import("@/lib/staff-alerts");
+    await raiseAlert(await getDb(), {
+      kind: "brand.campaign_built", desk: "sales",
+      title: `${brand.name} built a campaign`,
+      body: `${slots} week${slots === 1 ? "" : "s"} on ${game}. It needs the game metric, the rules and the trophies before it can be announced.`,
+      href: `/admin/brands/${brandId}`, refType: "campaign", refId: res.campaignId, once: true,
+    });
+  }
+
   revalidatePath(`/brands/${brand.slug}`);
   return { ok: true, campaignId: res.campaignId };
 }

@@ -1924,6 +1924,41 @@ export const serverCharges = pgTable("server_charges", {
   createdAt: now("created_at"),
 }, (t) => [index("server_charge_idx").on(t.guildId, t.createdAt)]);
 
+/**
+ * Something happened that a human here should know about. B91.4.
+ *
+ * NOT the same thing as the audit log, and the difference is who it is for.
+ * The audit log records what STAFF did, for the question "who authorised this";
+ * this records what CUSTOMERS did, for the question "is anybody on it". A brand
+ * that signs up at 2am, starts a campaign, and hears nothing for four days has
+ * been failed by us long before anybody looks at a log.
+ *
+ * Deliberately a table rather than a per-user notification: an alert belongs to
+ * the DESK, not to a person. The salesperson who happens to be on shift reads
+ * it, and the one who is on holiday does not have three days of unread rows.
+ */
+export const staffAlerts = pgTable("staff_alerts", {
+  id: id(),
+  /** brand.signup | brand.campaign_draft | invoice.paid | server.charge | … */
+  kind: text("kind").notNull(),
+  /** Which desk should see it: sales | ops | money. */
+  desk: text("desk").notNull().default("sales"),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  /** Where to go and deal with it. */
+  href: text("href"),
+  /** What it is about, so a screen can group by customer. */
+  refType: text("ref_type"),
+  refId: text("ref_id"),
+  /**
+   * Who dealt with it, and when. An alert nobody can clear is a list that
+   * grows until people stop opening it.
+   */
+  clearedBy: text("cleared_by"),
+  clearedAt: timestamp("cleared_at", { withTimezone: true, mode: "date" }),
+  createdAt: now("created_at"),
+}, (t) => [index("staff_alert_idx").on(t.desk, t.createdAt)]);
+
 export const serverPayouts = pgTable("server_payouts", {
   id: id(),
   guildId: text("guild_id").notNull(),

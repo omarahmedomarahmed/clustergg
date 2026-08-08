@@ -886,6 +886,21 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "server_charge_idx" ON "server_charges" ("guild_id","created_at")`,
 
+  `CREATE TABLE IF NOT EXISTS "staff_alerts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "kind" text NOT NULL,
+    "desk" text DEFAULT 'sales' NOT NULL,
+    "title" text NOT NULL,
+    "body" text DEFAULT '' NOT NULL,
+    "href" text,
+    "ref_type" text,
+    "ref_id" text,
+    "cleared_by" text,
+    "cleared_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "staff_alert_idx" ON "staff_alerts" ("desk","created_at")`,
+
   `CREATE TABLE IF NOT EXISTS "feature_shots" (
     "key" text PRIMARY KEY NOT NULL,
     "image_url" text,
