@@ -186,18 +186,45 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
     // Entrants ATTRIBUTED to a server, which is `guildId` on the join and not
     // guild membership. A null guildId is a pre-B86 row and is excluded rather
     // than guessed at — guessing is the defect that column exists to remove.
+    //
+    // ===== SPONSORED CHALLENGES ONLY =====
+    //
+    // A PRIVATE challenge is one a server owner bought for their own members.
+    // It puts nothing into the server pool — it is not brand inventory — so
+    // entering one must not earn a share of it. Counting private entrants would
+    // let an owner buy a cheap private challenge, have their own members enter
+    // it, and take a slice of money that other servers' sponsored work paid in.
+    //
+    // The line is `visibility`, which already exists and already means this:
+    // `public` is announced to every server and open to anyone, `private` is
+    // one server's own. That is the owner's own wording — "the pool counts only
+    // the money from the brand's public challenges available for everyone on any
+    // server to join" — and it needs no new column.
+    //
+    // It also correctly excludes a WELCOME challenge, which is private to one
+    // guild: a per-server promo we funded is not inventory another server's
+    // work paid for.
+    //
+    // What this does NOT touch is the linked-member terms. Linking a game
+    // account is linking a game account whatever prompted it, so a private
+    // challenge that brings members onto the platform still earns growth and
+    // still raises the denominator of conversion. That asymmetry is deliberate:
+    // we want owners buying private challenges, we just will not pay them from
+    // the pool for it twice.
     const joins = await db.select({
       userId: schema.challengeParticipants.userId,
       guildId: schema.challengeParticipants.guildId,
     }).from(schema.challengeParticipants)
+      .innerJoin(schema.challenges, eq(schema.challenges.id, schema.challengeParticipants.challengeId))
       .where(and(
         isNotNull(schema.challengeParticipants.guildId),
+        eq(schema.challenges.visibility, "public"),
         gte(schema.challengeParticipants.joinedAt, weekStart),
         lt(schema.challengeParticipants.joinedAt, weekEnd),
       ));
     const rows = joins.map((j) => ({ userId: j.userId, guildId: String(j.guildId) }));
     if (!rows.length) {
-      return EMPTY(key, `Week of ${key}: no server carried an entrant, so there is nobody to pay.`);
+      return EMPTY(key, `Week of ${key}: no server carried an entrant into a sponsored challenge, so there is nobody to pay. Private challenges do not count — they are bought by an owner and put nothing into the pool.`);
     }
 
     const exclusive = exclusiveEntrants(rows);
@@ -285,9 +312,10 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
     const TERM_VALUE: Record<string, (s: typeof base[number]) => number> = {
       exclusiveEntrants: (s) => s.exclusiveEntrants,
       newlyQualified: (s) => s.newlyQualified,
-      // No per-guild card-open source exists. Left here, reading zero, so the
-      // redistribution below drops it visibly instead of it being absent from
-      // the file and forgotten.
+      // SPONSORED entrants over ALL linked members. The numerator is filtered
+      // above; the denominator deliberately is not. A server whose members link
+      // accounts but never enter a sponsored challenge should see this fall —
+      // that is the term telling them so.
       conversion: (s) => (s.linked > 0 ? s.entrants / s.linked : 0),
     };
     const live = Object.keys(SCORE_WEIGHTS).filter((k) => base.some((s) => TERM_VALUE[k](s) > 0));

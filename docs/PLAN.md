@@ -544,6 +544,71 @@ reach — with no brand named and the 25-cohort floor applied.
 > | Announce | That server only, and **only after payment clears** |
 > | Draft | Cancellable and editable by the owner. Visible to admin as a lead |
 
+#### B90.7 — What counts, and what does not · **B88.4 KPIs, settled**
+
+| KPI | Counts | Does NOT count |
+|---|---|---|
+| **Entrants you brought** | Entrants into **public** challenges, each ÷ how many servers they are in | A private challenge. It put nothing into the pool |
+| **New members linked** | Every linked account, **whatever prompted it** | — |
+| **Conversion** | **Public** entrants ÷ **all** linked members | Private entries in the numerator |
+
+The asymmetry is deliberate and worth saying to owners in these words: **a
+private challenge grows you, it does not pay you twice.** Linking is linking
+whatever brought somebody in, so it earns growth and it raises the conversion
+denominator. Entering an event the owner bought for their own members does not
+earn a share of money other servers' sponsored work paid in.
+
+Implemented on `visibility`, which already existed and already means exactly
+this. No new column. It also correctly excludes a WELCOME challenge, which is
+private to one guild.
+
+#### B90.8 — The admin challenge builder, revamped
+
+Every challenge now belongs to something that was billed.
+
+| Kind | Built by | Billed to | Announced |
+|---|---|---|---|
+| **Campaign challenge** | Brand, 1–4 per campaign | The brand, one bill | Everywhere |
+| **Private** | Server owner | That owner, prize pool + 5% | That server only |
+| **House** | Admin | The Cluster brand | Everywhere |
+| **Custom** | **Admin only** | 1 or 2 brands, **max 2** | Everywhere |
+
+**Custom keeps what the old builder could do** — monthly, daily, any cadence —
+and gains a bill. Admin sets a prize pool and the fee equals it, so a custom
+challenge is priced like every other: half the money is the prize.
+
+**Co-sponsorship, max two brands.** Each gets a partial bill that says on its
+face that a co-sponsor is paying the other half. A bill that hides a co-sponsor
+is a bill somebody disputes.
+
+**The start date is always the following Monday**, for every kind. Announcement
+happens when an admin presses announce — which may be mid-week — and the message
+carries the start date. Nothing starts mid-week; announcements do.
+
+#### B90.9 — The server owner's wallet IS their billing page
+
+Earnings, balance, and every bill for their own challenges, in one place.
+
+**Any bill can be paid from the balance.** That is the loop the whole
+server-owner product rests on: earn from the pool, spend it back into your own
+server. It is a purchase, not a transfer — see B90.4.
+
+#### B90.10 — Every rule, with its reason, to the audience it binds
+
+Three guides: **gamer**, **server owner**, **brand**. Every rule that touches
+that audience, stated visually, and **each one carries WHY it exists in terms of
+what it gets them.**
+
+A rule with no reason reads as an obstacle and gets worked around. A rule whose
+reason is about US ("so we can measure") is worse. The daily ceiling is not "a
+limit we impose", it is "the reason the points are still worth something in six
+months". The 30-day first-payout hold is not "we distrust you", it is "the only
+mechanism that can claw back a fraud, which is why anybody can be paid at all".
+
+> **A drafting note that is not optional.** Every one of these is a promise. A
+> guide that overstates a rule is a term we are held to — the same reason C3
+> deleted the tier percentage.
+
 #### B90.5 — Admin sees every campaign, including the unpaid ones
 
 One console: every brand, every campaign, every challenge, filterable by status.
