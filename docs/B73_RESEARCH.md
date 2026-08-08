@@ -14,6 +14,7 @@ and starts being judgement.
 | Method | Primary sources fetched directly. Discord Help Center pages return HTTP 403 to ordinary fetches; they were retrieved through the public Zendesk Help Center API (`/api/v2/help_center/en-us/articles/<id>.json`), which returns the same article body plus an `edited_at` timestamp. Where a policy carries no internal date, the `edited_at` is given and labelled as such. |
 | Not changed | No code or copy was modified. Files are named where a finding lands on one. |
 | Second pass | 2026-08-08 — added §0 (master blocker index), §7 (world map, region by region), §8 (contradictions), §9 (market tiers), §10 (extra counsel questions), §11 (jurisdictions not researched). |
+| Third pass | 2026-08-08 — MENA filled country by country; US state registration and design codes; Russia's actual blocker; six more EU states; Ghana, Kenya, Philippines, Singapore, Malaysia. Blockers B37–B52 added. ~55 jurisdictions now carry a finding; §11 lists what still does not. |
 
 **Navigation:** §0 master blocker index · §1 verdict · §2 evidence by question · §3 judgement calls · §4 what survives · §5 counsel questions · §6 sources · **§7 world map** · §8 contradictions · §9 market tiers · §10 more counsel questions · §11 not researched
 
@@ -61,6 +62,22 @@ Every blocker found, one row each. `Hard` = the model as built cannot legally op
 | **B34** | Premium regulation bites only where the premium is offered **"in connection with a transaction"** | **Japan** | Likely clear | Act against Unjustifiable Premiums and Misleading Representations (Act No. 134 of 1962) — **text not fetched, page 403** | Free-entry ("open") campaigns are generally outside the premium caps. **Not verified against the statute. Treat as unconfirmed.** |
 | **B35** | Registration + bond/trust where total announced prize value exceeds **$5,000** | **New York, Florida** (and other US states) | Soft | NY GBL §369-e; Fla. Stat. §849.094 | NY reaches "games of chance"; FL reaches promotions "in connection with the sale of consumer products or services". **Our entire model is promoting a brand's products — that phrase is a live risk, not an obvious out.** |
 | **B36** | Free draws are **not lotteries** and are outside statutory control | **United Kingdom** | **For us** | Gambling Act 2005, Sch. 2; Gambling Commission guidance | The UK is the friendliest large market found for the prize mechanic. The exposure in the UK is the children's code (B13), not gambling law. |
+| **B37** | Promotions and competitions require a **Ministry of Commerce licence**; requiring purchase to enter is a banned lottery; competitions must comply with Sharia | **Saudi Arabia** | 🟨 | MC licensing regime under the Anti-Commercial Fraud Law; 44 businesses referred to prosecution for unlicensed competitions | Our free entry avoids the lottery limb. The **licence** requirement does not go away. Penalties to 3 years and SR 1m |
+| **B38** | Gambling, running a gambling place, and **promoting/advertising gambling** are criminal | **UAE** | 🟨 | Federal Decree-Law 31/2021 (Crimes and Penalties), Arts. 414–416; Art. 1021 voids gambling contracts | Skill contests with no stake fall outside "games of chance". Art. 416's advertising limb is the one to check against sponsored-challenge copy |
+| **B39** | Gambling defined as a game where "loss or gain … depend on luck **and require each party to give money**" | **Qatar** | 🟩 likely | Penal Code (Law 11/2004) Arts. 274–277 | **Two-limb definition — we fail both limbs, which is good.** No luck, no stake |
+| **B40** | Under-13 data may not be used for **targeted advertising or commercial purposes** even with parental consent | **UAE** | 🟧 | Federal Decree-Law 45/2021 (PDPL) | Same shape as India DPDP §9(3), at a lower age |
+| **B41** | Under-15s need guardian's **written** consent; 15–18 may consent themselves or via guardian | **Egypt** | 🟨 | PDPL 151/2020 + 2025 Executive Regulations | A three-band age model, unlike anywhere else in the file |
+| **B42** | Organising a prohibited game, lottery or betting is criminal; three state monopolies are the only exceptions | **Israel** | 🟩 likely | Penal Law 5737-1977 ss. 225, 226; narrow s. 230 exception | Turns on whether a skill contest is a "prohibited game". Israel's own social-casino industry exists on this distinction |
+| **B43** | **Data localisation** — personal data of Russian citizens must first be recorded and stored on servers in Russia | **Russia** | 🟥 practical | Federal Law 152-FZ Art. 18(5); new version in force 2025-07-01; fines to ₽18m repeat | Independent of sanctions. Effectively closes Russia to a foreign SaaS with no Russian infrastructure |
+| **B44** | **Prior DTI permit for every sales promotion**, with a 10-working-day wait for raffles and competitions | **Philippines** | 🟨 | Consumer Act (RA 7394) ch. VI; DAO 2 s.1993; DAO 10-02 s.2010 | One of the few regimes that permits **all** promotions, not only chance-based ones |
+| **B45** | Promotional gaming / prize competition **licence** from the national gaming regulator | **Ghana, Kenya** | 🟨 | Gaming Commission of Ghana (promotional gaming licence); Kenya Betting Control and Licensing Board | Marketing promotions are separately licensable, not incidental to a general business licence |
+| **B46** | Permit required where a promotion is a lottery (prize + consideration + chance) | **Singapore, Malaysia** | 🟩 likely | Private Lotteries Act 2011 (SG); Common Gaming Houses Act 1953 and Lotteries Act 1952 (MY) | Genuinely free entry with no consideration generally falls outside |
+| **B47** | Permit **and bank guarantee** for games of chance | **Poland** | 🟨 | Polish gambling law (secondary) | With Italy, the heaviest EU prize-promotion regime found |
+| **B48** | Notification to the tax authority for chance-based promotions; 10% levy on the prize pool; withholding on prizes over €300 | **Spain** | 🟨 | Ley 13/2011 de Regulación del Juego | A tax filing, not a licence |
+| **B49** | Authorisation request 15 days before launch, plus a bank or insurance **guarantee** | **Portugal** | 🟨 | Secondary (prize-promotion practitioner guide) | |
+| **B50** | Local presence required for prizes exceeding €1,000 | **Greece** | 🟨 | Secondary (same guide) | A corporate-presence trigger, not a permit |
+| **B51** | **State age-appropriate design codes are now live in the US** | California, Maryland, Nebraska (Vermont 2027) | 🟧 | Cal. AADC — 9th Cir. partially vacated the injunction 2026-03-12, mandate 2026-04-03; MD AADC in force 2024-10-01 (DPIA deadline 2026-04-01); NE in force 2026-01-01; VT 2027-01-01 | **New since the first pass.** The UK-style design duties now apply domestically. Q3 is no longer a COPPA-only question |
+| **B52** | Only **three** US states require sweepstakes registration, and **skill contests are generally exempt** | NY, FL, RI | 🟩 mostly | NY GBL §369-e; Fla. Stat. §849.094; RI (retail-only, >$500, no bond) | Narrower than feared — but see B35 on Florida's "in connection with the sale of consumer products" wording |
 
 ---
 
@@ -335,18 +352,25 @@ Named, not changed.
 | **United States (federal)** | 🟨 | 13 (COPPA) | Yes | Collecting a child's PI without VPC once we have actual knowledge; conditioning a prize on excess disclosure (§312.3(d)) | 16 CFR 312.2, 312.3 | P |
 | **US — New York** | 🟨 | 13 | Yes | Unregistered/unbonded **games of chance** with prizes over **$5,000**; 30 days' advance filing | NY GBL §369-e | S |
 | **US — Florida** | 🟨 | 13 | Yes | Unfiled **game promotions in connection with the sale of consumer products or services** over **$5,000**; trust account or bond; 7 days' advance filing | Fla. Stat. §849.094 | S |
-| **US — other registration states** (RI, and others) | ⬜ | 13 | Yes | Not researched | — | — |
-| **US — state kids' codes** (CA AADC, MD, others) | ⬜ | varies | Yes | Not researched. CA AADC has been subject to injunction; current status unverified | — | — |
-| **Canada (federal)** | 🟩 | none set federally (PIPEDA) | Yes | Nothing found | — | S |
+| **US — Rhode Island** | 🟨 | 13 | Yes | Registration where prize value exceeds **$500** — but only for promotions conducted **at retail establishments**. No bond | RI sweepstakes law | S |
+| **US — all other states** | 🟩 | 13 | Yes | **Only NY, FL and RI require sweepstakes registration.** Skill-based contests are generally exempt everywhere, provided the skill element is real and clearly defined | Multiple practitioner surveys | S |
+| **US — California AADC** | 🟧 **live** | 13 | Yes | Design-code duties. The 9th Circuit **partially vacated** the injunction on **2026-03-12**; mandate issued **2026-04-03**; previously-enjoined provisions took effect from **2026-04-02** | Cal. AADC; NetChoice v. Bonta (9th Cir.) | S |
+| **US — Maryland Kids Code** | 🟧 **live** | 13 | Yes | In force **2024-10-01**; first data protection impact assessments due **2026-04-01**. NetChoice challenge filed Feb 2025, **still pending** | MD AADC | S |
+| **US — Nebraska AADC** | 🟧 **live** | 13 | Yes | In force **2026-01-01**; AG civil penalties from **2026-07-01**. Not challenged | Nebraska Age-Appropriate Online Design Code Act, signed 2025-05-30 | S |
+| **US — Vermont AADC** | 🟨 pending | 13 | Yes | Takes effect **2027-01-01**. Not challenged | Vermont AADC, signed 2025-06-12 | S |
+| **US — South Carolina AADC** | 🟨 | 13 | Yes | Enacted; NetChoice challenge filed | Hunton reporting | S |
+| **Canada (federal)** | 🟩 | none set federally (PIPEDA) | Yes | Nothing found. Note the Canadian convention of a **skill-testing question** to keep a promotion out of gambling law | — | S |
 | **Canada — Quebec** | 🟨 | **14** | Yes | Any collection of PI from an under-14 without parental consent | Law 25 (P-39.1), in force 2024-09-22 | S |
-| **Mexico** | 🟨 | ⬜ | Yes | Any promotion where **chance** decides the winner, without a SEGOB permit. Pure skill is outside | Ley Federal de Juegos y Sorteos; DGJS | S |
+| **Mexico** | 🟨 | ⬜ | Yes | Any promotion where **chance** decides the winner, without a SEGOB permit. Pure skill is outside — "azar" is defined as "the casualty upon which the result of a game depends, which is completely beyond the will of the player" | Ley Federal de Juegos y Sorteos; Reglamento; DGJS | S |
+
+> **US takeaway.** The prize mechanic is close to clear — three registration states, and skill contests exempt in all of them. **The US risk has moved to children's design codes**, which went live during 2026 and impose UK-style duties domestically. That is a change since the first pass and it makes B12/B13 a single combined workstream rather than two.
 
 ### 7.2 Latin America
 
 | Jurisdiction | Status | Consent age | Cash out? | Specifically not allowed | Source | Conf. |
 |---|---|---|---|---|---|---|
 | **Brazil** | 🟨 | **12** (LGPD art. 14) | Yes | Free prize distribution by draw/coupon/contest **without Ministry of Finance authorisation** — unless the contest is exclusively cultural, artistic, **sporting** or recreational, with **no chance and no payment** by entrants | Lei 5.768/1971 art. 3(II); Decreto 70.951/1972; Portaria MF 422/2013 | S |
-| **Argentina, Chile, Colombia, Peru, rest of LatAm** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+| **Argentina, Chile, Colombia, Peru, rest of LatAm** | ⬜ | ⬜ | ⬜ | **Still thin after a second attempt.** Searches returned only generic international-sweepstakes guidance with no country-specific statute for any of these. The regional pattern elsewhere in LatAm (permit for chance, skill contests outside) is a *hypothesis*, not a finding | — | — |
 
 ### 7.3 European Union / EEA
 
@@ -372,6 +396,16 @@ Named, not changed.
 | Jurisdiction | Status | Specifically not allowed / required | Source | Conf. |
 |---|---|---|---|---|
 | **Italy** | 🟨 heavy | "Manifestazioni a premio" require **ministerial notification, a financial guarantee, and a notary or public official** overseeing the award. Certain contests are excluded and the exclusions must be checked against our mechanics | DPR 430/2001 | S |
+| **Poland** | 🟨 heavy | Games of chance are heavily regulated: **permit and bank guarantee** required for most promotion types | Polish gambling law | S |
+| **Spain** | 🟨 | **Mandatory notification to the AEAT** (tax authority) for chance-based promotions; a **10% levy on the prize pool**; withholding on individual prizes over **€300**. No licence, but a real filing | Ley 13/2011 de Regulación del Juego | S |
+| **Portugal** | 🟨 | **Authorisation request 15 days before launch**, plus a **bank or insurance guarantee** | Practitioner guide | S |
+| **Greece** | 🟨 | **Local presence required for prizes exceeding €1,000**; specific tax provisions apply | Practitioner guide | S |
+| **Germany** | 🟩 | **No registration or permit** for prize promotions under the UWG. Even purchase-linked promotions are permitted. A chance promotion must not require payment to enter, or it becomes gambling under the Interstate Treaty | UWG; Interstate Treaty on Gambling | S |
+| **France** | 🟩 | **No permit or notification.** Both chance and skill contests permitted. A notary is customary but not required | — | S |
+| **Netherlands** | 🟩 (see also below) | No permit found; contests classified by prize value, with an annual prize-pool cap reported at **€100,000** | Practitioner guide | S |
+| **Rest of EU** — Nordics, Baltics, Austria, Czechia, Hungary, Romania, Bulgaria, Croatia, Slovakia, Slovenia, Ireland, Luxembourg, Cyprus, Malta | ⬜ | Prize-promotion law **not researched**. Given that Italy, Poland, Spain and Portugal each turned out to carry a filing, bond or tax, the remaining states should not be assumed clear | — | — |
+
+> **The EU pattern.** There is no EU-level prize-promotion regime — it is 27 national regimes. The hinge everywhere is the same: **chance plus consideration**. Free-entry skill contests are the lightest-touch structure in every state examined. The heavy states are **Italy** (notary + bond), **Poland** (permit + guarantee), **Portugal** (authorisation + guarantee) and **Spain** (tax filing + levy).
 | **Belgium** | 🟩 for us | Paid loot boxes treated as illegal gambling since April 2018. We sell no random items. The Gaming Commission conceded in Dec 2024 the ban "proved difficult to enforce" | Belgian Gaming Commission; Gambling Act of 7 May 1999 | S |
 | **Netherlands** | 🟩 for us | Loot boxes with **transferable** contents are gambling; non-transferable are not. **Our no-P2P-transfer design lands on the safe side of the exact line Dutch law drew** | Kansspelautoriteit study, 2018-04-19; later narrowed in *EA v Ksa* | S |
 | **Germany, France, Spain, Poland, Nordics, rest of EU** | ⬜ | National prize-promotion, lottery and advertising-to-minors law **not researched** | — | — |
@@ -391,21 +425,52 @@ Named, not changed.
 | Jurisdiction | Status | Specifically not allowed | Source | Conf. |
 |---|---|---|---|---|
 | **Turkey** | 🟥/🟧 | Permission from the **Milli Piyango İdaresi** is required for prize draws **including free-entry ones**. The regulation covers **non-cash** prize draws; **cash** lotteries are a state monopoly, so cash prizes by draw are worse-placed, not better. A pure skill contest is the only plausible structure | Karşılığı Nakit Olmayan Piyangolar ve Çekilişler Hakkında Yönetmelik | S |
-| **Russia, Belarus** | 🟧 | Currently blocked by `lib/eligibility.ts` as if comprehensively embargoed. **They are not** — the US programs are extensive but targeted. Separately, Russian data-localisation law was **not researched** | OFAC program list | P (sanctions) / — (localisation) |
-| **Switzerland, Norway, Ukraine, Serbia, rest** | ⬜ | Not researched | — | — |
+| **Russia** | 🟥 **practical block, for a reason we had wrong** | Currently blocked by `lib/eligibility.ts` as if comprehensively embargoed. **The sanctions basis is wrong** — the US programs are extensive but targeted. **The real blocker is data localisation:** Federal Law 152-FZ **Art. 18(5)** requires Russian and foreign operators collecting personal data of Russian citizens, including over the internet, to **initially record and store that data on servers in Russia**. A new version of Art. 18(5) came into force **2025-07-01**. Fines ₽1m–₽6m first offence, ₽6m–₽18m repeat. Roskomnadzor enforces | OFAC program list (sanctions); Federal Law 152-FZ Art. 18(5) | P / S |
+| **Belarus** | 🟧 | Over-blocked on the same mistaken sanctions basis as Russia. Local law **not researched** | OFAC program list | P / — |
+| **Switzerland, Norway, Ukraine, Serbia, and the rest of non-EU Europe** | ⬜ | Not researched | — | — |
 
-### 7.6 MENA — a named concentration market, and the weakest-evidenced region in this document
+### 7.6 MENA — filled in, country by country
 
-| Jurisdiction | Status | Consent age | Cash out? | Specifically not allowed | Source | Conf. |
+**The regional rule, stated once.** Across the Arab world the near-universal position is that **gambling is prohibited**, and the prohibition is defined by two elements that recur almost verbatim from statute to statute: **(1) chance decides the outcome, and (2) each party stakes something**. ClusterGG's challenges are skill-based and free to enter, so on the face of these definitions they fail *both* limbs — which is the favourable reading. What survives the gambling analysis is a **separate and independent licensing layer**: several states require a permit for *any* commercial promotion or competition, chance or not.
+
+> **⚠ Confidence warning for the whole region.** Two primary sources were retrieved (UAE penal code article numbers via the UAE legislation portal listing, Qatar's Al Meezan legal portal listing). **Direct statute fetches failed for the UAE portal (403), Al Meezan (503) and the GCGRA (403).** Everything below is at `S` unless marked otherwise. This region remains the least-verified in the document even after a dedicated pass.
+
+#### Gulf Cooperation Council
+
+| Jurisdiction | Status | Consent age | Cash out? | Gambling position | Promotion licence? | Source | Conf. |
+|---|---|---|---|---|---|---|---|
+| **Saudi Arabia** | 🟨 | **13** (PDPL) | Likely yes, skill-only | All gambling and lottery illegal — *maysir*. Penalties include fines, imprisonment, asset confiscation | **Yes.** A licence from the Anti-Commercial Fraud Department / Ministry of Commerce is required before conducting **or advertising** a contest. **Requiring purchase to enter is itself a banned lottery.** Competitions must comply with Sharia and Kingdom customs. Applications reviewed within 7 days. Penalties to 3 years and SR 1m; MC referred 44 businesses to prosecution for unlicensed competitions | Saudi PDPL; MC licensing under the Anti-Commercial Fraud Law | S |
+| **UAE** | 🟨 | **13** (PDPL) | Yes | Federal Decree-Law 31/2021 (Crimes and Penalties): **Art. 414** criminalises gambling (to 2 years or AED 50,000); **Art. 415** running a gambling place (to 10 years, AED 100,000+); **Art. 416** extends the ban to **promoting and advertising** gambling. Art. 1021 voids gambling contracts | The **GCGRA** (est. 2023, federal) holds exclusive jurisdiction over commercial gaming, lotteries and raffles; first national lottery licence issued July 2024. **Whether free-entry promotional draws are in scope was not established — the GCGRA site returned 403** | Fed. Decree-Law 31/2021; Fed. Decree-Law 45/2021; GCGRA | S |
+| **UAE — children** | 🟧 | 13 | — | — | **Under-13 data may not be used for targeted advertising or commercial purposes**, even with parental consent, and the guardian must be able to withdraw consent easily | Fed. Decree-Law 45/2021 (PDPL) | S |
+| **Qatar** | 🟩 likely | ⬜ (Law 13/2016 — age not established) | Yes | Penal Code (Law 11/2004) **Arts. 274–277**. Art. 274 defines gambling as a game "in which loss or gain probabilities cannot be controlled, **depend on luck**, and **require each party to give money** to the winning party if it loses." Up to 3 months and QR 3,000; doubled in public places | None found | Al Meezan (listing retrieved; article text fetch returned 503) | S |
+| **Kuwait** | 🟥 for chance | ⬜ (CITRA regulation, not a statute) | Likely yes, skill-only | Penal Code **Art. 208** — organising or participating in gambling, land-based and online. To 1 year or KD 1,000 | Not established | Secondary | S |
+| **Bahrain** | 🟥 for chance | ⬜ (Law 30/2018 PDPL — age not established) | Likely yes, skill-only | Penal Code bans all gambling. First offence BD 300 and to 3 months; operators BD 1,000 and 1 year | Not established | Secondary | S |
+| **Oman** | 🟥 for chance | ⬜ (RD 6/2022 PDPL — age not established) | Likely yes, skill-only | Penal Law: arranging, preparing, opening or managing gambling places, or **organising chance-based games**, carries 3 months to 3 years plus fines | Not established | Secondary | S |
+
+#### Levant, Egypt and North Africa
+
+| Jurisdiction | Status | Consent age | Cash out? | Gambling position | Data-protection law | Conf. |
 |---|---|---|---|---|---|---|
-| **Saudi Arabia** | 🟥 for chance | ⬜ (PDPL age not established) | Probably, if no chance element | All gambling, online and offline, prohibited | Secondary summaries only; **statutes not fetched** | S |
-| **Kuwait, Oman** | 🟥 for chance | ⬜ | ⬜ | All gambling prohibited | Same secondary summaries | S |
-| **UAE** | 🟨 | ⬜ | Yes | The **GCGRA** (est. 2023 by Federal Decree-Law) holds "exclusive jurisdiction to regulate, license, and supervise all commercial gaming activities" including lotteries and raffles. First national lottery licence issued July 2024. **Whether a free-entry promotional draw needs a GCGRA licence is not established — the GCGRA site returned HTTP 403** | GCGRA; secondary summaries | S |
-| **Qatar, Bahrain** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
-| **Egypt, Jordan, Morocco, Algeria, Tunisia, Lebanon, Iraq** | ⬜ | ⬜ | ⬜ | **Not researched.** These are plausibly a large share of a MENA-concentrated user base | — | — |
-| **Iran** | 🟥 | — | **No** | Comprehensively sanctioned | OFAC Iran program, updated 2026-08-07 | P |
-| **Syria** | 🟩 (changed) | ⬜ | **Yes** — the comprehensive program was revoked | EO 14312, eff. 2025-07-01; SySR removed from the CFR 2025-08-25. Residual selective program (PAARSS) | P |
-| **Israel** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+| **Egypt** | 🟨 | **three bands: under 15** guardian's **written** consent; **15–18** child *or* guardian may consent; 18+ self | Yes | Land-based casinos permitted under licence but **closed to Egyptian nationals** — tourist-only. Online position not established | PDPL 151/2020 + 2025 Executive Regulations | S |
+| **Jordan** | 🟨 | **18** in effect — consent required from a parent or guardian where the data subject lacks legal capacity; **no specific digital-consent age is set** | Yes | Limited licensed casino gambling reported (Amman, Aqaba) | PDPL 24/2023 | S |
+| **Lebanon** | 🟨 | ⬜ | Yes | One of the few regional states permitting **limited** legal gambling. **No specific rules for online gambling** — a gap in the law, not a permission | Law 81/2018 (e-transactions and personal data) — **not verified** | S |
+| **Morocco** | 🟨 | **none set** — Law 09-08 has no GDPR-style age regime. A bill to introduce a digital age of consent was proposed (Dec 2024); status unverified | Yes | Licensed land-based casinos for tourists; state lottery operators | Law 09-08 (CNDP) | S |
+| **Tunisia** | 🟨 | ⬜ | Yes | Casino gambling tolerated in tourist areas, typically requiring a foreign passport and foreign currency | Law 2004-63 — **not verified** | S |
+| **Algeria** | 🟥 for chance | ⬜ | Yes | Online casinos and online betting **prohibited**. State-approved lotteries exist | Law 18-07 — **not verified** | S |
+| **Iraq** | ⬜ | ⬜ | ⬜ | **Not established.** Searches returned nothing specific | No comprehensive law identified | — |
+| **Israel** | 🟩 likely | ⬜ — Amendment 13 (in force **2025-08-14**) does not address a minors' consent age in the sources found; a draft "PPL (Minor's Privacy) 5782-2021" was published 2021 and its status is unverified | Yes | Penal Law 5737-1977 **s. 225** (organising a prohibited game, lottery or betting — to 3 years or ₪452,200) and **s. 226** (playing — to 1 year or ₪29,200). Only three exceptions: Mifal HaPayis, the Israel Sports Betting Board, and the narrow **s. 230** exception for a game aimed at "a particular circle of persons" that "may not exceed the scope of amusement or entertainment" | Privacy Protection Law 5741-1981, as amended by Amendment 13 | S |
+
+#### Sanctioned or otherwise closed
+
+| Jurisdiction | Cash out? | Basis | Conf. |
+|---|---|---|---|
+| **Iran** | **No** | OFAC comprehensive program, updated 2026-08-07 | P |
+| **Syria** | **Yes — this changed** | EO 14312 revoked the comprehensive program eff. 2025-07-01; the Syrian Sanctions Regulations were removed from the CFR 2025-08-25. Selective PAARSS program remains | P |
+| **Yemen, Libya, Sudan** | ⬜ | **Not researched.** Each carries targeted OFAC programs; none was examined | — |
+
+> **What the MENA pass actually settled, and what it did not.**
+> **Settled:** the two-limb gambling definition (chance + stake) recurs across the region and a free-entry skill contest fails both limbs. Egypt's three-band consent model. Saudi's licence requirement for competitions. The UAE's under-13 targeted-advertising ban. Qatar's definition, which is the most favourable text found anywhere in the region.
+> **Not settled:** whether a *cash prize* changes the analysis in any Gulf state — every definition found turns on the *entrant's* stake, not the prize, but no source addressed a cash prize funded by a third-party sponsor. Whether the UAE's GCGRA licenses free-entry draws. Whether Saudi's Sharia-compliance requirement for competitions reaches a cash-prize gaming contest. **No national statute text was successfully retrieved for any GCC state.** Counsel in-region is required; this pass narrows the questions but does not answer them.
 
 ### 7.7 Sub-Saharan Africa
 
@@ -413,7 +478,9 @@ Named, not changed.
 |---|---|---|---|---|---|---|
 | **Nigeria** | 🟨 | **18** | Yes | Processing a child's (under-18) data without explicit parental/guardian consent | NDPA 2023 — secondary | S |
 | **South Africa** | 🟨 | **18** | Yes | Processing a child's (under-18) PI without parental consent. Promotional competition rules under the Consumer Protection Act **not researched** | POPIA s.11, s.34–35 — secondary | S |
-| **Kenya, Ghana, Ethiopia, rest** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+| **Ghana** | 🟨 | ⬜ | Yes | A **Promotional Gaming Licence** from the Gaming Commission of Ghana is required to run competitions, raffles and promotional draws "with elements of game of chance" as part of a marketing campaign | Gaming Commission of Ghana | S |
+| **Kenya** | 🟨 | ⬜ | Yes | The **Betting Control and Licensing Board** authorises lotteries **and prize competitions**. Promotional campaigns "may require separate regulatory approval". New Gambling Control (Licensing) Regulations gazetted 2026 | BCLB; Gambling Control (Licensing) Regulations 2026 | S |
+| **Ethiopia, and the rest of Sub-Saharan Africa** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
 
 ### 7.8 Asia — the region with the hardest blocks
 
@@ -427,7 +494,10 @@ Named, not changed.
 | **Vietnam** | 🟨 | 7 (parental) / 7+ (dual child+parent) | ⬜ | Not otherwise researched | Secondary | S |
 | **Indonesia** | 🟨 | **17** | ⬜ | Government Regulation No. 17/2025 on Child Protection in Electronic Systems | Secondary | S |
 | **Thailand** | 🟨 | under 10 parental; 10–20 partial | ⬜ | PDPA guidance splits by age band | Secondary | S |
-| **Pakistan, Bangladesh, Philippines, Malaysia, Singapore, Taiwan, Hong Kong** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+| **Philippines** | 🟨 **notable** | ⬜ | Yes | **A DTI permit is required for every sales promotion**, not only chance-based ones — "big or small promotions must have permits". Raffles and competitions require a **10-working-day** wait before running; discounts and premiums 3 days | Consumer Act (RA 7394) ch. VI; DAO 2 s.1993; DAO 10-02 s.2010 | S |
+| **Singapore** | 🟩 likely | ⬜ | Yes | A permit is required where a promotion is a lottery — **prize + consideration + chance**. "If your giveaway is genuinely free to enter (no purchase or payment required) … it may not constitute a lottery" | Private Lotteries Act 2011 | S |
+| **Malaysia** | 🟩 likely | ⬜ | Yes | Promotions with an element of **chance** fall under the Common Gaming Houses Act 1953 and the Lotteries Act 1952 | CGHA 1953; Lotteries Act 1952 | S |
+| **Pakistan, Bangladesh, Taiwan, Hong Kong** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
 | **North Korea** | 🟥 | — | **No** | Comprehensively sanctioned | OFAC, updated 2026-03-12 | P |
 
 ### 7.9 Oceania
@@ -467,12 +537,17 @@ Our product has three floors (`lib/age.ts`, `lib/eligibility.ts`): **play** at a
 | China PIPL, Korea PIPA | **14** | All processing | ✅ Over-compliant (moot in Korea — B20 blocks the market anyway) |
 | Japan APPI (proposed) | **16** | Consent, notices | ✅ Matches |
 | Indonesia | **17** | Consent | ❌ Marginal gap at 16–17 |
+| **Saudi Arabia PDPL, UAE PDPL** | **13** | Consent; UAE also bans targeted ads to under-13s outright | ✅ Over-compliant on consent; ❌ the UAE ad ban is a separate obligation |
+| **Egypt PDPL** | **15** (written guardian consent), **15–18** either | Consent | ⚠ Partially. Our 16 sits inside Egypt's middle band, where either the child or the guardian may consent |
+| **Jordan, Nigeria, South Africa** | **18** | All processing | ❌ Parental consent needed to 18 |
+| **US state design codes** (CA, MD, NE, VT) | **18** in design terms | Design, defaults, DPIAs, profiling | ❌ **New.** Same shape as the UK code, now domestic |
+| Morocco | **none set** | — | n/a — a bill was proposed Dec 2024 |
 | Brazil LGPD | **12** | Consent | ✅ Over-compliant |
 | Australia social media minimum age | **16** | Holding an account on an age-restricted platform | ✅ Matches, if it applies to us at all |
 | Discord ToS | **13** | Having a Discord account | ✅ Over-compliant |
 | Our redemption floor | **18** | Being paid | ✅ At or above every line found |
 
-**The pattern:** 16 is a good line for the EU and a poor line for the Anglophone and South Asian regimes, which use **18**. The three regimes that use 18 (UK code, India DPDP, DSA Art. 28) all govern *design and advertising*, not payment — which is exactly the dimension our 16/18 split does not address.
+**The pattern, restated after the second pass.** 16 is a good line for the EU and a poor line almost everywhere else. **Nine** regimes now found using **18** for design or advertising purposes — UK code, India DPDP, Nigeria NDPA, South Africa POPIA, Jordan, DSA Art. 28, and the California, Maryland and Nebraska design codes. Every one of them governs **design and advertising, not payment** — which remains exactly the dimension the 16-earn/18-redeem split does not address. The single change that would move the most jurisdictions at once is not raising the earning age; it is **not showing profiled advertising to anyone under 18, anywhere**.
 
 ---
 
@@ -493,6 +568,11 @@ Tabled, not resolved.
 | **Netherlands loot boxes** | Ksa 2018 study: transferable-content loot boxes are gambling | Later Dutch court ruling in *EA v Kansspelautoriteit* narrowed this | The transferability line is the one our no-gifting decision sits on | **Both cited.** The 2018 line is the conservative reading and the one worth designing to |
 | **Is $600 or $2,000 the 1099 line?** | `lib/eligibility.ts:55` and most pre-2026 material say $600 | IRS Instructions (Rev. 12/2026) and IRC §6041(a) as amended: **$2,000** for payments after 2025-12-31 | The code is wrong | **Resolved — $2,000.** Listed because the stale figure is everywhere |
 | **Is Syria blocked?** | `lib/eligibility.ts` blocks it | EO 14312 revoked the program effective 2025-07-01; the regulations were removed from the CFR | Our list is out of date | **Resolved — not comprehensively sanctioned** |
+| **Is the California AADC enforceable?** | District court preliminarily enjoined it in March 2025 on First Amendment grounds | 9th Circuit **partially vacated** that injunction 2026-03-12; mandate 2026-04-03; previously-enjoined provisions took effect 2026-04-02 | Determines whether US design-code duties are live today | **Resolved — partially in force.** Which specific provisions survived was **not established** and matters |
+| **Saudi Arabia: are our contests lawful?** | Gambling and lottery are illegal outright — *maysir* | Free-entry competitions are lawful **with a Ministry of Commerce licence**; it is *requiring purchase* that makes a promotion an illegal lottery | The two statements are compatible but read as opposite in isolation | **Both true.** Free entry is the deciding fact; the licence is still required |
+| **Does the entrant's stake or the prize decide it?** | Every Gulf and Israeli definition retrieved turns on the **entrant** staking money (Qatar Art. 274: "require each party to give money"; Israel s.225's "prohibited game") | Practitioner commentary across the region describes cash prizes as inherently suspect | If the prize alone can make it gambling, free entry does not save us anywhere in MENA | **Unresolved, and it is the pivotal MENA question.** No source addressed a cash prize funded by a third-party sponsor |
+| **Why is Russia closed?** | Our code blocks it as comprehensively sanctioned | It is not comprehensively sanctioned — but 152-FZ Art. 18(5) data localisation independently closes it to a foreign SaaS with no Russian servers | Right outcome, wrong reason, and the wrong reason would have been fixed away | **Resolved — keep the block, change the rationale** |
+| **Philippines: which promotions need a permit?** | Most jurisdictions regulate only chance-based promotions | The Philippines requires a DTI permit for **every** sales promotion, explicitly including contests and competitions | Breaks the "skill contests are always exempt" heuristic that holds nearly everywhere else | **Resolved — the Philippines is the exception.** A useful reminder that the heuristic is a heuristic |
 
 ---
 
@@ -502,11 +582,13 @@ A planning view, not advice. Derived entirely from §7.
 
 | Tier | Markets | Why | What it would take |
 |---|---|---|---|
-| **Green — no blocker found** | UK, Netherlands, Belgium, Canada (ex-Quebec), Japan *(unverified)* | Free-entry prize mechanics are expressly outside gambling law; no transfer of value between users | UK still requires the children's code work (under-18 design) |
-| **Amber — filing or permit** | US (NY, FL, other registration states), Mexico, Brazil, Italy, UAE, Quebec, Australia, Nigeria, South Africa | Prize-promotion registration, bonding, or a child-consent age above our floor | Per-market filings; in Brazil and Mexico the skill-only structure avoids most of it |
-| **Orange — restructure required** | Turkey, India, EU as a whole (for *targeted* ads to under-18s) | Draw-based mechanics or targeted advertising to minors are the problem, not the prize itself | Skill-only contests; contextual (non-profiled) ad serving for under-18s |
-| **Red — hard block as built** | **South Korea**, Saudi Arabia / Kuwait / Oman (for anything chance-based), China (practical), Cuba, Iran, North Korea, Crimea/Donetsk/Luhansk | Korea prohibits the cash-exchange business itself; the GCC prohibits gambling outright; the sanctions list is absolute | Korea: no viable structure found for cash redemption. Others: skill-only, or geo-block |
-| **Unknown — not researched** | Most of Latin America, most of MENA, most of Sub-Saharan Africa, most of SE Asia, most of the EU's national prize-promotion law, all of Eastern Europe outside Turkey/Russia | See §11 | Named so nobody mistakes silence for clearance |
+| **Green — no blocker found beyond the universal ones** | **UK, Germany, France, Netherlands, Belgium, Canada (ex-Quebec), Qatar, Singapore, Malaysia, Israel, US (48 states), Japan *(unverified)*** | Free-entry skill contests sit outside gambling law and need no permit. Qatar's Art. 274 two-limb definition and the UK free-draw exemption are the two cleanest texts found anywhere | UK and US still require children's design-code work; that is now a *global* workstream, not a market-entry one |
+| **Amber — a filing, permit or tax** | **US (NY, FL, RI), Saudi Arabia, UAE, Egypt, Jordan, Mexico, Brazil, Italy, Poland, Spain, Portugal, Greece, Philippines, Ghana, Kenya, Nigeria, South Africa, Quebec, Australia, Morocco, Tunisia, Lebanon** | Prize-promotion registration, licensing, bonding or tax; or a child-consent age above our floor | Per-market filings. The **Philippines** is the widest (a permit for *every* promotion); **Italy, Poland and Portugal** the heaviest (bond/guarantee/notary); **Saudi** requires a licence to advertise a competition at all |
+| **Orange — restructure required** | **Turkey, India, Algeria, the whole EU and the US design-code states (for *profiled* ads to under-18s), UAE (for under-13 ads)** | Draw-based mechanics, or targeted advertising to minors — not the prize itself | Skill-only contests; **contextual, non-profiled ad serving for every under-18 everywhere** — the single change that clears the most jurisdictions |
+| **Red — hard block as built** | **South Korea, Russia, China (practical), Kuwait / Bahrain / Oman (for anything chance-based), Cuba, Iran, North Korea, Crimea / Donetsk / Luhansk** | Korea prohibits the cash-exchange business itself (GIPA Art. 32(1)7). Russia's data-localisation rule closes it independently of sanctions. The sanctions list is absolute | Korea: **no viable structure found** for cash redemption. Russia: servers in-country, or stay out. Others: skill-only, or geo-block |
+| **Unknown — still not researched after two passes** | Most of Latin America outside Brazil and Mexico; 14 EU states' prize-promotion law; Iraq; Yemen, Libya, Sudan; most of Sub-Saharan Africa; Pakistan, Bangladesh, Taiwan, Hong Kong; New Zealand; non-EU Europe outside Turkey and Russia | See §11 | Named so nobody mistakes silence for clearance |
+
+**Coverage after two passes:** roughly **55 jurisdictions** carry a finding; the ⬜ list in §11 is what remains. The two most consequential single facts in the whole map are **Korea's GIPA Art. 32(1)7** (the only place the business model itself is prohibited) and the **under-18 profiled-advertising line**, which now recurs in nine regimes across four continents.
 
 ---
 
@@ -529,7 +611,13 @@ These are in addition to §5. Same rule: each one exists because public sources 
 | **Australia.** Is Discord an "age-restricted social media platform" under the 2024 Act, and does that change anything for a bot operating inside it? | eSafety has named platforms in scope; I did not verify Discord's status | **Yes** → our under-16 Australian cohort may not exist on the channel at all. **No** → no change |
 | **Japan.** Confirm that a free-entry campaign is outside the premium caps because no premium is offered "in connection with a transaction." | **The statute page returned HTTP 403 and I could not verify this.** It is stated in §7.8 as unconfirmed | **Confirmed** → Japan is green. **Not confirmed** → premium value caps may apply |
 | **EU consent ages.** Produce a verified, dated, per-member-state table. | No primary EU-wide register was located, and several states are mid-reform | Determines whether a flat 16 can stay, or whether geo-specific handling is needed |
-| **MENA generally.** Which MENA jurisdictions permit a cash-prize skill contest, and what are their data-protection ages? | **Not researched at all.** Saudi PDPL, UAE PDPL, Egypt, Jordan, Morocco and the rest are absent from this document | Scopes whether "MENA concentration" is a market or a liability |
+| **MENA — the pivotal question, narrowed.** Every Gulf and Israeli gambling definition retrieved turns on the **entrant staking money**. Does a **cash prize funded by a third-party sponsor** bring a free-entry skill contest back within those definitions in Saudi Arabia, the UAE, Qatar, Kuwait, Bahrain or Oman? | The definitions address the entrant's stake, not the prize's source. **No source found addresses a sponsor-funded cash prize.** No GCC statute text was retrievable | **Prize alone is enough** → MENA closes for cash, and the region becomes non-cash rewards only. **Entrant's stake is the test** → MENA is an Amber licensing exercise, not a block |
+| **Saudi Arabia.** Does the Ministry of Commerce competition licence extend to a free-entry, cash-prize gaming contest run by a foreign operator with no Saudi establishment — and what does the Sharia-compliance condition require of it? | The licence regime is documented in enforcement reporting, not in a retrievable regulation, and the Sharia condition is not defined in anything I found | **Licensable** → apply. **Not available to a foreign operator** → Saudi is closed for contests regardless of the gambling analysis |
+| **UAE.** Does the GCGRA's exclusive jurisdiction reach free-entry promotional draws and skill contests, and does Penal Code Art. 416 (promoting gambling) reach our sponsored-challenge copy? | GCGRA site returned 403; the penal code portal returned 403 | Determines whether the UAE is Green, Amber or Orange |
+| **Israel.** Is a free-entry skill contest a "prohibited game" under Penal Law s. 225, and is the s. 230 "particular circle of persons / amusement or entertainment" exception available to a public platform? | Israel's social-casino industry exists on this distinction, which means it is contested rather than settled | **Not a prohibited game** → Israel is Green. **Is one** → only the narrow s. 230 route remains, and it likely fails on "particular circle of persons" |
+| **Russia.** Is 152-FZ Art. 18(5) localisation triggered by a Discord bot serving Russian users, and does the July 2025 amendment change the analysis? | The rule reaches foreign operators collecting over the internet, but its application to a bot with no Russian marketing presence was not established | **Triggered** → Russia stays blocked, for the correct reason this time. **Not triggered** → the sanctions-based block should be removed |
+| **Philippines.** Does the DTI sales-promotion permit apply to a promotion run by a foreign operator with no Philippine entity? | The regime is documented for domestic establishments; extraterritorial reach was not addressed in any source found | **Applies** → a 10-working-day permit per challenge, which is incompatible with a weekly cadence. **Does not** → the Philippines is Green |
+| **Which specific California AADC provisions survived the 9th Circuit's partial vacatur?** | The reporting says "many previously-enjoined provisions" took effect without enumerating them | Determines the actual US design-code obligation list |
 
 ---
 
@@ -537,21 +625,24 @@ These are in addition to §5. Same rule: each one exists because public sources 
 
 Named so that silence is never read as clearance. This list is part of the finding.
 
+**Closed in the second pass:** MENA country by country (§7.6), US state registration and design codes (§7.1), Russia's real blocker (§7.5), Germany/France/Spain/Portugal/Poland/Greece prize promotion (§7.3), Ghana/Kenya (§7.7), Philippines/Singapore/Malaysia (§7.8).
+
+**Still open:**
+
 | Not researched | Why it matters |
 |---|---|
-| **Most of MENA** — Saudi PDPL, UAE PDPL, Qatar, Bahrain, Egypt, Jordan, Morocco, Algeria, Tunisia, Lebanon, Iraq, Israel | A **named concentration market**. The GCC rows in §7.6 rest on secondary summaries and no retrieved statute. This is the largest gap in the document |
-| **Most of Latin America** — Argentina, Chile, Colombia, Peru and others | Only Brazil and Mexico were covered |
-| **National prize-promotion law in most of the EU** — Germany, France, Spain, Poland, the Nordics, Central and Eastern Europe | Only Italy, Belgium and the Netherlands were examined. Italy alone turned out to be heavy, which suggests others may be too |
-| **A verified EU per-state digital-consent age table** | The §7.3 table is secondary throughout |
-| **US state sweepstakes/contest registration beyond NY and FL** | There is no filing calendar without it |
-| **US state children's design codes** (California AADC and its injunction history, Maryland, and others) | Directly relevant to Q3 and entirely absent |
-| **Russia** — data localisation (152-FZ) and advertising law | We currently block Russia for the wrong reason; the right reasons were not examined |
-| **Sub-Saharan Africa beyond Nigeria and South Africa** | Kenya, Ghana, Ethiopia and others |
-| **SE and South Asia beyond the rows shown** — Pakistan, Bangladesh, Philippines, Malaysia, Singapore, Taiwan, Hong Kong | |
-| **New Zealand; Australian state trade-promotion permits** | Chance-based promotions are permit-controlled state by state in Australia |
+| **Latin America outside Brazil and Mexico** — Argentina, Chile, Colombia, Peru and the rest | Attempted twice. Searches returned only generic international-sweepstakes guidance and no country statute. **The regional pattern is a hypothesis, not a finding** |
+| **Prize-promotion law in 14 EU states** — the Nordics, Baltics, Austria, Czechia, Hungary, Romania, Bulgaria, Croatia, Slovakia, Slovenia, Ireland, Luxembourg, Cyprus, Malta | Of the 9 EU states examined, **6 carried a filing, bond, tax or notary requirement.** The unexamined 14 should not be assumed clear |
+| **A verified EU per-state digital-consent age table** | Attempted twice; no primary EU-wide register located. The §7.3 age table remains secondary throughout, and Greece is internally contradictory across sources |
+| **Iraq; Yemen, Libya, Sudan** | Iraq returned nothing on either gambling or data protection. The other three carry targeted OFAC programs that were not examined |
+| **GCC statute text** | Article numbers and penalties were obtained, but **no GCC national statute was successfully retrieved.** The UAE portal, Al Meezan and the GCGRA all refused the fetch |
+| **Sub-Saharan Africa beyond Nigeria, South Africa, Ghana and Kenya** | Ethiopia, Tanzania, Uganda, Côte d'Ivoire, Senegal and others |
+| **Pakistan, Bangladesh, Taiwan, Hong Kong** | |
+| **New Zealand; Australian state trade-promotion permits** | Chance-based promotions are permit-controlled state by state in Australia; NSW abolished its permit regime but the others were not checked |
 | **UK Online Safety Act 2023** | Only the children's code and the Gambling Act were covered |
 | **EU AVMSD and national rules on advertising to minors** | Distinct from DSA Art. 28 and not examined |
-| **Consumer-protection and advertising-disclosure law anywhere** (sponsored-content labelling) | Every jurisdiction has rules on disclosing paid promotion; none were researched |
+| **Consumer-protection and advertising-disclosure law anywhere** (sponsored-content labelling) | Every jurisdiction has rules on disclosing paid promotion; none were researched, in either pass |
+| **Whether the payout provider can actually pay into each Amber and Green market** | The entire map assumes payout rails exist. That is a vendor question, answerable in-house from the provider's coverage list, and it was never checked |
 | **Withholding tax treaties** for any specific market | Follows from the unresolved US-source question in §5 |
 
 ### Sources whose retrieval failed, and what that cost
@@ -565,6 +656,10 @@ Named so that silence is never read as clearance. This list is part of the findi
 | India Code (indiacode.nic.in), PRS India | 302 / 404 | Worked around — the Act text was retrieved from **MeitY**, which is primary |
 | Discord Help Center (direct fetch) | HTTP 403 | Worked around via the public Zendesk Help Center API; article bodies are identical and carry `edited_at` timestamps |
 | Internet Archive | Rate-limited (429) and blocked to the fetch tool | No archival verification of undated Discord policies was possible |
+| UAE legislation portal, Federal Decree-Law 31/2021 | HTTP 403 | Article numbers and penalties obtained from the portal listing and secondary sources; **verbatim text of Arts. 414–416 not held** |
+| Al Meezan (Qatar legal portal), Penal Code Law 11/2004 | HTTP 503 | The Art. 274 definition quoted in §7.6 is a close paraphrase from the portal listing, **not a verified verbatim quote** |
+| DLA Piper "Prize Promotions Around the World" (Saudi page) | HTTP 503 | No comparative prize-promotion source for MENA |
+| Saudi Ministry of Commerce regulations page | Not directly retrieved | Saudi's licence requirement rests on enforcement reporting rather than the regulation itself |
 
 ### New sources consulted in this pass
 
@@ -583,5 +678,31 @@ Named so that silence is never read as clearance. This list is part of the findi
 | Kansspelautoriteit, "Study into loot boxes — a treasure or a burden?" | 2018-04-19 | Netherlands transferability line | https://kansspelautoriteit.nl/publish/library/17/study_into_loot_boxes_-_a_treasure_or_a_burden_-_eng.pdf |
 | GCGRA (UAE) | Authority established 2023; first lottery licence July 2024 | UAE gaming jurisdiction | https://www.gcgra.gov.ae/ |
 | Milli Piyango — Karşılığı Nakit Olmayan Piyangolar ve Çekilişler Hakkında Yönetmelik | Consolidated text as retrieved | Turkey draw permits | https://www.mpi.gov.tr/lottery |
+
+### Sources added in the third pass (MENA and remaining gaps), all retrieved 2026-08-08
+
+| Source | Date on the instrument | Used for | URL | Conf. |
+|---|---|---|---|---|
+| UAE Federal Decree-Law 31/2021, Crimes and Penalties Law — UAE legislation portal listing | 2021 | UAE Arts. 414–416, penalties, Art. 1021 | https://uaelegislation.gov.ae/en/legislations/1529 | S — **listing retrieved, article text fetch returned 403** |
+| Qatar Penal Code, Law No. 11 of 2004 — Al Meezan legal portal | 2004 | Qatar Arts. 274–277 and the two-limb gambling definition | https://www.almeezan.qa/LawArticles.aspx?LawTreeSectionID=253&lawId=26&language=en | S — **listing retrieved, article text fetch returned 503** |
+| Saudi Ministry of Commerce competition/promotion licensing; enforcement reporting (44 referrals) | Reporting 2024–2026 | Saudi licence requirement, purchase-as-lottery rule, Sharia condition, penalties | https://mc.gov.sa/en/Regulations/ | S |
+| Saudi PDPL (Royal Decree M/19) — child age | 2021, amended 2023 | Saudi 13 | Practitioner summaries | S |
+| UAE Federal Decree-Law 45/2021 (PDPL) — children | 2021 | UAE 13; under-13 targeted-advertising ban | Practitioner summaries | S |
+| Egypt PDPL 151/2020 + 2025 Executive Regulations | 2020 / 2025 | Egypt's three consent bands (under 15 / 15–18 / 18+) | https://www.dlapiperdataprotection.com/?t=law&c=EG | S |
+| Jordan PDPL No. 24 of 2023 — MoDEE published text | 2023 | Jordan consent and capacity | https://www.modee.gov.jo/ebv4.0/root_storage/en/eb_list_page/pdpl.pdf | S |
+| Morocco Law 09-08 (CNDP); Dec 2024 bill on a digital age of consent | 2009 / bill 2024 | Morocco has no age regime | https://www.dlapiperdataprotection.com/?t=law&c=MA | S |
+| Israel Penal Law 5737-1977 ss. 225, 226, 230; Privacy Protection Law Amendment 13 | 1977; Amendment 13 in force 2025-08-14 | Israel prohibited games, the three monopolies, the s.230 exception | Herzog Law; IAPP; DLA Piper | S |
+| Russia Federal Law 152-FZ Art. 18(5) | New version in force 2025-07-01 | Data localisation; fines; Roskomnadzor | Morgan Lewis; Lidings; Konsu | S |
+| Philippines Consumer Act (RA 7394) ch. VI; DAO 2 s.1993; DAO 10-02 s.2010 — Supreme Court E-Library | 1993 / 2010 | DTI permit for **all** sales promotions; 10-working-day wait | https://elibrary.judiciary.gov.ph/thebookshelf/showdocs/10/54743 | S |
+| Singapore Private Lotteries Act 2011 — Singapore Statutes Online | 2011 | Lottery = prize + consideration + chance | https://sso.agc.gov.sg/Act-Rev/PLA2011/Published/20211231 | S |
+| Malaysia Common Gaming Houses Act 1953; Lotteries Act 1952 | 1952 / 1953 | Chance-based promotions | Practitioner guidance | S |
+| Gaming Commission of Ghana — promotional gaming licence | Current | Ghana promotional licence | https://www.gamingcommission.gov.gh/ | S |
+| Kenya Betting Control and Licensing Board; Gambling Control (Licensing) Regulations 2026 | 2026 | Kenya prize competitions licensing | https://bclb.go.ke/licence-information/ | S |
+| Spain Ley 13/2011 de Regulación del Juego | 2011-05-27 | AEAT notification, 10% levy, €300 withholding | Practitioner guides | S |
+| Germany UWG; Interstate Treaty on Gambling | Current | No permit for prize promotions | Practitioner guides | S |
+| Prize contests in Europe, country-by-country regulatory guide | Retrieved 2026-08-08 | France, Germany, Netherlands, Spain, Portugal, Greece requirements | https://www.promosfera.com/prize-contests-in-europe-a-country-by-country-regulatory-guide/ | S |
+| US sweepstakes registration surveys (Klein Moynihan Turco; Thompson Coburn; Fasthoff) | Current | Only NY, FL, RI require registration; skill contests exempt; RI thresholds | Multiple | S |
+| California AADC — NetChoice v. Bonta, 9th Cir. opinion 2026-03-12, mandate 2026-04-03 | 2026 | Partial vacatur; provisions live from 2026-04-02 | Holland & Knight; Wiley | S |
+| Maryland, Nebraska, Vermont, South Carolina design codes | MD in force 2024-10-01; NE 2026-01-01; VT 2027-01-01 | US design-code map | Wilson Sonsini; Hunton; Loeb | S |
 
 > **Standing caveat on this pass.** §§7–9 mix primary sources (India, Korea, UK, OFAC, IRS, the EU regulations) with secondary summaries (most of MENA, Africa, SE Asia, the EU consent-age table, Turkey, Brazil, Mexico, Australia). Every row carries a confidence marker. **No row marked `S` or `—` should be relied on without counsel retrieving the underlying instrument**, and the `⬜` rows are not findings at all — they are unexamined.
