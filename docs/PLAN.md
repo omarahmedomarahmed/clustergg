@@ -487,6 +487,33 @@ side of that line. It was not designed for that reason and it does it anyway.
 | Under-18 profiled ads barred in 9 regimes | Ad serving to under-18s must be **contextual, never profiled**. One change clears more jurisdictions than any other | Ad serving |
 | 30% NRA withholding, **no de-minimis**, on non-US prize payouts | **Pre-launch blocker for the international population.** Unresolved in the research — the largest open question in it | Redemption |
 
+### B91 — The challenge is the product · SPRINT IN FLIGHT
+
+The owner's brief, decomposed. Shipped items name their commit; the rest is the
+order it is being built in.
+
+| # | Item | State |
+|---|---|---|
+| B91 | Nothing counts before the gun — scoring rebaselines at the start line | SHIPPED `a3bf8ab` |
+| B91.2 | Every challenge shows who paid for it, and whether they have | SHIPPED `762061b` |
+| B91.3 | A series is materialised all the way out; announcing publishes it | SHIPPED `8ee1f0b` |
+| B91.4 | The desk: what a customer just did, per desk, clearable by name | SHIPPED `f927206` |
+| B91.5 | Admin builder: type picker (campaign / custom / private / house), a campaign REQUIRED for a sponsored one, repeat shown as "2 months = 8 weeks" | next |
+| B91.6 | Admin builds a campaign FOR a brand; the brand logs in, sees it, confirms and pays | |
+| B91.7 | Draft autosave everywhere — brand, server owner, admin — so a half-built thing survives a closed tab, and every draft is visible here with who built it | |
+| B91.8 | Trophies: several per tier per brand, chosen per PLACE, 1–10 winners on a custom challenge, and a brand picks which of its $100 designs a week uses | |
+| B91.9 | Sales + support sections: the shared brand mailbox, the ops queue for servers and gamers | |
+| B91.10 | Scoring locks at the end date, winners announced, trophies on profiles — end to end, proven | |
+| B91.11 | **Purge** every challenge and challenge request built the old way, at deploy | owner-authorised, not yet done |
+| B91.12 | The three guides, then the website rewrite | |
+
+**The rule that ties B91.3 and B91 together, written down because it is not
+obvious:** a challenge becomes visible and joinable when it is ANNOUNCED, which
+is before it starts — and scoring is gated separately, on the start date. Those
+are two different gates on purpose. Publishing early is how a competition gets
+entrants; scoring early is how an early entrant gets a head start nobody can
+match.
+
 #### B90.1 — Brand self-signup — SHIPPED (12eb0c6)
 
 > `lib/brand-signup.ts` + the form on `/brands`, above the enquiry form. The
