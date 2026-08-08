@@ -8,13 +8,18 @@ import { METHOD_OPTIONS } from "@/lib/payouts";
 import { vendorBy } from "@/lib/payments/vendors";
 import ImageUpload from "@/components/ImageUpload";
 import Icon from "@/components/Icon";
+import {
+  Page, Section, StatRow, Stat, Table, Tr, Td, Money, Note, Pill, num, AdminLink, LinkButton,
+} from "@/components/admin/kit";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Trophy redemptions" };
 
-const STATUS_COLOR: Record<string, string> = {
-  pending: "#fbbf24", approved: "#a78bfa", sent: "#22d3ee",
-  paid: "#34d399", rejected: "#fb7185", cancelled: "#94a3b8",
+// Status tone, in the kit's vocabulary rather than a private colour map. Six
+// hex codes in one file was six colours no other admin screen used.
+const STATUS_TONE: Record<string, "plain" | "good" | "warn" | "bad" | "info"> = {
+  pending: "warn", approved: "info", sent: "info",
+  paid: "good", rejected: "bad", cancelled: "plain",
 };
 
 const OPEN = ["pending", "approved", "sent"];
@@ -75,11 +80,12 @@ export default async function AdminRedeemsPage() {
       <div key={r.id} className="glass p-5">
         <div className="flex flex-wrap items-center gap-3">
           <Link href={`/u/${slug}`} className="font-bold hover:text-cyan-300">{name} <span className="text-muted font-normal">@{slug}</span></Link>
-          <span className="font-black text-emerald-300">${Number(r.amount).toLocaleString()} {r.currency}</span>
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-            style={{ background: `${STATUS_COLOR[r.status] ?? "#94a3b8"}22`, color: STATUS_COLOR[r.status] ?? "#94a3b8" }}>{r.status}</span>
-          {fresh && <span className="rounded-full bg-amber-500/15 text-amber-300 px-2 py-0.5 text-[10px] font-bold uppercase">new account</span>}
-          {Number(changes) >= 3 && <span className="rounded-full bg-rose-500/15 text-rose-300 px-2 py-0.5 text-[10px] font-bold uppercase">preference locked</span>}
+          <span className="font-black text-emerald-300">
+            <Money value={Number(r.amount)} currency={r.currency} />
+          </span>
+          <Pill tone={STATUS_TONE[r.status] ?? "plain"}>{r.status}</Pill>
+          {fresh && <Pill tone="warn">new account</Pill>}
+          {Number(changes) >= 3 && <Pill tone="bad">preference locked</Pill>}
           <span className="text-xs text-muted ml-auto">{fmt(r.createdAt)}</span>
         </div>
 
@@ -146,75 +152,85 @@ export default async function AdminRedeemsPage() {
   };
 
   return (
-    <div>
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-3">
-        <h1 className="text-2xl font-bold flex items-center gap-2"><Icon name="trophy" size={20} className="text-amber-300" /> Trophy redemptions</h1>
-        <Link href="/admin/payments" className="text-sm text-cyan-300 hover:underline">Payment providers →</Link>
-      </div>
-      <p className="text-sm text-muted mb-4 max-w-3xl">
-        Approve → release → the gamer collects. <b className="text-ink">We never hold their bank details.</b>{" "}
-        Releasing hands the amount to the payout provider, which issues a link the gamer opens to choose
-        exactly how they want the money — bank transfer, PayPal, a prepaid card or a gift card in their own
-        currency. The trophies leave their shelf when it is collected.
-      </p>
+    <Page
+      title="Trophy redemptions"
+      lede="Approve → release → the gamer collects. We never hold their bank details: releasing hands the amount to the payout provider, which issues a link the gamer opens to choose exactly how they want the money. The trophies leave their shelf when it is collected."
+      actions={<LinkButton href="/admin/payments">Payment providers</LinkButton>}
+    >
+      <StatRow>
+        <Stat
+          label="Open requests"
+          value={owed.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
+          note={`${open.length} waiting on somebody here`}
+          tone={open.length > 0 ? "warn" : "plain"}
+        />
+        <Stat label="Paid this year" value={num(recipients.length)} note={`Distinct recipients in ${taxYear}`} />
+        <Stat
+          label={`Over $${US_REPORT_THRESHOLD.toLocaleString()}`}
+          value={num(overLine.length)}
+          note="Where US information reporting typically begins"
+          tone={overLine.length > 0 ? "warn" : "plain"}
+        />
+        <Stat label="Provider" value={vendor?.name ?? adapter.key} note={reason ?? "connected"} tone={reason ? "warn" : "good"} />
+      </StatRow>
 
-      {/* What we have paid this year, per person. */}
+      {reason && (
+        <Note tone="warn">
+          <b>{vendor?.name ?? adapter.key}</b> — {reason}
+          {picked !== adapter.key && <> (you selected {picked})</>}. Releases will not reach anybody until
+          this is resolved.
+        </Note>
+      )}
+
+      {/* What we have paid this year, per person. Collapsed, because it is a
+          reference rather than a queue — but never hidden, because "who did we
+          pay this year" has to be answerable before anything can be filed. */}
       {recipients.length > 0 && (
-        <details className="glass mb-6 p-5">
+        <details className="glass p-5 sm:p-6">
           <summary className="cursor-pointer text-sm font-semibold">
             Paid in {taxYear} — {recipients.length} recipient{recipients.length === 1 ? "" : "s"}
-            {overLine.length > 0 && (
-              <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
-                {overLine.length} over ${US_REPORT_THRESHOLD.toLocaleString()}
-              </span>
-            )}
+            {overLine.length > 0 && <span className="ml-2"><Pill tone="warn">{overLine.length} over ${US_REPORT_THRESHOLD.toLocaleString()}</Pill></span>}
           </summary>
-          <p className="mt-2 text-xs text-muted max-w-3xl">
-            Counted from the date the money moved, not the date it was requested — a request approved in December
-            and paid in January belongs to January. ${US_REPORT_THRESHOLD.toLocaleString()} is where US information
-            reporting typically begins; what gets filed, and by whom, is a question for counsel and not for this page.
+          <p className="mt-2 max-w-3xl text-xs leading-relaxed text-muted">
+            Counted from the date the money MOVED, not the date it was requested — a request approved in
+            December and paid in January belongs to January. The whole list is kept rather than pre-filtered
+            by the threshold: the threshold is a number counsel may move, and a report that filters by it
+            cannot answer the question after it moves. What gets filed, and by whom, is for counsel.
           </p>
-          <table className="mt-3 w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-widest text-muted">
-              <tr className="border-b border-white/10">
-                <th className="py-2 text-left">Recipient</th>
-                <th className="py-2 text-left">Country</th>
-                <th className="py-2 text-right">Paid in {taxYear}</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className="mt-3">
+            <Table
+              cols={[
+                { key: "who", label: "Recipient" },
+                { key: "country", label: "Country", secondary: true },
+                { key: "total", label: `Paid in ${taxYear}`, align: "right" },
+              ]}
+              empty="Nobody has been paid this year."
+            >
               {recipients.map((r) => (
-                <tr key={r.userId} className="border-b border-white/5">
-                  <td className="py-2">
-                    <Link href={`/u/${r.slug}`} className="hover:text-cyan-300">{r.name}</Link>
-                  </td>
-                  <td className="py-2 text-muted">{r.country ?? "—"}</td>
-                  <td className={`py-2 text-right tabular-nums font-semibold ${r.overThreshold ? "text-amber-300" : ""}`}>
-                    ${r.total.toLocaleString()}
-                  </td>
-                </tr>
+                <Tr key={r.userId} tone={r.overThreshold ? "warn" : undefined}>
+                  <Td><AdminLink href={`/u/${r.slug}`}>{r.name}</AdminLink></Td>
+                  <Td secondary>{r.country ?? "—"}</Td>
+                  <Td align="right" mono bold><Money value={r.total} /></Td>
+                </Tr>
               ))}
-            </tbody>
-          </table>
+            </Table>
+          </div>
         </details>
       )}
 
-      <div className="mb-6 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-black/25 px-4 py-3 text-sm">
-        <span className="text-muted">Paying through</span>
-        <b>{vendor?.name ?? adapter.key}</b>
-        {reason
-          ? <span className="rounded-full border border-amber-400/40 bg-amber-500/10 px-2.5 py-0.5 text-[11px] text-amber-200">{reason}</span>
-          : <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2.5 py-0.5 text-[11px] text-emerald-200">connected</span>}
-        {picked !== adapter.key && <span className="text-[11px] text-muted">(you selected {picked})</span>}
-        <span className="ml-auto text-muted">Open requests: <b className="text-amber-200">${owed.toLocaleString()}</b></span>
-      </div>
+      <Section
+        title="Waiting on you"
+        note="Approve, then release. Rejecting returns the trophies to the shelf they came from — nothing is destroyed by a decision on this page."
+        empty="Nothing is waiting. Every request has been paid, rejected or cancelled."
+      >
+        {open.length > 0 ? <div className="space-y-4">{open.map(card)}</div> : null}
+      </Section>
 
-      {rows.length === 0 && <div className="glass p-8 text-center text-sm text-muted">No redeem requests yet.</div>}
-      <div className="space-y-4">
-        {open.map(card)}
-        {closed.length > 0 && <div className="text-[10px] uppercase tracking-widest text-muted pt-2">History</div>}
-        {closed.map(card)}
-      </div>
-    </div>
+      {closed.length > 0 && (
+        <Section title="History" note="Settled requests, newest first.">
+          <div className="space-y-4">{closed.map(card)}</div>
+        </Section>
+      )}
+    </Page>
   );
 }
