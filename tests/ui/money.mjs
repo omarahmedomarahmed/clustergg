@@ -9,6 +9,7 @@
  * asks anybody for a bank account.
  */
 import { chromium } from "playwright-core";
+import { open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -37,10 +38,10 @@ try {
   await boss.fill('input[name="email"]', "admin@clustergg.com");
   await boss.fill('input[name="password"]', "cluster-admin");
   await boss.click('button:has-text("Log in with email")');
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
 
   console.log("\n== The providers console ==");
-  let res = await boss.goto(`${BASE}/admin/payments`, { waitUntil: "networkidle" });
+  let res = await open(boss, `${BASE}/admin/payments`);
   let body = await boss.locator("body").innerText();
   ok("it opens", !!res && res.status() < 400 && !/could not be found/i.test(body), String(res?.status()));
   ok("all three money flows are named",
@@ -65,7 +66,7 @@ try {
     /keys are not set|no API|entered by hand/i.test(body));
 
   console.log("\n== Opening a bill ==");
-  res = await boss.goto(`${BASE}/admin/billing`, { waitUntil: "networkidle" });
+  res = await open(boss, `${BASE}/admin/billing`);
   body = await boss.locator("body").innerText();
   ok("the billing page opens", !!res && res.status() < 400, String(res?.status()));
   ok("it has an invoices section", /invoices/i.test(body));
@@ -76,7 +77,7 @@ try {
   await boss.selectOption('select[name="brandId"]', { index: 1 });
   const brandName = await boss.locator('select[name="brandId"] option').nth(1).innerText();
   await tap(boss.locator('button:has-text("Open this month")'));
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   await boss.waitForTimeout(600);
 
   body = await boss.locator("body").innerText();
@@ -85,7 +86,7 @@ try {
 
   // Open it.
   await tap(boss.locator(`a:has-text("${number}")`).first());
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   body = await boss.locator("body").innerText();
   ok("the editor opens on the invoice", body.includes(number) && /placements/i.test(body));
   ok("it is billed to the brand we picked", body.includes(brandName.trim()), brandName);
@@ -97,7 +98,7 @@ try {
   await boss.selectOption('select[name="kind"]', "discount");
   await boss.fill('input[name="unitAmount"]', "50");
   await tap(boss.locator('button:has-text("Add line")'));
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   await boss.waitForTimeout(600);
   body = await boss.locator("body").innerText();
   ok("staff can add a line", /negotiated launch discount/i.test(body));
@@ -115,7 +116,7 @@ try {
   await boss.fill('input[name="payLinkUrl"]', "https://pay.example.com/inv/abc123");
   await boss.fill('input[name="provider"]', "payoneer");
   await tap(boss.locator('button:has-text("Attach")'));
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   await boss.waitForTimeout(600);
   body = await boss.locator("body").innerText();
   ok("a pasted link attaches", /pay\.example\.com/.test(body));
@@ -125,7 +126,7 @@ try {
   ok("we have a public pay URL", !!payHref, String(payHref));
 
   await tap(boss.locator('button:has-text("Send to brand")'));
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
   await boss.waitForTimeout(700);
   body = await boss.locator("body").innerText();
   ok("now it sends", /is live on the brand/i.test(body) || /awaiting payment/i.test(body),
@@ -133,7 +134,7 @@ try {
 
   console.log("\n== The pay page, for somebody with no login ==");
   const stranger = await browser.newPage({ viewport: { width: 1100, height: 1000 } });
-  res = await stranger.goto(`${BASE}${payHref}`, { waitUntil: "networkidle" });
+  res = await open(stranger, `${BASE}${payHref}`);
   const payBody = await stranger.locator("body").innerText();
   ok("it opens with no session at all", !!res && res.status() < 400, String(res?.status()));
   ok("it shows the invoice number", payBody.includes(number));
@@ -147,17 +148,17 @@ try {
   await stranger.screenshot({ path: `${SHOTS}/pay-page.png`, fullPage: true });
 
   // A draft must not be reachable by anybody.
-  await boss.goto(`${BASE}/admin/billing`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/billing`);
   // Read the HEADING, not the body: the not-found page still renders the site
   // chrome, so a body-text match passes or fails on whether the nav happened to
   // contain the word "found" that day.
-  await stranger.goto(`${BASE}/pay/nonsense-token-that-is-long-enough`, { waitUntil: "networkidle" });
+  await open(stranger, `${BASE}/pay/nonsense-token-that-is-long-enough`);
   const missingH1 = (await stranger.locator("h1").first().innerText().catch(() => "")).trim();
   ok("a wrong token shows nothing", /404|lost in space|not found/i.test(missingH1), missingH1);
   await stranger.close();
 
   console.log("\n== Payouts ==");
-  res = await boss.goto(`${BASE}/admin/payouts`, { waitUntil: "networkidle" });
+  res = await open(boss, `${BASE}/admin/payouts`);
   body = await boss.locator("body").innerText();
   ok("the payouts page opens", !!res && res.status() < 400 && !/could not be found/i.test(body), String(res?.status()));
   ok("it separates prize money out explicitly",
@@ -178,7 +179,7 @@ try {
     await boss.fill('input[name="label"]', "Launch bonus — first 100 servers");
     await boss.fill('input[name="amount"]', "125");
     await tap(boss.locator('form button:has-text("Open")'));
-    await boss.waitForLoadState("networkidle");
+    await settle(boss);
     await boss.waitForTimeout(800);
     body = await boss.locator("body").innerText();
     ok("a manual payout opens", /launch bonus|\$125/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
@@ -186,7 +187,7 @@ try {
 
     // Release, then mark paid. Two clicks, deliberately.
     await tap(boss.locator('button:has-text("Approve for manual transfer")').first());
-    await boss.waitForLoadState("networkidle");
+    await settle(boss);
     await boss.waitForTimeout(800);
     body = await boss.locator("body").innerText();
     ok("releasing tells staff to send it by hand rather than pretending",
@@ -194,7 +195,7 @@ try {
 
     await boss.fill('input[name="ref"]', "WIRE-2026-001");
     await tap(boss.locator('button:has-text("Mark paid")').first());
-    await boss.waitForLoadState("networkidle");
+    await settle(boss);
     await boss.waitForTimeout(800);
     body = await boss.locator("body").innerText();
     ok("and marking paid records the reference", /WIRE-2026-001/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
@@ -202,7 +203,7 @@ try {
   await boss.screenshot({ path: `${SHOTS}/admin-payouts.png`, fullPage: true });
 
   console.log("\n== Trophy redemptions ==");
-  res = await boss.goto(`${BASE}/admin/redeems`, { waitUntil: "networkidle" });
+  res = await open(boss, `${BASE}/admin/redeems`);
   body = await boss.locator("body").innerText();
   ok("the redeems page opens", !!res && res.status() < 400 && !/could not be found/i.test(body), String(res?.status()));
   ok("it states that we never hold their bank details",
@@ -218,8 +219,8 @@ try {
   await gamer.fill('input[name="email"]', "nova@demo.gg");
   await gamer.fill('input[name="password"]', "cluster-demo");
   await gamer.click('button:has-text("Log in with email")');
-  await gamer.waitForLoadState("networkidle");
-  await gamer.goto(`${BASE}/feed`, { waitUntil: "networkidle" });
+  await settle(gamer);
+  await open(gamer, `${BASE}/feed`);
   await gamer.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await gamer.waitForTimeout(500);
 
@@ -243,13 +244,13 @@ try {
   console.log("\n== The brand sees the bill ==");
   // The admin list links to /admin/brands/<id>; the live portal link (with the
   // access key on it) is on the detail page. Walk detail pages to collect them.
-  await boss.goto(`${BASE}/admin/brands`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/brands`);
   const adminBrandHrefs = await boss.locator('a[href^="/admin/brands/"]').evaluateAll((els) =>
     [...new Set(els.map((e) => e.getAttribute("href")))]
       .filter((h) => h && !h.includes("testimonials")));
   const portalLinks = [];
   for (const href of adminBrandHrefs.slice(0, 6)) {
-    await boss.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
+    await open(boss, `${BASE}${href}`);
     const live = await boss.locator('a[href^="/brands/"]').first().getAttribute("href").catch(() => null);
     if (live) portalLinks.push(live);
   }
@@ -257,7 +258,7 @@ try {
 
   let sawBilling = false;
   for (const href of portalLinks.slice(0, 6)) {
-    await boss.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
+    await open(boss, `${BASE}${href}`);
     const t = await boss.locator("body").innerText();
     if (/billing/i.test(t)) {
       sawBilling = true;
@@ -275,7 +276,7 @@ try {
 
   console.log("\n== The server owner sees two earning types, and their tier ==");
   // Same shape as brands: the live portal link lives on the per-guild admin page.
-  await boss.goto(`${BASE}/admin/discord`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/discord`);
   // /admin/discord/<x> is mostly SUB-PAGES (analytics, requests, broadcast, hq)
   // and only sometimes a guild. Taking the first few finds none of the guilds,
   // which is how this quietly asserted nothing the first time it ran.
@@ -291,7 +292,7 @@ try {
   let sawEarnings = false;
   let portalUrl = null;
   for (const href of guildOnly.slice(0, 6)) {
-    await boss.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
+    await open(boss, `${BASE}${href}`);
     // Rotate FIRST. A server that has never needed a portal has no slug and no
     // /servers/ link yet — rotating is what creates both, so looking for the
     // link before rotating skips every guild on a fresh install.
@@ -302,7 +303,7 @@ try {
     const shown = await boss.locator("body").innerText();
     const key = (shown.match(/New key:\s*(\S+)/) ?? [])[1];
     if (!key) continue;
-    await boss.reload({ waitUntil: "networkidle" });
+    await boss.reload({ waitUntil: "domcontentloaded" }); await settle(boss);
     const slugLink = await boss.locator('a[href^="/servers/"]').first().getAttribute("href").catch(() => null);
     if (!slugLink) continue;
     portalUrl = `${BASE}${slugLink}?key=${encodeURIComponent(key)}`;
@@ -311,7 +312,7 @@ try {
   ok("staff can get into a server portal the way they really do", !!portalUrl, String(portalUrl));
 
   for (const url of portalUrl ? [portalUrl] : []) {
-    await boss.goto(url, { waitUntil: "networkidle" });
+    await open(boss, url);
     // The key handoff posts a form and lands back on the portal with a session.
     await boss.waitForTimeout(1200);
     const t = await boss.locator("body").innerText();
@@ -345,11 +346,11 @@ try {
   await staff.fill('input[name="email"]', "ops@clustergg.com");
   await staff.fill('input[name="password"]', "cluster-demo");
   await staff.click('button:has-text("Log in with email")');
-  await staff.waitForLoadState("networkidle");
+  await settle(staff);
   // The console shell renders first, so read the heading after the page settles
   // rather than the loading screen — otherwise this passes or fails on timing.
   const staffSees = async (path) => {
-    await staff.goto(`${BASE}${path}`, { waitUntil: "networkidle" });
+    await open(staff, `${BASE}${path}`);
     return (await staff.locator("h1").first().innerText().catch(() => "")).trim();
   };
   ok("a staff member cannot open the provider settings",
@@ -361,7 +362,7 @@ try {
   await staff.close();
 
   console.log("\n== Layout ==");
-  await boss.goto(`${BASE}/admin/billing`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/billing`);
   const overflow = await boss.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow on billing", overflow <= 0, String(overflow));

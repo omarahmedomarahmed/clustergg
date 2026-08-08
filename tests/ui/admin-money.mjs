@@ -8,6 +8,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/admin-money.mjs
  */
 import { chromium } from "playwright-core";
+import { open } from "./_nav.mjs";
 
 const BASE = process.env.BASE_URL || "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -33,7 +34,11 @@ await page.locator('input[name="password"]').press("Enter");
 await page.waitForFunction(() => !location.pathname.startsWith("/login"), null, { timeout: 15000 });
 
 for (const [path, heading] of [["/admin/vaults", "Vaults"], ["/admin/week", "The week"]]) {
-  const res = await page.goto(`${BASE}${path}`, { waitUntil: "domcontentloaded" });
+  // `open`, not a bare goto: at domcontentloaded the console is still showing
+  // its loading screen, so reading the body is a race — and it is a race this
+  // assertion lost on /admin/vaults while passing on /admin/week, which is the
+  // worst kind of failure to read because it looks like one broken page.
+  const res = await open(page, `${BASE}${path}`);
   ok(`${path} responds 200`, res?.status() === 200, String(res?.status()));
   const body = await page.locator("body").innerText();
   ok(`…and renders its heading`, body.includes(heading));

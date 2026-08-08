@@ -15,6 +15,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/redeem-flow.mjs
  */
 import { chromium } from "playwright-core";
+import { open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -52,7 +53,7 @@ try {
   console.log("\n== signed out, it does not leak a trophy case ==");
   const anonCtx = await browser.newContext();
   const anon = await anonCtx.newPage();
-  await anon.goto(`${BASE}/redeem`, { waitUntil: "networkidle" });
+  await open(anon, `${BASE}/redeem`);
   ok("it sends you to log in", /\/login/.test(anon.url()), anon.url());
   await anonCtx.close();
 
@@ -60,16 +61,16 @@ try {
   await page.fill('input[name="email"]', "nova@demo.gg");
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await page.waitForLoadState("networkidle");
+  await settle(page);
 
   console.log("\n== the wallet points at it ==");
-  await page.goto(`${BASE}/wallet`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/wallet`);
   await page.locator('button:has-text("Accept all")').first().click().catch(() => {});
   const cta = page.locator('a[href="/redeem"]').first();
   ok("there is a cash-out link on the wallet", await cta.count() > 0);
 
   console.log("\n== step 1 — choose trophies ==");
-  await page.goto(`${BASE}/redeem`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/redeem`);
   ok("an unknown step lands on step one",
     await page.locator('[data-redeem-step="trophies"]').count() === 1);
   const next = page.locator("[data-next]");
@@ -92,7 +93,7 @@ try {
 
   console.log("\n== a refresh mid-flow resumes ==");
   const urlAtStep1 = page.url();
-  await page.reload({ waitUntil: "networkidle" });
+  await page.reload({ waitUntil: "domcontentloaded" }); await settle(page);
   ok("the selection survives", await page.locator("[data-sel-total]").textContent() === total1);
   ok("…and so does the step", await page.locator('[data-redeem-step="trophies"]').count() === 1);
 
@@ -106,11 +107,11 @@ try {
   await page.waitForTimeout(300);
 
   console.log("\n== back works, because it is just navigation ==");
-  await page.goBack({ waitUntil: "networkidle" });
+  await page.goBack({ waitUntil: "domcontentloaded" }); await settle(page);
   await page.waitForTimeout(400);
   ok("the browser back button returns to step one",
     await page.locator('[data-redeem-step="trophies"]').count() === 1, page.url());
-  await page.goForward({ waitUntil: "networkidle" });
+  await page.goForward({ waitUntil: "domcontentloaded" }); await settle(page);
   await page.waitForTimeout(400);
   ok("…and forward returns to step two",
     await page.locator('[data-redeem-step="method"]').count() === 1, page.url());
@@ -139,19 +140,18 @@ try {
   // The property the whole payments design rests on. Checked per step, on the
   // real field surface — not on the prose, which could say anything.
   for (const step of ["trophies", "method", "confirm"]) {
-    await page.goto(`${BASE}/redeem?step=${step}&t=${new URL(urlAtStep1).searchParams.get("t")}`,
-      { waitUntil: "networkidle" });
+    await open(page, `${BASE}/redeem?step=${step}&t=${new URL(urlAtStep1).searchParams.get("t")}`);
     const surface = await fieldSurface(page);
     const hit = BANKISH.find((re) => re.test(surface));
     ok(`step "${step}" has no bank field`, !hit, `${hit} in: ${surface.slice(0, 200)}`);
   }
 
   console.log("\n== a stale link degrades instead of breaking ==");
-  await page.goto(`${BASE}/redeem?step=confirm&t=does-not-exist`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/redeem?step=confirm&t=does-not-exist`);
   ok("a trophy that is gone is dropped, not submitted",
     await page.locator("[data-submit]").isDisabled());
   ok("…and the page still renders", await page.locator("[data-redeem-step]").count() === 1);
-  await page.goto(`${BASE}/redeem?step=nonsense`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/redeem?step=nonsense`);
   ok("a nonsense step is step one, not an error",
     await page.locator('[data-redeem-step="trophies"]').count() === 1);
 } finally {

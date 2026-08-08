@@ -13,6 +13,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/week-band.mjs
  */
 import { chromium } from "playwright-core";
+import { open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -35,8 +36,8 @@ try {
   await page.fill('input[name="email"]', "nova@demo.gg");
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await page.waitForLoadState("networkidle");
-  await page.goto(`${BASE}/feed`, { waitUntil: "networkidle" });
+  await settle(page);
+  await open(page, `${BASE}/feed`);
   await page.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await page.waitForTimeout(400);
 
@@ -119,7 +120,7 @@ try {
   ok("the board closes", await page.locator("[data-week-panel]").count() === 0);
 
   console.log("\n== never over the admin area ==");
-  await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/admin`);
   ok("no band in Mission Control", await page.locator("[data-week-panel]").count() === 0);
 } finally {
   await browser.close();

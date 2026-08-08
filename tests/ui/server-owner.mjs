@@ -12,6 +12,7 @@
  *      editor, and the Pay-invoice CTA carries the brand colour.
  */
 import { chromium } from "playwright-core";
+import { open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -36,10 +37,10 @@ try {
   await boss.fill('input[name="email"]', "admin@clustergg.com");
   await boss.fill('input[name="password"]', "cluster-admin");
   await boss.click('button:has-text("Log in with email")');
-  await boss.waitForLoadState("networkidle");
+  await settle(boss);
 
   console.log("\n== Into a server portal, the way staff really get there ==");
-  await boss.goto(`${BASE}/admin/discord`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/discord`);
   const SUBPAGES = new Set(["analytics", "requests", "broadcast", "hq"]);
   const guildHrefs = (await boss.locator('a[href^="/admin/discord/"]').evaluateAll((els) =>
     [...new Set(els.map((e) => e.getAttribute("href")))].filter(Boolean)))
@@ -47,14 +48,14 @@ try {
 
   let portalUrl = null;
   for (const href of guildHrefs.slice(0, 6)) {
-    await boss.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
+    await open(boss, `${BASE}${href}`);
     await tap(boss.locator('button:has-text("Reset portal key")').first());
     await boss.waitForTimeout(300);
     await tap(boss.locator('button:has-text("Yes, rotate it")').first());
     await boss.waitForTimeout(1500);
     const key = ((await boss.locator("body").innerText()).match(/New key:\s*(\S+)/) ?? [])[1];
     if (!key) continue;
-    await boss.reload({ waitUntil: "networkidle" });
+    await boss.reload({ waitUntil: "domcontentloaded" }); await settle(boss);
     const slugLink = await boss.locator('a[href^="/servers/"]').first().getAttribute("href").catch(() => null);
     if (!slugLink) continue;
     portalUrl = `${BASE}${slugLink}?key=${encodeURIComponent(key)}`;
@@ -63,7 +64,7 @@ try {
   ok("we can open a server portal", !!portalUrl, String(portalUrl));
   if (!portalUrl) throw new Error("no portal to test");
 
-  await boss.goto(portalUrl, { waitUntil: "networkidle" });
+  await open(boss, portalUrl);
   await boss.waitForTimeout(1200);
   await boss.locator('button:has-text("Accept all")').first().click().catch(() => {});
 
@@ -122,7 +123,7 @@ try {
   console.log("\n== Approving a request does not put it live ==");
   // Seed one the way an owner really files it, from their own portal. A demo
   // database with no pending request makes this whole section a silent no-op.
-  await boss.goto(portalUrl.split("?")[0], { waitUntil: "networkidle" });
+  await open(boss, portalUrl.split("?")[0]);
   await tap(boss.locator('button:has-text("Challenges")').first());
   await boss.waitForTimeout(700);
   const opener = boss.locator('button:has-text("Request a challenge"), button:has-text("Ask for a challenge")').first();
@@ -136,7 +137,7 @@ try {
     await boss.waitForTimeout(1500);
   }
 
-  await boss.goto(`${BASE}/admin/discord/requests`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/discord/requests`);
   body = await boss.locator("body").innerText();
   const approveBtn = boss.locator('button:has-text("Approve")').first();
   const hasPending = (await approveBtn.count()) > 0;
@@ -153,7 +154,7 @@ try {
     // Assert the OUTCOME, not the toast. A banner is transient UI that a
     // revalidate can wipe; what matters — and what was broken — is whether the
     // challenge went live. So go and look at it.
-    await boss.goto(`${BASE}/admin/challenges`, { waitUntil: "networkidle" });
+    await open(boss, `${BASE}/admin/challenges`);
     const list = await boss.locator("body").innerText();
     ok("the approved challenge exists", /draft copy nobody proofread/i.test(list),
       list.slice(0, 400).replace(/\n/g, " | "));
@@ -164,7 +165,7 @@ try {
       [...new Set(els.map((e) => e.getAttribute("href")))].filter((h) => h && h.split("/").length > 3));
     let found = null;
     for (const h of hrefs.slice(0, 12)) {
-      await boss.goto(`${BASE}${h}`, { waitUntil: "networkidle" });
+      await open(boss, `${BASE}${h}`);
       if (/draft copy nobody proofread/i.test(await boss.locator("body").innerText())) { found = h; break; }
     }
     ok("and it is reachable from the challenges list", !!found, hrefs.join(", ").slice(0, 200));
@@ -182,29 +183,29 @@ try {
 
   console.log("\n== The Pay-invoice CTA carries the brand colour ==");
   // Raise a real invoice so this asserts a rendered button rather than skipping.
-  await boss.goto(`${BASE}/admin/billing`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/billing`);
   if ((await boss.locator('select[name="brandId"] option').count()) > 1) {
     await boss.selectOption('select[name="brandId"]', { index: 1 });
     await tap(boss.locator('button:has-text("Open this month")'));
-    await boss.waitForLoadState("networkidle");
+    await settle(boss);
     await boss.waitForTimeout(700);
     const number = ((await boss.locator("body").innerText()).match(/CGG-\d{4}/) ?? [])[0];
     if (number) {
       await tap(boss.locator(`a:has-text("${number}")`).first());
-      await boss.waitForLoadState("networkidle");
+      await settle(boss);
       await boss.fill('input[name="payLinkUrl"]', "https://pay.example.com/inv/colour");
       await tap(boss.locator('button:has-text("Attach")'));
-      await boss.waitForLoadState("networkidle");
+      await settle(boss);
       await boss.waitForTimeout(600);
       await tap(boss.locator('button:has-text("Send to brand")'));
-      await boss.waitForLoadState("networkidle");
+      await settle(boss);
       await boss.waitForTimeout(800);
     }
   }
   const payLink = await boss.locator('a[href^="/pay/"]').first().getAttribute("href").catch(() => null);
   if (payLink) {
     const stranger = await browser.newPage({ viewport: { width: 1100, height: 1000 } });
-    await stranger.goto(`${BASE}${payLink}`, { waitUntil: "networkidle" });
+    await open(stranger, `${BASE}${payLink}`);
     const btn = stranger.locator('a:has-text("Pay invoice")').first();
     if (await btn.count()) {
       const paint = await btn.evaluate((el) => {
@@ -226,7 +227,7 @@ try {
   }
 
   console.log("\n== And the money buttons share one deep-cyan class ==");
-  await boss.goto(`${BASE}/admin/redeems`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/redeems`);
   const moneyBtns = await boss.locator(".money-btn").count();
   const neon = await boss.locator('button[style*="22d3ee"], a[style*="22d3ee"]').count();
   ok("the redeem actions use it", moneyBtns >= 0, String(moneyBtns));

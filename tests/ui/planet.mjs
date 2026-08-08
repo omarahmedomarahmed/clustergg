@@ -10,6 +10,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/planet.mjs
  */
 import { chromium } from "playwright-core";
+import { open } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -29,7 +30,7 @@ const page = await browser.newPage({ viewport: { width: 1500, height: 1100 } });
 
 try {
   console.log("\n== find a planet with a ladder on it ==");
-  await page.goto(`${BASE}/planets`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/planets`);
   await page.locator('button:has-text("Accept all")').first().click().catch(() => {});
   const links = await page.evaluate(() =>
     [...new Set([...document.querySelectorAll('a[href^="/planets/"]')]
@@ -39,7 +40,7 @@ try {
 
   let found = null;
   for (const href of links.slice(0, 6)) {
-    await page.goto(`${BASE}${href}`, { waitUntil: "networkidle" });
+    await open(page, `${BASE}${href}`);
     await page.waitForTimeout(700);
     if (await page.locator("[data-explore-row]").count() > 0) { found = href; break; }
   }

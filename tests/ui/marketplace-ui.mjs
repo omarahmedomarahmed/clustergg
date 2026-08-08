@@ -7,6 +7,7 @@
  * Profile-of-the-Week board no longer opens over whatever page you asked for.
  */
 import { chromium } from "playwright-core";
+import { open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -27,8 +28,8 @@ try {
   await page.fill('input[name="email"]', "nova@demo.gg");
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await page.waitForLoadState("networkidle");
-  await page.goto(`${BASE}/marketplace`, { waitUntil: "networkidle" });
+  await settle(page);
+  await open(page, `${BASE}/marketplace`);
   await page.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await page.waitForTimeout(600);
 
@@ -87,7 +88,7 @@ try {
   ok("the nav has a marketplace link", navLink > 0, `${navLink}`);
 
   console.log("\n== The quests page carries the whole shelf ==");
-  await page.goto(`${BASE}/quests`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/quests`);
   const quests = await page.locator("body").innerText();
   ok("the shelf is on the page where CP is earned",
     /spend your cluster points/i.test(quests), quests.slice(-400).replace(/\n/g, " | "));
@@ -99,8 +100,8 @@ try {
   await boss.fill('input[name="email"]', "admin@clustergg.com");
   await boss.fill('input[name="password"]', "cluster-admin");
   await boss.click('button:has-text("Log in with email")');
-  await boss.waitForLoadState("networkidle");
-  const r = await boss.goto(`${BASE}/admin/marketplace`, { waitUntil: "networkidle" });
+  await settle(boss);
+  const r = await open(boss, `${BASE}/admin/marketplace`);
   const admin = await boss.locator("body").innerText();
   ok("the admin marketplace opens", !!r && r.status() < 400 && !/could not be found/i.test(admin), String(r?.status()));
   ok("the wallet counts CP taken in", /cp taken in/i.test(admin), admin.slice(0, 300).replace(/\n/g, " | "));
@@ -111,7 +112,7 @@ try {
   ok("every transaction has a ledger", /every transaction/i.test(admin));
 
   // Staff can set the price and hide a trophy.
-  await boss.goto(`${BASE}/admin/trophies`, { waitUntil: "networkidle" });
+  await open(boss, `${BASE}/admin/trophies`);
   const trophies = await boss.locator("body").innerText();
   ok("trophies can be priced in CP", (await boss.locator('input[name="cpPrice"]').count()) > 0);
   ok("and hidden from the shelf", (await boss.locator('input[name="inMarketplace"]').count()) > 0,
@@ -119,7 +120,7 @@ try {
   await boss.close();
 
   console.log("\n== Layout ==");
-  await page.goto(`${BASE}/marketplace`, { waitUntil: "networkidle" });
+  await open(page, `${BASE}/marketplace`);
   const overflow = await page.evaluate(() =>
     document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok("no horizontal overflow", overflow <= 0, String(overflow));

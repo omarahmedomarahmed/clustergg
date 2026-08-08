@@ -8,6 +8,7 @@
 //   node tests/ui/marketplace.mjs
 
 import { chromium } from "playwright-core";
+import { open } from "./_nav.mjs";
 
 const B = process.env.BASE_URL || "http://localhost:3031";
 const CHROME = process.env.CHROME_PATH || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
@@ -27,12 +28,12 @@ const p = await ctx.newPage();
 const pageErrors = [];
 p.on("pageerror", (e) => pageErrors.push(e.message));
 
-await p.goto(`${B}/login`, { waitUntil: "networkidle" });
+await open(p, `${B}/login`);
 await p.fill('input[name="email"]', "nova@demo.gg");
 await p.fill('input[name="password"]', "cluster-demo");
 await p.locator("form button.glow-btn").first().click();
 await p.waitForTimeout(4000);
-await p.goto(`${B}/marketplace`, { waitUntil: "networkidle" });
+await open(p, `${B}/marketplace`);
 
 // §0 trap: assert on the heading, not on body text — the console shell paints a
 // loading screen first and `notFound()` returns HTTP 200.
@@ -121,7 +122,7 @@ ok("…and at least one is affordable, so the shelf is not a wall", tiles.some((
 // whether any of this is worth an account.
 console.log("\n== signed out ==");
 await ctx.clearCookies();
-await p.goto(`${B}/marketplace`, { waitUntil: "networkidle" });
+await open(p, `${B}/marketplace`);
 ok("the quests are still shown to a stranger",
   (await p.evaluate(() => document.querySelectorAll('a[href^="/quests/"]').length)) > 0);
 ok("…and the balance still points at them",
