@@ -241,26 +241,57 @@ try {
     ok("a manual payout opens", /launch bonus|\$125/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
     ok("as requested, not paid", /requested/i.test(body));
 
-    // Release, then mark paid. Two clicks, deliberately.
-    await tap(boss.locator('button:has-text("Approve for manual transfer")').first());
-    // Wait for the STATE CHANGE, not for a timer: either the reference field
-    // (released) or the queue's message strip (refused). A fixed 800ms was a
-    // guess that held until the page got heavier.
-    // Wait for the marked outcome, not for a word. "held" appears in the page's
-    // own standing copy about the holding period, so a text match returned
-    // instantly and the body was read before the refusal had rendered.
+    // ===== Release, then mark paid. Two clicks, deliberately. =====
+    //
+    // Three separate bugs lived in the six lines this replaces, and all three
+    // produced the SAME symptom: an assertion reading a page where the click
+    // had never happened. Worth naming, because the symptom is recognisable
+    // and the causes are not.
+    //
+    //   1. Waiting for the WORD "held" matched the payouts page's own standing
+    //      copy about the holding period, so the wait returned instantly.
+    //   2. Waiting for `[data-queue-msg]` or `input[name="ref"]` to EXIST is
+    //      not the same question as "did one appear". An earlier suite against
+    //      the same demo database leaves an approved payout on this page, and
+    //      the previous step leaves its own message in the strip — so both were
+    //      true before the click.
+    //   3. Snapshotting the strip before the PREVIOUS step's message had landed
+    //      captured null, which the expected message then "changed" from.
+    //
+    // So: wait for a known state, snapshot it, click until something moves
+    // RELATIVE to that snapshot, and assert the click registered where it
+    // happened rather than three assertions later.
     await boss.waitForFunction(
-      () => !!document.querySelector('input[name="ref"]') || !!document.querySelector("[data-queue-msg]"),
-      null, { timeout: 20000 },
+      () => /payout opened/i.test(document.querySelector("[data-queue-msg]")?.textContent ?? ""),
+      null, { timeout: 15000 },
     ).catch(() => {});
+    // `textContent` on both sides — `innerText` differs in whitespace, and
+    // mixing them made "has it changed?" true on the first poll.
+    const stripBefore = await boss.locator("[data-queue-msg]").textContent().catch(() => "");
+    const refsBefore = await boss.locator('input[name="ref"]').count();
+    const moved = async () =>
+      (await boss.locator('input[name="ref"]').count()) > refsBefore
+      || (await boss.locator("[data-queue-msg]").textContent().catch(() => "")) !== stripBefore;
+
+    for (let i = 0; i < 10 && !(await moved()); i++) {
+      // A plain click, and retried. `tap` scrolls first and swallows the click
+      // error, so a click lost to a re-render — or landing before the queue has
+      // hydrated, which is what happens under a three-lane run — is invisible.
+      await boss.locator('button:has-text("Approve for manual transfer")').first()
+        .click({ timeout: 5000 }).catch(() => {});
+      for (let j = 0; j < 10 && !(await moved()); j++) await boss.waitForTimeout(250);
+    }
+    ok("the release click registered", await moved(),
+      `refs ${refsBefore} → ${await boss.locator('input[name="ref"]').count()}`);
+
     body = await boss.locator("body").innerText();
-    const released = await boss.locator('input[name="ref"]').count() > 0;
+    const released = (await boss.locator('input[name="ref"]').count()) > refsBefore;
 
     if (released) {
       ok("releasing tells staff to send it by hand rather than pretending",
         /approved|mark paid/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
-      await boss.fill('input[name="ref"]', "WIRE-2026-001");
-      await tap(boss.locator('button:has-text("Mark paid")').first());
+      await boss.locator('input[name="ref"]').last().fill("WIRE-2026-001");
+      await boss.locator('button:has-text("Mark paid")').last().click({ timeout: 10000 }).catch(() => {});
       await boss.waitForFunction(() => /WIRE-2026-001/.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
       body = await boss.locator("body").innerText();
       ok("and marking paid records the reference", /WIRE-2026-001/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
