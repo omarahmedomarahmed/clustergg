@@ -122,8 +122,37 @@ call badly organised.
 |---|---|
 | `/admin/vaults` | ✅ Shipped. Four vault balances, the split, transfers, breakage, CP runway. |
 | `/admin/week` | ✅ Shipped. The Monday close, the score, eight weeks of payouts. |
-| `/admin/delivery` | **Proposed.** What every brand's creatives actually delivered — the staff-side view of B82. Today the numbers exist only inside a brand's own portal. |
-| `/admin/cp` | **Proposed.** The CP dial: set the daily ceiling, see the vault's runway, apply the plan. `lib/cp-dial.ts` is built and nothing calls it. |
+| `/admin/delivery` | ✅ Shipped. What every brand's creatives actually delivered — the staff-side view of B82. |
+| `/admin/cp` | ✅ Shipped. The CP dial: set the daily ceiling, see the vault's runway, apply the plan. |
+
+**Both existed as a library with no caller**, which is the worst state for
+anything that touches money: written, reviewed, tested, and unreachable.
+
+`/admin/cp` is the one that mattered. `lib/cp-dial.ts` shipped with C1 and
+nothing called it, so the ceiling on what the gamer economy costs was only
+movable by editing a settings row by hand — with no view of what it does to a
+mission, and none of what it does to the vault's runway. The page is those two
+questions beside the control, and `app/actions/cp-dial.ts` is the only thing
+that can move it. It writes the ceiling AND rescales the mission weights in one
+call, because doing either alone is what breaks the model: raise the ceiling
+and a mission is still worth what it was worth; rescale the weights and the
+ceiling is a bound nobody is near, or one everybody hits by lunchtime.
+
+The plan is recomputed on the server from the weights the QUESTS are running,
+never from the catalogue defaults and never from anything the form posted. The
+dial's preview is a lookup into server-computed plans rather than a second
+implementation — a client-side copy of that arithmetic that drifts is a screen
+that lies about what a button will do.
+
+`/admin/delivery` answers "is this campaign delivering?" without opening a
+customer's own page and reading it as though we were the customer. It puts the
+brands delivering NOTHING at the top, because a brand with zero views does not
+log in to look at a zero — an active brand with creatives loaded and nothing
+delivered this month is always an operational failure, and it was invisible
+from every other screen. Same `deliveryFor`, so the same three bounds hold and
+none of them is relaxed for staff: aggregate only, no identity in any row, and
+no composition under 25 viewers. A staff screen reporting a breakdown the
+brand's own screen suppresses is still a re-identification.
 
 ### KEEP AND CONVERT (the rest)
 
