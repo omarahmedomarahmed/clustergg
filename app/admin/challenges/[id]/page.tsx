@@ -3,6 +3,8 @@ import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { setParticipantStatus } from "@/app/actions/admin";
 import ChallengeBuilder, { type ChallengeEdit } from "@/components/ChallengeBuilder";
+import StageLadder from "@/components/admin/StageLadder";
+import { stageOf, canAnnounce } from "@/lib/challenge-stage";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import Link from "next/link";
@@ -65,7 +67,7 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
   return (
     <div className="space-y-6">
       <div className="glass p-6">
-        <div className="text-xs uppercase tracking-widest text-cyan-300">{challenge.status} · {challenge.format}</div>
+        <div className="text-xs uppercase tracking-widest text-cyan-300">{challenge.format}</div>
         <h1 className="text-2xl font-bold mt-1">{challenge.title}</h1>
         <p className="text-sm text-muted mt-1">
           {challenge.game} via {challenge.provider} · ends {timeAgo(challenge.endAt)} · scoring:{" "}
@@ -87,6 +89,16 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
           <Stat value={reach.linked.toLocaleString()} label="could enter" />
           <Stat value={participants.length.toLocaleString()} label="entered" gold />
         </div>
+        {/* B90.3. The stage replaced a bare `status` word in the header above:
+            "active" was printed for a challenge that starts in five days and
+            for one that is running right now, which are different situations
+            and different jobs. */}
+        <StageLadder
+          challengeId={id}
+          stage={stageOf(challenge)}
+          canAnnounce={canAnnounce(challenge)}
+        />
+
         {challenge.status === "active" && reach.servers === 0 && (
           <p className="mt-2 text-xs text-amber-300">
             This run has not landed in any server yet. Announce it from Admin → Discord, or check the

@@ -382,6 +382,19 @@ export const challenges = pgTable("challenges", {
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
   endAt: timestamp("end_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("draft"), // draft | active | completed | cancelled
+  /**
+   * When the bot told the servers this was coming. B90.3.
+   *
+   * The rung between "paid" and "running". A challenge announced on Thursday
+   * for the following Monday is one every server has had four days to talk
+   * about; one announced at the moment it starts is a surprise, and a surprise
+   * competition gets the entrants of whoever happened to be online.
+   *
+   * It is a TIMESTAMP rather than a status value because a challenge can be
+   * announced and then still be edited, cancelled or rescheduled — and because
+   * "when did we tell people" is the question reach reporting actually asks.
+   */
+  announcedAt: timestamp("announced_at", { withTimezone: true, mode: "date" }),
   cadence: text("cadence").notNull().default("custom"), // daily | weekly | monthly | custom
   // ===== Repeating series =====
   //
