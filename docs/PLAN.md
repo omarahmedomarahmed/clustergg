@@ -457,6 +457,110 @@ from B88 and B89.1–B89.4. Written first, it is fiction we then have to correct
 
 ---
 
+### ▸ B90 — The campaign is the product · **PLANNED**
+
+**Read `docs/B73_RESEARCH.md` first.** It is now on this branch. The single most
+important thing in it, for this item: **Discord Developer Policy §6 probably
+prohibits a third-party brand's paid creative inside a bot message, and the
+sponsored-CHALLENGE business survives that.** The owner's redesign — sell
+campaigns of weekly challenges, not ad placements — moves us onto the surviving
+side of that line. It was not designed for that reason and it does it anyway.
+
+#### B90.0 — What the legal read changes, immediately
+
+| Finding | Change | Where |
+|---|---|---|
+| §6: paid creatives in bot messages | Discord surfaces become **name-and-mention only** — the challenge's own title carries the sponsor ("The AstroFuel 24h Bullet Marathon"). Brand imagery lives on OUR domain, which the card links to. Web placements keep images | `lib/cards/`, `adPlacements` surface flag |
+| §13: "do not fraudulently manipulate engagement" | The owner pool scored on raw activity is **a bounty on server messages**. Rescore on challenge OUTCOMES — entrants, completion — not on card opens | B88.4's KPIs |
+| §17: no API data to ad networks | Already our rule. A brand never sees a per-server or per-user Discord datum | `lib/ad-delivery.ts` |
+| 1099 threshold is **$2,000**, not $600 | Defect. `lib/eligibility.ts:55` over-reports | Fix now |
+| Sanctions list wrong **both ways** | Syria's program was revoked; Crimea/Donetsk/Luhansk are missing | `lib/eligibility.ts:41` |
+| Under-18 profiled ads barred in 9 regimes | Ad serving to under-18s must be **contextual, never profiled**. One change clears more jurisdictions than any other | Ad serving |
+| 30% NRA withholding, **no de-minimis**, on non-US prize payouts | **Pre-launch blocker for the international population.** Unresolved in the research — the largest open question in it | Redemption |
+
+#### B90.1 — Brand self-signup
+
+Create a brand → automated email with a portal link and key → build a campaign.
+
+**Admin approves before a brand appears anywhere public.** Self-signup with no
+gate is a spam surface and a "who are our customers" problem on a platform whose
+first counsel question is exactly that.
+
+**A brand never sees another brand's numbers.** The owner asked for "numbers on
+challenges by other brands"; that is a competitor's performance data. What ships
+is **aggregate platform benchmarks** — median entrants per challenge, typical
+reach — with no brand named and the 25-cohort floor applied.
+
+#### B90.2 — The campaign builder
+
+| Step | Rule |
+|---|---|
+| Pick 1–4 challenges | Each is **one week**. Four is a month, said in those words |
+| Weeks are consecutive | Never two in one week. Start dates shown before payment, all fixed to a Monday |
+| Prize pool | **Read-only.** It is 50% of the price and not a field |
+| Creatives, cover, logo | Plus light-background and dark-background logo variants — we render three branded trophies from them |
+| Estimated reach | Total gamers and total servers, labelled **estimate, not guaranteed** |
+| Pay | The whole campaign, once. Nothing queues until it clears |
+
+#### B90.3 — The status ladder
+
+`draft` → `queued` → `announced` → `live` → `ended`
+
+| Status | Means | Set by |
+|---|---|---|
+| **draft** | Built, **not paid**. Visible to admin as "a brand is buying and still thinking" | Brand |
+| **queued** | Paid. Starts the following Monday | Payment |
+| **announced** | Admin has set the three trophies, the rules and the game-API metric. The bot tells every server it opens next week. **Tracking starts here** | Admin |
+| **live** | Running | Cron, Monday |
+| **ended** | Scored, prizes awarded | Cron |
+
+**Nothing queues before payment clears.** A challenge in `draft` is a lead.
+
+#### B90.4 — Every challenge has somebody who paid for it
+
+| Kind | Who pays | Split | Cut |
+|---|---|---|---|
+| Sponsored | A brand | Normal 50/20/15/15 | Yes |
+| House | The Cluster house brand, billed to itself | Normal | Nominal — it is our own promo |
+| **Private** | A server owner, from their wallet balance | ⚠️ **See below** | ⚠️ |
+
+> **⚠️ PRIVATE CHALLENGES NEED COUNSEL BEFORE THEY ARE BUILT.**
+>
+> As described — the owner's balance funds a prize we pay to their members —
+> ClusterGG receives value from person A and pays it to person B. **That is the
+> money-transmitter trigger `B73_RESEARCH.md` Q3 flags**, and it re-opens
+> precisely what deleting gifting closed (§28: the Dutch line is
+> transferability).
+>
+> **The safer structure, and it is barely different to build:** the owner BUYS a
+> challenge from us, at a price, like any other customer. We then owe the prize
+> as **our own obligation out of our own revenue** — the "principal, not
+> conduit" characterisation the research says is defensible. That means it runs
+> through the normal split and takes a cut, however small. A pass-through with
+> no cut is the version that looks like transmission.
+>
+> Not built until this is decided.
+
+#### B90.5 — Admin sees every campaign, including the unpaid ones
+
+One console: every brand, every campaign, every challenge, filterable by status.
+A `draft` campaign is a **sales signal**, not clutter.
+
+#### B90.6 — BETA
+
+A `BETA` badge beside the wordmark, in the desktop nav and the mobile nav.
+
+Not decoration: it is the honest label for a platform whose Gate 1 opinion is
+not yet written, and it sets the expectation that things move.
+
+> **What the owner should know, said once.** Billing your own company proves the
+> software works. It does not prove anyone will pay — that is what Gate 4's
+> signed insertion order was for. Running the full cycle against a friendly
+> brand is a good test and a poor market signal, and the plan should not record
+> it as the second thing.
+
+---
+
 ### ▸ B86 — Start the clock on data we cannot backfill · **DO THIS WEEK**
 
 **Ahead of everything, including B72.** Not because it is more urgent than a
