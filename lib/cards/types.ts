@@ -199,6 +199,16 @@ export type PlanetCard = {
    * hero names is the list this whole item exists to replace.
    */
   world?: { name: string; imageUrl?: string | null; role?: string | null }[];
+  /**
+   * The GLOBE. B85.2.
+   *
+   * The named bug: `planetCard` selected `planetBgUrl` — the space background —
+   * and never `planetImageUrl`, the globe itself. The card was not
+   * mis-positioning the planet; the data layer never fetched it, so a card
+   * called "planet" had no planet on it. `BG_SOURCES` even labelled its option
+   * "The globe/space art" while only ever resolving the background.
+   */
+  globeUrl?: string | null;
   /** Distinct gamers with a linked account on this game. */
   gamers: number;
   serverGamers?: number | null;

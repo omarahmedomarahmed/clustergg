@@ -250,6 +250,44 @@ console.log("\n== the brand's own scope ==");
   ok("…and it says so plainly", /No cards/.test(none.note));
 }
 
+console.log("\n== B75.4: the frequency cap is an anti-fraud control ==");
+{
+  const { cardImpressionKey, CARD_IMPRESSION_WINDOW_HOURS } = await import("../../lib/cards/ads.ts");
+  // One gamer, one creative, one DAY. Longer than the web beacon's hour on
+  // purpose: a Discord card is a deliberate act by a person who typed
+  // something, so twice in an evening is a real second delivery — forty is
+  // somebody holding down a key.
+  eq("the window is a day", CARD_IMPRESSION_WINDOW_HOURS, 24);
+  const a = cardImpressionKey("cc1", "u1", new Date("2026-08-08T01:00:00Z"));
+  const b = cardImpressionKey("cc1", "u1", new Date("2026-08-08T23:00:00Z"));
+  eq("the same gamer on the same day is one key", a, b);
+  ok("…a different day is not", a !== cardImpressionKey("cc1", "u1", new Date("2026-08-09T01:00:00Z")));
+  ok("…a different gamer is not", a !== cardImpressionKey("cc1", "u2", new Date("2026-08-08T01:00:00Z")));
+  ok("…and a different creative is not", a !== cardImpressionKey("cc2", "u1", new Date("2026-08-08T01:00:00Z")));
+
+  const cards = code("lib/cards/ads.ts");
+  ok("the cap is enforced by the unique index, not a check",
+    /dedupeKey: cardImpressionKey/.test(cards) && /onConflictDoNothing/.test(cards));
+  // A render we cannot attribute still logs — dropping it would UNDER-report,
+  // which is the other way to be wrong.
+  ok("an unattributable render still counts", /anon:\$\{meta\.guildId/.test(cards));
+  ok("the viewer reaches the logger", /viewerId: currentCardViewer\(\)/.test(code("lib/discord/cards.ts")));
+}
+
+console.log("\n== B75.5: no silent cutoff ==");
+{
+  const ads = code("lib/ads.ts");
+  // The defect: sort by priority, slice to `maxCreativesInRotation`, and the
+  // fourth paying brand serves nothing while still being billed.
+  ok("the rotation no longer slices the tail away",
+    !/\.slice\(0, placement\.maxCreativesInRotation\)/.test(ads));
+  ok("…it rotates the tail through the spare slots", /offset \+ i\) % tail\.length/.test(ads));
+  ok("…on a window that advances with time", /now\.getTime\(\) \/ 3600_000/.test(ads));
+  // Priority still leads — the point is that the TAIL rotates, not that
+  // priority stops meaning anything.
+  ok("…while top priority is always served", /r\.priority === topPriority/.test(ads));
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);

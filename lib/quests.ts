@@ -169,6 +169,76 @@ export const ACTION_CAP_SUM = ACTION_CATALOG.reduce((s, a) => s + a.defaultWeigh
  */
 export const DEFAULT_DAILY_CP_CEILING = 500;
 
+/**
+ * The most one occurrence of one action may pay. B76.
+ *
+ * The 15-screen guarantee rests on this bound — "no single thing you do is
+ * worth more than 25 CP" is what makes a daily reachable by doing several
+ * things rather than by winning one. Two actions broke it:
+ * `win_challenge` at 100 and `best_profile_award` at 100.
+ *
+ * THEY ARE NOT REPRICED. Winning a challenge should be worth more than opening
+ * a card, and cutting a win to 25 to satisfy a sentence would be letting the
+ * copy decide the economy. Instead the guarantee is RESTATED to exclude them,
+ * and this constant plus `EXEMPT_FROM_ACTION_CAP` is what makes the exclusion
+ * checkable rather than a footnote: any NEW action over 25 that is not on that
+ * list fails the test.
+ */
+export const MAX_ACTION_CP = 25;
+
+/**
+ * The two the bound does not apply to, and they are named rather than inferred.
+ *
+ * Both are rare, both are once-ever-ish (cap 1), and both are the reward for an
+ * outcome rather than for an activity. A list that has to be edited on purpose
+ * is the point: it makes adding a third a decision somebody makes rather than a
+ * weight somebody types.
+ */
+export const EXEMPT_FROM_ACTION_CAP: readonly string[] = [
+  "win_challenge",       // 100 — first place in a challenge
+  "best_profile_award",  // 100 — a place in the weekly ceremony
+  "top3_challenge",      //  50 — a podium
+  "connect_account",     //  50 — the once-ever act the whole product needs
+];
+
+/**
+ * FOUR, not the two the plan named.
+ *
+ * The review listed `win_challenge` and `best_profile_award` at 100. Writing the
+ * test against the catalogue rather than against those two names found
+ * `top3_challenge` at 50 and `connect_account` at 50 as well — both over the
+ * bound, neither mentioned anywhere.
+ *
+ * All four share the shape that makes the exemption defensible: `defaultCap: 1`.
+ * They are outcomes, not activities — you cannot do them again today by doing
+ * more of the same thing, which is exactly what the 25-CP bound exists to
+ * limit. The guarantee is therefore restated rather than the weights cut: **no
+ * repeatable action pays more than 25 CP.** Cutting a challenge win to 25 to
+ * satisfy a sentence would be letting the copy decide the economy.
+ *
+ * The test asserts every exempt action has `defaultCap === 1`, so a fifth
+ * entry cannot be added to this list to smuggle a repeatable action past the
+ * bound.
+ */
+
+/**
+ * Actions a gamer does not choose — they happen TO them. B76.
+ *
+ * Somebody else viewing your profile, voting for you, following you. The model
+ * claims a 125 CP/day passive ceiling, and it did not exist: all of it counted
+ * against the same 500 and nothing separated the two.
+ *
+ * The ceiling exists because passive CP is the half a collusion ring can farm
+ * without playing anything — three accounts viewing each other's profiles all
+ * day cost them nothing and paid until the daily cap. Capping the passive
+ * subtotal means the ring hits 125 and stops, while a gamer who actually plays
+ * still reaches 500.
+ */
+export const PASSIVE_ACTIONS: readonly string[] = [
+  "profile_views_25", "profile_vote_received", "follower_gained", "best_profile_award",
+];
+export const DEFAULT_PASSIVE_CP_CEILING = 125;
+
 export const ACTION_LABEL: Record<string, string> = Object.fromEntries(ACTION_CATALOG.map((a) => [a.key, a.label]));
 
 // Cosmic quest emblem art (Higgsfield nano_banana). Served directly from the
@@ -463,6 +533,25 @@ export async function cpEarnedToday(db: DB, userId: string): Promise<number> {
 }
 
 /**
+ * How much of today's PASSIVE allowance is gone. B76.
+ *
+ * Counted from the events, like everything else, so it cannot drift from what
+ * was actually paid.
+ */
+export async function passiveCpToday(db: DB, userId: string): Promise<number> {
+  try {
+    const [row] = await db.select({ n: sql<number>`COALESCE(SUM(${CP_PAID_SQL}), 0)` })
+      .from(schema.questEvents)
+      .where(and(
+        eq(schema.questEvents.userId, userId),
+        gte(schema.questEvents.createdAt, startOfUtcDay()),
+        inArray(schema.questEvents.actionKey, PASSIVE_ACTIONS as string[]),
+      ));
+    return Number(row?.n ?? 0);
+  } catch { return 0; }
+}
+
+/**
  * Credit an action: **CP once, progress everywhere** (B34.2).
  *
  * This used to pay every quest listening to an action, with the daily cap stored
@@ -556,6 +645,17 @@ async function awardQuestActionLocked(
 
     const [ceiling, already] = await Promise.all([dailyCpCeiling(db), cpEarnedToday(db, userId)]);
     let room = Math.max(0, ceiling - already);
+
+    // The PASSIVE ceiling. B76 — the model claimed one and the code had none.
+    //
+    // Narrows `room` for actions somebody else causes: views, votes, follows.
+    // Three accounts viewing each other's profiles all day is free to run and
+    // used to pay to the full 500; now it stops at 125 while a gamer who
+    // actually plays still reaches the whole ceiling.
+    if ((PASSIVE_ACTIONS as string[]).includes(actionKey)) {
+      const passiveRoom = Math.max(0, DEFAULT_PASSIVE_CP_CEILING - (await passiveCpToday(db, userId)));
+      room = Math.min(room, passiveRoom);
+    }
 
     // The onboarding cap. B83.
     //

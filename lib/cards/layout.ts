@@ -396,7 +396,11 @@ export const DEFAULT_LAYOUT: CardLayout = {
  */
 export const BG_SOURCES: { id: string; label: string; note: string }[] = [
   { id: "entity.cover", label: "This thing's own cover", note: "The challenge's cover, the game's cover, the quest's card art — whatever the card is ABOUT." },
-  { id: "game.planetBg", label: "The game's planet art", note: "The globe/space art from the game's planet. The natural backdrop for anything game-shaped." },
+  // B85.2: relabelled. It only ever resolved the SPACE BACKGROUND, while the
+  // label promised "the globe/space art" — which is how a card called "planet"
+  // shipped with no planet on it and nobody could tell from the editor. The
+  // globe is a subject, not a backdrop, and it now rides on the identity.
+  { id: "game.planetBg", label: "The game's space backdrop", note: "The starfield behind the game's planet. A backdrop — the globe itself is drawn as the card's subject, not as art behind the text." },
   { id: "game.cover", label: "The game's cover", note: "The game's key art from the catalogue." },
   { id: "gamer.background", label: "The gamer's own art", note: "Their profile background, then their banner. Only on cards about a person." },
   { id: "card.bg", label: "Admin art for this card type", note: "What's set in Admin → Card backgrounds for this kind." },

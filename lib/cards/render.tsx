@@ -1455,7 +1455,11 @@ function PlanetBody(d: PlanetCard) {
 
   return (
     <Frame theme={t} identity={{
-      imageUrl: d.logoUrl, eyebrow: "PLANET", title: `${clamp(d.game, 18)}`,
+      // B85.2. The GLOBE leads the identity when the game has one, falling back
+      // to the logo. A card called "planet" with no planet on it was the widest
+      // gap between a bot card and its web counterpart — the web planet page
+      // opens on the globe, and this now opens on the same image.
+      imageUrl: d.globeUrl || d.logoUrl, eyebrow: "PLANET", title: `${clamp(d.game, 18)}`,
       subtitle: `${nf(d.gamers)} gamer${d.gamers === 1 ? "" : "s"} here${d.serverGamers != null ? ` · ${nf(d.serverGamers)} from this server` : ""}`,
     }}
       panes={[

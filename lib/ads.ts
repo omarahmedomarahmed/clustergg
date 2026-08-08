@@ -70,10 +70,44 @@ export async function serveAds(db: DB, placementKey: string, device: string): Pr
       gte(schema.adCampaigns.endDate, now),
     ));
 
-  const eligible = rows
+  // ===== B75.5: no silent cutoff =====
+  //
+  // `maxCreativesInRotation` defaults to 3 and this used to be a plain sort +
+  // slice: sorted by priority then weight, then everything past the third row
+  // DROPPED. A fourth paying brand on a placement served nothing, was billed,
+  // and appeared nowhere — money taken for delivery not made, invisible because
+  // the code looks completely reasonable.
+  //
+  // The cap is a rendering limit, not an eligibility one, so it now rotates
+  // WHICH creatives fill those slots instead of permanently excluding the same
+  // ones. The window advances with the hour, so every eligible creative reaches
+  // the surface within a day whatever its priority.
+  //
+  // Priority still leads: a high-priority creative is in every window. It is
+  // the tail that rotates rather than being cut off.
+  const ranked = rows
     .filter((r) => r.targetDevice === "both" || r.targetDevice === device)
-    .sort((a, b) => b.priority - a.priority || b.weight - a.weight)
-    .slice(0, placement.maxCreativesInRotation);
+    .sort((a, b) => b.priority - a.priority || b.weight - a.weight);
+
+  const slots = Math.max(1, placement.maxCreativesInRotation);
+  let eligible = ranked;
+  if (ranked.length > slots) {
+    // Everything at the top priority is always in. Whatever is left rotates
+    // through the remaining slots on an hourly offset.
+    const topPriority = ranked[0].priority;
+    const always = ranked.filter((r) => r.priority === topPriority).slice(0, slots);
+    const tail = ranked.filter((r) => !always.includes(r));
+    const room = Math.max(0, slots - always.length);
+    if (room === 0 || tail.length === 0) {
+      eligible = always;
+    } else {
+      const hour = Math.floor(now.getTime() / 3600_000);
+      const offset = (hour * room) % tail.length;
+      const window: typeof tail = [];
+      for (let i = 0; i < room; i++) window.push(tail[(offset + i) % tail.length]);
+      eligible = [...always, ...window];
+    }
+  }
 
   if (eligible.length === 0) return null;
 

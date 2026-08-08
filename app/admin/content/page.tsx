@@ -51,11 +51,15 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
       { key: "pricing.prizeW1", label: "1st place weight (4 : 2 : 1 gives 100 / 50 / 25 at a $175 pool)" },
       { key: "pricing.prizeW2", label: "2nd place weight" },
       { key: "pricing.prizeW3", label: "3rd place weight" },
-      { key: "pricing.reachBase", label: "Reach tier — monthly base" },
-      { key: "pricing.challengeBase", label: "Challenge tier — monthly base" },
-      { key: "pricing.ultimateBase", label: "Ultimate tier — monthly base (all games)" },
-      { key: "pricing.challengePrice", label: "Charged per sponsored challenge" },
-      { key: "pricing.streamAddon", label: "Sunday broadcast add-on, per month" },
+      { key: "pricing.challengePrice", label: "Charged per sponsored challenge — the package IS this number" },
+      // C11: retired to 0. v2 sells one package with placements and the
+      // broadcast included. Left editable so a base can be priced back up
+      // deliberately — set to 0 the lines are omitted from an invoice rather
+      // than printed as "$0", which reads as a fee somebody forgot to fill in.
+      { key: "pricing.reachBase", label: "RETIRED (0) — old placements-only monthly base" },
+      { key: "pricing.challengeBase", label: "RETIRED (0) — old challenge-tier monthly base" },
+      { key: "pricing.ultimateBase", label: "RETIRED (0) — old all-games monthly base" },
+      { key: "pricing.streamAddon", label: "RETIRED (0) — the Sunday broadcast comes with the package now" },
       { key: "pricing.yearlyDiscountPct", label: "Annual discount (%)" },
       { key: "pricing.slotCount", label: "Ultimate — video slots included" },
       { key: "pricing.slotSeconds", label: "Ultimate — seconds per video slot" },
@@ -95,6 +99,19 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
       // `finance.sponsorsUseHouseInventory` was here. C8: the commercial model
       // answers it — half of what a brand pays IS the prize pool — so a
       // checkbox that could contradict the model is one somebody would tick.
+    ],
+  },
+  {
+    title: "Card rendering — the cost ceilings",
+    note:
+      "B77. Every card the bot draws is a render, and every render is billed. These are the ceilings; "
+      + "past them we serve the last good card rather than failing, because a stale card is a card and a "
+      + "missing one is a broken Discord message. 4,000/day is roughly 200 active gamers — raise it "
+      + "deliberately, with the graph in front of you, not because something looked slow.",
+    keys: [
+      { key: "cards.dailyRenderCeiling", label: "Renders per day, network-wide (0 stops drawing entirely)" },
+      { key: "cards.dailyPreviewCeiling", label: "Profile-editor previews per day — their own line, so one gamer fiddling with colours cannot eat the network's allowance" },
+      { key: "cards.storeCap", label: "Stored cards kept before least-recently-used eviction" },
     ],
   },
   {

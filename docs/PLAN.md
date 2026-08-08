@@ -270,7 +270,7 @@ integrity checks; the Discord Developer Policy read; a FinCEN/state CVC opinion
 that also covers the 16 line, whether we are "directed to children", and whether
 an unredeemed trophy may ever expire.
 
-### ▸ B72 — Stop the bleeding *(4 items remain)*
+### ▸ B72 — Stop the bleeding · **SHIPPED** *(all four)*
 
 #### B72.1 — Kill the fabricated ROAS
 
@@ -379,7 +379,7 @@ this now.** Until then CI reports; it does not block.
 
 ---
 
-### ▸ B81 — Ad view counting *(D1/D4)*
+### ▸ B81 — Ad view counting · **SHIPPED** *(D1/D4)*
 
 **The revenue model rests on this, and it comes before anything that counts,
 prices, paces or reports delivery.**
@@ -418,7 +418,7 @@ nor skips; no exported report function multiplies a count by anything.
 
 ---
 
-### ▸ B82 — What the brand sees *(D1)*
+### ▸ B82 — What the brand sees · **SHIPPED** *(D1)*
 
 Only after B81. A view over logged rows, with no arithmetic the rows do not
 support.
@@ -449,7 +449,7 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
-### ▸ B83 — The gamer onboarding, properly *(D3)*
+### ▸ B83 — The gamer onboarding, properly · **SHIPPED** *(D3; B83.5 still deferred)*
 
 B72.4 closes the legal hole plainly. **This is the version that is good.**
 
@@ -547,7 +547,7 @@ real challenges we actually have**, not lorem.
 
 ---
 
-### ▸ B85 — Card parity, and the admin layout editor
+### ▸ B85 — Card parity · **B85.1/B85.2 SHIPPED** *(B85.3 deferred to the admin rewrite)*
 
 #### B85.1 — The rule
 
@@ -585,7 +585,7 @@ for the old frame.
 
 ---
 
-### ▸ B75 — Deliver what was sold · **CUT TO THREE ITEMS**
+### ▸ B75 — Deliver what was sold · **SHIPPED** *(items 4, 5, 6)*
 
 **Ads are included free now, so there is nothing to pace, target, or make good
 on.** Items 1, 2, 3 and 7 below are deleted. What survives is what keeps the
@@ -615,7 +615,7 @@ holds per gamer per day; under-delivery produces a credit row.
 
 ---
 
-### ▸ B76 — Make the 15-screen guarantee real
+### ▸ B76 — Make the 15-screen guarantee real · **SHIPPED**
 
 - **Four priced actions have no emitter** — `stat_levelup`, `play_session`,
   `challenge_progress`, `share_card`. They are in every mission variation and
@@ -636,7 +636,7 @@ fire*; no action exceeds 25; the passive subtotal cannot exceed 125 a day.
 
 ---
 
-### ▸ B77 — The caps our own cost control set
+### ▸ B77 — The caps our own cost control set · **SHIPPED** *(configurable; the cost modelling is an owner decision)*
 
 `lib/cards/budget.ts:22` caps rendering at 4,000/day — roughly 200 active gamers.
 B46 set it without checking it against the growth the model assumes; two of our
@@ -648,7 +648,7 @@ their own line in this budget.**
 
 ---
 
-### ▸ B78 — The model, restated
+### ▸ B78 — The model, restated · **SHIPPED**
 
 - `revenue = screens × CPM/1000 × fill`. **Fill was missing from our break-even —
   our error, not a dispute.**
@@ -690,7 +690,7 @@ their own line in this budget.**
 
 ---
 
-### ▸ B80 — The debt, in full
+### ▸ B80 — The debt, in full · **BOTH FATALS SHIPPED**
 
 **This section was wrong before.** It said "the remainder … none fatal alone" and
 listed five items. It was not the remainder, and it silently contained findings

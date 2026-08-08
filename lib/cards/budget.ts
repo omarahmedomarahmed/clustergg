@@ -19,8 +19,72 @@
 import { and, asc, desc, eq, gte, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 
-/** Renders per UTC day before we stop drawing and start serving stale. */
+/**
+ * Renders per UTC day before we stop drawing and start serving stale.
+ *
+ * ===== B77: THIS NUMBER WAS NEVER CHECKED AGAINST THE MODEL =====
+ *
+ * 4,000/day is roughly 200 active gamers at ordinary card usage. B46 set it as
+ * a bill guard without comparing it to the growth `docs/COMMERCIAL_MODEL_V2.md`
+ * assumes — two of our own documents contradicted each other, and the one that
+ * would have failed first was this one, silently, by serving stale cards to a
+ * network that had outgrown it.
+ *
+ * It is now a DEFAULT, not a constant: `renderCeiling()` reads
+ * `cards.dailyRenderCeiling` from settings, so raising it is an admin action
+ * rather than a deploy. That is the whole of B77 that belongs in code — the
+ * modelling of what a render actually costs is an owner decision, and a number
+ * nobody can change without a deploy is a number that goes stale between them.
+ *
+ * The default stays at 4,000 deliberately. Raising it here would remove the
+ * guard for everybody at once; raising it in settings is a decision somebody
+ * makes with the graph in front of them.
+ */
 export const DAILY_RENDER_CEILING = 4000;
+
+/**
+ * A separate line for editor previews. B83.5.
+ *
+ * Every preview in the profile editor is a real Satori render. One gamer
+ * fiddling with colours for ten minutes could otherwise eat the whole
+ * network's daily allowance, so previews draw on their own budget and running
+ * that one dry costs a preview rather than every card in every server.
+ *
+ * Zero disables previews entirely, which is the right emergency lever: an
+ * editor that says "previews are paused" is survivable, a Discord that cannot
+ * draw a card is not.
+ */
+export const DAILY_PREVIEW_CEILING = 500;
+
+/** Settings keys, so the admin form and the reader cannot disagree. */
+export const BUDGET_KEYS = {
+  render: "cards.dailyRenderCeiling",
+  preview: "cards.dailyPreviewCeiling",
+  store: "cards.storeCap",
+} as const;
+
+/**
+ * The configured ceiling, or the default.
+ *
+ * Reads through the caller's handle when given one — this is reachable from
+ * card rendering, which is reachable from a seed, and a helper that opens its
+ * own connection there deadlocks. That has happened twice in this codebase.
+ */
+export async function renderCeiling(
+  db?: Awaited<ReturnType<typeof getDb>>,
+  which: keyof typeof BUDGET_KEYS = "render",
+): Promise<number> {
+  const fallback = which === "preview" ? DAILY_PREVIEW_CEILING
+    : which === "store" ? CARD_STORE_CAP : DAILY_RENDER_CEILING;
+  try {
+    const handle = db ?? await getDb();
+    const [row] = await handle.select({ value: schema.platformSettings.value })
+      .from(schema.platformSettings)
+      .where(eq(schema.platformSettings.key, BUDGET_KEYS[which])).limit(1);
+    const n = Number((row?.value as { n?: number } | null)?.n);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
+  } catch { return fallback; }
+}
 /** How many stored cards we keep. Beyond this, least-recently-used goes first. */
 export const CARD_STORE_CAP = 3000;
 /** A card nobody has looked at in this long is a candidate whatever the cap says. */
@@ -57,14 +121,18 @@ export async function renderBudget(): Promise<RenderBudget> {
   };
   try {
     const db = await getDb();
+    // B77: configured, not compiled in.
+    const ceiling = await renderCeiling(db);
     const [row] = await db.select({ n: sql<number>`count(*)` })
       .from(schema.cardRenders)
       .where(gte(schema.cardRenders.updatedAt, startOfUtcDay()));
     const used = Number(row?.n ?? 0);
     return {
-      used, ceiling: DAILY_RENDER_CEILING,
-      remaining: Math.max(0, DAILY_RENDER_CEILING - used),
-      exhausted: used >= DAILY_RENDER_CEILING,
+      used, ceiling,
+      remaining: Math.max(0, ceiling - used),
+      // A ceiling of 0 means "stop drawing", not "unlimited". `used >= 0` is
+      // always true, which is the correct reading of a deliberate zero.
+      exhausted: used >= ceiling,
       resetsAt: reset.toISOString(),
     };
   } catch {
