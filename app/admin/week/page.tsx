@@ -10,6 +10,9 @@ import {
   Page, Section, StatRow, Stat, Table, Tr, Td, Money, Note, Pill, num, AdminLink,
 } from "@/components/admin/kit";
 import RunWeekClose from "@/components/admin/RunWeekClose";
+import WeekBudgets, { type BudgetView } from "@/components/admin/WeekBudgets";
+import { weekBudget, weekKeyOf } from "@/lib/allocations";
+import { planDailyCeiling } from "@/lib/daily-ceiling";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · The week" };
@@ -31,6 +34,20 @@ export default async function WeekPage() {
 
   const thisWeek = weekStartOf();
   const lastWeek = new Date(thisWeek.getTime() - 7 * 86400_000);
+
+  // ===== B88.5: this is the operating screen for BOTH vaults =====
+  //
+  // It was a record of what the close did. It still is, below — but the two
+  // decisions that determine what the platform pays this week are made here
+  // now, because they are the same decision seen from two sides: how much of
+  // the gamer vault today's ceiling divides, and how much of the server vault
+  // Monday's pool divides.
+  const [cpBudget, serverBudget, ceiling] = await Promise.all([
+    weekBudget(db, "cp"),
+    weekBudget(db, "server"),
+    planDailyCeiling(db),
+  ]);
+  const thisWeekKey = weekKeyOf();
 
   const [bal, closed, recent] = await Promise.all([
     balances(db),
@@ -93,6 +110,44 @@ export default async function WeekPage() {
           note="Split evenly between everyone who carried a challenge, placed or not"
         />
       </StatRow>
+
+      <Section
+        title={`This week's budget — ${thisWeekKey}`}
+        note="What a week may spend, per vault. Whatever is not released is the RESERVE, and the reserve is the point: it is what pays gamers and server owners through a week when nothing sold. An amount can be raised mid-week and never lowered — people have already been shown numbers computed from it."
+      >
+        <WeekBudgets
+          week={thisWeekKey}
+          canEdit={access.isAdmin}
+          budgets={[
+            {
+              vault: "cp",
+              label: "Gamer points",
+              bank: bal.cp,
+              allocated: cpBudget.allocated,
+              spent: cpBudget.spent,
+              remaining: cpBudget.remaining,
+              reserve: cpBudget.reserve,
+              locked: cpBudget.locked,
+              exists: cpBudget.exists,
+              effect: ceiling.note,
+            },
+            {
+              vault: "server",
+              label: "Server pool",
+              bank: bal.server,
+              allocated: serverBudget.allocated,
+              spent: serverBudget.spent,
+              remaining: serverBudget.remaining,
+              reserve: serverBudget.reserve,
+              locked: serverBudget.locked,
+              exists: serverBudget.exists,
+              effect: serverBudget.exists
+                ? `Monday's close divides ${serverBudget.allocated.toLocaleString("en-US", { style: "currency", currency: "USD" })} between the servers that carried a public challenge — 60 / 25 / 15 across small, mid and large.`
+                : "Nothing released, so Monday's close falls back to dividing the whole unpaid vault. Release an amount to hold a reserve.",
+            } satisfies BudgetView,
+          ] as BudgetView[]}
+        />
+      </Section>
 
       <Note tone="info">{PAYOUT_HOLD_PHRASE}</Note>
 
