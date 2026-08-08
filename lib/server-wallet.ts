@@ -58,6 +58,25 @@ import { uid } from "@/lib/utils";
  */
 const COMMITTED = ["requested", "approved", "processing"];
 
+/**
+ * Who opened a payout, when that payout is a movement of THIS WALLET.
+ *
+ * Two actors and only two: the weekly close (which puts money in) and the owner
+ * (who asks for it back out). Anything else — a correction, a goodwill cheque,
+ * a one-off an admin typed by hand — was never funded out of the pool and is
+ * not a withdrawal of it.
+ *
+ * `paid` and `pending` are filtered by this for the same reason `earned` is,
+ * and the reason is a money bug: a $200 goodwill cheque marked paid would have
+ * counted against `paid` without ever counting toward `earned`, so the owner's
+ * spendable balance would drop by $200 the moment we gave them $200. Extra
+ * money is not a withdrawal.
+ */
+export const OWNER_ACTOR_PREFIX = "owner:";
+export const ownerActor = (guildId: string) => `${OWNER_ACTOR_PREFIX}${guildId}`;
+const isWalletActor = (by: string | null | undefined) =>
+  by === WEEK_CLOSE_ACTOR || (by ?? "").startsWith(OWNER_ACTOR_PREFIX);
+
 export type Wallet = {
   guildId: string;
   earned: number;
@@ -98,6 +117,7 @@ export async function walletFor(db: DB, guildId: string): Promise<Wallet> {
       .where(and(
         eq(schema.serverPayouts.guildId, guildId),
         eq(schema.serverPayouts.status, "paid"),
+        inArray(schema.serverPayouts.requestedBy, [WEEK_CLOSE_ACTOR, ownerActor(guildId)]),
       ));
 
     const [pendingRow] = await db.select({
@@ -107,6 +127,7 @@ export async function walletFor(db: DB, guildId: string): Promise<Wallet> {
       .where(and(
         eq(schema.serverPayouts.guildId, guildId),
         inArray(schema.serverPayouts.status, COMMITTED),
+        inArray(schema.serverPayouts.requestedBy, [WEEK_CLOSE_ACTOR, ownerActor(guildId)]),
       ));
 
     const [spentRow] = await db.select({
@@ -194,11 +215,18 @@ export async function statementFor(db: DB, guildId: string, limit = 60): Promise
       // A payout is a WITHDRAWAL of money already earned, so it appears as its
       // own negative line rather than reducing the earning above it. An owner
       // reconciling a statement needs to see both events, not their net.
-      if (p.status === "paid" || COMMITTED.includes(p.status)) {
+      //
+      // Filtered to WALLET actors so the statement reconciles with the balance.
+      // A hand-opened correction is real money and it is not a movement of this
+      // wallet; showing it here would make the lines stop adding up to the
+      // number at the top, which is the one thing a statement must never do.
+      if (isWalletActor(p.requestedBy) && (p.status === "paid" || COMMITTED.includes(p.status))) {
         rows.push({
           at: p.paidAt ?? p.createdAt,
           kind: "withdrawn",
-          label: p.status === "paid" ? "Paid out" : "Withdrawal in progress",
+          label: p.status === "paid"
+            ? "Paid out"
+            : p.requestedBy === WEEK_CLOSE_ACTOR ? "Withdrawal in progress" : "You asked for this",
           amount: -amount,
           status: p.status,
         });
@@ -255,6 +283,66 @@ export async function chargeWallet(
     });
     return { ok: true, id };
   } catch { return { ok: false, error: "Could not take the payment. Nothing was charged." }; }
+}
+
+/**
+ * The smallest withdrawal we will open.
+ *
+ * Not a fee and not a trap: a provider transfer costs roughly a fixed amount
+ * whatever it carries, so a $3 withdrawal spends most of itself getting there.
+ * Below this the money stays in the wallet, where it is still theirs and still
+ * spendable on a private challenge.
+ */
+export const MIN_WITHDRAWAL = 20;
+
+/**
+ * The owner asking for their balance.
+ *
+ * This opens a payout in `requested` — the same state staff open one in — and
+ * it is deliberately the ONLY money-shaped thing an owner can do. It does not
+ * approve, does not call a provider, and does not pay: a human still releases
+ * it, exactly as before. What changed is who is allowed to ask.
+ *
+ * The amount is re-read from the wallet inside this call rather than trusted
+ * from the form. A balance shown on a page five minutes ago is not a balance.
+ */
+export async function requestWithdrawal(
+  db: DB,
+  opts: { guildId: string; guildName?: string | null; amount: number; currency?: string },
+): Promise<ChargeResult> {
+  const amount = round2(Number(opts.amount));
+  if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "That is not an amount." };
+
+  const wallet = await walletFor(db, opts.guildId);
+  if (amount < MIN_WITHDRAWAL) {
+    return { ok: false, error: `The smallest withdrawal is ${money(MIN_WITHDRAWAL)} — a transfer any smaller spends most of itself in fees. It stays in your wallet until then.` };
+  }
+  if (amount > wallet.available + 0.005) {
+    return {
+      ok: false,
+      error: `That is ${money(amount)} and your balance is ${money(wallet.available)}.`
+        + (wallet.pending > 0 ? ` ${money(wallet.pending)} is already on its way out.` : ""),
+    };
+  }
+
+  try {
+    const id = uid();
+    await db.insert(schema.serverPayouts).values({
+      id,
+      guildId: opts.guildId,
+      guildName: opts.guildName ?? null,
+      status: "requested",
+      currency: (opts.currency ?? "USD").toUpperCase(),
+      requestedBy: ownerActor(opts.guildId),
+      requestedAt: new Date(),
+      note: "Requested by the server owner from their wallet.",
+    });
+    await db.insert(schema.serverPayoutLines).values({
+      id: uid(), payoutId: id, kind: "pool",
+      label: "Withdrawal of wallet balance", amount,
+    });
+    return { ok: true, id };
+  } catch { return { ok: false, error: "Could not open the withdrawal. Nothing has moved." }; }
 }
 
 const money = (n: number) =>

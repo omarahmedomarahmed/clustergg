@@ -21,7 +21,8 @@ const eq = (name: string, got: unknown, want: unknown) =>
 
 const { getDb, schema } = await import("../../lib/db/index.ts");
 const { uid } = await import("../../lib/utils.ts");
-const { walletFor, statementFor, chargeWallet } = await import("../../lib/server-wallet.ts");
+const { walletFor, statementFor, chargeWallet, requestWithdrawal, MIN_WITHDRAWAL, ownerActor } =
+  await import("../../lib/server-wallet.ts");
 const { WEEK_CLOSE_ACTOR } = await import("../../lib/week-close.ts");
 const { eq: dEq } = await import("drizzle-orm");
 
@@ -135,6 +136,54 @@ console.log("\n== zero and nonsense are refused ==");
     const r = await chargeWallet(db, { guildId: guild, amount: bad, fee: 0, label: "x" });
     ok(`${String(bad)} is refused`, !r.ok);
   }
+}
+
+console.log("\n== a goodwill cheque does not eat the balance ==");
+{
+  // The mirror of the hand-opened-draft case above, and a worse bug: a payout
+  // an admin typed by hand was never funded out of the pool, so counting it as
+  // PAID while it does not count as EARNED would drop the owner's spendable
+  // balance by exactly the amount we just gave them. Give somebody $200 and
+  // take $200 off what they can spend.
+  const before = await walletFor(db, guild);
+  await award(200, "paid", "admin-by-hand");
+  const after = await walletFor(db, guild);
+  eq("paying a correction leaves the balance alone", after.available, before.available);
+  eq("…and it is not counted as a withdrawal of the pool", after.paid, before.paid);
+}
+
+console.log("\n== the owner asks for their money ==");
+{
+  const before = await walletFor(db, guild);
+  ok("there is a balance to withdraw", before.available >= MIN_WITHDRAWAL, JSON.stringify(before));
+
+  const tiny = await requestWithdrawal(db, { guildId: guild, amount: MIN_WITHDRAWAL - 1 });
+  ok("under the minimum is refused", !tiny.ok);
+  ok("…and the refusal says what the minimum is",
+    !tiny.ok && tiny.error.includes(String(MIN_WITHDRAWAL)), !tiny.ok ? tiny.error : "");
+
+  const huge = await requestWithdrawal(db, { guildId: guild, amount: before.available + 500 });
+  ok("more than the balance is refused", !huge.ok);
+
+  const amount = MIN_WITHDRAWAL;
+  const r = await requestWithdrawal(db, { guildId: guild, amount, guildName: "Wallet Test" });
+  ok("a withdrawal inside the balance opens", r.ok, JSON.stringify(r));
+
+  const after = await walletFor(db, guild);
+  eq("…it is now committed", after.pending, amount);
+  eq("…and it left the spendable balance",
+    after.available, Math.round((before.available - amount) * 100) / 100);
+  // The double-spend this whole file exists to prevent: money the owner has
+  // asked for must not still be available to buy a private challenge with.
+  const doubleSpend = await chargeWallet(db, {
+    guildId: guild, amount: before.available, fee: 0, label: "Spending it twice",
+  });
+  ok("…so it cannot also be spent", !doubleSpend.ok);
+
+  // An owner-requested withdrawal is not earnings, however it is labelled.
+  eq("asking for money does not create money", after.earned, before.earned);
+  ok("the request is attributed to the owner, not to staff",
+    ownerActor(guild) === `owner:${guild}`);
 }
 
 console.log("\n== the statement shows both sides of a movement ==");
