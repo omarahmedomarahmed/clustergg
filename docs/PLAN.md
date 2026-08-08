@@ -351,6 +351,112 @@ moves it. A weight nobody can act on is a number that reads as arbitrary.
 
 ---
 
+### ▸ B89 — The full cycle, then the storefront that shows it · **PLANNED**
+
+**Verified before planning.** What already exists, so nothing here rebuilds a
+working surface:
+
+| Exists | State |
+|---|---|
+| `/pay/[token]` — a brand's finance dept pays a hosted checkout | ✅ Works. No field on it could collect a card |
+| `payout_accounts` — preference word + opaque provider handle | ✅ Works. No bank details stored anywhere |
+| Server portal, Earnings tab | ⚠️ Exists, but **no wallet**: no balance, no history, no withdraw |
+| `/servers/[slug]` public server page, 517 lines | ⚠️ Exists, thin |
+| `/pricing`, 260 lines | ⚠️ Three-tier scaffolding around a one-package model (B78 follow-up) |
+| Live pool page | ❌ Does not exist |
+| Gamer segments for brands | ❌ Does not exist |
+| Self-serve brand purchase | ❌ Staff must raise every invoice by hand |
+
+**The stale thing verification found:** `lib/server-earnings.ts` still computes
+`serverShare` per challenge and the portal prints "% of the field", which is the
+per-challenge cut C3 deleted. Two models are live on one screen.
+
+#### B89.1 — The server owner's wallet
+
+An owner cannot see money they are owed, only challenges they ran.
+
+| Build | Rule |
+|---|---|
+| Balance: earned − paid | Summed from payout rows, never stored |
+| History: every week's pool share, every payout, every reference | An owner reconciling a number must not need to email us |
+| Withdraw | Requests a payout. **Never** takes bank details — the provider's link does |
+| The $25 floor, stated | Below it, it accrues. Said before they press, not after |
+| The 30-day first-payout hold, stated with its date | B35. A hold discovered at withdrawal reads as a refusal |
+
+**Delete `serverShare` and every surface printing "% of the field".** One model.
+
+#### B89.2 — The brand's buying cycle, end to end
+
+| Step | Today | After |
+|---|---|---|
+| Choose | `/pricing` calculator | Same, with a **Start** that creates a real enquiry |
+| Agree | Email | Staff turn the enquiry into a campaign |
+| Bill | Staff open an invoice | Unchanged — a human still prices a deal |
+| Pay | `/pay/[token]` | Unchanged. It already works |
+| Money splits | On PAID | Unchanged |
+| Launch | Immediate | **Next Monday.** B88 — the week is the unit |
+| Report | Brand portal | Unchanged |
+
+**Not building self-serve checkout.** A brand that can buy without talking to
+anybody is a brand nobody qualified, on a platform whose first question from
+counsel is who our customers are.
+
+#### B89.3 — The public pool page
+
+`/pool` — the live weekly server pool, open to anybody.
+
+| Shows | Why |
+|---|---|
+| This week's pool, in dollars | The number that makes an owner install the bot |
+| Which challenges it counts | Public sponsored only. Private earns nothing, said plainly |
+| The board: every competing server, its four KPIs, its share | An owner must see how to move up, not just where they are |
+| The bracket split | Why a 200-member server is not competing with a 5,000-member one |
+| Last week's result | A pool with no history reads as a promise |
+
+**Honest when empty.** No challenge sold means "$0 — the pool opens with the
+first sponsored challenge", never a placeholder.
+
+#### B89.4 — The public server profile
+
+`/servers/[slug]`, rebuilt, editable from the portal.
+
+Top members · challenges they joined · trophies their members won · featured
+gamers · who appears on which game leaderboard · the pool standing.
+
+**Every one of those is already public** on `/u/[slug]` and the boards. This
+page aggregates what a gamer has already chosen to show, and adds nothing.
+
+#### B89.5 — Gamer segments for brands ⚠️ **NEEDS A DECISION**
+
+"Show them as segments for brands" runs straight at B82's boundary: **aggregate
+only, no identity, nothing under 25 viewers.**
+
+| Build | Do not build |
+|---|---|
+| "18,000 gamers play Valorant, 40% also play Apex" | A list of who they are |
+| Reach estimates per game, per region, per server size | Any row a person could be picked out of |
+| The floor applies to every slice | An export |
+
+Owner decision, written down before it is built.
+
+#### B89.6 — The website, rewritten around real components
+
+Home · `/pricing` (with server earnings on the same page) · `/brands` ·
+`/servers` · `/discord-bot`.
+
+**Sections render the real component, not a screenshot.** A live bot card, a
+live pool board, a live trophy shelf. A screenshot is a claim; a component is
+the product.
+
+**Order: last.** Every page here is a storefront for a model whose numbers come
+from B88 and B89.1–B89.4. Written first, it is fiction we then have to correct.
+
+> **Gate 4 says this waits for one signed IO** and two of its three pages already
+> shipped. Building the rest is a deliberate owner decision, and it is recorded
+> here as one rather than quietly taken.
+
+---
+
 ### ▸ B86 — Start the clock on data we cannot backfill · **DO THIS WEEK**
 
 **Ahead of everything, including B72.** Not because it is more urgent than a
