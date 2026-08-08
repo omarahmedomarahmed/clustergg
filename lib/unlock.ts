@@ -47,7 +47,7 @@ import * as schema from "@/lib/db/schema";
  */
 export const LOCKED_CP_CAP = 5000;
 
-export type StepKey = "link" | "customize";
+export type StepKey = "link" | "customize" | "country";
 
 export type Step = {
   key: StepKey;
@@ -97,9 +97,33 @@ export function hasCustomized(u: {
   return !!theme && Object.keys(theme).length > 0;
 }
 
-/** What a gamer sees on the checklist, whichever surface draws it. */
-export function stepsFor(opts: { linked: boolean; customized: boolean }): Step[] {
+/**
+ * What a gamer sees on the checklist, whichever surface draws it.
+ *
+ * COUNTRY IS ITS OWN STEP, and it is the only one that is here for a reason
+ * outside the product. A trophy can be redeemed for money in some places and
+ * not others, US tax reporting starts at a threshold, and sanctions law is not
+ * something we get to be relaxed about. All three of those need to know where
+ * somebody is BEFORE they win anything — being told at the moment you try to
+ * cash out a trophy that you were never eligible is the worst possible time to
+ * find out.
+ *
+ * It is deliberately NOT folded into "make your profile yours", which is
+ * generous on purpose: an avatar satisfies that step, and an avatar tells us
+ * nothing about eligibility.
+ *
+ * The grandfather rule is untouched. `unlockState` returns early for anybody
+ * who is already unlocked, so adding a step cannot re-lock a single existing
+ * account.
+ */
+export function stepsFor(opts: { linked: boolean; customized: boolean; country: boolean }): Step[] {
   return [
+    {
+      key: "country",
+      label: "Tell us which country you are in",
+      detail: "It decides which prizes you can redeem for money, and we have to know before you win one rather than after. It is also the flag next to your name.",
+      done: opts.country,
+    },
     {
       key: "link",
       label: "Link a game account",
@@ -109,7 +133,7 @@ export function stepsFor(opts: { linked: boolean; customized: boolean }): Step[]
     {
       key: "customize",
       label: "Make your profile yours",
-      detail: "A flag, an avatar, a colour, a line about yourself — any one of them. You can do it from Discord.",
+      detail: "An avatar, a colour, a line about yourself — any one of them. You can do it from Discord.",
       done: opts.customized,
     },
   ];
@@ -141,6 +165,7 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
       .where(eq(schema.linkedGameAccounts.userId, userId));
     const linked = Number(linkRow?.n ?? 0) > 0;
     const customized = hasCustomized(u);
+    const hasCountry = /^[A-Za-z]{2}$/.test((u.country ?? "").trim());
 
     // A READ THAT PROMOTES. Deliberate, and worth defending.
     //
@@ -154,7 +179,7 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
     // So the check lives where the state is READ, which is every path that
     // could care. The write is idempotent and guarded on `unlocked_at is null`,
     // so concurrent reads cannot produce two different unlock moments.
-    if (linked && customized) {
+    if (linked && customized && hasCountry) {
       const now = new Date();
       await db.update(schema.users)
         .set({ unlockedAt: now })
@@ -169,7 +194,7 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
     return {
       unlocked: false,
       unlockedAt: null,
-      steps: stepsFor({ linked, customized }),
+      steps: stepsFor({ linked, customized, country: hasCountry }),
       lockedCp,
       capped: lockedCp >= LOCKED_CP_CAP,
       achieved: [],

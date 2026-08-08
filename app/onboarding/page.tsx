@@ -15,6 +15,8 @@ import OAuthButtons from "@/components/OAuthButtons";
 import { getT } from "@/lib/i18n/t-server";
 import UnlockChecklist from "@/components/UnlockChecklist";
 import { tryUnlock } from "@/lib/unlock";
+import ProfileLocaleFlag from "@/components/ProfileLocaleFlag";
+import { getCountries } from "@/lib/countries-server";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,10 @@ export default async function OnboardingPage() {
   // returns what they DID — so landing here after linking an account both
   // unlocks and produces the congratulations.
   const unlock = await tryUnlock(db, user.id);
+  // B89.2. The country step has to be COMPLETABLE where it is demanded. A
+  // checklist that says "tell us your country" on a page with nowhere to say it
+  // sends a new gamer hunting through settings on their first day.
+  const countries = user.country ? [] : await getCountries();
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -65,6 +71,10 @@ export default async function OnboardingPage() {
           checklist on its own is a chore. */}
       {!unlock.unlocked && (
         <div className="mb-6"><UnlockChecklist state={unlock} /></div>
+      )}
+
+      {!user.country && (
+        <div className="mb-6"><ProfileLocaleFlag countries={countries} country="" /></div>
       )}
 
       {unlock.unlocked && unlock.achieved.length > 0 && (

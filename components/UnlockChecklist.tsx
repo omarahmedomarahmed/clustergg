@@ -2,7 +2,11 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import { LOCKED_CP_CAP, type UnlockState } from "@/lib/unlock";
 
-// Two steps, and the balance waiting behind them. B83.
+// The steps, and the balance waiting behind them. B83.
+//
+// The count is read off `state.steps` rather than written into the copy. It was
+// "two steps" in three places, and B89.2 added a third — a sentence that says
+// "two" over a list of three is the kind of thing a gamer screenshots.
 //
 // The number is the argument. A checklist on its own is a chore; a checklist
 // with a balance sitting next to it that the gamer earned and cannot spend yet
@@ -44,7 +48,7 @@ export default function UnlockChecklist({ state, compact = false }: {
           <div className="text-4xl font-black tabular-nums text-amber-200">{n(state.lockedCp)} CP</div>
           <p className="mt-1 text-xs text-muted">
             {/* Never "you might lose these". They are earned and they are theirs. */}
-            Earned and held. Two steps and it is yours to spend.
+            Earned and held. {state.steps.length} step{state.steps.length === 1 ? "" : "s"} and it is yours to spend.
           </p>
         </div>
         <div className="text-right text-[11px] text-muted">
@@ -80,7 +84,7 @@ export default function UnlockChecklist({ state, compact = false }: {
       </ul>
 
       <p className="mt-4 text-[11px] leading-relaxed text-muted">
-        Until both are done your points are held — they cannot be spent in the marketplace or cashed out, and a
+        Until they are all done your points are held — they cannot be spent in the marketplace or cashed out, and a
         trophy you win is held with them. Nothing is taken and nothing expires.
         {" "}
         <b className="text-ink">It is free to unlock</b>, and you can do all of it from Discord.
