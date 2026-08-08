@@ -115,6 +115,16 @@ try {
   ok("the page says a tier is not a rate",
     /not a rate|different set of servers to compete against/i.test(body),
     body.slice(0, 600).replace(/\n/g, " | "));
+  // THE COLUMN THAT SAID "You earned" OVER THE MEMBERS' PRIZE MONEY.
+  //
+  // A banner on the same tab says the prize money is not payable to the owner,
+  // and a column header directly contradicted it. That is not a wording nit —
+  // it is the exact shape of a dispute, and the owner would have been right.
+  ok("no column claims the members' winnings as the owner's",
+    !/You earned/i.test(body), body.slice(0, 900).replace(/\n/g, " | "));
+  ok("…it is labelled as the members'",
+    /Your members won|members.{0,3} winnings/i.test(body), body.slice(0, 900).replace(/\n/g, " | "));
+
   ok("the two earning types are still separate",
     // "Sponsored challenge share" was the old per-challenge rate. What an owner
     // is paid now comes out of the WEEKLY POOL, and the distinction this
