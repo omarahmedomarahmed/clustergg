@@ -30,6 +30,29 @@ const tap = async (loc) => {
   await loc.click({ timeout: 4000 }).catch(async () => { await loc.evaluate((el) => el.click()); });
 };
 
+/**
+ * Click, and keep clicking until it took.
+ *
+ * Every control in this flow is a client component, and a click that lands
+ * before React has hydrated hits a button whose handler does not exist yet: no
+ * error, no effect, and every assertion afterwards reads a page that never
+ * moved. It is the defect that made this suite fail on a three-lane run while
+ * passing alone — hydration is slower when three browsers share the machine.
+ *
+ * There is no reliable "hydrated" signal to wait for in the app router, so this
+ * waits for the EFFECT instead, which is the thing the test cares about anyway.
+ */
+const tapUntil = async (loc, ready, tries = 12) => {
+  for (let i = 0; i < tries; i++) {
+    await tap(loc);
+    for (let j = 0; j < 10; j++) {
+      if (await ready()) return true;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+  return false;
+};
+
 // Every name, placeholder, label and option a human could type into, on
 // whatever step is currently rendered.
 const fieldSurface = (page) => page.evaluate(() => {
@@ -84,13 +107,13 @@ try {
   const awards = page.locator("[data-award]");
   const n = await awards.count();
   ok("there are trophies to cash out", n > 0, `${n} held`);
-  await tap(awards.first());
   // The tick itself is optimistic; the URL catches up behind it. Asserted in
   // that order deliberately — a checkbox that waits on a server round trip is
   // the defect this component was rewritten to remove.
-  await page.waitForTimeout(150);   // a React render, not a server round trip
-  ok("the tick is immediate", await awards.first().getAttribute("aria-pressed") === "true");
-  await page.waitForTimeout(1500);
+  const ticked = await tapUntil(awards.first(),
+    async () => (await awards.first().getAttribute("aria-pressed")) === "true");
+  ok("the tick is immediate", ticked);
+  await page.waitForFunction(() => /[?&]t=/.test(location.search), null, { timeout: 15000 }).catch(() => {});
   ok("…and the URL catches up", /[?&]t=/.test(page.url()), page.url());
   ok("…and unlocks Next", !(await page.locator("[data-next]").isDisabled()));
   const total1 = await page.locator("[data-sel-total]").textContent();
@@ -110,33 +133,39 @@ try {
   ok("…and so does the step", await page.locator('[data-redeem-step="trophies"]').count() === 1);
 
   console.log("\n== step 2 — how you want to be paid ==");
-  await tap(page.locator("[data-next]"));
-  await page.waitForTimeout(1500);
+  await tapUntil(page.locator("[data-next]"),
+    async () => (await page.locator('[data-redeem-step="method"]').count()) === 1);
   ok("it is step two", await page.locator('[data-redeem-step="method"]').count() === 1, page.url());
   ok("…and the step is in the URL", /step=method/.test(page.url()), page.url());
   ok("the methods are words, not accounts", await page.locator("[data-method]").count() >= 4);
-  await tap(page.locator('[data-method="paypal"]'));
-  await page.waitForTimeout(300);
+  await tapUntil(page.locator('[data-method="paypal"]'),
+    async () => (await page.locator('[data-method="paypal"]').getAttribute("aria-pressed")) === "true");
 
   console.log("\n== back works, because it is just navigation ==");
+  // Back and forward are real navigations; wait for the step they land on
+  // rather than for 400ms, which is a guess that gets tighter every time the
+  // page gains a component.
   await page.goBack({ waitUntil: "domcontentloaded" }); await settle(page);
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => !!document.querySelector('[data-redeem-step="trophies"]'), null, { timeout: 15000 }).catch(() => {});
   ok("the browser back button returns to step one",
     await page.locator('[data-redeem-step="trophies"]').count() === 1, page.url());
   await page.goForward({ waitUntil: "domcontentloaded" }); await settle(page);
-  await page.waitForTimeout(400);
+  await page.waitForFunction(() => !!document.querySelector('[data-redeem-step="method"]'), null, { timeout: 15000 }).catch(() => {});
   ok("…and forward returns to step two",
     await page.locator('[data-redeem-step="method"]').count() === 1, page.url());
-  await tap(page.locator("[data-back]"));
-  await page.waitForTimeout(1500);
+  await tapUntil(page.locator("[data-back]"),
+    async () => (await page.locator('[data-redeem-step="trophies"]').count()) === 1);
   ok("the in-page Back does the same",
     await page.locator('[data-redeem-step="trophies"]').count() === 1);
 
   console.log("\n== step 3 — confirm, and the totals match ==");
-  await tap(page.locator("[data-next]"));
-  await page.waitForTimeout(1500);
-  await tap(page.locator("[data-next]"));
-  await page.waitForTimeout(1500);
+  // Wait for each step to ARRIVE, not for 1500ms. Two fixed timeouts held when
+  // this suite ran alone and lost the second one under a three-lane run — the
+  // stepper puts its step in the URL and in `data-redeem-step`, so there is a
+  // real signal to wait for and no reason to guess.
+  const atStep = (w) => async () => (await page.locator(`[data-redeem-step="${w}"]`).count()) === 1;
+  await tapUntil(page.locator("[data-next]"), atStep("method"));
+  await tapUntil(page.locator("[data-next]"), atStep("confirm"));
   ok("it is the confirm step", await page.locator('[data-redeem-step="confirm"]').count() === 1, page.url());
   const total3 = await page.locator("[data-total]").textContent();
   ok("the confirm total matches what was selected",
