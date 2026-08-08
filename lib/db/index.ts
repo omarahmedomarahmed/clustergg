@@ -854,6 +854,23 @@ const COLUMN_MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS "vault_ledger_idx" ON "vault_ledger" ("vault","created_at")`,
   `CREATE INDEX IF NOT EXISTS "vault_ledger_ref_idx" ON "vault_ledger" ("ref_type","ref_id")`,
 
+  // B88.2 — what an admin RELEASED for one week, per vault. The vault is the
+  // bank; this is the week's budget, and what is not released is the reserve.
+  `CREATE TABLE IF NOT EXISTS "week_allocations" (
+    "id" text PRIMARY KEY NOT NULL,
+    "week" text NOT NULL,
+    "vault" text NOT NULL,
+    "amount" double precision DEFAULT 0 NOT NULL,
+    "locked_at" timestamp with time zone,
+    "actor_id" text,
+    "note" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  // The upsert target, and the thing that stops two admins releasing two
+  // budgets for the same week.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "week_alloc_once_idx" ON "week_allocations" ("week","vault")`,
+
   `CREATE TABLE IF NOT EXISTS "feature_shots" (
     "key" text PRIMARY KEY NOT NULL,
     "image_url" text,

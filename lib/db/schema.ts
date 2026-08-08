@@ -543,6 +543,51 @@ export const vaultLedger = pgTable("vault_ledger", {
   index("vault_ledger_ref_idx").on(t.refType, t.refId),
 ]);
 
+/**
+ * What an admin RELEASED for one week, per vault. B88.2.
+ *
+ * THE PROBLEM THIS SOLVES. The gamer ceiling and the server pool were both
+ * computed against the whole vault, which meant a week with no sales paid
+ * nothing and a week with a big sale paid all of it. There was no reserve and
+ * no way to hold one, because there was nowhere to say "this much, this week."
+ *
+ * So an allocation is a deliberate act: somebody decides what a week may spend,
+ * and what is NOT allocated is the reserve. The vault is the bank; this is the
+ * week's budget.
+ *
+ * Three rules, and they are the reason the table exists rather than a settings
+ * row:
+ *
+ *   1. **Per week and per vault**, so history is readable. "What did we release
+ *      in March" is a query, not an archaeology exercise.
+ *   2. **Raisable, never lowerable, once locked.** Gamers have been shown a
+ *      ceiling computed from it and servers have been shown a pool. Taking that
+ *      back mid-week is the one move that would make both numbers untrustworthy.
+ *   3. **Owners see the allocation, never the vault.** The reserve is ours to
+ *      manage, and showing it invites "why am I not paid out of that".
+ */
+export const weekAllocations = pgTable("week_allocations", {
+  id: id(),
+  /** The Monday it applies to, as YYYY-MM-DD. Same key the weekly close uses. */
+  week: text("week").notNull(),
+  /** `cp` or `server`. The prize and cluster vaults are not allocated weekly. */
+  vault: text("vault").notNull(),
+  /** Dollars released for that week. Never a percentage — a percentage of a
+   *  moving balance is a number that changes after somebody has been shown it. */
+  amount: doublePrecision("amount").notNull().default(0),
+  /** Set when the week starts. Before that the amount is freely editable. */
+  lockedAt: timestamp("locked_at", { withTimezone: true, mode: "date" }),
+  /** Who released it, and why they chose this number. */
+  actorId: text("actor_id"),
+  note: text("note"),
+  createdAt: now("created_at"),
+  updatedAt: now("updated_at"),
+}, (t) => [
+  // One row per week per vault. The upsert target, and the thing that stops two
+  // admins releasing two budgets for the same week.
+  uniqueIndex("week_alloc_once_idx").on(t.week, t.vault),
+]);
+
 export const challengeEvents = pgTable("challenge_events", {
   id: id(),
   challengeId: text("challenge_id").notNull().references(() => challenges.id, { onDelete: "cascade" }),
