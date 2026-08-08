@@ -64,8 +64,13 @@ export default function PayoutQueue({ payouts, guilds, providerLabel, manual }: 
 
   return (
     <div className="mt-4 space-y-4">
+      {/* `data-queue-msg` so the outcome of a release is observable rather than
+          inferred from prose. A test waiting for the WORD "held" matched the
+          page's own standing copy about the holding period and read the body
+          before this strip existed — the assertion then failed on a refusal
+          that had worked. A state worth asserting is a state worth marking. */}
       {msg && (
-        <div className={`rounded-xl border px-3 py-2 text-sm ${
+        <div data-queue-msg={msg.tone} className={`rounded-xl border px-3 py-2 text-sm ${
           msg.tone === "ok" ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200" : "border-rose-400/30 bg-rose-500/10 text-rose-200"}`}>
           {msg.text}
         </div>

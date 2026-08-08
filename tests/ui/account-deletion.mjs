@@ -12,7 +12,7 @@
 import { chromium } from "playwright-core";
 // This suite has its own `login` (it signs in as several fixtures), so only
 // the navigation helpers come from the shared file.
-import { open, settle } from "./_nav.mjs";
+import { after, open } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -26,7 +26,7 @@ const login = async (page, email) => {
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await settle(page);
+  await after(page);
 };
 
 const browser = await chromium.launch({ executablePath: "/opt/pw-browsers/chromium" });

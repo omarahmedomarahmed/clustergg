@@ -17,9 +17,17 @@ import { join } from "node:path";
 const here = new URL(".", import.meta.url).pathname;
 const withUi = process.argv.includes("--ui");
 
+// A leading underscore means "shared code, not a suite". Without this the
+// browser band ran tests/ui/_nav.mjs as a test, and it PASSED — a file of
+// exported helpers has no assertions to fail, so it reported green and inflated
+// the suite count by one. A runner that can pass a file containing no test is a
+// runner whose totals cannot be trusted.
 const list = (dir, ext) => {
-  try { return readdirSync(join(here, dir)).filter((f) => f.endsWith(ext)).sort(); }
-  catch { return []; }
+  try {
+    return readdirSync(join(here, dir))
+      .filter((f) => f.endsWith(ext) && !f.startsWith("_"))
+      .sort();
+  } catch { return []; }
 };
 
 const suites = [

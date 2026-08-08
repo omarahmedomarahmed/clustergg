@@ -6,8 +6,8 @@ import { billingSummary } from "@/lib/billing";
 import { brandBalances, listInvoices } from "@/lib/invoices";
 import { collector } from "@/lib/payments";
 import { vendorBy } from "@/lib/payments/vendors";
-import { createInvoice } from "@/app/actions/billing";
 import { pricingConfig } from "@/lib/pricing-live";
+import OpenInvoice from "@/components/admin/OpenInvoice";
 import { money } from "@/lib/pricing";
 import InvoiceEditor from "@/components/InvoiceEditor";
 import { InvoiceStatus, DueLine } from "@/components/InvoiceView";
@@ -114,24 +114,7 @@ export default async function BillingPage({
             : <span className="rounded-full border border-emerald-400/40 bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-200">connected</span>}
         </div>
 
-        <form action={async (fd: FormData) => { "use server"; await createInvoice(fd); }}
-          className="mt-4 flex flex-wrap items-end gap-2 rounded-2xl border border-white/10 bg-black/20 p-3">
-          <label className="text-[10px] uppercase tracking-widest text-muted">
-            Brand
-            <select name="brandId" required className="input-cosmic !py-1 mt-0.5 block w-56 text-xs">
-              <option value="">Pick a brand…</option>
-              {brandList.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
-            </select>
-          </label>
-          <label className="text-[10px] uppercase tracking-widest text-muted">
-            Terms (days)
-            <input name="termsDays" type="number" min={0} max={120} defaultValue={30} className="input-cosmic !py-1 mt-0.5 block w-24 text-xs" />
-          </label>
-          <label className="flex items-center gap-1.5 pb-1.5 text-xs text-muted">
-            <input type="checkbox" name="addon" /> Sunday Broadcast add-on
-          </label>
-          <button className="glow-btn pressable rounded-full px-5 py-1.5 text-sm font-semibold text-white">Open this month&apos;s bill</button>
-        </form>
+        <OpenInvoice brands={brandList.map((br) => ({ id: br.id, name: br.name }))} />
 
         {invoices.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Nothing invoiced yet.</p>

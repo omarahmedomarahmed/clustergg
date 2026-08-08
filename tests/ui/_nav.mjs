@@ -48,6 +48,28 @@ export async function settle(page, timeout = 20000) {
   ).catch(() => {});
 }
 
+/**
+ * Wait for a navigation a CLICK or a form SUBMIT just started.
+ *
+ * `settle` alone is not enough after a click, and getting that wrong is how the
+ * first version of this file broke four suites that had been passing: at the
+ * instant a submit button is clicked the browser is still on the old page, the
+ * old page has no loading screen, so `settle` returns immediately and every
+ * assertion after it reads the form that was just submitted.
+ *
+ * The old `waitForLoadState("networkidle")` was wrong for its own reasons but
+ * it did, accidentally, wait for the navigation. This waits for it on purpose:
+ * the path this page is on now is the path it must leave.
+ *
+ * Not for `reload`, `goBack` or `goForward` — those land on the SAME path, so
+ * this would wait out its whole timeout. Use `settle` for those.
+ */
+export async function after(page, timeout = 20000) {
+  const from = new URL(page.url()).pathname;
+  await page.waitForFunction((f) => location.pathname !== f, from, { timeout }).catch(() => {});
+  await settle(page);
+}
+
 /** `goto` + `settle`. The replacement for every `waitUntil: "networkidle"`. */
 export async function open(page, url, timeout = 30000) {
   const res = await page.goto(url, { waitUntil: "domcontentloaded", timeout });

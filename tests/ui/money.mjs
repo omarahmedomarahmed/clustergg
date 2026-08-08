@@ -9,7 +9,7 @@
  * asks anybody for a bank account.
  */
 import { chromium } from "playwright-core";
-import { open, settle } from "./_nav.mjs";
+import { after, open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -38,7 +38,7 @@ try {
   await boss.fill('input[name="email"]', "admin@clustergg.com");
   await boss.fill('input[name="password"]', "cluster-admin");
   await boss.click('button:has-text("Log in with email")');
-  await settle(boss);
+  await after(boss);
 
   console.log("\n== The providers console ==");
   let res = await open(boss, `${BASE}/admin/payments`);
@@ -74,8 +74,33 @@ try {
 
   const brandOpts = await boss.locator('select[name="brandId"] option').count();
   ok("there are brands to bill", brandOpts > 1, `${brandOpts} options`);
-  await boss.selectOption('select[name="brandId"]', { index: 1 });
-  const brandName = await boss.locator('select[name="brandId"] option').nth(1).innerText();
+
+  // ===== A brand with nothing running cannot be billed =====
+  //
+  // Found by this suite, after its stale $600 assertion was replaced. The lines
+  // on an invoice come from the brand's LIVE campaigns, and since C11 retired
+  // the placements base to $0 a brand with none produces no lines at all — so
+  // "Open this month's bill" minted a draft reading Total $0.00, which could
+  // then be attached to a payment link and SENT. An invoice for nothing burns a
+  // number out of the sequence and, if it reaches a brand, is a question we
+  // cannot answer well.
+  const optionTexts = await boss.locator('select[name="brandId"] option').allInnerTexts();
+  const idle = optionTexts.findIndex((t, i) => i > 0 && /nebulatech/i.test(t));
+  if (idle > 0) {
+    await boss.selectOption('select[name="brandId"]', { index: idle });
+    await tap(boss.locator('button:has-text("Open this month")'));
+    await boss.waitForTimeout(900);
+    const refusal = await boss.locator("body").innerText();
+    ok("a brand with no live campaign is refused, not given a $0 draft",
+      /nothing to bill/i.test(refusal), refusal.slice(0, 300).replace(/\n/g, " | "));
+    ok("…and the refusal says what is missing",
+      /no submitted or running campaign/i.test(refusal), refusal.slice(0, 300).replace(/\n/g, " | "));
+  }
+
+  // The brand that DOES have one running.
+  const billable = optionTexts.findIndex((t, i) => i > 0 && /astrofuel/i.test(t));
+  await boss.selectOption('select[name="brandId"]', { index: billable > 0 ? billable : 1 });
+  const brandName = await boss.locator('select[name="brandId"] option').nth(billable > 0 ? billable : 1).innerText();
   await tap(boss.locator('button:has-text("Open this month")'));
   await settle(boss);
   await boss.waitForTimeout(600);
@@ -91,7 +116,33 @@ try {
   ok("the editor opens on the invoice", body.includes(number) && /placements/i.test(body));
   ok("it is billed to the brand we picked", body.includes(brandName.trim()), brandName);
   ok("it starts as a draft", /draft/i.test(body));
-  ok("the base line quotes the placements price", /\$600|600\.00/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+  // C11 retired the placements base to $0, and a $0 line is OMITTED rather
+  // than printed — a zero row makes an invoice look padded and invites a
+  // question with no good answer. This used to assert the $600 base line; it
+  // now asserts the opposite, which is the fact worth holding: one package,
+  // priced per challenge, and no phantom row.
+  ok("no retired base line is printed", !/Placements — clustergg\.com/.test(body),
+    body.slice(0, 400).replace(/\n/g, " | "));
+  ok("…and no $0 line at all", !/\$0\.00/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+  ok("the invoice quotes the challenge price", /sponsored weekly challenges|weekly challenges/i.test(body),
+    body.slice(0, 400).replace(/\n/g, " | "));
+
+  // The total, read rather than assumed. Hard-coding it is what made the line
+  // above go stale the moment the commercial model changed.
+  // Read off the rendered text. A locator chained through the DOM breaks the
+  // moment somebody wraps the row in another div; the words "Total $8,400.00"
+  // are what an operator actually reads, and that is what this should assert on.
+  const totalOf = async () => {
+    const t = await boss.locator("body").innerText();
+    const m = t.match(/Total\s*\$([\d,]+(?:\.\d{2})?)/);
+    return m ? Number(m[1].replace(/,/g, "")) : null;
+  };
+  // The editor renders after the click that opened it; reading immediately got
+  // null on a page that was about to show $1,400.
+  await boss.waitForFunction(() => /Total\s*\$[\d,]/.test(document.body.innerText), null, { timeout: 15000 }).catch(() => {});
+  const totalBefore = await totalOf();
+  ok("the invoice states a total, and it is not zero",
+    totalBefore !== null && totalBefore > 0, String(totalBefore));
 
   console.log("\n== Editing every line, including a discount ==");
   await boss.fill('input[name="label"]', "Negotiated launch discount");
@@ -104,7 +155,12 @@ try {
   ok("staff can add a line", /negotiated launch discount/i.test(body));
   // Typed positive, stored negative: nobody should have to remember the sign.
   ok("a discount typed positive comes out negative", /−\$50|-\$50/.test(body), body.slice(0, 500).replace(/\n/g, " | "));
-  ok("and the total moved by exactly that", /\$550|550\.00/.test(body));
+  // Read, not assumed: a discount of 50 must move the total by exactly 50,
+  // whatever the package costs this month.
+  const totalAfter = await totalOf();
+  ok("and the total moved by exactly that",
+    totalBefore !== null && totalAfter !== null && Math.abs((totalBefore - totalAfter) - 50) < 0.01,
+    `${totalBefore} → ${totalAfter}`);
 
   console.log("\n== It can't be sent with nowhere to pay ==");
   await tap(boss.locator('button:has-text("Send to brand")'));
@@ -187,18 +243,49 @@ try {
 
     // Release, then mark paid. Two clicks, deliberately.
     await tap(boss.locator('button:has-text("Approve for manual transfer")').first());
-    await settle(boss);
-    await boss.waitForTimeout(800);
+    // Wait for the STATE CHANGE, not for a timer: either the reference field
+    // (released) or the queue's message strip (refused). A fixed 800ms was a
+    // guess that held until the page got heavier.
+    // Wait for the marked outcome, not for a word. "held" appears in the page's
+    // own standing copy about the holding period, so a text match returned
+    // instantly and the body was read before the refusal had rendered.
+    await boss.waitForFunction(
+      () => !!document.querySelector('input[name="ref"]') || !!document.querySelector("[data-queue-msg]"),
+      null, { timeout: 20000 },
+    ).catch(() => {});
     body = await boss.locator("body").innerText();
-    ok("releasing tells staff to send it by hand rather than pretending",
-      /send \$125.*by hand|approved/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+    const released = await boss.locator('input[name="ref"]').count() > 0;
 
-    await boss.fill('input[name="ref"]', "WIRE-2026-001");
-    await tap(boss.locator('button:has-text("Mark paid")').first());
-    await settle(boss);
-    await boss.waitForTimeout(800);
-    body = await boss.locator("body").innerText();
-    ok("and marking paid records the reference", /WIRE-2026-001/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+    if (released) {
+      ok("releasing tells staff to send it by hand rather than pretending",
+        /approved|mark paid/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+      await boss.fill('input[name="ref"]', "WIRE-2026-001");
+      await tap(boss.locator('button:has-text("Mark paid")').first());
+      await boss.waitForFunction(() => /WIRE-2026-001/.test(document.body.innerText), null, { timeout: 20000 }).catch(() => {});
+      body = await boss.locator("body").innerText();
+      ok("and marking paid records the reference", /WIRE-2026-001/.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+    } else {
+      // B35's holding period, doing its job. It is checked at RELEASE rather
+      // than at open, because opening is bookkeeping and reversible while
+      // releasing hands money to a provider — and money that has left a
+      // provider cannot be brought back. It is the only reversal mechanism this
+      // product has, so a refusal here is the assertion worth keeping.
+      //
+      // This branch is why the test no longer insists on a release: it used to,
+      // and it was asserting that a control which now correctly refuses would
+      // let the money out.
+      const strip = await boss.locator("[data-queue-msg]").innerText().catch(() => "");
+      ok("a held payout is refused rather than released",
+        /held|hold/i.test(strip), strip || body.slice(0, 300).replace(/\n/g, " | "));
+      // Either branch of the hold, and both must EXPLAIN. The demo server has
+      // no recorded unlock date, which is its own refusal — "we do not know
+      // when this tier unlocked, so a human confirms the growth first" — and a
+      // guard that refuses without saying why is one an operator routes around.
+      ok("…and the refusal says why, not just that it cannot",
+        /\b\d+\s*day|no record of when its tier unlocked|human confirms/i.test(strip), strip);
+      ok("…and no reference field appeared, so nothing can be marked paid",
+        await boss.locator('input[name="ref"]').count() === 0);
+    }
   }
   await boss.screenshot({ path: `${SHOTS}/admin-payouts.png`, fullPage: true });
 
@@ -219,7 +306,7 @@ try {
   await gamer.fill('input[name="email"]', "nova@demo.gg");
   await gamer.fill('input[name="password"]', "cluster-demo");
   await gamer.click('button:has-text("Log in with email")');
-  await settle(gamer);
+  await after(gamer);
   await open(gamer, `${BASE}/feed`);
   await gamer.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await gamer.waitForTimeout(500);
@@ -320,10 +407,18 @@ try {
     await tap(boss.locator('button:has-text("Earnings")').first());
     await boss.waitForTimeout(700);
     const earn = await boss.locator("body").innerText();
-    if (!/sponsored challenge share/i.test(earn)) continue;
+    // "Sponsored challenge share" was the OLD per-challenge rate. C3 removed it:
+    // an owner is paid out of the weekly server pool, and a tier decides which
+    // servers they compete against in it rather than what percentage they get.
+    //
+    // This guard is why the whole block was silently skipped and `sawEarnings`
+    // stayed false — a `continue` on a stale phrase reads in the output as one
+    // failed assertion at the end, not as eight that never ran.
+    if (!/weekly pool|server pool/i.test(earn)) continue;
     sawEarnings = true;
     ok("the tier is stated first", /your tier/i.test(earn));
-    ok("earning type 1: the sponsored share", /sponsored challenge share/i.test(earn));
+    ok("earning type 1: what the weekly pool pays them",
+      /weekly pool|server pool/i.test(earn));
     ok("earning type 2: their members' winnings", /members.{0,3} winnings/i.test(earn));
     // The line that stops an owner budgeting the prize pool as revenue.
     // The wording moved from a footnote to a banner — assert the claim, not
@@ -346,7 +441,7 @@ try {
   await staff.fill('input[name="email"]', "ops@clustergg.com");
   await staff.fill('input[name="password"]', "cluster-demo");
   await staff.click('button:has-text("Log in with email")');
-  await settle(staff);
+  await after(staff);
   // The console shell renders first, so read the heading after the page settles
   // rather than the loading screen — otherwise this passes or fails on timing.
   const staffSees = async (path) => {

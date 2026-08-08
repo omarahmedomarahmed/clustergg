@@ -13,7 +13,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/week-band.mjs
  */
 import { chromium } from "playwright-core";
-import { open, settle } from "./_nav.mjs";
+import { after, open } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -36,7 +36,7 @@ try {
   await page.fill('input[name="email"]', "nova@demo.gg");
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await settle(page);
+  await after(page);
   await open(page, `${BASE}/feed`);
   await page.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await page.waitForTimeout(400);

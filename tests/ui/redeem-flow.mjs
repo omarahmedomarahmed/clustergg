@@ -15,7 +15,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/redeem-flow.mjs
  */
 import { chromium } from "playwright-core";
-import { open, settle } from "./_nav.mjs";
+import { after, landed, open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -54,6 +54,11 @@ try {
   const anonCtx = await browser.newContext();
   const anon = await anonCtx.newPage();
   await open(anon, `${BASE}/redeem`);
+  // The bounce to /login is CLIENT-side: the page streams, so by the time the
+  // guard runs the shell has flushed and Next can no longer answer with a 307.
+  // Reading the URL at domcontentloaded reports /redeem on a redirect that
+  // worked.
+  await landed(anon, "/redeem");
   ok("it sends you to log in", /\/login/.test(anon.url()), anon.url());
   await anonCtx.close();
 
@@ -61,7 +66,7 @@ try {
   await page.fill('input[name="email"]', "nova@demo.gg");
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await settle(page);
+  await after(page);
 
   console.log("\n== the wallet points at it ==");
   await open(page, `${BASE}/wallet`);
@@ -94,6 +99,13 @@ try {
   console.log("\n== a refresh mid-flow resumes ==");
   const urlAtStep1 = page.url();
   await page.reload({ waitUntil: "domcontentloaded" }); await settle(page);
+  // Wait for HYDRATION, not just for paint. `data-next` is server-rendered
+  // disabled and React enables it once the selection is restored from the URL
+  // token — so a click before that lands on a button whose handler does not
+  // exist yet, and the flow silently stays on step one. The old
+  // `networkidle` waited long enough for this by accident; this waits for it
+  // on purpose.
+  await page.waitForSelector("[data-next]:not([disabled])", { timeout: 15000 }).catch(() => {});
   ok("the selection survives", await page.locator("[data-sel-total]").textContent() === total1);
   ok("…and so does the step", await page.locator('[data-redeem-step="trophies"]').count() === 1);
 

@@ -12,7 +12,7 @@
  *      editor, and the Pay-invoice CTA carries the brand colour.
  */
 import { chromium } from "playwright-core";
-import { open, settle } from "./_nav.mjs";
+import { after, open, settle } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -37,7 +37,7 @@ try {
   await boss.fill('input[name="email"]', "admin@clustergg.com");
   await boss.fill('input[name="password"]', "cluster-admin");
   await boss.click('button:has-text("Log in with email")');
-  await settle(boss);
+  await after(boss);
 
   console.log("\n== Into a server portal, the way staff really get there ==");
   await open(boss, `${BASE}/admin/discord`);
@@ -73,8 +73,13 @@ try {
   const head = await boss.locator("body").innerText();
   ok("the server's rank is named on the header", /tier (i|ii|iii|iv)\b/i.test(head),
     head.slice(0, 300).replace(/\n/g, " | "));
-  ok("and the badge says what the rank pays",
-    /% share|no share yet/i.test(head), head.slice(0, 400).replace(/\n/g, " | "));
+  // INVERTED. This used to require the badge to say "· 25% share". C3 removed
+  // the rate: a tier decides which servers you compete against in the weekly
+  // pool and nothing else, and a badge quoting a percentage is a promise the
+  // pool does not make. The badge is the thing an owner screenshots and pins in
+  // their own server, so a stale rate on it is a rate we would be held to.
+  ok("the badge quotes no rate, because a tier is not one",
+    !/%\s*share/i.test(head), head.slice(0, 400).replace(/\n/g, " | "));
   void header;
 
   await tap(boss.locator('button:has-text("Earnings")').first());
@@ -104,8 +109,19 @@ try {
     ["Seed Server", "Sponsored Server", "Broadcaster", "Flagship Server"].every((n) => body.includes(n)));
 
   console.log("\n== Members' winnings: itemised, and not theirs ==");
+  // Said in words, on the tab where an owner reads what they are paid. Not on
+  // the overview header, where the badge lives — that one only has to avoid
+  // quoting a rate, which is the assertion above.
+  ok("the page says a tier is not a rate",
+    /not a rate|different set of servers to compete against/i.test(body),
+    body.slice(0, 600).replace(/\n/g, " | "));
   ok("the two earning types are still separate",
-    /sponsored challenge share/i.test(body) && /members.{0,3} winnings/i.test(body));
+    // "Sponsored challenge share" was the old per-challenge rate. What an owner
+    // is paid now comes out of the WEEKLY POOL, and the distinction this
+    // assertion exists to protect — the owner's money is not the members' money
+    // — is unchanged.
+    /weekly pool|server pool/i.test(body) && /members.{0,3} winnings/i.test(body),
+    body.slice(0, 600).replace(/\n/g, " | "));
   ok("the not-payable statement is unmissable, not a footnote",
     /this is not payable to you/i.test(body), body.slice(0, 1200).replace(/\n/g, " | "));
   ok("it says who paid the member instead",

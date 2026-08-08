@@ -7,7 +7,7 @@
  * Profile-of-the-Week board no longer opens over whatever page you asked for.
  */
 import { chromium } from "playwright-core";
-import { open, settle } from "./_nav.mjs";
+import { after, open } from "./_nav.mjs";
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -28,7 +28,7 @@ try {
   await page.fill('input[name="email"]', "nova@demo.gg");
   await page.fill('input[name="password"]', "cluster-demo");
   await page.click('button:has-text("Log in with email")');
-  await settle(page);
+  await after(page);
   await open(page, `${BASE}/marketplace`);
   await page.locator('button:has-text("Accept all")').first().click().catch(() => {});
   await page.waitForTimeout(600);
@@ -100,7 +100,7 @@ try {
   await boss.fill('input[name="email"]', "admin@clustergg.com");
   await boss.fill('input[name="password"]', "cluster-admin");
   await boss.click('button:has-text("Log in with email")');
-  await settle(boss);
+  await after(boss);
   const r = await open(boss, `${BASE}/admin/marketplace`);
   const admin = await boss.locator("body").innerText();
   ok("the admin marketplace opens", !!r && r.status() < 400 && !/could not be found/i.test(admin), String(r?.status()));
