@@ -15,6 +15,7 @@ import Icon from "@/components/Icon";
 import PortalKeyHandoff from "@/components/PortalKeyHandoff";
 import { ServerBoard, TierLadder, TierBadge, FunnelPanel, ChallengeRow, CommandFeed, EarningsPanel, EarningGuide } from "@/components/ServerPortal";
 import PayoutSetup from "@/components/PayoutSetup";
+import ServerWallet from "@/components/ServerWallet";
 import { listPayouts, payoutTotals, getPayoutAccount, METHOD_OPTIONS } from "@/lib/payouts";
 import { payer } from "@/lib/payments";
 import { vendorBy } from "@/lib/payments/vendors";
@@ -84,11 +85,22 @@ export default async function ServerPortalPage({
     getPayoutAccount("server", server.guildId),
     payer("payout"),
   ]);
+
+  // B89.1 — the wallet. Its own read, after the guild is known and inside the
+  // same request: the balance an owner acts on has to be the one this page was
+  // rendered from, not one fetched again by a client component a moment later.
+  const { walletFor, statementFor, MIN_WITHDRAWAL } = await import("@/lib/server-wallet");
+  const { getDb: getWalletDb } = await import("@/lib/db");
+  const walletDb = await getWalletDb();
+  const [wallet, statement] = await Promise.all([
+    walletFor(walletDb, server.guildId),
+    statementFor(walletDb, server.guildId),
+  ]);
   // B35: both counts and the rule, on the owner's own screen. A rule an owner
   // cannot read is a rule they will assume is arbitrary — and the moment to
   // learn that half your members do not count toward a tier is long before the
   // payout that does not arrive.
-  const { linkedCountsFor, QUALIFY_RULE, payoutHoldFor } = await import("@/lib/abuse");
+  const { linkedCountsFor, QUALIFY_RULE, payoutHoldFor, PAYOUT_HOLD_PHRASE } = await import("@/lib/abuse");
   const { getDb } = await import("@/lib/db");
   const abuseDb = await getDb();
   const [counts, hold] = await Promise.all([
@@ -227,15 +239,38 @@ export default async function ServerPortalPage({
                   price: r.price, serverShare: r.serverShare, membersWon: r.membersWon,
                 }))}
               />
-              <PayoutSetup
-                guildId={server.guildId}
-                method={account?.methodPreference ?? null}
-                country={account?.country ?? null}
-                currency={account?.currency ?? "USD"}
-                status={account?.status ?? "none"}
-                providerName={payVendor?.name ?? "our payout partner"}
-                providerConnected={!pay.reason}
-              />
+              </div>
+            ),
+          },
+          {
+            // B89.1/B90.9 — the wallet IS the billing page. Earnings is the
+            // story of what the pool did; this is the money itself, both
+            // directions, with the payout route on the same screen as the
+            // button that uses it.
+            key: "wallet",
+            label: wallet.available > 0 ? `Wallet ($${Math.round(wallet.available).toLocaleString()})` : "Wallet",
+            icon: "diamond",
+            node: (
+              <div className="space-y-6">
+                <ServerWallet
+                  wallet={wallet}
+                  statement={statement.map((r) => ({
+                    at: r.at.toISOString(), kind: r.kind, label: r.label,
+                    amount: r.amount, status: r.status,
+                  }))}
+                  minWithdrawal={MIN_WITHDRAWAL}
+                  hasPayoutMethod={Boolean(account?.methodPreference)}
+                  holdPhrase={PAYOUT_HOLD_PHRASE}
+                />
+                <PayoutSetup
+                  guildId={server.guildId}
+                  method={account?.methodPreference ?? null}
+                  country={account?.country ?? null}
+                  currency={account?.currency ?? "USD"}
+                  status={account?.status ?? "none"}
+                  providerName={payVendor?.name ?? "our payout partner"}
+                  providerConnected={!pay.reason}
+                />
               </div>
             ),
           },

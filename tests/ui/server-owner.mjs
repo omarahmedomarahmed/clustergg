@@ -47,6 +47,7 @@ try {
     .filter((h) => !SUBPAGES.has(h.split("/").pop()));
 
   let portalUrl = null;
+  let portalGuildId = null;
   for (const href of guildHrefs.slice(0, 6)) {
     await open(boss, `${BASE}${href}`);
     await tap(boss.locator('button:has-text("Reset portal key")').first());
@@ -59,6 +60,7 @@ try {
     const slugLink = await boss.locator('a[href^="/servers/"]').first().getAttribute("href").catch(() => null);
     if (!slugLink) continue;
     portalUrl = `${BASE}${slugLink}?key=${encodeURIComponent(key)}`;
+    portalGuildId = href.split("/").pop();
     break;
   }
   ok("we can open a server portal", !!portalUrl, String(portalUrl));
@@ -145,6 +147,100 @@ try {
     ok("and links the member who won", (await boss.locator('a[href^="/u/"]').count()) > 0);
   }
   await boss.screenshot({ path: `${SHOTS}/owner-earnings.png`, fullPage: true });
+
+  console.log("\n== The wallet: the balance, and what it is not ==");
+  // B89.1. The Earnings tab is the story of what the pool did; the wallet is
+  // the money itself, and it is the only screen where an owner acts on a
+  // number rather than reads one.
+  await open(boss, portalUrl.split("?")[0]);
+  await tap(boss.locator('button:has-text("Wallet")').first());
+  await boss.waitForTimeout(900);
+  body = await boss.locator("body").innerText();
+
+  ok("the wallet tab opens", /your balance/i.test(body), body.slice(0, 400).replace(/\n/g, " | "));
+  // The arithmetic is PRINTED, not implied. A balance smaller than the
+  // earnings above it that does not say why is a support ticket.
+  ok("the balance shows its own working",
+    /earned .*− .*paid .*− .*on its way .*− .*spent .*=/i.test(body.replace(/\n/g, " ")),
+    body.slice(0, 900).replace(/\n/g, " | "));
+  ok("…and says none of it is a stored number",
+    /nothing here is a stored number/i.test(body));
+  ok("the payout route is on the same screen as the button that uses it",
+    /set up your payouts/i.test(body), body.slice(0, 1200).replace(/\n/g, " | "));
+  ok("the statement is there, both directions",
+    /statement/i.test(body) && /both directions/i.test(body));
+  // A withdrawal we have no route for is a row that sits there looking like we
+  // ignored them, so the ask is refused before it is made.
+  const canAsk = await boss.locator('button:has-text("Ask for it")').count();
+  const tooSmall = /smallest withdrawal is/i.test(body);
+  ok("there is either a way to ask or a stated reason there isn't",
+    canAsk > 0 || tooSmall, body.slice(0, 900).replace(/\n/g, " | "));
+
+  const readBalance = async () => {
+    const t = await boss.locator("body").innerText();
+    return ((t.match(/YOUR BALANCE\s*\n?\s*\$([\d,.]+)/i) ?? [])[1]) ?? null;
+  };
+  // `available` is clamped at zero, so on a server that has earned nothing it
+  // cannot move and asserting on it alone would prove nothing. `ON ITS WAY OUT`
+  // is not clamped: under the bug below, a $200 cheque marked requested lands
+  // there and the owner reads $200 leaving a wallet that never held it.
+  const readOnItsWay = async () => {
+    const t = await boss.locator("body").innerText();
+    return ((t.match(/ON ITS WAY OUT\s*\n?\s*\$([\d,.]+)/i) ?? [])[1]) ?? null;
+  };
+  const balanceBefore = await readBalance();
+  const onItsWayBefore = await readOnItsWay();
+  ok("…and so is what is on its way out", onItsWayBefore !== null, String(onItsWayBefore));
+  ok("the balance is a number, not a blank", balanceBefore !== null, String(balanceBefore));
+  await boss.screenshot({ path: `${SHOTS}/owner-wallet.png`, fullPage: true });
+
+  console.log("\n== A cheque we hand somebody does not eat their balance ==");
+  // THE BUG THIS EXISTS TO CATCH. `paid` summed every payout on the guild while
+  // `earned` counted only the weekly close's, so a goodwill payment counted
+  // against what had gone out without ever counting as having come in: give an
+  // owner $200 and watch $200 come off what they can spend. It is worth a
+  // browser because the two halves live on different screens — staff open the
+  // cheque in the admin queue and the owner reads the damage in their portal.
+  const openPayouts = async () => {
+    const t = await boss.locator("body").innerText();
+    return ((t.match(/OPEN PAYOUTS\s*\n?\s*\$([\d,.]+)/i) ?? [])[1]) ?? null;
+  };
+  await open(boss, `${BASE}/admin/payouts`);
+  const queuedBefore = await openPayouts();
+  await tap(boss.locator('button:has-text("Pay something")').first());
+  await boss.waitForTimeout(400);
+  const guildSelect = boss.locator('select[name="guildId"]').first();
+  let opened = false;
+  if (await guildSelect.count()) {
+    await guildSelect.selectOption(portalGuildId).catch(() => {});
+    await boss.locator('input[name="label"]').first().fill("Goodwill cheque, not from the pool");
+    await boss.locator('input[name="amount"]').first().fill("200");
+    await tap(boss.locator('form button:has-text("Open")').first());
+    await boss.waitForTimeout(2500);
+    // The queue lists a payout by server and amount rather than by its line
+    // label, so the evidence it landed is the total, not the words.
+    opened = (await openPayouts()) !== queuedBefore;
+  }
+  ok("staff can open a payment that isn't from the pool", opened,
+    `open payouts ${queuedBefore} → ${await openPayouts()}`);
+
+  if (opened) {
+    await open(boss, portalUrl.split("?")[0]);
+    await tap(boss.locator('button:has-text("Wallet")').first());
+    await boss.waitForTimeout(900);
+    const balanceAfter = await readBalance();
+    ok("the owner's balance is untouched by it", balanceAfter === balanceBefore,
+      `${balanceBefore} → ${balanceAfter}`);
+    // The assertion with teeth: this is the term the bug moved.
+    ok("…and it is not counted as money leaving their wallet",
+      (await readOnItsWay()) === onItsWayBefore,
+      `${onItsWayBefore} → ${await readOnItsWay()}`);
+    // And it is not on the statement either: a line that does not move the
+    // number above it makes the statement stop adding up, which is the one
+    // thing a statement must never do.
+    ok("…and it is not on the statement pretending to be one",
+      !/goodwill cheque/i.test(await boss.locator("body").innerText()));
+  }
 
   console.log("\n== Approving a request does not put it live ==");
   // Seed one the way an owner really files it, from their own portal. A demo
