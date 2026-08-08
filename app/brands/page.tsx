@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import EnquiryForm from "@/components/EnquiryForm";
+import BrandSignupForm from "@/components/BrandSignupForm";
 import { pricingLive } from "@/lib/pricing-live";
 import { money, quote } from "@/lib/pricing";
 
@@ -79,7 +80,17 @@ export default async function BrandsPage({
           </div>
         </div>
 
-        <EnquiryForm cfg={cfg} initialGames={initialGames} initialAddon={initialAddon} initialYearly={initialYearly} />
+        {/* B90.1. Two doors, and the self-serve one is FIRST.
+            The enquiry form is the right thing for somebody who wants a
+            conversation; it was the only thing for somebody who wanted an
+            account, and that person lands at 2am and leaves. */}
+        <div className="space-y-6">
+          <BrandSignupForm />
+          <div className="flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted">
+            <span className="h-px flex-1 bg-white/10" /> or talk to a human <span className="h-px flex-1 bg-white/10" />
+          </div>
+          <EnquiryForm cfg={cfg} initialGames={initialGames} initialAddon={initialAddon} initialYearly={initialYearly} />
+        </div>
       </div>
     </div>
   );
