@@ -13,6 +13,54 @@ and starts being judgement.
 | All retrieval dates | 2026-08-08 unless a row says otherwise |
 | Method | Primary sources fetched directly. Discord Help Center pages return HTTP 403 to ordinary fetches; they were retrieved through the public Zendesk Help Center API (`/api/v2/help_center/en-us/articles/<id>.json`), which returns the same article body plus an `edited_at` timestamp. Where a policy carries no internal date, the `edited_at` is given and labelled as such. |
 | Not changed | No code or copy was modified. Files are named where a finding lands on one. |
+| Second pass | 2026-08-08 — added §0 (master blocker index), §7 (world map, region by region), §8 (contradictions), §9 (market tiers), §10 (extra counsel questions), §11 (jurisdictions not researched). |
+
+**Navigation:** §0 master blocker index · §1 verdict · §2 evidence by question · §3 judgement calls · §4 what survives · §5 counsel questions · §6 sources · **§7 world map** · §8 contradictions · §9 market tiers · §10 more counsel questions · §11 not researched
+
+---
+
+## 0. Master blocker index
+
+Every blocker found, one row each. `Hard` = the model as built cannot legally operate there. `Soft` = operable with a change, a filing or a licence. `Open` = cannot be resolved from public sources.
+
+| # | Blocker | Where | Kind | Source (primary unless noted) | Finding |
+|---|---|---|---|---|---|
+| **B1** | Bot messages "may not contain material unrelated to an Application's function" | Discord, global | **Hard** for paid creatives in cards | Discord Developer Policy §6, eff. 2024-07-08 | The single clause the ad-inventory model must survive. Sponsored *challenges* survive without creatives. |
+| **B2** | "Do not misrepresent or fraudulently manipulate engagement" | Discord, global | Soft | Developer Policy §13 | Owner pool paid on engagement score is a bounty on server activity. Rescore it. |
+| **B3** | No disclosing API Data to "ad networks … or any other monetization-related service" | Discord, global | Soft | Developer Policy §17 | Survivable only if brand reporting is aggregate and de-identified. |
+| **B4** | "Gambling-adjacent or addictive behavior" is age-restricted content | Discord App Directory | Soft | App Directory Content Requirements, `edited_at` 2025-10-09 | Blocks *discovery* listing, not verification. |
+| **B5** | May not monetize content whose primary purpose is "promotional benefit … of a third party" | Discord | **Open** | Monetization Policy cl. 10, eff. 2024-05-05 | Describes our product by name — but the policy's own scope limits it to Discord's monetization rails, which we don't use. |
+| **B6** | Verification policy-review criteria are unpublished | Discord, at 100 servers | **Open** | "How Do I Get My App Verified?" | Discord publishes the identity step and a portal-only checklist. The standard applied by the human review is unknowable from outside. |
+| **B7** | "Administrator" of a convertible virtual currency ⇒ generally a money transmitter | US federal | **Open** | FinCEN FIN-2019-G001, 2019-05-09 | We issue CP and we redeem it. Conflicts with the two-sided money-transmitter definition. FinCEN raises the in-game-currency question and never answers it. |
+| **B8** | "Receiving money for transmission" | US states (MTMA) | **Open** | CSBS MTMA §1.04(q)(3), (z) | The brand's $350 with a 50% prize earmark. Turns on our own contract drafting. Issuing CP itself is clearly exempt — §1.04(aa) excludes rewards-program value not sold to the public. |
+| **B9** | Comprehensively sanctioned jurisdictions | Cuba, Iran, North Korea, Crimea/Donetsk/Luhansk | **Hard** | OFAC program pages | Our list over-blocks (Syria, Russia, Belarus) and under-blocks (the three Ukrainian regions). `lib/eligibility.ts:41`. |
+| **B10** | 1099 threshold is $2,000, not $600 | US | Soft (defect) | Instructions for 1099-MISC/NEC (Rev. 12/2026); IRC §6041(a) as amended by P.L. 119-21 §70433 | `lib/eligibility.ts:55` is stale. Over-reports, so not a risk — but wrong. |
+| **B11** | 30% NRA withholding + Form 1042-S, **no de-minimis** | Every non-US gamer | **Open** | IRS "Withholding on Specific Income", rev. 2026-06-27 | Hinges on a source rule for prize income I could not find. Pre-launch blocker for the international population. |
+| **B12** | COPPA: directed-to-children factors include "child-oriented activities and incentives"; actual knowledge triggers on collection | US | Soft | 16 CFR 312.2, 312.3 (78 FR 4008 as amended 90 FR 16977, 2025-04-22) | Turning earning off under 16 does **not** remove exposure. COPPA attaches to collection, not payment. |
+| **B13** | Whole-product design duties for **everyone under 18** | UK | Soft | ICO Age Appropriate Design Code, DPA 2018 s.123, in force 2021-09-02 | Widest net of the four regimes. Expressly covers free, ad-funded services. |
+| **B14** | Digital-consent age patchwork 13–16 | EU/EEA | Soft | GDPR Art. 8(1) | One flat 16 is over-compliant everywhere in the EU and still doesn't answer the UK (under 18) or India (under 18). |
+| **B15** | No profiling-based ads to users known with reasonable certainty to be minors | EU | **Hard** if ads are targeted | DSA Art. 28(2), Reg. (EU) 2022/2065 | Collecting the age band is what makes us "aware with reasonable certainty." Contextual/untargeted placement is unaffected. |
+| **B16** | Unclaimed trophies are escheatable; both carve-outs are closed | Delaware (state of incorporation) | Soft | 12 Del. C. §§1130(8), (13), (21); 1133(6), (14) | "Loyalty card" and "game-related digital content" each exclude anything redeemable for money. Five-year dormancy runs on last indication of interest. **Never expiring does not avoid escheat.** |
+| **B17** | Gift-card expiry rules | US federal + states | Soft (clear) | 12 CFR 1005.20(a),(b)(3),(e); Cal. Civ. Code §1749.5 | Federal rules need "in exchange for payment" — trophies are awarded. California permits expiry for awards/loyalty programs given without consideration, **if disclosed**. |
+| **B18** | **Total ban on "online money games"**, plus a ban on advertising them and on facilitating funds for them | **India** | **Hard, if we are in scope** | Promotion and Regulation of Online Gaming Act, 2025 (Act 32 of 2025, assent 2025-08-22; in force 2026-05-01) §§2(g), 2(j), 5, 6, 7 | **The definition requires the user to pay.** Gamers pay nothing and CP is earned not purchased, so we are probably an "online social game" — but the Authority decides under §8, and §6's advertising ban is drafted very wide. |
+| **B19** | Child = **under 18**; verifiable parental consent; **absolute** ban on targeted advertising to children and on behavioural tracking of them | **India** | **Hard** for under-18 ad exposure | DPDP Act 2023 §§2(f), 9(1), 9(3) (secondary summaries; statute text not fetched) | Prohibition is absolute — parental consent does not cure it. Our whole under-18 cohort cannot be shown targeted ads or behaviourally tracked. |
+| **B20** | "Acts making a business of **exchange or intermediating exchange or repurchase** of … game money … score, premiums and virtual currency … obtained through the use of game products" | **South Korea** | **Hard** | Game Industry Promotion Act Art. 32(1)7 (KLRI official English translation) | This is a near-verbatim description of CP → trophy → cash. Korea is the cleanest hard block found anywhere. |
+| **B21** | Game products must be rating-classified before distribution | South Korea | Soft/Hard | GIPA Art. 32(1)1–3 | Unclassified distribution is itself prohibited. Applies before Art. 32(1)7 is even reached. |
+| **B22** | Prize sales by lottery capped at **RMB 50,000** top prize | **China** | Soft | Anti-Unfair Competition Law Art. 11, amended 2025-06-27, eff. **2025-10-15**; fine ¥50k–¥500k | Only bites chance-based prize promotion. Compounded by PIPL (14), ICP licensing, and Discord being unavailable in China. |
+| **B23** | Permission from the National Lottery Administration for prize draws — **including free-entry ones** | **Turkey** | **Hard** for draws | Karşılığı Nakit Olmayan Piyangolar ve Çekilişler Yönetmeliği (Milli Piyango) — secondary summaries | The regulation is framed around **non-cash** prizes; cash lotteries are a state monopoly, which is worse, not better. Skill contests are the only plausible route. |
+| **B24** | Prior authorisation from the Ministry of Finance for free prize distribution — **unless** the contest is exclusively cultural/artistic/**sporting**/recreational with no chance and no payment | **Brazil** | Soft | Lei 5.768/1971 art. 3(II); Decreto 70.951/1972; Portaria MF 422/2013 | The sporting-contest exemption is a good fit for skill challenges. It fails the moment any chance element or any payment appears. |
+| **B25** | SEGOB permit required where **chance** ("azar") decides the winner | **Mexico** | Soft | Ley Federal de Juegos y Sorteos; Reglamento; DGJS | Pure-skill contests fall outside. Any random draw needs a permit. |
+| **B26** | "Manifestazioni a premio": ministerial notification, guarantee/bond, and notary or public official supervising the award | **Italy** | Soft, expensive | DPR 430/2001 | Heaviest administrative regime in the EU for prize promotions. Certain contests are excluded — the exclusions must be checked against our mechanics. |
+| **B27** | Paid loot boxes treated as illegal gambling | **Belgium** | Not applicable | Belgian Gaming Commission position, April 2018, under the Gambling Act of 7 May 1999 | We sell no random items. Included because it shows the regulator's posture toward monetised randomness; the Commission itself conceded in Dec 2024 the ban "proved difficult to enforce." |
+| **B28** | Loot boxes whose contents are **transferable** are gambling; non-transferable are not | **Netherlands** | **For us** | Kansspelautoriteit study, 2018-04-19 (later narrowed by the courts in *EA v Ksa*) | **Deleting gifting was the single most protective product decision in the file.** Transferability is the line Dutch law drew. |
+| **B29** | Minimum age **16** for age-restricted social media accounts | **Australia** | Soft | Online Safety Amendment (Social Media Minimum Age) Act 2024, eff. 2025-12-10; penalties to A$49.5m | Bites our *distribution channel* more than us. eSafety has named the platforms in scope; whether Discord is among them was **not verified**. |
+| **B30** | No collection of personal information from a child **under 14** without parental consent | **Quebec** | Soft | Law 25 (P-39.1), in force 2024-09-22 | Canada's only child-specific age line; PIPEDA sets none. |
+| **B31** | Gambling prohibited outright; prize draws require permits | **Saudi Arabia, Kuwait, Oman** and GCC generally | **Hard** for anything chance-based | Secondary summaries; national statutes **not fetched** | A skill-only, no-stake contest is the only plausible structure. Confidence is low and this is a named concentration market. |
+| **B32** | Exclusive federal jurisdiction over commercial gaming, lotteries and raffles | **UAE** | Soft | GCGRA (est. 2023 by Federal Decree-Law); first national lottery licence July 2024 | A single federal regulator now owns this space. Whether free-entry promotional draws need a GCGRA licence was **not established** — the GCGRA site returned 403. |
+| **B33** | Child = **under 18** | **Nigeria** (NDPA 2023), **South Africa** (POPIA) | Soft | Secondary summaries | Same shape as India: an 18 line, not a 13/16 line. Our 16 floor does not reach it. |
+| **B34** | Premium regulation bites only where the premium is offered **"in connection with a transaction"** | **Japan** | Likely clear | Act against Unjustifiable Premiums and Misleading Representations (Act No. 134 of 1962) — **text not fetched, page 403** | Free-entry ("open") campaigns are generally outside the premium caps. **Not verified against the statute. Treat as unconfirmed.** |
+| **B35** | Registration + bond/trust where total announced prize value exceeds **$5,000** | **New York, Florida** (and other US states) | Soft | NY GBL §369-e; Fla. Stat. §849.094 | NY reaches "games of chance"; FL reaches promotions "in connection with the sale of consumer products or services". **Our entire model is promoting a brand's products — that phrase is a live risk, not an obvious out.** |
+| **B36** | Free draws are **not lotteries** and are outside statutory control | **United Kingdom** | **For us** | Gambling Act 2005, Sch. 2; Gambling Commission guidance | The UK is the friendliest large market found for the prize mechanic. The exposure in the UK is the children's code (B13), not gambling law. |
 
 ---
 
@@ -271,3 +319,269 @@ Named, not changed.
 | `lib/db/schema.ts`, `lib/cards/render.tsx`, `lib/db/seed.ts` (`discord_bot_post` placement) | Where the Q1 surface split would land if Discord creatives must become name-and-mention only. |
 | `lib/quests.ts` | Daily-mission CP is the part of the earning model most exposed to Developer Policy §13. |
 | `lib/payments/vendors.ts` | Brand-contract drafting determines whether the $350 is "received for transmission" (MTMA limb 3), and whether the payout provider is payor of record for tax reporting. |
+
+---
+
+## 7. World map — market entry blockers by region
+
+**Legend.** 🟥 hard block, as built · 🟧 operable only after a product restructure · 🟨 operable with a filing, permit or licence · 🟩 no blocker found · ⬜ not researched.
+
+**Column meanings.** *Consent age* = age below which parental consent is required to process personal data (not our earn/redeem floor). *Cash out?* = whether an adult gamer in that market can be paid. *Confidence*: `P` primary source read · `S` secondary only · `—` not established.
+
+### 7.1 North America
+
+| Jurisdiction | Status | Consent age | Cash out? | Specifically not allowed | Source | Conf. |
+|---|---|---|---|---|---|---|
+| **United States (federal)** | 🟨 | 13 (COPPA) | Yes | Collecting a child's PI without VPC once we have actual knowledge; conditioning a prize on excess disclosure (§312.3(d)) | 16 CFR 312.2, 312.3 | P |
+| **US — New York** | 🟨 | 13 | Yes | Unregistered/unbonded **games of chance** with prizes over **$5,000**; 30 days' advance filing | NY GBL §369-e | S |
+| **US — Florida** | 🟨 | 13 | Yes | Unfiled **game promotions in connection with the sale of consumer products or services** over **$5,000**; trust account or bond; 7 days' advance filing | Fla. Stat. §849.094 | S |
+| **US — other registration states** (RI, and others) | ⬜ | 13 | Yes | Not researched | — | — |
+| **US — state kids' codes** (CA AADC, MD, others) | ⬜ | varies | Yes | Not researched. CA AADC has been subject to injunction; current status unverified | — | — |
+| **Canada (federal)** | 🟩 | none set federally (PIPEDA) | Yes | Nothing found | — | S |
+| **Canada — Quebec** | 🟨 | **14** | Yes | Any collection of PI from an under-14 without parental consent | Law 25 (P-39.1), in force 2024-09-22 | S |
+| **Mexico** | 🟨 | ⬜ | Yes | Any promotion where **chance** decides the winner, without a SEGOB permit. Pure skill is outside | Ley Federal de Juegos y Sorteos; DGJS | S |
+
+### 7.2 Latin America
+
+| Jurisdiction | Status | Consent age | Cash out? | Specifically not allowed | Source | Conf. |
+|---|---|---|---|---|---|---|
+| **Brazil** | 🟨 | **12** (LGPD art. 14) | Yes | Free prize distribution by draw/coupon/contest **without Ministry of Finance authorisation** — unless the contest is exclusively cultural, artistic, **sporting** or recreational, with **no chance and no payment** by entrants | Lei 5.768/1971 art. 3(II); Decreto 70.951/1972; Portaria MF 422/2013 | S |
+| **Argentina, Chile, Colombia, Peru, rest of LatAm** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+
+### 7.3 European Union / EEA
+
+**Common to all EU/EEA states** — 🟨 minimum:
+
+| Instrument | What it does to us | Source |
+|---|---|---|
+| GDPR Art. 8(1) | Parental consent below the national age (13–16) where the lawful basis is consent | Reg. (EU) 2016/679 |
+| **DSA Art. 28(2)** | **No profiling-based advertising to any user we know with reasonable certainty is a minor.** Our age band creates that knowledge | Reg. (EU) 2022/2065 |
+| DSA Art. 28(1) | Appropriate and proportionate measures for privacy, safety and security of minors | same |
+
+**Per-state digital-consent ages.** ⚠ **This whole column is secondary and unverified.** I could not retrieve a primary, current, EU-wide table; the European Commission page I tried returned 404 and no EDPB register was located. The ages below are the commonly-cited figures and **must be confirmed against each national implementing act before anyone relies on them.**
+
+| Age | States commonly cited at this age | Notes |
+|---|---|---|
+| **13** | Belgium, Denmark, Estonia, Finland, Latvia, Malta, Portugal, Sweden | The GDPR floor |
+| **14** | Austria, Bulgaria, Cyprus, Italy, Lithuania, Spain | Spain has been reported as moving to 16 — see §8 |
+| **15** | Czechia, France, Greece, Slovenia | Greece also reported at 14 — see §8 |
+| **16** | Croatia, Germany, Hungary, Ireland, Luxembourg, Netherlands, Poland, Romania, Slovakia | The GDPR default |
+
+**State-specific blockers found:**
+
+| Jurisdiction | Status | Specifically not allowed / required | Source | Conf. |
+|---|---|---|---|---|
+| **Italy** | 🟨 heavy | "Manifestazioni a premio" require **ministerial notification, a financial guarantee, and a notary or public official** overseeing the award. Certain contests are excluded and the exclusions must be checked against our mechanics | DPR 430/2001 | S |
+| **Belgium** | 🟩 for us | Paid loot boxes treated as illegal gambling since April 2018. We sell no random items. The Gaming Commission conceded in Dec 2024 the ban "proved difficult to enforce" | Belgian Gaming Commission; Gambling Act of 7 May 1999 | S |
+| **Netherlands** | 🟩 for us | Loot boxes with **transferable** contents are gambling; non-transferable are not. **Our no-P2P-transfer design lands on the safe side of the exact line Dutch law drew** | Kansspelautoriteit study, 2018-04-19; later narrowed in *EA v Ksa* | S |
+| **Germany, France, Spain, Poland, Nordics, rest of EU** | ⬜ | National prize-promotion, lottery and advertising-to-minors law **not researched** | — | — |
+
+### 7.4 United Kingdom
+
+| Aspect | Status | Finding | Source | Conf. |
+|---|---|---|---|---|
+| Prize mechanic | 🟩 | "Free draws are not lotteries and are exempt from statutory control." Where entry is free, no gambling licence is engaged | Gambling Act 2005 Sch. 2; Gambling Commission guidance | P |
+| Paid competitions | n/a | If payment were ever required, the skill test applies — skill must "deter a significant proportion" from entering or from winning | same | P |
+| Children | 🟨 **widest net found** | The children's code applies to services "**likely to be accessed by children**", is "**not restricted to services specifically directed at children**", defines a child as "**a person under 18**", and expressly covers services "**funded via advertising**" | ICO AADC; DPA 2018 s.123; in force 2021-09-02 | P |
+| Consent age | — | **13** | UK GDPR Art. 8 as modified | S |
+| Online Safety Act 2023 | ⬜ | Not researched | — | — |
+
+### 7.5 Rest of Europe
+
+| Jurisdiction | Status | Specifically not allowed | Source | Conf. |
+|---|---|---|---|---|
+| **Turkey** | 🟥/🟧 | Permission from the **Milli Piyango İdaresi** is required for prize draws **including free-entry ones**. The regulation covers **non-cash** prize draws; **cash** lotteries are a state monopoly, so cash prizes by draw are worse-placed, not better. A pure skill contest is the only plausible structure | Karşılığı Nakit Olmayan Piyangolar ve Çekilişler Hakkında Yönetmelik | S |
+| **Russia, Belarus** | 🟧 | Currently blocked by `lib/eligibility.ts` as if comprehensively embargoed. **They are not** — the US programs are extensive but targeted. Separately, Russian data-localisation law was **not researched** | OFAC program list | P (sanctions) / — (localisation) |
+| **Switzerland, Norway, Ukraine, Serbia, rest** | ⬜ | Not researched | — | — |
+
+### 7.6 MENA — a named concentration market, and the weakest-evidenced region in this document
+
+| Jurisdiction | Status | Consent age | Cash out? | Specifically not allowed | Source | Conf. |
+|---|---|---|---|---|---|---|
+| **Saudi Arabia** | 🟥 for chance | ⬜ (PDPL age not established) | Probably, if no chance element | All gambling, online and offline, prohibited | Secondary summaries only; **statutes not fetched** | S |
+| **Kuwait, Oman** | 🟥 for chance | ⬜ | ⬜ | All gambling prohibited | Same secondary summaries | S |
+| **UAE** | 🟨 | ⬜ | Yes | The **GCGRA** (est. 2023 by Federal Decree-Law) holds "exclusive jurisdiction to regulate, license, and supervise all commercial gaming activities" including lotteries and raffles. First national lottery licence issued July 2024. **Whether a free-entry promotional draw needs a GCGRA licence is not established — the GCGRA site returned HTTP 403** | GCGRA; secondary summaries | S |
+| **Qatar, Bahrain** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+| **Egypt, Jordan, Morocco, Algeria, Tunisia, Lebanon, Iraq** | ⬜ | ⬜ | ⬜ | **Not researched.** These are plausibly a large share of a MENA-concentrated user base | — | — |
+| **Iran** | 🟥 | — | **No** | Comprehensively sanctioned | OFAC Iran program, updated 2026-08-07 | P |
+| **Syria** | 🟩 (changed) | ⬜ | **Yes** — the comprehensive program was revoked | EO 14312, eff. 2025-07-01; SySR removed from the CFR 2025-08-25. Residual selective program (PAARSS) | P |
+| **Israel** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+
+### 7.7 Sub-Saharan Africa
+
+| Jurisdiction | Status | Consent age | Cash out? | Specifically not allowed | Source | Conf. |
+|---|---|---|---|---|---|---|
+| **Nigeria** | 🟨 | **18** | Yes | Processing a child's (under-18) data without explicit parental/guardian consent | NDPA 2023 — secondary | S |
+| **South Africa** | 🟨 | **18** | Yes | Processing a child's (under-18) PI without parental consent. Promotional competition rules under the Consumer Protection Act **not researched** | POPIA s.11, s.34–35 — secondary | S |
+| **Kenya, Ghana, Ethiopia, rest** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+
+### 7.8 Asia — the region with the hardest blocks
+
+| Jurisdiction | Status | Consent age | Cash out? | Specifically not allowed | Source | Conf. |
+|---|---|---|---|---|---|---|
+| **South Korea** | 🟥 **hard** | **14** (PIPA) | **No, as built** | "Acts making a business of **exchange or intermediating exchange or repurchase of tangible and intangible results** (… game money … score, premiums and virtual currency used in game) **obtained through the use of game products by anyone**." Also: distributing a game product **without rating classification** | Game Industry Promotion Act Art. 32(1)7 and 32(1)1–3, KLRI official English translation | **P** |
+| **India** | 🟧/🟥 | **18** (DPDP) | **Contested** | §5 bans offering any "online money game" — but §2(g) requires the game be "**played by a user by paying fees, depositing money or other stakes**", and §2(j) requires stakes be "**purchased by paying money**". **Our gamers pay nothing and CP is earned, so we are probably an "online social game."** §6 separately bans *advertising* money games; §7 bans banks facilitating funds for them. §8 gives an Authority the power to decide what a given game is | Act 32 of 2025, assent 2025-08-22, in force 2026-05-01 — MeitY published text | **P** |
+| **India — children** | 🟥 for under-18 ads | **18** | — | "A Data Fiduciary shall **not** undertake tracking or behavioural monitoring of children **or targeted advertising directed at children**." Reported as **absolute — parental consent does not cure it** | DPDP Act 2023 §9(3) — secondary summaries; statute text not fetched | S |
+| **China** | 🟥 practical | **14** (PIPL) | Effectively no | Prize sales by lottery with a top prize over **RMB 50,000**; fine ¥50k–¥500k. Compounded by ICP licensing for foreign online services and by Discord being unavailable in-market | Anti-Unfair Competition Law Art. 11, amended 2025-06-27, eff. **2025-10-15** | S |
+| **Japan** | 🟩 likely | **16** (proposed APPI amendment, Art. 40-2) | Yes | Premium caps bite only where a premium is offered "**in connection with a transaction**"; a free-entry campaign is generally outside them. **⚠ Not verified — the statute page returned 403** | Act against Unjustifiable Premiums and Misleading Representations (Act No. 134 of 1962) | — |
+| **Vietnam** | 🟨 | 7 (parental) / 7+ (dual child+parent) | ⬜ | Not otherwise researched | Secondary | S |
+| **Indonesia** | 🟨 | **17** | ⬜ | Government Regulation No. 17/2025 on Child Protection in Electronic Systems | Secondary | S |
+| **Thailand** | 🟨 | under 10 parental; 10–20 partial | ⬜ | PDPA guidance splits by age band | Secondary | S |
+| **Pakistan, Bangladesh, Philippines, Malaysia, Singapore, Taiwan, Hong Kong** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+| **North Korea** | 🟥 | — | **No** | Comprehensively sanctioned | OFAC, updated 2026-03-12 | P |
+
+### 7.9 Oceania
+
+| Jurisdiction | Status | Consent age | Cash out? | Specifically not allowed | Source | Conf. |
+|---|---|---|---|---|---|---|
+| **Australia** | 🟨 | none set in the Privacy Act | Yes | **Minimum age 16 for "age-restricted social media platforms"**, in force **2025-12-10**, penalties to **A$49.5m**. This bites our *distribution channel*: an age-restricted platform must prevent under-16 accounts. **Whether Discord is in scope was not verified** — eSafety has named ten platforms, and Discord's status is unestablished here. State/territory trade-promotion permits for **chance**-based promotions were not researched | Online Safety Amendment (Social Media Minimum Age) Act 2024 | S |
+| **New Zealand** | ⬜ | ⬜ | ⬜ | Not researched | — | — |
+
+### 7.10 Sanctions — the only category where the answer is simply "no"
+
+| Jurisdiction | Cash out? | Basis | Currently in `BLOCKED_COUNTRIES`? | Source |
+|---|---|---|---|---|
+| **Cuba** | No | Comprehensive program, updated 2026-08-06 | ✅ Yes | OFAC |
+| **Iran** | No | Comprehensive program, updated 2026-08-07 | ✅ Yes | OFAC |
+| **North Korea** | No | Comprehensive program, updated 2026-03-12 | ✅ Yes | OFAC |
+| **Crimea** | No | Region-based comprehensive restrictions | ❌ **Missing** | OFAC |
+| **Donetsk** | No | Region-based comprehensive restrictions | ❌ **Missing** | OFAC |
+| **Luhansk** | No | Region-based comprehensive restrictions | ❌ **Missing** | OFAC |
+| **Syria** | **Yes** | Comprehensive program **revoked** by EO 14312 eff. 2025-07-01; SySR removed from CFR 2025-08-25 | ⚠ **Blocked in error** | EO 14312 |
+| **Russia** | Qualified yes | Extensive but **not** a comprehensive embargo | ⚠ **Over-blocked** | OFAC program list |
+| **Belarus** | Qualified yes | Extensive but **not** a comprehensive embargo | ⚠ **Over-blocked** | OFAC program list |
+
+### 7.11 The age floors, consolidated
+
+Our product has three floors (`lib/age.ts`, `lib/eligibility.ts`): **play** at any age, **earn** at 16, **redeem** at 18. Here is what each regime actually demands, so the mismatches are visible in one place.
+
+| Regime | Its age line | What that line governs | Does our 16/18 satisfy it? |
+|---|---|---|---|
+| COPPA (US) | **13** | Collection of personal information | ✅ Over-compliant on earning. ❌ But the obligation is on *collection*, which happens below 16 — see B12 |
+| GDPR Art. 8 (EU) | **13–16** by state | Consent-based processing | ✅ A flat 16 is over-compliant in every EU state |
+| UK children's code | **18** | Whole-product design, defaults, profiling, nudge | ❌ **Our 16 does not reach it.** Everyone under 18 is a "child" |
+| DSA Art. 28(2) (EU) | **minor** (18) | Profiling-based advertising | ❌ Under-18s must not be shown profiled ads |
+| India DPDP | **18** | Consent, tracking, targeted advertising | ❌ Under-18s must not be targeted or tracked at all |
+| Nigeria NDPA, South Africa POPIA | **18** | All processing | ❌ Parental consent needed to 18 |
+| Quebec Law 25 | **14** | All collection | ✅ Over-compliant |
+| China PIPL, Korea PIPA | **14** | All processing | ✅ Over-compliant (moot in Korea — B20 blocks the market anyway) |
+| Japan APPI (proposed) | **16** | Consent, notices | ✅ Matches |
+| Indonesia | **17** | Consent | ❌ Marginal gap at 16–17 |
+| Brazil LGPD | **12** | Consent | ✅ Over-compliant |
+| Australia social media minimum age | **16** | Holding an account on an age-restricted platform | ✅ Matches, if it applies to us at all |
+| Discord ToS | **13** | Having a Discord account | ✅ Over-compliant |
+| Our redemption floor | **18** | Being paid | ✅ At or above every line found |
+
+**The pattern:** 16 is a good line for the EU and a poor line for the Anglophone and South Asian regimes, which use **18**. The three regimes that use 18 (UK code, India DPDP, DSA Art. 28) all govern *design and advertising*, not payment — which is exactly the dimension our 16/18 split does not address.
+
+---
+
+## 8. Contradictions — sources that disagree
+
+Tabled, not resolved.
+
+| Topic | Source A | Source B | Why it matters | Status |
+|---|---|---|---|---|
+| **Can a third party run ads in a Discord bot?** | Developer Policy §6: messaging "may not contain material unrelated to an Application's function" | Ads Policy: "applies to **all native and third party ads on Discord** including ads in Activities … the ad, the landing page, the username, **reward**…" | If B wins, the ad-inventory business exists. If A wins, it does not | **Unresolved.** Both are current Discord policies. Ask Discord directly at verification |
+| **Does the Monetization Policy's clause 10 bind us?** | Clause 10 bans monetizing content whose "primary purpose" is "promotional benefit … of a third party" — describes us exactly | Same policy's scope sentence: "applies to all of **Discord's user monetization features**, including Server Subscriptions, App Subscriptions, and Server Shop" — none of which we use | Determines whether an on-point prohibition reaches an off-platform ad sale | **Unresolved** |
+| **Is a rewards currency a money transmitter's product?** | FinCEN: an "administrator" issues and has authority to redeem, and administrators "generally qualify as money transmitters" | 31 CFR 1010.100(ff)(5)(i)(A): requires acceptance **from one person** and transmission **to another** | Federal MSB registration turns on it | **Unresolved.** FinCEN raises the in-game-currency question in FIN-2019-G001 §3 and never returns to it |
+| **State money transmission** | CSBS MTMA §1.04(aa) excludes rewards-program value "not sold to the public" — we are clearly out | MTMA §1.04(q)(3) still catches "receiving money for transmission" — the brand's earmarked $350 | One limb exempts us and another may not | **Unresolved**, and it turns on our own contract drafting |
+| **India: are we banned?** | §5 bans all "online money games" irrespective of skill, and the Act deliberately abolished the skill/chance distinction | §2(g) requires the user to be "**paying fees, depositing money or other stakes**", and §2(j) requires stakes to be "**purchased by paying money**" — neither is true of us | India is a very large gaming market | **Contested.** Probably out of scope, but §8 gives the Authority the power to decide, and a constitutional challenge is pending in the Supreme Court |
+| **EU digital-consent ages** | Comparative charts and DPA summaries give a 13/14/15/16 split | No primary EU-wide register was located; the Commission page I tried 404'd; several states are reported mid-reform (Spain toward 16, France toward 15 for social media) | Determines where a 16 floor is over- or under-compliant | **Unverified.** The whole column in §7.3 is secondary |
+| **Greece's age** | One search result gave **14** | Common comparative charts place Greece at **15** | Small, but illustrative of why the whole column needs national verification | **Unresolved** |
+| **Belgium's loot-box ban** | Gaming Commission, 2018: paid loot boxes are illegal gambling | Gaming Commission, Dec 2024: the ban "proved difficult to enforce" and "a ban on paid random items is not desirable" | A regulator publicly retreating from its own position | **Both true.** Not applicable to us either way |
+| **Netherlands loot boxes** | Ksa 2018 study: transferable-content loot boxes are gambling | Later Dutch court ruling in *EA v Kansspelautoriteit* narrowed this | The transferability line is the one our no-gifting decision sits on | **Both cited.** The 2018 line is the conservative reading and the one worth designing to |
+| **Is $600 or $2,000 the 1099 line?** | `lib/eligibility.ts:55` and most pre-2026 material say $600 | IRS Instructions (Rev. 12/2026) and IRC §6041(a) as amended: **$2,000** for payments after 2025-12-31 | The code is wrong | **Resolved — $2,000.** Listed because the stale figure is everywhere |
+| **Is Syria blocked?** | `lib/eligibility.ts` blocks it | EO 14312 revoked the program effective 2025-07-01; the regulations were removed from the CFR | Our list is out of date | **Resolved — not comprehensively sanctioned** |
+
+---
+
+## 9. Market tiers
+
+A planning view, not advice. Derived entirely from §7.
+
+| Tier | Markets | Why | What it would take |
+|---|---|---|---|
+| **Green — no blocker found** | UK, Netherlands, Belgium, Canada (ex-Quebec), Japan *(unverified)* | Free-entry prize mechanics are expressly outside gambling law; no transfer of value between users | UK still requires the children's code work (under-18 design) |
+| **Amber — filing or permit** | US (NY, FL, other registration states), Mexico, Brazil, Italy, UAE, Quebec, Australia, Nigeria, South Africa | Prize-promotion registration, bonding, or a child-consent age above our floor | Per-market filings; in Brazil and Mexico the skill-only structure avoids most of it |
+| **Orange — restructure required** | Turkey, India, EU as a whole (for *targeted* ads to under-18s) | Draw-based mechanics or targeted advertising to minors are the problem, not the prize itself | Skill-only contests; contextual (non-profiled) ad serving for under-18s |
+| **Red — hard block as built** | **South Korea**, Saudi Arabia / Kuwait / Oman (for anything chance-based), China (practical), Cuba, Iran, North Korea, Crimea/Donetsk/Luhansk | Korea prohibits the cash-exchange business itself; the GCC prohibits gambling outright; the sanctions list is absolute | Korea: no viable structure found for cash redemption. Others: skill-only, or geo-block |
+| **Unknown — not researched** | Most of Latin America, most of MENA, most of Sub-Saharan Africa, most of SE Asia, most of the EU's national prize-promotion law, all of Eastern Europe outside Turkey/Russia | See §11 | Named so nobody mistakes silence for clearance |
+
+---
+
+## 10. Additional questions for counsel — from the world map
+
+These are in addition to §5. Same rule: each one exists because public sources cannot settle it.
+
+| Question | Why we cannot answer it from public sources | What we would do with each answer |
+|---|---|---|
+| **Korea.** Does GIPA Art. 32(1)7 prohibit ClusterGG paying cash for CP-derived trophies, given we are the issuer rather than a third-party broker? | The clause reaches exchange "**by anyone**" and covers "repurchase," which reads as capturing the issuer too — but this is a translated statute and we have no Korean enforcement precedent | **Yes** → geo-block cash redemption in Korea, or offer non-cash rewards only. **No** → the rating requirement under Art. 32(1)1 still has to be met first |
+| **India.** Is ClusterGG an "online social game" under §2(i), or an "online money game" under §2(g)? Should we seek a determination from the Authority under §8(2)(a)? | The definition's payment element points our way; the Act's stated purpose points the other; the Authority has express power to decide, and a constitutional challenge is pending | **Social game** → operate, and consider a proactive §8 determination as insurance. **Money game** → India is closed, and §6 means we cannot even advertise there |
+| **India.** Does DPDP §9(3)'s absolute ban on targeted advertising to children apply to contextual, non-profiled brand placement? | "Targeted advertising" is not defined in the sources I found, and the prohibition is reported as absolute | **Contextual is fine** → serve untargeted creatives to under-18s. **Any brand placement counts** → no ads to under-18s in India at all |
+| **DSA Art. 28(2).** Is ClusterGG an "online platform" within DSA Art. 3, and does contextual (non-profiled) placement fall outside the prohibition? | Art. 28(2) bars ads "based on profiling"; whether our placement logic profiles, and whether we are an in-scope platform, are both open | **In scope + profiling** → build a non-profiled ad path for under-18s EU-wide. **Out of scope** → document why |
+| **Turkey.** Does the Milli Piyango permit regime reach a free-entry, skill-based contest with cash prizes, or only chance-based draws? | The regulation is framed around **non-cash** draws; cash lotteries are a state monopoly. Neither framing obviously covers a skill contest with a cash prize | **Reached** → Turkey needs a permit or is closed. **Not reached** → operate skill-only and document it |
+| **GCC (Saudi, Kuwait, Oman, Qatar, Bahrain).** Does a free-entry, skill-based contest with a cash prize constitute prohibited gambling? | I found only secondary summaries. **No national statute was retrieved for any GCC state**, and this is a named concentration market | **Prohibited** → the largest single market-closure risk in the file. **Permitted** → confirm whether any permit applies |
+| **UAE.** Does the GCGRA's exclusive jurisdiction over "commercial gaming" extend to free-entry promotional prize draws or skill contests? | The GCGRA site returned HTTP 403 and the enabling Federal Decree-Law was not retrieved | **Yes** → a licence or a restructure. **No** → operate |
+| **Brazil.** Does a skill-based gaming challenge qualify as an "exclusively … sporting or recreational" contest exempt under Lei 5.768 art. 3(II) — and does earning CP through daily missions count as "payment by contestants"? | Portaria MF 422/2013 exists precisely to police the boundary of this exemption, and I did not retrieve it | **Exempt** → operate without authorisation. **Not exempt** → Ministry of Finance authorisation per campaign |
+| **Florida.** Is a brand-sponsored challenge a "game promotion … in connection with the sale of consumer products or services" under §849.094, given the brand is promoting its products? | The phrase is broad and our entire model is third-party product promotion. This is not the easy out it first appears to be | **Yes** → 7-day filing plus trust account or bond wherever prizes exceed $5,000. **No** → document why |
+| **Which US states require sweepstakes/contest registration**, and does the skill basis exempt us in each? | I checked NY and FL only. A complete state survey was not done | Produces the actual filing calendar |
+| **Australia.** Is Discord an "age-restricted social media platform" under the 2024 Act, and does that change anything for a bot operating inside it? | eSafety has named platforms in scope; I did not verify Discord's status | **Yes** → our under-16 Australian cohort may not exist on the channel at all. **No** → no change |
+| **Japan.** Confirm that a free-entry campaign is outside the premium caps because no premium is offered "in connection with a transaction." | **The statute page returned HTTP 403 and I could not verify this.** It is stated in §7.8 as unconfirmed | **Confirmed** → Japan is green. **Not confirmed** → premium value caps may apply |
+| **EU consent ages.** Produce a verified, dated, per-member-state table. | No primary EU-wide register was located, and several states are mid-reform | Determines whether a flat 16 can stay, or whether geo-specific handling is needed |
+| **MENA generally.** Which MENA jurisdictions permit a cash-prize skill contest, and what are their data-protection ages? | **Not researched at all.** Saudi PDPL, UAE PDPL, Egypt, Jordan, Morocco and the rest are absent from this document | Scopes whether "MENA concentration" is a market or a liability |
+
+---
+
+## 11. Jurisdictions and topics NOT researched
+
+Named so that silence is never read as clearance. This list is part of the finding.
+
+| Not researched | Why it matters |
+|---|---|
+| **Most of MENA** — Saudi PDPL, UAE PDPL, Qatar, Bahrain, Egypt, Jordan, Morocco, Algeria, Tunisia, Lebanon, Iraq, Israel | A **named concentration market**. The GCC rows in §7.6 rest on secondary summaries and no retrieved statute. This is the largest gap in the document |
+| **Most of Latin America** — Argentina, Chile, Colombia, Peru and others | Only Brazil and Mexico were covered |
+| **National prize-promotion law in most of the EU** — Germany, France, Spain, Poland, the Nordics, Central and Eastern Europe | Only Italy, Belgium and the Netherlands were examined. Italy alone turned out to be heavy, which suggests others may be too |
+| **A verified EU per-state digital-consent age table** | The §7.3 table is secondary throughout |
+| **US state sweepstakes/contest registration beyond NY and FL** | There is no filing calendar without it |
+| **US state children's design codes** (California AADC and its injunction history, Maryland, and others) | Directly relevant to Q3 and entirely absent |
+| **Russia** — data localisation (152-FZ) and advertising law | We currently block Russia for the wrong reason; the right reasons were not examined |
+| **Sub-Saharan Africa beyond Nigeria and South Africa** | Kenya, Ghana, Ethiopia and others |
+| **SE and South Asia beyond the rows shown** — Pakistan, Bangladesh, Philippines, Malaysia, Singapore, Taiwan, Hong Kong | |
+| **New Zealand; Australian state trade-promotion permits** | Chance-based promotions are permit-controlled state by state in Australia |
+| **UK Online Safety Act 2023** | Only the children's code and the Gambling Act were covered |
+| **EU AVMSD and national rules on advertising to minors** | Distinct from DSA Art. 28 and not examined |
+| **Consumer-protection and advertising-disclosure law anywhere** (sponsored-content labelling) | Every jurisdiction has rules on disclosing paid promotion; none were researched |
+| **Withholding tax treaties** for any specific market | Follows from the unresolved US-source question in §5 |
+
+### Sources whose retrieval failed, and what that cost
+
+| Source | Failure | Consequence |
+|---|---|---|
+| Japan, Act against Unjustifiable Premiums (japaneselawtranslation.go.jp) | HTTP 403 | Japan's green status in §7.8 is **unverified** |
+| UAE GCGRA, "Activities We Regulate" | HTTP 403 | Cannot say whether free-entry draws are licensable in the UAE |
+| FTC press release, *Cognosphere / Genshin Impact* | HTTP 404 | The §2 Q3 row rests on secondary summaries |
+| European Commission "Better Internet for Kids" age-of-consent page | HTTP 404 | No primary EU-wide consent-age table |
+| India Code (indiacode.nic.in), PRS India | 302 / 404 | Worked around — the Act text was retrieved from **MeitY**, which is primary |
+| Discord Help Center (direct fetch) | HTTP 403 | Worked around via the public Zendesk Help Center API; article bodies are identical and carry `edited_at` timestamps |
+| Internet Archive | Rate-limited (429) and blocked to the fetch tool | No archival verification of undated Discord policies was possible |
+
+### New sources consulted in this pass
+
+| Source | Date | Used for | URL |
+|---|---|---|---|
+| Promotion and Regulation of Online Gaming Act, 2025 (Act 32 of 2025) — MeitY published text | Assent 2025-08-22; corrigenda 2025-08-28; in force 2026-05-01 | India §§2(g), 2(i), 2(j), 5, 6, 7, 8 | https://www.meity.gov.in/static/uploads/2025/10/8a7f103cefc68ed8aaa2ebc9a2ed7c13.pdf |
+| Game Industry Promotion Act (Korea), KLRI official English translation | Art. 32 as amended by Act No. 10554, 2010-04-05 | Korea Art. 32(1)7 and 32(1)1–3 | https://elaw.klri.re.kr/eng_mobile/viewer.do?hseq=28802&type=sogan&key=8 |
+| Anti-Unfair Competition Law of the PRC | Amended 2025-06-27, eff. 2025-10-15 | China Art. 11 prize cap | https://www.afdip.com/China_IP_Laws/Others/Laws___Regulations/2025/0806/2131.html |
+| Lei 5.768/1971 and Decreto 70.951/1972 (Brazil) | 1971 / 1972; Portaria MF 422 of 2013-07-18 | Brazil prize authorisation and the art. 3(II) exemption | https://www.planalto.gov.br/ccivil_03/decreto/antigos/d70951.htm |
+| Ley Federal de Juegos y Sorteos (Mexico) + Reglamento | Current as retrieved | Mexico SEGOB permits and the chance/skill line | https://www.diputados.gob.mx/LeyesBiblio/pdf/109.pdf |
+| DPR 430/2001 (Italy), MIMIT copy | 2001-10-26 | Italy manifestazioni a premio | https://www.mimit.gov.it/images/stories/normativa/dPR_26_ottobre_2001_n430.pdf |
+| Gambling Commission, "Prize competitions and free draws: the requirements of the Gambling Act 2005" | Guidance, undated on the copy retrieved | UK free-draw exemption and the skill test | https://www.gamblingcommission.gov.uk/guidance/lotteries-and-the-gambling-act-2005/lotteries-and-the-ga05-types-of-lottery-that-do-not-require-a-registration |
+| Online Safety Amendment (Social Media Minimum Age) Act 2024 (Australia) | Eff. 2025-12-10 | Australia's 16 line | https://www.legislation.gov.au/C2024A00127/asmade |
+| NY GBL §369-e | Current as retrieved | NY registration and bonding over $5,000 | https://law.justia.com/codes/new-york/gbs/article-24-a/369-e/ |
+| Fla. Stat. §849.094 (2025) | 2025 statutes | FL game-promotion filing and trust/bond | https://www.flsenate.gov/Laws/Statutes/2025/0849.094 |
+| Kansspelautoriteit, "Study into loot boxes — a treasure or a burden?" | 2018-04-19 | Netherlands transferability line | https://kansspelautoriteit.nl/publish/library/17/study_into_loot_boxes_-_a_treasure_or_a_burden_-_eng.pdf |
+| GCGRA (UAE) | Authority established 2023; first lottery licence July 2024 | UAE gaming jurisdiction | https://www.gcgra.gov.ae/ |
+| Milli Piyango — Karşılığı Nakit Olmayan Piyangolar ve Çekilişler Hakkında Yönetmelik | Consolidated text as retrieved | Turkey draw permits | https://www.mpi.gov.tr/lottery |
+
+> **Standing caveat on this pass.** §§7–9 mix primary sources (India, Korea, UK, OFAC, IRS, the EU regulations) with secondary summaries (most of MENA, Africa, SE Asia, the EU consent-age table, Turkey, Brazil, Mexico, Australia). Every row carries a confidence marker. **No row marked `S` or `—` should be relied on without counsel retrieving the underlying instrument**, and the `⬜` rows are not findings at all — they are unexamined.
