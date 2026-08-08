@@ -525,7 +525,15 @@ reach — with no brand named and the 25-cohort floor applied.
 | Estimated reach | Total gamers and total servers, labelled **estimate, not guaranteed** |
 | Pay | The whole campaign, once. Nothing queues until it clears |
 
-#### B90.3 — The status ladder
+#### B90.3 — The status ladder — SHIPPED (69d5367)
+
+> `lib/challenge-stage.ts`, DERIVED from status + dates + a new `announcedAt`
+> rather than stored, so the stage cannot drift from the row. `announced` is
+> real behaviour: `announceChallengeUpcoming` posts days ahead and stamps only
+> when it reached a server. What is NOT wired yet: the `paid` input is
+> optional and no caller passes it, so `draft` still means "status draft"
+> rather than "unpaid" until B90.4 gives a challenge a bill to check.
+
 
 `draft` → `queued` → `announced` → `live` → `ended`
 
