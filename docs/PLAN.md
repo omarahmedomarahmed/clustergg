@@ -219,6 +219,138 @@ to have vanished.
 
 ---
 
+### ▸ B88 — The vaults actually run the economy · **BUILDING**
+
+**The finding, from the owner and it is correct:** the daily CP ceiling is a
+number a human types (500) with no connection to the money in the CP vault, and
+the server pool is the whole server vault with no reserve. Both should be
+**derived from an amount somebody deliberately allocated**, and both should
+**move as the week is spent**.
+
+Underneath it is a defect neither of us had named: **nothing debits the CP
+vault.** `lib/vaults.ts` has `allocateInvoice` and `transfer` and no outflow for
+a CP credit at all, so the vault only ever grows and "what is left this week"
+cannot be asked. Every part of this item rests on fixing that first.
+
+#### B88.1 — A CP credit is money leaving a vault
+
+| Change | Why |
+|---|---|
+| `awardQuestAction` posts a `cp` outflow for every credit, at the live rate | The balance on `/admin/vaults` becomes a real remaining balance rather than a running total of sales |
+| The outflow carries the gamer, the action and the CP | "Where did the vault go" is answerable without a second system |
+| Zero-CP events write nothing | A gamer at their ceiling did not drain anything |
+
+**Verification owed → `tests/db/cp-vault.mts` (new):** N credits reduce the CP
+vault by exactly Σ(CP)÷rate; a credit of 0 CP writes no row; the balance equals
+inflows minus outflows and never drifts.
+
+#### B88.2 — The week is an ALLOCATION, not the whole vault
+
+One new table: an allocation per week, per vault.
+
+| Field | Meaning |
+|---|---|
+| `week` | The Monday it applies to |
+| `vault` | `cp` or `server` |
+| `amount` | What an admin released for that week |
+| `lockedAt` | Set when the week starts; before that it is freely editable |
+
+Rules, and they are the point:
+
+1. **Admin sets it, never the software.** A percentage picker is a convenience
+   over the top; the stored value is dollars.
+2. **It can be raised mid-week, never lowered.** Gamers have already been shown
+   a ceiling computed from it and servers have been shown a pool.
+3. **What is not allocated is a RESERVE.** A week with no sales still pays,
+   which is the whole reason to hold one back.
+4. **Owners see the allocation, never the vault.** The reserve is ours to
+   manage and showing it invites "why am I not paid out of that".
+
+#### B88.3 — The daily ceiling, derived and recomputed
+
+```
+today's ceiling = remaining allocation ÷ eligible gamers ÷ days left in week
+```
+
+| Term | Definition | Why not the obvious thing |
+|---|---|---|
+| remaining allocation | allocated − credited so far this week | Unspent CP rolls forward automatically; no separate rollover to get wrong |
+| eligible gamers | unlocked, not banned, active in 7 days, **plus** everyone who joined today | "All registered" drags in dormant accounts and makes the ceiling meaninglessly small |
+| days left | including today | Spends the week evenly rather than emptying it on Monday |
+
+Recomputed **once a day**, not per request: a ceiling that moves while a gamer
+is mid-mission is a ceiling that takes something away mid-task.
+
+**Bounded both ways.** Admin sets a floor and a cap. Without a floor a growth
+spike makes a mission worth 4 CP, which reads as the product breaking; without a
+cap a quiet week hands one gamer a fortune.
+
+**The mission total IS the ceiling.** Already true in `lib/cp-dial.ts`; what
+changes is that the number now comes from the vault instead of from a form.
+
+**Verification owed → `tests/db/cp-ceiling.mts` (new):** more gamers, same
+money → lower ceiling; unspent CP raises tomorrow's; the floor holds when the
+maths says 3 CP; the cap holds when it says 90,000; a zero allocation stops
+earning without deleting anything; the ceiling recomputed twice in one day is
+the same number.
+
+#### B88.4 — The server pool, simplified to one sentence
+
+**Delete** slots, `1/(rank+1)`, repeat-winner decay, empty-slot redistribution,
+and the 500-linked earn threshold.
+
+**Replace with:** *your share of the pool is your share of the score.*
+
+| Before | After |
+|---|---|
+| Top 20% place; #1 gets 2× #2 | Everyone who qualified is paid, in proportion to their score |
+| Decay ×1/(1+0.25·wins) | Gone. Winning often is what we want |
+| Empty slot redistributed | No slots, nothing to redistribute |
+| Unlock at 500 linked | **0.** A server earns from its first week |
+| Participation 20% flat | **Kept** — it is the floor that makes a small server's first cheque real |
+
+Tiers stay as **labels** and never become rates. C3 deleted `ownerPct` for a
+reason and this does not bring it back: a per-server rate on top of a pool pays
+twice, and a published percentage is a promise we are held to.
+
+**What counts, and it must be visible:** only **public sponsored challenges
+live this week**. A private challenge a server runs for itself earns nothing —
+it is not inventory a brand paid for, and counting it would pay owners for
+talking to themselves.
+
+**Verification owed → `tests/db/pool-share.mts` (new):** shares sum to the pool
+exactly; a server with 12% of the score gets 12% of the competitive half; a
+private challenge contributes nothing to any KPI; a server under 500 linked is
+paid.
+
+#### B88.5 — The week is the dashboard
+
+`/admin/week` becomes the operating screen for both vaults.
+
+| Shows | For |
+|---|---|
+| Allocated / spent / remaining, per vault | Whether this week is on track |
+| Today's ceiling, its inputs, and yesterday's | Why a gamer's mission changed |
+| The pool, the standings, every server's four KPIs | The number an owner will ring about |
+| Next week's allocation, editable until it locks | The one decision this screen exists for |
+
+**New challenges wait for the boundary.** A challenge sold mid-week is billed
+and its money splits into the vaults immediately, but it **launches next
+Monday** — an allocation that grew mid-week would mean a pool an owner had
+already been shown going up, and a race to sell before Sunday.
+
+#### B88.6 — The KPIs, said in the owner's words
+
+The four terms are shown to owners as **KPIs with a target and a delta**, on the
+portal and on a public board: what it counts, what it counted for you, what
+moves it. A weight nobody can act on is a number that reads as arbitrary.
+
+> **What we are NOT doing.** No per-server percentage rate. No paying for
+> private challenges. No showing an owner the reserve. No lowering an allocation
+> after a week has started.
+
+---
+
 ### ▸ B86 — Start the clock on data we cannot backfill · **DO THIS WEEK**
 
 **Ahead of everything, including B72.** Not because it is more urgent than a
