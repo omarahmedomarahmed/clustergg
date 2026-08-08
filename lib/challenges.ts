@@ -255,6 +255,11 @@ export async function joinChallengeFor(
 
   await db.insert(schema.challengeParticipants).values({
     id: uid(), challengeId, userId, linkedAccountId: account.id, baseline,
+    // WHEN this baseline was taken. B91. Stamped here so that a null can only
+    // mean "written before that column existed" — which is what lets the
+    // scorer rebaseline new entrants at the start line without touching a
+    // challenge that was already running when this shipped.
+    baselineAt: new Date(),
     joinedFrom: opts.source ?? "web",
     guildId: opts.guildId ?? null,
   }).onConflictDoNothing();

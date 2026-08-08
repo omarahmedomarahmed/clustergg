@@ -57,6 +57,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announced_at" timestamptz`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
+  `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "baseline_at" timestamptz`,
   // ----- Quests & gamification (new tables; idempotent so both fresh and
   // existing databases converge without editing the static DDL string) -----
   `CREATE TABLE IF NOT EXISTS "quests" (

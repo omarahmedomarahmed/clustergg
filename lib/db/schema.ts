@@ -452,6 +452,21 @@ export const challengeParticipants = pgTable("challenge_participants", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   linkedAccountId: text("linked_account_id").notNull().references(() => linkedGameAccounts.id, { onDelete: "cascade" }),
   baseline: jsonb("baseline").$type<Record<string, number>>().notNull().default({}),
+  /**
+   * When the baseline above was taken. B91.
+   *
+   * The baseline used to be snapshotted at JOIN time and never moved, which
+   * made every hour of play between joining and the challenge starting count
+   * towards it. That is wrong in both directions: a gamer who joins the moment
+   * a challenge is announced is scored for a week they were not competing in,
+   * and one who joins on the start line is scored fairly — so the reward for
+   * entering early was a head start nobody else could match.
+   *
+   * Null means "never rebaselined", which is every row written before this
+   * column existed. Those are left alone: re-snapshotting a challenge that is
+   * already running would wipe points people have already been shown.
+   */
+  baselineAt: timestamp("baseline_at", { withTimezone: true, mode: "date" }),
   currentPoints: integer("current_points").notNull().default(0),
   status: text("status").notNull().default("active"), // active | completed | disqualified
   finalPlacement: integer("final_placement"),
