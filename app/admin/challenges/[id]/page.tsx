@@ -5,6 +5,8 @@ import { setParticipantStatus } from "@/app/actions/admin";
 import ChallengeBuilder, { type ChallengeEdit } from "@/components/ChallengeBuilder";
 import StageLadder from "@/components/admin/StageLadder";
 import { stageOf, canAnnounce } from "@/lib/challenge-stage";
+import BillPanel from "@/components/admin/BillPanel";
+import { billFor } from "@/lib/challenge-billing";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import Link from "next/link";
@@ -63,6 +65,9 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
   // beside it. A repeating challenge is only comprehensible as a series.
   const plan = challenge.seriesId ? await seriesPlan(challenge.seriesId) : null;
   const reach = await deliveryTotals(id);
+  // B91.2. Every challenge costs somebody money; until this panel an admin
+  // looking at one could not tell which somebody, or whether they had paid.
+  const bill = await billFor(db, challenge);
 
   return (
     <div className="space-y-6">
@@ -93,6 +98,8 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
             "active" was printed for a challenge that starts in five days and
             for one that is running right now, which are different situations
             and different jobs. */}
+        <BillPanel bill={bill} />
+
         <StageLadder
           challengeId={id}
           stage={stageOf(challenge)}
