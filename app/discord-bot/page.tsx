@@ -12,6 +12,7 @@ import BotShowcase from "@/components/BotShowcase";
 import BrandGlyph from "@/components/BrandGlyph";
 import Icon from "@/components/Icon";
 import ProductAtlas from "@/components/marketing/ProductAtlas";
+import LiveBotCard from "@/components/marketing/LiveBotCard";
 import { BotSchema, BotFaqSchema, BOT_FAQ } from "@/components/StructuredData";
 
 export const dynamic = "force-dynamic";
@@ -237,6 +238,21 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           and the two gates on a challenge. An owner deciding whether to install
           should not have to install to find out how they get paid. */}
       <ProductAtlas />
+
+      {/* B109. Two live renders, because the two things an owner is deciding
+          between are "will my members care" and "does it look like it belongs
+          in my server". Prose answers neither. */}
+      <section className="mx-auto max-w-6xl px-4 py-12">
+        <h2 className="text-2xl font-bold">The cards your members will actually see</h2>
+        <p className="mt-2 mb-7 max-w-2xl text-sm text-muted">
+          Rendered live, right now, from the real platform — the same code path that draws them in
+          Discord. If the product changes, this changes with it.
+        </p>
+        <div className="grid gap-6 md:grid-cols-2">
+          <LiveBotCard kind="profile" caption="Here's your Cluster card." />
+          <LiveBotCard kind="leaderboard" caption="This week's board." />
+        </div>
+      </section>
 
       {/* ===== WHAT INSTALL ACTUALLY DOES ===== */}
       <section className="mx-auto max-w-6xl px-4 py-14">

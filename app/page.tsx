@@ -1,5 +1,6 @@
 import Link from "next/link";
 import ProductAtlas from "@/components/marketing/ProductAtlas";
+import LiveBotCard from "@/components/marketing/LiveBotCard";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -385,6 +386,20 @@ export default async function LandingPage() {
               before the argument for it. Everything above this point is a
               claim; this is the thing itself. */}
           <ProductAtlas />
+
+          {/* B109. The rule B89.6 wrote down and nobody built: a section
+              renders the real component, not a screenshot. This is the actual
+              PNG the bot posts, drawn from real data minutes ago. A brand
+              reading a pitch about "your challenge, in their server" should see
+              the thing that lands in the server. */}
+          <section className="mx-auto max-w-3xl px-4 py-10">
+            <h2 className="text-2xl font-bold">This is what lands in the server</h2>
+            <p className="mt-2 mb-6 text-sm text-muted">
+              Not a mock-up of one. The card below was rendered by the same code the bot uses, from the
+              same data, and it changes when the challenge does.
+            </p>
+            <LiveBotCard kind="challenge" caption="A sponsored challenge just went live on this server." />
+          </section>
 
           <ProblemSection c={c} bg={cardBg} />
           <InsightSection c={c} bg={cardBg} />

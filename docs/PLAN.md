@@ -934,6 +934,63 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B109 — A component, not a screenshot · **SHIPPED**
+
+B89.6 wrote the rule down and nobody built it: *"Sections render the real
+component, not a screenshot. A screenshot is a claim; a component is the
+product."* Every public page described the bot in prose. Not one showed a card
+it draws.
+
+`lib/marketing-card.ts` + `components/marketing/LiveBotCard.tsx` — a real Satori
+render, in a Discord-message frame, on **home**, **/discord-bot**, **/brands**
+and **/servers**. Server component: the URL resolves on the server, the browser
+fetches a hosted PNG, no client JavaScript and no way for a visitor to trigger a
+render.
+
+**Three things made this non-obvious, and each is why the suite is longer than
+the feature.**
+
+1. **It must not go through `cardRef`.** That is the obvious function and it is
+   the wrong one: it picks a sponsor and calls `logCardAdImpression`. That row
+   is **delivery evidence** — the number shown to a brand to prove their
+   challenge reached the servers they paid for. Drawing a card on our own
+   homepage through it would pad a brand's delivery with website visitors who
+   were never in any Discord server. B107 exists because we bill per challenge
+   rather than per view; inflating the evidence anyway would be the same
+   dishonesty arriving through a side door. **The marketing card carries no
+   sponsor and logs nothing.**
+2. **It must not cost a render per visitor.** Renders are capped at 4,000/day
+   for the whole network. A public page drawing one per pageview would eat that
+   ceiling with strangers and then serve stale cards to every gamer in Discord —
+   the marketing page degrading the product it markets. Guarded by the Blob
+   cache plus a 10-minute memo, under its own `marketing|` key so it can never
+   evict or re-draw somebody's real card.
+3. **A draft challenge must not reach the public site.** The obvious fixture,
+   `previewFixtures().challengeId`, is `order by start_at desc limit 1` — which
+   on any week where next week's run is drafted **is a draft**. On a public page
+   that publishes an unannounced competition, and after B107 the name of a brand
+   whose invoice may not have cleared. `publicChallengeId()` filters through
+   `stageOf`, in code rather than SQL so there is one opinion about what public
+   means — and `stageOf` returns `draft` for an *unpaid* challenge too.
+
+**Null is a first-class answer.** No Blob, an empty database, the ceiling with
+nothing cached — all return null and the section renders nothing. A broken image
+on a marketing page is worse than no section. Null is cached for the same TTL,
+because the emptiest database is launch day and that is the busiest possible
+cache miss.
+
+`tests/db/live-components.mts` (39). **Two of its guards passed against a
+deliberately broken build on the first attempt** — `if (value) memo.set(...)`
+still contains `memo.set(...)`, and a source check for "does not call
+previewFixtures" matched a build that called it and used the answer. Both were
+rewritten: the cache rule is now asked of the cache (`marketingCacheKeys()`),
+and the draft rule plants a draft with the newest start date and asserts the
+contract directly — because `previewFixtures` has a memo of its own, so a wrong
+build would return the *previous* answer and read as a pass. Four break-tests now
+turn them red.
+
+---
+
 ### ▸ B108.1 — Ten commits of "suite green" that was not · **CORRECTION**
 
 **This is the worst thing in this document and it belongs at the top of the
