@@ -439,6 +439,19 @@ export default async function BrandPortalPage({
             // thing they can buy is a month of sponsored challenges on a game.
             key: "buy", label: "Buy challenges", icon: "rocket",
             node: (
+              <>
+              <a
+                href="/rules/brand"
+                className="glass mb-4 flex items-center gap-3 p-4 text-sm hover:border-cyan-400/40"
+              >
+                <Icon name="spark" size={16} className="shrink-0 text-violet-300" />
+                <span>
+                  <b>What we will and will not promise you</b>
+                  <span className="block text-xs text-muted">
+                    Every rule that binds a brand here, with the reason it exists.
+                  </span>
+                </span>
+              </a>
               <CampaignBuilder
                 brandId={brand.id} keyStr={key}
                 games={builderGames}
@@ -447,6 +460,7 @@ export default async function BrandPortalPage({
                 weeks={buyWeeks.map((w) => ({ startAt: w.startAt.toISOString(), endAt: w.endAt.toISOString() }))}
                 trophies={brandTrophies}
               />
+              </>
             ),
           },
           {

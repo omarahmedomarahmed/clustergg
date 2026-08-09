@@ -253,6 +253,21 @@ export default async function ServerPortalPage({
             icon: "diamond",
             node: (
               <div className="space-y-6">
+                {/* B90.10. Every rule that binds an owner, one click from the
+                    money it applies to. */}
+                <a
+                  href="/rules/owner"
+                  className="glass flex items-center gap-3 p-4 text-sm hover:border-cyan-400/40"
+                >
+                  <Icon name="spark" size={16} className="shrink-0 text-violet-300" />
+                  <span>
+                    <b>Every rule that applies to you</b>
+                    <span className="block text-xs text-muted">
+                      What the pool counts, what it does not, and why each one is the way it is.
+                    </span>
+                  </span>
+                </a>
+
                 <ServerWallet
                   wallet={wallet}
                   statement={statement.map((r) => ({

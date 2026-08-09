@@ -34,6 +34,12 @@ export default async function QuestsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
+      {/* B90.10. The daily ceiling bites here, so the page that explains why
+          it exists belongs here too. */}
+      <a href="/rules/gamer" className="mb-6 flex items-center gap-2 text-xs text-muted hover:text-ink">
+        <Icon name="spark" size={13} className="text-violet-300" />
+        Every rule that decides what you earn — and why each one is there
+      </a>
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-cyan-300 mb-2">
           <Icon name="trophy" size={14} /> {tr("Quests")}
