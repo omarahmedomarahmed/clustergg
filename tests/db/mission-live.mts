@@ -228,9 +228,27 @@ console.log("\n== a milestone with no trophy promises nothing ==");
 console.log("\n== the band is chrome, and behaves like the one above it ==");
 {
   const band = read("components/MissionBand.tsx");
-  ok("it takes the nav's background art", /bgUrl/.test(band) && /backgroundImage/.test(band),
-    "B63.2 — the two bands must read as one piece of chrome");
-  ok("…collapsed and expanded", (band.match(/style=\{art\}/g) ?? []).length >= 2);
+  // B63.2, and the assertion here was WRONG before the browser band caught it.
+  //
+  // It demanded `backgroundImage` in this component — i.e. it asserted that the
+  // band paints the nav art itself. That is exactly the defect: the header
+  // group paints the image ONCE and everything inside it stays transparent so
+  // that single layer shows through. `tests/ui/week-band.mjs` has guarded
+  // "exactly one element paints the nav art" since B10, and it went red the
+  // first time this component ran in a browser.
+  //
+  // The db band cannot see a rendered page, so it could not have caught this —
+  // but it could have avoided ASSERTING the wrong thing, which is worse than
+  // not testing it. The rule is now stated the way it actually works.
+  ok("the band does NOT paint the nav art", !/backgroundImage/.test(band),
+    "a second copy of the image is what makes the header stop reading as one surface");
+  ok("…it stays transparent when the nav has art",
+    /const bandBg = bgUrl \? undefined :/.test(band),
+    "bgUrl is a flag, not a source — exactly what WeekBand does");
+  ok("…and supplies its own ground when the nav has none",
+    /bgUrl \? undefined : \{ background:/.test(band));
+  ok("…while the expanded panel, which drops below the header, gets a scrim",
+    /const panelBg = \{ background: bgUrl \?/.test(band));
   ok("clicking anywhere in the panel closes it", /onClick=\{toggle\} className="cursor-pointer/.test(band),
     "B63.1, and it is what people try first");
   ok("…but a link inside still navigates", /e\.stopPropagation\(\)/.test(band));
@@ -239,7 +257,9 @@ console.log("\n== the band is chrome, and behaves like the one above it ==");
     /localStorage\.getItem\(KEY\) === "open"/.test(band),
     "two panels opening over every page on every visit is what makes people collapse both");
   const nav = code("components/Nav.tsx");
-  ok("both bands get the same art", (nav.match(/optImg\(navBg, 1600\)/g) ?? []).length >= 3);
+  ok("both bands are handed the nav's art flag",
+    (nav.match(/optImg\(navBg, 1600\)/g) ?? []).length >= 3,
+    "the header paints it once; the two bands each receive it to decide whether they need their own ground");
 }
 
 console.log("\n== the job only walks gamers who could have moved ==");
