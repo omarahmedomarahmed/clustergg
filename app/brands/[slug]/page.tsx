@@ -9,6 +9,8 @@ import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
 import { networkStats } from "@/lib/network";
 import { brandCampaigns, campaignQuote, networkReach, nextMonday, slotWindows } from "@/lib/sponsored-campaigns";
 import { trophiesForBrand } from "@/lib/brand-trophies";
+import BrandDraftCampaigns from "@/components/BrandDraftCampaigns";
+import { campaignGames } from "@/lib/sponsored-campaigns";
 import { brandChallengeReports, campaignReport, brandTestimonials, brandTier, challengeServers } from "@/lib/brand-report";
 import { pricingConfig } from "@/lib/pricing-live";
 import { listInvoices } from "@/lib/invoices";
@@ -271,6 +273,18 @@ export default async function BrandPortalPage({
     id: t.id, name: t.name, tier: t.tier, value: t.value, brandId: t.brandId,
   }));
 
+  // B91.10. Campaigns sales built for them, waiting to be confirmed. Before
+  // this, what a brand saw after a sales call was an invoice for something they
+  // had never seen a screen for.
+  const draftCampaigns = sponsored
+    .filter((c) => c.status === "draft")
+    .map((c) => ({
+      id: c.id, game: c.game, slots: c.slots,
+      total: Number(c.total ?? 0), pricePerChallenge: Number(c.pricePerChallenge ?? 0),
+      startAt: c.startAt.toISOString(), status: c.status,
+      games: campaignGames(c),
+    }));
+
   const buyQuote = campaignQuote();
   const buyWeeks = slotWindows(nextMonday());
 
@@ -440,9 +454,12 @@ export default async function BrandPortalPage({
             // months AND the ad campaigns. This used to be a section buried at
             // the bottom of the analytics tab, which is why nobody found the
             // week-by-week detail that sits one click inside it.
-            key: "campaigns", label: "Campaigns", icon: "rocket",
+            key: "campaigns",
+            label: draftCampaigns.length ? `Campaigns (${draftCampaigns.length} waiting)` : "Campaigns",
+            icon: "rocket",
             node: (
               <div className="space-y-8">
+                <BrandDraftCampaigns brandId={brand.id} keyStr={key} campaigns={draftCampaigns} />
                 {/* Every week of every sponsored month, as its own card.
                     `sponsored` is the CAMPAIGNS a brand bought; the weeks
                     inside them are the challenges that actually ran, and the

@@ -396,3 +396,63 @@ export async function portalSetSlotCover(brandId: string, key: string, campaignI
   revalidatePath(`/brands/${brand.slug}`);
   return { ok: true };
 }
+
+/**
+ * "Yes, that is what we agreed." B91.10.
+ *
+ * Sales builds the campaign in the admin console — the games, the weeks, the
+ * price that was negotiated — and the brand opens their portal to find it
+ * already there. This is the button that says go.
+ *
+ * It does NOT take money and it does not put anything on the network. It moves
+ * a DRAFT to SUBMITTED, which is the same state a self-serve purchase lands in,
+ * and raises an alert so somebody here raises the invoice. Nothing announces
+ * until that invoice clears — `announceChallengeUpcoming` checks the bill, and
+ * that check is the only thing standing between a handshake and a promise to
+ * every server on the network.
+ *
+ * A brand confirming is also the strongest signal we get. It is the moment a
+ * deal stops being a conversation, so it is worth an alert on the sales desk
+ * whatever else is happening that day.
+ */
+export async function portalConfirmCampaign(brandId: string, key: string, campaignId: string) {
+  const { db, brand } = await requireBrand(brandId, key);
+
+  const [c] = await db.select().from(schema.sponsoredCampaigns)
+    .where(eq(schema.sponsoredCampaigns.id, campaignId)).limit(1);
+  if (!c) return { error: "That campaign no longer exists." };
+  // Checked against the brand that OPENED the portal, not against the id in the
+  // form. Confirming somebody else's campaign would commit them to a bill.
+  if (c.brandId !== brand.id) return { error: "That campaign is not yours." };
+  if (c.status !== "draft") {
+    return c.status === "submitted"
+      ? { ok: true, message: "Already confirmed — we're raising the invoice." }
+      : { error: "That campaign is already running." };
+  }
+
+  await db.update(schema.sponsoredCampaigns)
+    .set({ status: "submitted" })
+    .where(eq(schema.sponsoredCampaigns.id, campaignId));
+
+  const { raiseAlert } = await import("@/lib/staff-alerts");
+  await raiseAlert(db, {
+    kind: "brand.campaign_confirmed", desk: "sales",
+    title: `${brand.name} confirmed a campaign`,
+    body: `${c.slots} week${c.slots === 1 ? "" : "s"} on ${c.game}, ${
+      Number(c.total ?? 0).toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 })
+    }. They are waiting on an invoice — nothing announces until it clears.`,
+    href: `/admin/brands/${brand.id}`, refType: "campaign", refId: campaignId, once: true,
+  });
+
+  // DELIBERATELY NOT revalidated.
+  //
+  // Revalidating swaps the card for the space where it used to be: the parent
+  // filters on `status = draft`, so the moment the tree refreshes the thing
+  // they just confirmed vanishes along with the acknowledgement. Somebody who
+  // agreed to spend four figures deserves to be told it worked. The campaign
+  // moves into the list below on their next load, which is soon enough.
+  return {
+    ok: true,
+    message: "Confirmed. We'll send the invoice today — nothing runs until it's paid, and you can still change the artwork before it does.",
+  };
+}
