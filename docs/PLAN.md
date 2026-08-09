@@ -501,12 +501,21 @@ order it is being built in.
 | B91.5 | A brand's money always belongs to a campaign — created from the deal being typed, as a draft | SHIPPED `fc01cb9` |
 | B91.6 | The seam between two runs: the next run opens, carries the field, announces | SHIPPED `e50ee81` |
 | B91.7 | A podium of any depth — 1 to 10 places, and the award query that only ever paid three | SHIPPED `8ec81b9` |
-| B91.8 | Draft autosave everywhere — brand, server owner, admin — so a half-built thing survives a closed tab, and every draft visible here with who built it | next |
-| B91.9 | A brand picks WHICH of its $100 designs a week uses; several trophies per tier per brand, visible in the brand portal | |
-| B91.10 | Admin builds a campaign FOR a brand; the brand logs in, sees it, confirms and pays | |
-| B91.11 | Sales + support sections: the shared brand mailbox, the ops queue for servers and gamers | |
-| B91.12 | **Purge** every challenge and challenge request built the old way, at deploy | owner-authorised, not yet done |
-| B91.13 | The three guides, then the website rewrite | |
+| B91.8 | Draft autosave everywhere, and half-built things on the sales desk | SHIPPED `a488ced` |
+| B91.9 | A brand chooses which of its trophies goes out, per place | SHIPPED `899e4f4` |
+| B91.10 | Sales builds a campaign FOR a brand; the brand confirms it in their portal | SHIPPED `b82a2ce` |
+| B90.4 | A server owner buys a private challenge from their wallet — prize pool + 5% | SHIPPED `4382ef7` |
+| B90.10 | Every rule, to the person it binds, with the reason — three pages | SHIPPED `b3a91ba` |
+| B91.11 | A desk for sales and a desk for support | SHIPPED `9367359` |
+| B91.12 | The pre-relaunch purge | SHIPPED `8b968ca` · see docs/PURGE_2026-08-09.md |
+| B91.13 | The rules on every page | SHIPPED `41778ed` |
+
+**What is left, and why it is left.** The public marketing pages still describe
+the product in the words of the version before B90–B91: they do not mention the
+ladder, the two gates, the bracket shares or private challenges. That is a
+rewrite of copy against a product that has only just stopped moving, and it is
+the right next thing — but it is writing, not plumbing, and it should be done
+once rather than twice.
 
 **The rule that ties B91.3 and B91 together, written down because it is not
 obvious:** a challenge becomes visible and joinable when it is ANNOUNCED, which
