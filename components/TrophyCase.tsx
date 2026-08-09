@@ -8,6 +8,7 @@ import GameLogo from "@/components/GameLogo";
 import { useTr } from "@/components/LocaleProvider";
 import { requestRedeem, cancelRedeem, confirmRedeem } from "@/app/actions/trophies";
 import type { TrophyAward, RedeemView } from "@/lib/trophies";
+import { stackTrophies } from "@/lib/trophy-stack";
 
 // The gamer's trophy case: select trophies, ask to cash them out, and collect.
 //
@@ -60,6 +61,11 @@ export default function TrophyCase({
   useEffect(() => setMounted(true), []);
 
   const shelf = awards.filter((a) => a.status !== "redeemed");
+  // B62.1. Grouped by the SAME key the bot card and the public profile use —
+  // `stackTrophies` in `lib/trophies.ts` — so one gamer's shelf reads the same
+  // in all three places. The awards ride along because selection here is
+  // per-award and the redeem request must keep sending individual ids.
+  const shelfStacks = useMemo(() => stackTrophies(shelf), [shelf]);
   const held = shelf.filter((a) => a.status === "held");
   const history = awards.filter((a) => a.status === "redeemed");
   const totalValue = useMemo(() => shelf.reduce((s, a) => s + a.value, 0), [shelf]);
@@ -157,25 +163,64 @@ export default function TrophyCase({
               <div className="rounded-2xl border border-white/10 p-6 text-center text-sm text-muted">{tr("No trophies yet — win a challenge podium to earn your first.")}</div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {shelf.map((a) => {
-                  const selectable = a.status === "held" && a.value > 0;
-                  const on = !!sel[a.id];
+                {shelfStacks.map((st) => {
+                  // B62.1. One tile per trophy, not per award row.
+                  //
+                  // SELECTION STAYS PER-AWARD underneath: the redeem request
+                  // still sends individual ids, so nothing about the payout
+                  // path changed. What a tap does is select every REDEEMABLE
+                  // copy in the stack, because three identical trophies of
+                  // identical value are not a choice anybody wants to make one
+                  // at a time.
+                  const usable = st.awards.filter((a) => a.status === "held" && a.value > 0);
+                  const selectable = usable.length > 0;
+                  const chosen = usable.filter((a) => sel[a.id]).length;
+                  const on = chosen > 0 && chosen === usable.length;
+                  const partial = chosen > 0 && !on;
+                  const stackValue = usable.reduce((n, a) => n + a.value, 0);
+                  const inRedeem = st.awards.filter((a) => a.status === "pending").length;
                   return (
-                    <button key={a.id} disabled={!selectable}
-                      onClick={() => setSel((s) => ({ ...s, [a.id]: !s[a.id] }))}
-                      className={`relative rounded-2xl border p-3 text-center transition-all ${on ? "scale-[1.03]" : ""} ${selectable ? "" : "opacity-75"}`}
-                      style={{ borderColor: on ? "#34d399cc" : "rgba(255,255,255,0.12)", background: on ? "#10b98114" : "rgba(0,0,0,0.35)" }}>
+                    <button key={st.key} disabled={!selectable}
+                      onClick={() => setSel((prev) => {
+                        const next = { ...prev };
+                        // All-or-nothing on the stack, and "some selected"
+                        // means the next tap selects the rest rather than
+                        // clearing — the direction somebody part-way through
+                        // is heading.
+                        for (const a of usable) next[a.id] = !on;
+                        return next;
+                      })}
+                      className={`relative rounded-2xl border p-3 text-center transition-all ${on || partial ? "scale-[1.03]" : ""} ${selectable ? "" : "opacity-75"}`}
+                      style={{ borderColor: on ? "#34d399cc" : partial ? "#34d39966" : "rgba(255,255,255,0.12)", background: on || partial ? "#10b98114" : "rgba(0,0,0,0.35)" }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={a.imageUrl} alt={a.name} className="mx-auto h-24 object-contain float-y" />
-                      <div className="text-xs font-bold mt-1.5 truncate">{a.name}</div>
+                      <img src={st.imageUrl} alt={st.name} className="mx-auto h-24 object-contain float-y" />
+                      <div className="text-xs font-bold mt-1.5 truncate">{st.name}</div>
                       <div className="mt-0.5 flex items-center justify-center gap-1.5 text-[10px] text-muted">
-                        {a.gameLogoUrl && <GameLogo logoUrl={a.gameLogoUrl} name={a.game ?? ""} size={14} rounded="rounded" />}
-                        <span className="truncate">{a.challengeTitle ?? tr("Challenge")}</span>
+                        {st.gameLogoUrl && <GameLogo logoUrl={st.gameLogoUrl} name={st.game ?? ""} size={14} rounded="rounded" />}
+                        <span className="truncate">{st.challengeTitle ?? tr("Challenge")}</span>
                       </div>
-                      <div className="text-[10px] font-bold text-amber-300 mt-0.5">{place(a.placement)}</div>
-                      {a.value > 0 && <span className="absolute top-1.5 right-1.5 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-black text-white">${a.value.toLocaleString()}</span>}
-                      {a.status === "pending" && <span className="absolute top-1.5 left-1.5 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[9px] font-black text-black uppercase">{tr("in redeem")}</span>}
-                      {on && <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[11px] font-black ring-2 ring-[#070826]"><Icon name="check" size={11} /></span>}
+                      <div className="text-[10px] font-bold text-amber-300 mt-0.5">{place(st.placement)}</div>
+                      {/* The count, top-left, where the "in redeem" flag used
+                          to sit alone. A stack of three where one is already in
+                          a payout is a real state and it has to READ as one —
+                          "×3" with nothing else would promise three redeemable
+                          trophies when only two are. */}
+                      {st.count > 1 && (
+                        <span className="absolute top-1.5 left-1.5 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-black text-[#0b1020]">×{st.count}</span>
+                      )}
+                      {inRedeem > 0 && (
+                        <span className="absolute bottom-1.5 left-1.5 rounded-full bg-amber-500/90 px-1.5 py-0.5 text-[9px] font-black text-black uppercase">
+                          {inRedeem === st.count ? tr("in redeem") : `${inRedeem} ${tr("in redeem")}`}
+                        </span>
+                      )}
+                      {/* The value of what a tap actually selects, not of one
+                          copy — pressing this adds the whole stack. */}
+                      {stackValue > 0 && <span className="absolute top-1.5 right-1.5 rounded-full bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-black text-white">${stackValue.toLocaleString()}</span>}
+                      {(on || partial) && (
+                        <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 px-1 text-white text-[11px] font-black ring-2 ring-[#070826]">
+                          {on && usable.length === 1 ? <Icon name="check" size={11} /> : chosen}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -251,10 +296,13 @@ export default function TrophyCase({
               <div className="mt-5">
                 <div className="text-[10px] uppercase tracking-widest text-muted mb-2">{tr("Previous trophies (redeemed)")}</div>
                 <div className="flex flex-wrap gap-2">
-                  {history.map((a) => (
-                    <div key={a.id} className="w-20 text-center opacity-70">
+                  {stackTrophies(history).map((a) => (
+                    <div key={a.key} className="relative w-20 text-center opacity-70">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={a.imageUrl} alt={a.name} className="mx-auto h-14 object-contain grayscale-[0.4]" />
+                      {a.count > 1 && (
+                        <span className="absolute top-0 right-1 rounded-full bg-white/15 px-1.5 text-[9px] font-black">×{a.count}</span>
+                      )}
                       <div className="text-[9px] text-muted truncate mt-0.5">{a.name}</div>
                     </div>
                   ))}

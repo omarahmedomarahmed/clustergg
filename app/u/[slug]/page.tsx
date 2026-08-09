@@ -31,7 +31,7 @@ import QuestCard from "@/components/QuestCard";
 import CpIcon from "@/components/CpIcon";
 import VoteButton from "@/components/VoteButton";
 import { getUserQuests } from "@/lib/quests";
-import { getTrophyCase, getMyRedeems } from "@/lib/trophies";
+import { getTrophyCase, getMyRedeems, stackTrophies } from "@/lib/trophies";
 import TrophyCase from "@/components/TrophyCase";
 import { localizeQuest } from "@/lib/i18n/entities";
 import { levelFromCp } from "@/lib/level";
@@ -261,9 +261,28 @@ export default async function ProfilePage({ params }: Props) {
                 )}
               </div>
             </div>
+            {/* B62.1. STACKED. Three copies of one trophy used to be three
+                identical tiles in a row, which reads as a rendering bug rather
+                than an achievement — and the count is the impressive part.
+                The bot card has stacked since B62; this surface had not, so the
+                same gamer's shelf looked different depending where you saw it.
+                One rule now, in `stackTrophies`.
+
+                Still no price, which was already true here and is the other
+                half of B62: a profile is a brag and a shelf is a shop. A cash
+                figure turns a trophy case into a receipt. The value lives in
+                the redeem flow, where it is deciding something. */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {trophyShelf.map((a) => (
-                <div key={a.id} className={`${cardCls} text-center`}>
+              {stackTrophies(trophyShelf).map((a) => (
+                <div key={a.id} className={`${cardCls} text-center relative`}>
+                  {a.count > 1 && (
+                    <span
+                      className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[11px] font-black"
+                      style={{ background: theme.accent2, color: "#0b1020" }}
+                    >
+                      ×{a.count}
+                    </span>
+                  )}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={a.imageUrl} alt={a.name} className="mx-auto h-32 object-contain float-y" />
                   <div className="mt-2 text-xs font-bold" style={{ color: theme.accent2 }}>{a.placement === 1 ? tr("CHAMPION") : `#${a.placement} ${tr("PLACE")}`}</div>

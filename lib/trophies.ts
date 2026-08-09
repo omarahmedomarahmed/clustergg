@@ -30,6 +30,11 @@ export type RedeemView = {
   createdAt: string; decidedAt: string | null; sentAt: string | null; paidAt: string | null;
 };
 
+// B62.1's grouping lives in `lib/trophy-stack.ts`, which imports nothing —
+// `TrophyCase` is a client component and this module pulls in Drizzle and the
+// schema. Re-exported so server callers still reach it from one place.
+export { stackTrophies, type TrophyStack } from "@/lib/trophy-stack";
+
 // Everything on a gamer's trophy shelf, newest first. Includes redeemed ones —
 // callers filter by status (redeemed stays visible only in history views).
 export async function getTrophyCase(db: DB, userId: string): Promise<TrophyAward[]> {

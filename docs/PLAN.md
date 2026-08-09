@@ -1009,6 +1009,53 @@ nothing.
 
 ---
 
+### ▸ B62.1 (web half) — One tile, with a count · **SHIPPED**
+
+A gamer can hold the same trophy several times over — bought one, won one in a
+challenge, earned one at a streak milestone. Drawn one row per award, that is
+three identical pictures in a row, which reads as a rendering bug rather than an
+achievement. **The count is the impressive part.**
+
+**The defect was not that nobody had built it.** The bot card has stacked since
+B62. The web never did — and the grouping lived *inline in `lib/cards/data.ts`*,
+where no other surface could reach it. So the same gamer's shelf looked like a
+different shelf depending on where you saw it, and the whole reason was one
+`reduce` in the wrong file.
+
+`lib/trophy-stack.ts` now holds the rule, and **all three surfaces call it**: the
+card, the public profile, and the redeem shelf.
+
+**Its own module, importing nothing.** `TrophyCase` is a client component and
+`lib/trophies.ts` pulls in Drizzle and the whole schema; reusing one `reduce`
+must not drag that into the browser bundle. Writing the `reduce` twice instead is
+exactly how this drifted in the first place — and a module with no imports is
+also testable without a database.
+
+**The key is `name + image`, not `trophyId`** — deliberately the key the card has
+always used. Two `trophies` rows can be the same prize to a person: staff
+duplicating one for a second brand, or a re-issue. A gamer looking at two
+identical pictures does not care that they carry different ids, and grouping on
+`trophyId` would leave exactly the duplicate-looking tiles this removes.
+
+**The redeem shelf stacks without changing the payout path.** Selection stays
+per-award underneath — the request still sends individual ids — but a tap selects
+every *redeemable* copy, because three identical trophies of identical value are
+not a choice anybody wants to make one at a time. A stack where one copy is
+already mid-payout says so: `×3` alone would promise three redeemable trophies
+when only two are, and the price shown is the **stack's**, because that is what
+the tap adds.
+
+**B62.2's web half was already done** — the public trophy grid has never drawn a
+cash figure. The suite now asserts it, because "a price on a profile turns a
+trophy case into a receipt" is the kind of thing that gets re-added by somebody
+being helpful.
+
+`tests/db/trophy-stack.mts` (38). Proved by breaking both halves: keying on
+`trophyId` turns fifteen assertions red, and putting a price back on the profile
+turns another.
+
+---
+
 ### ▸ B112 — The documents describe the product that exists · **SHIPPED**
 
 **The owner's instruction, and it is the right diagnosis:** *"rewrite the docs
@@ -2052,7 +2099,6 @@ the reviewer rated **fatal**.
 
 | Item | What |
 |---|---|
-| **B62** (web half) | Trophy stacking and no-price-on-your-own-case on `components/TrophyCase.tsx`. |
 | **B63** | The nav bands: today's mission and the streak. |
 | **B59** | A gamer can see and control their own card on the website. *(Largely absorbed by B83.5.)* |
 | **B56** (remainder) | Card kinds not yet on the new shared layout. |
