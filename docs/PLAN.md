@@ -1009,6 +1009,62 @@ nothing.
 
 ---
 
+### ▸ B115 — Every card kind actually renders · **SHIPPED** *(owed since B54)*
+
+`lib/cards/render.tsx` has **thirteen card bodies**. Before this, exactly one of
+them was ever rendered by any test — the guide card, incidentally, inside
+`bot-growth`. The other twelve were verified by somebody looking at Discord.
+
+**It could only ever be a browser-band suite.** A card is Satori turning React
+into SVG and resvg turning that into a PNG, inside a route handler, against real
+rows. `tsc` cannot see any of it and the db band cannot reach it. The failure
+modes — a font that did not load, an image host that 403s, a `flex` Satori
+refuses, a data layer returning null for a kind nobody looked at this month — are
+each a 500 or a blank rectangle at request time and green everywhere else.
+
+**The assertion that matters is not "did it return 200".** When the route cannot
+resolve a kind's data it returns `fallbackCard(...)` — **200, valid PNG, correct
+content-type, tens of kilobytes**. A completely broken kind looks perfectly
+healthy to every cheap check.
+
+**The first version of that assertion was too weak, and I proved it.** It
+compared every kind's hash against every other kind's, on the theory that a
+fallback would collide. Disabling `planetsCard` entirely — returning `null` —
+gave **58/58 green**, because one broken kind falls back *alone* and its bytes
+are still unique within the set. That is both the common case and the one worth
+catching.
+
+So the fallback is **fingerprinted**: ask for a card that certainly has no data,
+hash the PNG, assert no real kind matches. `fallbackCard` takes the same string
+on every path and returns before `withCardAd`, so it renders byte-identical. With
+the same break in place it now reads: *"planets returned the 'no data' card —
+broken, and answering 200."*
+
+Also checked: a PNG magic number rather than trusting `content-type`, a floor on
+byte length, `?fresh=1` so a cached Blob redirect cannot make a broken renderer
+look healthy, an unknown kind that must not draw anything, a missing gamer that
+must not 500, and that every `/api/card/…` URL referenced on the homepage is a
+kind this suite covers.
+
+`tests/ui/cards.mjs` (60). **60/60, and 16 browser suites now, not 15.**
+
+---
+
+### ▸ B56 (remainder) — Already done · **VERIFIED, no work needed**
+
+The carried-over row read *"card kinds not yet on the new shared layout."*
+Checked rather than assumed: **all thirteen bodies render through `<Frame>` and
+all thirteen pass an `identity`** — B56.0's rule that the top-left is always an
+image, never a headline alone.
+
+Worth recording as a finding rather than silently deleting the row: the first
+check I ran said the opposite (`identity: 0` for all thirteen), because the
+`awk` range I used terminated on its own opening line. The row was stale, not
+the code — but a sloppier reading of that output would have produced a sprint
+rebuilding something that already worked.
+
+---
+
 ### ▸ B114 — No Riot game is sold to a brand · **REVERTED, same day**
 
 Shipped and removed within the hour, at the owner's instruction. Recorded so
@@ -2228,10 +2284,8 @@ the reviewer rated **fatal**.
 | Item | What |
 |---|---|
 | **B59** | A gamer can see and control their own card on the website. *(Largely absorbed by B83.5.)* |
-| **B56** (remainder) | Card kinds not yet on the new shared layout. |
 | **B66, B67, B69** | Admin sales console, brand portal rebuild, public site — **behind Gate 4**. |
 | **B70** | Component screenshots — **deferred**, the surfaces are all about to change. |
-| `tests/ui/cards.mjs` | Owed since B54. |
 
 ---
 
