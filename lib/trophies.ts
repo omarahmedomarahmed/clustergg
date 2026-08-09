@@ -2,6 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
+import { placesOf } from "@/lib/prize-places";
 
 // ===== Trophy economy read/award models =====
 
@@ -89,12 +90,23 @@ export async function getMyRedeems(db: DB, userId: string): Promise<RedeemView[]
 export async function awardChallengeTrophies(db: DB, challengeId: string) {
   const [c] = await db.select().from(schema.challenges).where(eq(schema.challenges.id, challengeId)).limit(1);
   if (!c || c.status !== "completed") return;
-  const prizes = c.prizes ?? (c.trophyId ? { first: [c.trophyId] } : null);
-  if (!prizes) return;
-  const byPlace: Record<number, string[]> = { 1: prizes.first ?? [], 2: prizes.second ?? [], 3: prizes.third ?? [] };
+  // B91.7. A podium is any depth now: one winner, or ten. The old
+  // `{first, second, third}` shape is still READ — there are challenges in the
+  // database holding it, and rewriting live prize data is how a trophy somebody
+  // already won goes missing.
+  const places = placesOf(c.prizes, c.trophyId);
+  if (!places.length) return;
+  const byPlace: Record<number, string[]> = {};
+  places.forEach((ids, i) => { byPlace[i + 1] = ids; });
+
+  // Exactly the places that pay. It used to be hard-coded to [1,2,3], so a
+  // ten-place challenge awarded three trophies and the other seven were handed
+  // out by hand — which means seven trophies on nobody's profile and missing
+  // from the prize vault's arithmetic.
+  const payingPlaces = places.map((_, i) => i + 1);
   const winners = await db.select({ userId: schema.challengeParticipants.userId, place: schema.challengeParticipants.finalPlacement })
     .from(schema.challengeParticipants)
-    .where(and(eq(schema.challengeParticipants.challengeId, challengeId), inArray(schema.challengeParticipants.finalPlacement, [1, 2, 3])));
+    .where(and(eq(schema.challengeParticipants.challengeId, challengeId), inArray(schema.challengeParticipants.finalPlacement, payingPlaces)));
   const awardedTrophyIds: string[] = [];
   for (const w of winners) {
     const place = Number(w.place);

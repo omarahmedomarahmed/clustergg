@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import CoverFramer from "@/components/CoverFramer";
+import { placesOf, MAX_PLACES } from "@/lib/prize-places";
 import MetricsGuide from "@/components/MetricsGuide";
 import { saveChallenge, type ChallengeSaveState } from "@/app/actions/admin";
 import { RULE_OPS, isRanked, ruleSentence, valueChoices, OPEN_TO_EVERYONE } from "@/lib/challenge-rules";
@@ -166,11 +167,17 @@ export default function ChallengeBuilder({
   // so picking a brand immediately reveals its trophies.
   const podiumTrophies = trophies.filter((t) => !t.brandId || t.brandId === sponsorBrandId);
 
-  const [prizeFirst, setPrizeFirst] = useState<string[]>(
-    challenge?.prizes?.first ?? (challenge?.trophyId ? [challenge.trophyId] : []),
-  );
-  const [prizeSecond, setPrizeSecond] = useState<string[]>(challenge?.prizes?.second ?? []);
-  const [prizeThird, setPrizeThird] = useState<string[]>(challenge?.prizes?.third ?? []);
+  // B91.7. A podium of any depth: one winner, or ten. It used to be three named
+  // slots, so "the top ten each get something" had to be built as a top-three
+  // and the other seven handed out by hand — seven trophies on nobody's profile
+  // and missing from the prize vault's arithmetic.
+  const [places, setPlaces] = useState<string[][]>(() => {
+    const initial = placesOf(challenge?.prizes, challenge?.trophyId);
+    return initial.length ? initial : [[], [], []];
+  });
+  const setPlace = (i: number, v: string[]) =>
+    setPlaces((prev) => prev.map((p, j) => (j === i ? v : p)));
+  const prizeFirst = places[0] ?? [];
 
   const provider = useMemo(() => providers.find((p) => p.id === providerId), [providers, providerId]);
   const caps = provider?.capabilities ?? [];
@@ -207,7 +214,7 @@ export default function ChallengeBuilder({
     .map((c) => ruleSentence(c, caps.find((m) => m.key === c.metric)));
 
   // ===== The money, as the model has it =====
-  const podiumValue = [...prizeFirst, ...prizeSecond, ...prizeThird]
+  const podiumValue = places.flat()
     .reduce((sum, id) => sum + (trophies.find((t) => t.id === id)?.value ?? 0), 0);
   const prizeShare = rate.challengePrice > 0
     ? rate.prizePool / rate.challengePrice
@@ -654,16 +661,12 @@ export default function ChallengeBuilder({
 
         <Step n={8} title="Prizes" hint="what the winners actually keep">
           <div className="grid gap-3 sm:grid-cols-3">
-            {([
-              ["prize:first", "1st place", prizeFirst, setPrizeFirst],
-              ["prize:second", "2nd place", prizeSecond, setPrizeSecond],
-              ["prize:third", "3rd place", prizeThird, setPrizeThird],
-            ] as [string, string, string[], (v: string[]) => void][]).map(([name, label, value, set]) => (
-              <label key={name} className="block text-xs text-muted">
-                {label}{format !== "top3" && name !== "prize:first" ? " (podium only)" : ""}
+            {places.map((value, i) => (
+              <label key={i} className="block text-xs text-muted">
+                {ordinal(i + 1)} place
                 <select
-                  name={name} multiple size={4} value={value}
-                  onChange={(e) => set([...e.target.selectedOptions].map((o) => o.value))}
+                  name={`prize:place:${i + 1}`} multiple size={4} value={value}
+                  onChange={(e) => setPlace(i, [...e.target.selectedOptions].map((o) => o.value))}
                   className="input-cosmic mt-1 w-full !py-1 text-xs"
                 >
                   {podiumTrophies.map((t) => (
@@ -675,6 +678,33 @@ export default function ChallengeBuilder({
               </label>
             ))}
           </div>
+
+          {/* Places are added and removed here rather than fixed at three. The
+              count IS the prize structure: one place is winner-takes-all, ten
+              is a deal somebody negotiated. */}
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={places.length >= MAX_PLACES}
+              onClick={() => setPlaces((p) => [...p, []])}
+              className="ghost-btn pressable rounded-lg px-2.5 py-1 text-[11px] disabled:opacity-40"
+            >
+              + Add a place
+            </button>
+            <button
+              type="button"
+              disabled={places.length <= 1}
+              onClick={() => setPlaces((p) => p.slice(0, -1))}
+              className="ghost-btn pressable rounded-lg px-2.5 py-1 text-[11px] disabled:opacity-40"
+            >
+              − Remove the last
+            </button>
+            <span className="text-[11px] text-muted">
+              {places.filter((p) => p.length).length === 1 ? "Winner takes all." : `Top ${places.filter((p) => p.length).length}.`}
+              {" "}A place with no trophy pays nothing and is not shown to gamers.
+            </span>
+          </div>
+
           <p className="mt-1.5 text-[10px] text-muted">
             Ctrl/Cmd-click for more than one per place.
             {sponsorBrandId
@@ -797,4 +827,10 @@ function Row({ label, value, tone }: { label: string; value: string; tone?: "goo
       </dd>
     </div>
   );
+}
+
+/** 1st, 2nd, 3rd, 4th… — a place is read as a rank, not as a number. */
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"][(n % 100 - 20) % 10] ?? ["th", "st", "nd", "rd"][n % 100] ?? "th";
+  return `${n}${s}`;
 }

@@ -10,6 +10,7 @@ import { uid, slugify } from "@/lib/utils";
 import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
 import { syncAccount } from "@/lib/sync";
 import { CADENCE_DAYS, isRepeating, runTitle, stripRunSuffix } from "@/lib/challenge-series";
+import { MAX_PLACES, toPrizeBag } from "@/lib/prize-places";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
 
@@ -511,8 +512,15 @@ export async function saveChallenge(
     // single trophyId mirrors the first 1st-place trophy for old consumers.
     ...(() => {
       const pick = (k: string) => formData.getAll(k).map(String).map((s) => s.trim()).filter(Boolean);
-      const prizes = { first: pick("prize:first"), second: pick("prize:second"), third: pick("prize:third") };
-      const any = prizes.first.length || prizes.second.length || prizes.third.length;
+      // B91.7. Any number of places, read by position. The old three named
+      // fields are still accepted so a cached form or an older screen posting
+      // them keeps working.
+      const byPlace: string[][] = [];
+      for (let i = 1; i <= MAX_PLACES; i++) byPlace.push(pick(`prize:place:${i}`));
+      const legacyPosted = [pick("prize:first"), pick("prize:second"), pick("prize:third")];
+      const posted = byPlace.some((p) => p.length) ? byPlace : legacyPosted;
+      const prizes = toPrizeBag(posted) as { places: string[][]; first: string[]; second: string[]; third: string[] };
+      const any = prizes.places.some((p) => p.length);
       const legacy = String(formData.get("trophyId") ?? "").trim() || null;
       return { prizes: any ? prizes : null, trophyId: prizes.first[0] ?? legacy };
     })(),
