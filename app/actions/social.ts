@@ -257,11 +257,15 @@ export async function joinChallenge(challengeId: string, path: string, formData?
   // The rules (provider match, entry gate, access key, baseline snapshot, CP
   // award) live in lib/challenges.ts so a Discord join and a web join are
   // exactly equivalent.
-  await joinChallengeFor(me.id, challengeId, {
+  const res = await joinChallengeFor(me.id, challengeId, {
     ...(linkedAccountId ? { linkedAccountId } : {}),
     source: "web",
     accessKey,
   });
+  // B94. An unfinished account cannot enter, and the redirect is the whole
+  // answer: the page it lands on is the one that explains why and fixes it in a
+  // minute. A toast saying "finish onboarding" with no way there is a dead end.
+  if (!res.ok && res.reason === "onboarding") redirect("/onboarding?from=challenge");
   revalidatePath(path);
 }
 

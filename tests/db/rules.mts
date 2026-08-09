@@ -25,7 +25,7 @@ const { RULES, AUDIENCES, rulesByTopic } = await import("../../lib/rules.ts");
 const { MIN_WITHDRAWAL } = await import("../../lib/server-wallet.ts");
 const { PRIVATE_FEE_PCT, MIN_PRIZE_POOL } = await import("../../lib/private-quote.ts");
 const { PARTICIPATION_SHARE, BRACKETS } = await import("../../lib/server-score.ts");
-const { LOCKED_CP_CAP } = await import("../../lib/unlock.ts");
+const { UNLOCK_STEPS } = await import("../../lib/unlock.ts");
 const { US_REPORT_THRESHOLD } = await import("../../lib/eligibility.ts");
 
 const all = [...RULES.gamer, ...RULES.owner, ...RULES.brand];
@@ -72,8 +72,8 @@ console.log("\n== every number comes from the code that enforces it ==");
   for (const b of BRACKETS) {
     ok(`the ${b.key} bracket's share is the real one`, owner.includes(`${b.share}%`), owner);
   }
-  ok("the locked-points cap is the real one",
-    gamer.includes(LOCKED_CP_CAP.toLocaleString("en-US")), gamer);
+  ok("the number of setup steps is the real one",
+    gamer.includes(String(UNLOCK_STEPS)), gamer);
   ok("the US reporting line is the real one",
     gamer.includes(US_REPORT_THRESHOLD.toLocaleString("en-US")), gamer);
 }

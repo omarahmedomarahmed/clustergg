@@ -934,6 +934,41 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B94–B98 — The account is real before it earns · **SHIPPED**
+
+The sprint that answers one question: *a gamer links a game account, joins a
+challenge, wins a trophy — and then what?* The old answer was that they held a
+locked balance and a trophy while we still did not know their age, their country
+or whether the inbox on file was theirs. Five changes, and the first one is a
+reversal of B83.
+
+| | What changed | Why |
+|---|---|---|
+| **B94** | **Nothing accrues before onboarding is finished.** No CP, no trophies, no challenge entry. The action is still WRITTEN (worth zero), so nothing looks like it vanished | A held balance is a promise made to an account we cannot price, cannot pay, and could not legally have made if the person turns out to be twelve |
+| **B94** | **Nobody is grandfathered.** The `unlocked_at = created_at` backfill is reversed for anybody who has not actually finished; the backfilled `email_verified_at` stamps are lifted too | The two facts we now require were never asked of the early accounts, and they are the two we cannot operate without. **Nothing they earned is taken** — the balance is there, shown as safe, and spendable the moment they finish |
+| **B95** | Bands are **13–17** and **18+**. Under-13 is **not selectable** — it is a link that explains the law, asks for a typed confirmation, and **deletes the account** | A third button that visibly ends the fun teaches a twelve-year-old to press one of the other two |
+| **B95** | A deleted under-13 **cannot sign up again**: a salted SHA-256 of the email and the Discord ID, a reason word and a date. Nothing else | Keeping nothing makes the deletion pointless — they are back in thirty seconds with a different answer |
+| **B95** | **No self-serve age change.** `MAX_BAND_CHANGES = 0`; corrections go through gamer support | The onboarding page designed the mis-tap out, which left the change budget doing one thing: letting a teenager pick 18+ on the day they want to cash out |
+| **B96** | A **check mark, not a label**: gold at 18+, blue under it, tooltip "Confirmed account" and never a number. On the profile and on every Discord card. **Hideable** in one switch | "13–17" written beside a handle on a card that gets posted in public channels is a flag for exactly the wrong readers |
+| **B97** | The third mandatory answer is a **theme**, with a live card preview beside the form. Avatar and bio stay optional | The mandatory part of "make it yours" is the part other people see. A profile builder at signup is a wall |
+| **B98** | The verification code is **sent at signup** on both paths, and the onboarding page shows a **masked** address | They typed it ten seconds ago; making them press a button to have it used is a step nobody wired up |
+
+**Found on the way, and it is the serious one:** `db.delete(users)` did not
+delete most of a user. Every table added after the original generated schema —
+quest events, trophies, redemptions, drafts, payout preference, Discord logs —
+was created by an idempotent `CREATE TABLE IF NOT EXISTS` in the migration list,
+and **none of those statements declares a foreign key**. Nothing read the
+orphans, so nothing complained. `purgeUserRows` in `lib/account-deletion.ts`
+deletes them explicitly and keeps the books (paid redemptions, vault ledger,
+allocations) on purpose. Found by asserting that an under-13 deletion removes
+everything.
+
+Tests: `tests/db/onboarding.mts` (rewritten — the grandfather assertion is now
+its opposite), `tests/db/under13.mts` (new), `tests/db/eligibility.mts`,
+`tests/db/rules.mts`.
+
+---
+
 ### ▸ B83 — The gamer onboarding, properly · **SHIPPED** *(D3; B83.5 still deferred)*
 
 B72.4 closes the legal hole plainly. **This is the version that is good.**
@@ -950,7 +985,13 @@ quest action; it is simply not a lock.
 become a user → pick an age band on a Discord card → link an account (to compete)
 → tap the flag button → unlocked. They discover what the flag does on their own.
 
-#### B83.2 — The locked balance
+#### B83.2 — The locked balance · **REVERSED BY B94, kept for the reasoning**
+
+> B94 removed all of this: nothing accrues before onboarding is finished, and
+> nobody is grandfathered. Left in place because the argument below is a good
+> one and was right about the thing it was solving — it lost to a different
+> question, which is whether we should be promising anything at all to an
+> account whose age, country and inbox we do not know.
 
 - Accrues **only after the age band is set**. Caps at **5,000 CP**; earning stops
   there until they finish.
@@ -1274,12 +1315,17 @@ the reviewer rated **fatal**.
    number that means nothing?
 2. **Audience composition (B82):** aggregate only, cohort floor 25. Can a brand or
    server owner re-identify anyone? Is 25 the right floor?
-3. **The age design (§2 D3, B72.4, B83):** bands at 13/17, under-13 read-only,
-   no earning before answering, no backfill, self-declared. **Does that close the
-   COPPA exposure, or is a self-declared band worth nothing?** 2–3 paths.
-4. **B83's locked balance:** accrues only after the band is set, caps at 5,000 CP,
-   cannot be spent or redeemed, existing gamers grandfathered. Where is the
-   loophole?
+3. **The age design (§2 D3, B72.4, B95):** two selectable bands — 13–17 and 18+
+   — with under-13 as a link that deletes the account and blocks a re-signup on
+   a salted hash. Self-declared, answered once, no self-serve change. **Does
+   that close the COPPA exposure, or is a self-declared band worth nothing?**
+   2–3 paths.
+4. **B94 replaced B83's locked balance with nothing at all:** an unfinished
+   account earns no CP, wins no trophy and cannot enter a challenge, and every
+   pre-existing account now goes through the same three steps with its balance
+   held safe. Is "no carrot until you finish" the right trade, or did the locked
+   balance do real work in getting people to finish? And where is the loophole
+   in the under-13 delete-and-block — a hash of the email and the Discord ID?
 5. **§1.1 — what else is stale?** Twelve stored card layouts silently overrode a
    redesign and shipped to 15 servers. Where else does this codebase merge old
    stored state over new intent?

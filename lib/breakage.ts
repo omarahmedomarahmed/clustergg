@@ -37,7 +37,7 @@ import { eq, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { MIN_REDEEM_AGE, ageForBand } from "@/lib/eligibility";
-import { AGE_BANDS, type AgeBand } from "@/lib/age";
+import { AGE_BANDS, LEGACY_BANDS, type StoredBand } from "@/lib/age";
 
 export type Breakage = {
   /** Prize value awarded, ever. */
@@ -67,8 +67,16 @@ const EMPTY: Breakage = {
   heldByUnderAge: 0, heldByGoneAccounts: 0, outstandingRate: null,
 };
 
-/** Bands that cannot turn a trophy into money today. */
-export const CANNOT_REDEEM: AgeBand[] = AGE_BANDS.filter(
+/**
+ * Bands that cannot turn a trophy into money today.
+ *
+ * Derived over the SELECTABLE bands and the legacy ones together (B95). The
+ * legacy `under16` band cannot be chosen any more but rows still carry it, and
+ * a breakage figure that ignored them would count trophies as collectable that
+ * nobody can collect — which is the exact flattering assumption this whole file
+ * exists to stop making.
+ */
+export const CANNOT_REDEEM: StoredBand[] = [...AGE_BANDS, ...LEGACY_BANDS].filter(
   (b) => (ageForBand(b) ?? 0) < MIN_REDEEM_AGE,
 );
 
@@ -120,7 +128,7 @@ export async function measureBreakage(db: DB): Promise<Breakage> {
       // An unset band cannot be paid, so it counts as un-collectable. Reading it
       // as adult would be the flattering assumption, and the flattering
       // assumption is what made "50% goes to gamers" wrong in the first place.
-      const band = r.band as AgeBand | null;
+      const band = r.band as StoredBand | null;
       if (!band || (CANNOT_REDEEM as string[]).includes(band)) heldByUnderAge += v;
     }
 

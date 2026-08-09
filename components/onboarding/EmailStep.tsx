@@ -14,24 +14,35 @@ import { requestEmailCode, confirmEmailCode, type OnboardState } from "@/app/act
 // already been sent and this opens on "check your inbox", with the address on
 // screen so a typo is visible rather than mysterious.
 
-export default function EmailStep({ email, done, alreadySent }: {
-  /** What we have on file, if anything. */
+export default function EmailStep({ email, masked, done, alreadySent }: {
+  /** What we have on file, if anything. Never rendered — see `masked`. */
   email: string | null;
+  /**
+   * The same address with most of it taken out. B98.
+   *
+   * THE PAGE SHOWS THIS ONE. It is enough to recognise the inbox — "yes, that's
+   * my gmail" — and not enough to read an address off a shared screen or a
+   * screenshot posted in a Discord channel. The full value stays in the input
+   * they typed it into, where they can already see it.
+   */
+  masked: string;
   done: boolean;
-  /** A code went out at sign-in because Discord gave us the address. */
+  /** A code went out at sign-in because we already had the address. */
   alreadySent: boolean;
 }) {
   const [sendState, send, sending] = useActionState<OnboardState | undefined, FormData>(requestEmailCode, undefined);
   const [checkState, check, checking] = useActionState<OnboardState | undefined, FormData>(confirmEmailCode, undefined);
   const [typed, setTyped] = useState(email ?? "");
 
-  const sentTo = sendState?.sentTo ?? (alreadySent ? email : null);
+  // Once they have typed an address themselves it is on their own screen
+  // already, so masking what they just sent to would be theatre.
+  const sentTo = sendState?.sentTo ?? (alreadySent ? masked : null);
   const waiting = !!sentTo;
 
   if (done) {
     return (
       <p className="flex items-center gap-2 text-sm text-emerald-300">
-        <Icon name="check" size={15} /> {email} — confirmed.
+        <Icon name="check" size={15} /> {masked} — confirmed.
       </p>
     );
   }
@@ -42,7 +53,7 @@ export default function EmailStep({ email, done, alreadySent }: {
         <label className="min-w-[16rem] flex-1 text-[10px] uppercase tracking-widest text-muted">
           Your email
           <input
-            name="email" type="email" required value={typed}
+            name="email" type="email" required value={typed} autoComplete="email"
             onChange={(e) => setTyped(e.target.value)}
             placeholder="you@example.com"
             className="input-cosmic mt-1 block w-full text-sm"
@@ -72,7 +83,8 @@ export default function EmailStep({ email, done, alreadySent }: {
               A local copy of the product has to be usable past step two. */}
           {sendState?.demoCode && (
             <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
-              Mail is not switched on here, so the code is <b className="font-mono tracking-widest">{sendState.demoCode}</b>.
+              Mail is not switched on here, so the code is{" "}
+              <b className="font-mono tracking-widest">{sendState.demoCode}</b>.
             </p>
           )}
 

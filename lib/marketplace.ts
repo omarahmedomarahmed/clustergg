@@ -208,7 +208,7 @@ export async function buyTrophy(
     if (!state.unlocked) {
       return {
         ok: false,
-        error: "Finish setting up your account first — link a game and make your profile yours. Your points are safe and they're waiting.",
+        error: "Finish setting up your account first — link a game, confirm your email, and tell us your age and country. Anything you already have is safe and waiting.",
       };
     }
   }

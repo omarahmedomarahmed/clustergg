@@ -1,51 +1,49 @@
-// Two steps, and what happens before you finish them. B83.
+// The three things, and what nothing does before they are done. B83 → B94.
 //
-// B72.4 closed the legal hole plainly: no age band, no earning. This is the
-// version that is good — it gives a new gamer a reason to finish, and it does
-// it without taking anything from anybody who was already here.
+// B72.4 closed the legal hole plainly: no age band, no earning. B93 turned that
+// into one page with three steps. B94 is the part that makes the page mean
+// something — **nothing accrues before it is finished.**
 //
-// ===== TWO STEPS, NOT FIVE =====
+// ===== THREE STEPS =====
 //
 //   1. Link a game account.
-//   2. Customize your profile — and setting a flag from Discord counts.
+//   2. Confirm your email.
+//   3. Your age and your country.
 //
 // Sharing the profile card is NOT a step. It stays a paid quest action; it is
 // simply not a lock. A gate that requires broadcasting to your friends before
 // you can use the product is a gate that reads as a growth tax.
 //
-// The whole path works without leaving Discord: press a button, become a user,
-// pick an age band on a card, link an account, tap the flag button. Unlocked.
+// ===== NOTHING ACCRUES WHILE LOCKED, AND THAT IS A REVERSAL =====
 //
-// ===== WHY A LOCKED BALANCE AND NOT A REFUSAL =====
+// B83 let a locked gamer bank up to 5,000 CP, on the argument that watching a
+// number climb is a better reason to finish than an empty screen. It is a good
+// argument and it was the wrong call, for one reason: **we do not know who they
+// are yet.** A held balance is a promise made to an account with no confirmed
+// inbox, no declared age and no country — which is to say a promise we cannot
+// price, cannot pay, and cannot legally have made if the person behind it turns
+// out to be twelve.
 //
-// A new gamer who earns nothing until they finish learns nothing about what
-// earning feels like. A new gamer who watches a number climb and cannot spend
-// it has a reason to finish. So CP accrues, up to a cap, and stops there — with
-// the actions past the cap still LOGGED, the same pattern the daily ceiling
-// uses, so nothing looks like it vanished.
+// So there is nothing to hold. No CP, no trophies, no challenge entry. The
+// onboarding page sells what earning WILL be rather than showing a number that
+// is already owed, and the first point anybody earns is a point we are allowed
+// to owe them.
 //
-// ===== THE GRANDFATHER RULE, WHICH IS NOT NEGOTIABLE =====
+// ===== NOBODY IS GRANDFATHERED, AND NOTHING IS TAKEN =====
 //
-// **Nothing anybody already earned is ever locked.** Every account that existed
-// before this shipped is unlocked by the migration that adds the column —
-// `unlocked_at` is backfilled from `created_at`. Taking back access to a balance
-// somebody already had would be the worst thing we could do to our earliest
-// users, and it is the kind of thing that gets decided by an omission rather
-// than a decision. So it is decided here, in writing.
+// B94 also ends the grandfather rule. Every account — including every account
+// that existed before any of this — goes through the three steps, because the
+// two facts we now require (a confirmed inbox, an age band) were never asked of
+// them and are exactly the two we cannot operate without.
+//
+// What that does NOT mean: nothing anybody earned is deleted. Balances stay,
+// trophies stay, ranks stay, and the page says so. What is blocked is the next
+// action, not the past one. An old account that finishes the three steps finds
+// everything exactly where it left it.
 
 import { and, eq, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-
-/**
- * How much a locked gamer may accrue before earning stops.
- *
- * 5,000 CP is half a dollar at the shipped rate — enough to feel like a
- * balance, far too little to be worth farming, and reachable in about ten days
- * of ordinary play. The number matters less than the fact that it is a CAP and
- * not a refusal.
- */
-export const LOCKED_CP_CAP = 5000;
 
 export type StepKey = "link" | "email" | "profile";
 
@@ -62,16 +60,22 @@ export type UnlockState = {
   /** When it happened. Null while locked. */
   unlockedAt: Date | null;
   steps: Step[];
-  /** CP accrued while locked. Zero once unlocked — it stops being separate. */
-  lockedCp: number;
-  /** At the cap, so nothing more is being credited. */
-  capped: boolean;
+  /**
+   * What is sitting in the account, waiting.
+   *
+   * Zero for a new gamer, because B94 credits nothing before the steps are
+   * done. NOT zero for an account that predates the lock — those carry a real
+   * balance they earned under the old rules, and the whole promise of forcing
+   * them through onboarding is that the number is still there afterwards. It is
+   * shown as SAFE, never as pending.
+   */
+  heldCp: number;
   /** What they did, for the congratulations card. Empty while locked. */
   achieved: string[];
 };
 
 const UNLOCKED: UnlockState = {
-  unlocked: true, unlockedAt: null, steps: [], lockedCp: 0, capped: false, achieved: [],
+  unlocked: true, unlockedAt: null, steps: [], heldCp: 0, achieved: [],
 };
 
 /**
@@ -137,12 +141,22 @@ export function stepsFor(opts: { linked: boolean; email: boolean; profile: boole
     },
     {
       key: "profile",
-      label: "Your age and your country",
-      detail: "Two answers. Your age decides whether prize money can be paid to you at all; your country decides how it reaches you. Neither is shown to anybody but the flag beside your name.",
+      label: "Your age, your country and your colours",
+      detail: "Your age decides whether prize money can be paid to you at all; your country decides how it reaches you; your colours are what your card looks like in every server. Nobody sees the first two — only the flag beside your name.",
       done: opts.profile,
     },
   ];
 }
+
+/**
+ * How many steps there are.
+ *
+ * Derived from `stepsFor`, never written down twice. The guide pages quote it,
+ * and a guide that says "two steps" over a list of three is the kind of thing a
+ * gamer screenshots.
+ */
+export const UNLOCK_STEPS =
+  stepsFor({ linked: false, email: false, profile: false }).length;
 
 /**
  * Where this gamer stands.
@@ -171,9 +185,15 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
       .from(schema.linkedGameAccounts)
       .where(eq(schema.linkedGameAccounts.userId, userId));
     const linked = Number(linkRow?.n ?? 0) > 0;
-    // The profile step is BOTH answers, not either. A country with no age band
-    // cannot be paid and an age band with no country cannot be paid either.
-    const profile = /^[A-Za-z]{2}$/.test((u.country ?? "").trim()) && !!u.ageBand;
+    // The profile step is ALL THREE answers, not any of them. A country with no
+    // age band cannot be paid and an age band with no country cannot be paid
+    // either; the theme is there because a card nobody has made theirs is a card
+    // nobody shows anyone. All three are saved by one button, so this can never
+    // be half-done by a gamer — only by a fixture.
+    const theme = u.theme as { template?: unknown } | null;
+    const profile = /^[A-Za-z]{2}$/.test((u.country ?? "").trim())
+      && !!u.ageBand
+      && !!theme && typeof theme.template === "string" && theme.template.length > 0;
     const email = !!u.emailVerifiedAt;
 
     // A READ THAT PROMOTES. Deliberate, and worth defending.
@@ -198,14 +218,12 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
 
     const [cp] = await db.select({ n: sql<number>`coalesce(sum(${schema.questEvents.cpAwarded}), 0)` })
       .from(schema.questEvents).where(eq(schema.questEvents.userId, userId));
-    const lockedCp = Number(cp?.n ?? 0);
 
     return {
       unlocked: false,
       unlockedAt: null,
       steps: stepsFor({ linked, email, profile }),
-      lockedCp,
-      capped: lockedCp >= LOCKED_CP_CAP,
+      heldCp: Number(cp?.n ?? 0),
       achieved: [],
     };
   } catch {
@@ -238,24 +256,6 @@ export async function tryUnlock(db: DB, userId: string): Promise<UnlockState> {
     "You told us your age and where you are",
   ];
   return { ...UNLOCKED, unlockedAt: now, achieved };
-}
-
-/**
- * May this gamer be credited right now, and how much?
- *
- * Called from inside the award path, after the age gate. Returns the amount to
- * actually credit — which is the requested amount, or whatever is left under
- * the cap, or nothing.
- *
- * It returns a NUMBER rather than a boolean so a gamer sitting at 4,990 gets
- * their last 10 CP instead of being refused a 25-CP action outright. Refusing
- * the whole action would leave the cap reading 4,990 forever, which looks
- * broken in exactly the way that generates support tickets.
- */
-export function creditableWhileLocked(state: UnlockState, want: number): number {
-  if (state.unlocked) return want;
-  const room = Math.max(0, LOCKED_CP_CAP - state.lockedCp);
-  return Math.min(want, room);
 }
 
 /** Every gamer who has not finished. Admin only — never a brand-facing count. */

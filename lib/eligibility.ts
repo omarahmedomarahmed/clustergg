@@ -136,7 +136,11 @@ export type Eligibility = {
  */
 export function ageForBand(band: string | null | undefined): number | null {
   if (band === "adult") return MIN_REDEEM_AGE;
-  if (band === "teen") return 16;
+  // B95 widened `teen` from "16 or 17" to "13 to 17". The number moves with it,
+  // because the lowest age the band could mean is the only safe reading — and
+  // both values fail the 18 test identically, which is the only thing this
+  // function is asked.
+  if (band === "teen") return 13;
   if (band === "under16") return 0;
   return null;
 }

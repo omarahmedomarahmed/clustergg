@@ -206,6 +206,11 @@ export async function seed(db: DB, opts: { demo: boolean }) {
       ageBand: "adult", ageBandSetAt: new Date(),
       // B83. A demo gamer who has not finished onboarding cannot spend or cash
       // out, and the demo exists to show a working economy.
+      //
+      // B94 made the stamp insufficient on its own — the de-grandfathering
+      // migration lifts `unlocked_at` from anybody who does not actually meet
+      // the bar — so the demo people MEET it rather than claiming it.
+      emailVerifiedAt: new Date(),
       unlockedAt: new Date(),
     });
     return id;

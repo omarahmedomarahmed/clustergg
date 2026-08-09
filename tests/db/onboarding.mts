@@ -1,10 +1,14 @@
-// Two steps, a held balance, and the promise not to take anything. B83.
+// Three steps, and nothing at all before they are done. B83 → B94.
 //
-// The assertion this file exists for is the LAST one: an account that existed
-// before the lock did is never locked. Everything else here is a gate, and a
-// gate that is slightly wrong costs a support ticket. Locking an early user out
-// of a balance they already had costs the early user, and there is no version
-// of that we could apologise our way out of.
+// This file used to exist for one assertion: that an account created before the
+// lock was never locked. B94 REVERSED that, and the reversal is now what the
+// last block asserts — everybody goes through onboarding, including the people
+// who were here first.
+//
+// The promise that survives is the one that was always the important half:
+// **nothing anybody earned is taken.** A pre-existing account is stopped from
+// doing the NEXT thing, never stripped of the last one, and the tests below
+// check the balance is still there afterwards.
 //
 //   DEMO_DB=1 npx tsx tests/db/onboarding.mts
 
@@ -28,7 +32,7 @@ const { getDb, schema } = await import("../../lib/db/index.ts");
 const { eq: sqlEq, sql } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
 const {
-  unlockState, tryUnlock, hasCustomized, stepsFor, creditableWhileLocked, LOCKED_CP_CAP,
+  unlockState, tryUnlock, hasCustomized, stepsFor, UNLOCK_STEPS,
 } = await import("../../lib/unlock.ts");
 const { awardQuestAction } = await import("../../lib/quests.ts");
 const { buyTrophy, cpPerDollar, priceOf } = await import("../../lib/marketplace.ts");
@@ -36,7 +40,10 @@ const { buyTrophy, cpPerDollar, priceOf } = await import("../../lib/marketplace.
 const db = await getDb();
 const tag = uid().slice(0, 8);
 
-const mkGamer = async (opts: { customized?: boolean; country?: boolean; email?: boolean; band?: string | null; unlocked?: boolean } = {}) => {
+const mkGamer = async (opts: {
+  customized?: boolean; country?: boolean; email?: boolean;
+  band?: string | null; unlocked?: boolean; theme?: boolean;
+} = {}) => {
   const id = uid();
   await db.insert(schema.users).values({
     id, email: `${id}@ob.test`, displayName: `OB ${id.slice(0, 4)}`,
@@ -46,6 +53,7 @@ const mkGamer = async (opts: { customized?: boolean; country?: boolean; email?: 
     // which one the assertion is actually about.
     ...(opts.customized ? { avatarUrl: "/a.png" } : {}),
     ...(opts.country ? { country: "EG" } : {}),
+    ...(opts.theme ? { theme: { template: "cosmic" } } : {}),
     ...(opts.email ? { emailVerifiedAt: new Date() } : {}),
     ...(opts.unlocked ? { unlockedAt: new Date() } : {}),
   });
@@ -93,41 +101,53 @@ console.log("== what counts as customizing ==");
     !stepsFor({ linked: true, email: true, profile: false }).find((x) => x.key === "profile")?.done);
 }
 
-console.log("\n== a new gamer is locked, and earns anyway ==");
+console.log("\n== a new gamer is locked, and earns NOTHING ==");
 {
   const id = await mkGamer();
   const s = await unlockState(db, id);
   ok("a fresh account is locked", !s.unlocked);
   eq("…with every step outstanding", s.steps.filter((x) => x.done).length, 0);
 
-  // Earning still happens. A gamer who earns nothing until they finish learns
-  // nothing about what earning feels like.
+  // B94 REVERSED B83. It used to accrue to a cap, on the theory that a balance
+  // somebody can see is a reason to finish. What that actually created was a
+  // promise made to an account with no confirmed inbox, no declared age and no
+  // country — a promise we could not price, could not pay, and could not
+  // legally have made if the person behind it turned out to be twelve.
   await awardQuestAction(db, id, "join_challenge");
   const [row] = await db.select({ n: sql<number>`coalesce(sum(${schema.questEvents.cpAwarded}), 0)` })
     .from(schema.questEvents).where(sqlEq(schema.questEvents.userId, id));
-  ok("a locked gamer still accrues CP", Number(row.n) > 0, String(row.n));
+  eq("a locked gamer accrues nothing", Number(row.n), 0);
+
+  // But the ACTION is still recorded, the same as an action over the daily
+  // ceiling. Nothing should look like it vanished, and the history is there the
+  // moment they finish.
+  const [seen] = await db.select({ n: sql<number>`count(*)` })
+    .from(schema.questEvents).where(sqlEq(schema.questEvents.userId, id));
+  ok("…but what they did is still written down", Number(seen.n) > 0, String(seen.n));
+
+  // And the page never shows a pending number, because there is not one.
+  eq("there is no held balance to advertise", s.heldCp, 0);
 }
 
-console.log("\n== the cap holds, and does not refuse the last few points ==");
+console.log("\n== the gate lives in one place, and every door reads it ==");
 {
-  const state = { unlocked: false, lockedCp: 0, capped: false } as never;
-  eq("under the cap, the full amount is credited", creditableWhileLocked(state, 25), 25);
-  // The one that matters: at 4,990 a 25-CP action credits 10, not 0. Refusing
-  // the whole action would leave the balance reading 4,990 forever, which looks
-  // broken in exactly the way that generates support tickets.
-  eq("at the edge, what is left is credited",
-    creditableWhileLocked({ unlocked: false, lockedCp: LOCKED_CP_CAP - 10 } as never, 25), 10);
-  eq("at the cap, nothing is", creditableWhileLocked({ unlocked: false, lockedCp: LOCKED_CP_CAP } as never, 25), 0);
-  eq("past the cap, still nothing and never negative",
-    creditableWhileLocked({ unlocked: false, lockedCp: LOCKED_CP_CAP + 500 } as never, 25), 0);
-  eq("an unlocked gamer is uncapped", creditableWhileLocked({ unlocked: true } as never, 999), 999);
-
-  // The cap is applied centrally, beside the daily ceiling — not at each
-  // emitter. Same rule as B72.4's age gate, same reason.
-  ok("the cap lives in the award path", /creditableWhileLocked/.test(code("lib/quests.ts")));
+  // The award path, the challenge path and the redeem path. Three doors, one
+  // check — a gate that has to be remembered at each emitter is a gate that
+  // will be forgotten at one of them, and the one it is forgotten at is the one
+  // that pays somebody we know nothing about.
+  ok("nothing accrues before onboarding is finished",
+    /if \(!state\.unlocked\) room = 0;/.test(code("lib/quests.ts")));
+  ok("…joining a challenge is refused with its own reason",
+    /reason: "onboarding"/.test(code("lib/challenges.ts")));
+  ok("…and the refusal is in the LIB, so Discord is covered too",
+    /unlockState/.test(code("lib/challenges.ts")));
+  ok("…the web path sends them to the page rather than showing an error",
+    /\/onboarding\?from=challenge/.test(code("app/actions/social.ts")));
+  ok("…and the bot path names the same page",
+    /onboarding/.test(code("app/api/discord/interactions/route.ts")));
 }
 
-console.log("\n== locked CP cannot be spent or cashed out ==");
+console.log("\n== a locked gamer cannot spend or cash out ==");
 {
   const id = await mkGamer();
   const rate = await cpPerDollar(db);
@@ -179,6 +199,9 @@ console.log("\n== finishing both steps unlocks, and says what they did ==");
   ok("a country with no age band is still not enough",
     !(await unlockState(db, id)).unlocked);
   await db.update(schema.users).set({ ageBand: "adult" }).where(sqlEq(schema.users.id, id));
+  ok("…and an age band with no colours is not enough either (B97)",
+    !(await unlockState(db, id)).unlocked);
+  await db.update(schema.users).set({ theme: { template: "cosmic" } }).where(sqlEq(schema.users.id, id));
   const done = await tryUnlock(db, id);
   ok("all three steps unlock it", done.unlocked);
   ok("…and it names the game they linked",
@@ -211,40 +234,73 @@ console.log("\n== finishing both steps unlocks, and says what they did ==");
   ok("an unlocked gamer can spend", bought.ok === true, JSON.stringify(bought));
 }
 
-console.log("\n== the grandfather rule ==");
+console.log("\n== nobody is grandfathered, and nothing is taken ==");
 {
-  // THE ASSERTION THIS FILE EXISTS FOR.
+  // THE ASSERTION THIS FILE EXISTS FOR, and it is the reverse of what it was.
   //
-  // Every account that existed before the lock did is unlocked, at the moment
-  // it was created. It is a MIGRATION rather than a runtime check, so it cannot
-  // be forgotten on a later read path — and the migration is the entire promise
-  // that nothing anybody already earned is ever taken away.
+  // B83 unlocked every pre-existing account by copying `created_at` into
+  // `unlocked_at`, on the principle that you do not take something away from
+  // somebody to close a hole they did not open. B94 lifts that stamp, because
+  // the two facts we now require — a confirmed inbox and a declared age — are
+  // the two we cannot operate without, and grandfathering an account with
+  // neither carries the hole forward forever.
+  //
+  // What must remain true is the other half of the old promise: their MONEY is
+  // untouched. Both halves are asserted here, in that order.
   const dbSrc = code("lib/db/index.ts");
-  ok("the backfill exists",
-    /UPDATE "users" SET "unlocked_at" = "created_at" WHERE "unlocked_at" IS NULL/.test(dbSrc));
-  ok("…and it is unconditional on age, not gated on a deploy date",
-    !/created_at\s*<\s*'/.test(dbSrc));
+  ok("the old blanket backfill is gone",
+    !/SET "unlocked_at" = "created_at"/.test(dbSrc));
+  ok("…and an account that does not meet the bar has its stamp lifted",
+    /SET "unlocked_at" = NULL/.test(dbSrc));
+  ok("…on all three conditions, not just the age one",
+    /"age_band" IS NULL/.test(dbSrc)
+    && /"email_verified_at" IS NULL/.test(dbSrc)
+    && /linked_game_accounts/.test(dbSrc));
+  ok("…and the backfilled email stamps are lifted with it",
+    /SET "email_verified_at" = NULL/.test(dbSrc));
 
-  // Behaviourally: an account carrying the stamp is unlocked with no steps
-  // done and no game linked at all.
-  const old = await mkGamer({ unlocked: true });
+  // Behaviourally: a stamp on an account that has done nothing is still a
+  // stamp, because `unlockState` trusts the column — the migration is what
+  // clears it, and it is asserted above. What is asserted HERE is the promise:
+  // an old account with a real balance is stopped, and the balance survives.
+  const old = await mkGamer();
+  const [quest] = await db.select().from(schema.quests).limit(1);
+  await db.insert(schema.questEvents).values({
+    id: uid(), userId: old, questId: quest.id, actionKey: "manual",
+    qpAwarded: 0, cpAwarded: 4321, refType: "seed", refId: "legacy-balance",
+  });
+
   const s = await unlockState(db, old);
-  ok("an existing account is unlocked with nothing done", s.unlocked);
-  eq("…and is shown no checklist", s.steps.length, 0);
+  ok("an account from before the lock is locked like everybody else", !s.unlocked);
+  eq("…and is shown the same checklist", s.steps.length, UNLOCK_STEPS);
+  eq("…with the balance it already had, intact", s.heldCp, 4321);
+
+  // Not "pending", not "at risk", not "held for review". It is theirs.
+  const checklist = code("components/UnlockChecklist.tsx");
+  ok("the page calls that balance safe rather than pending",
+    /safe/i.test(checklist) && !/CP locked/.test(checklist));
+
+  // And finishing gives it straight back.
+  await linkAccount(old);
+  await db.update(schema.users).set({
+    country: "EG", ageBand: "adult", emailVerifiedAt: new Date(),
+    theme: { template: "cosmic" },
+  }).where(sqlEq(schema.users.id, old));
+  const after = await tryUnlock(db, old);
+  ok("finishing the steps unlocks it", after.unlocked);
 
   const rate = await cpPerDollar(db);
   const trophyId = uid();
   await db.insert(schema.trophies).values({
     id: trophyId, name: `Old ${tag}`, imageUrl: "/x.png", value: "0", inMarketplace: true,
   });
-  const [quest] = await db.select().from(schema.quests).limit(1);
   await db.insert(schema.questEvents).values({
     id: uid(), userId: old, questId: quest.id, actionKey: "manual",
     qpAwarded: 0, cpAwarded: priceOf({ value: "0" } as never, rate) * 3,
     refType: "seed", refId: "funding",
   });
   const spend = await buyTrophy(old, trophyId);
-  ok("…and can spend a balance it already had", spend.ok === true, JSON.stringify(spend));
+  ok("…and the balance they had is spendable again", spend.ok === true, JSON.stringify(spend));
 }
 
 console.log("\n== a read that fails must not lock somebody out ==");

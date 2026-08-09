@@ -99,9 +99,10 @@ export async function eligibleGamers(db: DB, now = new Date()): Promise<number> 
         and ${schema.questEvents.createdAt} >= ${sevenDays}`)
       .where(and(
         sql`${schema.users.status} = 'active'`,
-        // Unlocked, or new enough to still be unlocking. A locked account can
-        // still earn up to LOCKED_CP_CAP, so it draws on the vault and belongs
-        // in the divisor.
+        // Earned something in the last seven days, or new enough today that it
+        // has not had the chance. B94 means a locked account draws nothing from
+        // the vault at all — it is the first clause that keeps it out, and the
+        // second is there so a gamer's first day is not counted as inactivity.
         or(
           sql`${schema.questEvents.id} is not null`,
           gte(schema.users.createdAt, startOfToday),

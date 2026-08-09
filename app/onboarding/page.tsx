@@ -11,12 +11,11 @@ import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import DiscordTag from "@/components/DiscordTag";
 import OAuthButtons from "@/components/OAuthButtons";
-import { tryUnlock, LOCKED_CP_CAP } from "@/lib/unlock";
+import { tryUnlock } from "@/lib/unlock";
 import EmailStep from "@/components/onboarding/EmailStep";
 import ProfileStep from "@/components/onboarding/ProfileStep";
 import { getCountries } from "@/lib/countries-server";
-import { pendingCodeEmail } from "@/lib/email-verify";
-import { cpPerDollar } from "@/lib/marketplace";
+import { pendingCodeEmail, maskEmail } from "@/lib/email-verify";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set up your account · Cluster" };
@@ -30,12 +29,13 @@ export const metadata = { title: "Set up your account · Cluster" };
 // choices are made here, and the page updates under them. A signup that hands
 // somebody off to settings loses the ones who close the tab.
 //
-// ===== IT LEADS WITH WHAT THEY GET =====
+// ===== IT LEADS WITH WHAT THEY GET, NOT WITH A NUMBER =====
 //
-// The balance is at the top, before the checklist, because the number is the
-// argument and a checklist on its own is a chore. Points accrue while locked —
-// nothing is taken and nothing expires — so what this page is really asking for
-// is the last mile on money they can already see.
+// This used to open on a held CP balance, because a number beats a checklist.
+// B94 stopped crediting anything before the steps are done, so that number is
+// zero for everybody arriving today and leading with it would be leading with
+// nothing. What it leads with instead is what earning IS — and, for an account
+// that predates the lock and carries a real balance, that the balance is safe.
 
 export default async function OnboardingPage() {
   const user = await getCurrentUser();
@@ -64,15 +64,13 @@ export default async function OnboardingPage() {
   // what they DID — so landing here after the last step both unlocks and
   // produces the congratulations.
   const unlock = await tryUnlock(db, user.id);
-  const [countries, sentTo, rate] = await Promise.all([
+  const [countries, sentTo] = await Promise.all([
     getCountries(),
     pendingCodeEmail(db, user.id),
-    cpPerDollar(db),
   ]);
 
   const step = (key: string) => unlock.steps.find((s) => s.key === key);
   const done = unlock.unlocked ? 3 : unlock.steps.filter((s) => s.done).length;
-  const lockedValue = rate > 0 ? unlock.lockedCp / rate : 0;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
@@ -96,15 +94,10 @@ export default async function OnboardingPage() {
 
           {!unlock.unlocked && (
             <div className="rounded-2xl border border-amber-400/35 bg-amber-500/10 px-5 py-3 text-center">
-              <div className="text-[10px] uppercase tracking-widest text-amber-200/80">Waiting for you</div>
-              <div className="text-2xl font-black tabular-nums text-amber-200">
-                {unlock.lockedCp.toLocaleString("en-US")} <span className="text-sm font-bold">CP</span>
+              <div className="text-[10px] uppercase tracking-widest text-amber-200/80">Locked until you finish</div>
+              <div className="mt-0.5 text-sm font-bold text-amber-100">
+                Challenges · Missions · Points
               </div>
-              {lockedValue > 0 && (
-                <div className="text-[11px] text-amber-100/80">
-                  ≈ ${lockedValue.toFixed(2)} at today&apos;s rate
-                </div>
-              )}
             </div>
           )}
         </div>
@@ -123,7 +116,7 @@ export default async function OnboardingPage() {
             {/* What they get, in the same breath as what they must do. */}
             <div className="mt-5 grid gap-2 sm:grid-cols-3">
               {[
-                ["diamond", "Your points unlock", `Up to ${LOCKED_CP_CAP.toLocaleString("en-US")} CP is already accruing. Finishing makes it spendable.`],
+                ["diamond", "Points for playing", "Missions and quests pay CP for the games you already play."],
                 ["trophy", "Real prize money", "Brands fund the challenges. What you win is yours to keep or cash."],
                 ["chart", "Every game, one profile", "Your stats, your rank and your trophies in one place."],
               ].map(([icon, title, body]) => (
@@ -187,6 +180,7 @@ export default async function OnboardingPage() {
         )}
         <EmailStep
           email={user.email ?? null}
+          masked={maskEmail(sentTo ?? user.email)}
           done={!!step("email")?.done}
           alreadySent={!!sentTo}
         />
@@ -195,15 +189,18 @@ export default async function OnboardingPage() {
       {/* ===== Step 3 — the two answers ===== */}
       <Step
         n={3}
-        title="Your age and your country"
-        why="Two answers, and both of them decide how prize money reaches you. Read what each choice means before you confirm — they are hard to change later."
+        title="Your age, your country and your colours"
+        why="The first two decide how prize money reaches you — read what each choice means before you confirm, because your age is answered once. The third is just what your card looks like."
         done={!!step("profile")?.done}
       >
         <ProfileStep
           countries={countries}
           band={(user as { ageBand?: string | null }).ageBand ?? null}
           country={user.country ?? null}
+          theme={(user.theme as { template?: string } | null)?.template ?? null}
           done={!!step("profile")?.done}
+          name={user.displayName}
+          avatarUrl={user.avatarUrl ?? null}
         />
       </Step>
 
@@ -218,8 +215,7 @@ export default async function OnboardingPage() {
       )}
 
       <p className="mt-8 text-center text-xs leading-relaxed text-muted">
-        Nothing is taken while you finish. Points keep accruing up to{" "}
-        {LOCKED_CP_CAP.toLocaleString("en-US")} CP and nothing expires —{" "}
+        Everything you have already done is kept. Nothing starts counting until you finish —{" "}
         <Link href="/rules/gamer" className="text-cyan-300 hover:underline">every rule, and why it exists</Link>.
       </p>
     </div>

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -95,14 +96,42 @@ export async function saveProfileAnswers(
 
   const band = parseBand(String(fd.get("ageBand") ?? ""));
   const country = String(fd.get("country") ?? "").trim().toUpperCase();
+  const themeKey = String(fd.get("theme") ?? "").trim();
+  const showAgeMark = String(fd.get("showAgeMark") ?? "1") !== "0";
 
   if (!band) return { error: "Pick whether you are over 18 — it decides whether prize money can reach you." };
   if (!/^[A-Z]{2}$/.test(country)) return { error: "Pick your country." };
 
+  // The theme is the third mandatory answer (B97) and the only one that is pure
+  // decoration — so an unknown key falls back to the default rather than
+  // refusing the whole form. Nobody should lose two correct answers because a
+  // preset was renamed between the page loading and the button being pressed.
+  const { TEMPLATES, DEFAULT_THEME } = await import("@/lib/theme");
+  const template = TEMPLATES.find((t) => t.key === themeKey) ?? TEMPLATES[0];
+
   try {
     const db = await getDb();
+    // ANSWERED ONCE. B95 removed self-serve age changes — a fact somebody can
+    // rewrite the day it becomes inconvenient is not a fact, and this one is
+    // the only thing between a minor and a payment we may not make. The guard
+    // is here as well as in `changeBand` because this action is the path
+    // everybody actually takes.
+    const [row] = await db.select({ band: schema.users.ageBand })
+      .from(schema.users).where(eq(schema.users.id, me.id)).limit(1);
+    if (row?.band && row.band !== band) {
+      const { BAND_CHANGE_HELP } = await import("@/lib/age");
+      return { error: BAND_CHANGE_HELP };
+    }
+
     await db.update(schema.users)
-      .set({ ageBand: band, country })
+      .set({
+        ageBand: band, ageBandSetAt: new Date(), country, showAgeMark,
+        // Written WHOLE, from the defaults up, rather than as `{ template }`
+        // alone: the renderer reads a full theme, and a blob carrying only a
+        // key would render as the default while the picker showed something
+        // else. B97.
+        theme: { ...DEFAULT_THEME, ...template.theme, template: template.key },
+      })
       .where(eq(schema.users.id, me.id));
     revalidatePath("/onboarding");
     revalidatePath("/", "layout");
@@ -110,4 +139,34 @@ export async function saveProfileAnswers(
   } catch {
     return { error: "Could not save that just now. Try again in a moment." };
   }
+}
+
+/**
+ * "I'm under 13" — confirmed. B95.
+ *
+ * The account is deleted and the identifiers are blocked. See `lib/under13.ts`
+ * for why anything is kept at all and exactly what.
+ *
+ * A typed confirmation is required, the same as the ordinary delete path and
+ * for the same reason: this is irreversible, and a button somebody can reach by
+ * mis-tapping twice is not a decision.
+ */
+export async function confirmUnderThirteen(
+  _prev: OnboardState | undefined, fd: FormData,
+): Promise<OnboardState> {
+  const me = await getCurrentUser();
+  if (!me) return { error: "Sign in first." };
+
+  if (String(fd.get("confirm") ?? "").trim().toUpperCase() !== "DELETE") {
+    return { error: "Type DELETE to confirm. Nothing has been deleted." };
+  }
+
+  const db = await getDb();
+  const { deleteForUnderThirteen } = await import("@/lib/under13");
+  const res = await deleteForUnderThirteen(db, me.id);
+  if (!res.ok) return { error: res.error };
+
+  const { destroySession } = await import("@/lib/auth");
+  await destroySession();
+  redirect("/goodbye");
 }

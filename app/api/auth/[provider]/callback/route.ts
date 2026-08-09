@@ -233,6 +233,22 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   }
 
   // 4) Brand-new gamer → create the account (Discord avatar + handle become identity).
+  //
+  // B95 first: somebody who told us they were under 13 had their account
+  // deleted, and a hash of this Discord ID and this address was the only thing
+  // kept. Checked here rather than at the top, because steps 1–3 are an
+  // EXISTING account signing in — a block only ever stops a new one being made.
+  {
+    const { isSignupBlocked } = await import("@/lib/under13");
+    if (await isSignupBlocked(db, {
+      email: profile.email ?? null,
+      discordId: provider === "discord" ? profile.providerUserId : null,
+    })) {
+      const { BLOCKED_SIGNUP_MESSAGE } = await import("@/lib/under13");
+      return fail(BLOCKED_SIGNUP_MESSAGE);
+    }
+  }
+
   let slug = slugify(profile.username) || `gamer-${uid().slice(0, 5).toLowerCase()}`;
   const [slugTaken] = await db.select({ id: schema.users.id }).from(schema.users).where(eq(schema.users.slug, slug)).limit(1);
   if (slugTaken) slug = `${slug}-${uid().slice(0, 4).toLowerCase()}`;
@@ -252,5 +268,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   });
   await attachIdentity(userId);
   await linkGameAccount(userId);
+
+  // B98. Discord gave us an address, so the code is already in their inbox by
+  // the time the onboarding page renders — step two opens on "check your
+  // inbox" rather than on a form asking for something we are already holding.
+  if (profile.email) {
+    try {
+      const { autoSendSignupCode } = await import("@/lib/email-verify");
+      await autoSendSignupCode(db, userId);
+    } catch { /* the page has a "send it again" button */ }
+  }
+
   return finish(userId, "user", "/onboarding");
 }

@@ -106,6 +106,29 @@ our own obligation.
   is possible at all, which is why country is asked before anybody earns rather
   than at the moment they try to collect.
 
+### None of it starts until the account is real
+
+Three steps, one page, about a minute: **link a game account**, **confirm an
+email** (a six-digit code, sent automatically at signup), and **answer three
+questions** — age band, country, and the colours their card wears.
+
+Until all three are done, **nothing accrues.** No points, no trophies, no
+challenge entry. We used to let a balance build to a cap, on the argument that a
+number somebody can watch climb is a better reason to finish than an empty
+screen. It is a good argument and it lost to a better one: a balance is a
+promise, and a promise made to an account whose age, country and inbox we do not
+know is one we may not be able to keep.
+
+Two age bands are selectable — **13 to 17** and **18 or over**. Under-13 is not
+one of them; it is a link that explains why, asks for a typed confirmation, and
+deletes the account. A salted hash of the email and the Discord ID is kept
+afterwards, and nothing else, so the same person cannot sign up again a minute
+later with a different answer.
+
+A confirmed account carries a **check mark** — gold at 18+, blue below it, and
+the hover text says "Confirmed account" and never an age. It can be switched off
+in one place, and switching it off changes nothing about what they may do.
+
 ---
 
 ## 6. The lifecycle every challenge follows

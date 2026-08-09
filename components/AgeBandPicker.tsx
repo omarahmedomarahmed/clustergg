@@ -3,22 +3,23 @@
 import { useActionState } from "react";
 import Icon from "@/components/Icon";
 import { setAgeBand, type BandState } from "@/app/actions/age";
-import { AGE_BANDS, BAND_LABEL, BAND_RULES, type AgeBand } from "@/lib/age";
+import { AGE_BANDS, BAND_CHANGE_HELP, BAND_LABEL, BAND_RULES, type AgeBand } from "@/lib/age";
 
-// Three buttons. B72.4.
+// The band, in settings. B72.4 → B95.
 //
-// **The click IS the answer** — no "next", no "confirm". A confirm step on a
-// question this small is a step people abandon, and an unanswered band is worth
-// nothing to us and costs the gamer their earnings. One tap, and the page moves
-// on.
+// IT IS NOT THE SIGNUP CONTROL ANY MORE. The band is asked on the onboarding
+// page now, where selecting one shows what it does before a separate button
+// saves it. This survives as the settings view of the same fact: it shows which
+// band the account is in, and — since B95 set `MAX_BAND_CHANGES` to zero — what
+// to do when it is wrong, which is to talk to a human.
 //
-// That shape guarantees mis-taps, which is exactly why `/settings/earning`
-// exists and why this component says so underneath rather than burying it.
+// The buttons are disabled rather than removed. A control that vanishes leaves
+// somebody hunting for it and then writing to support asking where their age
+// setting went; a control they can see, with the reason underneath, answers the
+// question without the ticket.
 //
 // What each band gets is printed on the button. Not because a regulator asks
-// for it, but because "Under 16" with no consequence attached reads as a
-// formality — and somebody who taps it without understanding is the person the
-// whole gate is meant to protect.
+// for it, but because a band with no consequence attached reads as a formality.
 
 export default function AgeBandPicker({
   current, locked, left, compact = false,
@@ -35,7 +36,7 @@ export default function AgeBandPicker({
 
   return (
     <div className="space-y-3">
-      <div className="grid gap-2 sm:grid-cols-3">
+      <div className="grid gap-2 sm:grid-cols-2">
         {AGE_BANDS.map((b) => {
           const rules = BAND_RULES[b];
           const active = shown === b;
@@ -43,7 +44,7 @@ export default function AgeBandPicker({
             <form key={b} action={act}>
               <input type="hidden" name="band" value={b} />
               <button
-                disabled={busy || (locked && !active)}
+                disabled={busy || !!shown}
                 data-band={b}
                 className={`w-full rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed disabled:opacity-45 ${
                   active
@@ -77,12 +78,8 @@ export default function AgeBandPicker({
       {!compact && (
         <p className="text-[11px] leading-relaxed text-muted">
           <Icon name="check" size={10} className="mr-1 inline text-emerald-300" />
-          We never ask for your date of birth — only which of these three you are in.
-          {locked ? (
-            <> Your age range is <b className="text-ink">locked</b> after three changes. Message support if it is wrong.</>
-          ) : shown ? (
-            <> Tapped the wrong one? You can change it {left === 1 ? "once more" : `${left} more times`}.</>
-          ) : null}
+          We never ask for your date of birth — only which of these you are in.
+          {shown ? <> {BAND_CHANGE_HELP}</> : null}
         </p>
       )}
     </div>

@@ -63,6 +63,10 @@ const slug = `pe-${tag}`;
 await db.insert(schema.users).values({
   id: userId, slug, displayName: `Planet Explorer ${tag}`,
   email: `${userId}@test.invalid`, passwordHash: "x", ageBand: "adult", status: "active",
+  // B94: a challenge refuses an account that has not finished onboarding, so a
+  // fixture about the EXPLORE rule has to be a finished account or it tests the
+  // onboarding gate by accident.
+  unlockedAt: new Date(),
 } as never);
 
 const mkAccount = async (ign: string) => {

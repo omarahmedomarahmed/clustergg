@@ -77,6 +77,17 @@ export const users = pgTable("users", {
    */
   ageBandChanges: integer("age_band_changes").notNull().default(0),
   /**
+   * Draw the confirmed check mark beside this name? B96.
+   *
+   * On by default, because it is worth having. Off is one switch in settings and
+   * it applies everywhere at once — profile, Discord cards, pills. A mark whose
+   * colour distinguishes minors from adults is information a minor may not want
+   * public, and whether it is public is their call rather than ours.
+   *
+   * It changes nothing about what they may DO. See lib/verified-mark.ts.
+   */
+  showAgeMark: boolean("show_age_mark").notNull().default(true),
+  /**
    * The address this account was created from. B80.
    *
    * Stored so account-creation velocity can be counted per address at all — the
@@ -157,6 +168,34 @@ export const emailCodes = pgTable("email_codes", {
   usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
   createdAt: now("created_at"),
 }, (t) => [index("email_code_user_idx").on(t.userId, t.createdAt)]);
+
+/**
+ * People who told us they are under 13. B95.
+ *
+ * The account is deleted — genuinely, `db.delete(users)`, cascades and all —
+ * and this is the ONLY thing that survives it: a one-way hash of the Discord ID
+ * and of the email, so the same person cannot make the account again ten
+ * seconds later and pick a different answer.
+ *
+ * WHAT IS IN HERE, EXACTLY: a SHA-256 of an identifier and a date. No name, no
+ * email in readable form, no Discord ID in readable form, no age, no IP, no
+ * history. It cannot be searched by a human, cannot be reversed into a contact
+ * detail, and answers exactly one question — "has this identifier been here
+ * before" — which is the question the whole record exists to answer.
+ *
+ * Keeping something is not the comfortable option and it is the right one:
+ * keeping nothing means the deletion accomplishes nothing at all.
+ */
+export const blockedSignups = pgTable("blocked_signups", {
+  id: id(),
+  /** "discord" | "email". What kind of identifier the hash is of. */
+  kind: text("kind").notNull(),
+  /** SHA-256. Never the value itself, on any path. */
+  keyHash: text("key_hash").notNull(),
+  /** Why. One word — "under13" today, and the column exists so it can be more. */
+  reason: text("reason").notNull().default("under13"),
+  createdAt: now("created_at"),
+}, (t) => [uniqueIndex("blocked_signup_idx").on(t.kind, t.keyHash)]);
 
 export const oauthIdentities = pgTable("oauth_identities", {
   id: id(),

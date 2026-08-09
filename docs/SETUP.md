@@ -117,7 +117,7 @@ and you can stop after any step.
 
 | Variable | Required | What it is |
 |---|---|---|
-| `RESEND_API_KEY` | to send at all | From resend.com → API Keys. Without it the layer no-ops. |
+| `RESEND_API_KEY` | to send at all | From resend.com → API Keys. Without it the layer no-ops — and **the signup verification code is printed on the onboarding page instead**, so a local copy stays usable past step two. On a deployment with this key set, the code exists only in the inbox. |
 | `EMAIL_FROM` | strongly | `Cluster <billing@yourdomain.com>`. Defaults to Resend's shared `onboarding@resend.dev`, which is fine for a first test and wrong for anything real. |
 | `EMAIL_REPLY_TO` | optional | Where a human reply should land — usually the forwarding address from step 2. |
 | `RESEND_WEBHOOK_SECRET` | for delivery status | Any long random string. Set the same value in Resend's webhook config. Without it the webhook endpoint returns 503 and refuses everything, which is deliberate. |

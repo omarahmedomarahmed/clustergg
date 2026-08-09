@@ -11,9 +11,12 @@ import { unlockState } from "@/lib/unlock";
 // the last step is done, and then it is gone forever.
 //
 // It says how many steps are left and NOT what they are. The detail belongs on
-// the page; a bar that tries to be the page is a bar people dismiss. What it
-// does carry is the balance, because that is the argument — the points are
-// already accruing and this is the thing standing between them and spending it.
+// the page; a bar that tries to be the page is a bar people dismiss.
+//
+// It carries a balance only when there IS one — an account that predates B94
+// and has CP sitting in it, which is the case where the bar has something
+// concrete to say. A new account has nothing accruing, so the bar does not
+// imply that it does.
 //
 // Server component: it reads the same `unlockState` every other surface reads,
 // so it can never disagree with the checklist it links to.
@@ -60,9 +63,9 @@ export default async function OnboardingBar() {
 
         {next && <span className="text-amber-100/70">Next: {next.label.toLowerCase()}</span>}
 
-        {state.lockedCp > 0 && (
+        {state.heldCp > 0 && (
           <span className="text-amber-100/70">
-            · {state.lockedCp.toLocaleString("en-US")} CP waiting
+            · {state.heldCp.toLocaleString("en-US")} CP safe
           </span>
         )}
 

@@ -57,12 +57,24 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announced_at" timestamptz`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified_at" timestamptz`,
-  // THE GRANDFATHER RULE, AGAIN. Everybody who already had an account keeps
-  // their earning: an unverified email is a gate on NEW accounts, and taking
-  // something away from somebody to close a hole they did not open is the one
-  // thing this migration must not do. Runs once; `is null` makes it a no-op
-  // afterwards, and a genuinely new row is created with null and stays null.
-  `UPDATE "users" SET "email_verified_at" = "created_at" WHERE "email_verified_at" IS NULL AND "created_at" < now() - interval '1 minute'`,
+  // THE GRANDFATHER RULE, REVERSED. B94, and it is a decision rather than a fix.
+  //
+  // B93 stamped every pre-existing account as verified, on the principle that
+  // you do not take something away from somebody to close a hole they did not
+  // open. That principle still holds for their MONEY — balances, trophies and
+  // ranks are untouched by any of this.
+  //
+  // It does not hold for the fact itself. A stamp that says "this inbox was
+  // proved" against an inbox nobody ever proved is not a kindness, it is a
+  // false record, and the whole point of the column is to be able to reach a
+  // person about their own prize money. So the backfilled stamps are lifted and
+  // those accounts confirm an address like everybody else.
+  //
+  // `email_verified_at = created_at` identifies backfilled rows EXACTLY: the
+  // backfill copied one column into the other, and a real verification always
+  // lands later than the row was created. So this cannot clear a stamp somebody
+  // earned, and it is a no-op on every subsequent run.
+  `UPDATE "users" SET "email_verified_at" = NULL WHERE "email_verified_at" IS NOT NULL AND "email_verified_at" = "created_at"`,
   `ALTER TABLE "sponsored_campaigns" ADD COLUMN IF NOT EXISTS "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "baseline_at" timestamptz`,
@@ -827,6 +839,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band_set_at" timestamp with time zone`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band_changes" integer DEFAULT 0 NOT NULL`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "show_age_mark" boolean DEFAULT true NOT NULL`,
 
   // B72.2 — one viewer, one creative, one hour. A unique index because two
   // racing beacon calls would both pass a SELECT and both insert.
@@ -907,6 +920,17 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "email_code_user_idx" ON "email_codes" ("user_id","created_at")`,
 
+  // B95. The only thing that outlives an under-13 deletion. See the schema
+  // comment: hashes and a date, nothing that can be read back into a person.
+  `CREATE TABLE IF NOT EXISTS "blocked_signups" (
+    "id" text PRIMARY KEY NOT NULL,
+    "kind" text NOT NULL,
+    "key_hash" text NOT NULL,
+    "reason" text DEFAULT 'under13' NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "blocked_signup_idx" ON "blocked_signups" ("kind","key_hash")`,
+
   `CREATE TABLE IF NOT EXISTS "form_drafts" (
     "id" text PRIMARY KEY NOT NULL,
     "owner_type" text NOT NULL,
@@ -952,17 +976,37 @@ const COLUMN_MIGRATIONS = [
 
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "signup_ip" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "unlocked_at" timestamp with time zone`,
-  // B83's grandfather rule, as a migration rather than a runtime check.
+  // EVERY ACCOUNT GOES THROUGH ONBOARDING. B94.
   //
-  // Every account that existed before onboarding gained a lock is unlocked, at
-  // the moment it was created. It runs once (the marker in
-  // `runColumnMigrations` sees to that) and it is the entire promise that
-  // nothing anybody already earned is ever taken away.
+  // B83 unlocked every pre-existing account by copying `created_at` into
+  // `unlocked_at`. This lifts that stamp from anybody who has not actually
+  // finished the three steps — and it is the reversal of a promise, so it is
+  // worth being exact about what is and is not being taken.
   //
-  // Guarded on `created_at` being older than the deploy is NOT what this does,
-  // deliberately: an account created between the column landing and this
-  // statement running is also an account nobody told about a lock.
-  `UPDATE "users" SET "unlocked_at" = "created_at" WHERE "unlocked_at" IS NULL`,
+  //   TAKEN     the ability to earn, spend, redeem or enter a challenge, until
+  //             the steps are done. About a minute of work.
+  //   NOT TAKEN a single point, a single trophy, a rank, a placement, or any
+  //             history whatsoever. Everything is exactly where they left it,
+  //             and the page they land on says so in those words.
+  //
+  // Why it was worth doing: the two facts we now require of everybody — a
+  // confirmed inbox and a declared age band — are the two we cannot operate
+  // without. An account with neither cannot be paid, cannot be contacted about
+  // a prize, and might belong to a twelve-year-old. Grandfathering that is not
+  // generosity, it is carrying the hole forward forever.
+  //
+  // Idempotent by construction: it only ever clears a stamp on an account that
+  // does not meet the bar, and `unlockState` re-stamps the moment one does.
+  `UPDATE "users" SET "unlocked_at" = NULL
+     WHERE "unlocked_at" IS NOT NULL
+       AND (
+         "age_band" IS NULL
+         OR coalesce("country", '') = ''
+         OR "email_verified_at" IS NULL
+         OR NOT EXISTS (
+           SELECT 1 FROM "linked_game_accounts" l WHERE l."user_id" = "users"."id"
+         )
+       )`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "surface" text`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "card_kind" text`,
   `CREATE INDEX IF NOT EXISTS "imp_kind_idx" ON "ad_impressions" ("campaign_creative_id", "card_kind")`,

@@ -100,7 +100,7 @@ export async function requestRedeem(input: {
     const state = await unlockState(db, user.id);
     if (!state.unlocked) {
       return {
-        error: "Finish setting up your account before cashing out — link a game and make your profile yours. Everything you've won is held safely until you do.",
+        error: "Finish setting up your account before cashing out — link a game, confirm your email, and tell us your age and country. Everything you have won is held safely until you do.",
       };
     }
   }
@@ -120,9 +120,17 @@ export async function requestRedeem(input: {
     if (input.ageBand) {
       const { parseBand } = await import("@/lib/age");
       const band = parseBand(input.ageBand);
-      if (!band) return { error: "Pick one of the three age ranges." };
-      patch.ageBand = band;
-      patch.ageBandSetAt = new Date();
+      if (!band) return { error: "Pick one of the two age ranges." };
+      // ANSWERED ONCE. B95 — the band is set on the onboarding page and cannot
+      // be rewritten from a cash-out form, which is precisely where somebody
+      // has a reason to rewrite it. A band already on file wins, and the
+      // eligibility check below then refuses on the real one.
+      const [existing] = await db.select({ band: schema.users.ageBand })
+        .from(schema.users).where(eq(schema.users.id, user.id)).limit(1);
+      if (!existing?.band) {
+        patch.ageBand = band;
+        patch.ageBandSetAt = new Date();
+      }
     }
     if (input.country) patch.country = input.country.trim().toUpperCase().slice(0, 2);
     if (Object.keys(patch).length) {

@@ -20,6 +20,8 @@ import Flag from "@/components/Flag";
 import { getT } from "@/lib/i18n/t-server";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
+import VerifiedMarkIcon from "@/components/VerifiedMark";
+import { markFor } from "@/lib/verified-mark";
 import FollowButton from "@/components/FollowButton";
 import AdSlot from "@/components/AdSlot";
 import ProfileAccounts from "@/components/ProfileAccounts";
@@ -424,7 +426,10 @@ export default async function ProfilePage({ params }: Props) {
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center justify-center sm:justify-start gap-2 flex-wrap break-words" style={{ color: theme.text }}>
               {user.displayName}
               {user.country && <Flag code={user.country} className="text-2xl sm:text-3xl" title={user.country} />}
-              {user.isVerified && <Icon name="check" size={20} strokeWidth={3} style={{ color: theme.accent2 }} />}
+              {/* B96. The confirmed mark — gold at 18+, blue under it, and
+                  nothing at all when the gamer has switched it off. It never
+                  writes an age out; see lib/verified-mark.ts. */}
+              <VerifiedMarkIcon mark={markFor(user)} size={22} />
             </h1>
             {user.title && <div className="text-base sm:text-lg font-semibold p-grad">{user.title}</div>}
             {user.discordUsername && <div className="mt-1.5 flex justify-center sm:justify-start"><DiscordTag username={user.discordUsername} size="md" /></div>}

@@ -174,6 +174,57 @@ export async function checkVerificationCode(
   }
 }
 
+/**
+ * Send the first code the moment an account exists. B98.
+ *
+ * Called from both signup paths. On the Discord path we usually have an address
+ * already (Discord gives us one with the `email` scope), and asking somebody to
+ * press "send me a code" for an address we are already holding is a step that
+ * exists only because nobody wired it up. On the email path we certainly have
+ * one — they just typed it.
+ *
+ * NEVER THROWS AND NEVER BLOCKS SIGNUP. A mail provider having a bad afternoon
+ * must not stop an account being created; the onboarding page has a "send it
+ * again" button, and that is the recovery path.
+ *
+ * Returns whether a code went out, so the page can open on "check your inbox"
+ * instead of an empty form.
+ */
+export async function autoSendSignupCode(db: DB, userId: string): Promise<boolean> {
+  try {
+    const res = await sendVerificationCode(db, userId);
+    if (!res.ok || !res.code) return false;
+    const { sendEmail } = await import("@/lib/email");
+    await sendEmail({
+      to: res.email,
+      template: "verify.code",
+      data: { name: "", code: res.code, minutes: CODE_TTL_MIN },
+      ref: { type: "user", id: userId },
+    });
+    return true;
+  } catch { return false; }
+}
+
+/**
+ * An address with most of it taken out.
+ *
+ * Shown on the onboarding page instead of the full address. The point is to let
+ * somebody RECOGNISE the inbox — "yes, that's my gmail" — without the page
+ * itself being a place an address can be read off a shared screen or a
+ * screenshot. Enough characters to recognise, never enough to retype.
+ */
+export function maskEmail(email: string | null | undefined): string {
+  const raw = (email ?? "").trim();
+  const at = raw.lastIndexOf("@");
+  if (at < 1) return "";
+  const [name, domain] = [raw.slice(0, at), raw.slice(at + 1)];
+  const head = name.slice(0, Math.min(2, name.length));
+  const dot = domain.lastIndexOf(".");
+  const tld = dot > 0 ? domain.slice(dot) : "";
+  const host = dot > 0 ? domain.slice(0, dot) : domain;
+  return `${head}${"•".repeat(Math.max(3, name.length - head.length))}@${host.slice(0, 1)}${"•".repeat(Math.max(2, host.length - 1))}${tld}`;
+}
+
 /** Has this account proved its inbox? */
 export async function isEmailVerified(db: DB, userId: string): Promise<boolean> {
   try {

@@ -3,6 +3,7 @@ import { getDb, schema } from "@/lib/db";
 import { getProvider, PROVIDERS } from "@/lib/providers/registry";
 import { getUserQuests, getTotalCp } from "@/lib/quests";
 import { levelFromCp } from "@/lib/level";
+import { markFor } from "@/lib/verified-mark";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys } from "@/lib/card-bg";
 import type { CardData, CardTheme } from "@/lib/cards/types";
@@ -83,6 +84,7 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     avatarUrl: user.avatarUrl,
     title: user.title,
     country: user.country,
+    mark: markFor(user),
     totalCp,
     level: levelFromCp(totalCp).level,
     views: user.profileViews ?? 0,
