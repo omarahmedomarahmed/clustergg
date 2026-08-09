@@ -56,6 +56,9 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_adjust" jsonb NOT NULL DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announced_at" timestamptz`,
+  // B101. Two brands on one challenge, and never three — see lib/co-sponsor.ts.
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "co_sponsor_brand_id" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "lead_share_pct" integer DEFAULT 50 NOT NULL`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified_at" timestamptz`,
   // THE GRANDFATHER RULE, REVERSED. B94, and it is a decision rather than a fix.
   //

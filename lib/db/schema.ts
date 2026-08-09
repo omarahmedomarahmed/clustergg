@@ -510,6 +510,24 @@ export const challenges = pgTable("challenges", {
    */
   kind: text("kind").notNull().default("standard"), // standard | welcome
   sponsorBrandId: text("sponsor_brand_id"),
+  /**
+   * The SECOND brand on a co-sponsored challenge. B101.
+   *
+   * A column rather than an array, and that is the design: the owner set a
+   * ceiling of two, and a nullable second column makes "three brands"
+   * impossible to store rather than merely illegal to write. See
+   * lib/co-sponsor.ts, which also owns the rule that a co-sponsored challenge
+   * is not paid until BOTH brands have paid.
+   */
+  coSponsorBrandId: text("co_sponsor_brand_id"),
+  /**
+   * The lead brand's percentage of the bill. The co-sponsor takes the rest.
+   *
+   * 50 is the default and not the rule — a publisher putting up the prize money
+   * beside a drink brand putting up a logo is a 70/30 deal, and that belongs in
+   * a field rather than in a comment explaining why the numbers look odd.
+   */
+  leadSharePct: integer("lead_share_pct").notNull().default(50),
   /** The ad campaign this challenge was bought under, when there is one. */
   sponsorCampaignId: text("sponsor_campaign_id"),
   /** What the brand paid for THIS challenge. Zero for anything unsponsored. */

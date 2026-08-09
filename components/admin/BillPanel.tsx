@@ -35,8 +35,21 @@ export default function BillPanel({ bill }: { bill: Bill }) {
               : bill.payer.name}
           </span>
         )}
+        {/* B101. The second brand, beside the first, with what each owes. A
+            co-sponsored challenge showing one name is the screen that lets
+            somebody announce it on half its funding. */}
+        {bill.coPayer && (
+          <span className="text-sm font-semibold">
+            &amp; <span className="text-cyan-300">{bill.coPayer.name}</span>
+          </span>
+        )}
         {bill.amount > 0 && (
           <span className="text-sm font-black tabular-nums">{usd(bill.amount)}</span>
+        )}
+        {bill.split && bill.payer && bill.coPayer && (
+          <span className="text-[11px] tabular-nums text-muted">
+            {bill.payer.name} {usd(bill.split.lead)} · {bill.coPayer.name} {usd(bill.split.co)}
+          </span>
         )}
         <span className={`ml-auto rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-widest ${
           bill.paid

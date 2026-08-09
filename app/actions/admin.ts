@@ -5,6 +5,7 @@ import { and, eq, isNull, count } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireAdmin, requireStaff, hashPassword } from "@/lib/auth";
 import { requireArea, setStaffGrants } from "@/lib/permissions";
+import { checkCoSponsor } from "@/lib/co-sponsor";
 import { requireSystemFor } from "@/lib/departments";
 import { uid, slugify } from "@/lib/utils";
 import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
@@ -539,8 +540,16 @@ export async function saveChallenge(
       const brandId = String(formData.get("sponsorBrandId") ?? "").trim() || null;
       const campaignId = String(formData.get("sponsorCampaignId") ?? "").trim() || null;
       const price = Math.max(0, Number(formData.get("sponsorPrice")) || 0);
+      // B101. A second brand, never a third — the check is pure and lives in
+      // lib/co-sponsor.ts so the form and the action refuse for the same reason
+      // in the same words. An invalid pick is DROPPED rather than throwing:
+      // losing a co-sponsor is recoverable, losing the whole form is not.
+      const co = checkCoSponsor(brandId, formData.get("coSponsorBrandId"));
+      const leadPct = Math.min(100, Math.max(0, Number(formData.get("leadSharePct")) || 50));
       return {
         sponsorBrandId: brandId,
+        coSponsorBrandId: co.ok ? co.coSponsorBrandId : null,
+        leadSharePct: co.ok && co.coSponsorBrandId ? leadPct : 50,
         sponsorCampaignId: brandId ? campaignId : null,
         sponsorPrice: brandId ? price : 0,
       };

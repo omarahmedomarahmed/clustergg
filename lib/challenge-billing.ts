@@ -30,6 +30,7 @@
 // copy is a second thing to drift.
 
 import { and, desc, eq, inArray, or } from "drizzle-orm";
+import { splitBill } from "@/lib/co-sponsor";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
@@ -59,6 +60,10 @@ export type KindInput = {
   visibility?: string | null;
   guildId?: string | null;
   sponsorBrandId?: string | null;
+  /** The second brand, when there is one. B101 — see lib/co-sponsor.ts. */
+  coSponsorBrandId?: string | null;
+  /** The lead's percentage of the bill. The co-sponsor takes the rest. */
+  leadSharePct?: number | null;
   sponsorCampaignId?: string | null;
 };
 
@@ -82,6 +87,17 @@ export type Bill = {
   kind: ChallengeKind;
   /** Who owes it. Null for a house challenge nobody is billed for yet. */
   payer: { type: "brand" | "server"; id: string; name: string } | null;
+  /**
+   * The SECOND brand, on a co-sponsored challenge. B101.
+   *
+   * Kept beside `payer` rather than turning `payer` into a list, because every
+   * screen and every test that reads "who owes this" means the lead brand and
+   * would keep meaning it — a list would have made forty call sites take an
+   * index and one of them would have taken the wrong one.
+   */
+  coPayer: { type: "brand"; id: string; name: string } | null;
+  /** What each owes, when there are two. Null when there is one payer. */
+  split: { lead: number; co: number } | null;
   /** What this challenge is worth. Zero when it was never priced. */
   amount: number;
   paid: boolean;
@@ -112,7 +128,8 @@ export async function billFor(
 ): Promise<Bill> {
   const kind = kindOf(challenge);
   const base: Bill = {
-    kind, payer: null, amount: round2(Number(challenge.sponsorPrice ?? 0)),
+    kind, payer: null, coPayer: null, split: null,
+    amount: round2(Number(challenge.sponsorPrice ?? 0)),
     paid: false, evidence: null, href: null, warning: "",
   };
 
@@ -140,10 +157,14 @@ export async function billFor(
     }
 
     const brandId = challenge.sponsorBrandId ?? null;
-    const [brand] = brandId
+    const coBrandId = challenge.coSponsorBrandId ?? null;
+    const brandRows = brandId || coBrandId
       ? await db.select({ id: schema.brands.id, name: schema.brands.name, isHouse: schema.brands.isHouse })
-        .from(schema.brands).where(eq(schema.brands.id, brandId)).limit(1)
-      : [undefined];
+        .from(schema.brands)
+        .where(inArray(schema.brands.id, [brandId, coBrandId].filter((x): x is string => !!x)))
+      : [];
+    const brand = brandRows.find((b) => b.id === brandId);
+    const coBrand = coBrandId ? brandRows.find((b) => b.id === coBrandId) : undefined;
 
     // The invoice lines that point at this challenge OR at its campaign. A
     // campaign is billed once for all of its weeks, so a week with no line of
@@ -166,6 +187,10 @@ export async function billFor(
         id: schema.brandInvoices.id,
         number: schema.brandInvoices.number,
         status: schema.brandInvoices.status,
+        // B101 needs to know WHOSE invoice each one is: a co-sponsored
+        // challenge is paid only when both brands have paid, and "an invoice
+        // was paid" cannot answer that.
+        brandId: schema.brandInvoices.brandId,
       }).from(schema.brandInvoices)
         .where(inArray(schema.brandInvoices.id, [...new Set(lines.map((l) => l.invoiceId))]))
       : [];
@@ -176,6 +201,30 @@ export async function billFor(
 
     const payer = brand
       ? { type: "brand" as const, id: brand.id, name: brand.name }
+      : null;
+    const coPayer = coBrand
+      ? { type: "brand" as const, id: coBrand.id, name: coBrand.name }
+      : null;
+
+    // ===== B101: TWO BRANDS MEANS TWO INVOICES, AND BOTH MUST BE PAID =====
+    //
+    // Not pedantry. Running a challenge on one brand's money while the other's
+    // logo is on it means the first brand funded the second's exposure, and
+    // they would be right to be angry about it. So a co-sponsored challenge is
+    // paid only when a paid invoice exists for EACH of them.
+    //
+    // The lines are matched by brand through their invoice, which is the only
+    // link that exists — an invoice belongs to a brand, and a line belongs to
+    // an invoice.
+    const paidBrandIds = new Set(
+      invoices.filter((i) => i.status === "paid").map((i) => i.brandId),
+    );
+    const bothPaid = !coPayer
+      ? !!paidInvoice
+      : !!payer && paidBrandIds.has(payer.id) && paidBrandIds.has(coPayer.id);
+    const total = lineTotal || base.amount;
+    const split = coPayer
+      ? splitBill(total, Number(challenge.leadSharePct ?? 50))
       : null;
 
     if (kind === "house") {
@@ -191,19 +240,30 @@ export async function billFor(
       };
     }
 
+    // Which of the two has not paid, by name. "One of the brands has not paid"
+    // sends an operator to look it up; naming them is the whole difference
+    // between a warning and a task.
+    const unpaidNames = coPayer
+      ? [payer, coPayer].filter((p): p is NonNullable<typeof p> => !!p && !paidBrandIds.has(p.id)).map((p) => p.name)
+      : [];
+
     return {
-      ...base, payer,
-      amount: lineTotal || base.amount,
-      paid: !!paidInvoice,
-      evidence: paidInvoice ? `Invoice ${paidInvoice.number}` : anyInvoice ? `Invoice ${anyInvoice.number} — ${anyInvoice.status}` : null,
+      ...base, payer, coPayer, split,
+      amount: total,
+      paid: bothPaid,
+      evidence: bothPaid
+        ? coPayer ? `Both brands invoiced and paid` : `Invoice ${paidInvoice!.number}`
+        : anyInvoice ? `Invoice ${anyInvoice.number} — ${anyInvoice.status}` : null,
       href: anyInvoice ? `/admin/billing?invoice=${anyInvoice.id}` : null,
       warning: !brand
         ? "No brand on this challenge, so nobody is being billed for it."
         : !invoices.length
           ? "No invoice covers this yet. It is running on nobody's money."
-          : !paidInvoice
-            ? `Invoiced and not paid — ${anyInvoice?.number}.`
-            : "",
+          : unpaidNames.length
+            ? `Co-sponsored, and ${unpaidNames.join(" and ")} ${unpaidNames.length === 1 ? "has" : "have"} not paid. It must not be announced until both have — one brand should never fund the other's logo.`
+            : !bothPaid
+              ? `Invoiced and not paid — ${anyInvoice?.number}.`
+              : "",
     };
   } catch {
     // A billing panel that throws takes the challenge editor down with it.

@@ -65,6 +65,8 @@ export type ChallengeEdit = {
   visibility: string; guildId: string | null; guildIds?: string[]; accessKey: string | null; announceHype: boolean;
   /** Set when a brand paid for this one — it changes which trophies belong on it. */
   sponsorBrandId?: string | null;
+  coSponsorBrandId?: string | null;
+  leadSharePct?: number | null;
   sponsorCampaignId?: string | null;
   sponsorPrice?: number;
   /** How many runs this series has. 4 = a sponsored month. */
@@ -153,6 +155,10 @@ export default function ChallengeBuilder({
   // create. A sponsored challenge is what a brand's report, the server's
   // earnings and the invoice are all built from.
   const [sponsorBrandId, setSponsorBrandId] = useState(challenge?.sponsorBrandId ?? "");
+  // B101. The second brand, and the split. Max two — see lib/co-sponsor.ts for
+  // why this is one more field rather than a list.
+  const [coSponsorBrandId, setCoSponsorBrandId] = useState(challenge?.coSponsorBrandId ?? "");
+  const [leadSharePct, setLeadSharePct] = useState(Number(challenge?.leadSharePct ?? 50));
   const [sponsorCampaignId, setSponsorCampaignId] = useState(challenge?.sponsorCampaignId ?? "");
   const [sponsorPrice, setSponsorPrice] = useState(
     challenge?.sponsorPrice ?? 0,
@@ -306,6 +312,9 @@ export default function ChallengeBuilder({
                     // bills nobody. Staff can still type anything.
                     if (e.target.value && !sponsorPrice) setSponsorPrice(rate.challengePrice);
                     if (!e.target.value) setSponsorPrice(0);
+                    // A co-sponsor with no lead is not a thing, and the same
+                    // brand twice is not a collaboration.
+                    if (!e.target.value || e.target.value === coSponsorBrandId) setCoSponsorBrandId("");
                   }}
                 >
                   <option value="">— nobody, this one&apos;s on us —</option>
@@ -329,6 +338,48 @@ export default function ChallengeBuilder({
                 </div>
               </label>
             </div>
+
+            {/* ===== B101: the second brand ===== */}
+            {sponsorBrandId && (
+              <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs text-muted">Co-sponsor <span className="opacity-60">(optional, max two)</span>
+                    <select
+                      name="coSponsorBrandId" value={coSponsorBrandId} className="input-cosmic mt-1"
+                      onChange={(e) => setCoSponsorBrandId(e.target.value)}
+                    >
+                      <option value="">— one brand only —</option>
+                      {/* The lead is excluded from its own co-sponsor list.
+                          Offering it would let somebody build a challenge
+                          co-sponsored by one brand with itself. */}
+                      {brands.filter((b) => b.id !== sponsorBrandId)
+                        .map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+                    </select>
+                  </label>
+                  {coSponsorBrandId && (
+                    <label className="text-xs text-muted">Lead brand&apos;s share of the bill
+                      <div className="mt-1 flex items-center gap-2">
+                        <input
+                          name="leadSharePct" type="number" min={0} max={100} step={5} value={leadSharePct}
+                          onChange={(e) => setLeadSharePct(Math.min(100, Math.max(0, Number(e.target.value) || 0)))}
+                          className="input-cosmic !py-1.5 w-24"
+                        />
+                        <span className="text-[11px] text-muted">
+                          % — the co-sponsor pays {100 - leadSharePct}%
+                        </span>
+                      </div>
+                    </label>
+                  )}
+                </div>
+                {coSponsorBrandId && (
+                  <p className="mt-2 text-[11px] leading-relaxed text-amber-200/90">
+                    Both brands are invoiced, and this <b>will not announce until both have paid</b> —
+                    running it on one brand&apos;s money with the other&apos;s logo on it means the first
+                    funded the second&apos;s exposure.
+                  </p>
+                )}
+              </div>
+            )}
 
             {sponsor && (
               <label className="block text-xs text-muted">Bought under which campaign

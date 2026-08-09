@@ -934,6 +934,39 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B101 — Two brands on one challenge · **SHIPPED**
+
+A co-sponsored challenge is two brands on the same competition — a publisher and
+an energy drink, a hardware brand and a tournament organiser. The owner set the
+ceiling: **at most two.**
+
+**It is a second column, not an array.** `co_sponsor_brand_id` makes "three
+brands" impossible to store, which is cheaper than making it illegal to write —
+no check constraint, no validator, no test for the day somebody wrote four. The
+lead stays `sponsor_brand_id` and every existing read is untouched.
+
+**The rule that matters: it is not paid until BOTH brands have paid.** Running
+it on one brand's money with the other's logo on it means the first funded the
+second's exposure. `billFor` now reads which brand each invoice belongs to and
+`bill.paid` requires one paid invoice per sponsor — and since the announce gate
+reads `bill.paid`, getting this wrong would not have produced a wrong number on
+a screen, it would have produced a promise to the whole network. Proven by
+removal: replacing the rule with `!!paidInvoice` turns `tests/db/co-sponsor.mts`
+red.
+
+The split is a field, not a constant: `leadSharePct` defaults to 50 because a
+publisher putting up prize money beside a drink brand putting up a logo is a
+70/30 deal, and `splitBill` rounds so the two halves always add back to the
+total — a cent missing from an invoice is a support ticket from somebody's
+finance department.
+
+**Still open:** there is no gamer-facing "presented by" line anywhere in the
+product today — not on the challenge card, not in the bot. Co-sponsorship is
+correct in the money and in admin; the place a gamer would READ two brand names
+does not exist yet and belongs with the bot and marketing rewrites.
+
+---
+
 ### ▸ B100 — The public server page · **SHIPPED**
 
 It was the locked-out screen with a badge row on top: three sections, one of
