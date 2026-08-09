@@ -934,6 +934,123 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B108.1 — Ten commits of "suite green" that was not · **CORRECTION**
+
+**This is the worst thing in this document and it belongs at the top of the
+block, not buried in it.**
+
+`e483bfb` (B94–B98) built the onboarding gate: nothing accrues, and no challenge
+is entered, until a gamer has finished the three steps. Four suites had fixtures
+written before that gate existed — `caps`, `cp-economics`, `entry-rules`,
+`bot-attribution` — and every award in them started paying **0** while every
+join started returning `reason: "onboarding"`.
+
+They went red in that commit and stayed red through **B99, B100, B101, B102,
+B103, B104, B104.1, B105, B106 and B107.** Verified by checkout:
+`e483bfb~1` runs all four green; `e483bfb` runs all four red.
+
+**Two failures, and the second is the real one.**
+
+1. Every run was checked with `| tail`. Suites finish in whatever order the
+   lanes free up, so the four `FAIL` lines sat in the middle of the summary
+   list and the tail showed the pass lines that happened to finish last.
+
+2. **The shortfall was then explained away with a reason that was never
+   checked.** Nine commit messages say some version of *"61/65 suites green —
+   the other four are browser suites"*. The runner does not include browser
+   suites in a default run at all: `run-all.mjs` only adds them when `--ui` is
+   passed, so `results.length` is the db-suite count and nothing else. There
+   were never four skipped browser suites in that number. The four were
+   failures, every time.
+
+The first failure is carelessness. The second is the one worth writing down: an
+invented explanation that *fits* the number is what stops you looking at the
+number. `e483bfb`'s own message — the commit that broke them — reads "Full DB
+suite green, build clean."
+
+**What was done about it:**
+
+- All four fixtures now set `unlockedAt`, with a comment at each saying why the
+  gate is not what they are testing. All four green again.
+- **Every one of the 69 db suites was then run individually**, not as a batch
+  summary. 69/69, zero failures. `bot-growth` reports one block skipped, and
+  says so itself — it needs a running server and is covered by the `--ui` band.
+- **And the browser band was actually run**, which the "the other four are
+  browser suites" line had been quietly standing in for. `npm test -- --ui`
+  against a fresh production build: **84/84, all 69 db suites and all 15 browser
+  suites, 823s.** That is the first run in this stretch of work where the number
+  reported is a number that was observed.
+- `tests/run-all.mjs` now prints the failures **last**, after the count, in
+  their own red block, and states the number twice. The count was always there
+  and was always misread, so the fix is to put the bad news where a truncated
+  read cannot miss it rather than to promise to read more carefully.
+
+The commit messages on the pushed branch cannot be corrected without rewriting
+shared history, so this entry is the correction of record.
+
+---
+
+### ▸ B108 — The gate the bot never mentioned · **SHIPPED**
+
+**B94 built a real gate and left it invisible on the surface most of our gamers
+live on.**
+
+Nothing accrues until a gamer has linked a game, confirmed an email, and given
+an age, a country and a card template. B95, B96, B97 and B98 refined it. Every
+bit of it lived on the website.
+
+The bot knew nothing about any of it. And because `ensureGamerForDiscord` makes
+the account on the first `/cluster`, **every new gamer is locked** — so the
+default new-user experience was a Cluster Points card footed with *"Cluster
+Points come from quests"* while earning exactly zero of them, for a reason no
+screen in the bot ever gave.
+
+That is the worst version of a gate: invisible, and on the surface where the
+funnel actually starts. Nobody concludes "I have three steps left". They conclude
+the product is broken.
+
+**A new `unlock` screen**, plus the banner on the two screens gamers open most:
+
+- **Home** — the unlock button **first** in the row, because `rows()` truncates
+  from the *end* and the one button that must never be dropped is the one
+  explaining why nothing is counting. The footer says it too.
+- **Cluster Points** — the footer no longer promises points to somebody earning
+  none.
+- **`/cluster unlock`**, and `start` and `verify`, because those are what
+  somebody types when they have been told there is something to do but not what
+  it is called. Listed in the command help and reachable from More, so a gamer
+  who merely wants to *check* need not be blocked to find it.
+
+**The bot has no opinion about the steps.** `stepsFor` owns the list, the
+labels, the wording and the count; the screen renders what it returns and the
+button labels are the step labels, cut to Discord's 80. A bot that says "two
+steps" over a website asking for three is exactly the screenshot we do not want,
+and the only guarantee they agree is for one of them to hold no copy.
+
+**Two facts stay on the site, deliberately.** An email code and a date of birth
+are the two things we handle most carefully; they belong on the signed-in site,
+not in a chat modal in somebody else's server. Linking a game is the one step
+the bot does itself — it is what a gamer sitting in a Discord server is most
+ready for.
+
+**Green, not red.** This file had already worked out that Discord red reads as
+*destructive* (it is why the game palette excludes it). "Unlock my account" in
+red is a button somebody hesitates over in case it deletes something.
+
+**The congratulations moment (B83.3)** lands on the same screen: `tryUnlock` is
+the promoting read, so a gamer who finished the last step on the website and came
+straight back is unlocked *by opening the card* rather than told they still have
+one to go — and the card names what they **did** ("You linked riot"), not that
+they completed a form.
+
+`tests/db/bot-unlock.mts` (41). **The test caught three real defects in my own
+first draft** — a retyped step label, a hard-coded "three", and a footer word —
+and a fourth in itself: the "button is first" assertion passed while the button
+had been moved to the end of home's row, because it was matching the *CP*
+screen's copy of the same call. Both are now scoped to the function under test.
+
+---
+
 ### ▸ B107 — Two brands, one line · **SHIPPED**
 
 **The gap B101 left open, and the wrong half to have built.**

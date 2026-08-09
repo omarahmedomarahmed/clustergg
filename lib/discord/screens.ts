@@ -220,9 +220,12 @@ async function signInPrompt(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
 async function homeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   if (!ctx.gamer) return welcomeScreen(ctx, trail);
   const here = frame("home");
-  const [{ url, data }, accounts] = await Promise.all([
+  const [{ url, data }, accounts, locked] = await Promise.all([
     cardRef("profile", { slug: ctx.gamer.slug }),
     linkedAccountsOf(ctx.gamer.userId),
+    // B108. The gate was invisible in the bot: a locked gamer saw their card,
+    // earned nothing, and no screen here ever said why.
+    lockState(ctx),
   ]);
   const accent = data && "theme" in data ? data.theme.accent : null;
   return {
@@ -231,13 +234,19 @@ async function homeScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       color: accent,
       // When there are more accounts than buttons, say so. Silent truncation
       // reads as "Cluster lost four of my accounts".
-      footer: accounts.length > ACCOUNT_BUTTONS
+      footer: locked.locked
+        ? `Nothing is counting yet — ${locked.done} of ${locked.total} steps done. Tap Unlock my account.`
+        : accounts.length > ACCOUNT_BUTTONS
         ? `Showing ${ACCOUNT_BUTTONS} of your ${accounts.length} accounts — the rest are on your profile. Everything below edits this message — no channel spam.`
         : accounts.length
           ? "Tap an account for its live stats. Everything below edits this message — no channel spam."
           : "Everything below edits this message — no channel spam.",
     })],
     components: rows([
+      // B108 FIRST, above the accounts. `rows()` truncates from the END, and
+      // the one thing a locked gamer must not have pushed off the message is
+      // the only button that explains why nothing is counting.
+      unlockButton(locked, [here, ...trail]),
       // Your accounts first — they're the reason to look at your own card.
       //
       // One button EACH, named after the account. Two accounts on the same game
@@ -284,6 +293,7 @@ async function moreScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
       navButton("Trophy marketplace", frame("market"), t, ButtonStyle.Secondary, "🏆"),
       navButton("Quests", frame("quests"), t, ButtonStyle.Secondary, "🗺"),
       navButton("Leaderboards", frame("leaderboard", ""), t, ButtonStyle.Secondary, "📊"),
+      navButton("Unlock my account", frame("unlock"), t, ButtonStyle.Secondary, "🔓"),
       navButton("How it works", frame("guide", "getting-started"), t, ButtonStyle.Secondary, "📖"),
       ctx.isManager ? navButton("Server admin", frame("admin", ""), t, ButtonStyle.Secondary, "🛰") : null,
       navButton("Commands", frame("help"), t, ButtonStyle.Secondary, "❓"),
@@ -513,15 +523,26 @@ async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[], accountA
 
   if (target === "cp") {
     if (!ctx.gamer) return signInPrompt(ctx, trail);
-    const { url, data } = await cardRef("cp", { slug: ctx.gamer.slug });
+    const [{ url, data }, locked] = await Promise.all([
+      cardRef("cp", { slug: ctx.gamer.slug }),
+      lockState(ctx),
+    ]);
     const here = frame("show", "cp");
     return {
       embeds: [embed(url, {
         title: "Your Cluster Points",
         color: data && "theme" in data ? data.theme.accent : null,
-        footer: "Cluster Points come from quests — every game you play feeds the same total.",
+        // B108. This footer used to read "Cluster Points come from quests" to a
+        // gamer earning exactly zero of them, because the gate B94 built was
+        // invisible in the bot. Not wrong so much as beside the point — and
+        // beside the point is how somebody concludes the product is broken
+        // rather than that they have three steps left.
+        footer: locked.locked
+          ? `Nothing is counting yet — ${locked.done} of ${locked.total} steps done. Finish them and every point from then on is yours.`
+          : "Cluster Points come from quests — every game you play feeds the same total.",
       })],
       components: rows([
+        unlockButton(locked, [here, ...trail]),
         navButton("My quests", frame("quests"), [here, ...trail], ButtonStyle.Primary, "🗺"),
         linkButton("CP history", `${siteUrl()}/quests`, "📜"),
         ...tail(ctx, here, trail),
@@ -571,6 +592,170 @@ async function showScreen(what: string, ctx: ScreenCtx, trail: Frame[], accountA
   if (q) return questScreen(q.value, ctx, trail);
 
   return showScreen("profile", ctx, trail);
+}
+
+/**
+ * Is this gamer still locked, and how far in? B108.
+ *
+ * One tiny read for anybody who has finished — `unlockState` returns on the
+ * `unlocked_at` column without touching anything else — so putting this on the
+ * two screens gamers open most costs nothing for the people it is not about.
+ *
+ * Never throws. A screen that cannot answer this question shows the screen
+ * without the banner, which is the pre-B108 behaviour and is survivable; a
+ * screen that 500s is not.
+ */
+async function lockState(ctx: ScreenCtx): Promise<{ locked: boolean; done: number; total: number }> {
+  const off = { locked: false, done: 0, total: 0 };
+  if (!ctx.gamer) return off;
+  try {
+    const { getDb } = await import("@/lib/db");
+    const { unlockState, UNLOCK_STEPS } = await import("@/lib/unlock");
+    const st = await unlockState(await getDb(), ctx.gamer.userId);
+    if (st.unlocked) return off;
+    return { locked: true, done: st.steps.filter((x) => x.done).length, total: UNLOCK_STEPS };
+  } catch { return off; }
+}
+
+/**
+ * The button that leads to the three steps, or nothing when there is nothing
+ * left to do.
+ *
+ * GREEN, not red — even though the message is "you are blocked". This file
+ * already worked out that Discord red reads as *destructive*, which is why the
+ * game palette excludes it. "Unlock my account" in red is a button somebody
+ * hesitates over in case it deletes something. Green says go, which is what
+ * this is: the way out, not the warning.
+ *
+ * The count is in the label because "Unlock my account" alone is a chore and
+ * "· 2/3" is nearly finished.
+ */
+function unlockButton(l: { locked: boolean; done: number; total: number }, trail: Frame[]): Button | null {
+  return l.locked
+    ? navButton(`Unlock my account · ${l.done}/${l.total}`, frame("unlock"), trail, ButtonStyle.Success, "🔓")
+    : null;
+}
+
+/**
+ * The unlock, in Discord. B108.
+ *
+ * ===== WHAT WAS MISSING =====
+ *
+ * B94 made the three steps a real gate: nothing accrues until a gamer has
+ * linked a game, confirmed an email, and told us their age, country and
+ * colours. B98 auto-sends the code. B95 fixed the age band. All of it lives on
+ * the website.
+ *
+ * The bot knew nothing about any of it. A gamer whose whole relationship with
+ * Cluster is `/cluster` in their server saw a Cluster Points card with a
+ * footer reading "Cluster Points come from quests" — while earning exactly
+ * zero of them, for a reason no screen in the bot ever mentioned.
+ *
+ * That is the worst version of a gate: invisible, on the surface where most of
+ * our gamers actually live. They do not conclude "I have three steps left".
+ * They conclude the product is broken.
+ *
+ * ===== WHY THE STEPS ARE NOT RETYPED HERE =====
+ *
+ * `stepsFor` owns the list, the labels and the wording. This screen renders
+ * whatever it returns. A bot that says "two steps" over a website that asks for
+ * three is the exact screenshot we do not want, and the only way to guarantee
+ * they agree is for one of them to have no opinion.
+ *
+ * ===== WHERE EACH STEP IS FINISHED =====
+ *
+ * Linking is the one step the bot can genuinely do — the modal is already here
+ * and it is the step a gamer in a Discord server is most ready for. The other
+ * two are link-outs, and that is deliberate rather than lazy: an email code and
+ * a date of birth are the two facts we are most careful with, and they belong
+ * on the signed-in site rather than in a chat modal in somebody's server.
+ */
+async function unlockScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  if (!ctx.gamer) return signInPrompt(ctx, trail);
+  const here = frame("unlock");
+  const t = [here, ...trail];
+  const site = siteUrl();
+
+  const { getDb } = await import("@/lib/db");
+  const { tryUnlock, UNLOCK_STEPS } = await import("@/lib/unlock");
+  const db = await getDb();
+  // `tryUnlock` is the promoting read — a gamer who finished the last step on
+  // the website and came straight back here is unlocked BY OPENING THIS SCREEN,
+  // rather than being told they still have one to go.
+  const state = await tryUnlock(db, ctx.gamer.userId);
+
+  if (state.unlocked) {
+    // The congratulations moment (B83.3), and it names what they DID. "You
+    // completed onboarding" congratulates somebody for filling in a form; "you
+    // linked League of Legends" congratulates them for playing.
+    const { url, data } = await cardRef("cp", { slug: ctx.gamer.slug });
+    const did = state.achieved.length
+      ? state.achieved.map((a) => `✅ ${a}`).join("\n")
+      : "✅ Everything is done.";
+    return {
+      embeds: [embed(url, {
+        title: "UNLOCKED",
+        description: [
+          "**Your account is open.** Every point you earn from here is yours, and everything you earned before is exactly where you left it.",
+          "",
+          did,
+        ].join("\n"),
+        color: "#34d399",
+        footer: "Play, finish quests, enter challenges. Points land in the card above.",
+      })],
+      components: rows([
+        navButton("My quests", frame("quests"), t, ButtonStyle.Success, "🗺"),
+        navButton("Challenges", frame("challenges"), t, ButtonStyle.Primary, "🏆"),
+        navButton("Trophy marketplace", frame("market"), t, ButtonStyle.Secondary, "🏆"),
+        ...tail(ctx, here, trail),
+      ]),
+    };
+  }
+
+  const done = state.steps.filter((x) => x.done).length;
+  const list = state.steps
+    .map((x) => `${x.done ? "✅" : "⬜"} **${x.label}**\n${x.detail}`)
+    .join("\n\n");
+
+  // The held balance, when there is one.
+  //
+  // Only an account that predates B94 has one, and for them it is the whole
+  // reason to finish — so it is stated as SAFE rather than as pending. A number
+  // described as "waiting" reads as a number that might not arrive.
+  const held = state.heldCp > 0
+    ? `\n\n**${state.heldCp.toLocaleString()} CP is already yours** and none of it goes anywhere. Finishing below is what lets you spend it.`
+    : "";
+
+  const next = state.steps.find((x) => !x.done);
+  const todo = (key: string) => state.steps.some((x) => x.key === key && !x.done);
+  const label = (key: string) =>
+    (state.steps.find((x) => x.key === key)?.label ?? "").slice(0, 80);
+
+  return {
+    embeds: [embed((await cardRef("guide", { topic: "getting-started" })).url, {
+      title: `${done} of ${UNLOCK_STEPS} done`,
+      description: [
+        `Cluster does not start counting until it knows who it is counting for. ${UNLOCK_STEPS} things, once, and then never again.`,
+        "",
+        list,
+        held,
+      ].join("\n"),
+      color: "#8b5cf6",
+      footer: next ? `Next: ${next.label}` : undefined,
+    })],
+    components: rows([
+      // The one step the bot can actually finish. It opens the same modal the
+      // link screen does, for the game this gamer is most likely to play.
+      // Every label is the STEP's label, cut to Discord's 80 characters. Typing
+      // them here would be three more places for the bot and the website to
+      // drift apart, and the drift would show up as a button promising
+      // something the page then asks differently.
+      todo("link") ? navButton(label("link"), frame("link", ""), t, ButtonStyle.Success, "🎮") : null,
+      todo("email") ? linkButton(label("email"), `${site}/onboarding`, "✉") : null,
+      todo("profile") ? linkButton(label("profile"), `${site}/onboarding`, "🎨") : null,
+      ...tail(ctx, here, trail),
+    ]),
+  };
 }
 
 async function questScreen(key: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
@@ -639,6 +824,7 @@ async function helpScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload
         "**`/cluster`** — your own card.",
         "**`/cluster <anything>`** — a game, a quest, a guide, or another gamer's name. Start typing and the suggestions fill in from live data.",
         ctx.isManager ? "**`/cluster show:admin`** — run a challenge for this server, and see your growth toward ad revenue." : null,
+        "**`/cluster unlock`** — the three things Cluster needs before it starts counting, and how far in you are.",
         "**`/cluster show:week`** — Profile of the Week: where the vote stands and how long is left.",
         "**`/cluster show:share`** — post your card publicly so people can vote for it.",
       ].filter(Boolean).join("\n"),
@@ -1690,6 +1876,7 @@ async function renderScreenBody(f: Frame, trail: Frame[], ctx: ScreenCtx): Promi
     case "gamer": return otherGamerScreen(a, f.args[1] ?? "", ctx, trail);
     case "quest": return questScreen(a, ctx, trail);
     case "quests": return questsScreen(ctx, trail);
+    case "unlock": return unlockScreen(ctx, trail);
     case "guide": return guideScreen(a, ctx, trail);
     case "planet": return planetScreen(a, ctx, trail);
     case "planets": return planetsScreen(ctx, trail);
@@ -1751,6 +1938,14 @@ export async function screenForCommand(query: string): Promise<Frame> {
     case "link":
     case "connect":
       return frame("link", rest);
+
+    // B108. The word a locked gamer is most likely to type once anything has
+    // told them there is something to unlock — and "start" is what somebody
+    // types when they want to know where to begin, which is the same screen.
+    case "unlock":
+    case "start":
+    case "verify":
+      return frame("unlock");
 
     // Voting IS the Profile of the Week screen. There is no second place to go.
     case "vote":

@@ -45,6 +45,12 @@ const mkGamer = async (tag: string, accounts: string[]) => {
   await db.insert(schema.users).values({
     id, slug: `er-${tag}-${id.slice(0, 6)}`, displayName: `ER ${tag}`,
     email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
+    // B94 gates earning and entry on a finished onboarding, and this fixture
+    // predates it. Without `unlockedAt` every award here pays 0 and every join
+    // is refused with `reason: "onboarding"` — a red suite that says nothing
+    // about caps, economics or entry rules. The gate has its own suite
+    // (`tests/db/onboarding.mts`); this one is about what happens AFTER it.
+    unlockedAt: new Date(),
   } as never);
   const ids: string[] = [];
   for (const name of accounts) {

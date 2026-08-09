@@ -156,5 +156,25 @@ console.log("\n─────────────────────�
 for (const r of results) console.log(`${r.ok ? "\x1b[32m  pass\x1b[0m" : "\x1b[31m  FAIL\x1b[0m"}  ${r.file}`);
 console.log(`${results.length - failed}/${results.length} suites passed in ${((Date.now() - t0) / 1000).toFixed(0)}s (${LANES} lanes)`);
 if (!withUi) console.log("(browser suites skipped — run `npm test -- --ui`, which starts and stops its own server)");
+
+// THE FAILURES GO LAST, ALWAYS.
+//
+// This block exists because of a real and embarrassing miss. Suites finish in
+// whatever order the lanes free up, so a FAIL lands wherever it lands in the
+// list above — and four suites stayed red for ten consecutive commits while
+// every run was checked with `| tail`, which showed the pass lines that happened
+// to finish last and the summary count, and never the four FAIL lines sitting
+// in the middle.
+//
+// The count was right there and was misread every time, so the fix is not "read
+// more carefully". It is: put the bad news where a truncated read cannot miss
+// it, and say the number twice.
+if (failed) {
+  console.log(`\n\x1b[31m✗ ${failed} suite${failed === 1 ? "" : "s"} FAILED:\x1b[0m`);
+  for (const r of results.filter((x) => !x.ok)) console.log(`\x1b[31m    ${r.file}\x1b[0m`);
+  console.log(`\x1b[31m✗ ${failed} of ${results.length} suites failed.\x1b[0m`);
+} else {
+  console.log(`\n\x1b[32m✓ all ${results.length} suites passed.\x1b[0m`);
+}
 killServers();
 process.exit(failed ? 1 : 0);
