@@ -934,6 +934,30 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B99 — The pool, in the open · **SHIPPED**
+
+A server owner's income was decided on a Monday by terms nobody outside the code
+had ever seen. That is an allowance, not a deal.
+
+`/pool` is public: this week's released pool, every server competing for it,
+what each has done, and what each would be paid if the week ended now. Plus the
+reserve, said out loud, because an owner who can see one exists has a reason to
+believe the pool is still there in January.
+
+**The part that matters is that it is not a second implementation.** The scoring
+moved out of `closeWeek` into `lib/week-standing.ts`; the close calls it for the
+week that just ended and the page calls it for the week in progress. Same terms,
+same brackets, same rounding, same flat participation share. `week-standing.ts`
+writes nothing — the close still owns every write it ever owned — which is what
+makes it safe to call from a public page on every request.
+
+A live estimate computed anywhere other than the code that decides the money is
+a number that drifts from the cheque, and the first time it drifts the owner is
+right to say we made it up. `tests/db/pool-live.mts` asserts the close contains
+no scoring of its own, which is the only way that stays true.
+
+---
+
 ### ▸ B94–B98 — The account is real before it earns · **SHIPPED**
 
 The sprint that answers one question: *a gamer links a game account, joins a

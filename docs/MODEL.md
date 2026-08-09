@@ -77,6 +77,16 @@ pay you twice.*
 
 ---
 
+### The pool is public
+
+`/pool` shows this week's released pool, every server competing for it, what
+each has done and what each would be paid if the week ended now — computed by
+the same function that writes Monday's cheques, not by a second implementation
+that could drift from it. The reserve is shown too: it is what pays owners
+through a week when nothing sold.
+
+---
+
 ## 4. The owner's wallet
 
 `earned − paid − requested − spent = available`, every term a sum over rows.

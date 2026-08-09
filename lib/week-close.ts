@@ -42,6 +42,7 @@ import {
   PARTICIPATION_SHARE, type Payout,
 } from "@/lib/server-score";
 import { createPayout } from "@/lib/payouts";
+import type { StandingServer } from "@/lib/week-standing";
 
 /**
  * Who opens a pool payout.
@@ -56,25 +57,15 @@ export const WEEK_CLOSE_ACTOR = "system:week-close";
 export const weekKey = (d: Date): string => d.toISOString().slice(0, 10);
 
 /**
- * Size tiers. LABELS, not rates.
+ * Size tiers, re-exported.
  *
- * A tier decides who a server competes against, and nothing else. The old model
- * paid a percentage per tier, which is the thing v2 replaced with this pool —
- * see C3. Thresholds are qualified linked members, the same count the snapshot
- * records and the same one an owner is shown.
+ * They live in `lib/week-tiers.ts` since B99: the scoring moved to
+ * `lib/week-standing.ts`, this file calls it, and a tier constant owned here
+ * would have made that import circular. Re-exported rather than moved outright
+ * because five call sites and four suites import them from this module, and
+ * churning them would have been a rename pretending to be a refactor.
  */
-export const TIERS = [
-  { key: "small", floor: 0 },
-  { key: "mid", floor: 500 },
-  { key: "large", floor: 5000 },
-] as const;
-export type TierKey = (typeof TIERS)[number]["key"];
-
-export const tierOf = (qualified: number): TierKey => {
-  let k: TierKey = "small";
-  for (const t of TIERS) if (qualified >= t.floor) k = t.key;
-  return k;
-};
+export { TIERS, tierOf, type TierKey } from "@/lib/week-tiers";
 
 // `slotsFor` lived here and is DELETED, not stubbed.
 //
@@ -89,27 +80,16 @@ export const tierOf = (qualified: number): TierKey => {
 // calls again.
 
 
-export type ScoredServer = {
-  guildId: string;
-  name: string;
-  /** The LABEL. Decides nothing about money — see `bracket`. */
-  tier: TierKey;
-  /** Qualified linked members, the number both the tier and the bracket read. */
-  qualified: number;
-  exclusiveEntrants: number;
-  newlyQualified: number;
-  entrants: number;
-  linked: number;
-  score: number;
-  /**
-   * Always 1 now. Repeat-winner decay is retired — it punished a server for
-   * being good, and score-proportional shares already give everyone below the
-   * leader a real slice. Kept on the type so eight weeks of stored results
-   * still read, rather than being deleted and leaving a hole in the history.
-   */
-  decay: number;
-  final: number;
-};
+/**
+ * One scored server.
+ *
+ * The shape (and the arithmetic behind it) belongs to `lib/week-standing.ts`
+ * now. `decay` is always 1: repeat-winner decay is retired — it punished a
+ * server for being good, and score-proportional shares already give everyone
+ * below the leader a real slice. Kept on the type so eight weeks of stored
+ * results still read.
+ */
+export type ScoredServer = StandingServer;
 
 export type WeekCloseResult = {
   week: string;
@@ -207,188 +187,20 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
         : `Week of ${key}: nothing in the server pool to divide.`);
     }
 
-    // ===== Who took part =====
+    // ===== Score the week, and divide =====
     //
-    // Entrants ATTRIBUTED to a server, which is `guildId` on the join and not
-    // guild membership. A null guildId is a pre-B86 row and is excluded rather
-    // than guessed at — guessing is the defect that column exists to remove.
-    //
-    // ===== SPONSORED CHALLENGES ONLY =====
-    //
-    // A PRIVATE challenge is one a server owner bought for their own members.
-    // It puts nothing into the server pool — it is not brand inventory — so
-    // entering one must not earn a share of it. Counting private entrants would
-    // let an owner buy a cheap private challenge, have their own members enter
-    // it, and take a slice of money that other servers' sponsored work paid in.
-    //
-    // The line is `visibility`, which already exists and already means this:
-    // `public` is announced to every server and open to anyone, `private` is
-    // one server's own. That is the owner's own wording — "the pool counts only
-    // the money from the brand's public challenges available for everyone on any
-    // server to join" — and it needs no new column.
-    //
-    // It also correctly excludes a WELCOME challenge, which is private to one
-    // guild: a per-server promo we funded is not inventory another server's
-    // work paid for.
-    //
-    // What this does NOT touch is the linked-member terms. Linking a game
-    // account is linking a game account whatever prompted it, so a private
-    // challenge that brings members onto the platform still earns growth and
-    // still raises the denominator of conversion. That asymmetry is deliberate:
-    // we want owners buying private challenges, we just will not pay them from
-    // the pool for it twice.
-    const joins = await db.select({
-      userId: schema.challengeParticipants.userId,
-      guildId: schema.challengeParticipants.guildId,
-    }).from(schema.challengeParticipants)
-      .innerJoin(schema.challenges, eq(schema.challenges.id, schema.challengeParticipants.challengeId))
-      .where(and(
-        isNotNull(schema.challengeParticipants.guildId),
-        eq(schema.challenges.visibility, "public"),
-        gte(schema.challengeParticipants.joinedAt, weekStart),
-        lt(schema.challengeParticipants.joinedAt, weekEnd),
-      ));
-    const rows = joins.map((j) => ({ userId: j.userId, guildId: String(j.guildId) }));
-    if (!rows.length) {
-      return EMPTY(key, `Week of ${key}: no server carried an entrant into a sponsored challenge, so there is nobody to pay. Private challenges do not count — they are bought by an owner and put nothing into the pool.`);
-    }
+    // One call, and the SAME call `/pool` makes for the week in progress. The
+    // entrant filter, the profile gate, the dropped-term redistribution, the
+    // bracket percentiles and the split all live in `lib/week-standing.ts`, so
+    // the number an owner watched climb all week is the number that becomes
+    // their cheque. A "live estimate" computed anywhere else is a number that
+    // drifts from the payment, and the first time it drifts they are right to
+    // say we made it up.
+    const { standingFor } = await import("@/lib/week-standing");
+    const standing = await standingFor(db, { weekStart, weekEnd, pool });
+    if (standing.reason) return EMPTY(key, `Week of ${key}: ${standing.reason}`);
 
-    const exclusive = exclusiveEntrants(rows);
-    const entrantsBy = new Map<string, number>();
-    for (const r of rows) entrantsBy.set(r.guildId, (entrantsBy.get(r.guildId) ?? 0) + 1);
-    const guildIds = [...exclusive.keys()];
-
-    // ===== The snapshots that make "newly qualified" a real number =====
-    const snaps = await db.select({
-      guildId: schema.guildSnapshots.guildId,
-      weekStart: schema.guildSnapshots.weekStart,
-      linked: schema.guildSnapshots.linked,
-      qualifiedLinked: schema.guildSnapshots.qualifiedLinked,
-    }).from(schema.guildSnapshots)
-      .where(and(
-        inArray(schema.guildSnapshots.guildId, guildIds),
-        inArray(schema.guildSnapshots.weekStart, [weekStart, new Date(weekStart.getTime() - 7 * 86400_000)]),
-      ));
-    const thisSnap = new Map(snaps.filter((s) => +s.weekStart === +weekStart).map((s) => [s.guildId, s]));
-    const prevSnap = new Map(snaps.filter((s) => +s.weekStart !== +weekStart).map((s) => [s.guildId, s]));
-
-    // ===== B47's gate, carried over =====
-    //
-    // A server that has not described itself is not inventory, it is a number:
-    // a brand buys "PUBG players in MENA", and we cannot sell a community with
-    // no games named, no audience and nobody to email. That gate used to live
-    // inside the per-challenge rate (`earningOwnerPct`), and deleting the rate
-    // in C3 would have silently deleted the gate with it — so it moves here,
-    // where the money is now decided.
-    //
-    // They are dropped from the RUN, not paid zero: leaving them in would let
-    // them take percentile positions off servers that did the work, and a score
-    // beaten by a server that cannot be paid is a score that means nothing.
-    const guildRows = await db.select({
-      guildId: schema.discordGuilds.guildId,
-      name: schema.discordGuilds.name,
-      community: schema.discordGuilds.community,
-      contactEmail: schema.discordGuilds.contactEmail,
-    }).from(schema.discordGuilds).where(inArray(schema.discordGuilds.guildId, guildIds));
-    const { parseCommunity, profileComplete } = await import("@/lib/discord/community");
-    const payable = new Set(guildRows
-      .filter((g) => profileComplete(parseCommunity(g.community), g.contactEmail))
-      .map((g) => g.guildId));
-    const skippedForProfile = guildIds.length - payable.size;
-
-    const names = new Map(
-      (await db.select({ guildId: schema.discordGuilds.guildId, name: schema.discordGuilds.name })
-        .from(schema.discordGuilds).where(inArray(schema.discordGuilds.guildId, guildIds)))
-        .map((g) => [g.guildId, g.name ?? g.guildId]),
-    );
-
-    // Wins in the last eight weeks, for decay. A dominant server keeps winning,
-    // declining — no cliff, because a cliff is itself a thing to game.
-    const eightWeeksAgo = new Date(weekStart.getTime() - 8 * 7 * 86400_000);
-    const priorWins = await db.select({
-      guildId: schema.serverPayouts.guildId,
-      n: sql<number>`count(*)`,
-    }).from(schema.serverPayouts)
-      .where(and(
-        inArray(schema.serverPayouts.guildId, guildIds),
-        isNotNull(schema.serverPayouts.periodStart),
-        gte(schema.serverPayouts.periodStart, eightWeeksAgo),
-      )).groupBy(schema.serverPayouts.guildId);
-    const winsBy = new Map(priorWins.map((r) => [r.guildId, Number(r.n ?? 0)]));
-
-    const base = guildIds.filter((g) => payable.has(g)).map((guildId) => {
-      const now_ = thisSnap.get(guildId);
-      const before = prevSnap.get(guildId);
-      const qualified = Number(now_?.qualifiedLinked ?? 0);
-      return {
-        guildId,
-        name: names.get(guildId) ?? guildId,
-        tier: tierOf(qualified),
-        // Carried so the bracket can be computed from the same number the tier
-        // label was. Deriving it twice from different sources is how a server
-        // ends up labelled "Small" and paid out of the mid bracket.
-        qualified,
-        exclusiveEntrants: exclusive.get(guildId) ?? 0,
-        // A first-ever week has no "before", so everyone qualified in it is
-        // newly qualified. Treating an absent prior week as zero growth would
-        // punish a server for being new.
-        newlyQualified: Math.max(0, qualified - Number(before?.qualifiedLinked ?? 0)),
-        entrants: entrantsBy.get(guildId) ?? 0,
-        linked: Number(now_?.linked ?? 0),
-      };
-    });
-
-    // ===== Which terms have anything to say =====
-    const TERM_VALUE: Record<string, (s: typeof base[number]) => number> = {
-      exclusiveEntrants: (s) => s.exclusiveEntrants,
-      newlyQualified: (s) => s.newlyQualified,
-      // SPONSORED entrants over ALL linked members. The numerator is filtered
-      // above; the denominator deliberately is not. A server whose members link
-      // accounts but never enter a sponsored challenge should see this fall —
-      // that is the term telling them so.
-      conversion: (s) => (s.linked > 0 ? s.entrants / s.linked : 0),
-    };
-    const live = Object.keys(SCORE_WEIGHTS).filter((k) => base.some((s) => TERM_VALUE[k](s) > 0));
-    const liveWeight = live.reduce((a, k) => a + SCORE_WEIGHTS[k as keyof typeof SCORE_WEIGHTS], 0);
-    const terms: Record<string, number> = {};
-    for (const k of live) {
-      terms[k] = Math.round((SCORE_WEIGHTS[k as keyof typeof SCORE_WEIGHTS] / liveWeight) * 10000) / 100;
-    }
-    if (!base.length) {
-      return EMPTY(key, `Week of ${key}: ${guildIds.length} server${guildIds.length === 1 ? "" : "s"} carried an entrant, but none has a complete profile, so none can be paid.`);
-    }
-    if (!live.length) return EMPTY(key, `Week of ${key}: no term had any data to score on.`);
-
-    // ===== Score, within bracket =====
-    //
-    // Percentile-ranked against the servers you actually compete with, so one
-    // enormous server cannot flatten everybody else's terms to zero.
-    //
-    // NO DECAY. It used to multiply a repeat winner's score down to a floor of
-    // 0.5 over eight weeks, which punished a server for being good — the
-    // opposite of what a network wants from its best server. Score-proportional
-    // shares mean a dominant server is already sharing with everyone below it,
-    // so the mechanism decay existed to soften no longer exists.
-    const servers: ScoredServer[] = base.map((s) => {
-      const peers = base.filter((p) => bracketOf(p.qualified) === bracketOf(s.qualified));
-      const score = Math.round(live.reduce((a, k) =>
-        a + percentile(TERM_VALUE[k](s), peers.map(TERM_VALUE[k])) * terms[k], 0) * 100) / 100;
-      return { ...s, score, decay: 1, final: score };
-    });
-
-    // ===== Divide: your share of the pool is your share of the score =====
-    //
-    // One call. The bracket split, the flat participation share and the
-    // score-proportional remainder all live in `weekPayouts`, so there is one
-    // place that decides what a server is owed rather than a loop here and a
-    // function there.
-    const { payouts: paid, carried } = weekPayouts(
-      pool,
-      servers.map((s) => ({
-        guildId: s.guildId, score: s.final, bracket: bracketOf(s.qualified),
-      })),
-    );
-    const payouts: Payout[] = paid;
+    const { servers, terms, payouts, carried, skippedForProfile } = standing;
 
     // ===== Write them, as DRAFTS =====
     //
@@ -428,8 +240,8 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
         + `${opened} payout${opened === 1 ? "" : "s"} opened`
         + (carried > 0 ? `, $${carried.toFixed(2)} held under the floor` : "")
         + (skippedForProfile > 0 ? `, ${skippedForProfile} skipped for an incomplete server profile` : "")
-        + `. Scored on ${live.length} of ${Object.keys(SCORE_WEIGHTS).length} terms `
-        + `(${live.join(", ")}) — ${PARTICIPATION_SHARE}% of the pool was paid flat to everyone who took part.`,
+        + `. Scored on ${Object.keys(terms).length} of ${Object.keys(SCORE_WEIGHTS).length} terms `
+        + `(${Object.keys(terms).join(", ")}) — ${PARTICIPATION_SHARE}% of the pool was paid flat to everyone who took part.`,
     };
   } catch (e) {
     return EMPTY(weekKey(weekStart), `Week close failed: ${String(e).slice(0, 160)}`);

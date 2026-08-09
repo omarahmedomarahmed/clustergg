@@ -26,6 +26,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE}/leaderboards`, changeFrequency: "daily", priority: 0.8 },
     { url: `${SITE}/quests`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE}/pricing`, changeFrequency: "weekly", priority: 0.9 },
+    // B99. The pool changes every day it is open, and it is the page an owner
+    // reads before deciding whether any of this is real.
+    { url: `${SITE}/pool`, changeFrequency: "daily", priority: 0.9 },
+    { url: `${SITE}/rules/gamer`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE}/rules/owner`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${SITE}/rules/brand`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE}/answers`, changeFrequency: "weekly", priority: 0.9 },
     { url: `${SITE}/vote`, changeFrequency: "weekly", priority: 0.5 },
     { url: `${SITE}/blog`, changeFrequency: "weekly", priority: 0.8 },
