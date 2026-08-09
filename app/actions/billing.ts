@@ -353,6 +353,18 @@ export async function markInvoicePaid(invoiceId: string, formData: FormData): Pr
   // the same state and a webhook may reach it a third time.
   await allocatePaidInvoice(db, invoiceId);
   await emailBrandAboutInvoice(db, invoiceId, "invoice.paid");
+  // B91.4. Money landing is the alert everybody actually wants, and it is also
+  // the one that unblocks work: a paid invoice is a campaign that can now be
+  // announced.
+  {
+    const { raiseAlert } = await import("@/lib/staff-alerts");
+    await raiseAlert(db, {
+      kind: "invoice.paid", desk: "money",
+      title: `${inv.number} is paid`,
+      body: "The vaults have been posted. Anything this invoice covers can be announced now.",
+      href: `/admin/billing?invoice=${invoiceId}`, refType: "invoice", refId: invoiceId, once: true,
+    });
+  }
   refresh();
   return { ok: true, message: `${inv.number} marked paid.` };
 }

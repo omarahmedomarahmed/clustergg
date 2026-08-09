@@ -55,7 +55,10 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_url" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_adjust" jsonb NOT NULL DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announced_at" timestamptz`,
+  `ALTER TABLE "sponsored_campaigns" ADD COLUMN IF NOT EXISTS "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
+  `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "baseline_at" timestamptz`,
   // ----- Quests & gamification (new tables; idempotent so both fresh and
   // existing databases converge without editing the static DDL string) -----
   `CREATE TABLE IF NOT EXISTS "quests" (
@@ -308,6 +311,7 @@ const COLUMN_MIGRATIONS = [
     "cover_url" text,
     "slot_state" jsonb DEFAULT '[]'::jsonb NOT NULL,
     "targeting" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "spc_brand_idx" ON "sponsored_campaigns" ("brand_id","created_at")`,
@@ -854,6 +858,64 @@ const COLUMN_MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS "vault_ledger_idx" ON "vault_ledger" ("vault","created_at")`,
   `CREATE INDEX IF NOT EXISTS "vault_ledger_ref_idx" ON "vault_ledger" ("ref_type","ref_id")`,
 
+  // B88.2 — what an admin RELEASED for one week, per vault. The vault is the
+  // bank; this is the week's budget, and what is not released is the reserve.
+  `CREATE TABLE IF NOT EXISTS "week_allocations" (
+    "id" text PRIMARY KEY NOT NULL,
+    "week" text NOT NULL,
+    "vault" text NOT NULL,
+    "amount" double precision DEFAULT 0 NOT NULL,
+    "locked_at" timestamp with time zone,
+    "actor_id" text,
+    "note" text,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  // The upsert target, and the thing that stops two admins releasing two
+  // budgets for the same week.
+  `CREATE UNIQUE INDEX IF NOT EXISTS "week_alloc_once_idx" ON "week_allocations" ("week","vault")`,
+
+  // B89.1 — what a server owner spent out of their earnings.
+  `CREATE TABLE IF NOT EXISTS "server_charges" (
+    "id" text PRIMARY KEY NOT NULL,
+    "guild_id" text NOT NULL,
+    "amount" double precision DEFAULT 0 NOT NULL,
+    "kind" text DEFAULT 'private_challenge' NOT NULL,
+    "challenge_id" text,
+    "label" text DEFAULT '' NOT NULL,
+    "fee_amount" double precision DEFAULT 0 NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "server_charge_idx" ON "server_charges" ("guild_id","created_at")`,
+
+  `CREATE TABLE IF NOT EXISTS "form_drafts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "owner_type" text NOT NULL,
+    "owner_id" text NOT NULL,
+    "form_key" text NOT NULL,
+    "payload" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "label" text DEFAULT '' NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "form_draft_key_idx" ON "form_drafts" ("owner_type","owner_id","form_key")`,
+  `CREATE INDEX IF NOT EXISTS "form_draft_seen_idx" ON "form_drafts" ("updated_at")`,
+
+  `CREATE TABLE IF NOT EXISTS "staff_alerts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "kind" text NOT NULL,
+    "desk" text DEFAULT 'sales' NOT NULL,
+    "title" text NOT NULL,
+    "body" text DEFAULT '' NOT NULL,
+    "href" text,
+    "ref_type" text,
+    "ref_id" text,
+    "cleared_by" text,
+    "cleared_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "staff_alert_idx" ON "staff_alerts" ("desk","created_at")`,
+
   `CREATE TABLE IF NOT EXISTS "feature_shots" (
     "key" text PRIMARY KEY NOT NULL,
     "image_url" text,
@@ -985,7 +1047,15 @@ async function runColumnMigrations(db: DB) {
   for (const stmt of COLUMN_MIGRATIONS) {
     try { await db.execute(dsql.raw(stmt)); }
     catch (e) {
-      if (!/already exists|does not exist/i.test(String(e))) throw e;
+      // The message we need is on the CAUSE, not on the error.
+      //
+      // Drizzle wraps a failed statement in a DrizzleQueryError whose own
+      // message is "Failed query: ALTER TABLE …" — the reason lives one level
+      // down. Testing only `String(e)` meant every expected miss (an ALTER
+      // against a table a later statement creates) looked unexpected and was
+      // rethrown, which took the whole bootstrap down on a fresh database.
+      const chain = [String(e), String((e as { cause?: unknown })?.cause ?? "")].join(" ");
+      if (!/already exists|does not exist/i.test(chain)) throw e;
       // Say which one was skipped, and why.
       //
       // Most of these are expected — an ALTER against a table a later statement

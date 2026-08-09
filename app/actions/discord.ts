@@ -132,6 +132,46 @@ export async function announceChallenge(_prev: BotActionState, formData: FormDat
 }
 
 /**
+ * Tell the servers a challenge is coming. B90.3.
+ *
+ * The rung between paid and running, and the point in the ladder where reach
+ * starts being counted. Separate from `announceChallenge` on purpose: that one
+ * says a challenge IS live and refuses a draft, this one says one is COMING and
+ * refuses anything already running. Merging them into "announce, whatever state
+ * it is in" is how a server gets told about a competition that finished
+ * yesterday.
+ */
+export async function announceUpcoming(_prev: BotActionState, formData: FormData): Promise<BotActionState> {
+  await requireAdmin();
+  if (!discordConfigured()) return { error: "Discord isn't configured on this deployment yet." };
+  const id = String(formData.get("challengeId") ?? "").trim();
+  if (!id) return { error: "Missing challenge." };
+
+  const { announceChallengeUpcoming } = await import("@/lib/discord/announce");
+  const res = await announceChallengeUpcoming(id);
+  if (!res.ok) {
+    const why: Record<string, string> = {
+      not_paid: "Nothing is announced before its bill is paid. The challenge page shows who owes it "
+        + "and which invoice — a challenge announced on nobody's money pays its prizes out of the prize "
+        + "vault, which is other brands'.",
+      not_queued: "Only a challenge that is paid, dated and has not started can be announced ahead. "
+        + "A draft has nothing to announce; one that is already live has been announced.",
+      reached_nobody: "It reached no server, so nothing was marked announced — check the bot can post "
+        + "somewhere, and try again.",
+      private_without_a_server: "It is private and belongs to no server, so there is nobody to tell.",
+      unknown_challenge: "That challenge no longer exists.",
+      bot_not_configured: "Discord isn't configured on this deployment yet.",
+      no_card: "Its card would not render, and an announcement without one is a wall of text.",
+    };
+    return { error: why[res.reason ?? ""] ?? "It could not be announced." };
+  }
+  return {
+    ok: `Queued for ${res.reached} ${res.reached === 1 ? "server" : "servers"}. `
+      + "It is marked announced from now, which is when reach starts counting for it.",
+  };
+}
+
+/**
  * Nudge a challenge again, by hand.
  *
  * The daily job reminds every live challenge once. This is the other case: a

@@ -76,6 +76,7 @@ export const ANNOUNCEMENT_AUDIENCE: Record<string, { audience: Audience; persona
 
   // About a competition, not about a person.
   announceChallengeLaunched: { audience: "NETWORK", personal: false },
+  announceChallengeUpcoming: { audience: "NETWORK", personal: false },
   announceChallengeReminder: { audience: "NETWORK", personal: false },
   announceChallengeEnded: { audience: "NETWORK", personal: false },
   remindLiveChallenges: { audience: "NETWORK", personal: false },

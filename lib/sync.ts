@@ -166,7 +166,43 @@ export async function scoreChallengesForAccount(db: DB, linkedAccountId: string)
   for (const s of stats) current[s.metricKey] = s.metricValue;
 
   for (const { participant, challenge } of participations) {
-    if (challenge.endAt < new Date()) continue;
+    const now = new Date();
+    if (challenge.endAt < now) continue;
+
+    // ===== B91: NOTHING COUNTS BEFORE THE GUN =====
+    //
+    // A challenge is joinable from the moment it is ANNOUNCED, which is days
+    // before it starts — that is the whole point of announcing ahead. But the
+    // baseline was taken at JOIN time and never moved, so every match played
+    // between joining and the start counted towards the score. Two things were
+    // wrong with that at once: a gamer who joined on announcement day was
+    // scored for a week they were not competing in, and one who joined on the
+    // start line was scored fairly, so entering early bought a head start
+    // nobody else could match.
+    //
+    // Before the start: score nothing at all. There is no partial credit to
+    // give and writing a number would put a leaderboard on screen for a
+    // challenge that has not begun.
+    if (challenge.startAt > now) continue;
+
+    // At or after the start, with a baseline older than the start: RESNAPSHOT.
+    // The delta everybody is measured on now runs from the same moment for
+    // everybody, whenever they entered.
+    //
+    // `baselineAt` null on a challenge that is already running means a row
+    // written before this existed. Those are left alone deliberately —
+    // rebaselining mid-run would wipe points people have already been shown,
+    // and a scoreboard that resets itself is worse than one that started
+    // slightly early.
+    const takenAt = participant.baselineAt;
+    if (takenAt !== null && takenAt < challenge.startAt) {
+      await db.update(schema.challengeParticipants)
+        .set({ baseline: current, baselineAt: now, currentPoints: 0 })
+        .where(eq(schema.challengeParticipants.id, participant.id));
+      participant.baseline = current;
+      participant.baselineAt = now;
+    }
+
     const baseline = participant.baseline ?? {};
     const delta: Record<string, number> = {};
     // A metric the baseline has never seen starts AT its current value: a

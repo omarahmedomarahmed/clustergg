@@ -78,7 +78,7 @@ export default async function OwnProfilePage() {
   const countries = await getCountries();
   const customize = (
     <div className="space-y-6">
-      <ProfileLocaleFlag countries={countries} country={user.country ?? ""} locale={(user as { locale?: string }).locale ?? "en"} />
+      <ProfileLocaleFlag countries={countries} country={user.country ?? ""} />
       <ProfileBuilder
         slug={user.slug}
         displayName={user.displayName}

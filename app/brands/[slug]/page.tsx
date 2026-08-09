@@ -8,6 +8,9 @@ import { portalSendMessage } from "@/app/actions/brand-portal";
 import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
 import { networkStats } from "@/lib/network";
 import { brandCampaigns, campaignQuote, networkReach, nextMonday, slotWindows } from "@/lib/sponsored-campaigns";
+import { trophiesForBrand } from "@/lib/brand-trophies";
+import BrandDraftCampaigns from "@/components/BrandDraftCampaigns";
+import { campaignGames } from "@/lib/sponsored-campaigns";
 import { brandChallengeReports, campaignReport, brandTestimonials, brandTier, challengeServers } from "@/lib/brand-report";
 import { pricingConfig } from "@/lib/pricing-live";
 import { listInvoices } from "@/lib/invoices";
@@ -264,6 +267,24 @@ export default async function BrandPortalPage({
   // B36: what is owed, when it is due, and what happens if it is not paid.
   const { brandBlocked } = await import("@/lib/prepay");
   const prepay = await brandBlocked(db, brand.id);
+  // B91.9. Theirs plus the general catalogue — another brand's logo must never
+  // appear in this list, let alone on a podium.
+  const brandTrophies = (await trophiesForBrand(await getDb(), brand.id)).map((t) => ({
+    id: t.id, name: t.name, tier: t.tier, value: t.value, brandId: t.brandId,
+  }));
+
+  // B91.10. Campaigns sales built for them, waiting to be confirmed. Before
+  // this, what a brand saw after a sales call was an invoice for something they
+  // had never seen a screen for.
+  const draftCampaigns = sponsored
+    .filter((c) => c.status === "draft")
+    .map((c) => ({
+      id: c.id, game: c.game, slots: c.slots,
+      total: Number(c.total ?? 0), pricePerChallenge: Number(c.pricePerChallenge ?? 0),
+      startAt: c.startAt.toISOString(), status: c.status,
+      games: campaignGames(c),
+    }));
+
   const buyQuote = campaignQuote();
   const buyWeeks = slotWindows(nextMonday());
 
@@ -418,13 +439,28 @@ export default async function BrandPortalPage({
             // thing they can buy is a month of sponsored challenges on a game.
             key: "buy", label: "Buy challenges", icon: "rocket",
             node: (
+              <>
+              <a
+                href="/rules/brand"
+                className="glass mb-4 flex items-center gap-3 p-4 text-sm hover:border-cyan-400/40"
+              >
+                <Icon name="spark" size={16} className="shrink-0 text-violet-300" />
+                <span>
+                  <b>What we will and will not promise you</b>
+                  <span className="block text-xs text-muted">
+                    Every rule that binds a brand here, with the reason it exists.
+                  </span>
+                </span>
+              </a>
               <CampaignBuilder
                 brandId={brand.id} keyStr={key}
                 games={builderGames}
                 quote={buyQuote}
                 network={{ servers: reach.servers, unlockedServers: reach.unlockedServers, gamers: reach.gamers }}
                 weeks={buyWeeks.map((w) => ({ startAt: w.startAt.toISOString(), endAt: w.endAt.toISOString() }))}
+                trophies={brandTrophies}
               />
+              </>
             ),
           },
           {
@@ -432,9 +468,12 @@ export default async function BrandPortalPage({
             // months AND the ad campaigns. This used to be a section buried at
             // the bottom of the analytics tab, which is why nobody found the
             // week-by-week detail that sits one click inside it.
-            key: "campaigns", label: "Campaigns", icon: "rocket",
+            key: "campaigns",
+            label: draftCampaigns.length ? `Campaigns (${draftCampaigns.length} waiting)` : "Campaigns",
+            icon: "rocket",
             node: (
               <div className="space-y-8">
+                <BrandDraftCampaigns brandId={brand.id} keyStr={key} campaigns={draftCampaigns} />
                 {/* Every week of every sponsored month, as its own card.
                     `sponsored` is the CAMPAIGNS a brand bought; the weeks
                     inside them are the challenges that actually ran, and the

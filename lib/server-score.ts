@@ -132,28 +132,42 @@ export function scoreWeek(me: ServerWeek, tier: ServerWeek[]): number {
 }
 
 /**
- * Decay, not a cooldown.
+ * ===== SIZE BRACKETS =====
  *
- * A hard "you won, sit out a week" kills the incentive to keep growing right
- * after a win and creates a predictable rotation that is itself gameable. This
- * lets a dominant server keep winning, but declining, so the server just below
- * them gets a real path in without anybody being locked out.
+ * The pool is split by bracket BEFORE anything is scored, and that split is the
+ * answer to the only fairness question owners actually ask: can four big servers
+ * take everything?
+ *
+ * They cannot. A large server competes for the large bracket's share and can
+ * never reach the small one's. Fixed per-server percentages could never do this
+ * — 20 small servers at 5% is 100%, 21 is 105%, and four large servers at 25% is
+ * the whole pool with nothing left for anybody else. Percentages only add up
+ * when they are computed, not assigned.
+ *
+ * An EMPTY bracket gives its share to the others, pro-rata. Money set aside for
+ * servers that did not turn up is money nobody can be paid, and holding it back
+ * would shrink a pool that was already announced.
  */
-export function decayFor(recentWins: number): number {
-  return Math.max(0.5, 1 / (1 + 0.25 * Math.max(0, recentWins)));
+export const BRACKETS = [
+  { key: "small", label: "Small", floor: 0, share: 60 },
+  { key: "mid", label: "Mid", floor: 500, share: 25 },
+  { key: "large", label: "Large", floor: 1000, share: 15 },
+] as const;
+export type BracketKey = (typeof BRACKETS)[number]["key"];
+
+/** Which bracket a server competes in, by qualified linked members. */
+export function bracketOf(qualifiedLinked: number): BracketKey {
+  let k: BracketKey = "small";
+  for (const b of BRACKETS) if (qualifiedLinked >= b.floor) k = b.key;
+  return k;
 }
 
-/** The number slots are ranked on. */
-export const finalScore = (me: ServerWeek, tier: ServerWeek[]): number =>
-  Math.round(scoreWeek(me, tier) * decayFor(me.recentWins) * 100) / 100;
-
 /**
- * Divide a pool between a flat participation share and the competition.
+ * **20% flat to every server that took part**, whether or not they placed.
  *
- * **20% flat to every server that carried a challenge**, whether or not they
- * placed. Showing a pool somebody cannot reach is a taunt; a pool plus a small
- * cheque is a ladder — and the 90% who never win are the ones who decide
- * whether the bot stays installed.
+ * Showing a pool somebody cannot reach is a taunt; a pool plus a small cheque is
+ * a ladder — and the 90% who never come first are the ones who decide whether
+ * the bot stays installed.
  */
 export const PARTICIPATION_SHARE = 20;
 
@@ -162,46 +176,78 @@ export type Payout = { guildId: string; amount: number; kind: "participation" | 
 /**
  * Who gets paid what, out of one week's pool.
  *
- * Two rules that only show up when the network is small, and both were found by
- * walking a real week rather than by reading the design:
+ * ===== ONE SENTENCE: YOUR SHARE OF THE POOL IS YOUR SHARE OF THE SCORE =====
  *
- *   * **Under-filled slots redistribute.** With ten servers and ten slots there
- *     is no competition at all, and a preset that allocates twenty slots to a
- *     ten-server network would strand half the pool with no destination and no
- *     rule. Unclaimed placement money is shared pro-rata among the slots that
- *     were filled.
- *   * **A payout floor.** A $7.88 transfer costs more in provider fees than it
- *     delivers. Below the floor it accrues instead — the money stays in the
- *     vault and the owner is paid when it crosses.
+ * Within a bracket, after the flat participation share, a server takes the
+ * fraction of the competitive money that matches its fraction of the total
+ * score. 120 points out of 1,000 is 12%.
+ *
+ * ===== WHAT THIS REPLACED, AND WHY =====
+ *
+ * Slots (`top 20%`, share ∝ 1/(rank+1)), repeat-winner decay, and empty-slot
+ * redistribution. Three mechanisms, each with its own edge cases, none of which
+ * an owner could work out from their own numbers.
+ *
+ *   * SLOTS created a cliff at #21 — the difference between 20th and 21st was
+ *     the difference between a cheque and nothing, for one entrant.
+ *   * DECAY punished a server for winning, which is the opposite of what a
+ *     network wants from its best server.
+ *   * REDISTRIBUTION existed only to patch the first.
+ *
+ * Score-proportional needs none of them: every qualifying server is paid, there
+ * is no cliff to fall off, and there is nothing left over to redistribute.
+ *
+ * **A payout floor survives.** A $7.88 transfer costs more in provider fees than
+ * it delivers, so below the floor it accrues and the owner is paid when it
+ * crosses. That is the one piece of the old design that was about reality
+ * rather than about the ranking.
  */
 export function weekPayouts(
   pool: number,
-  ranked: { guildId: string; score: number }[],
-  slots: { share: number }[],
+  ranked: { guildId: string; score: number; bracket?: BracketKey }[],
   opts: { participationShare?: number; floor?: number } = {},
 ): { payouts: Payout[]; carried: number } {
   const partPct = opts.participationShare ?? PARTICIPATION_SHARE;
   const floor = opts.floor ?? 25;
-  const participants = ranked.length;
   const payouts: Payout[] = [];
+  if (!ranked.length || !(pool > 0)) return { payouts: [], carried: 0 };
 
-  const partPool = pool * (partPct / 100);
-  if (participants > 0) {
-    const each = partPool / participants;
-    for (const r of ranked) payouts.push({ guildId: r.guildId, amount: each, kind: "participation" });
-  }
+  // ===== Split the pool by bracket, then give empty brackets away =====
+  const present = new Set(ranked.map((r) => r.bracket ?? "small"));
+  const liveShare = BRACKETS.filter((b) => present.has(b.key)).reduce((a, b) => a + b.share, 0);
+  const poolOf = (k: BracketKey) => {
+    if (!liveShare) return 0;
+    const b = BRACKETS.find((x) => x.key === k)!;
+    // Normalised against only the brackets that turned up, so an empty one's
+    // share flows to the others rather than stranding money with no destination.
+    return pool * (b.share / liveShare);
+  };
 
-  // Placement. A slot with nobody in it does not disappear — its share is
-  // redistributed across the slots that were filled.
-  const compPool = pool - (participants > 0 ? partPool : 0);
-  const filled = Math.min(slots.length, participants);
-  if (filled > 0) {
-    const usedShare = slots.slice(0, filled).reduce((a, s) => a + s.share, 0);
-    const top = [...ranked].sort((a, b) => b.score - a.score).slice(0, filled);
-    top.forEach((r, i) => {
-      const share = usedShare > 0 ? slots[i].share / usedShare : 1 / filled;
-      payouts.push({ guildId: r.guildId, amount: compPool * share, kind: "placement" });
-    });
+  for (const b of BRACKETS) {
+    if (!present.has(b.key)) continue;
+    const inBracket = ranked.filter((r) => (r.bracket ?? "small") === b.key);
+    const bracketPool = poolOf(b.key);
+
+    // Flat, to everyone who took part.
+    const partPool = bracketPool * (partPct / 100);
+    const each = partPool / inBracket.length;
+    for (const r of inBracket) payouts.push({ guildId: r.guildId, amount: each, kind: "participation" });
+
+    // Competitive, in proportion to score.
+    const compPool = bracketPool - partPool;
+    const total = inBracket.reduce((a, r) => a + Math.max(0, r.score), 0);
+    if (total > 0) {
+      for (const r of inBracket) {
+        const share = Math.max(0, r.score) / total;
+        if (share > 0) payouts.push({ guildId: r.guildId, amount: compPool * share, kind: "placement" });
+      }
+    } else {
+      // Nobody scored. The competitive money joins the flat share rather than
+      // vanishing — it was announced as this week's pool and it is owed to the
+      // servers that turned up.
+      const extra = compPool / inBracket.length;
+      for (const r of inBracket) payouts.push({ guildId: r.guildId, amount: extra, kind: "participation" });
+    }
   }
 
   // Merge per guild, then hold anything under the floor.

@@ -36,6 +36,7 @@ export type TemplateData = {
   "redeem.ready": { name: string; amount: Money; collectUrl: string };
   "portal.key": { serverName: string; key: string; portalUrl: string };
   "portal.key.rotated": { serverName: string; key: string; portalUrl: string; reason: string };
+  "brand.portal.key": { brand: string; key: string; portalUrl: string };
   "challenge.approved": { serverName: string; title: string; startsOn: string; url: string };
   "challenge.published": { name: string; title: string; game: string; endsOn: string; url: string };
   "challenge.ended": { name: string; title: string; placement: number | null; points: number; prize: Money | null; url: string };
@@ -110,6 +111,18 @@ const TEMPLATES: { [K in TemplateKey]: (d: TemplateData[K]) => Built } = {
       `Key: ${d.key}`],
     cta: { label: "Open your portal", url: d.portalUrl },
     footnote: "If you did not install Cluster on this server, reply to this email and we will remove it.",
+  }),
+  // Same rule as the server key: in the BODY, never the subject.
+  "brand.portal.key": (d) => ({
+    subject: `Your Cluster brand portal is ready — ${d.brand}`,
+    heading: `${d.brand} is on Cluster`,
+    lines: [
+      "Your portal key is below. Anyone holding it can open your brand's portal, so keep it to yourself.",
+      `Key: ${d.key}`,
+      "You can build a campaign straight away. Before anything of yours runs on the network a person here checks the account — we will come back to you within one business day.",
+    ],
+    cta: { label: "Open your portal", url: d.portalUrl },
+    footnote: "If you did not sign up for Cluster, reply to this email and we will delete the account.",
   }),
   "portal.key.rotated": (d) => ({
     subject: `New portal key for ${d.serverName}`,

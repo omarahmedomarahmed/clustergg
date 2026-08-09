@@ -3,11 +3,15 @@ import { money, type PricingConfig } from "@/lib/pricing";
 
 // What a server's community plays for as more of it connects.
 //
-// This curve is about the PRIZE money — the share gamers win, not the
-// owner's own share of the platform fee. The two are separate and are shown
-// separately: an owner's cut rises in steps at 500 / 1,000 / 5,000 linked
-// gamers (see `lib/server-earnings.ts` and the ladder), while this rises
-// smoothly with connection because it is the members' share of a pool.
+// This curve is about the PRIZE money — what the MEMBERS win — and not about
+// what the owner is paid. The two are separate and are shown separately: an
+// owner is paid from the weekly server pool (`lib/week-close.ts`), which is
+// scored and bracketed, while this rises smoothly with connection because it
+// is simply the members' share of the prize money in play.
+//
+// It used to say the owner's cut rose in steps at 500 / 1,000 / 5,000. That
+// rate was deleted in C3 and the comment outlived it by three sprints, which is
+// how a stale number gets copied onto a page by somebody trusting the comment.
 //
 // Stated as an expectation with the arithmetic on the page, because a curve
 // with no formula under it is a promise.

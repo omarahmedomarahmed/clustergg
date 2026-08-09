@@ -1,4 +1,5 @@
 import { getContent } from "@/lib/cms";
+import BetaBadge from "@/components/BetaBadge";
 
 // The brand lockup shown in the nav / footer. Admin chooses per placement
 // whether to show the square letter-mark, the wide wordmark, or both — and the
@@ -50,6 +51,9 @@ export default async function BrandHeader({ placement = "nav" }: { placement?: "
         </span>
       )}
       {word}
+      {/* On the lockup, both placements. The phone hides the wordmark and keeps
+          this: the badge is the part that has to survive the narrow viewport. */}
+      <BetaBadge size={placement === "nav" ? "md" : "sm"} />
     </span>
   );
 }

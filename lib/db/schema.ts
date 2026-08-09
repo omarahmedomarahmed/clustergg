@@ -382,6 +382,19 @@ export const challenges = pgTable("challenges", {
   startAt: timestamp("start_at", { withTimezone: true, mode: "date" }).notNull(),
   endAt: timestamp("end_at", { withTimezone: true, mode: "date" }).notNull(),
   status: text("status").notNull().default("draft"), // draft | active | completed | cancelled
+  /**
+   * When the bot told the servers this was coming. B90.3.
+   *
+   * The rung between "paid" and "running". A challenge announced on Thursday
+   * for the following Monday is one every server has had four days to talk
+   * about; one announced at the moment it starts is a surprise, and a surprise
+   * competition gets the entrants of whoever happened to be online.
+   *
+   * It is a TIMESTAMP rather than a status value because a challenge can be
+   * announced and then still be edited, cancelled or rescheduled — and because
+   * "when did we tell people" is the question reach reporting actually asks.
+   */
+  announcedAt: timestamp("announced_at", { withTimezone: true, mode: "date" }),
   cadence: text("cadence").notNull().default("custom"), // daily | weekly | monthly | custom
   // ===== Repeating series =====
   //
@@ -439,6 +452,21 @@ export const challengeParticipants = pgTable("challenge_participants", {
   userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   linkedAccountId: text("linked_account_id").notNull().references(() => linkedGameAccounts.id, { onDelete: "cascade" }),
   baseline: jsonb("baseline").$type<Record<string, number>>().notNull().default({}),
+  /**
+   * When the baseline above was taken. B91.
+   *
+   * The baseline used to be snapshotted at JOIN time and never moved, which
+   * made every hour of play between joining and the challenge starting count
+   * towards it. That is wrong in both directions: a gamer who joins the moment
+   * a challenge is announced is scored for a week they were not competing in,
+   * and one who joins on the start line is scored fairly — so the reward for
+   * entering early was a head start nobody else could match.
+   *
+   * Null means "never rebaselined", which is every row written before this
+   * column existed. Those are left alone: re-snapshotting a challenge that is
+   * already running would wipe points people have already been shown.
+   */
+  baselineAt: timestamp("baseline_at", { withTimezone: true, mode: "date" }),
   currentPoints: integer("current_points").notNull().default(0),
   status: text("status").notNull().default("active"), // active | completed | disqualified
   finalPlacement: integer("final_placement"),
@@ -541,6 +569,51 @@ export const vaultLedger = pgTable("vault_ledger", {
 }, (t) => [
   index("vault_ledger_idx").on(t.vault, t.createdAt),
   index("vault_ledger_ref_idx").on(t.refType, t.refId),
+]);
+
+/**
+ * What an admin RELEASED for one week, per vault. B88.2.
+ *
+ * THE PROBLEM THIS SOLVES. The gamer ceiling and the server pool were both
+ * computed against the whole vault, which meant a week with no sales paid
+ * nothing and a week with a big sale paid all of it. There was no reserve and
+ * no way to hold one, because there was nowhere to say "this much, this week."
+ *
+ * So an allocation is a deliberate act: somebody decides what a week may spend,
+ * and what is NOT allocated is the reserve. The vault is the bank; this is the
+ * week's budget.
+ *
+ * Three rules, and they are the reason the table exists rather than a settings
+ * row:
+ *
+ *   1. **Per week and per vault**, so history is readable. "What did we release
+ *      in March" is a query, not an archaeology exercise.
+ *   2. **Raisable, never lowerable, once locked.** Gamers have been shown a
+ *      ceiling computed from it and servers have been shown a pool. Taking that
+ *      back mid-week is the one move that would make both numbers untrustworthy.
+ *   3. **Owners see the allocation, never the vault.** The reserve is ours to
+ *      manage, and showing it invites "why am I not paid out of that".
+ */
+export const weekAllocations = pgTable("week_allocations", {
+  id: id(),
+  /** The Monday it applies to, as YYYY-MM-DD. Same key the weekly close uses. */
+  week: text("week").notNull(),
+  /** `cp` or `server`. The prize and cluster vaults are not allocated weekly. */
+  vault: text("vault").notNull(),
+  /** Dollars released for that week. Never a percentage — a percentage of a
+   *  moving balance is a number that changes after somebody has been shown it. */
+  amount: doublePrecision("amount").notNull().default(0),
+  /** Set when the week starts. Before that the amount is freely editable. */
+  lockedAt: timestamp("locked_at", { withTimezone: true, mode: "date" }),
+  /** Who released it, and why they chose this number. */
+  actorId: text("actor_id"),
+  note: text("note"),
+  createdAt: now("created_at"),
+  updatedAt: now("updated_at"),
+}, (t) => [
+  // One row per week per vault. The upsert target, and the thing that stops two
+  // admins releasing two budgets for the same week.
+  uniqueIndex("week_alloc_once_idx").on(t.week, t.vault),
 ]);
 
 export const challengeEvents = pgTable("challenge_events", {
@@ -1361,6 +1434,21 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
    */
   targeting: jsonb("targeting").$type<{ regions?: string[]; countries?: string[]; guildIds?: string[] }>()
     .notNull().default({}),
+  /**
+   * Which trophies the brand wants given out, by place. B91.9.
+   *
+   * A brand with three different $100 designs has a reason for wanting a
+   * particular one on a particular week — a launch, a colourway, a partner. It
+   * used to be impossible to say so: staff picked from the catalogue and the
+   * brand found out when they saw the podium.
+   *
+   * Stored on the CAMPAIGN rather than on each challenge because it is a
+   * standing instruction for everything bought under it, and because the
+   * challenges do not exist yet at the moment the brand is asked. Index 0 is
+   * first place. It is a REQUEST, not a guarantee — staff still build the
+   * podium, and a trophy that has been retired cannot be given.
+   */
+  prizes: jsonb("prizes").$type<{ places?: string[][] }>().notNull().default({}),
   createdAt: now("created_at"),
 }, (t) => [index("spc_brand_idx").on(t.brandId, t.createdAt), index("spc_game_idx").on(t.game, t.status)]);
 
@@ -1820,6 +1908,103 @@ export const invoiceLines = pgTable("invoice_lines", {
  * Always initiated by an admin — an owner cannot press a button and make money
  * leave. They can see what they are owed and ask about it; the release is ours.
  */
+/**
+ * What a server owner SPENT out of their earnings. B89.1.
+ *
+ * The other side of the wallet. Pool earnings are credits, computed from the
+ * weekly close's payout lines; withdrawals are payouts. This is the third
+ * movement: an owner buying a private challenge for their own members and
+ * paying for it out of what they earned.
+ *
+ * It is a CHARGE and not a transfer, and that distinction is the whole reason
+ * the table looks like this. The owner buys a product from us at a price; we
+ * then owe the prize as our own obligation out of our own revenue. A row here
+ * reduces what we owe the owner and increases what we owe their members — it
+ * never moves value from one person to another, which is the thing that would
+ * make us a money transmitter (`docs/B73_RESEARCH.md` Q3).
+ */
+export const serverCharges = pgTable("server_charges", {
+  id: id(),
+  guildId: text("guild_id").notNull(),
+  /** Positive dollars. What was taken out of the wallet. */
+  amount: doublePrecision("amount").notNull().default(0),
+  /** `private_challenge` today. Named so a second kind cannot be confused with it. */
+  kind: text("kind").notNull().default("private_challenge"),
+  /** The challenge this bought, so the charge and the thing are one click apart. */
+  challengeId: text("challenge_id"),
+  /** What the owner reads on their statement. */
+  label: text("label").notNull().default(""),
+  /** Our margin on it, recorded separately so "what did we make" is a query. */
+  feeAmount: doublePrecision("fee_amount").notNull().default(0),
+  createdAt: now("created_at"),
+}, (t) => [index("server_charge_idx").on(t.guildId, t.createdAt)]);
+
+/**
+ * A half-built thing, kept. B91.8.
+ *
+ * A brand builds a campaign, gets interrupted, closes the tab, and comes back
+ * to an empty form. So do server owners requesting a challenge and staff
+ * building one. Every one of those is somebody who decided to give us money and
+ * then had to start again — the single cheapest place to lose a customer.
+ *
+ * Keyed by (ownerType, ownerId, formKey) so a draft belongs to whoever was
+ * typing it, and one row per form rather than a history: this is a resumption
+ * point, not a version control system, and keeping every keystroke would make
+ * the table bigger than the things it is drafts of.
+ */
+export const formDrafts = pgTable("form_drafts", {
+  id: id(),
+  /** brand | server | staff */
+  ownerType: text("owner_type").notNull(),
+  ownerId: text("owner_id").notNull(),
+  /** Which form. `campaign`, `challenge`, `challenge-request`. */
+  formKey: text("form_key").notNull(),
+  /** Whatever the form had on it. Never trusted on the way back in. */
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  /** What to call it in a list of drafts. */
+  label: text("label").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  createdAt: now("created_at"),
+}, (t) => [
+  uniqueIndex("form_draft_key_idx").on(t.ownerType, t.ownerId, t.formKey),
+  index("form_draft_seen_idx").on(t.updatedAt),
+]);
+
+/**
+ * Something happened that a human here should know about. B91.4.
+ *
+ * NOT the same thing as the audit log, and the difference is who it is for.
+ * The audit log records what STAFF did, for the question "who authorised this";
+ * this records what CUSTOMERS did, for the question "is anybody on it". A brand
+ * that signs up at 2am, starts a campaign, and hears nothing for four days has
+ * been failed by us long before anybody looks at a log.
+ *
+ * Deliberately a table rather than a per-user notification: an alert belongs to
+ * the DESK, not to a person. The salesperson who happens to be on shift reads
+ * it, and the one who is on holiday does not have three days of unread rows.
+ */
+export const staffAlerts = pgTable("staff_alerts", {
+  id: id(),
+  /** brand.signup | brand.campaign_draft | invoice.paid | server.charge | … */
+  kind: text("kind").notNull(),
+  /** Which desk should see it: sales | ops | money. */
+  desk: text("desk").notNull().default("sales"),
+  title: text("title").notNull(),
+  body: text("body").notNull().default(""),
+  /** Where to go and deal with it. */
+  href: text("href"),
+  /** What it is about, so a screen can group by customer. */
+  refType: text("ref_type"),
+  refId: text("ref_id"),
+  /**
+   * Who dealt with it, and when. An alert nobody can clear is a list that
+   * grows until people stop opening it.
+   */
+  clearedBy: text("cleared_by"),
+  clearedAt: timestamp("cleared_at", { withTimezone: true, mode: "date" }),
+  createdAt: now("created_at"),
+}, (t) => [index("staff_alert_idx").on(t.desk, t.createdAt)]);
+
 export const serverPayouts = pgTable("server_payouts", {
   id: id(),
   guildId: text("guild_id").notNull(),

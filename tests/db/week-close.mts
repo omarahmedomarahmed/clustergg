@@ -12,6 +12,7 @@
 //   DEMO_DB=1 npx tsx tests/db/week-close.mts
 
 process.env.DEMO_DB = "1";
+import { readFileSync } from "node:fs";
 
 let pass = 0;
 const fails: string[] = [];
@@ -25,7 +26,7 @@ const near = (name: string, got: number, want: number, tol = 0.02) =>
 const { getDb, schema } = await import("../../lib/db/index.ts");
 const { and, eq, inArray } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
-const { closeWeek, weekKey, tierOf, slotsFor, TIERS } = await import("../../lib/week-close.ts");
+const { closeWeek, weekKey, tierOf, TIERS } = await import("../../lib/week-close.ts");
 const { weekStartOf } = await import("../../lib/guild-snapshot.ts");
 const { JOBS, WEEKLY_DAY, runAllJobs } = await import("../../lib/jobs.ts");
 
@@ -40,14 +41,50 @@ console.log("== tiers are labels, and slots scale with the field ==");
   ok("there are exactly three, and none of them names a rate",
     TIERS.length === 3 && !TIERS.some((t) => "ownerPct" in t));
 
-  // The boundary problem the model names: a fixed slot count would make
-  // crossing a tier boundary beat any amount of in-tier effort.
-  for (const n of [1, 5, 20, 100]) {
-    const s = slotsFor(n);
-    near(`${n} servers → shares still total 1`, s.reduce((a, x) => a + x.share, 0), 1, 0.0001);
-    ok(`…and about a fifth of them are paid`, s.length === Math.max(1, Math.round(n * 0.2)), String(s.length));
-    if (s.length > 1) ok("…with first place ahead of second", s[0].share > s[1].share);
+  // SLOTS ARE RETIRED. `slotsFor` paid the top 20% on a 1/(rank+1) ladder,
+  // which put a cliff at #21 — 20th got a cheque and 21st got nothing over one
+  // entrant — and needed an empty-slot redistribution rule to patch the case
+  // where a network had fewer servers than slots.
+  //
+  // Every server that scores is now paid in proportion to its score, so there is
+  // no cliff and nothing left over to redistribute. Asserted here rather than in
+  // attribution.mts because this is the file that owns the weekly close.
+  {
+    const wc = await import("../../lib/week-close.ts");
+    const src = readFileSync(new URL("../../lib/week-close.ts", import.meta.url), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "");
+    // Gone from the module, not merely uncalled. An exported function nobody
+    // calls is one somebody calls again.
+    ok("slotsFor is gone entirely", !("slotsFor" in wc) && !/slotsFor/.test(src),
+      Object.keys(wc).filter((k) => /slot/i.test(k)).join(","));
+    ok("…and so is repeat-winner decay", !/decayFor/.test(src));
   }
+}
+
+console.log("\n== the pool is what was RELEASED, not the whole vault ==");
+{
+  const { setAllocation } = await import("../../lib/allocations.ts");
+  const { getDb } = await import("../../lib/db/index.ts");
+  const adb = await getDb();
+
+  // A week where an admin deliberately released NOTHING. The vault is full — the
+  // seed put money in it — but nothing was allocated, so nothing is divided.
+  //
+  // This is the branch that makes a reserve possible at all: without it, one
+  // good sales week empties the vault into one weekly pool and the next quiet
+  // week pays nobody. The pool check runs before the entrant check, so this
+  // reaches the allocation branch rather than the no-entrants one.
+  const quiet = new Date(Date.UTC(2029, 5, 11));           // a Monday
+  const quietKey = weekKey(new Date(quiet.getTime() - 7 * 86400_000));
+  await setAllocation(adb, { vault: "server", week: quietKey, amount: 0, actorId: "test" });
+
+  const r = await closeWeek(quiet);
+  eq("nothing is divided", r.pool, 0);
+  ok("…and the summary says it was not released, not that we are broke",
+    /nothing was released/i.test(r.summary), r.summary);
+  ok("…and says the money is still in the vault",
+    /still in the vault/i.test(r.summary), r.summary);
+  eq("…and nobody was paid", r.payouts.length, 0);
 }
 
 console.log("\n== the weekly job runs on the daily cron, behind a day check ==");

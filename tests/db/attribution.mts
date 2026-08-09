@@ -28,7 +28,7 @@ const eq = (name: string, got: unknown, want: unknown) =>
 const near = (name: string, got: number, want: number, tol = 0.001) =>
   ok(name, Math.abs(got - want) < tol, `got ${got}, want ${want}`);
 
-const { exclusiveEntrants, percentile, scoreWeek, decayFor, weekPayouts, SCORE_WEIGHTS } =
+const { exclusiveEntrants, percentile, scoreWeek, weekPayouts, bracketOf, BRACKETS, SCORE_WEIGHTS } =
   await import("../../lib/server-score.ts");
 const { DEFAULT_SPLIT, SPLIT_PRESETS, splitProblems, allocate, VAULTS, transfer, balances, postToLedger } =
   await import("../../lib/vaults.ts");
@@ -89,9 +89,89 @@ console.log("\n== scoring cannot be bought ==");
 }
 
 console.log("\n== decay, not a cooldown ==");
-eq("a first-time winner is undecayed", decayFor(0), 1);
-ok("a repeat winner declines", decayFor(4) < decayFor(1));
-ok("…but is never locked out", decayFor(99) >= 0.5, String(decayFor(99)));
+// DECAY IS RETIRED. It multiplied a repeat winner's score down to a floor of
+// 0.5 over eight weeks — punishing a server for being the best one on the
+// network, which is the opposite of what a network wants. Score-proportional
+// shares already give everyone below the leader a real slice, so the thing
+// decay existed to soften no longer happens.
+//
+// Asserted as ABSENT rather than deleted, so it cannot quietly come back.
+{
+  const score = await import("../../lib/server-score.ts");
+  ok("decay is gone from the scoring module", !("decayFor" in score), Object.keys(score).join(","));
+  ok("…and so is the slot ladder", !("slotsFor" in score));
+}
+
+console.log("\n== brackets: big servers cannot eat the small pool ==");
+{
+  eq("the three brackets total 100%", BRACKETS.reduce((a, b) => a + b.share, 0), 100);
+  eq("a 0-member server is small", bracketOf(0), "small");
+  eq("499 is still small", bracketOf(499), "small");
+  eq("500 is mid", bracketOf(500), "mid");
+  eq("1,000 is large", bracketOf(1000), "large");
+
+  // THE QUESTION THIS ANSWERS: four large servers turn up. Can they take
+  // everything? Under fixed per-server percentages they could — 4 × 25% is the
+  // whole pool. Under brackets they take the large bracket's share and no more.
+  const ranked = [
+    { guildId: "s1", score: 80, bracket: "small" as const },
+    { guildId: "s2", score: 40, bracket: "small" as const },
+    { guildId: "L1", score: 90, bracket: "large" as const },
+    { guildId: "L2", score: 90, bracket: "large" as const },
+  ];
+  const { payouts, carried } = weekPayouts(10_000, ranked, { floor: 0 });
+  const by = Object.fromEntries(payouts.map((p) => [p.guildId, p.amount]));
+  const smallTotal = (by.s1 ?? 0) + (by.s2 ?? 0);
+  const largeTotal = (by.L1 ?? 0) + (by.L2 ?? 0);
+
+  eq("nothing is carried when the floor is 0", carried, 0);
+  ok("every share adds back to the pool",
+    Math.abs(smallTotal + largeTotal - 10_000) < 0.05, `${smallTotal + largeTotal}`);
+  // 60 : 15 with the mid bracket empty → 80% / 20%.
+  ok("the small bracket keeps the larger share even against higher scores",
+    smallTotal > largeTotal * 3, `small ${smallTotal.toFixed(2)} vs large ${largeTotal.toFixed(2)}`);
+  ok("…and two identical large servers split their bracket evenly",
+    Math.abs((by.L1 ?? 0) - (by.L2 ?? 0)) < 0.05);
+  // Within the small bracket: 80 vs 40 is 2:1 on the competitive half, plus a
+  // flat share each. The higher scorer must be ahead — that is the whole
+  // incentive to climb, which an equal split would have removed.
+  ok("a higher score is paid more inside a bracket", (by.s1 ?? 0) > (by.s2 ?? 0),
+    `${by.s1} vs ${by.s2}`);
+}
+
+console.log("\n== an empty bracket gives its share away ==");
+{
+  // Money set aside for servers that did not turn up is money nobody can be
+  // paid, and holding it back would shrink a pool that was already announced.
+  const only = [{ guildId: "a", score: 10, bracket: "small" as const }];
+  const { payouts } = weekPayouts(1000, only, { floor: 0 });
+  const total = payouts.reduce((a, p) => a + p.amount, 0);
+  ok("one small server alone takes the whole pool", Math.abs(total - 1000) < 0.05, String(total));
+}
+
+console.log("\n== everyone who took part is paid something ==");
+{
+  // No cliff at #21. The old slot ladder paid the top 20% and nothing to the
+  // rest, so 20th place got a cheque and 21st got nothing over one entrant.
+  const many = Array.from({ length: 30 }, (_, i) => ({
+    guildId: `g${i}`, score: 30 - i, bracket: "small" as const,
+  }));
+  const { payouts } = weekPayouts(10_000, many, { floor: 0 });
+  eq("all thirty are paid", payouts.length, 30);
+  ok("…and the last one is not zero",
+    (payouts.find((p) => p.guildId === "g29")?.amount ?? 0) > 0);
+}
+
+console.log("\n== the floor holds small amounts back rather than sending them ==");
+{
+  // A $7.88 transfer costs more in provider fees than it delivers.
+  const many = Array.from({ length: 40 }, (_, i) => ({
+    guildId: `t${i}`, score: 1, bracket: "small" as const,
+  }));
+  const { payouts, carried } = weekPayouts(200, many, { floor: 25 });
+  eq("nobody is paid under the floor", payouts.length, 0);
+  ok("…and the money is carried, not lost", Math.abs(carried - 200) < 0.5, String(carried));
+}
 
 console.log("\n== a week's pool leaves nothing stranded ==");
 {

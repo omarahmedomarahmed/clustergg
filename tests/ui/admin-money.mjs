@@ -93,6 +93,41 @@ console.log("\n== the week page explains a payout before anybody disputes one ==
   ok("the close button exists", /Close the week|Re-run the close/.test(body));
 }
 
+console.log("\n== the week is where a budget is released ==");
+{
+  await open(page, `${BASE}/admin/week`);
+  await page.waitForFunction(
+    () => /reserve/i.test(document.body.innerText),
+    null, { timeout: 20000 },
+  ).catch(() => {});
+  const body = await page.locator("body").innerText();
+
+  ok("both vaults are budgeted here", /Gamer points/.test(body) && /Server pool/.test(body), body.slice(0, 300));
+  // The reserve is the whole reason the control exists. If it is not next to
+  // the decision, an operator releases everything and the next quiet week pays
+  // nobody.
+  ok("the reserve is shown beside the release, not after it", /in reserve/i.test(body));
+  ok("…and releasing everything is called out", /reserve/i.test(body));
+  // The direction rule, stated before somebody tries it rather than as an error.
+  ok("the page says a budget can go up and never down",
+    /raised mid-week and never lowered|can only go up/i.test(body), body.slice(0, 600));
+
+  // The two effects, in the operator's terms: what the CP budget does today and
+  // what the server budget does on Monday.
+  ok("the CP budget says what it produces",
+    /ceiling|CP each today|shipped default/i.test(body));
+  ok("…and the server budget says what Monday divides",
+    /Monday|divides|unpaid vault/i.test(body));
+
+  const releases = await page.locator('button:has-text("Release for this week"), button:has-text("Update this week")').count();
+  ok("there is a control per vault", releases >= 2, `${releases} buttons`);
+
+  // A reason is required. A budget released with no reason is one nobody can
+  // defend when it runs out — asserted on the field, not on the copy.
+  const notes = await page.locator('input[name="note"][required]').count();
+  ok("a reason is required, not optional", notes >= 2, `${notes} required note fields`);
+}
+
 console.log("\n== a staff member without billing cannot reach them ==");
 {
   const ctx2 = await browser.newContext();

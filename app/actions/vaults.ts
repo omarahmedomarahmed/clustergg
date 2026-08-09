@@ -121,3 +121,65 @@ export async function runWeekClose(_prev: WeekCloseState, _formData: FormData): 
   revalidatePath("/admin/payouts");
   return { summary: r.summary };
 }
+
+// ===== The week's budget. B88.2 =====
+
+export type AllocState = { ok?: true; message?: string; error?: string } | undefined;
+
+/**
+ * Release an amount for a week.
+ *
+ * ADMIN ONLY, like the split. Reading where the money is belongs to whoever
+ * runs billing; deciding how much of it a week may spend does not.
+ *
+ * The refusals live in `lib/allocations.ts` — not here — so the same rule
+ * applies whether the caller is this form, a cron, or a script somebody writes
+ * next year. A guard that only exists in a server action is a guard with one
+ * door and no walls.
+ */
+export async function releaseForWeek(_prev: AllocState, formData: FormData): Promise<AllocState> {
+  const access = await requireSystemFor("/admin/week");
+  if (!access.isAdmin) return { error: "Only a super admin can release a week's budget." };
+
+  const vault = String(formData.get("vault") ?? "") as "cp" | "server";
+  if (vault !== "cp" && vault !== "server") return { error: "Pick the CP vault or the server pool." };
+
+  const amount = Number(formData.get("amount"));
+  const week = String(formData.get("week") ?? "").trim() || undefined;
+  const note = String(formData.get("note") ?? "").trim();
+  if (!note) {
+    return { error: "Say why this number. A budget released without a reason is one nobody can defend when it runs out." };
+  }
+
+  const db = await getDb();
+  const { setAllocation, allocationFor } = await import("@/lib/allocations");
+  const before = await allocationFor(db, vault, week);
+  const res = await setAllocation(db, { vault, week, amount, actorId: access.user.id, note });
+  if (!res.ok) return { error: res.error };
+
+  await auditChange(
+    access.user.id, "week.allocate", `${before.week}:${vault}`,
+    before.exists ? before.amount : null, res.amount, note,
+  );
+
+  revalidatePath("/admin/week");
+  revalidatePath("/admin/cp");
+  revalidatePath("/admin/vaults");
+  // The gamer's own page reads the ceiling this changes. Revalidating only the
+  // admin screens would leave a gamer looking at yesterday's number.
+  revalidatePath("/quests");
+
+  const label = vault === "cp" ? "the CP vault" : "the server pool";
+  return {
+    ok: true,
+    message: before.exists
+      ? `${label}: ${money(before.amount)} → ${money(res.amount)} for the week of ${before.week}.`
+      : `${label}: ${money(res.amount)} released for the week of ${before.week}. `
+        + (vault === "cp"
+          ? "Today's ceiling is now derived from it rather than from the shipped default."
+          : "This is the pool Monday's close will divide."),
+  };
+}
+
+const money = (n: number) =>
+  n.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 });

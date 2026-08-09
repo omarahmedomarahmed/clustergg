@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ProductAtlas from "@/components/marketing/ProductAtlas";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
@@ -379,6 +380,11 @@ export default async function LandingPage() {
           {/* Proof before argument. A brand reading a pitch wants to know the
               audience is real before it wants to know why. */}
           <ProofBand net={network} games={pricing.games.length || pricing.cfg.games} cfg={pricing.cfg} />
+
+          {/* B92. The mechanism, shown with the product's own components,
+              before the argument for it. Everything above this point is a
+              claim; this is the thing itself. */}
+          <ProductAtlas />
 
           <ProblemSection c={c} bg={cardBg} />
           <InsightSection c={c} bg={cardBg} />

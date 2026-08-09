@@ -318,6 +318,89 @@ export async function announceChallengeLaunched(challengeId: string): Promise<nu
 }
 
 /**
+ * "This opens Monday" — the rung between paid and running. B90.3.
+ *
+ * A challenge used to be announced at the instant it started, which makes every
+ * competition a surprise: the entrants are whoever happened to be online in the
+ * first hours. Announcing it days ahead gives every server something to talk
+ * about before it matters, and it is the moment reach starts being counted —
+ * `announcedAt` is stamped here and nowhere else.
+ *
+ * Refuses anything that is not QUEUED. Announcing a live challenge is not an
+ * announcement, it is a note that you missed it, and stamping `announcedAt`
+ * after the fact would quietly corrupt the window the stamp exists to define.
+ *
+ * Same targeting as a launch: public everywhere, private only in the servers
+ * that hold it.
+ */
+export async function announceChallengeUpcoming(
+  challengeId: string,
+): Promise<{ ok: boolean; reason?: string; reached?: number }> {
+  if (!canAct()) return { ok: false, reason: "bot_not_configured" };
+  const db = await getDb();
+  const [ch] = await db.select().from(schema.challenges)
+    .where(eq(schema.challenges.id, challengeId)).limit(1);
+  if (!ch) return { ok: false, reason: "unknown_challenge" };
+
+  // The guard is the shared derivation, not a hand-rolled copy of it. A second
+  // opinion about what "queued" means is how a screen and an action end up
+  // disagreeing about the same row.
+  //
+  // And it is asked WITH THE BILL. "Nothing queues before payment clears" is
+  // the rule the whole ladder exists for, and the only place it can actually be
+  // enforced is here: this is the moment a challenge stops being an internal
+  // record and starts being a promise to every server on the network.
+  const [{ canAnnounce }, { billFor }] = await Promise.all([
+    import("@/lib/challenge-stage"),
+    import("@/lib/challenge-billing"),
+  ]);
+  const bill = await billFor(db, ch);
+  if (!bill.paid && bill.kind !== "house") return { ok: false, reason: "not_paid" };
+  if (!canAnnounce({ ...ch, paid: bill.paid || bill.kind === "house" })) {
+    return { ok: false, reason: "not_queued" };
+  }
+
+  const [card, url] = await Promise.all([
+    cardRef("challenge", { id: challengeId }),
+    challengeUrl(siteUrl(), challengeId),
+  ]);
+  if (!card.data || card.data.kind !== "challenge") return { ok: false, reason: "no_card" };
+
+  const opensOn = ch.startAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+  const holders = [...new Set([ch.guildId, ...(ch.guildIds ?? [])].filter((g): g is string => !!g))];
+  const isPrivate = ch.visibility === "private";
+  if (isPrivate && !holders.length) return { ok: false, reason: "private_without_a_server" };
+
+  const reached = await announce({
+    content: [
+      `📣 **${ch.title}** opens **${opensOn}** on **${ch.game}**.`,
+      "Nothing to sign up for and nothing to pay — link a game account before it starts and every match you play counts from the first minute.",
+    ].join("\n"),
+    embeds: [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }],
+    components: rows([
+      navButton("Link a game account", frame("link", ""), [frame("home")], ButtonStyle.Primary, "🎮"),
+      linkButton("Details", url, "🔗"),
+    ]),
+  }, { only: isPrivate ? holders : undefined, sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
+
+  // Nothing landed is not success — and it must not stamp. A challenge marked
+  // announced that reached nobody is one nobody will think to announce again.
+  if (!reached) return { ok: false, reason: "reached_nobody" };
+
+  // ANNOUNCING IS WHAT PUBLISHES IT.
+  //
+  // A later run of a series is written as a draft so it does not appear on the
+  // homepage weeks early. This is the moment that changes: the servers have
+  // been told, so gamers can find it and enter it. Scoring is still gated on
+  // the start date — `scoreChallengesForAccount` rebaselines at the gun — so an
+  // early entrant gains nothing but a place in the queue.
+  await db.update(schema.challenges)
+    .set({ announcedAt: new Date(), status: "active" })
+    .where(eq(schema.challenges.id, challengeId));
+  return { ok: true, reached };
+}
+
+/**
  * "Three days left" — the message that turns a challenge somebody scrolled
  * past into one they enter.
  *

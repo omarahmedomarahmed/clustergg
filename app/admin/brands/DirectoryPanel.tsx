@@ -24,6 +24,7 @@ export default async function DirectoryPanel() {
           <select name="status" className="input-cosmic">
             <option value="active">Active</option>
             <option value="paused">Paused</option>
+            <option value="pending">Pending review</option>
           </select>
           <div>
             <button className="glow-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white">Add brand</button>

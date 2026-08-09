@@ -371,7 +371,16 @@ working surface:
 `serverShare` per challenge and the portal prints "% of the field", which is the
 per-challenge cut C3 deleted. Two models are live on one screen.
 
-#### B89.1 — The server owner's wallet
+#### B89.1 — The server owner's wallet — SHIPPED (418e8da, f121808, ebadd23)
+
+> Built as `lib/server-wallet.ts` + the Wallet tab, which is also the billing
+> page (B90.9). Two design failures the tests caught: counting a `draft` payout
+> as committed made `available` identically 0 for every owner forever, and
+> summing every payout into `paid` made a goodwill cheque eat the balance it
+> was added to. The minimum withdrawal shipped at **$20**, not the $25 written
+> below. Spending the balance on a private challenge is `chargeWallet`, which
+> is built and tested; the challenge that spends it is B90.4 and is not.
+
 
 An owner cannot see money they are owed, only challenges they ran.
 
@@ -478,7 +487,50 @@ side of that line. It was not designed for that reason and it does it anyway.
 | Under-18 profiled ads barred in 9 regimes | Ad serving to under-18s must be **contextual, never profiled**. One change clears more jurisdictions than any other | Ad serving |
 | 30% NRA withholding, **no de-minimis**, on non-US prize payouts | **Pre-launch blocker for the international population.** Unresolved in the research — the largest open question in it | Redemption |
 
-#### B90.1 — Brand self-signup
+### B91 — The challenge is the product · SPRINT IN FLIGHT
+
+The owner's brief, decomposed. Shipped items name their commit; the rest is the
+order it is being built in.
+
+| # | Item | State |
+|---|---|---|
+| B91 | Nothing counts before the gun — scoring rebaselines at the start line | SHIPPED `a3bf8ab` |
+| B91.2 | Every challenge shows who paid for it, and whether they have | SHIPPED `762061b` |
+| B91.3 | A series is materialised all the way out; announcing publishes it | SHIPPED `8ee1f0b` |
+| B91.4 | The desk: what a customer just did, per desk, clearable by name | SHIPPED `f927206` |
+| B91.5 | A brand's money always belongs to a campaign — created from the deal being typed, as a draft | SHIPPED `fc01cb9` |
+| B91.6 | The seam between two runs: the next run opens, carries the field, announces | SHIPPED `e50ee81` |
+| B91.7 | A podium of any depth — 1 to 10 places, and the award query that only ever paid three | SHIPPED `8ec81b9` |
+| B91.8 | Draft autosave everywhere, and half-built things on the sales desk | SHIPPED `a488ced` |
+| B91.9 | A brand chooses which of its trophies goes out, per place | SHIPPED `899e4f4` |
+| B91.10 | Sales builds a campaign FOR a brand; the brand confirms it in their portal | SHIPPED `b82a2ce` |
+| B90.4 | A server owner buys a private challenge from their wallet — prize pool + 5% | SHIPPED `4382ef7` |
+| B90.10 | Every rule, to the person it binds, with the reason — three pages | SHIPPED `b3a91ba` |
+| B91.11 | A desk for sales and a desk for support | SHIPPED `9367359` |
+| B91.12 | The pre-relaunch purge | SHIPPED `8b968ca` · see docs/PURGE_2026-08-09.md |
+| B91.13 | The rules on every page | SHIPPED `41778ed` |
+
+**What is left, and why it is left.** The public marketing pages still describe
+the product in the words of the version before B90–B91: they do not mention the
+ladder, the two gates, the bracket shares or private challenges. That is a
+rewrite of copy against a product that has only just stopped moving, and it is
+the right next thing — but it is writing, not plumbing, and it should be done
+once rather than twice.
+
+**The rule that ties B91.3 and B91 together, written down because it is not
+obvious:** a challenge becomes visible and joinable when it is ANNOUNCED, which
+is before it starts — and scoring is gated separately, on the start date. Those
+are two different gates on purpose. Publishing early is how a competition gets
+entrants; scoring early is how an early entrant gets a head start nobody can
+match.
+
+#### B90.1 — Brand self-signup — SHIPPED (12eb0c6)
+
+> `lib/brand-signup.ts` + the form on `/brands`, above the enquiry form. The
+> gate below is one column: a self-signed-up brand lands `pending` and
+> `lib/ads.ts` serves `active` only. Free-mail addresses sign up fine — a real
+> four-person studio runs on Gmail — and are flagged for the reviewer instead.
+
 
 Create a brand → automated email with a portal link and key → build a campaign.
 
@@ -491,6 +543,14 @@ challenges by other brands"; that is a competitor's performance data. What ships
 is **aggregate platform benchmarks** — median entrants per challenge, typical
 reach — with no brand named and the 25-cohort floor applied.
 
+#### B89.2b — Country mandatory, language selector gone — SHIPPED (dd5331e)
+
+> Country is a third unlock step with its own key, not folded into "make your
+> profile yours" — that step is generous by design and an avatar satisfies it,
+> which tells us nothing about redemption eligibility. The grandfather rule is
+> untouched: `unlockState` returns early for anybody already unlocked. The
+> language selector is removed until the translation registry is finished.
+
 #### B90.2 — The campaign builder
 
 | Step | Rule |
@@ -502,7 +562,15 @@ reach — with no brand named and the 25-cohort floor applied.
 | Estimated reach | Total gamers and total servers, labelled **estimate, not guaranteed** |
 | Pay | The whole campaign, once. Nothing queues until it clears |
 
-#### B90.3 — The status ladder
+#### B90.3 — The status ladder — SHIPPED (69d5367)
+
+> `lib/challenge-stage.ts`, DERIVED from status + dates + a new `announcedAt`
+> rather than stored, so the stage cannot drift from the row. `announced` is
+> real behaviour: `announceChallengeUpcoming` posts days ahead and stamps only
+> when it reached a server. What is NOT wired yet: the `paid` input is
+> optional and no caller passes it, so `draft` still means "status draft"
+> rather than "unpaid" until B90.4 gives a challenge a bill to check.
+
 
 `draft` → `queued` → `announced` → `live` → `ended`
 
@@ -585,7 +653,11 @@ is a bill somebody disputes.
 happens when an admin presses announce — which may be mid-week — and the message
 carries the start date. Nothing starts mid-week; announcements do.
 
-#### B90.9 — The server owner's wallet IS their billing page
+#### B90.9 — The server owner's wallet IS their billing page — SHIPPED (ebadd23)
+
+> One tab, both directions, with the payout-route form moved onto it. The bills
+> half is real (`chargeWallet`) and has nothing to bill until B90.4 ships.
+
 
 Earnings, balance, and every bill for their own challenges, in one place.
 
@@ -614,7 +686,10 @@ mechanism that can claw back a fraud, which is why anybody can be paid at all".
 One console: every brand, every campaign, every challenge, filterable by status.
 A `draft` campaign is a **sales signal**, not clutter.
 
-#### B90.6 — BETA
+#### B90.6 — BETA — SHIPPED (80dc936)
+
+> On the lockup in `BrandHeader` (nav + footer) and in the mobile drawer.
+
 
 A `BETA` badge beside the wordmark, in the desktop nav and the mobile nav.
 

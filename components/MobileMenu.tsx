@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/Icon";
 import GameLogo from "@/components/GameLogo";
+import BetaBadge from "@/components/BetaBadge";
 import { useT } from "@/components/LocaleProvider";
 import { logout } from "@/app/actions/auth";
 
@@ -37,13 +38,18 @@ export default function MobileMenu({
       <div className="absolute right-0 top-0 h-full w-72 max-w-[85vw] bg-[#070826]/97 backdrop-blur-2xl border-l border-violet-500/25 p-5 flex flex-col animate-[rise-in_.25s_ease] shadow-2xl overflow-y-auto"
         style={{ paddingTop: "calc(env(safe-area-inset-top) + 1.25rem)", paddingBottom: "calc(env(safe-area-inset-bottom) + 1.25rem)" }}>
         <div className="flex items-center justify-between mb-6">
-          {wordmarkUrl
-            // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={wordmarkUrl} alt="Cluster" className="h-8 w-auto max-w-[150px] object-contain" />
-            : markUrl
+          {/* Lockup and badge are ONE item in a justify-between row — as
+              siblings the badge drifted to the middle of the drawer header. */}
+          <span className="flex items-center gap-2">
+            {wordmarkUrl
               // eslint-disable-next-line @next/next/no-img-element
-              ? <img src={markUrl} alt="Cluster" className="h-9 w-9 rounded-lg object-cover ring-1 ring-violet-400/30" />
-              : <span className="text-sm font-bold tracking-widest grad-text">CLUSTER</span>}
+              ? <img src={wordmarkUrl} alt="Cluster" className="h-8 w-auto max-w-[150px] object-contain" />
+              : markUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={markUrl} alt="Cluster" className="h-9 w-9 rounded-lg object-cover ring-1 ring-violet-400/30" />
+                : <span className="text-sm font-bold tracking-widest grad-text">CLUSTER</span>}
+            <BetaBadge size="sm" />
+          </span>
           <button aria-label="Close menu" onClick={() => setOpen(false)}
             className="flex h-9 w-9 items-center justify-center rounded-lg border border-violet-400/25 text-muted">
             <Icon name="x" size={16} />

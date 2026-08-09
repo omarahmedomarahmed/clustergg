@@ -36,13 +36,16 @@ const { buyTrophy, cpPerDollar, priceOf } = await import("../../lib/marketplace.
 const db = await getDb();
 const tag = uid().slice(0, 8);
 
-const mkGamer = async (opts: { customized?: boolean; band?: string | null; unlocked?: boolean } = {}) => {
+const mkGamer = async (opts: { customized?: boolean; country?: boolean; band?: string | null; unlocked?: boolean } = {}) => {
   const id = uid();
   await db.insert(schema.users).values({
     id, email: `${id}@ob.test`, displayName: `OB ${id.slice(0, 4)}`,
     slug: `ob-${tag}-${id.slice(0, 6)}`, passwordHash: "x",
     ageBand: opts.band === undefined ? "adult" : opts.band,
-    ...(opts.customized ? { country: "EG" } : {}),
+    // An AVATAR, not a country. Since B89.2 country is its own step, and a
+    // fixture that satisfies both with one column cannot tell them apart.
+    ...(opts.customized ? { avatarUrl: "/a.png" } : {}),
+    ...(opts.country ? { country: "EG" } : {}),
     ...(opts.unlocked ? { unlockedAt: new Date() } : {}),
   });
   return id;
@@ -66,10 +69,23 @@ console.log("== what counts as customizing ==");
   ok("…and an empty theme object is not a theme", !hasCustomized({ theme: {} }));
 
   // Sharing the card is NOT a step. It stays a paid action; it is not a lock.
-  const steps = stepsFor({ linked: false, customized: false });
-  eq("there are exactly two steps", steps.length, 2);
-  ok("…and neither of them is sharing a card",
+  const steps = stepsFor({ linked: false, customized: false, country: false });
+  eq("there are exactly three steps", steps.length, 3);
+  ok("…and none of them is sharing a card",
     !steps.some((s) => /share/i.test(s.label) || /share/i.test(s.key)));
+
+  // B89.2. Country is its OWN step, not a way of satisfying "customize".
+  // `hasCustomized` is generous by design — an avatar satisfies it — and an
+  // avatar tells us nothing about whether somebody may redeem a trophy for
+  // money. Folding the two together would let a gamer unlock, win, and only
+  // then be told we never knew where they were.
+  ok("country is a step of its own", steps.some((x) => x.key === "country"));
+  ok("…and it says why we are asking, not just that we are",
+    /redeem|eligib|money/i.test(steps.find((x) => x.key === "country")?.detail ?? ""),
+    steps.find((x) => x.key === "country")?.detail ?? "");
+  ok("an avatar alone does not answer it",
+    !stepsFor({ linked: true, customized: hasCustomized({ avatarUrl: "/a.png" }), country: false })
+      .find((x) => x.key === "country")?.done);
 }
 
 console.log("\n== a new gamer is locked, and earns anyway ==");
@@ -77,7 +93,7 @@ console.log("\n== a new gamer is locked, and earns anyway ==");
   const id = await mkGamer();
   const s = await unlockState(db, id);
   ok("a fresh account is locked", !s.unlocked);
-  eq("…with both steps outstanding", s.steps.filter((x) => x.done).length, 0);
+  eq("…with every step outstanding", s.steps.filter((x) => x.done).length, 0);
 
   // Earning still happens. A gamer who earns nothing until they finish learns
   // nothing about what earning feels like.
@@ -145,8 +161,15 @@ console.log("\n== finishing both steps unlocks, and says what they did ==");
   eq("…and the checklist says which one", half.steps.filter((s) => s.done).map((s) => s.key), ["customize"]);
 
   await linkAccount(id);
+  const stillLocked = await unlockState(db, id);
+  ok("linking a game is not enough on its own either", !stillLocked.unlocked,
+    JSON.stringify(stillLocked.steps.map((x) => [x.key, x.done])));
+  ok("…and what is missing is the country", 
+    stillLocked.steps.find((x) => x.key === "country")?.done === false);
+
+  await db.update(schema.users).set({ country: "EG" }).where(sqlEq(schema.users.id, id));
   const done = await tryUnlock(db, id);
-  ok("both steps unlock it", done.unlocked);
+  ok("all three steps unlock it", done.unlocked);
   ok("…and it names the game they linked",
     done.achieved.some((a) => /chesscom/i.test(a)), JSON.stringify(done.achieved));
   ok("…rather than congratulating them for filling in a form",

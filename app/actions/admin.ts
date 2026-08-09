@@ -10,6 +10,7 @@ import { uid, slugify } from "@/lib/utils";
 import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
 import { syncAccount } from "@/lib/sync";
 import { CADENCE_DAYS, isRepeating, runTitle, stripRunSuffix } from "@/lib/challenge-series";
+import { MAX_PLACES, toPrizeBag } from "@/lib/prize-places";
 
 export type ActionState = { ok?: boolean; error?: string; message?: string } | undefined;
 
@@ -511,8 +512,15 @@ export async function saveChallenge(
     // single trophyId mirrors the first 1st-place trophy for old consumers.
     ...(() => {
       const pick = (k: string) => formData.getAll(k).map(String).map((s) => s.trim()).filter(Boolean);
-      const prizes = { first: pick("prize:first"), second: pick("prize:second"), third: pick("prize:third") };
-      const any = prizes.first.length || prizes.second.length || prizes.third.length;
+      // B91.7. Any number of places, read by position. The old three named
+      // fields are still accepted so a cached form or an older screen posting
+      // them keeps working.
+      const byPlace: string[][] = [];
+      for (let i = 1; i <= MAX_PLACES; i++) byPlace.push(pick(`prize:place:${i}`));
+      const legacyPosted = [pick("prize:first"), pick("prize:second"), pick("prize:third")];
+      const posted = byPlace.some((p) => p.length) ? byPlace : legacyPosted;
+      const prizes = toPrizeBag(posted) as { places: string[][]; first: string[]; second: string[]; third: string[] };
+      const any = prizes.places.some((p) => p.length);
       const legacy = String(formData.get("trophyId") ?? "").trim() || null;
       return { prizes: any ? prizes : null, trophyId: prizes.first[0] ?? legacy };
     })(),
@@ -538,6 +546,31 @@ export async function saveChallenge(
       };
     })(),
   };
+
+  // ===== B91.5: A BRAND'S MONEY ALWAYS BELONGS TO A CAMPAIGN =====
+  //
+  // The campaign is the only object that answers "what did this brand buy" —
+  // the invoice lines point at it, `billFor` rolls a whole series up under it,
+  // and the brand's own portal lists it. A sponsored challenge with no campaign
+  // is money that arrived attached to nothing.
+  //
+  // Created rather than demanded, because the case this exists for is a sales
+  // deal being typed in right now, and the campaign it belongs to does not
+  // exist yet. Refusing would send the operator away to make one and back to
+  // re-type everything on screen. See lib/custom-campaign.ts.
+  if (values.sponsorBrandId) {
+    const { ensureCampaignFor } = await import("@/lib/custom-campaign");
+    values.sponsorCampaignId = await ensureCampaignFor(db, {
+      brandId: values.sponsorBrandId,
+      campaignId: values.sponsorCampaignId,
+      game: values.game,
+      startAt,
+      cadence,
+      runs: runsPlanned,
+      pricePerChallenge: values.sponsorPrice,
+      label: values.title,
+    });
+  }
 
   // Say which field is missing. This used to be `return;` — the form posted,
   // nothing happened, and nothing explained why.
@@ -590,6 +623,30 @@ export async function saveChallenge(
         seriesId: id, runIndex: 1, runsPlanned, baseTitle,
         title: runTitle(baseTitle, cadence, 1),
       });
+
+      // B91.3: WRITE THE WHOLE SERIES NOW.
+      //
+      // It used to be a chain — run 1 exists, run 2 is created when run 1
+      // finishes — which is fine for a machine and useless for everybody else.
+      // The month a brand bought did not exist yet, so nobody could look at it,
+      // announce week 2 early, or tell a gamer this is week 2 of 8.
+      //
+      // Every later run is a DRAFT, which `stageOf` reads as queued once the
+      // bill is paid. Writing them active would put week 8 on the homepage
+      // today — a dozen gamer-facing queries read "active" as "live now".
+      if (runsPlanned > 1) {
+        const { planRuns, materialiseSeries } = await import("@/lib/series-plan");
+        const windows = planRuns(startAt, cadence, runsPlanned);
+        // Skip run 1: it was just written above, with whatever status the
+        // operator chose.
+        await materialiseSeries(db, {
+          seriesId: id,
+          createdBy: admin.id,
+          template: { ...values, baseTitle, cadence },
+          windows: windows.slice(1),
+        });
+      }
+
       if (values.status === "active") await launchChallenge(id);
       await audit(admin.id, "challenge.create", "challenge", values.title);
       challengeId = id;

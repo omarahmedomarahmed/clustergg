@@ -278,9 +278,14 @@ export function ServerBoard({ rows, highlight }: {
 // The one panel an owner opens to answer "what am I making?".
 //
 // Every row shows its own working — what the brand paid, how many of the
-// entrants came from here, the tier percentage, and the product of the three.
-// A total an owner cannot reconstruct from the challenge in front of them is a
-// total they will email us about, and rightly.
+// entrants came from here, and what this server's MEMBERS took home. A total an
+// owner cannot reconstruct from the challenge in front of them is a total they
+// will email us about, and rightly.
+//
+// "the tier percentage" was in this comment until B89. There is no tier
+// percentage: C3 deleted the per-challenge rate, and what an owner is paid comes
+// out of the weekly pool. A stale comment on a money screen is how the next
+// person reintroduces the thing that was removed.
 
 export type EarningRowView = {
   challengeId: string;
@@ -555,7 +560,12 @@ export function EarningsPanel({
                 <th className="px-4 py-3 text-right">Brand paid</th>
                 <th className="px-4 py-3 text-right">Your players</th>
                 <th className="px-4 py-3 text-right">Your share of the field</th>
-                <th className="px-4 py-3 text-right">You earned</th>
+                {/* "You earned" was WRONG here and materially so: the column
+                    shows what this server's MEMBERS won out of the prize pool,
+                    which is never the owner's money. A banner further down says
+                    "this is not payable to you" and this header contradicted it
+                    on the same screen — the exact shape of a dispute. */}
+                <th className="px-4 py-3 text-right">Your members won</th>
               </tr>
             </thead>
             <tbody>
@@ -578,7 +588,10 @@ export function EarningsPanel({
                   <td className="px-4 py-3 text-right tabular-nums text-muted">
                     {Math.round(r.serverShare * 100)}% of the field
                   </td>
-                  <td className={`px-4 py-3 text-right font-bold tabular-nums ${r.membersWon > 0 ? "text-emerald-300" : "text-muted"}`}>
+                  {/* Amber, not emerald. Green is the colour every other
+                      screen uses for money coming TO you, and this money went to
+                      a member. */}
+                  <td className={`px-4 py-3 text-right font-bold tabular-nums ${r.membersWon > 0 ? "text-amber-200" : "text-muted"}`}>
                     {usd(r.membersWon)}
                   </td>
                 </tr>

@@ -52,6 +52,7 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
           <select name="status" defaultValue={brand.status} className="input-cosmic">
             <option value="active">Active</option>
             <option value="paused">Paused</option>
+            <option value="pending">Pending review</option>
           </select>
           <textarea name="about" defaultValue={brand.about ?? ""} placeholder="About / creative brief shown on the portal" rows={2} className="input-cosmic sm:col-span-2" />
           <div><button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Save branding</button></div>
@@ -86,6 +87,7 @@ export default async function AdminBrandDetail({ params }: { params: Promise<{ i
             <option value="draft">Draft (upload creatives, then launch)</option>
             <option value="active">Active</option>
             <option value="paused">Paused</option>
+            <option value="pending">Pending review</option>
           </select>
           <div><button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Create campaign</button></div>
         </form>

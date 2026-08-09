@@ -59,6 +59,24 @@ export default async function Footer() {
           </div>
         ))}
       </div>
+      {/* B90.10. The rules, on every page, to all three audiences.
+          They live in the footer rather than behind a "Legal" link because they
+          are not legal text — they are how the product works, and the person
+          who most needs them is the one deciding whether to bother. */}
+      <div className="mx-auto max-w-6xl px-4 pb-8">
+        <div className="rounded-2xl border border-white/10 bg-black/25 px-5 py-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+            <span className="font-semibold text-ink">Every rule, and why it exists:</span>
+            <Link href="/rules/gamer" className="text-muted hover:text-ink">If you play</Link>
+            <Link href="/rules/owner" className="text-muted hover:text-ink">If you run a server</Link>
+            <Link href="/rules/brand" className="text-muted hover:text-ink">If you buy</Link>
+            <span className="text-muted/70">
+              Every figure on those pages is read from the code that enforces it.
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="border-t border-violet-500/10 py-5 text-center text-xs text-muted/70">
         © {new Date().getFullYear()} Cluster · clustergg.com · Made among the stars
       </div>

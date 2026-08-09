@@ -511,15 +511,53 @@ function startOfUtcDay(): Date { const d = new Date(); d.setUTCHours(0, 0, 0, 0)
  */
 export const CP_PAID_SQL = sql<number>`COALESCE(${schema.questEvents.cpAwarded}, ${schema.questEvents.qpAwarded})`;
 
-/** The one ceiling, from settings, with the model's default when unset. */
+/**
+ * The one ceiling.
+ *
+ * ===== B88.3: DERIVED, NOT TYPED =====
+ *
+ * This used to read a settings row somebody typed a number into, with no
+ * connection to the money funding it. It now comes from the week's CP
+ * allocation divided by the gamers who could earn today and the days left —
+ * so it falls as the platform grows, rises after a quiet day, and cannot
+ * overspend a week whose budget is its own numerator.
+ *
+ * THE MANUAL SETTING STILL WINS WHEN IT IS SET. Not as a fallback — as an
+ * override, and a deliberate one. There has to be a way to pin the number
+ * during an incident, and a derived value with no manual escape is a value
+ * nobody can stop. `/admin/cp` writes it; clearing it hands control back.
+ *
+ * The order matters: override → derived → the shipped default. The default is
+ * reached only when there is no override AND the derivation cannot run, which
+ * on an empty database is the honest answer rather than zero.
+ */
 export async function dailyCpCeiling(db: DB): Promise<number> {
   try {
     const [row] = await db.select({ value: schema.platformSettings.value })
       .from(schema.platformSettings)
       .where(eq(schema.platformSettings.key, "quests.dailyCpCeiling")).limit(1);
     const n = Number((row?.value as { cp?: number } | null)?.cp);
-    return Number.isFinite(n) && n >= 0 ? n : DEFAULT_DAILY_CP_CEILING;
-  } catch { return DEFAULT_DAILY_CP_CEILING; }
+    // An override of 0 is REAL — it is how earning is stopped without deleting
+    // anything — so this tests for a finite number, never for truthiness.
+    if (Number.isFinite(n) && n >= 0) return n;
+  } catch (e) {
+    // Narrow and LOUD, for the same reason the award path's catch is. Falling
+    // through to the derivation is the right recovery, but a settings read that
+    // failed and one that simply had no row are different facts, and only one of
+    // them means something is wrong.
+    console.error("[cp] could not read the pinned ceiling; using the derived one", e);
+  }
+
+  try {
+    const { planDailyCeiling } = await import("@/lib/daily-ceiling");
+    return (await planDailyCeiling(db)).ceiling;
+  } catch (e) {
+    // Last resort. Reaching here means neither the override nor the derivation
+    // could be read, and the shipped default is the only number left that
+    // anybody has ever defended.
+    console.error("[cp] could not derive the ceiling; using the shipped default", e);
+    return DEFAULT_DAILY_CP_CEILING;
+  }
 }
 
 /** How much CP this gamer has already been credited today (UTC). */

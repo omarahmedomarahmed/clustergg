@@ -3,6 +3,10 @@ import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { setParticipantStatus } from "@/app/actions/admin";
 import ChallengeBuilder, { type ChallengeEdit } from "@/components/ChallengeBuilder";
+import StageLadder from "@/components/admin/StageLadder";
+import { stageOf, canAnnounce } from "@/lib/challenge-stage";
+import BillPanel from "@/components/admin/BillPanel";
+import { billFor } from "@/lib/challenge-billing";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import Link from "next/link";
@@ -61,11 +65,14 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
   // beside it. A repeating challenge is only comprehensible as a series.
   const plan = challenge.seriesId ? await seriesPlan(challenge.seriesId) : null;
   const reach = await deliveryTotals(id);
+  // B91.2. Every challenge costs somebody money; until this panel an admin
+  // looking at one could not tell which somebody, or whether they had paid.
+  const bill = await billFor(db, challenge);
 
   return (
     <div className="space-y-6">
       <div className="glass p-6">
-        <div className="text-xs uppercase tracking-widest text-cyan-300">{challenge.status} · {challenge.format}</div>
+        <div className="text-xs uppercase tracking-widest text-cyan-300">{challenge.format}</div>
         <h1 className="text-2xl font-bold mt-1">{challenge.title}</h1>
         <p className="text-sm text-muted mt-1">
           {challenge.game} via {challenge.provider} · ends {timeAgo(challenge.endAt)} · scoring:{" "}
@@ -87,6 +94,21 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
           <Stat value={reach.linked.toLocaleString()} label="could enter" />
           <Stat value={participants.length.toLocaleString()} label="entered" gold />
         </div>
+        {/* B90.3. The stage replaced a bare `status` word in the header above:
+            "active" was printed for a challenge that starts in five days and
+            for one that is running right now, which are different situations
+            and different jobs. */}
+        <BillPanel bill={bill} />
+
+        {/* The bill is passed IN, not looked up again: an unpaid challenge must
+            read as a draft on the ladder and offer no announce button, and the
+            only way the stage can know that is if the caller tells it. */}
+        <StageLadder
+          challengeId={id}
+          stage={stageOf({ ...challenge, paid: bill.paid || bill.kind === "house" })}
+          canAnnounce={canAnnounce({ ...challenge, paid: bill.paid || bill.kind === "house" })}
+        />
+
         {challenge.status === "active" && reach.servers === 0 && (
           <p className="mt-2 text-xs text-amber-300">
             This run has not landed in any server yet. Announce it from Admin → Discord, or check the
