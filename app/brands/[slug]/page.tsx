@@ -29,7 +29,6 @@ import BrandAppearanceEditor from "@/components/BrandAppearanceEditor";
 import BrandCreativesTab from "@/components/BrandCreativesTab";
 import BrandCardCampaign from "@/components/BrandCardCampaign";
 import CampaignBuilder from "@/components/CampaignBuilder";
-import { isSponsorable } from "@/lib/sponsorable";
 import BrandChartBuilder from "@/components/BrandChartBuilder";
 import Tabs from "@/components/Tabs";
 import AnimatedNumber from "@/components/AnimatedNumber";
@@ -256,14 +255,7 @@ export default async function BrandPortalPage({
       .where(and(eq(schema.challenges.status, "active"), sql`${schema.challenges.sponsorPrice} > 0`)))
       .map((c) => c.game),
   );
-  // B114. A game we cannot legally sell is not shown to a brand at all.
-  //
-  // Filtered rather than disabled-with-a-tooltip: a greyed row on a buying
-  // screen reads as "coming soon, ask us", and the answer to that question is a
-  // conversation nobody on this team wants to have twice. Gamers still play it,
-  // still link, still appear on its board — it is only the SALE that is
-  // withheld. `lib/sponsorable.ts` is the one place that decides.
-  const builderGames = reach.byGame.filter((g) => isSponsorable(g.game)).map((g) => ({
+  const builderGames = reach.byGame.map((g) => ({
     game: g.game,
     logoUrl: gameLogos.get(g.game) ?? null,
     servers: g.servers,

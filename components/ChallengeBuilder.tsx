@@ -4,7 +4,6 @@ import { useActionState, useMemo, useState } from "react";
 import Icon from "@/components/Icon";
 import CoverFramer from "@/components/CoverFramer";
 import { placesOf, MAX_PLACES } from "@/lib/prize-places";
-import { sponsorBlockFor } from "@/lib/sponsorable";
 import MetricsGuide from "@/components/MetricsGuide";
 import { saveChallenge, type ChallengeSaveState } from "@/app/actions/admin";
 import { RULE_OPS, isRanked, ruleSentence, valueChoices, OPEN_TO_EVERYONE } from "@/lib/challenge-rules";
@@ -187,9 +186,6 @@ export default function ChallengeBuilder({
   const prizeFirst = places[0] ?? [];
 
   const provider = useMemo(() => providers.find((p) => p.id === providerId), [providers, providerId]);
-  // B114. Why this game cannot be sold, or null. Read from the same function
-  // the save action uses, so the form and the refusal cannot disagree.
-  const sponsorBlock = sponsorBlockFor(provider?.game ?? "");
   const caps = provider?.capabilities ?? [];
   const matchingSpaces = useMemo(() => {
     const match = spaces.filter((s) => s.game === provider?.game);
@@ -322,21 +318,9 @@ export default function ChallengeBuilder({
                   }}
                 >
                   <option value="">— nobody, this one&apos;s on us —</option>
-                  {/* B114. Disabled rather than hidden HERE, unlike the brand's
-                      own builder: staff need to know the option exists and why
-                      it is off, and the alternative is somebody hunting for a
-                      dropdown that silently lost its contents. */}
-                  {brands.map((b) => (
-                    <option key={b.id} value={b.id} disabled={!!sponsorBlock}>{b.name}</option>
-                  ))}
+                  {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
               </label>
-              {sponsorBlock && (
-                <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 sm:col-span-2">
-                  <b>{provider?.game}</b> cannot carry a sponsor yet. {sponsorBlock} Run it unsponsored,
-                  or pick another game.
-                </p>
-              )}
               <label className="text-xs text-muted">What they paid for this run
                 <div className="mt-1 flex items-center gap-2">
                   <input

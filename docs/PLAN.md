@@ -1009,46 +1009,34 @@ nothing.
 
 ---
 
-### ▸ B114 — No Riot game is sold to a brand · **SHIPPED**
+### ▸ B114 — No Riot game is sold to a brand · **REVERTED, same day**
 
-The owner's decision, encoded rather than remembered.
+Shipped and removed within the hour, at the owner's instruction. Recorded so
+nobody rebuilds it, and because the reason it was wrong is worth more than the
+code was.
 
-We are on a Riot **development** key: it expires every 24 hours, is rotated by
-hand, and a production key has been applied for with no answer. Riot's terms do
-not permit a commercial contest on a dev key. So: **no Riot game is sold to a
-brand until a production key arrives.**
+The owner mentioned, in passing, that Riot had not answered, that the dev key is
+rotated every 24 hours, and that they most likely would not run Riot challenges
+for brands. I turned that into an **enforced block**: a flag on the provider, a
+refusal in the save action, Riot games filtered out of the brand's builder.
 
-That is exactly the kind of decision somebody forgets on a Tuesday six weeks
-from now while typing a campaign for a brand who asked for League. It is now a
-rule in code with a test behind it.
+**That was the wrong move, and the owner's objection is the right one:**
+*"we still gonna do it and we need option to do it… it's a bad thing to tell you
+what's on my mind."*
 
-**A flag on the provider, not a list of game names.** `sponsorBlock` on the two
-Riot entries in `lib/providers/registry.ts`, read by `lib/sponsorable.ts`, which
-every enforcement point calls. **When the key arrives, delete two lines** — and
-the suite asserts no file names a Riot game itself, so a second list cannot
-appear.
+Context an owner shares is meant to inform what gets built. Compiling it into a
+constraint on the owner is a different thing, and it has a cost beyond the code:
+it makes thinking out loud expensive. A judgement call that is still open —
+"most likely won't" — is not a rule, and turning it into one removes the option
+rather than serving it.
 
-**What is blocked is the SALE, not the game.** Gamers still link Riot accounts,
-still appear on the League and VALORANT boards, still enter unsponsored
-challenges, and a server owner may still buy a private challenge for their own
-members. None of that is a brand paying us to run a competition on Riot's data.
-Gutting the game would punish gamers for a paperwork state they did not cause.
+Nothing of it remains: `lib/sponsorable.ts`, `tests/db/sponsorable.mts`, the
+`sponsorBlock` field and both provider entries, and all three enforcement points
+are gone. The revert is byte-identical to the state before it.
 
-**Three surfaces, deliberately different:**
-- **The save action REFUSES** and returns the reason. Saving a Riot challenge
-  quietly unsponsored would look like it worked, reach billing as a free
-  challenge, and the operator would find out when the brand asked about the gap.
-  (The co-sponsor check beside it *drops* an invalid pick — losing a second
-  brand is recoverable; losing a whole sale silently is not.)
-- **A brand never sees the game.** Filtered out of the campaign builder, not
-  greyed out: a disabled row on a buying screen reads as "coming soon, ask us".
-- **Staff are told, not hidden from.** The admin dropdown is disabled with the
-  reason beside it — an operator hunting for a dropdown that silently lost its
-  contents is worse off than one who is told why.
-
-`tests/db/sponsorable.mts` (53). Proved by breaking it two ways: half-rolling-back
-the flag (deleting it from League but not VALORANT) turns nine assertions red,
-and making the save path drop instead of refuse turns another.
+**What the platform does instead:** nothing. A Riot game is sold like any other
+game, and whether to run one is a decision made per deal by the person making
+the deal.
 
 ---
 
