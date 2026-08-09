@@ -15,6 +15,7 @@ import MobileHud from "@/components/MobileHud";
 import UnlockChecklist from "@/components/UnlockChecklist";
 import { unlockState } from "@/lib/unlock";
 import WeekBand, { type BandData } from "@/components/WeekBand";
+import MissionBand, { type MissionBandData } from "@/components/MissionBand";
 import { getNavQuests, getTotalCp } from "@/lib/quests";
 import { weekBoard } from "@/lib/profile-week";
 import { parseDrawerLinks } from "@/lib/mobile-nav";
@@ -110,6 +111,33 @@ export default async function Nav() {
     signedIn: !!user,
     me: user ? { id: user.id, slug: user.slug } : null,
   };
+  // B113. The mission and the streak, read here with the rest of the chrome.
+  // Never for a guest: there is no mission for somebody with no account, and
+  // the query is skipped rather than run and discarded.
+  //
+  // READ ONLY. `awardStreakMilestones` is deliberately NOT called from a page
+  // render — handing somebody a redeemable trophy because they loaded a page is
+  // a write nobody asked for. The cron does it.
+  let missionBand: MissionBandData | null = null;
+  if (user) {
+    try {
+      const { liveMission } = await import("@/lib/mission-live");
+      const m = await liveMission(db, user.id);
+      missionBand = {
+        streak: m.streak,
+        earned: m.progress.earned,
+        ceiling: m.progress.ceiling,
+        complete: m.progress.complete,
+        tasks: m.progress.tasks.map((t) => ({
+          label: t.label, count: t.count, done: t.done, complete: t.complete, cp: t.cp,
+        })),
+        milestones: m.milestones.map((x) => ({ days: x.days, hasTrophy: !!x.trophyId })),
+        reached: m.reached,
+        next: m.next ? { days: m.next.milestone.days, away: m.next.away } : null,
+      };
+    } catch { missionBand = null; }
+  }
+
   const brand = await getContent(["brand.nav.planetsIcon", "brand.nav.bg", "brand.nav.hidePlanets", "brand.logo", "brand.wordmark", "brand.nav.mode", "mobile.drawer.extra", "brand.nav.marketplaceIcon", "brand.nav.marketplaceLabel", "brand.nav.marketplaceOrder", NAV_SETTING_KEY]);
   // What this audience is allowed to see (Admin → Site chrome). Guests and
   // members are configured separately, because the row a brand needs and the
@@ -332,6 +360,13 @@ export default async function Nav() {
           every click underneath it — the card studio was unusable. Admin is a
           workspace, not somewhere anyone votes. */}
       {show("weekBand") && <WeekBand initial={bandData} bgUrl={navBg ? optImg(navBg, 1600) ?? "" : ""} />}
+
+      {/* B63.1 / B113. The second band: today's mission and the streak.
+          Signed-in only — there is no mission for somebody with no account,
+          and a strip saying "start a streak" above a sign-up page is noise.
+          Same background art as the nav and the band above (B63.2), so the
+          two read as one piece of chrome. */}
+      {missionBand && <MissionBand data={missionBand} bgUrl={navBg ? optImg(navBg, 1600) ?? "" : ""} />}
       </div>
     </header>
     </>

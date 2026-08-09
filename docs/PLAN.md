@@ -1009,6 +1009,68 @@ nothing.
 
 ---
 
+### ▸ B113 / B63.1 — The Daily Mission was built and never wired up · **SHIPPED**
+
+**The worst kind of defect: a promise in the product with no path behind it.**
+
+`lib/missions.ts` is a complete system — templates, per-day schedules, task
+progress, a streak that loops, milestones that award trophies — with **89 green
+assertions** in `tests/db/missions.mts`, for months.
+
+**Nothing imported it.** A grep for `from "@/lib/missions"` returned exactly one
+hit: `lib/cp-dial.ts`, which reads the templates to price them for an admin
+screen and never asks whether anybody is running one.
+
+So no gamer had ever seen a daily mission. No streak had ever been counted. And
+`milestonesHit` had never been called by anything, which means **no milestone
+trophy had ever been awarded to anybody** — while `lib/cards/render.tsx` tells
+gamers a trophy might have been *"earned at a streak milestone"*. That reads as
+working, which is why it is worse than an absent feature.
+
+**This sprint is a wiring job, not a new one.** Almost none of the logic is new;
+what was missing was the reader, the writer and the award path.
+
+- **`lib/mission-live.ts`** — today's mission and progress, the streak, the run,
+  the milestones. The streak is **derived from `quest_events` grouped by UTC
+  day**, in one query, like every balance in this codebase. There is no `streak`
+  column and there should not be: a stored counter and its events disagree the
+  first time a job runs twice or a day rolls over in the wrong zone, and the
+  stored one is the one nobody can reconstruct.
+- **`components/MissionBand.tsx`** — B63.1's second band. Collapsed: the day
+  count and today's progress. Expanded: the tasks with their done state and the
+  milestone ladder. **Click anywhere in the panel to close it**, which is what
+  people try first. **The nav's own background art, collapsed and expanded**
+  (B63.2), so the two bands read as one piece of chrome. Starts *collapsed*,
+  unlike the week band — two panels opening over every page on every visit is
+  what makes people collapse both.
+- **A daily job awards the milestones**, and the band writes nothing. Handing
+  somebody a redeemable trophy because they loaded a page is a write nobody
+  asked for, and it would fire from a prefetch. The job walks only gamers with
+  an event in the last two days, because a nightly pass over the whole user
+  table is the shape that stops working at the size the model plans for.
+- **Idempotent on `streak:<days>:<run start>`.** The streak is a LOOP — a missed
+  day resets to zero and the climb back awards the same milestone again — so
+  *"have they had the 7-day trophy"* is the wrong question and *"have they had it
+  for this run"* is the right one.
+- **A milestone with no trophy attached promises nothing.** It still shows on the
+  ladder and still marks the run; the band says "trophies for these are being
+  chosen" rather than implying a prize.
+
+`tests/db/mission-live.mts` (49). Proved by breaking it: awarding from the page
+render turns the rule-that-matters-most red.
+
+**One thing this suite cannot prove, said plainly in the file.** Idempotence has
+two layers — `reachedThisRun` feeding `milestonesHit`, and a row check before the
+insert. Deleting the second and re-running still passes, because **PGlite is one
+in-process connection and cannot contend**: the "two calls at once" test never
+actually races. That is the same limitation `tests/db/concurrency.mts` was
+rewritten for, and it runs against a real Postgres in CI for exactly this reason.
+So the race assertion is labelled a regression guard rather than a proof, and
+layer 2's presence is asserted structurally beside it. A test that implies more
+coverage than it has is worse than a missing one.
+
+---
+
 ### ▸ B62.1 (web half) — One tile, with a count · **SHIPPED**
 
 A gamer can hold the same trophy several times over — bought one, won one in a
@@ -2099,7 +2161,6 @@ the reviewer rated **fatal**.
 
 | Item | What |
 |---|---|
-| **B63** | The nav bands: today's mission and the streak. |
 | **B59** | A gamer can see and control their own card on the website. *(Largely absorbed by B83.5.)* |
 | **B56** (remainder) | Card kinds not yet on the new shared layout. |
 | **B66, B67, B69** | Admin sales console, brand portal rebuild, public site — **behind Gate 4**. |

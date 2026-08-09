@@ -15,7 +15,7 @@ import { postBotListStats } from "@/lib/botlist-post";
 // Each job must be safe to run repeatedly. Closing challenges is idempotent,
 // and ad posting has its own per-server interval.
 
-export type JobKey = "challenges" | "challenge-reminders" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats" | "guild-snapshots" | "week-close" | "purge-observations";
+export type JobKey = "challenges" | "challenge-reminders" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats" | "guild-snapshots" | "week-close" | "purge-observations" | "streak-milestones";
 
 export type JobResult = { key: JobKey; ok: boolean; summary: string };
 
@@ -42,6 +42,21 @@ export type JobCadence = "hourly" | "daily";
 export const WEEKLY_DAY = 1;
 
 export const JOBS: { key: JobKey; label: string; description: string; cadence: JobCadence; weeklyOn?: number }[] = [
+  {
+    // B113. The streak awarded nothing, because `milestonesHit` had no caller
+    // anywhere in the product — so a system with 89 green assertions had never
+    // handed anybody a trophy, while the profile card told gamers a trophy
+    // might have been "earned at a streak milestone".
+    //
+    // A JOB rather than a page read. The band reads the streak on every render
+    // and writes nothing: handing somebody a REDEEMABLE PRIZE because they
+    // loaded a page is a write nobody asked for, and it would fire from a
+    // prefetch. Idempotent per milestone per run, so daily is enough and twice
+    // in a minute is harmless.
+    key: "streak-milestones", cadence: "daily",
+    label: "Award streak milestone trophies",
+    description: "Hands over the trophy for every streak milestone a gamer has reached and not yet been given. Keyed on the day their current run began, so the loop works: a missed day resets the streak and the climb back awards the same milestone again. Awards nothing for a milestone with no trophy attached.",
+  },
   {
     // B104. Two findings, one job: the event tables grow without limit, and
     // every row in them carries a hashed address and a session key we stop
@@ -100,6 +115,30 @@ export const JOBS: { key: JobKey; label: string; description: string; cadence: J
 export async function runJob(key: JobKey): Promise<JobResult> {
   try {
     switch (key) {
+      case "streak-milestones": {
+        const { getDb, schema } = await import("@/lib/db");
+        const { awardStreakMilestones } = await import("@/lib/mission-live");
+        const { sql: dsql } = await import("drizzle-orm");
+        const db = await getDb();
+        // Only gamers who earned something recently can have moved a streak.
+        // Everybody else's answer cannot have changed since yesterday, and
+        // walking the whole user table nightly is the shape that stops working
+        // at the size we are planning for.
+        const active = await db.selectDistinct({ id: schema.questEvents.userId })
+          .from(schema.questEvents)
+          .where(dsql`${schema.questEvents.createdAt} >= now() - interval '2 days'`);
+        let awarded = 0;
+        for (const u of active) {
+          const out = await awardStreakMilestones(db, u.id);
+          awarded += out.filter((x) => x.awarded).length;
+        }
+        return {
+          key, ok: true,
+          summary: awarded
+            ? `Awarded ${awarded} streak trophy${awarded === 1 ? "" : "s"} across ${active.length} active gamer${active.length === 1 ? "" : "s"}.`
+            : `No streak milestone came due (${active.length} active gamer${active.length === 1 ? "" : "s"} checked).`,
+        };
+      }
       case "purge-observations": {
         const { getDb } = await import("@/lib/db");
         const { purgeOldObservations, purgeSummary } = await import("@/lib/retention");
