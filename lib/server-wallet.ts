@@ -130,8 +130,12 @@ export async function walletFor(db: DB, guildId: string): Promise<Wallet> {
         inArray(schema.serverPayouts.requestedBy, [WEEK_CLOSE_ACTOR, ownerActor(guildId)]),
       ));
 
+    // AMOUNT PLUS FEE. B90.4 caught this: a charge stores the prize pool and our
+    // margin in separate columns, and summing only the pool meant the fee never
+    // left the wallet. The owner was billed $210, $200 came off their balance,
+    // and the $10 was a discount nobody decided to give.
     const [spentRow] = await db.select({
-      n: sql<number>`coalesce(sum(${schema.serverCharges.amount}), 0)`,
+      n: sql<number>`coalesce(sum(${schema.serverCharges.amount} + coalesce(${schema.serverCharges.feeAmount}, 0)), 0)`,
     }).from(schema.serverCharges).where(eq(schema.serverCharges.guildId, guildId));
 
     const earned = round2(Number(earnedRow?.n ?? 0));
@@ -237,7 +241,10 @@ export async function statementFor(db: DB, guildId: string, limit = 60): Promise
         at: c.createdAt,
         kind: "spent",
         label: c.label || "Private challenge",
-        amount: -round2(Number(c.amount ?? 0)),
+        // What actually left the wallet, which is the prize pool and the fee.
+        // A statement line smaller than the balance movement it explains is a
+        // statement that stops adding up.
+        amount: -round2(Number(c.amount ?? 0) + Number(c.feeAmount ?? 0)),
       });
     }
     return rows.sort((a, b) => +b.at - +a.at).slice(0, limit);
@@ -263,11 +270,16 @@ export async function chargeWallet(
   const amount = round2(Number(opts.amount));
   if (!Number.isFinite(amount) || amount <= 0) return { ok: false, error: "That is not an amount." };
 
+  // The balance has to cover the FEE as well. Checking only the amount would
+  // let a wallet with exactly the prize pool in it buy a challenge that costs
+  // the pool plus our margin, and the balance would go negative — which
+  // `walletFor` then clamps to zero, hiding it.
+  const fee = round2(Math.max(0, Number(opts.fee) || 0));
   const wallet = await walletFor(db, opts.guildId);
-  if (amount > wallet.available + 0.005) {
+  if (amount + fee > wallet.available + 0.005) {
     return {
       ok: false,
-      error: `That is ${money(amount)} and the balance is ${money(wallet.available)}. `
+      error: `That is ${money(amount + fee)} and the balance is ${money(wallet.available)}. `
         + (wallet.pending > 0
           ? `${money(wallet.pending)} is already committed to a withdrawal — cancel it to spend that here instead.`
           : "Earn more from the weekly pool, or make it smaller."),
@@ -278,7 +290,7 @@ export async function chargeWallet(
     const id = uid();
     await db.insert(schema.serverCharges).values({
       id, guildId: opts.guildId, amount,
-      feeAmount: round2(Number(opts.fee) || 0),
+      feeAmount: fee,
       label: opts.label, challengeId: opts.challengeId ?? null,
     });
     // B91.4. An owner just spent their balance on a challenge for their own

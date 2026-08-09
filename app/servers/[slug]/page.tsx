@@ -16,6 +16,7 @@ import PortalKeyHandoff from "@/components/PortalKeyHandoff";
 import { ServerBoard, TierLadder, TierBadge, FunnelPanel, ChallengeRow, CommandFeed, EarningsPanel, EarningGuide } from "@/components/ServerPortal";
 import PayoutSetup from "@/components/PayoutSetup";
 import ServerWallet from "@/components/ServerWallet";
+import BuyPrivateChallenge from "@/components/BuyPrivateChallenge";
 import { listPayouts, payoutTotals, getPayoutAccount, METHOD_OPTIONS } from "@/lib/payouts";
 import { payer } from "@/lib/payments";
 import { vendorBy } from "@/lib/payments/vendors";
@@ -262,6 +263,16 @@ export default async function ServerPortalPage({
                   hasPayoutMethod={Boolean(account?.methodPreference)}
                   holdPhrase={PAYOUT_HOLD_PHRASE}
                 />
+                {/* B90.4. The loop the whole server-owner product rests on:
+                    earn from the weekly pool, spend it back into your own
+                    server. It sits on the wallet because that is where the
+                    number it spends is. */}
+                <BuyPrivateChallenge
+                  guildId={server.guildId}
+                  available={wallet.available}
+                  games={games.map((g) => ({ name: g.name }))}
+                />
+
                 <PayoutSetup
                   guildId={server.guildId}
                   method={account?.methodPreference ?? null}

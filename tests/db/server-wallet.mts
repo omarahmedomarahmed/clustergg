@@ -119,14 +119,19 @@ console.log("\n== spending the balance ==");
 
   {
     const amount = Math.min(before.available, 10);
+    const fee = Math.round(amount * 0.05 * 100) / 100;
     const r = await chargeWallet(db, {
-      guildId: guild, amount, fee: amount * 0.05, label: "Private challenge — Chess night",
+      guildId: guild, amount, fee, label: "Private challenge — Chess night",
     });
     ok("a charge inside the balance goes through", r.ok, JSON.stringify(r));
     const after = await walletFor(db, guild);
-    eq("…and the balance went down by exactly it",
-      Math.round((before.available - after.available) * 100) / 100, Math.round(amount * 100) / 100);
-    eq("…and it is recorded as spent", after.spent, Math.round(amount * 100) / 100);
+    // AMOUNT PLUS FEE. B90.4: a charge stores the prize pool and our margin in
+    // separate columns, and this used to assert the pool alone — which is
+    // exactly the bug it was hiding. The fee never left the wallet: the owner
+    // was billed for it and it was a discount nobody decided to give.
+    eq("…and the balance went down by the whole charge, fee included",
+      Math.round((before.available - after.available) * 100) / 100, Math.round((amount + fee) * 100) / 100);
+    eq("…and that is what is recorded as spent", after.spent, Math.round((amount + fee) * 100) / 100);
   }
 }
 
