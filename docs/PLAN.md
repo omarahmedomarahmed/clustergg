@@ -970,9 +970,35 @@ older than 90 days to remove" on every run while quietly deleting thousands of
 rows. Deleting correctly and lying about it is the version of that bug that
 survives review. It counts `RETURNING` rows now.
 
-**Still open from B80:** cookie consent — see the question below — and the three
-remaining scale findings (cold-start DDL replay, stat sync throughput, brand
-report heap).
+#### The consent decision, and a correction worth recording
+
+The banner offered **"Accept all" / "Essential only"** and *nothing read the
+answer*. Pressing "essential only" wrote a string to localStorage and changed no
+behaviour at all — the beacon carried on counting, which is exactly what the
+person pressing it had asked us not to do. That is worse than no banner: it asks
+and ignores the answer.
+
+Two honest options — gate the beacon on consent, or stop pretending to offer a
+choice. **The owner chose the second.** So there is now a notice with one
+button, and `/legal/cookies` says plainly what is stored and why.
+
+**The correction.** When putting that choice to the owner I described the beacon
+as counting "impressions, which is what brands are billed on". That is wrong,
+and it is the V1 ad-network model — the CPM the due-diligence review took apart
+and the whole pivot was away from. The owner caught it.
+
+| | |
+|---|---|
+| What a brand actually pays | A **fixed price per challenge**. The invoice line is `quantity: challengesPerGame × unitAmount: challengePrice` |
+| What the counting is for | **Evidence of delivery** — proof the challenge we sold reached the servers it was meant to. It generates no money and meters nothing |
+| `ecpm` in the brand report | Spend ÷ server headcount × 1000, labelled as exactly that. Not a media CPM, and `lib/brand-report.ts` says so where it is defined |
+
+The decision survives the correction and is easier to defend because of it: this
+is first-party counting that earns nobody money and proves we did what we sold,
+not a meter that generates invoices.
+
+**Still open from B80:** the three remaining scale findings (cold-start DDL
+replay, stat sync throughput, brand report heap).
 
 ---
 
