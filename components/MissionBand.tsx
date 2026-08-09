@@ -30,9 +30,11 @@ import { useTr } from "@/components/LocaleProvider";
 // **Click anywhere in the panel to close it** (B63.1), which is what people try
 // first and what the week band already does.
 //
-// The nav's own background art, collapsed and expanded (B63.2), so the two
-// bands read as one piece of chrome rather than two features that landed in
-// different months.
+// B63.2 asks for both bands to sit on the nav's own background art. The way
+// that is achieved is the opposite of what it sounds like: the header group
+// paints the image ONCE and this band stays transparent so that single layer
+// shows through. See the note on `bandBg` below — painting a second copy is
+// what makes the header stop reading as one surface.
 
 export type MissionBandData = {
   streak: number;
@@ -67,9 +69,22 @@ export default function MissionBand({ data, bgUrl }: { data: MissionBandData; bg
   };
 
   const pct = data.ceiling > 0 ? Math.min(100, Math.round((data.earned / data.ceiling) * 100)) : 0;
-  const art = bgUrl
-    ? { backgroundImage: `linear-gradient(rgba(4,5,26,0.86), rgba(4,5,26,0.86)), url(${bgUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
-    : undefined;
+  // B63.2, corrected. The band must NOT paint the nav art.
+  //
+  // It reads as one piece of chrome because the header group paints the image
+  // ONCE and everything inside it — this band, the week band above it — stays
+  // transparent and lets that single layer through. Painting a second copy is
+  // what makes the header stop reading as one surface, and `tests/ui/week-band`
+  // has guarded "exactly one element paints the nav art" since B10. My first
+  // version of this component painted it directly and turned that guard red.
+  //
+  // So `bgUrl` is a FLAG, not a source: when the nav has art we stay see-through,
+  // and when it does not we supply our own solid ground so the strip still has
+  // one. Exactly what `WeekBand` does.
+  const bandBg = bgUrl ? undefined : { background: "rgba(4,5,26,0.70)" };
+  // The expanded panel drops below the header group, past the painted layer, so
+  // it needs a ground of its own either way — a scrim, never the image.
+  const panelBg = { background: bgUrl ? "rgba(4,5,26,0.90)" : "rgba(4,5,26,0.95)" };
 
   return (
     <>
@@ -77,7 +92,7 @@ export default function MissionBand({ data, bgUrl }: { data: MissionBandData; bg
         onClick={toggle}
         aria-expanded={open}
         className="w-full border-t border-white/5 px-4 py-1.5 text-left"
-        style={art}
+        style={bandBg}
       >
         <span className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 text-xs">
           <span className="inline-flex items-center gap-1.5 font-semibold">
@@ -110,7 +125,7 @@ export default function MissionBand({ data, bgUrl }: { data: MissionBandData; bg
       {open && (
         // Click ANYWHERE in here to close (B63.1). The links inside stop the
         // event, so tapping a task still navigates rather than only closing.
-        <div onClick={toggle} className="cursor-pointer border-t border-white/5 px-4 py-4" style={art}>
+        <div onClick={toggle} className="cursor-pointer border-t border-white/5 px-4 py-4" style={panelBg}>
           <div className="mx-auto grid max-w-6xl gap-5 sm:grid-cols-2">
             <div>
               <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-muted">
