@@ -539,6 +539,31 @@ export async function saveChallenge(
     })(),
   };
 
+  // ===== B91.5: A BRAND'S MONEY ALWAYS BELONGS TO A CAMPAIGN =====
+  //
+  // The campaign is the only object that answers "what did this brand buy" —
+  // the invoice lines point at it, `billFor` rolls a whole series up under it,
+  // and the brand's own portal lists it. A sponsored challenge with no campaign
+  // is money that arrived attached to nothing.
+  //
+  // Created rather than demanded, because the case this exists for is a sales
+  // deal being typed in right now, and the campaign it belongs to does not
+  // exist yet. Refusing would send the operator away to make one and back to
+  // re-type everything on screen. See lib/custom-campaign.ts.
+  if (values.sponsorBrandId) {
+    const { ensureCampaignFor } = await import("@/lib/custom-campaign");
+    values.sponsorCampaignId = await ensureCampaignFor(db, {
+      brandId: values.sponsorBrandId,
+      campaignId: values.sponsorCampaignId,
+      game: values.game,
+      startAt,
+      cadence,
+      runs: runsPlanned,
+      pricePerChallenge: values.sponsorPrice,
+      label: values.title,
+    });
+  }
+
   // Say which field is missing. This used to be `return;` — the form posted,
   // nothing happened, and nothing explained why.
   const missing = [

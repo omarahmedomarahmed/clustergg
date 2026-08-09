@@ -323,13 +323,23 @@ export default function ChallengeBuilder({
               </label>
             </div>
 
-            {sponsor && sponsor.campaigns.length > 0 && (
-              <label className="block text-xs text-muted">Bought under which campaign (optional)
+            {sponsor && (
+              <label className="block text-xs text-muted">Bought under which campaign
                 <select name="sponsorCampaignId" value={sponsorCampaignId}
                   onChange={(e) => setSponsorCampaignId(e.target.value)} className="input-cosmic mt-1">
-                  <option value="">— not tied to a campaign —</option>
+                  <option value="">— a new campaign, built from what is on this screen —</option>
                   {sponsor.campaigns.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+                {/* B91.5. It used to say "(optional)" and mean it, which left a
+                    brand's money attached to nothing: no report, no renewal
+                    conversation, and a portal telling the brand they bought
+                    nothing. There is no unattached option any more — picking
+                    none creates one from the deal being typed. */}
+                <span className="mt-1 block text-[11px] leading-relaxed text-muted">
+                  {sponsorCampaignId
+                    ? "This run bills under that campaign."
+                    : `A draft campaign will be created for ${sponsor.name}${repeating && runs > 1 ? ` covering all ${runs} runs` : ""} — built, not paid. Nothing is announced until its invoice clears.`}
+                </span>
               </label>
             )}
 
