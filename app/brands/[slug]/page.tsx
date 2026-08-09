@@ -10,6 +10,8 @@ import { networkStats } from "@/lib/network";
 import { brandCampaigns, campaignQuote, networkReach, nextMonday, slotWindows } from "@/lib/sponsored-campaigns";
 import { trophiesForBrand } from "@/lib/brand-trophies";
 import BrandDraftCampaigns from "@/components/BrandDraftCampaigns";
+import BrandAudience from "@/components/BrandAudience";
+import { audienceSegments } from "@/lib/segments";
 import { campaignGames } from "@/lib/sponsored-campaigns";
 import { brandChallengeReports, campaignReport, brandTestimonials, brandTier, challengeServers } from "@/lib/brand-report";
 import { pricingConfig } from "@/lib/pricing-live";
@@ -285,6 +287,10 @@ export default async function BrandPortalPage({
       games: campaignGames(c),
     }));
 
+  // B89.5. Aggregate only, floor of 25, no drill-down and no export — the
+  // decision is in lib/segments.ts and this is the only surface that shows it.
+  const audience = await audienceSegments(db);
+
   const buyQuote = campaignQuote();
   const buyWeeks = slotWindows(nextMonday());
 
@@ -474,6 +480,7 @@ export default async function BrandPortalPage({
             node: (
               <div className="space-y-8">
                 <BrandDraftCampaigns brandId={brand.id} keyStr={key} campaigns={draftCampaigns} />
+                <BrandAudience audience={audience} />
                 {/* Every week of every sponsored month, as its own card.
                     `sponsored` is the CAMPAIGNS a brand bought; the weeks
                     inside them are the challenges that actually ran, and the
