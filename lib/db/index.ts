@@ -56,6 +56,13 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_adjust" jsonb NOT NULL DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announced_at" timestamptz`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified_at" timestamptz`,
+  // THE GRANDFATHER RULE, AGAIN. Everybody who already had an account keeps
+  // their earning: an unverified email is a gate on NEW accounts, and taking
+  // something away from somebody to close a hole they did not open is the one
+  // thing this migration must not do. Runs once; `is null` makes it a no-op
+  // afterwards, and a genuinely new row is created with null and stays null.
+  `UPDATE "users" SET "email_verified_at" = "created_at" WHERE "email_verified_at" IS NULL AND "created_at" < now() - interval '1 minute'`,
   `ALTER TABLE "sponsored_campaigns" ADD COLUMN IF NOT EXISTS "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "baseline_at" timestamptz`,
@@ -887,6 +894,18 @@ const COLUMN_MIGRATIONS = [
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "server_charge_idx" ON "server_charges" ("guild_id","created_at")`,
+
+  `CREATE TABLE IF NOT EXISTS "email_codes" (
+    "id" text PRIMARY KEY NOT NULL,
+    "user_id" text NOT NULL,
+    "email" text NOT NULL,
+    "code_hash" text NOT NULL,
+    "expires_at" timestamp with time zone NOT NULL,
+    "attempts" integer DEFAULT 0 NOT NULL,
+    "used_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "email_code_user_idx" ON "email_codes" ("user_id","created_at")`,
 
   `CREATE TABLE IF NOT EXISTS "form_drafts" (
     "id" text PRIMARY KEY NOT NULL,

@@ -47,7 +47,7 @@ import * as schema from "@/lib/db/schema";
  */
 export const LOCKED_CP_CAP = 5000;
 
-export type StepKey = "link" | "customize" | "country";
+export type StepKey = "link" | "email" | "profile";
 
 export type Step = {
   key: StepKey;
@@ -77,10 +77,13 @@ const UNLOCKED: UnlockState = {
 /**
  * Has this gamer customized anything?
  *
- * Deliberately generous, and the generosity is the design. A country flag set
- * from a Discord button counts, an avatar counts, a theme change counts. The
- * step exists to get somebody to make the profile theirs, and insisting on a
- * particular gesture would fail the gamer who made it a different way.
+ * NO LONGER AN UNLOCK STEP. B93 replaced "make your profile yours" — which an
+ * avatar satisfied — with two answers we actually need: an age band and a
+ * country. A picture tells us nothing about whether somebody may be paid.
+ *
+ * Kept because other surfaces ask it for their own reasons (a profile that has
+ * never been touched is worth prompting), and deleting a question because it
+ * stopped being a gate would break those.
  */
 export function hasCustomized(u: {
   country?: string | null;
@@ -98,32 +101,28 @@ export function hasCustomized(u: {
 }
 
 /**
- * What a gamer sees on the checklist, whichever surface draws it.
+ * The three things, in the order a gamer does them.
  *
- * COUNTRY IS ITS OWN STEP, and it is the only one that is here for a reason
- * outside the product. A trophy can be redeemed for money in some places and
- * not others, US tax reporting starts at a threshold, and sanctions law is not
- * something we get to be relaxed about. All three of those need to know where
- * somebody is BEFORE they win anything — being told at the moment you try to
- * cash out a trophy that you were never eligible is the worst possible time to
- * find out.
+ * B93 CUT THIS DOWN FROM FOUR TO THREE, and the cut is the point. It was:
+ * country, link an account, make your profile yours — with "yours" satisfied by
+ * an avatar, a colour or a line of bio. That is a scavenger hunt. Somebody
+ * arriving wants to know what they have to do and how far off they are, and
+ * four steps where one of them is "any of five things" cannot answer that.
  *
- * It is deliberately NOT folded into "make your profile yours", which is
- * generous on purpose: an avatar satisfies that step, and an avatar tells us
- * nothing about eligibility.
+ * Now:
  *
- * The grandfather rule is untouched. `unlockState` returns early for anybody
- * who is already unlocked, so adding a step cannot re-lock a single existing
- * account.
+ *   link     Prove you play something. Without it there is nothing to score.
+ *   email    Prove you can read an inbox. It is what switches earning on, and
+ *            it is the only thing that makes a fake account cost anything.
+ *   profile  Two answers we actually need: your age band and your country.
+ *
+ * The profile step is where the old "customize" step went. It is not decoration
+ * any more — an age band decides whether money may be paid at all, and a
+ * country decides how. Both were previously optional, and one of them was
+ * satisfiable by uploading a picture.
  */
-export function stepsFor(opts: { linked: boolean; customized: boolean; country: boolean }): Step[] {
+export function stepsFor(opts: { linked: boolean; email: boolean; profile: boolean }): Step[] {
   return [
-    {
-      key: "country",
-      label: "Tell us which country you are in",
-      detail: "It decides which prizes you can redeem for money, and we have to know before you win one rather than after. It is also the flag next to your name.",
-      done: opts.country,
-    },
     {
       key: "link",
       label: "Link a game account",
@@ -131,10 +130,16 @@ export function stepsFor(opts: { linked: boolean; customized: boolean; country: 
       done: opts.linked,
     },
     {
-      key: "customize",
-      label: "Make your profile yours",
-      detail: "An avatar, a colour, a line about yourself — any one of them. You can do it from Discord.",
-      done: opts.customized,
+      key: "email",
+      label: "Confirm your email",
+      detail: "We send a six-digit code. It is what switches your earning on — and it is what stops somebody making five hundred accounts and taking the prize money.",
+      done: opts.email,
+    },
+    {
+      key: "profile",
+      label: "Your age and your country",
+      detail: "Two answers. Your age decides whether prize money can be paid to you at all; your country decides how it reaches you. Neither is shown to anybody but the flag beside your name.",
+      done: opts.profile,
     },
   ];
 }
@@ -152,6 +157,8 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
     const [u] = await db.select({
       unlockedAt: schema.users.unlockedAt,
       country: schema.users.country,
+      ageBand: schema.users.ageBand,
+      emailVerifiedAt: schema.users.emailVerifiedAt,
       avatarUrl: schema.users.avatarUrl,
       bio: schema.users.bio,
       title: schema.users.title,
@@ -164,8 +171,10 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
       .from(schema.linkedGameAccounts)
       .where(eq(schema.linkedGameAccounts.userId, userId));
     const linked = Number(linkRow?.n ?? 0) > 0;
-    const customized = hasCustomized(u);
-    const hasCountry = /^[A-Za-z]{2}$/.test((u.country ?? "").trim());
+    // The profile step is BOTH answers, not either. A country with no age band
+    // cannot be paid and an age band with no country cannot be paid either.
+    const profile = /^[A-Za-z]{2}$/.test((u.country ?? "").trim()) && !!u.ageBand;
+    const email = !!u.emailVerifiedAt;
 
     // A READ THAT PROMOTES. Deliberate, and worth defending.
     //
@@ -179,7 +188,7 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
     // So the check lives where the state is READ, which is every path that
     // could care. The write is idempotent and guarded on `unlocked_at is null`,
     // so concurrent reads cannot produce two different unlock moments.
-    if (linked && customized && hasCountry) {
+    if (linked && email && profile) {
       const now = new Date();
       await db.update(schema.users)
         .set({ unlockedAt: now })
@@ -194,7 +203,7 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
     return {
       unlocked: false,
       unlockedAt: null,
-      steps: stepsFor({ linked, customized, country: hasCountry }),
+      steps: stepsFor({ linked, email, profile }),
       lockedCp,
       capped: lockedCp >= LOCKED_CP_CAP,
       achieved: [],
@@ -225,7 +234,8 @@ export async function tryUnlock(db: DB, userId: string): Promise<UnlockState> {
     .from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, userId)).limit(5);
   const achieved = [
     ...games.map((g) => `You linked ${g.provider}`),
-    "You made your profile yours",
+    "You confirmed your email",
+    "You told us your age and where you are",
   ];
   return { ...UNLOCKED, unlockedAt: now, achieved };
 }

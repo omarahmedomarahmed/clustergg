@@ -36,16 +36,17 @@ const { buyTrophy, cpPerDollar, priceOf } = await import("../../lib/marketplace.
 const db = await getDb();
 const tag = uid().slice(0, 8);
 
-const mkGamer = async (opts: { customized?: boolean; country?: boolean; band?: string | null; unlocked?: boolean } = {}) => {
+const mkGamer = async (opts: { customized?: boolean; country?: boolean; email?: boolean; band?: string | null; unlocked?: boolean } = {}) => {
   const id = uid();
   await db.insert(schema.users).values({
     id, email: `${id}@ob.test`, displayName: `OB ${id.slice(0, 4)}`,
     slug: `ob-${tag}-${id.slice(0, 6)}`, passwordHash: "x",
     ageBand: opts.band === undefined ? "adult" : opts.band,
-    // An AVATAR, not a country. Since B89.2 country is its own step, and a
-    // fixture that satisfies both with one column cannot tell them apart.
+    // One flag per step, so a fixture can never satisfy two at once and hide
+    // which one the assertion is actually about.
     ...(opts.customized ? { avatarUrl: "/a.png" } : {}),
     ...(opts.country ? { country: "EG" } : {}),
+    ...(opts.email ? { emailVerifiedAt: new Date() } : {}),
     ...(opts.unlocked ? { unlockedAt: new Date() } : {}),
   });
   return id;
@@ -68,24 +69,28 @@ console.log("== what counts as customizing ==");
   ok("…and whitespace is not a bio", !hasCustomized({ bio: "   " }));
   ok("…and an empty theme object is not a theme", !hasCustomized({ theme: {} }));
 
-  // Sharing the card is NOT a step. It stays a paid action; it is not a lock.
-  const steps = stepsFor({ linked: false, customized: false, country: false });
+  // B93. THREE steps, and none of them is a scavenger hunt. It was four, one of
+  // which — "make your profile yours" — was satisfied by uploading a picture,
+  // which tells us nothing about whether somebody may be paid.
+  const steps = stepsFor({ linked: false, email: false, profile: false });
   eq("there are exactly three steps", steps.length, 3);
   ok("…and none of them is sharing a card",
     !steps.some((s) => /share/i.test(s.label) || /share/i.test(s.key)));
+  eq("…in the order a gamer does them", steps.map((s) => s.key), ["link", "email", "profile"]);
 
-  // B89.2. Country is its OWN step, not a way of satisfying "customize".
-  // `hasCustomized` is generous by design — an avatar satisfies it — and an
-  // avatar tells us nothing about whether somebody may redeem a trophy for
-  // money. Folding the two together would let a gamer unlock, win, and only
-  // then be told we never knew where they were.
-  ok("country is a step of its own", steps.some((x) => x.key === "country"));
-  ok("…and it says why we are asking, not just that we are",
-    /redeem|eligib|money/i.test(steps.find((x) => x.key === "country")?.detail ?? ""),
-    steps.find((x) => x.key === "country")?.detail ?? "");
-  ok("an avatar alone does not answer it",
-    !stepsFor({ linked: true, customized: hasCustomized({ avatarUrl: "/a.png" }), country: false })
-      .find((x) => x.key === "country")?.done);
+  // Every step says WHY, not just what. A step with no reason reads as a chore.
+  ok("every step explains itself", steps.every((s) => s.detail.length > 40),
+    JSON.stringify(steps.map((s) => s.detail.length)));
+  ok("the email step says what it switches on",
+    /earning/i.test(steps.find((s) => s.key === "email")?.detail ?? ""));
+  ok("…and the profile step says what each answer decides",
+    /age decides/i.test(steps.find((s) => s.key === "profile")?.detail ?? "")
+    && /country decides/i.test(steps.find((s) => s.key === "profile")?.detail ?? ""));
+
+  // Both answers, not either. A country with no age band cannot be paid, and an
+  // age band with no country cannot be paid either.
+  ok("the profile step needs BOTH answers",
+    !stepsFor({ linked: true, email: true, profile: false }).find((x) => x.key === "profile")?.done);
 }
 
 console.log("\n== a new gamer is locked, and earns anyway ==");
@@ -155,19 +160,25 @@ console.log("\n== locked CP cannot be spent or cashed out ==");
 
 console.log("\n== finishing both steps unlocks, and says what they did ==");
 {
-  const id = await mkGamer({ customized: true });
+  // No band on purpose: the profile step is BOTH answers, and this block walks
+  // them one at a time.
+  const id = await mkGamer({ email: true, band: null });
   const half = await unlockState(db, id);
   ok("one step done is still locked", !half.unlocked, JSON.stringify(half.steps));
-  eq("…and the checklist says which one", half.steps.filter((s) => s.done).map((s) => s.key), ["customize"]);
+  eq("…and the checklist says which one", half.steps.filter((s) => s.done).map((s) => s.key), ["email"]);
 
   await linkAccount(id);
   const stillLocked = await unlockState(db, id);
   ok("linking a game is not enough on its own either", !stillLocked.unlocked,
     JSON.stringify(stillLocked.steps.map((x) => [x.key, x.done])));
-  ok("…and what is missing is the country", 
-    stillLocked.steps.find((x) => x.key === "country")?.done === false);
+  ok("…and what is missing is the profile",
+    stillLocked.steps.find((x) => x.key === "profile")?.done === false);
 
+  // Country alone does not finish it — the band is the other half.
   await db.update(schema.users).set({ country: "EG" }).where(sqlEq(schema.users.id, id));
+  ok("a country with no age band is still not enough",
+    !(await unlockState(db, id)).unlocked);
+  await db.update(schema.users).set({ ageBand: "adult" }).where(sqlEq(schema.users.id, id));
   const done = await tryUnlock(db, id);
   ok("all three steps unlock it", done.unlocked);
   ok("…and it names the game they linked",

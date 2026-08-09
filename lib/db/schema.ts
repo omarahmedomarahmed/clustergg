@@ -14,6 +14,19 @@ const now = (name: string) => timestamp(name, { withTimezone: true, mode: "date"
 export const users = pgTable("users", {
   id: id(),
   email: text("email").unique(),
+  /**
+   * When they proved they can read that inbox. B93.
+   *
+   * Null means unverified, and unverified means NOT EARNING — an account that
+   * costs nothing to create is an account somebody creates five hundred of, and
+   * the weekly pool now pays real money for linked members. A code in an inbox
+   * is the cheapest thing that makes a fake account cost something.
+   *
+   * Existing accounts are backfilled to their creation date by the migration:
+   * taking earning away from somebody who already had it, to close a hole they
+   * did not open, is the one thing this must not do.
+   */
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true, mode: "date" }),
   passwordHash: text("password_hash"),
   displayName: text("display_name").notNull(),
   slug: text("slug").notNull().unique(),
@@ -124,6 +137,26 @@ export const users = pgTable("users", {
   createdAt: now("created_at"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
 }, (t) => [index("users_slug_idx").on(t.slug)]);
+
+/**
+ * A one-time code sent to an email, and the attempts against it. B93.
+ *
+ * The code is stored HASHED. It is short-lived and low-entropy by design — six
+ * digits somebody types off a phone — so the database holding it in clear would
+ * be the easiest account takeover in the product.
+ */
+export const emailCodes = pgTable("email_codes", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Where it was sent. Kept so a resend to a changed address invalidates this. */
+  email: text("email").notNull(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+  /** Wrong guesses. A code with too many is dead — see lib/email-verify.ts. */
+  attempts: integer("attempts").notNull().default(0),
+  usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
+  createdAt: now("created_at"),
+}, (t) => [index("email_code_user_idx").on(t.userId, t.createdAt)]);
 
 export const oauthIdentities = pgTable("oauth_identities", {
   id: id(),

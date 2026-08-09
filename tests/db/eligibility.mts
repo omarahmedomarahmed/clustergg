@@ -227,16 +227,35 @@ console.log("\n== somebody is actually ASKED ==");
   // seeing the question. The root layout asks, so skipping onboarding cannot
   // skip it.
   const layout = raw("app/layout.tsx");
-  ok("the root layout renders the gate", /<AgeGate \/>/.test(layout));
-  ok("…only when the band is unset", /!me\.ageBand/.test(layout));
-  ok("…and never inside an embed", /!embedded && <AgeGate/.test(layout));
-  ok("the gate is answerable in place", /AgeBandPicker/.test(raw("components/AgeGate.tsx")));
-  // Answering revalidates the LAYOUT, not a list of pages — otherwise the
-  // "nothing is earning" bar survives on every other page after they answered.
-  ok("answering clears it everywhere", /revalidatePath\("\/", "layout"\)/.test(raw("app/actions/age.ts")));
-  // The layout reads the band off `getCurrentUser`, whose projection is partial
-  // while its TYPE is the full row — a column left out reads `undefined` and
-  // would make every gamer look unanswered forever.
+  // INVERTED IN B93, and the inversion is an upgrade.
+  //
+  // This used to assert that the root layout renders `<AgeGate />`. That gate
+  // asked the age question in three options with no consequence shown, and it
+  // rendered ON TOP of the onboarding page that was asking the same thing — one
+  // screen, one fact, two different questions.
+  //
+  // What guarantees somebody is asked now is `OnboardingBar`: it renders on
+  // every page for anybody who has not finished, and links to the page that
+  // asks properly. It covers all three steps rather than only the band, so the
+  // guarantee is wider than the one it replaced.
+  ok("the root layout follows an unfinished account everywhere",
+    /<OnboardingBar \/>/.test(layout));
+  ok("…and the age gate it replaced is gone", !/<AgeGate \/>/.test(layout));
+  ok("the bar only appears while something is unfinished",
+    /if \(state\.unlocked\) return null;/.test(raw("components/OnboardingBar.tsx")));
+  ok("…and it is the band-and-country step it points at",
+    /key: "profile"/.test(raw("lib/unlock.ts")));
+  // The question is answerable where it is asked, with what the choice means
+  // shown BEFORE it is saved — the thing the old three-option banner never did.
+  const profileStep = raw("components/onboarding/ProfileStep.tsx");
+  ok("the age question is answerable on the onboarding page", /ageBand/.test(profileStep));
+  ok("…in two options, not five", /Under 18/.test(profileStep) && /18 or over/.test(profileStep));
+  ok("…and each choice says what it does before it is confirmed",
+    /What this means/i.test(profileStep) && /turn a trophy into cash until you turn 18/.test(profileStep));
+  // Answering revalidates the LAYOUT, not a list of pages — otherwise the bar
+  // survives on every other page after they answered.
+  ok("answering clears it everywhere",
+    /revalidatePath\("\/", "layout"\)/.test(raw("app/actions/onboarding.ts")));
   ok("the per-request user fetch carries the band",
     /ageBand: schema\.users\.ageBand/.test(raw("lib/auth.ts")));
 }

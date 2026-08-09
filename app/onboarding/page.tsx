@@ -7,83 +7,142 @@ import { providerInfoList } from "@/lib/providers/serialize";
 import { resolveGameLogo, resolveGameCover } from "@/lib/game-logos";
 import { getContent } from "@/lib/cms";
 import LinkAccountForm from "@/components/LinkAccountForm";
-import FollowButton from "@/components/FollowButton";
 import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import DiscordTag from "@/components/DiscordTag";
 import OAuthButtons from "@/components/OAuthButtons";
-import { getT } from "@/lib/i18n/t-server";
-import UnlockChecklist from "@/components/UnlockChecklist";
-import { tryUnlock } from "@/lib/unlock";
-import ProfileLocaleFlag from "@/components/ProfileLocaleFlag";
+import { tryUnlock, LOCKED_CP_CAP } from "@/lib/unlock";
+import EmailStep from "@/components/onboarding/EmailStep";
+import ProfileStep from "@/components/onboarding/ProfileStep";
 import { getCountries } from "@/lib/countries-server";
+import { pendingCodeEmail } from "@/lib/email-verify";
+import { cpPerDollar } from "@/lib/marketplace";
 
 export const dynamic = "force-dynamic";
+export const metadata = { title: "Set up your account · Cluster" };
+
+// Where a gamer becomes able to earn. B93.
+//
+// ===== IT IS ONE PAGE, AND EVERYTHING HAPPENS ON IT =====
+//
+// Three steps: link a game account, confirm an email, answer two questions.
+// None of them sends anybody anywhere else — the code is typed here, the
+// choices are made here, and the page updates under them. A signup that hands
+// somebody off to settings loses the ones who close the tab.
+//
+// ===== IT LEADS WITH WHAT THEY GET =====
+//
+// The balance is at the top, before the checklist, because the number is the
+// argument and a checklist on its own is a chore. Points accrue while locked —
+// nothing is taken and nothing expires — so what this page is really asking for
+// is the last mile on money they can already see.
 
 export default async function OnboardingPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   const db = await getDb();
-  const [accounts, suggestions, games] = await Promise.all([
+
+  const [accounts, games] = await Promise.all([
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
-    db.select().from(schema.users).where(ne(schema.users.id, user.id))
-      .orderBy(desc(schema.users.createdAt)).limit(4),
-    db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games),
+    db.select({
+      name: schema.games.name, slug: schema.games.slug,
+      logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl,
+    }).from(schema.games),
   ]);
+
   const hiddenConnect = (await getContent(["connect.hidden"]))["connect.hidden"]
     .split(",").map((s) => s.trim()).filter(Boolean);
   const providers = providerInfoList(hiddenConnect);
   const gameLogos: Record<string, string | null> = {};
   const gameCovers: Record<string, string | null> = {};
-  for (const info of providers) { gameLogos[info.id] = resolveGameLogo(games, info.game); gameCovers[info.id] = resolveGameCover(games, info.game); }
-  const linkedAccounts = accounts.map((a) => ({ provider: a.provider, name: a.inGameName }));
-  const { tr } = await getT();
-  // B83. `tryUnlock` reads the state, promotes anybody who has finished, and
-  // returns what they DID — so landing here after linking an account both
-  // unlocks and produces the congratulations.
+  for (const info of providers) {
+    gameLogos[info.id] = resolveGameLogo(games, info.game);
+    gameCovers[info.id] = resolveGameCover(games, info.game);
+  }
+
+  // `tryUnlock` reads the state, promotes anybody who has finished, and returns
+  // what they DID — so landing here after the last step both unlocks and
+  // produces the congratulations.
   const unlock = await tryUnlock(db, user.id);
-  // B89.2. The country step has to be COMPLETABLE where it is demanded. A
-  // checklist that says "tell us your country" on a page with nowhere to say it
-  // sends a new gamer hunting through settings on their first day.
-  const countries = user.country ? [] : await getCountries();
+  const [countries, sentTo, rate] = await Promise.all([
+    getCountries(),
+    pendingCodeEmail(db, user.id),
+    cpPerDollar(db),
+  ]);
+
+  const step = (key: string) => unlock.steps.find((s) => s.key === key);
+  const done = unlock.unlocked ? 3 : unlock.steps.filter((s) => s.done).length;
+  const lockedValue = rate > 0 ? unlock.lockedCp / rate : 0;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
-      <div className="text-center mb-8 sm:mb-10">
-        <div className="flex justify-center mb-4">
-          <Avatar name={user.displayName} src={user.avatarUrl} size={72} />
-        </div>
-        <h1 className="text-2xl sm:text-3xl font-bold">{tr("Welcome to the Cluster,")} <span className="grad-text">{user.displayName}</span></h1>
-        <p className="text-muted mt-2">{tr("Your identity is set — now light up your constellation.")}</p>
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-          {user.discordUsername ? (
-            <DiscordTag username={user.discordUsername} size="md" />
-          ) : (
-            <div className="w-full max-w-xs">
-              <p className="text-xs text-muted mb-2">{tr("Link Discord to make it your universal identity:")}</p>
-              <OAuthButtons next="/onboarding" intent="link" compact />
+      {/* ===== The hero: who they are, and what is waiting ===== */}
+      <div className="relative overflow-hidden rounded-3xl border border-violet-400/25 bg-gradient-to-br from-violet-500/[0.14] via-transparent to-cyan-500/[0.10] p-6 sm:p-8">
+        <div className="flex flex-wrap items-center gap-4">
+          <Avatar name={user.displayName} src={user.avatarUrl} size={64} />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-2xl font-bold sm:text-3xl">
+              Welcome, <span className="grad-text">{user.displayName}</span>
+            </h1>
+            <p className="mt-1 text-sm text-muted">
+              {unlock.unlocked
+                ? "Everything is on. Go and win something."
+                : "Three things and your earning switches on. It takes about a minute."}
+            </p>
+            {user.discordUsername && (
+              <div className="mt-2"><DiscordTag username={user.discordUsername} size="md" /></div>
+            )}
+          </div>
+
+          {!unlock.unlocked && (
+            <div className="rounded-2xl border border-amber-400/35 bg-amber-500/10 px-5 py-3 text-center">
+              <div className="text-[10px] uppercase tracking-widest text-amber-200/80">Waiting for you</div>
+              <div className="text-2xl font-black tabular-nums text-amber-200">
+                {unlock.lockedCp.toLocaleString("en-US")} <span className="text-sm font-bold">CP</span>
+              </div>
+              {lockedValue > 0 && (
+                <div className="text-[11px] text-amber-100/80">
+                  ≈ ${lockedValue.toFixed(2)} at today&apos;s rate
+                </div>
+              )}
             </div>
           )}
         </div>
+
+        {!unlock.unlocked && (
+          <>
+            <div className="mt-6 flex items-center gap-3">
+              <div className="h-2 flex-1 overflow-hidden rounded-full bg-black/40">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-violet-400 to-cyan-300 transition-all"
+                  style={{ width: `${(done / 3) * 100}%` }}
+                />
+              </div>
+              <span className="shrink-0 text-xs font-bold tabular-nums">{done} of 3</span>
+            </div>
+            {/* What they get, in the same breath as what they must do. */}
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              {[
+                ["diamond", "Your points unlock", `Up to ${LOCKED_CP_CAP.toLocaleString("en-US")} CP is already accruing. Finishing makes it spendable.`],
+                ["trophy", "Real prize money", "Brands fund the challenges. What you win is yours to keep or cash."],
+                ["chart", "Every game, one profile", "Your stats, your rank and your trophies in one place."],
+              ].map(([icon, title, body]) => (
+                <div key={title} className="rounded-xl border border-white/10 bg-black/25 p-3">
+                  <Icon name={icon} size={14} className="text-cyan-300" />
+                  <div className="mt-1.5 text-xs font-bold">{title}</div>
+                  <div className="mt-0.5 text-[11px] leading-relaxed text-muted">{body}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
-      {/* B83. The balance first, because the number is the argument — a
-          checklist on its own is a chore. */}
-      {!unlock.unlocked && (
-        <div className="mb-6"><UnlockChecklist state={unlock} /></div>
-      )}
-
-      {!user.country && (
-        <div className="mb-6"><ProfileLocaleFlag countries={countries} country="" /></div>
-      )}
-
       {unlock.unlocked && unlock.achieved.length > 0 && (
-        <section className="glass mb-6 border border-emerald-400/35 bg-emerald-500/[0.07] p-6">
+        <section className="glass mt-6 border border-emerald-400/35 bg-emerald-500/[0.07] p-6">
           <div className="flex items-center gap-2 text-lg font-black text-emerald-200">
             <Icon name="check" size={18} /> Unlocked
           </div>
-          {/* What they actually DID. "You completed onboarding" congratulates
-              somebody for filling in a form. */}
           <ul className="mt-3 space-y-1.5 text-sm">
             {unlock.achieved.map((a) => (
               <li key={a} className="flex items-center gap-2 text-muted">
@@ -91,63 +150,99 @@ export default async function OnboardingPage() {
               </li>
             ))}
           </ul>
-          <p className="mt-3 text-xs text-muted">
-            Your points are yours to spend, and anything you win can be cashed out.
-          </p>
           <Link href="/quests" className="glow-btn pressable mt-4 inline-block rounded-full px-6 py-2.5 text-sm font-semibold text-white">
-            {tr("See today's mission")}
+            See today&apos;s mission
           </Link>
         </section>
       )}
 
-      <section className="glass p-6 mb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <span className="glow-btn flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white">1</span>
-          <h2 className="text-lg font-bold">{tr("Link your game accounts")}</h2>
-          {accounts.length > 0 && <span className="text-emerald-300 text-sm ml-auto">{accounts.length} {tr("linked")}</span>}
-        </div>
-        <p className="text-sm text-muted mb-4 ml-10">
-          {tr("Green providers verify instantly against real APIs — try Chess.com, Lichess, Dota 2, Speedrun.com or Roblox.")}
-        </p>
-        <LinkAccountForm providers={providers} gameLogos={gameLogos} gameCovers={gameCovers} linked={linkedAccounts} next="/onboarding" />
-      </section>
+      {/* ===== Step 1 — link a game account ===== */}
+      <Step
+        n={1}
+        title="Link a game account"
+        why="It is what lets you enter a challenge at all — there is nothing to score without it."
+        done={!!step("link")?.done}
+        badge={accounts.length ? `${accounts.length} linked` : undefined}
+      >
+        <LinkAccountForm
+          providers={providers}
+          gameLogos={gameLogos}
+          gameCovers={gameCovers}
+          linked={accounts.map((a) => ({ provider: a.provider, name: a.inGameName }))}
+          next="/onboarding"
+        />
+      </Step>
 
-      <section className="glass p-6 mb-6">
-        <div className="flex items-center gap-3 mb-1">
-          <span className="glow-btn flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white">2</span>
-          <h2 className="text-lg font-bold">{tr("Your public profile")}</h2>
-        </div>
-        <p className="text-sm text-muted ml-10">
-          {tr("Your shareable link is ready:")}{" "}
-          <Link href={`/u/${user.slug}`} className="text-cyan-300 hover:underline">clustergg.com/u/{user.slug}</Link>
-          {" "}— {tr("customize it in")} <Link href="/profile" className="text-cyan-300 hover:underline">{tr("profile settings")}</Link>.
-        </p>
-      </section>
+      {/* ===== Step 2 — confirm the email ===== */}
+      <Step
+        n={2}
+        title="Confirm your email"
+        why="It is what switches your earning on. It is also what stops one person making five hundred accounts and taking prize money that belongs to real gamers."
+        done={!!step("email")?.done}
+      >
+        {!user.email && !user.discordUsername && (
+          <p className="mb-3 text-xs text-muted">
+            We do not have an address for you yet — add one and we will send a code straight away.
+          </p>
+        )}
+        <EmailStep
+          email={user.email ?? null}
+          done={!!step("email")?.done}
+          alreadySent={!!sentTo}
+        />
+      </Step>
 
-      <section className="glass p-6 mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <span className="glow-btn flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold text-white">3</span>
-          <h2 className="text-lg font-bold">{tr("Follow some gamers")}</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 gap-3">
-          {suggestions.map((s) => (
-            <div key={s.id} className="flex items-center gap-3 border border-violet-400/15 rounded-xl p-3">
-              <Avatar name={s.displayName} src={s.avatarUrl} size={40} />
-              <div className="min-w-0 flex-1">
-                <Link href={`/u/${s.slug}`} className="font-semibold hover:text-cyan-300 truncate block">{s.displayName}</Link>
-                <div className="text-xs text-muted truncate">{s.bio ?? `@${s.slug}`}</div>
-              </div>
-              <FollowButton targetUserId={s.id} isFollowing={false} path="/onboarding" />
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* ===== Step 3 — the two answers ===== */}
+      <Step
+        n={3}
+        title="Your age and your country"
+        why="Two answers, and both of them decide how prize money reaches you. Read what each choice means before you confirm — they are hard to change later."
+        done={!!step("profile")?.done}
+      >
+        <ProfileStep
+          countries={countries}
+          band={(user as { ageBand?: string | null }).ageBand ?? null}
+          country={user.country ?? null}
+          done={!!step("profile")?.done}
+        />
+      </Step>
 
-      <div className="text-center">
-        <Link href="/feed" className="glow-btn pressable rounded-full px-10 py-3 font-semibold text-white">
-          {tr("Enter the Cluster")}
-        </Link>
-      </div>
+      {!user.discordUsername && (
+        <div className="glass mt-6 p-5">
+          <div className="text-sm font-bold">Link Discord</div>
+          <p className="mt-1 text-xs text-muted">
+            Optional, and it makes your Cluster account work inside every server you are in.
+          </p>
+          <div className="mt-3"><OAuthButtons next="/onboarding" intent="link" compact /></div>
+        </div>
+      )}
+
+      <p className="mt-8 text-center text-xs leading-relaxed text-muted">
+        Nothing is taken while you finish. Points keep accruing up to{" "}
+        {LOCKED_CP_CAP.toLocaleString("en-US")} CP and nothing expires —{" "}
+        <Link href="/rules/gamer" className="text-cyan-300 hover:underline">every rule, and why it exists</Link>.
+      </p>
     </div>
+  );
+}
+
+function Step({ n, title, why, done, badge, children }: {
+  n: number; title: string; why: string; done: boolean; badge?: string; children: React.ReactNode;
+}) {
+  return (
+    <section className={`glass mt-5 p-6 ${done ? "border border-emerald-400/25" : ""}`}>
+      <div className="flex flex-wrap items-center gap-3">
+        <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-black ${
+          done ? "bg-emerald-500/25 text-emerald-200" : "glow-btn text-white"
+        }`}>
+          {done ? <Icon name="check" size={15} /> : n}
+        </span>
+        <h2 className={`text-lg font-bold ${done ? "text-muted line-through" : ""}`}>{title}</h2>
+        {badge && <span className="text-xs text-emerald-300">{badge}</span>}
+      </div>
+      {/* The reason, always, and never smaller than the instruction it explains. */}
+      <p className="ml-11 mt-1.5 text-sm leading-relaxed text-muted">{why}</p>
+      <div className="ml-0 mt-4 sm:ml-11">{children}</div>
+    </section>
   );
 }
