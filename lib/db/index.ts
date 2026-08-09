@@ -1066,7 +1066,7 @@ const COLUMN_MIGRATIONS = [
  * and the failure mode is a migration that silently never runs. Adding,
  * removing or editing any statement changes the hash by construction.
  */
-function migrationsFingerprint(): string {
+export function migrationsFingerprint(): string {
   // FNV-1a. Not cryptographic — it is a change detector, and a 32-bit collision
   // between two versions of a list we wrote ourselves is not a risk worth a
   // dependency.
@@ -1087,7 +1087,7 @@ function migrationsFingerprint(): string {
  * that controls whether migrations run should not sit in a table an admin
  * screen can edit.
  */
-async function migrationsAlreadyRun(db: DB, fingerprint: string): Promise<boolean> {
+export async function migrationsAlreadyRun(db: DB, fingerprint: string): Promise<boolean> {
   try {
     await db.execute(dsql.raw(
       `CREATE TABLE IF NOT EXISTS "schema_state" ("key" text PRIMARY KEY, "value" text NOT NULL, "updated_at" timestamp with time zone DEFAULT now() NOT NULL)`,
@@ -1107,6 +1107,73 @@ async function markMigrationsRun(db: DB, fingerprint: string): Promise<void> {
   } catch { /* the marker is an optimisation; failing to write it costs a replay */ }
 }
 
+/**
+ * How long one instance is allowed to hold the claim before the others stop
+ * believing it. B106.
+ *
+ * Long enough that a genuinely slow migration run is not trampled — the list is
+ * ~1000 statements and a cold Neon compute is not fast — and short enough that a
+ * lambda killed mid-run does not wedge every later boot behind a dead claim.
+ */
+export const MIGRATION_CLAIM_SECONDS = 120;
+/** How long a loser waits for the winner before it gives up and runs anyway. */
+export const MIGRATION_WAIT_MS = 4000;
+const MIGRATION_POLL_MS = 250;
+
+/**
+ * Exactly one instance runs the list. B106.
+ *
+ * THE DEFECT: `migrationsAlreadyRun` makes the STEADY state one tiny read, which
+ * is what B80 was for. It does nothing about the moment the fingerprint changes.
+ * On the deploy that changes it, every cold lambda reads "not run yet" at the
+ * same instant and every one of them starts replaying the same ~1000 statements
+ * — a hundred concurrent `ALTER TABLE`s taking ACCESS EXCLUSIVE on `users`,
+ * against a database that is also serving the traffic that woke them. The
+ * statements are idempotent, so nothing corrupts; the site just stops answering
+ * for the length of the lock queue, on the deploy, which is precisely when
+ * somebody is watching.
+ *
+ * So: an atomic claim. `INSERT … ON CONFLICT DO NOTHING RETURNING` either
+ * returns a row (we own it) or returns nothing (somebody else does), in one
+ * statement, with no read-then-write window for a second instance to slip
+ * through.
+ *
+ * A stale claim is taken over rather than waited on. The holder is a lambda and
+ * lambdas get killed; a claim that outlives its owner must not be able to block
+ * migrations forever, or the failure mode of this fix is worse than the thing it
+ * fixes.
+ */
+export async function claimMigrations(db: DB, fingerprint: string): Promise<boolean> {
+  try {
+    // Take over a claim whose owner has plainly died. Bounded by the same
+    // statement rather than a separate read, so two instances cannot both
+    // decide the claim is stale and both delete-then-insert.
+    await db.execute(dsql.raw(
+      `DELETE FROM "schema_state"
+         WHERE "key" = 'column_migrations:claim'
+           AND "updated_at" < now() - interval '${MIGRATION_CLAIM_SECONDS} seconds'`,
+    ));
+    const r = await db.execute(dsql`
+      INSERT INTO "schema_state" ("key", "value", "updated_at")
+      VALUES ('column_migrations:claim', ${fingerprint}, now())
+      ON CONFLICT ("key") DO NOTHING
+      RETURNING "key"
+    `);
+    return rowsOf(r).length > 0;
+  } catch {
+    // No claim table, no claim — fall through and run. Failing OPEN is the only
+    // safe direction: a migration that does not run is a column that does not
+    // exist, and that breaks the site permanently rather than briefly.
+    return true;
+  }
+}
+
+export async function releaseMigrations(db: DB): Promise<void> {
+  try {
+    await db.execute(dsql`DELETE FROM "schema_state" WHERE "key" = 'column_migrations:claim'`);
+  } catch { /* the stale-takeover above is the backstop */ }
+}
+
 async function runColumnMigrations(db: DB) {
   // The marker is written only after the whole list has run without throwing.
   // A partial run must replay: skipping the rest because we got most of the way
@@ -1114,31 +1181,52 @@ async function runColumnMigrations(db: DB) {
   const fingerprint = migrationsFingerprint();
   if (await migrationsAlreadyRun(db, fingerprint)) return;
 
-  for (const stmt of COLUMN_MIGRATIONS) {
-    try { await db.execute(dsql.raw(stmt)); }
-    catch (e) {
-      // The message we need is on the CAUSE, not on the error.
-      //
-      // Drizzle wraps a failed statement in a DrizzleQueryError whose own
-      // message is "Failed query: ALTER TABLE …" — the reason lives one level
-      // down. Testing only `String(e)` meant every expected miss (an ALTER
-      // against a table a later statement creates) looked unexpected and was
-      // rethrown, which took the whole bootstrap down on a fresh database.
-      const chain = [String(e), String((e as { cause?: unknown })?.cause ?? "")].join(" ");
-      if (!/already exists|does not exist/i.test(chain)) throw e;
-      // Say which one was skipped, and why.
-      //
-      // Most of these are expected — an ALTER against a table a later statement
-      // creates, run again on the next boot. But the swallow used to be
-      // completely silent, and a CREATE TABLE that quietly failed left a table
-      // missing with no trace anywhere: every query against it errored at
-      // request time, far away from the cause, and the migration list looked
-      // fine because it always looks fine. One line of warning is the
-      // difference between a five-minute diagnosis and an afternoon.
-      console.warn(`[migrate] skipped: ${stmt.slice(0, 70).replace(/\s+/g, " ")}… — ${String(e).slice(0, 120)}`);
+  if (!await claimMigrations(db, fingerprint)) {
+    // Somebody else is running the list. Wait a little — usually it finishes and
+    // this boot does nothing at all, which is the whole point.
+    const until = Date.now() + MIGRATION_WAIT_MS;
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, MIGRATION_POLL_MS));
+      if (await migrationsAlreadyRun(db, fingerprint)) return;
     }
+    // It did not finish in time. Run it anyway rather than boot a process whose
+    // schema might be half a version behind: the statements are idempotent, so
+    // the cost of duplicating is a slow boot, and the cost of skipping is a
+    // request that 500s on a missing column.
+    console.warn("[migrate] claim held elsewhere and not finished — running anyway");
   }
-  await markMigrationsRun(db, fingerprint);
+
+  try {
+    for (const stmt of COLUMN_MIGRATIONS) {
+      try { await db.execute(dsql.raw(stmt)); }
+      catch (e) {
+        // The message we need is on the CAUSE, not on the error.
+        //
+        // Drizzle wraps a failed statement in a DrizzleQueryError whose own
+        // message is "Failed query: ALTER TABLE …" — the reason lives one level
+        // down. Testing only `String(e)` meant every expected miss (an ALTER
+        // against a table a later statement creates) looked unexpected and was
+        // rethrown, which took the whole bootstrap down on a fresh database.
+        const chain = [String(e), String((e as { cause?: unknown })?.cause ?? "")].join(" ");
+        if (!/already exists|does not exist/i.test(chain)) throw e;
+        // Say which one was skipped, and why.
+        //
+        // Most of these are expected — an ALTER against a table a later statement
+        // creates, run again on the next boot. But the swallow used to be
+        // completely silent, and a CREATE TABLE that quietly failed left a table
+        // missing with no trace anywhere: every query against it errored at
+        // request time, far away from the cause, and the migration list looked
+        // fine because it always looks fine. One line of warning is the
+        // difference between a five-minute diagnosis and an afternoon.
+        console.warn(`[migrate] skipped: ${stmt.slice(0, 70).replace(/\s+/g, " ")}… — ${String(e).slice(0, 120)}`);
+      }
+    }
+    await markMigrationsRun(db, fingerprint);
+  } finally {
+    // Released even when a statement throws, so a real migration failure costs
+    // one boot rather than every boot for the next two minutes.
+    await releaseMigrations(db);
+  }
 }
 
 async function ensureProvisioned(db: DB) {

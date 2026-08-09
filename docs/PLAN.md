@@ -934,6 +934,51 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B106 — One instance replays the list, not all of them · **SHIPPED**
+
+The last of B80's four scale findings.
+
+B80 made the **steady** state cheap: a fingerprint of `COLUMN_MIGRATIONS` is
+stored in `schema_state`, and a boot whose list matches skips all ~1000
+statements after one tiny read. That is still true and still the fast path.
+
+It did nothing about **the one moment the fingerprint changes**. On that deploy
+every cold instance reads "not run yet" at the same instant, and every one of
+them starts replaying the same list — a hundred concurrent `ALTER TABLE`s each
+taking ACCESS EXCLUSIVE on `users`, against a database that is simultaneously
+serving the traffic that woke them. Nothing corrupts, because the statements are
+idempotent. The site just stops answering for the length of the lock queue, on
+the deploy, which is exactly when somebody is watching it.
+
+**An atomic claim.** `INSERT … ON CONFLICT DO NOTHING RETURNING` either returns a
+row (we own it) or returns nothing (somebody else does) — one statement, with no
+read-then-write window a second instance can slip through. Released in a
+`finally`, so a throw mid-list costs one boot rather than every boot for the next
+two minutes.
+
+**Three decisions worth the words:**
+
+- **A stale claim is taken over, not waited on** (`MIGRATION_CLAIM_SECONDS` =
+  120). The holder is a lambda and lambdas get killed. A claim that outlives its
+  owner and blocks migrations forever is a *worse* failure than the stampede.
+  The takeover is bounded inside the same `DELETE`, so two instances cannot both
+  decide it is stale and both delete-then-insert.
+- **A loser waits, then proceeds anyway** (`MIGRATION_WAIT_MS` = 4000, shorter
+  than the claim window by construction). Usually the winner finishes inside the
+  wait and this boot does nothing at all. If it does not, running a second time
+  costs a slow boot; *skipping* costs a request that 500s on a missing column.
+- **Claim failure fails OPEN.** No claim table, no claim — run the list. A
+  migration that does not run is a column that does not exist, and that breaks
+  the site permanently rather than briefly.
+
+`tests/db/cold-start.mts` (27) drives the real functions against the demo
+database: the second and third claim lose, release hands it on, a claim aged past
+the window is taken over while one inside it is respected, and the numbers are
+asserted in relation to each other rather than as literals. Proved by breaking
+it — swapping `DO NOTHING` for `DO UPDATE` turns five assertions red.
+
+---
+
 ### ▸ B105 — The sync queue has to drain · **SHIPPED**
 
 `syncDueAccounts` was a **serial loop over 25 accounts**, each one an external
@@ -962,8 +1007,8 @@ exceeding the pool size.
 **Two of the four scale findings were already fixed and the plan had not caught
 up:** unbounded event tables (B104's retention job) and the brand-report heap
 (`lib/ad-delivery.ts` aggregates in SQL and bounds the server list — its own
-comment says it is "replacing" that defect). **Cold-start DDL replay is the last
-one open.**
+comment says it is "replacing" that defect). Cold-start DDL replay was the last
+one open — **closed by B106. All four of B80's scale findings are now done.**
 
 ---
 
@@ -1030,8 +1075,9 @@ The decision survives the correction and is easier to defend because of it: this
 is first-party counting that earns nobody money and proves we did what we sold,
 not a meter that generates invoices.
 
-**Still open from B80:** the three remaining scale findings (cold-start DDL
-replay, stat sync throughput, brand report heap).
+**Still open from B80 at the time:** the three remaining scale findings —
+cold-start DDL replay (B106), stat sync throughput (B105), brand report heap
+(already fixed in `lib/ad-delivery.ts`). All closed since.
 
 ---
 
@@ -1485,10 +1531,14 @@ the reviewer rated **fatal**.
 
 - Cold-start DDL replay: 219 raw statements, 108 `ALTER TABLE` (ACCESS
   EXCLUSIVE), 11 full-table `UPDATE`, on every cold boot against production. *(fatal)*
+  — **fixed: B80 (fingerprint marker) + B106 (claim, so one instance replays).**
 - Stat sync saturates at ~30 accounts — 60/hr sequential, no queue. *(fatal)*
+  — **fixed: B105.**
 - Per-award query cost: ~12 round-trips × 20 actions × 1M gamers = 240M
   queries/day; `quest_events` and `ad_impressions` unbounded, unpartitioned. *(fatal)*
+  — **unbounded tables fixed: B104 (90-day retention purge).**
 - Brand report loads every impression row into function heap. *(severe)*
+  — **already fixed: `lib/ad-delivery.ts` aggregates in SQL.**
 
 > **The tension we are not hiding:** these are deferrable only if our honest
 > position is "pre-revenue, scale is years away". But then the 1,000,000-gamer
