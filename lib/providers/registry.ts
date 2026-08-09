@@ -123,6 +123,18 @@ export type ProviderDef = {
   docsUrl?: string;
   legalFlag?: string;
   identityOnly?: boolean;
+  /**
+   * Why a brand may NOT be attached to a challenge on this game. B114.
+   *
+   * Absent means sponsorable, which is the normal case. Set it and
+   * `lib/sponsorable.ts` refuses the sale everywhere at once — the admin form,
+   * the action that saves it, and the campaign builder — so the rule cannot be
+   * enforced in two of three places.
+   *
+   * Deleting the line is the whole of "we got the key". There is deliberately
+   * no second list of game names anywhere.
+   */
+  sponsorBlock?: string;
   // Special two-step in-game verification-code link flow (Mobile Legends).
   linkFlow?: "vc";
 };
@@ -201,6 +213,10 @@ export const PROVIDERS: ProviderDef[] = [
   },
   {
     id: "riot-lol", name: "League of Legends", game: "League of Legends", glyph: "⚡", color: "#c89b3c",
+    // B114. Gamers still link, still appear on the board, still enter
+    // unsponsored challenges. What is withheld is a BRAND paying for a
+    // competition on Riot's data, which is the thing their terms are about.
+    sponsorBlock: "We are on a Riot development key, which expires every 24 hours and is not permitted for commercial contests; a production key has been applied for and not yet granted.",
     authType: "apikey", envVars: ["RIOT_API_KEY"], identifierLabel: "Riot ID",
     identifierHint: "GameName#TAG — e.g. Faker#KR1 (region in provider settings)", phase: 1,
     docsUrl: "https://developer.riotgames.com",
@@ -216,6 +232,7 @@ export const PROVIDERS: ProviderDef[] = [
   },
   {
     id: "riot-valorant", name: "VALORANT", game: "VALORANT", glyph: "▲", color: "#fd4556",
+    sponsorBlock: "We are on a Riot development key, which expires every 24 hours and is not permitted for commercial contests; a production key has been applied for and not yet granted.",
     authType: "apikey", envVars: ["RIOT_API_KEY"], identifierLabel: "Riot ID",
     identifierHint: "GameName#TAG — VALORANT API requires production key approval", phase: 1,
     docsUrl: "https://developer.riotgames.com",

@@ -1009,6 +1009,84 @@ nothing.
 
 ---
 
+### ▸ B114 — No Riot game is sold to a brand · **SHIPPED**
+
+The owner's decision, encoded rather than remembered.
+
+We are on a Riot **development** key: it expires every 24 hours, is rotated by
+hand, and a production key has been applied for with no answer. Riot's terms do
+not permit a commercial contest on a dev key. So: **no Riot game is sold to a
+brand until a production key arrives.**
+
+That is exactly the kind of decision somebody forgets on a Tuesday six weeks
+from now while typing a campaign for a brand who asked for League. It is now a
+rule in code with a test behind it.
+
+**A flag on the provider, not a list of game names.** `sponsorBlock` on the two
+Riot entries in `lib/providers/registry.ts`, read by `lib/sponsorable.ts`, which
+every enforcement point calls. **When the key arrives, delete two lines** — and
+the suite asserts no file names a Riot game itself, so a second list cannot
+appear.
+
+**What is blocked is the SALE, not the game.** Gamers still link Riot accounts,
+still appear on the League and VALORANT boards, still enter unsponsored
+challenges, and a server owner may still buy a private challenge for their own
+members. None of that is a brand paying us to run a competition on Riot's data.
+Gutting the game would punish gamers for a paperwork state they did not cause.
+
+**Three surfaces, deliberately different:**
+- **The save action REFUSES** and returns the reason. Saving a Riot challenge
+  quietly unsponsored would look like it worked, reach billing as a free
+  challenge, and the operator would find out when the brand asked about the gap.
+  (The co-sponsor check beside it *drops* an invalid pick — losing a second
+  brand is recoverable; losing a whole sale silently is not.)
+- **A brand never sees the game.** Filtered out of the campaign builder, not
+  greyed out: a disabled row on a buying screen reads as "coming soon, ask us".
+- **Staff are told, not hidden from.** The admin dropdown is disabled with the
+  reason beside it — an operator hunting for a dropdown that silently lost its
+  contents is worse off than one who is told why.
+
+`tests/db/sponsorable.mts` (53). Proved by breaking it two ways: half-rolling-back
+the flag (deleting it from League but not VALORANT) turns nine assertions red,
+and making the save path drop instead of refuse turns another.
+
+---
+
+### ▸ B114.1 — CI had not run on any of it · **SHIPPED**
+
+Found while answering "it's been building for 18 minutes". Nothing was building:
+every Vercel deployment was `READY`, and **the last GitHub Actions run was that
+morning, on `main`.**
+
+`ci.yml` triggered on `pull_request` and `push` to `main` only. With no PR open,
+**nine commits went to a feature branch in one day and CI ran on none of them.**
+The first anybody would have known is the moment a PR was opened and everything
+went red at once. It is also why `ci` could not be found in the branch-ruleset's
+status-check picker: GitHub only offers checks it has recently seen, and this one
+had never reported on the branch it was meant to protect.
+
+- **`push: branches: [main, "claude/**"]`.** `concurrency` already cancels a
+  superseded run, so a branch pushed to five times costs one run, not five.
+- **The db band is sharded across two runners** (`SHARD`/`SHARDS` in
+  `tests/run-all.mjs`). It had grown from ~30 files to 76 and the single job was
+  closing on its own 20-minute timeout — the worst failure this workflow can
+  have, because from the outside a timeout is indistinguishable from a real
+  break and the instinct is to raise the limit, which makes the slow suite
+  permanent instead of parallel. Round-robin by index, not a halved sorted list:
+  the alphabet does not correlate with runtime and `cards` and `split` would
+  otherwise land together.
+- **`fail-fast: false`**, so one red shard does not cancel the other. Two red
+  shards are two pieces of information; one red and one cancelled is one.
+- **An empty shard now exits 1.** A typo in `SHARD`/`SHARDS` used to print "No
+  suites found" and go green — the same failure class as the runner that once
+  counted `_nav.mjs` as a passing suite.
+- **`ci` still aggregates**, so branch protection requires exactly one name
+  whatever the matrix does.
+
+Both shards verified locally at 38 suites each.
+
+---
+
 ### ▸ B113 / B63.1 — The Daily Mission was built and never wired up · **SHIPPED**
 
 **The worst kind of defect: a promise in the product with no path behind it.**

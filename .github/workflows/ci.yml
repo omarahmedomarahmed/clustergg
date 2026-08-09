@@ -31,7 +31,20 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [main]
+    # `main` AND the working branches. B114.1.
+    #
+    # This used to be `[main]` alone, and the consequence was invisible: nine
+    # commits went to a feature branch in one day and CI ran on NONE of them,
+    # because there was no PR open. The first anybody would have known is the
+    # moment a PR was opened and twelve suites went red at once.
+    #
+    # It is also why `ci` could not be found in the branch-ruleset's status
+    # check picker — GitHub only offers checks it has recently seen, and this
+    # one had never reported on the branch it needed to protect.
+    #
+    # `concurrency` below already cancels a superseded run, so a branch that is
+    # pushed to five times in an hour costs one run, not five.
+    branches: [main, "claude/**"]
 
 concurrency:
   # A newer push supersedes an in-flight run on the same ref. Green on stale
@@ -91,9 +104,27 @@ jobs:
 
   # ===== Everything else the database can prove.
   suite:
+    # B114.1. TWO MACHINES, not one longer timeout.
+    #
+    # The db band grew from ~30 files to 76 and the single job was closing on
+    # its own 20-minute limit. A timeout that trips is the worst failure this
+    # workflow can have: from the outside it is indistinguishable from a real
+    # break, and the fix people reach for is raising the limit, which makes the
+    # slow suite permanent instead of parallel.
+    #
+    # `SHARD`/`SHARDS` deal the files out round-robin — see `tests/run-all.mjs`
+    # for why round-robin rather than halving the sorted list. The aggregate
+    # `ci` job below needs no change: `needs: [suite]` waits for the whole
+    # matrix, so branch protection still requires exactly one name.
     name: Database suite
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
+    strategy:
+      # One shard failing must not cancel the other. Two red shards are two
+      # pieces of information; one red and one cancelled is one.
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -102,7 +133,10 @@ jobs:
           cache: npm
       - run: npm ci
       # Includes Phase-0 integrity and the PGlite half of the money gate.
-      - name: Full database suite
+      - name: Database suite (shard ${{ matrix.shard }} of 2)
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: 2
         # No lane override. I assumed these suites were I/O-bound and would
         # benefit from more lanes than cores; measured, six lanes took 414s
         # against 302s at three. PGlite is WebAssembly running in-process — it

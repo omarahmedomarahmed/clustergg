@@ -584,6 +584,23 @@ export async function saveChallenge(
     })(),
   };
 
+  // ===== B114: NO RIOT GAME IS SOLD TO A BRAND =====
+  //
+  // REFUSED, not dropped. The co-sponsor above is dropped on an invalid pick
+  // because losing a second brand is recoverable; this is the opposite — saving
+  // a Riot challenge quietly unsponsored would look like it worked, reach
+  // billing as a free challenge, and the operator would find out when the brand
+  // asked why their campaign has a gap.
+  //
+  // The check is `lib/sponsorable.ts`, which reads the flag off the provider,
+  // so the form, this action and the campaign builder all refuse for the same
+  // reason in the same words.
+  {
+    const { checkSponsorable } = await import("@/lib/sponsorable");
+    const gate = checkSponsorable(String(values.game ?? ""), values.sponsorBrandId);
+    if (!gate.ok) return { error: gate.error };
+  }
+
   // ===== B91.5: A BRAND'S MONEY ALWAYS BELONGS TO A CAMPAIGN =====
   //
   // The campaign is the only object that answers "what did this brand buy" —
