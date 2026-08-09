@@ -934,6 +934,38 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B102 — The campaign console · **SHIPPED**
+
+A campaign is the thing a brand actually buys: one to four weekly challenges,
+one bill. Until this screen the only way to see one was to open the brand it
+belongs to, and the only way to see all of them was not to.
+
+**It is sorted by risk, not by date.** The question that costs money is *which
+weeks did somebody pay for that are not going to happen* — a slot with no
+challenge two days before it opens is a refund and an apology; a week later it
+is a refund, an apology and a brand that does not come back. So the worst is at
+the top, in that order:
+
+| Risk | What it means |
+|---|---|
+| A week **already opened** with nothing behind it | A refund conversation, not a backlog item |
+| A week opening within `AT_RISK_DAYS` with nothing built | An afternoon's work, if somebody sees it |
+| Running with nothing invoiced | It is on nobody's money |
+| Running with an unpaid invoice | An email |
+
+Every week is a BOX, and an empty box is a job — a gap in a row of boxes is
+visible from across a room in a way "3 of 4 slots filled" is not. And a console
+that is silent when it is happy and silent when it is broken teaches people to
+distrust it, so "nothing needs you here" is a thing it says out loud.
+
+It computes nothing of its own: the games come from `campaignGames` (a campaign
+can be mixed since C7), the slot state from the same document the brand portal
+reads, and it writes nothing. One query for the whole page rather than one per
+campaign — asserted, because this is the screen most likely to be left open on
+a second monitor.
+
+---
+
 ### ▸ B101 — Two brands on one challenge · **SHIPPED**
 
 A co-sponsored challenge is two brands on the same competition — a publisher and

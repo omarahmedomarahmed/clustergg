@@ -163,6 +163,11 @@ export const ADMIN_NAV: AdminGroup[] = [
       // /admin/brands/[id] — `ownersOfPath` matches by prefix, so a desk that
       // owns /admin/brands owns everything under it. A tab is not worth a key.
       { href: "/admin/brands", label: "Brands", desc: "Every brand, the enquiries that became them, and the player quotes their reports close with.", metric: "brands", system: "billing" },
+      // B102. The campaign is what a brand actually buys, and until this screen
+      // the only way to see one was to open the brand it belongs to. Sorted by
+      // risk: the weeks somebody paid for that have nothing behind them are at
+      // the top, because that is the one that becomes a refund.
+      { href: "/admin/campaigns", label: "Campaigns", desc: "What every brand bought, week by week, and which weeks have nothing built for them yet. Worst first.", queue: true, system: "billing" },
       { href: "/admin/creatives", label: "Creatives", desc: "The artwork that runs.", metric: "creatives" , system: "ad" },
       { href: "/admin/placements", label: "Placements", desc: "Where creatives can appear.", metric: "placements" , system: "ad" },
       { href: "/admin/ads/schedule", label: "Ad schedule", desc: "What runs when." , system: "ad" },
