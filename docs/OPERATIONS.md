@@ -3,6 +3,44 @@
 The console is **Admin → Command centre**. It is organised as *systems*, and a
 department owns one. Everything below is a thing a person does.
 
+## Where a shift starts
+
+Two screens, and between them they are the whole day:
+
+| Screen | Who | What is on it |
+|---|---|---|
+| **Admin → Sales desk** | Whoever talks to brands | Who signed up, who is half-way through buying and stopped, who owes us, who is waiting on a reply |
+| **Admin → Support desk** | Whoever looks after servers and gamers | Everything where somebody outside is blocked on us: challenge requests, unanswered threads, challenges bought and not yet set up |
+
+The split is by **who is waiting**, not by feature. Neither screen edits
+anything — every row links to the page that owns the thing, because a worklist
+that can also move money is one somebody edits by accident.
+
+**Admin → What needs you** is the same alerts, ungrouped, with the desks as
+filters. Clearing one puts your name on it.
+
+## The week
+
+**Admin → The week** is where the two decisions that set what the platform pays
+are made: how much of the CP vault this week's daily ceiling divides, and how
+much of the server vault Monday's pool divides. Whatever is not released is the
+reserve, and the reserve is the point — it is what pays everybody through a week
+when nothing sells.
+
+An amount can be raised mid-week and never lowered. People have already been
+shown numbers computed from it.
+
+## A challenge, end to end
+
+```
+draft → queued → announced → live → ended
+```
+
+The only rung a human moves is **announced**, and the button is on the
+challenge's own page. It refuses anything unpaid, because that announcement is
+a promise to every server on the network. Everything else is a payment or the
+cron.
+
 ## The systems
 
 | System | Owns | The one number |

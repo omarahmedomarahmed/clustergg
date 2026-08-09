@@ -100,7 +100,7 @@ async function guildOwner(guildId: string): Promise<{
  *
  * It built a payout out of per-challenge owner shares — the tier's percentage
  * applied to each finished sponsored challenge. That share no longer exists:
- * `docs/COMMERCIAL_MODEL_V2.md` §4 pays owners out of a weekly competitive pool
+ * `docs/MODEL.md` §4 pays owners out of a weekly competitive pool
  * instead, and `lib/week-close.ts` opens those payouts already scored, already
  * apportioned and already netted against the vault.
  *

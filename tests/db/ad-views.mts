@@ -38,7 +38,7 @@ const db = await getDb();
 
 console.log("== B81.1: the definition is written down, and honestly ==");
 {
-  const doc = src("docs/AD_VIEW.md");
+  const doc = src("docs/legacy/AD_VIEW.md");
   ok("the document exists and states the rule", /One card carrying a creative/i.test(doc));
   // The three admissions that make it worth reading. Each of them costs us
   // something, which is exactly why a reviewer should check they survived.

@@ -10,6 +10,7 @@ import { getUiOverrides } from "@/lib/i18n/t-server";
 import { dirOf } from "@/lib/i18n/locale";
 import Starfield from "@/components/Starfield";
 import Nav from "@/components/Nav";
+import OnboardingBar from "@/components/OnboardingBar";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
 import { LocaleProvider } from "@/components/LocaleProvider";
@@ -18,7 +19,6 @@ import FloatingOrbs from "@/components/FloatingOrbs";
 import EmbedMode from "@/components/EmbedMode";
 import RouteProgress from "@/components/RouteProgress";
 import PageBackground from "@/components/PageBackground";
-import AgeGate from "@/components/AgeGate";
 import { getContent } from "@/lib/cms";
 import { parseBottomTabs } from "@/lib/mobile-nav";
 import { getCurrentUser } from "@/lib/auth";
@@ -119,6 +119,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <Starfield />
         <div className="relative z-10 flex min-h-screen flex-col">
           <Nav />
+          {/* B93. Follows an unfinished account everywhere, and disappears the
+              moment the last step is done. A gamer who clicks away from
+              onboarding otherwise has no way back and no way to know anything
+              is waiting. */}
+          <OnboardingBar />
           {/* The global top ad now lives *inside* each page's hero (over the
               hero artwork) via <TopBannerAd>, so it blends with the page rather
               than sitting on the plain site backdrop. */}
@@ -126,7 +131,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               is skippable and skipping it used to mean earning nothing forever
               without ever being asked why. Never inside an embed — a framed
               profile is somebody else's page. */}
-          {me && !me.ageBand && !embedded && <AgeGate />}
+{/* THE AGE GATE USED TO LIVE HERE. B93 removed it.
+
+              It asked the same question the onboarding page asks, in three
+              options instead of two, with no consequence shown — and it
+              rendered on top of onboarding, so a new gamer saw the same
+              question twice on one screen with different answers.
+
+              What replaced it is stronger, not weaker: `OnboardingBar` above
+              follows anybody who has not finished, on every page, and links to
+              the page that asks properly. It covers all three steps rather than
+              only the band, and it is why nobody can skip the question by
+              skipping onboarding. */}
           <main className="flex-1 pb-20 md:pb-0">{children}</main>
           <Footer />
         </div>

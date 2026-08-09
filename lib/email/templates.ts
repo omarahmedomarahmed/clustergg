@@ -37,6 +37,7 @@ export type TemplateData = {
   "portal.key": { serverName: string; key: string; portalUrl: string };
   "portal.key.rotated": { serverName: string; key: string; portalUrl: string; reason: string };
   "brand.portal.key": { brand: string; key: string; portalUrl: string };
+  "verify.code": { name: string; code: string; minutes: number };
   "challenge.approved": { serverName: string; title: string; startsOn: string; url: string };
   "challenge.published": { name: string; title: string; game: string; endsOn: string; url: string };
   "challenge.ended": { name: string; title: string; placement: number | null; points: number; prize: Money | null; url: string };
@@ -112,6 +113,19 @@ const TEMPLATES: { [K in TemplateKey]: (d: TemplateData[K]) => Built } = {
     cta: { label: "Open your portal", url: d.portalUrl },
     footnote: "If you did not install Cluster on this server, reply to this email and we will remove it.",
   }),
+  // A code, in the body, never the subject — a subject is rendered on a lock
+  // screen, and this one is a key to an account.
+  "verify.code": (d) => ({
+    subject: "Your Cluster code",
+    heading: `Hey ${d.name}`,
+    lines: [
+      `Your code is **${d.code}**`,
+      `It works for ${d.minutes} minutes. Type it back on the page you left open.`,
+      "Verifying your email is what switches your earning on — nothing you have already done is lost while it is off.",
+    ],
+    footnote: "If you did not ask for this, ignore it. Nothing happens without the code.",
+  }),
+
   // Same rule as the server key: in the BODY, never the subject.
   "brand.portal.key": (d) => ({
     subject: `Your Cluster brand portal is ready — ${d.brand}`,

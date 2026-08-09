@@ -117,9 +117,14 @@ console.log("\n== what it does NOT do ==");
   // challenges, and paying an owner from it for an event they bought
   // themselves pays them twice.
   const { readFileSync } = await import("node:fs");
-  const close = readFileSync("lib/week-close.ts", "utf8");
-  ok("the weekly close counts public challenges only",
-    /eq\(schema\.challenges\.visibility, "public"\)/.test(close));
+  // B99 moved the entrant query into `week-standing.ts`, which the close and
+  // the public pool page both call — so the filter is asserted where it lives
+  // now, and the close is asserted to be running it.
+  const standing = readFileSync("lib/week-standing.ts", "utf8");
+  ok("the pool counts public challenges only",
+    /eq\(schema\.challenges\.visibility, "public"\)/.test(standing));
+  ok("…and the weekly close is what runs it",
+    /standingFor\(/.test(readFileSync("lib/week-close.ts", "utf8")));
 }
 
 console.log("\n== the bounds ==");

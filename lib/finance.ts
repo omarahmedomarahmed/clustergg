@@ -1,4 +1,4 @@
-import { PRICING_DEFAULTS, prizeSharePct, type PricingConfig } from "@/lib/pricing";
+import { PRICING_DEFAULTS, prizeSharePct, money, type PricingConfig } from "@/lib/pricing";
 
 // The plan for the money, as arithmetic instead of a slide.
 //
@@ -479,6 +479,42 @@ export function stress(
  * rests on. Printed next to the plan so the reader can check the foundation
  * rather than take the totals on trust.
  */
+/**
+ * The three unit-economics rows the investor deck shows, from the live card.
+ *
+ * B110. These used to be typed into `SEED_DOCS` — `{ revenue: 250, cost: 175 }`
+ * — under a subtitle reading "Every number here is the live rate card". The
+ * costs had been kept in step with the prize and the REVENUES had not, so the
+ * section quietly understated every margin by the difference between the price
+ * we charge and the price somebody typed in a different quarter.
+ *
+ * Computed rather than stored, so the sentence above them is true.
+ */
+export function liveUnitRows(pricing: PricingConfig = PRICING_DEFAULTS) {
+  const u = challengeUnit(pricing);
+  const perMonth = pricing.challengesPerGame;
+  return [
+    {
+      label: "One weekly challenge",
+      revenue: u.price,
+      cost: u.prize,
+      note: `${money(u.prize, pricing.currency)} is the prize, paid as three trophies carrying the sponsor's brand. The only cost of goods.`,
+    },
+    {
+      label: "One game, one month",
+      revenue: u.price * perMonth,
+      cost: u.prize * perMonth,
+      note: `${perMonth} challenges. The prize cost is fixed per month — a second sponsor does not double it.`,
+    },
+    {
+      label: `${pricing.games} games, one month`,
+      revenue: u.price * perMonth * pricing.games,
+      cost: u.prize * perMonth * pricing.games,
+      note: "The full catalogue as sold today, before placement revenue.",
+    },
+  ];
+}
+
 export function challengeUnit(pricing: PricingConfig = PRICING_DEFAULTS) {
   const fee = pricing.challengePrice - pricing.prizePool;
   return {

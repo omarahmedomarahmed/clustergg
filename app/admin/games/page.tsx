@@ -3,8 +3,9 @@ import { asc, desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import {
   saveGame, deleteGame, saveSpace, deleteSpace, ensurePlanetsForGames, deleteLegacyPlanets,
-  adminDeletePost, togglePinPost,
 } from "@/app/actions/admin";
+import SocialPurgePanel from "@/components/SocialPurgePanel";
+import { socialRowCounts } from "@/lib/social-purge";
 import GameLogo from "@/components/GameLogo";
 import ImageUpload from "@/components/ImageUpload";
 import CoverFramer from "@/components/CoverFramer";
@@ -112,15 +113,10 @@ function PlanetForm({ planet, gameName, games }: {
 
 export default async function AdminGamesPage() {
   const db = await getDb();
-  const [games, planets, recentPosts] = await Promise.all([
+  const [games, planets, socialCounts] = await Promise.all([
     db.select().from(schema.games).orderBy(asc(schema.games.sortOrder)),
     db.select().from(schema.spaces).orderBy(asc(schema.spaces.name)),
-    db.select({ post: schema.posts, author: schema.users, space: schema.spaces })
-      .from(schema.posts)
-      .innerJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
-      .innerJoin(schema.spaces, eq(schema.posts.spaceId, schema.spaces.id))
-      .where(sql`${schema.posts.deletedAt} IS NULL`)
-      .orderBy(desc(schema.posts.createdAt)).limit(20),
+    socialRowCounts(db),
   ]);
 
   const planetFor = new Map(planets.filter((p) => p.game).map((p) => [p.game as string, p]));
@@ -251,7 +247,7 @@ export default async function AdminGamesPage() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-bold">{s.name}</div>
-                    <div className="truncate text-xs text-muted">{s.memberCount} members · {s.postCount} posts</div>
+                    <div className="truncate text-xs text-muted">{s.memberCount} members</div>
                   </div>
                   <span className="text-xs text-cyan-300">Fix</span>
                 </summary>
@@ -267,31 +263,11 @@ export default async function AdminGamesPage() {
         </section>
       )}
 
-      <section>
-        <h2 className="mb-4 text-xl font-bold">Moderation queue — recent posts</h2>
-        <div className="space-y-2">
-          {recentPosts.length === 0 && <div className="glass p-5 text-sm text-muted">Nothing posted yet.</div>}
-          {recentPosts.map(({ post, author, space }) => (
-            <div key={post.id} className="glass flex flex-wrap items-start gap-3 p-4">
-              <div className="min-w-0 flex-1">
-                <div className="mb-1 text-xs text-muted">
-                  {author.displayName} in {space.name} · {timeAgo(post.createdAt)}
-                  {post.isPinned && <span className="text-amber-300"> · pinned</span>}
-                </div>
-                <p className="line-clamp-2 text-sm">{post.body}</p>
-              </div>
-              <div className="flex shrink-0 gap-2">
-                <form action={togglePinPost.bind(null, post.id, !post.isPinned, "/admin/games")}>
-                  <button className="ghost-btn rounded-full px-3 py-1 text-xs">{post.isPinned ? "Unpin" : "Pin"}</button>
-                </form>
-                <form action={adminDeletePost.bind(null, post.id)}>
-                  <button className="rounded-full border border-rose-400/40 px-3 py-1 text-xs text-rose-300">Delete</button>
-                </form>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* B111. The moderation queue was here. Removing posts removed the only
+          thing on this platform that needed moderating, which was most of the
+          argument for removing them. What sits in its place is the one button
+          the removal deliberately did not press. */}
+      <SocialPurgePanel counts={socialCounts} />
     </div>
   );
 }

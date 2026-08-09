@@ -109,6 +109,72 @@ export async function deletionImpact(db: DB, userId: string): Promise<DeletionIm
   } catch { return empty; }
 }
 
+/**
+ * Everything of theirs that `DELETE FROM users` does not take with it. B95.
+ *
+ * ===== THE BUG THIS EXISTS FOR =====
+ *
+ * `db.delete(users)` cascades — but only over the foreign keys that exist, and
+ * the tables added after the original schema was generated have none. Every one
+ * of them was created by an idempotent `CREATE TABLE IF NOT EXISTS` in the
+ * migration list, and none of those statements declares a reference. So an
+ * account deletion took the row and left the quest events, the trophies, the
+ * saved drafts, the payout preference and the Discord command log behind,
+ * keyed to an id that no longer resolved.
+ *
+ * Nobody noticed because nothing reads an orphan. It was found by asserting
+ * that an under-13 deletion removes everything, which is the one case where
+ * "mostly deleted" is not a tidiness problem.
+ *
+ * Adding the missing foreign keys to a live database is the other fix, and it
+ * is the one that cannot be done safely from a boot migration: an ALTER that
+ * adds a reference fails outright if a single orphan already exists, which on
+ * production is a boot loop rather than a migration. So the deletion is
+ * explicit, ordered, and written down here where it can be read.
+ *
+ * ===== WHAT IS DELIBERATELY KEPT =====
+ *
+ * Money that actually moved. A `paid` redemption is a record of a payment we
+ * made to a person — a financial record with its own retention rules, and one
+ * the vault reconciliation reads. The same goes for the vault ledger, the
+ * weekly allocations and the server payouts: those are the books, and an
+ * account deletion must not rewrite the books.
+ *
+ * What they keep is an id that no longer resolves to a person, which is the
+ * correct residue: the amount and the date survive, the human does not.
+ */
+export async function purgeUserRows(db: DB, userId: string): Promise<void> {
+  const { sql: raw } = await import("drizzle-orm");
+  // Written as raw statements against table names on purpose: this list must
+  // match the DATABASE, and a table missing from a given deployment (an older
+  // one, a test harness) has to be skipped rather than take the deletion down.
+  const byUser = [
+    "user_quest_progress", "quest_events", "user_quest_tiers", "user_trophies",
+    "discord_guild_members", "discord_command_logs", "server_events",
+    "brand_testimonials", "email_codes",
+  ];
+  for (const t of byUser) {
+    try { await db.execute(raw.raw(`DELETE FROM "${t}" WHERE "user_id" = '${userId.replace(/'/g, "''")}'`)); }
+    catch { /* table not on this deployment */ }
+  }
+  const byOther: [string, string][] = [
+    ["payout_accounts", "owner_id"],
+    ["form_drafts", "owner_id"],
+    ["marketplace_orders", "recipient_id"],
+    ["vote_week_actions", "actor_id"],
+  ];
+  for (const [t, col] of byOther) {
+    try { await db.execute(raw.raw(`DELETE FROM "${t}" WHERE "${col}" = '${userId.replace(/'/g, "''")}'`)); }
+    catch { /* table not on this deployment */ }
+  }
+  // Requests that never became a payment. The paid ones stay — see above.
+  try {
+    await db.execute(raw.raw(
+      `DELETE FROM "trophy_redeems" WHERE "user_id" = '${userId.replace(/'/g, "''")}' AND "status" <> 'paid'`,
+    ));
+  } catch { /* table not on this deployment */ }
+}
+
 export type DeletionGuard = { ok: boolean; reason: string };
 
 /**

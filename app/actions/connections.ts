@@ -190,8 +190,16 @@ export async function updatePrivacy(formData: FormData) {
   await db.update(schema.users).set({
     profileVisibility: ["public", "followers", "private"].includes(visibility) ? visibility : "public",
     allowMessagesFrom: ["everyone", "following", "nobody"].includes(allowMessages) ? allowMessages : "everyone",
+    // B96. The confirmed tick. It is a privacy setting and it lives with the
+    // other two, because what it discloses — that this account is an adult's,
+    // or that it is not — is exactly the kind of thing this page is for.
+    // Unchecked means the box was not sent, which is a checkbox being a
+    // checkbox; every other switch on this form works the same way.
+    showAgeMark: formData.get("showAgeMark") === "on",
   }).where(eq(schema.users.id, me.id));
   revalidatePath("/settings/privacy");
+  // The mark is drawn by the layout on every page, not only by the profile.
+  revalidatePath("/", "layout");
 }
 
 export async function updateNotificationPrefs(formData: FormData) {
@@ -251,6 +259,10 @@ export async function deleteAccount(formData?: FormData): Promise<{ error?: stri
     } catch { /* a failed email must never block somebody leaving */ }
   }
 
+  // Not every user-keyed table cascades — the ones added after the original
+  // schema have no foreign key at all — so they go explicitly first. B95.
+  const { purgeUserRows } = await import("@/lib/account-deletion");
+  await purgeUserRows(db, me.id);
   await db.delete(schema.users).where(eq(schema.users.id, me.id));
   const { destroySession } = await import("@/lib/auth");
   await destroySession();

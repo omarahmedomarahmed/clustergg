@@ -428,9 +428,10 @@ console.log("\n== C14: breakage is measured, never banked ==");
   const { measureBreakage, reachedGamersPct, CANNOT_REDEEM } = await import("../../lib/breakage.ts");
   const { getDb } = await import("../../lib/db/index.ts");
 
-  // Under a 16 floor and an 18 redeem age, teens hold value they cannot collect.
-  ok("under-16 cannot redeem", CANNOT_REDEEM.includes("under16"));
-  ok("…and neither can 16-17", CANNOT_REDEEM.includes("teen"));
+  // Under-18s hold value they cannot collect, and that includes the legacy
+  // band nobody can pick any more but plenty of rows still carry (B95).
+  ok("the legacy under-16 band cannot redeem", CANNOT_REDEEM.includes("under16"));
+  ok("…and neither can 13-17", CANNOT_REDEEM.includes("teen"));
   ok("…but an adult can", !CANNOT_REDEEM.includes("adult"));
 
   const b = await measureBreakage(await getDb());

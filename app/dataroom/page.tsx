@@ -26,7 +26,7 @@ export default async function DataroomPage() {
         <div className="text-xs uppercase tracking-widest text-cyan-300">ClusterGG</div>
         <h1 className="text-3xl sm:text-5xl font-black mt-2 leading-tight">Data room</h1>
         <p className="text-muted mt-4 text-lg leading-relaxed">
-          Everything we&apos;d send you, with the numbers read from production rather than typed into a slide.
+          Everything we&apos;d send you, with the traction read from production rather than typed into a slide.
           Open a document and it shows you today.
         </p>
       </header>
@@ -79,9 +79,26 @@ export default async function DataroomPage() {
         </div>
       )}
 
-      <p className="text-xs text-muted mt-10">
-        Every figure in these documents is counted from production when you load them. Nothing is modelled or
-        projected. If a number looks small, it is small — we&apos;d rather you saw that than a chart.
+      {/* B110. THIS PARAGRAPH USED TO BE FALSE, and it was false in the worst
+          possible room. It read: "Every figure in these documents is counted
+          from production when you load them. Nothing is modelled or projected."
+          The deck underneath it contains a six-month plan, a free-to-paid
+          conversion assumption, a cost-per-server rate and an MRR run-rate —
+          all projections, and all labelled as such INSIDE the deck, which had
+          the honesty the front page then took away.
+          It also quoted a rate card we had stopped charging (see B110), so the
+          one blanket promise the page made was the one thing it could not keep.
+          Two sentences now, because there are two kinds of number. */}
+      <p className="text-xs text-muted mt-10 max-w-3xl leading-relaxed">
+        <b className="text-ink">Counted:</b> every traction figure — gamers, servers, linked accounts, live
+        challenges — and every price is read from production the moment you load the page. Nothing about what we
+        have done is typed into a slide.
+      </p>
+      <p className="text-xs text-muted mt-2 max-w-3xl leading-relaxed">
+        <b className="text-ink">Planned:</b> the raise, the six-month plan and anything with a date in the future
+        is a projection. Every one of them carries its assumption on the same line, and the deck has a slide that
+        says which assumptions would break it. If a number looks small, it is small — we&apos;d rather you saw
+        that than a chart.
       </p>
     </div>
   );

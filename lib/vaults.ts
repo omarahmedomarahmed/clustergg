@@ -1,6 +1,6 @@
 // The four vaults, and the rule that makes them mean anything.
 //
-// `docs/COMMERCIAL_MODEL_V2.md` §3. Every payout comes out of a vault that money
+// `docs/MODEL.md` §3. Every payout comes out of a vault that money
 // has actually arrived in, and a vault's balance is a SUM OF ROWS — never a
 // stored number somebody edits.
 //

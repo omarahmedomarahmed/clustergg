@@ -774,6 +774,31 @@ function Pill({ children, color = MUTED, bg = "rgba(255,255,255,0.07)", size = 2
   );
 }
 
+/**
+ * A check mark, drawn out of borders. B96.
+ *
+ * NOT the character ✓ and not an SVG. The card fonts are loaded explicitly and
+ * a glyph that is missing from them renders as a blank box on the one surface
+ * we cannot inspect after the fact — a PNG already posted in somebody's server.
+ * Two borders on a rotated box is geometry, so it draws identically wherever
+ * this runs and in whatever colour it is handed.
+ */
+function Tick({ color, size = 16 }: { color: string; size?: number }) {
+  const c = safeColor(color, "#fbbf24");
+  return (
+    <div style={{ display: "flex", width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <div style={{
+        display: "flex",
+        width: size * 0.42, height: size * 0.78,
+        marginTop: -size * 0.16,
+        borderRight: `${Math.max(2, size * 0.16)}px solid ${c}`,
+        borderBottom: `${Math.max(2, size * 0.16)}px solid ${c}`,
+        transform: "rotate(45deg)",
+      }} />
+    </div>
+  );
+}
+
 function Avatar({ url, size = 104, ring: raw }: { url?: string | null; size?: number; ring: string }) {
   const ring = safeColor(raw);
   return url ? (
@@ -902,6 +927,19 @@ function ProfileBody(d: ProfileCard) {
               {`${nf(d.votes)} votes`}
             </Pill>
             {d.award ? <Pill color="#34d399" bg="rgba(52,211,153,0.12)" size={pStats.f(19)}>{clamp(d.award, 22)}</Pill> : null}
+            {/* B96. The country and the confirmed tick, in that order, because
+                the flag is the one a stranger actually reads. Both are drawn
+                only when there is something to draw — see ProfileCard.mark. */}
+            {d.country ? (
+              <Pill color={t.accent} bg={alpha(t.accent, 0.12, FALLBACK_ACCENT)} size={pStats.f(19)}>
+                {d.country.toUpperCase()}
+              </Pill>
+            ) : null}
+            {d.mark ? (
+              <Pill color={d.mark.color} bg={alpha(d.mark.color, 0.14, "#fbbf24")} size={pStats.f(19)}>
+                <Tick color={d.mark.color} size={pStats.f(16)} />
+              </Pill>
+            ) : null}
           </Section>
 
           <Section p={pAccounts} style={{ marginTop: 14, gap: 8 }}>

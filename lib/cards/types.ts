@@ -67,6 +67,17 @@ export type ProfileCard = {
   avatarUrl?: string | null;
   title?: string | null;
   country?: string | null;
+  /**
+   * The confirmed check mark, or null. B96.
+   *
+   * A COLOUR AND NOTHING ELSE — gold for 18+, blue under it. The card never
+   * prints an age, a range or the word for either; a badge reading "13-17" on a
+   * card that gets posted in public Discord channels is a flag for exactly the
+   * people you would least like reading it. Null when the gamer has switched
+   * the mark off, and null draws nothing at all rather than a grey placeholder,
+   * because a placeholder is itself a disclosure.
+   */
+  mark?: { color: string } | null;
   totalCp: number;
   level: number;
   views: number;

@@ -31,7 +31,6 @@ const STAT_CATALOG: { key: string; label: string; icon: string; href: (slug: str
   { key: "views", label: "Profile views", icon: "eye", href: (s) => `/u/${s}` },
   { key: "games", label: "Games linked", icon: "gamepad", href: () => "/profile" },
   { key: "challenges", label: "Challenges joined", icon: "zap", href: () => "/planets" },
-  { key: "posts", label: "Posts", icon: "message", href: (s) => `/u/${s}` },
 ];
 const DEFAULT_STATS = ["cp", "quests", "followers", "games"];
 

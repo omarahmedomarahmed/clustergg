@@ -3,7 +3,7 @@ import { getDb } from "@/lib/db";
 import { getServerBySlugOrId } from "@/lib/server-portal";
 import { getBrandBySlugOrId } from "@/lib/brands";
 import { grantPortalSession, verifyPortalKey, clearThrottle, MAX_FAILURES } from "@/lib/portal-auth";
-import { lockState, recordAttempt } from "@/lib/portal-attempts";
+import { lockState, ipLockState, recordAttempt } from "@/lib/portal-attempts";
 
 export const dynamic = "force-dynamic";
 
@@ -78,11 +78,26 @@ async function unlock(req: NextRequest, kind: string, slug: string, key: string,
 
   // Locked out? Answer before looking at the key at all. Checking it first
   // would let an attacker keep testing keys and simply ignore the response.
-  const lock = await lockState(kind, portal.id);
-  if (lock.locked) {
+  //
+  // TWO LOCKS, and they answer different questions. B103.
+  //
+  //   lockState    is this PORTAL under attack — five wrong keys at one server.
+  //   ipLockState  is this PERSON attacking — fifteen wrong keys from one
+  //                address, whichever portals they were aimed at.
+  //
+  // The second is the one that matters against a spray: four guesses each at
+  // two hundred servers never trips a per-portal counter, which made guessing
+  // free at exactly the scale somebody would actually use.
+  const [lock, ipLock] = await Promise.all([
+    lockState(kind, portal.id),
+    ipLockState(who.ip),
+  ]);
+  if (lock.locked || ipLock.locked) {
     await recordAttempt(kind, portal.id, portal.name, false, who);
     dest.searchParams.set("unlock", "throttled");
-    dest.searchParams.set("mins", String(Math.max(1, Math.ceil(lock.retryInMs / 60000))));
+    dest.searchParams.set("mins", String(Math.max(1, Math.ceil(
+      Math.max(lock.retryInMs, ipLock.retryInMs) / 60000,
+    ))));
     return NextResponse.redirect(dest);
   }
 

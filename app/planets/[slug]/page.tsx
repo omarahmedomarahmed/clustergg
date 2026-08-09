@@ -11,13 +11,11 @@ import Avatar from "@/components/Avatar";
 import Icon from "@/components/Icon";
 import AdSlot from "@/components/AdSlot";
 import LeaderboardWidget from "@/components/LeaderboardWidget";
-import PostCard from "@/components/PostCard";
 import JoinSpaceButton from "@/components/JoinSpaceButton";
 import HeroStage from "@/components/HeroStage";
 import GameDirectory from "@/components/GameDirectory";
 import ChallengePointsButton from "@/components/ChallengeLog";
 import Countdown from "@/components/Countdown";
-import { createPost } from "@/app/actions/social";
 import { getContent } from "@/lib/cms";
 import { timeAgo } from "@/lib/utils";
 import { slimImg, optImg } from "@/lib/img";
@@ -69,13 +67,7 @@ export default async function PlanetPage({
   const providerIds = gameProviders.map((p) => p.id);
   const cms = await getContent(["banner.games", "banner.arena"]);
 
-  const [posts, membership, challenges, boards, players, expertRows] = await Promise.all([
-    db.select({ post: schema.posts, author: schema.publicUserColumns })
-      .from(schema.posts)
-      .innerJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
-      .where(and(eq(schema.posts.spaceId, space.id), sql`${schema.posts.deletedAt} IS NULL`))
-      .orderBy(desc(schema.posts.isPinned), desc(schema.posts.createdAt))
-      .limit(30),
+  const [membership, challenges, boards, players] = await Promise.all([
     viewer
       ? db.select().from(schema.spaceMembers).where(and(
           eq(schema.spaceMembers.spaceId, space.id), eq(schema.spaceMembers.userId, viewer.id))).limit(1)
@@ -94,10 +86,8 @@ export default async function PlanetPage({
           .where(and(inArray(schema.linkedGameAccounts.provider, providerIds), eq(schema.users.status, "active")))
           .limit(12)
       : Promise.resolve([]),
-    db.select().from(schema.spaceExpertScores).where(eq(schema.spaceExpertScores.spaceId, space.id)),
   ]);
 
-  const tierByUser = new Map(expertRows.map((r) => [r.userId, r.tier]));
   const path = `/planets/${space.slug}`;
   const cover = slimImg(game?.coverUrl, 400000) ?? cms["banner.games"];
   const activeChallenges = challenges.filter((c) => c.status === "active");
@@ -226,7 +216,6 @@ export default async function PlanetPage({
             <p className="text-muted mt-2 max-w-xl">{space.description}</p>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
               <span className="inline-flex items-center gap-1.5"><Icon name="users" size={12} /> {space.memberCount} members</span>
-              <span className="inline-flex items-center gap-1.5"><Icon name="message" size={12} /> {space.postCount} posts</span>
               {gameProviders.map((p) => (
                 <span key={p.id} className={`rounded-full px-2.5 py-1 border ${isProviderLive(p) ? "border-emerald-400/40 text-emerald-300" : "border-amber-400/30 text-amber-300/80"}`}>
                   {p.name} {isProviderLive(p) ? "· live" : "· key ready"}
@@ -452,33 +441,9 @@ export default async function PlanetPage({
             {game && <GameDirectory game={game.name} />}
 
             {/* Community feed */}
-            <section>
-              <h2 className="text-xl font-bold mb-4 flex items-center gap-2"><Icon name="users" size={20} className="text-violet-300" /> Community</h2>
-              {viewer ? (
-                <form action={createPost.bind(null, space.id, space.slug)} className="glass p-4 mb-6">
-                  <textarea name="body" rows={3} required maxLength={5000} placeholder={`Transmit to ${space.name}…`} className="input-cosmic resize-none" />
-                  <div className="mt-3 flex justify-end">
-                    <button className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Post</button>
-                  </div>
-                </form>
-              ) : (
-                <div className="glass p-5 mb-6 text-center">
-                  <div className="text-sm text-muted mb-3">Sign in with Discord to join {space.name} and post on this planet.</div>
-                  <div className="mx-auto max-w-xs"><OAuthButtons next={path} /></div>
-                </div>
-              )}
-              <div className="space-y-4">
-                {posts.length === 0 && (
-                  <div className="glass p-10 text-center text-muted">Silence in this sector… be the first to transmit.</div>
-                )}
-                {posts.map(({ post, author }, i) => (
-                  <div key={post.id}>
-                    <PostCard post={post} author={author} viewerId={viewer?.id ?? null} path={path} expertTier={tierByUser.get(author.id)} />
-                    {(i + 1) % 6 === 0 && i + 1 < posts.length && <div className="mt-4"><AdSlot placement="feed_inline" /></div>}
-                  </div>
-                ))}
-              </div>
-            </section>
+            {/* B111. The Community feed — composer, posts, comments,
+                reactions — is gone. The planet is a competition page: its
+                challenges, its leaderboards and the people playing it. */}
           </div>
 
           {/* Rail */}

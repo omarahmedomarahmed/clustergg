@@ -221,6 +221,9 @@ async function seedServerScale(db: any) {
       // 520 are the population every count, cap and payout demo is computed
       // from.
       ageBand: "adult", ageBandSetAt: new Date(),
+      // B94 — these have to MEET the onboarding bar, not merely carry the
+      // stamp, or the de-grandfathering migration lifts it back off them.
+      country: "US", emailVerifiedAt: new Date(),
       unlockedAt: new Date(),
     });
     members.push({

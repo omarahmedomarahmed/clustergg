@@ -64,7 +64,56 @@ const nextConfig: NextConfig = {
     "/**": ["./node_modules/@electric-sql/pglite/dist/**"],
   },
   images: {
-    remotePatterns: [{ protocol: "https", hostname: "**" }],
+    // ===== B103: NOT `hostname: "**"` =====
+    //
+    // It was. That makes `/_next/image?url=…` an OPEN IMAGE PROXY: anybody can
+    // fetch any https URL on the internet through our domain and our bill.
+    // Three things it costs, in order of how much they cost:
+    //
+    //   1. Bandwidth and Fast Origin Transfer, which is metered and is ours.
+    //   2. Laundering. Content served from clustergg.com is content people
+    //      reasonably believe came from us — including content we would never
+    //      host, sitting behind our TLS certificate.
+    //   3. A fetch primitive pointed wherever somebody likes, from inside our
+    //      network, with our egress address.
+    //
+    // So it is a LIST, and adding to it is a deliberate act. Anything not here
+    // renders as a broken image rather than as a proxy — a visible failure on
+    // one picture, which is the cheap end of getting this wrong. The expensive
+    // end is the other way round.
+    //
+    // `EXTRA_IMAGE_HOSTS` is a comma-separated escape hatch for a deployment
+    // with its own CDN, so nobody has to edit and redeploy this file to add one
+    // — and so nobody reaches for `**` again when they are in a hurry.
+    remotePatterns: [
+      // Our own storage. Blob mints a new URL per upload, which is why the
+      // cache TTL below can be a month.
+      { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
+      // Art generated for us, and the older bucket it used to land in.
+      { protocol: "https", hostname: "d8j0ntlcm91z4.cloudfront.net" },
+      { protocol: "https", hostname: "d3u0tzju9qaucj.cloudfront.net" },
+      // Discord: avatars, server icons, attachments the bot renders.
+      { protocol: "https", hostname: "cdn.discordapp.com" },
+      { protocol: "https", hostname: "media.discordapp.net" },
+      // Game providers whose art we show beside a linked account.
+      { protocol: "https", hostname: "ddragon.leagueoflegends.com" },
+      { protocol: "https", hostname: "*.rgapi.com" },
+      { protocol: "https", hostname: "avatars.steamstatic.com" },
+      { protocol: "https", hostname: "*.akamai.steamstatic.com" },
+      { protocol: "https", hostname: "cdn.cloudflare.steamstatic.com" },
+      { protocol: "https", hostname: "steamcdn-a.akamaihd.net" },
+      { protocol: "https", hostname: "osu.ppy.sh" },
+      { protocol: "https", hostname: "a.ppy.sh" },
+      { protocol: "https", hostname: "lichess1.org" },
+      { protocol: "https", hostname: "images.chesscomfiles.com" },
+      { protocol: "https", hostname: "tr.rbxcdn.com" },
+      { protocol: "https", hostname: "fortnite-api.com" },
+      { protocol: "https", hostname: "media.fortniteapi.io" },
+      { protocol: "https", hostname: "www.speedrun.com" },
+      ...(process.env.EXTRA_IMAGE_HOSTS ?? "")
+        .split(",").map((h) => h.trim()).filter(Boolean)
+        .map((hostname) => ({ protocol: "https" as const, hostname })),
+    ],
     // Every Blob read counts against Fast Origin Transfer (10 GB on Hobby), and
     // Next's default only caches an optimized image for 60 SECONDS — so a
     // background on a busy page gets re-fetched from Blob and re-encoded every

@@ -1,8 +1,10 @@
 import { and, eq, inArray, desc } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { stackTrophies } from "@/lib/trophy-stack";
 import { getProvider, PROVIDERS } from "@/lib/providers/registry";
 import { getUserQuests, getTotalCp } from "@/lib/quests";
 import { levelFromCp } from "@/lib/level";
+import { markFor } from "@/lib/verified-mark";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys } from "@/lib/card-bg";
 import type { CardData, CardTheme } from "@/lib/cards/types";
@@ -83,6 +85,7 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     avatarUrl: user.avatarUrl,
     title: user.title,
     country: user.country,
+    mark: markFor(user),
     totalCp,
     level: levelFromCp(totalCp).level,
     views: user.profileViews ?? 0,
@@ -115,18 +118,22 @@ export async function profileCard(slug: string): Promise<CardData | null> {
     // of the same picture read as a bug, and the count is the impressive part.
     // Keyed on name+image rather than on the trophy id, because two rows can be
     // the same prize re-issued, and a gamer does not care which id it was.
-    trophies: (() => {
-      const by = new Map<string, { name: string; imageUrl: string; value: number; count: number; at: number }>();
-      for (const t of won) {
-        const key = `${t.name}::${t.imageUrl}`;
-        const hit = by.get(key);
-        if (hit) { hit.count += 1; hit.at = Math.max(hit.at, t.awardedAt.getTime()); }
-        else by.set(key, { name: t.name, imageUrl: t.imageUrl, value: t.value, count: 1, at: t.awardedAt.getTime() });
-      }
-      return [...by.values()]
-        .sort((a, b) => (b.value - a.value) || (b.at - a.at))
-        .map(({ name, imageUrl, value, count }) => ({ name, imageUrl, value, count }));
-    })(),
+    //
+    // B62.1: this `reduce` used to live here and only here, which is how the
+    // bot card stacked while the website drew three identical tiles for the
+    // same gamer. It is now `stackTrophies` in `lib/trophy-stack.ts`, shared by
+    // the card, the public profile and the redeem shelf — one key, one answer.
+    trophies: stackTrophies(
+      won.map((t) => ({
+        id: `${t.name}::${t.imageUrl}::${t.awardedAt.getTime()}`,
+        name: t.name, imageUrl: t.imageUrl, value: t.value,
+        awardedAt: t.awardedAt.toISOString(),
+      })),
+    )
+      // Most valuable first, then most recent. The card has room for a handful,
+      // so which handful is the whole decision.
+      .sort((a, b) => (b.value - a.value) || (b.awardedAt < a.awardedAt ? -1 : 1))
+      .map(({ name, imageUrl, value, count }) => ({ name, imageUrl, value, count })),
     // The TOTAL held, which is still the honest number for the heading — a
     // gamer with three of one trophy and two of another has five.
     trophyCount: won.length,

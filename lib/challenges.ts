@@ -27,7 +27,7 @@ export type JoinResult =
   }
   | {
     ok: false;
-    reason: "not_found" | "not_active" | "no_account" | "gated" | "locked" | "bad_key" | "requirements";
+    reason: "not_found" | "not_active" | "no_account" | "gated" | "locked" | "bad_key" | "requirements" | "onboarding";
     /** For "requirements": the entry rules this account doesn't meet, in plain English. */
     unmet?: string[];
   };
@@ -173,6 +173,22 @@ export async function joinChallengeFor(
     .where(eq(schema.challenges.id, challengeId)).limit(1);
   if (!challenge) return { ok: false, reason: "not_found" };
   if (challenge.status !== "active") return { ok: false, reason: "not_active" };
+
+  // ===== B94: FINISH SETTING UP BEFORE YOU CAN ENTER =====
+  //
+  // The hole this closes: a half-onboarded account could enter a competition
+  // and WIN A REAL TROPHY while we still did not know their age or their
+  // country — the two facts that decide whether that trophy can ever be paid.
+  // The prize would sit on a profile we cannot pay, and the first anybody heard
+  // of it would be the day they tried to collect.
+  //
+  // Checked HERE rather than on the button, because the button is not the only
+  // way in: Discord has one too.
+  {
+    const { unlockState } = await import("@/lib/unlock");
+    const state = await unlockState(db, userId);
+    if (!state.unlocked) return { ok: false, reason: "onboarding" };
+  }
 
   // Server-gated: anyone can watch, only key-holders can enter. The key was
   // sent to the server the challenge belongs to, which is what makes it that

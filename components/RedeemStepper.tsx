@@ -287,8 +287,8 @@ export default function RedeemStepper({
             {(needs.includes("age") || !knowsAge) && (
               <fieldset className="block">
                 <legend className="mb-1 block text-[11px] font-semibold text-muted">Your age range</legend>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[["under16", "Under 16"], ["teen", "16–17"], ["adult", "18+"]].map(([v, label]) => (
+                <div className="grid grid-cols-2 gap-1.5">
+                  {[["teen", "13–17"], ["adult", "18+"]].map(([v, label]) => (
                     <button key={v} type="button" onClick={() => setAgeBand(v)}
                       className={`rounded-xl border px-2 py-2 text-xs font-bold transition ${
                         ageBand === v ? "border-emerald-400/50 bg-emerald-500/15 text-emerald-100"

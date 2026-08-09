@@ -695,21 +695,26 @@ async function awardQuestActionLocked(
       room = Math.min(room, passiveRoom);
     }
 
-    // The onboarding cap. B83.
-    //
-    // A gamer who has not finished onboarding accrues up to `LOCKED_CP_CAP` and
-    // stops. It narrows `room` rather than refusing the action, for the same
-    // reason the daily ceiling does: the event is still WRITTEN, so nothing
-    // looks like it vanished, and a gamer sitting at 4,990 gets their last 10
-    // CP instead of a 25-CP action being refused outright and the number
-    // reading 4,990 forever.
+    // The onboarding gate. B83 → B94.
     //
     // Applied here, once, beside the ceiling — not at each emitter. Same rule
-    // as B72.4's age gate, same reason.
+    // as B72.4's age gate, same reason: a gate that has to be remembered at
+    // twenty call sites will be forgotten at one of them.
     {
-      const { unlockState, creditableWhileLocked } = await import("@/lib/unlock");
+      // B94: NOTHING ACCRUES BEFORE ONBOARDING IS FINISHED.
+      //
+      // It used to accrue to a cap, on the theory that a balance somebody can
+      // see is a reason to finish. In practice it created a number we then had
+      // to explain on three screens, a promise about points that were not
+      // spendable, and a gamer who could win a real trophy while we still did
+      // not know their age or country.
+      //
+      // Simpler and honest: an unfinished account earns nothing. The event is
+      // still WRITTEN — so nothing looks like it vanished and the history is
+      // there the moment they finish — it is simply worth zero CP.
+      const { unlockState } = await import("@/lib/unlock");
       const state = await unlockState(db, userId);
-      if (!state.unlocked) room = Math.min(room, creditableWhileLocked(state, room));
+      if (!state.unlocked) room = 0;
     }
     // Set the moment any quest records this action, so the second listener pays
     // nothing however it is ordered.

@@ -70,6 +70,10 @@ export default async function Footer() {
             <Link href="/rules/gamer" className="text-muted hover:text-ink">If you play</Link>
             <Link href="/rules/owner" className="text-muted hover:text-ink">If you run a server</Link>
             <Link href="/rules/brand" className="text-muted hover:text-ink">If you buy</Link>
+            {/* B99. The pool sits with the rules because it is the same promise
+                in numbers: the rules say how an owner is paid, and this is the
+                money actually being divided this week. */}
+            <Link href="/pool" className="font-semibold text-emerald-300 hover:text-emerald-200">This week&apos;s pool →</Link>
             <span className="text-muted/70">
               Every figure on those pages is read from the code that enforces it.
             </span>

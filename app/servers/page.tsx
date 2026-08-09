@@ -6,6 +6,7 @@ import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
 import { buildPricing, money, perGame, prizeSharePct, PRICING_NUMBER_KEYS } from "@/lib/pricing";
 import ServerEarnCards from "@/components/ServerEarnCards";
+import LiveBotCard from "@/components/marketing/LiveBotCard";
 import EarnCurve from "@/components/viz/EarnCurve";
 import Icon from "@/components/Icon";
 
@@ -75,6 +76,17 @@ export default async function ServersDirectoryPage() {
               networkGamers={stats.linked}
               title="What your members are playing for"
               subtitle="Every gamer who links an account puts your community into more of the weekly prize money — that part is won by your players. Your own share of what the brand paid rises separately, in steps, on the ladder above."
+            />
+          </div>
+
+          {/* B109. What actually shows up in their channel. An owner deciding
+              whether to install is deciding whether this belongs in their
+              server, and no amount of copy answers that question. */}
+          <div className="mt-10">
+            <LiveBotCard
+              kind="week"
+              caption="Profile of the Week — voting is open."
+              className="max-w-2xl"
             />
           </div>
 

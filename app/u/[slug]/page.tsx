@@ -20,6 +20,8 @@ import Flag from "@/components/Flag";
 import { getT } from "@/lib/i18n/t-server";
 import GameLogo from "@/components/GameLogo";
 import Icon from "@/components/Icon";
+import VerifiedMarkIcon from "@/components/VerifiedMark";
+import { markFor } from "@/lib/verified-mark";
 import FollowButton from "@/components/FollowButton";
 import AdSlot from "@/components/AdSlot";
 import ProfileAccounts from "@/components/ProfileAccounts";
@@ -29,7 +31,7 @@ import QuestCard from "@/components/QuestCard";
 import CpIcon from "@/components/CpIcon";
 import VoteButton from "@/components/VoteButton";
 import { getUserQuests } from "@/lib/quests";
-import { getTrophyCase, getMyRedeems } from "@/lib/trophies";
+import { getTrophyCase, getMyRedeems, stackTrophies } from "@/lib/trophies";
 import TrophyCase from "@/components/TrophyCase";
 import { localizeQuest } from "@/lib/i18n/entities";
 import { levelFromCp } from "@/lib/level";
@@ -126,15 +128,11 @@ export default async function ProfilePage({ params }: Props) {
   const vars = themeToVars(theme) as React.CSSProperties;
   const cardCls = `p-card p-card-${theme.cardStyle}`;
 
-  const [accounts, [followerRow], [followingRow], isFollowingRow, recentPosts, participations, allBoards, spaceRows] = await Promise.all([
+  const [accounts, [followerRow], [followingRow], isFollowingRow, participations, allBoards, spaceRows] = await Promise.all([
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followingId, user.id)),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followerId, user.id)),
     viewer ? db.select().from(schema.follows).where(and(eq(schema.follows.followerId, viewer.id), eq(schema.follows.followingId, user.id))).limit(1) : Promise.resolve([]),
-    db.select({ post: schema.posts, space: schema.spaces }).from(schema.posts)
-      .innerJoin(schema.spaces, eq(schema.posts.spaceId, schema.spaces.id))
-      .where(and(eq(schema.posts.authorId, user.id), sql`${schema.posts.deletedAt} IS NULL`))
-      .orderBy(desc(schema.posts.createdAt)).limit(5),
     db.select({ p: schema.challengeParticipants, c: schema.challenges }).from(schema.challengeParticipants)
       .innerJoin(schema.challenges, eq(schema.challengeParticipants.challengeId, schema.challenges.id))
       .where(eq(schema.challengeParticipants.userId, user.id)).orderBy(desc(schema.challengeParticipants.joinedAt)).limit(8),
@@ -263,9 +261,28 @@ export default async function ProfilePage({ params }: Props) {
                 )}
               </div>
             </div>
+            {/* B62.1. STACKED. Three copies of one trophy used to be three
+                identical tiles in a row, which reads as a rendering bug rather
+                than an achievement — and the count is the impressive part.
+                The bot card has stacked since B62; this surface had not, so the
+                same gamer's shelf looked different depending where you saw it.
+                One rule now, in `stackTrophies`.
+
+                Still no price, which was already true here and is the other
+                half of B62: a profile is a brag and a shelf is a shop. A cash
+                figure turns a trophy case into a receipt. The value lives in
+                the redeem flow, where it is deciding something. */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {trophyShelf.map((a) => (
-                <div key={a.id} className={`${cardCls} text-center`}>
+              {stackTrophies(trophyShelf).map((a) => (
+                <div key={a.id} className={`${cardCls} text-center relative`}>
+                  {a.count > 1 && (
+                    <span
+                      className="absolute top-2 right-2 rounded-full px-2 py-0.5 text-[11px] font-black"
+                      style={{ background: theme.accent2, color: "#0b1020" }}
+                    >
+                      ×{a.count}
+                    </span>
+                  )}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={a.imageUrl} alt={a.name} className="mx-auto h-32 object-contain float-y" />
                   <div className="mt-2 text-xs font-bold" style={{ color: theme.accent2 }}>{a.placement === 1 ? tr("CHAMPION") : `#${a.placement} ${tr("PLACE")}`}</div>
@@ -315,21 +332,12 @@ export default async function ProfilePage({ params }: Props) {
             </div>
           </section>
         );
+      // B111. "Recent posts" was here. The section key stays in the layout
+        // type so a saved profile layout that still lists it does not break —
+        // it simply renders nothing, which is what it should have done for
+        // anybody with no posts anyway.
       case "activity":
-        if (!S.activity || recentPosts.length === 0) return null;
-        return (
-          <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="message" size={19} style={{ color: theme.accent }} /> {poss} {tr("recent posts")}</h2>
-            <div className="space-y-2">
-              {recentPosts.map(({ post, space }) => (
-                <Link key={post.id} href={`/planets/${space.slug}`} className={`${cardCls} block`}>
-                  <div className="text-xs p-muted mb-1">{space.name} · {timeAgo(post.createdAt)}</div>
-                  <p className="text-sm line-clamp-2" style={{ color: theme.text }}>{post.body}</p>
-                </Link>
-              ))}
-            </div>
-          </section>
-        );
+        return null;
       case "spaces":
         if (!S.spaces || spaceRows.length === 0) return null;
         return (
@@ -424,7 +432,10 @@ export default async function ProfilePage({ params }: Props) {
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold flex items-center justify-center sm:justify-start gap-2 flex-wrap break-words" style={{ color: theme.text }}>
               {user.displayName}
               {user.country && <Flag code={user.country} className="text-2xl sm:text-3xl" title={user.country} />}
-              {user.isVerified && <Icon name="check" size={20} strokeWidth={3} style={{ color: theme.accent2 }} />}
+              {/* B96. The confirmed mark — gold at 18+, blue under it, and
+                  nothing at all when the gamer has switched it off. It never
+                  writes an age out; see lib/verified-mark.ts. */}
+              <VerifiedMarkIcon mark={markFor(user)} size={22} />
             </h1>
             {user.title && <div className="text-base sm:text-lg font-semibold p-grad">{user.title}</div>}
             {user.discordUsername && <div className="mt-1.5 flex justify-center sm:justify-start"><DiscordTag username={user.discordUsername} size="md" /></div>}

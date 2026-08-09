@@ -154,45 +154,52 @@ ok("somebody under the line is still LISTED, not filtered out", !!under);
 ok("…and not flagged", under?.overThreshold === false);
 ok("the list is sorted by what we paid", list.every((r, i) => i === 0 || list[i - 1].total >= r.total));
 
-console.log("\n== the age BAND, and what each one may do (B72.4) ==");
+console.log("\n== the age BAND, and what each one may do (B72.4 → B95) ==");
 {
-  const { AGE_BANDS, BAND_RULES, rulesFor, parseBand, changeBand, MAX_BAND_CHANGES } =
+  const { AGE_BANDS, LEGACY_BANDS, BAND_RULES, rulesFor, parseBand, changeBand, MAX_BAND_CHANGES } =
     await import("../../lib/age.ts");
   const { ageForBand } = await import("../../lib/eligibility.ts");
 
-  eq("three bands, and the line is 16", [...AGE_BANDS], ["under16", "teen", "adult"]);
+  // TWO selectable bands, and the missing one is the point of B95. A picker
+  // containing "Under 13" teaches a twelve-year-old to press one of the others;
+  // the way out is a link that deletes the account, not a third button.
+  eq("two bands a gamer can pick", [...AGE_BANDS], ["teen", "adult"]);
+  ok("…and under-13 is not one of them",
+    !(AGE_BANDS as readonly string[]).some((b) => /13|child|kid/i.test(b)));
+  ok("…and cannot be stored as one either", parseBand("under13") === null);
+  eq("the old bottom band still exists to be READ", [...LEGACY_BANDS], ["under16"]);
+  ok("…and cannot be written any more", parseBand("under16") === null);
 
   // THE assertion. An unanswered band is not a permissive default.
   const unset = rulesFor(null);
   ok("nobody who has not answered can earn", !unset.earn && !unset.play && !unset.redeem);
 
-  ok("under 16 is read-only", !BAND_RULES.under16.play && !BAND_RULES.under16.earn && !BAND_RULES.under16.redeem);
-  ok("16-17 plays and earns", BAND_RULES.teen.play && BAND_RULES.teen.earn);
+  ok("the legacy bottom band is read-only", !BAND_RULES.under16.play && !BAND_RULES.under16.earn && !BAND_RULES.under16.redeem);
+  ok("13-17 plays and earns", BAND_RULES.teen.play && BAND_RULES.teen.earn);
   ok("…but cannot cash out", !BAND_RULES.teen.redeem);
   ok("18+ can do everything", Object.values(BAND_RULES.adult).every(Boolean));
 
   // A band maps to the LOWEST age it could mean. Rounding up would pay somebody
   // on the strength of an age they never claimed.
-  eq("a band becomes its lowest possible age", [ageForBand("under16"), ageForBand("teen"), ageForBand("adult")], [0, 16, 18]);
+  eq("a band becomes its lowest possible age", [ageForBand("under16"), ageForBand("teen"), ageForBand("adult")], [0, 13, 18]);
   eq("…and an unset band is not an age at all", ageForBand(null), null);
-  ok("16-17 therefore FAILS the redeem check", !eligibilityOf(ageForBand("teen"), "US").ok);
+  ok("13-17 therefore FAILS the redeem check", !eligibilityOf(ageForBand("teen"), "US").ok);
   ok("…and 18+ passes it", eligibilityOf(ageForBand("adult"), "US").ok);
 
   eq("junk is not a band", parseBand("nineteen"), null);
 
-  // The correction path. A band asked in one click WILL be mis-tapped, and a
-  // mis-tap onto under-16 turns off the whole product.
-  ok("answering for the first time is allowed", changeBand(null, 0, "under16").ok);
-  ok("…and does not count as a change", changeBand(null, 0, "under16").ok
-    && (changeBand(null, 0, "under16") as { locked: boolean }).locked === false);
-  ok("a correction is allowed", changeBand("under16", 0, "adult").ok);
-  ok("…and so is the third", changeBand("under16", MAX_BAND_CHANGES - 1, "adult").ok);
-  ok("the fourth is refused", !changeBand("under16", MAX_BAND_CHANGES, "adult").ok);
-  ok("…with a message that says what to do",
-    /support/i.test((changeBand("under16", MAX_BAND_CHANGES, "adult") as { error: string }).error));
-  // Re-picking what you already have is not a change, so a locked gamer is not
-  // shown an error for touching their own current answer.
-  ok("re-picking the same band is not refused when locked",
+  // ANSWERED ONCE. B95 took the self-serve change away: the onboarding page
+  // designed the mis-tap out (select → read what it means → confirm), which
+  // left the change budget doing one thing only, which was letting a teenager
+  // pick "18 or over" on the day they wanted to cash out.
+  eq("there is no self-serve change budget", MAX_BAND_CHANGES, 0);
+  ok("answering for the first time is allowed", changeBand(null, 0, "adult").ok);
+  ok("changing it afterwards is refused", !changeBand("teen", 0, "adult").ok);
+  ok("…with a message that says where to go instead",
+    /support/i.test((changeBand("teen", 0, "adult") as { error: string }).error));
+  // Re-picking what you already have is not a change, so somebody touching
+  // their own current answer is not shown an error.
+  ok("re-picking the same band is not refused",
     changeBand("adult", MAX_BAND_CHANGES, "adult").ok);
 }
 
@@ -227,16 +234,40 @@ console.log("\n== somebody is actually ASKED ==");
   // seeing the question. The root layout asks, so skipping onboarding cannot
   // skip it.
   const layout = raw("app/layout.tsx");
-  ok("the root layout renders the gate", /<AgeGate \/>/.test(layout));
-  ok("…only when the band is unset", /!me\.ageBand/.test(layout));
-  ok("…and never inside an embed", /!embedded && <AgeGate/.test(layout));
-  ok("the gate is answerable in place", /AgeBandPicker/.test(raw("components/AgeGate.tsx")));
-  // Answering revalidates the LAYOUT, not a list of pages — otherwise the
-  // "nothing is earning" bar survives on every other page after they answered.
-  ok("answering clears it everywhere", /revalidatePath\("\/", "layout"\)/.test(raw("app/actions/age.ts")));
-  // The layout reads the band off `getCurrentUser`, whose projection is partial
-  // while its TYPE is the full row — a column left out reads `undefined` and
-  // would make every gamer look unanswered forever.
+  // INVERTED IN B93, and the inversion is an upgrade.
+  //
+  // This used to assert that the root layout renders `<AgeGate />`. That gate
+  // asked the age question in three options with no consequence shown, and it
+  // rendered ON TOP of the onboarding page that was asking the same thing — one
+  // screen, one fact, two different questions.
+  //
+  // What guarantees somebody is asked now is `OnboardingBar`: it renders on
+  // every page for anybody who has not finished, and links to the page that
+  // asks properly. It covers all three steps rather than only the band, so the
+  // guarantee is wider than the one it replaced.
+  ok("the root layout follows an unfinished account everywhere",
+    /<OnboardingBar \/>/.test(layout));
+  ok("…and the age gate it replaced is gone", !/<AgeGate \/>/.test(layout));
+  ok("the bar only appears while something is unfinished",
+    /if \(state\.unlocked\) return null;/.test(raw("components/OnboardingBar.tsx")));
+  ok("…and it is the band-and-country step it points at",
+    /key: "profile"/.test(raw("lib/unlock.ts")));
+  // The question is answerable where it is asked, with what the choice means
+  // shown BEFORE it is saved — the thing the old three-option banner never did.
+  const profileStep = raw("components/onboarding/ProfileStep.tsx");
+  ok("the age question is answerable on the onboarding page", /ageBand/.test(profileStep));
+  ok("…in two options, not five", /13 to 17/.test(profileStep) && /18 or over/.test(profileStep));
+  // B95. Under-13 is reachable and is NOT a third button — it is a link that
+  // ends in a deletion, which is the only honest place it can go.
+  ok("…with under-13 as a way out rather than an option",
+    /UnderThirteen/.test(profileStep)
+    && /I&apos;m under 13/.test(raw("components/onboarding/UnderThirteen.tsx")));
+  ok("…and each choice says what it does before it is confirmed",
+    /What this means/i.test(profileStep) && /turn a trophy into cash until you turn 18/.test(profileStep));
+  // Answering revalidates the LAYOUT, not a list of pages — otherwise the bar
+  // survives on every other page after they answered.
+  ok("answering clears it everywhere",
+    /revalidatePath\("\/", "layout"\)/.test(raw("app/actions/onboarding.ts")));
   ok("the per-request user fetch carries the band",
     /ageBand: schema\.users\.ageBand/.test(raw("lib/auth.ts")));
 }

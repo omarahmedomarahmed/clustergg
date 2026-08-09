@@ -72,11 +72,17 @@ ok("a tier carries no rate at all",
 // what a deleted rate could have quietly taken away.
 {
   const { readFileSync } = await import("node:fs");
+  // B99 moved the scoring out of `week-close.ts` into `week-standing.ts`, which
+  // the close and the public pool page both call. The gate moved with it — so
+  // the rule is asserted where it now lives, AND the close is asserted to call
+  // it, because a gate in a file nobody calls is not a gate.
   const wc = readFileSync(new URL("../../lib/week-close.ts", import.meta.url), "utf8");
-  ok("the weekly close consults the server profile", /profileComplete\(/.test(wc));
+  const st = readFileSync(new URL("../../lib/week-standing.ts", import.meta.url), "utf8");
+  ok("the scoring consults the server profile", /profileComplete\(/.test(st));
   ok("…and drops the incomplete from the run rather than paying them zero",
-    /payable\.has\(g\)/.test(wc));
-  ok("…and says how many it skipped", /skippedForProfile/.test(wc));
+    /payable\.has\(g\)/.test(st));
+  ok("…and says how many it skipped", /skippedForProfile/.test(st));
+  ok("…and the weekly close is what runs it", /standingFor\(/.test(wc));
 }
 
 console.log("\n== the money it actually splits ==");

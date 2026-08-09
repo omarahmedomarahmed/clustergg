@@ -11,18 +11,17 @@ export type BandState = { ok?: true; band?: AgeBand; locked?: boolean; error?: s
 /**
  * Set or correct the age band. B72.4.
  *
- * THE CORRECTION PATH IS THE POINT. The band is asked as the first thing on
- * sign-in, in one click, with no confirm step — which is the right shape for
- * getting an honest answer quickly and guarantees that some people will
- * mis-tap. A mis-tap onto "Under 16" locks somebody out of the entire product,
- * and a gate with no way back is a support queue with extra steps.
+ * ANSWERED ONCE. B95 set `MAX_BAND_CHANGES` to zero, so what this action does
+ * now is set a band that has never been set — and refuse everything else with
+ * the sentence that tells somebody how to get it corrected by a human.
  *
- * So it is editable from account settings, and counted. Three changes, the same
- * number and the same shape as the payout preference, then it locks and a human
- * has to be involved — because a band that can be changed without limit is a
- * band that means nothing, and somebody who moves between "twelve" and
- * "nineteen" three times is telling us something we should see rather than
- * silently absorb.
+ * It was three self-serve changes, on the reasoning that the band was asked in
+ * one tap with no confirm and mis-taps were therefore inevitable. The onboarding
+ * page designed the mis-tap out (select, read what it means, press confirm),
+ * which left the change budget doing only one thing: letting a teenager pick
+ * "18 or over" on the day they want to cash out. The band is the only thing
+ * standing between a minor and a payment we may not make, and a fact somebody
+ * can rewrite when it becomes inconvenient is not a fact.
  *
  * Every set is timestamped. That record — that we asked, and when — is half of
  * what the band is for.
@@ -52,8 +51,8 @@ export async function setAgeBand(_prev: BandState, formData: FormData): Promise<
     ...(isChange ? { ageBandChanges: changes + 1 } : {}),
   }).where(eq(schema.users.id, me.id));
 
-  // The whole layout, not a list of pages. `<AgeGate>` is rendered by the root
-  // layout on EVERY page, so revalidating five gamer routes would leave the
+  // The whole layout, not a list of pages. `<OnboardingBar>` is rendered by the
+  // root layout on EVERY page, so revalidating five gamer routes would leave the
   // "nothing is earning" bar on top of every other page until a hard reload —
   // telling somebody who just answered that they still have not.
   revalidatePath("/", "layout");

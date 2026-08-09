@@ -166,7 +166,7 @@ The brand gets:
 ### D2 — Gifting is deleted
 
 Not disabled — removed. The gift checkout, the search-for-a-gamer flow, every
-Discord gift button, the `gift_sent`/`gift_received` actions, the gift
+Discord gift button, the `gift_sent`/`gift_received` actions — all deleted — and the gift
 notification.
 
 **A gamer can only buy a trophy for themselves. Nothing transfers between
@@ -175,9 +175,9 @@ accounts, ever.**
 It closes the FinCEN money-transmission trigger, the 1099 aggregation hole and
 the under-18 cash-out bypass together.
 
-**Consequence nobody had spotted:** two of the four Daily Mission templates are
-built on gifting (`lib/missions.ts:88,103`, 50 CP each). Rebuilding them is
-inside the item, not after it.
+**Consequence nobody had spotted:** two of the four Daily Mission templates were
+built on gifting (`lib/missions.ts:88,103`, 50 CP each) — so deleting it broke
+them. Rebuilding them is inside the item, not after it.
 
 ### D3 — Age: a band, never a date of birth
 
@@ -602,7 +602,7 @@ reach — with no brand named and the 25-cohort floor applied.
 > The 5% is what makes it a sale. A pass-through with no margin is the version
 > that reads as receiving money from person A to pay person B — the
 > money-transmitter trigger at `B73_RESEARCH.md` Q3, and the thing deleting
-> gifting closed. The owner buys a product; we then owe the prize as our own
+> gifting (deleted, B72.3) closed. The owner buys a product; we then owe the prize as our own
 > obligation.
 >
 > | Rule | Value |
@@ -801,12 +801,13 @@ Twelve files plus the schema. Rules:
 - **Missions 2 and 4 rebuilt.** Orbit has the room: `share_card` 25×3,
   `profile_views_25` 25×3, `follower_gained` 25×2, `profile_vote_received` 25×2.
   Both blocks must still total exactly 125.
-- `tests/db/missions.mts:90-92` asserts gifts exist and are symmetric. It goes red
-  **on purpose** and is rewritten to assert the opposite.
+- `tests/db/missions.mts:90-92` asserted gifts exist and are symmetric, from before the deletion,
+  before the deletion. It goes red **on purpose** and is rewritten to assert the
+  opposite.
 
-**Verification → `tests/db/gifting.mts` (rewritten):** no path creates a
+**Verification → `tests/db/gifting.mts` (rewritten to keep it deleted):** no path creates a
 `userTrophies` row for anyone but the buyer; every mission variation still totals
-500 and 125 per quest; no gift UI string survives.
+500 and 125 per quest; no gift UI string survives the deletion.
 
 #### B72.4 — The age band *(D3)*
 
@@ -934,6 +935,984 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B111 — The social purge · **SHIPPED**
+
+B68's brief, quoted as it was written:
+
+<!-- retired-quote -->
+> *"Posts, comments and reactions leave the product — the feature, its pages, its
+> rows. Following, messaging and gifting stay. The platform is a competition and
+> earning layer, not a social network."*
+
+⚠ **That quote is out of date in one word and it is quoted anyway, marked.**
+B68 predates **B72.3, which deleted gifting outright** — a transfer of
+redeemable value between two people is a money-transmission trigger, a 1099
+aggregation hole and an under-18 cash-out bypass at once, and one deletion
+closed all three. B111 kept **following and messaging**. It did not keep
+gifting, because there was no gifting left to keep. See B111.1 below.
+
+**What went, deleted.** The composer and the post feed on `/feed`; the whole Community tab
+on a planet; "recent posts" on a public profile; the Posts column in search; the
+**moderation queue** in admin; `createPost`, `reactToPost`, `addComment`,
+`adminDeletePost`, `togglePinPost`; `PostCard`, `CommentThread`, `ReactionBar`;
+the seeded posts; the `posts` admin metric; and `lib/experts.ts` entirely —
+expert tiers were scored from posts, comments and likes, so with those gone the
+function had no inputs and was deleted rather than left computing zero every
+hour on the cron.
+
+**What stayed, and why.** Following, messaging, planets and their
+membership. A planet is a game's page and joining one is how a gamer says which
+games they play — neither was ever a social feature. `/feed` stays too: it is the
+signed-in home that OAuth, the login redirect and the bot all land on, and it was
+never only a feed. What replaces the post list is the rest of that page.
+
+**The earning half was already retired.** `write_post`, `write_comment`,
+`reaction_given` and `reaction_received` have sat at weight 0 with "(retired)"
+in their labels since B64, so nothing here paid CP by the time it was removed.
+The `community_activity` badge is now **unearnable rather than free** — a badge
+that starts awarding itself to everyone the day its condition becomes uncountable
+is worse than one nobody earns.
+
+**THE DECISION WORTH DEFENDING is the half this sprint did not do.**
+
+The obvious move is a `DROP TABLE` in `COLUMN_MIGRATIONS`. That list runs on
+**every boot**. A drop in it deletes every post anybody ever wrote, on the next
+deploy, irreversibly, as a *side effect of shipping something else* — no count
+shown, no confirmation, no way back. Removing a feature is a refactor;
+destroying what people wrote in it is the owner's call, and it should look like a
+decision at the moment it is taken.
+
+So the reader is gone today and the rows wait for a button:
+`lib/social-purge.ts` + a panel where the moderation queue used to be. It is
+**admin-only, not staff** — `requireStaff` would cover a support agent clearing a
+queue. The **count is on the page before anything is typed**, because a dialog
+that cannot say "12,431 posts" is a dialog people click through. The confirmation
+is a **typed word**, not a second click, and the button stays disabled until it
+matches.
+
+**One thing found on the way out:** the `feed_inline` ad placement — *"every 6
+posts in a Space feed"* — is now inventory with **no surface**, which is
+something a brand could be sold that would deliver exactly zero. Removed from the
+seed. An install seeded before B111 still carries the row; `/admin/placements` is
+where that shows.
+
+`tests/db/social-purge.mts` (81). Its most important assertion — that nothing
+drops the tables — is deliberately placed **above the `getDb()` import**: a
+`DROP TABLE` in `COLUMN_MIGRATIONS` breaks the demo bootstrap, so the same check
+placed after the import died with a stack trace instead of naming the defect.
+**The assertion that must never fail cannot depend on the database booting.**
+Proved by breaking all three guards: purging `follows`, downgrading the auth
+check to staff, and planting a `DROP TABLE` — the last of which only went red
+after the restructure, and whose first break attempt silently no-opped because
+the declaration had no type annotation. A break-test that does not break proves
+nothing.
+
+---
+
+### ▸ B114 — No Riot game is sold to a brand · **REVERTED, same day**
+
+Shipped and removed within the hour, at the owner's instruction. Recorded so
+nobody rebuilds it, and because the reason it was wrong is worth more than the
+code was.
+
+The owner mentioned, in passing, that Riot had not answered, that the dev key is
+rotated every 24 hours, and that they most likely would not run Riot challenges
+for brands. I turned that into an **enforced block**: a flag on the provider, a
+refusal in the save action, Riot games filtered out of the brand's builder.
+
+**That was the wrong move, and the owner's objection is the right one:**
+*"we still gonna do it and we need option to do it… it's a bad thing to tell you
+what's on my mind."*
+
+Context an owner shares is meant to inform what gets built. Compiling it into a
+constraint on the owner is a different thing, and it has a cost beyond the code:
+it makes thinking out loud expensive. A judgement call that is still open —
+"most likely won't" — is not a rule, and turning it into one removes the option
+rather than serving it.
+
+Nothing of it remains: `lib/sponsorable.ts`, `tests/db/sponsorable.mts`, the
+`sponsorBlock` field and both provider entries, and all three enforcement points
+are gone. The revert is byte-identical to the state before it.
+
+**What the platform does instead:** nothing. A Riot game is sold like any other
+game, and whether to run one is a decision made per deal by the person making
+the deal.
+
+---
+
+### ▸ B114.1 — CI had not run on any of it · **SHIPPED**
+
+Found while answering "it's been building for 18 minutes". Nothing was building:
+every Vercel deployment was `READY`, and **the last GitHub Actions run was that
+morning, on `main`.**
+
+`ci.yml` triggered on `pull_request` and `push` to `main` only. With no PR open,
+**nine commits went to a feature branch in one day and CI ran on none of them.**
+The first anybody would have known is the moment a PR was opened and everything
+went red at once. It is also why `ci` could not be found in the branch-ruleset's
+status-check picker: GitHub only offers checks it has recently seen, and this one
+had never reported on the branch it was meant to protect.
+
+- **`push: branches: [main, "claude/**"]`.** `concurrency` already cancels a
+  superseded run, so a branch pushed to five times costs one run, not five.
+- **The db band is sharded across two runners** (`SHARD`/`SHARDS` in
+  `tests/run-all.mjs`). It had grown from ~30 files to 76 and the single job was
+  closing on its own 20-minute timeout — the worst failure this workflow can
+  have, because from the outside a timeout is indistinguishable from a real
+  break and the instinct is to raise the limit, which makes the slow suite
+  permanent instead of parallel. Round-robin by index, not a halved sorted list:
+  the alphabet does not correlate with runtime and `cards` and `split` would
+  otherwise land together.
+- **`fail-fast: false`**, so one red shard does not cancel the other. Two red
+  shards are two pieces of information; one red and one cancelled is one.
+- **An empty shard now exits 1.** A typo in `SHARD`/`SHARDS` used to print "No
+  suites found" and go green — the same failure class as the runner that once
+  counted `_nav.mjs` as a passing suite.
+- **`ci` still aggregates**, so branch protection requires exactly one name
+  whatever the matrix does.
+
+Both shards verified locally at 38 suites each.
+
+---
+
+### ▸ B113 / B63.1 — The Daily Mission was built and never wired up · **SHIPPED**
+
+**The worst kind of defect: a promise in the product with no path behind it.**
+
+`lib/missions.ts` is a complete system — templates, per-day schedules, task
+progress, a streak that loops, milestones that award trophies — with **89 green
+assertions** in `tests/db/missions.mts`, for months.
+
+**Nothing imported it.** A grep for `from "@/lib/missions"` returned exactly one
+hit: `lib/cp-dial.ts`, which reads the templates to price them for an admin
+screen and never asks whether anybody is running one.
+
+So no gamer had ever seen a daily mission. No streak had ever been counted. And
+`milestonesHit` had never been called by anything, which means **no milestone
+trophy had ever been awarded to anybody** — while `lib/cards/render.tsx` tells
+gamers a trophy might have been *"earned at a streak milestone"*. That reads as
+working, which is why it is worse than an absent feature.
+
+**This sprint is a wiring job, not a new one.** Almost none of the logic is new;
+what was missing was the reader, the writer and the award path.
+
+- **`lib/mission-live.ts`** — today's mission and progress, the streak, the run,
+  the milestones. The streak is **derived from `quest_events` grouped by UTC
+  day**, in one query, like every balance in this codebase. There is no `streak`
+  column and there should not be: a stored counter and its events disagree the
+  first time a job runs twice or a day rolls over in the wrong zone, and the
+  stored one is the one nobody can reconstruct.
+- **`components/MissionBand.tsx`** — B63.1's second band. Collapsed: the day
+  count and today's progress. Expanded: the tasks with their done state and the
+  milestone ladder. **Click anywhere in the panel to close it**, which is what
+  people try first. **The nav's own background art, collapsed and expanded**
+  (B63.2), so the two bands read as one piece of chrome. Starts *collapsed*,
+  unlike the week band — two panels opening over every page on every visit is
+  what makes people collapse both.
+- **A daily job awards the milestones**, and the band writes nothing. Handing
+  somebody a redeemable trophy because they loaded a page is a write nobody
+  asked for, and it would fire from a prefetch. The job walks only gamers with
+  an event in the last two days, because a nightly pass over the whole user
+  table is the shape that stops working at the size the model plans for.
+- **Idempotent on `streak:<days>:<run start>`.** The streak is a LOOP — a missed
+  day resets to zero and the climb back awards the same milestone again — so
+  *"have they had the 7-day trophy"* is the wrong question and *"have they had it
+  for this run"* is the right one.
+- **A milestone with no trophy attached promises nothing.** It still shows on the
+  ladder and still marks the run; the band says "trophies for these are being
+  chosen" rather than implying a prize.
+
+`tests/db/mission-live.mts` (49). Proved by breaking it: awarding from the page
+render turns the rule-that-matters-most red.
+
+**One thing this suite cannot prove, said plainly in the file.** Idempotence has
+two layers — `reachedThisRun` feeding `milestonesHit`, and a row check before the
+insert. Deleting the second and re-running still passes, because **PGlite is one
+in-process connection and cannot contend**: the "two calls at once" test never
+actually races. That is the same limitation `tests/db/concurrency.mts` was
+rewritten for, and it runs against a real Postgres in CI for exactly this reason.
+So the race assertion is labelled a regression guard rather than a proof, and
+layer 2's presence is asserted structurally beside it. A test that implies more
+coverage than it has is worse than a missing one.
+
+---
+
+### ▸ B62.1 (web half) — One tile, with a count · **SHIPPED**
+
+A gamer can hold the same trophy several times over — bought one, won one in a
+challenge, earned one at a streak milestone. Drawn one row per award, that is
+three identical pictures in a row, which reads as a rendering bug rather than an
+achievement. **The count is the impressive part.**
+
+**The defect was not that nobody had built it.** The bot card has stacked since
+B62. The web never did — and the grouping lived *inline in `lib/cards/data.ts`*,
+where no other surface could reach it. So the same gamer's shelf looked like a
+different shelf depending on where you saw it, and the whole reason was one
+`reduce` in the wrong file.
+
+`lib/trophy-stack.ts` now holds the rule, and **all three surfaces call it**: the
+card, the public profile, and the redeem shelf.
+
+**Its own module, importing nothing.** `TrophyCase` is a client component and
+`lib/trophies.ts` pulls in Drizzle and the whole schema; reusing one `reduce`
+must not drag that into the browser bundle. Writing the `reduce` twice instead is
+exactly how this drifted in the first place — and a module with no imports is
+also testable without a database.
+
+**The key is `name + image`, not `trophyId`** — deliberately the key the card has
+always used. Two `trophies` rows can be the same prize to a person: staff
+duplicating one for a second brand, or a re-issue. A gamer looking at two
+identical pictures does not care that they carry different ids, and grouping on
+`trophyId` would leave exactly the duplicate-looking tiles this removes.
+
+**The redeem shelf stacks without changing the payout path.** Selection stays
+per-award underneath — the request still sends individual ids — but a tap selects
+every *redeemable* copy, because three identical trophies of identical value are
+not a choice anybody wants to make one at a time. A stack where one copy is
+already mid-payout says so: `×3` alone would promise three redeemable trophies
+when only two are, and the price shown is the **stack's**, because that is what
+the tap adds.
+
+**B62.2's web half was already done** — the public trophy grid has never drawn a
+cash figure. The suite now asserts it, because "a price on a profile turns a
+trophy case into a receipt" is the kind of thing that gets re-added by somebody
+being helpful.
+
+`tests/db/trophy-stack.mts` (38). Proved by breaking both halves: keying on
+`trophyId` turns fifteen assertions red, and putting a price back on the profile
+turns another.
+
+---
+
+### ▸ B112 — The documents describe the product that exists · **SHIPPED**
+
+**The owner's instruction, and it is the right diagnosis:** *"rewrite the docs
+you get your info from and check that it matched the new plan and new model —
+don't make this mistake again, stale docs, update them."*
+
+Two wrong statements have now shipped, by the same mechanism both times, and
+neither was a code defect:
+
+| Shipped claim | The truth | Where it reached |
+|---|---|---|
+| *(retired claim)* "Brands are billed on impressions" | A fixed price per challenge; impressions are delivery evidence | `CookieConsent.tsx`, `app/legal/cookies` — **legal copy** |
+| *(retired claim)* "Following, messaging and gifting stay" | Gifting was deleted in **B72.3** | `docs/PLAN.md`, a pushed commit message |
+
+**The code was right both times.** Both came from reading a document written
+before the change and repeating its words as fact — and `docs/legacy/` is full
+of such documents, because that is the folder's job. `docs/legacy/BUSINESS.md`
+still opened by describing the **retired CPM ad-network model** as what the company
+sells.
+
+**What was fixed in the documents themselves:**
+
+- **Every file in `docs/legacy/` now carries a banner**, under its H1 where it
+  cannot be missed. It names both errors specifically — a generic "may be out of
+  date" is a warning people skim — and states the order of authority: the code,
+  then `PLAN.md`, then `MODEL.md`/`HANDOVER.md`. Only one of the twelve said
+  anything of the sort before.
+- **`docs/PAYMENTS.md`** described a **$600 placements base**, a **$100 tier
+  discount** and a **$250** challenge, under a heading claiming the bill is
+  *derived, not typed*. All three were retired by C11 (`reachBase`,
+  `challengeBase`, `ultimateBase` are `0`) and the price had moved besides. It
+  now describes the *shape* and points at `lib/pricing.ts`.
+- **`docs/ARCHITECTURE.md`** listed "recompute expert tiers" on the hourly cron.
+  That function was deleted in B111.
+- **`docs/PLAN.md`**: B78 and the "$5 CPM" row now say they describe the retired
+  model; B111's quote of B68's brief is marked as a dated quote rather than
+  presented as description.
+- **`docs/MODEL.md` checked out exactly** — 50/15/15/20, the 5% private fee, the
+  $20 withdrawal floor all match the code. Verified, not assumed.
+
+**`lib/retired.ts` is the systematic half.** A registry of what was removed, why,
+and the file that proves it. `tests/db/docs-truth.mts` reads it and fails when a
+live document mentions a retired feature without saying it is gone. Adding a
+deletion means adding an entry in the same commit; the `evidence` field is
+asserted to still say what the entry claims, so the registry cannot itself drift.
+
+**The rule is SAME-LINE, and it took three attempts to get there.** Both earlier
+versions passed against the exact sentence that shipped:
+
+1. A list of present-tense phrases — missed a bare enumeration.
+   <!-- retired-quote -->
+   ("Following, messaging, gifting, planets…" — the sentence that shipped.)
+2. A three-line proximity window — found the word "deleted" in a *neighbouring
+   paragraph, about something else* and read it as permission. The more
+   carefully a document explains a deletion, the more words it leaves lying
+   around to excuse the next wrong sentence.
+
+An acknowledgement has to be attached to the mention. A deliberate quote of a
+dated document is still allowed and just has to say so, with an explicit
+`<!-- retired-quote -->` marker. Proved by re-introducing both shipped sentences
+and confirming the break applied first — a break-test that silently no-ops
+proves nothing, which had already happened twice today.
+
+---
+
+### ▸ B111.1 — "Gifting stays", about a feature that does not exist · **CORRECTION**
+
+B111's entry and its commit message both said the purge kept **gifting** — deleted long before. It
+did not, and it could not: **B72.3 deleted gifting**, and `tests/db/gifting.mts`
+exists for no other purpose than to keep it deleted.
+
+The mechanism is the same one that produced the impressions error the owner
+caught earlier, and that is why this is written down rather than quietly edited:
+
+- B68's brief says *"following, messaging and gifting stay."* True when written.
+- B72.3 deleted gifting afterwards, for three named reasons.
+- B111 quoted the brief and then **restated its words as a description of the
+  present** without checking the code.
+
+**Reading stale source text and repeating it as current fact.** The code was
+right both times; the prose was wrong both times. `lib/marketplace.ts` removed
+`recipientSlug` and `message` from the SIGNATURE rather than ignoring them,
+specifically so nobody could reintroduce the deleted gifting by passing an argument — and
+`docs/PLAN.md` already carried a section titled *"B72.3 — Delete gifting"*, four
+hundred lines above the entry that contradicted it.
+
+**Why it matters more than a wrong word.** This document is what a reader trusts
+about what the product does. Saying a product has value transfer between
+accounts, when it deliberately removed exactly that to stay outside money
+transmission, is a claim that could be repeated to counsel, a regulator or an
+investor by somebody who had no reason to doubt it.
+
+The pushed commit message cannot be corrected without rewriting shared history,
+so this entry is the correction of record. The B111 entry above now quotes the
+brief as a **quote**, flagged, rather than as a description of today.
+
+---
+
+### ▸ B110 — The deck quoted a price we had stopped charging · **SHIPPED**
+
+**The most expensive wrong sentence in the repo, in the room where a wrong
+sentence costs the most.**
+
+`/dataroom` told every reader on its front page:
+
+> *"Every figure in these documents is counted from production when you load
+> them. Nothing is modelled or projected."*
+
+The investor deck underneath it said a challenge runs for **$250**, that *"the
+**$75** platform fee is the only line the business lives on, and every total in
+this document is built from it"*, that six games are **$1,000** a month each, and
+showed three unit-economics cards reading `{ revenue: 250, cost: 175 }` under a
+subtitle promising *"every number here is the live rate card"*.
+
+| | Live (`lib/pricing.ts`) | Deck said |
+|---|---|---|
+| Challenge price | **$350** | $250 |
+| Prize pool | $175 | $175 ✓ |
+| **Platform fee** | **$175** | **$75** |
+| Per game / month | **$1,400** | $1,000 |
+| Whole network / month | **$8,400** | $6,400 |
+
+Out by **2.33×** on the one line the deck said every other total was built from.
+And the front page's blanket promise was doubly unkeepable: the deck also
+contains a six-month plan, a free-to-paid conversion assumption and an MRR run
+rate — all projections, all labelled as such *inside* the deck, which had the
+honesty the front page then took away.
+
+**The model was never wrong.** `lib/finance.ts` derives price, prize and fee from
+the config and always has. Only the *prose* was — a sentence typed once against a
+rate card that moved underneath it. `tests/db/marketing-truth.mts` exists to stop
+precisely this on the public pages; the data room had no equivalent, which is why
+the worse copy of the bug lived in the more expensive document.
+
+Understating our own revenue is not the commercially dangerous direction. The
+dangerous part is an investor opening `/pricing` in the next tab and finding a
+fundraising document that contradicts the product.
+
+**The fix is tokens, not retyping.** Writing $350 where $250 was is the same bug
+with a fresh date on it. `lib/dataroom/tokens.ts` gives the prose
+`{{challengePrice}}`, `{{prizePool}}`, `{{platformFee}}`, `{{perGameMonth}}`,
+`{{networkMonth}}`, filled from the same config the rate card, the invoice and
+the finance model read. Filling is **deep and at one choke point** — because the
+drifted numbers were spread across a subtitle, a body, and a `note` buried in a
+use-of-funds row, and a filler covering only the obvious fields would have left
+the worst of them untouched. An **unknown** token is left visible rather than
+blanked: `{{whatever}}` in a deck is embarrassing and gets fixed in an hour,
+while *"a brand pays  for a sponsored challenge"* reads as a typo and survives
+for months.
+
+**The unit-economics slide now computes** (`liveUnitRows`, `data.liveUnits`)
+instead of storing three typed rows under a sentence claiming it did not.
+
+**The front page tells the two kinds of number apart.** *Counted* — traction and
+prices, read from production on load. *Planned* — the raise and anything with a
+future date, each carrying its assumption, with the deck's own "what would break
+this" slide behind it.
+
+**Existing installs need the reseed.** Seeded prose lives in the database, so
+changing `defaults.ts` fixes a fresh install and does nothing for a deployed
+one. `reseedDoc` is already wired to an admin action, and the suite asserts that
+path exists — a fix only in the seed leaves the live deck quoting the old price.
+
+`tests/db/dataroom-truth.mts` (48) walks **every string in every seeded
+document** and fails on any currency figure that has a live source. That general
+rule caught **two more hard-coded prices than the known-bad list did**. Proved by
+breaking it: restoring the old sentence turns three assertions red, and rendering
+the unfilled section instead of the filled one turns a fourth.
+
+---
+
+### ▸ B109 — A component, not a screenshot · **SHIPPED**
+
+B89.6 wrote the rule down and nobody built it: *"Sections render the real
+component, not a screenshot. A screenshot is a claim; a component is the
+product."* Every public page described the bot in prose. Not one showed a card
+it draws.
+
+`lib/marketing-card.ts` + `components/marketing/LiveBotCard.tsx` — a real Satori
+render, in a Discord-message frame, on **home**, **/discord-bot**, **/brands**
+and **/servers**. Server component: the URL resolves on the server, the browser
+fetches a hosted PNG, no client JavaScript and no way for a visitor to trigger a
+render.
+
+**Three things made this non-obvious, and each is why the suite is longer than
+the feature.**
+
+1. **It must not go through `cardRef`.** That is the obvious function and it is
+   the wrong one: it picks a sponsor and calls `logCardAdImpression`. That row
+   is **delivery evidence** — the number shown to a brand to prove their
+   challenge reached the servers they paid for. Drawing a card on our own
+   homepage through it would pad a brand's delivery with website visitors who
+   were never in any Discord server. B107 exists because we bill per challenge
+   rather than per view; inflating the evidence anyway would be the same
+   dishonesty arriving through a side door. **The marketing card carries no
+   sponsor and logs nothing.**
+2. **It must not cost a render per visitor.** Renders are capped at 4,000/day
+   for the whole network. A public page drawing one per pageview would eat that
+   ceiling with strangers and then serve stale cards to every gamer in Discord —
+   the marketing page degrading the product it markets. Guarded by the Blob
+   cache plus a 10-minute memo, under its own `marketing|` key so it can never
+   evict or re-draw somebody's real card.
+3. **A draft challenge must not reach the public site.** The obvious fixture,
+   `previewFixtures().challengeId`, is `order by start_at desc limit 1` — which
+   on any week where next week's run is drafted **is a draft**. On a public page
+   that publishes an unannounced competition, and after B107 the name of a brand
+   whose invoice may not have cleared. `publicChallengeId()` filters through
+   `stageOf`, in code rather than SQL so there is one opinion about what public
+   means — and `stageOf` returns `draft` for an *unpaid* challenge too.
+
+**Null is a first-class answer.** No Blob, an empty database, the ceiling with
+nothing cached — all return null and the section renders nothing. A broken image
+on a marketing page is worse than no section. Null is cached for the same TTL,
+because the emptiest database is launch day and that is the busiest possible
+cache miss.
+
+`tests/db/live-components.mts` (39). **Two of its guards passed against a
+deliberately broken build on the first attempt** — `if (value) memo.set(...)`
+still contains `memo.set(...)`, and a source check for "does not call
+previewFixtures" matched a build that called it and used the answer. Both were
+rewritten: the cache rule is now asked of the cache (`marketingCacheKeys()`),
+and the draft rule plants a draft with the newest start date and asserts the
+contract directly — because `previewFixtures` has a memo of its own, so a wrong
+build would return the *previous* answer and read as a pass. Four break-tests now
+turn them red.
+
+---
+
+### ▸ B108.1 — Ten commits of "suite green" that was not · **CORRECTION**
+
+**This is the worst thing in this document and it belongs at the top of the
+block, not buried in it.**
+
+`e483bfb` (B94–B98) built the onboarding gate: nothing accrues, and no challenge
+is entered, until a gamer has finished the three steps. Four suites had fixtures
+written before that gate existed — `caps`, `cp-economics`, `entry-rules`,
+`bot-attribution` — and every award in them started paying **0** while every
+join started returning `reason: "onboarding"`.
+
+They went red in that commit and stayed red through **B99, B100, B101, B102,
+B103, B104, B104.1, B105, B106 and B107.** Verified by checkout:
+`e483bfb~1` runs all four green; `e483bfb` runs all four red.
+
+**Two failures, and the second is the real one.**
+
+1. Every run was checked with `| tail`. Suites finish in whatever order the
+   lanes free up, so the four `FAIL` lines sat in the middle of the summary
+   list and the tail showed the pass lines that happened to finish last.
+
+2. **The shortfall was then explained away with a reason that was never
+   checked.** Nine commit messages say some version of *"61/65 suites green —
+   the other four are browser suites"*. The runner does not include browser
+   suites in a default run at all: `run-all.mjs` only adds them when `--ui` is
+   passed, so `results.length` is the db-suite count and nothing else. There
+   were never four skipped browser suites in that number. The four were
+   failures, every time.
+
+The first failure is carelessness. The second is the one worth writing down: an
+invented explanation that *fits* the number is what stops you looking at the
+number. `e483bfb`'s own message — the commit that broke them — reads "Full DB
+suite green, build clean."
+
+**What was done about it:**
+
+- All four fixtures now set `unlockedAt`, with a comment at each saying why the
+  gate is not what they are testing. All four green again.
+- **Every one of the 69 db suites was then run individually**, not as a batch
+  summary. 69/69, zero failures. `bot-growth` reports one block skipped, and
+  says so itself — it needs a running server and is covered by the `--ui` band.
+- **And the browser band was actually run**, which the "the other four are
+  browser suites" line had been quietly standing in for. `npm test -- --ui`
+  against a fresh production build: **84/84, all 69 db suites and all 15 browser
+  suites, 823s.** That is the first run in this stretch of work where the number
+  reported is a number that was observed.
+- `tests/run-all.mjs` now prints the failures **last**, after the count, in
+  their own red block, and states the number twice. The count was always there
+  and was always misread, so the fix is to put the bad news where a truncated
+  read cannot miss it rather than to promise to read more carefully.
+
+The commit messages on the pushed branch cannot be corrected without rewriting
+shared history, so this entry is the correction of record.
+
+---
+
+### ▸ B108 — The gate the bot never mentioned · **SHIPPED**
+
+**B94 built a real gate and left it invisible on the surface most of our gamers
+live on.**
+
+Nothing accrues until a gamer has linked a game, confirmed an email, and given
+an age, a country and a card template. B95, B96, B97 and B98 refined it. Every
+bit of it lived on the website.
+
+The bot knew nothing about any of it. And because `ensureGamerForDiscord` makes
+the account on the first `/cluster`, **every new gamer is locked** — so the
+default new-user experience was a Cluster Points card footed with *"Cluster
+Points come from quests"* while earning exactly zero of them, for a reason no
+screen in the bot ever gave.
+
+That is the worst version of a gate: invisible, and on the surface where the
+funnel actually starts. Nobody concludes "I have three steps left". They conclude
+the product is broken.
+
+**A new `unlock` screen**, plus the banner on the two screens gamers open most:
+
+- **Home** — the unlock button **first** in the row, because `rows()` truncates
+  from the *end* and the one button that must never be dropped is the one
+  explaining why nothing is counting. The footer says it too.
+- **Cluster Points** — the footer no longer promises points to somebody earning
+  none.
+- **`/cluster unlock`**, and `start` and `verify`, because those are what
+  somebody types when they have been told there is something to do but not what
+  it is called. Listed in the command help and reachable from More, so a gamer
+  who merely wants to *check* need not be blocked to find it.
+
+**The bot has no opinion about the steps.** `stepsFor` owns the list, the
+labels, the wording and the count; the screen renders what it returns and the
+button labels are the step labels, cut to Discord's 80. A bot that says "two
+steps" over a website asking for three is exactly the screenshot we do not want,
+and the only guarantee they agree is for one of them to hold no copy.
+
+**Two facts stay on the site, deliberately.** An email code and a date of birth
+are the two things we handle most carefully; they belong on the signed-in site,
+not in a chat modal in somebody else's server. Linking a game is the one step
+the bot does itself — it is what a gamer sitting in a Discord server is most
+ready for.
+
+**Green, not red.** This file had already worked out that Discord red reads as
+*destructive* (it is why the game palette excludes it). "Unlock my account" in
+red is a button somebody hesitates over in case it deletes something.
+
+**The congratulations moment (B83.3)** lands on the same screen: `tryUnlock` is
+the promoting read, so a gamer who finished the last step on the website and came
+straight back is unlocked *by opening the card* rather than told they still have
+one to go — and the card names what they **did** ("You linked riot"), not that
+they completed a form.
+
+`tests/db/bot-unlock.mts` (41). **The test caught three real defects in my own
+first draft** — a retyped step label, a hard-coded "three", and a footer word —
+and a fourth in itself: the "button is first" assertion passed while the button
+had been moved to the end of home's row, because it was matching the *CP*
+screen's copy of the same call. Both are now scoped to the function under test.
+
+---
+
+### ▸ B107 — Two brands, one line · **SHIPPED**
+
+**The gap B101 left open, and the wrong half to have built.**
+
+B101 gave a challenge a second sponsor: a column, a validator, a 50/50 split,
+and a billing rule that refuses to announce until *both* brands have paid. It
+gave them nowhere a gamer reads two names.
+
+A brand buys their name in front of the people playing; the invoice is how they
+pay for it. We had the invoice working perfectly and the thing it bought did not
+exist. To every single person who saw it, a co-sponsored challenge looked exactly
+like a challenge with one sponsor — and the second brand had paid half the bill
+for that.
+
+**The one place a brand name reached a gamer at all** was the weekly Discord
+recap, and it `INNER JOIN`ed the lead brand. The co-sponsor was not merely
+unmentioned; it was *structurally impossible* to mention.
+
+**`lib/presented-by.ts`** — one file, because four surfaces have to say the same
+thing and four call sites writing their own `${a} and ${b}` is four chances to
+disagree about ordering, about a deleted brand, and about what an unsponsored
+challenge prints.
+
+- **The lead is always first.** Not alphabetical, not by amount paid — the lead
+  is what `sponsor_brand_id` says and what the deal says. A line that reorders
+  itself when somebody edits a price is a line we would have to explain. The
+  test fixture is named so the co-sponsor sorts *first* alphabetically, so an
+  accidental sort cannot pass.
+- **Ordering is not restated.** `sponsorsOf` (B101) decides which ids and in
+  what order; this file looks up what that returned.
+- **A deleted brand is dropped, not rendered.** A gap where a name should be is
+  worse than one fewer name.
+- **`presentersFor` batches**, because the recap and the feed render lists and
+  `presentersOf` in a loop is the N+1 this codebase keeps removing.
+
+**Four surfaces:** the challenge page (names + logos under the title), the
+Discord launch post *including the private-challenge branch*, the ending
+reminder, and the result post — which is the most-read of the three and named
+nobody.
+
+**Never printed before it is paid.** The web page withholds the line while
+`stageOf` returns `draft`, which it also returns for an *unpaid* challenge. The
+announcements need no extra check: announcing is already gated on the bill, and
+`tests/db/presented-by.mts` asserts that gate still reads *both* brands rather
+than trusting the comment that says so.
+
+**Not linked.** `/brands/[slug]` is the brand's key-gated back office — invoices,
+reach numbers, their inbox. Pointing a gamer at it lands them on a key prompt for
+somebody else's admin. A public brand page is a real thing to build and this is
+not it.
+
+**Deliberately not on the Satori card.** The card already carries a fixed ad slot
+rendering a *different* brand. Two brand marks on one card meaning two different
+things is worse than one honest line underneath it — and the announcement embeds
+carry the card and the line together anyway.
+
+`tests/db/presented-by.mts` (38). Proved by breaking it: sorting presenters
+alphabetically instead of lead-first turns two assertions red.
+
+---
+
+### ▸ B106 — One instance replays the list, not all of them · **SHIPPED**
+
+The last of B80's four scale findings.
+
+B80 made the **steady** state cheap: a fingerprint of `COLUMN_MIGRATIONS` is
+stored in `schema_state`, and a boot whose list matches skips all ~1000
+statements after one tiny read. That is still true and still the fast path.
+
+It did nothing about **the one moment the fingerprint changes**. On that deploy
+every cold instance reads "not run yet" at the same instant, and every one of
+them starts replaying the same list — a hundred concurrent `ALTER TABLE`s each
+taking ACCESS EXCLUSIVE on `users`, against a database that is simultaneously
+serving the traffic that woke them. Nothing corrupts, because the statements are
+idempotent. The site just stops answering for the length of the lock queue, on
+the deploy, which is exactly when somebody is watching it.
+
+**An atomic claim.** `INSERT … ON CONFLICT DO NOTHING RETURNING` either returns a
+row (we own it) or returns nothing (somebody else does) — one statement, with no
+read-then-write window a second instance can slip through. Released in a
+`finally`, so a throw mid-list costs one boot rather than every boot for the next
+two minutes.
+
+**Three decisions worth the words:**
+
+- **A stale claim is taken over, not waited on** (`MIGRATION_CLAIM_SECONDS` =
+  120). The holder is a lambda and lambdas get killed. A claim that outlives its
+  owner and blocks migrations forever is a *worse* failure than the stampede.
+  The takeover is bounded inside the same `DELETE`, so two instances cannot both
+  decide it is stale and both delete-then-insert.
+- **A loser waits, then proceeds anyway** (`MIGRATION_WAIT_MS` = 4000, shorter
+  than the claim window by construction). Usually the winner finishes inside the
+  wait and this boot does nothing at all. If it does not, running a second time
+  costs a slow boot; *skipping* costs a request that 500s on a missing column.
+- **Claim failure fails OPEN.** No claim table, no claim — run the list. A
+  migration that does not run is a column that does not exist, and that breaks
+  the site permanently rather than briefly.
+
+`tests/db/cold-start.mts` (27) drives the real functions against the demo
+database: the second and third claim lose, release hands it on, a claim aged past
+the window is taken over while one inside it is respected, and the numbers are
+asserted in relation to each other rather than as literals. Proved by breaking
+it — swapping `DO NOTHING` for `DO UPDATE` turns five assertions red.
+
+---
+
+### ▸ B105 — The sync queue has to drain · **SHIPPED**
+
+`syncDueAccounts` was a **serial loop over 25 accounts**, each one an external
+HTTP call to a game provider, on an hourly cron. That is a hard ceiling of 25
+accounts an hour — so at about thirty linked accounts the queue stops draining,
+and every account past that falls further behind every hour, forever.
+
+It is the worst shape a scale bug can have: nothing crashes, nothing errors, and
+the only symptom is a leaderboard that quietly stops moving.
+
+**Two numbers, separate on purpose.** `SYNC_TAKE` (120) is how many a run
+claims — bounded because a run has a wall-clock budget and an unbounded one gets
+killed mid-flight with `nextSyncAt` unset on whatever it missed. `SYNC_POOL` (6)
+is how many run at once — bounded because the thing on the other end is somebody
+else's rate limit, and the fastest way to lose a Riot key is to spike it.
+
+A worker POOL, not chunks: each worker takes the next index, so one slow account
+cannot idle five workers waiting for its batch. Each account is caught
+individually, because a throw would otherwise abandon everything that worker had
+left.
+
+`tests/db/sync-throughput.mts` asserts the shape from source *and* drives the
+pool over 50 items to prove it runs each exactly once, in parallel, never
+exceeding the pool size.
+
+**Two of the four scale findings were already fixed and the plan had not caught
+up:** unbounded event tables (B104's retention job) and the brand-report heap
+(`lib/ad-delivery.ts` aggregates in SQL and bounds the server list — its own
+comment says it is "replacing" that defect). Cold-start DDL replay was the last
+one open — **closed by B106. All four of B80's scale findings are now done.**
+
+---
+
+### ▸ B104 — What we keep, and for how long · **SHIPPED**
+
+B80 raised two findings that are the same thing said twice: *"deletion leaves
+PII"* and *"unbounded event tables"*. A retention window answers both — we stop
+holding what we no longer use, and the tables stop growing without limit.
+
+**90 days, on the daily cron, batched.** It deletes OBSERVATIONS: impressions,
+clicks, bot command logs, server events, portal login attempts. Rows written
+because something happened, counted into a rollup that day, read by nobody
+after.
+
+**It never touches money or entitlement**, and both sides are written down by
+name in `lib/retention.ts` so the test can compare them. Not the vault ledger,
+not invoices, not payouts, not redemptions, not trophies, and above all not
+quest events — a quest event is somebody's CP balance. The delivery ledger is
+excluded for the same reason: a brand is billed on the rollup, and a count of
+rows that have been deleted is zero.
+
+The table list is a LITERAL, not a loop over the schema. A loop would quietly
+include the next table somebody adds, and the next table somebody adds might be
+the ledger.
+
+**Also: the session fragment.** The ad beacon stored
+`cluster_session.slice(-16)` — sixteen characters of a live JWT — in
+`ad_impressions.session_id`. Not enough to forge, and that was never the point:
+it is a piece of a credential in a table that staff read, reports join on, and
+backups copy. Now `hashSession`, salted with the same secret as `hashIp`.
+Nothing needed the value; it needed a key that is stable for the same browser,
+and a hash is that.
+
+**The test caught a live bug in the purge itself.** It read `rowCount`, which
+PGlite leaves at zero on a delete — so the job would have reported "nothing
+older than 90 days to remove" on every run while quietly deleting thousands of
+rows. Deleting correctly and lying about it is the version of that bug that
+survives review. It counts `RETURNING` rows now.
+
+#### The consent decision, and a correction worth recording
+
+The banner offered **"Accept all" / "Essential only"** and *nothing read the
+answer*. Pressing "essential only" wrote a string to localStorage and changed no
+behaviour at all — the beacon carried on counting, which is exactly what the
+person pressing it had asked us not to do. That is worse than no banner: it asks
+and ignores the answer.
+
+Two honest options — gate the beacon on consent, or stop pretending to offer a
+choice. **The owner chose the second.** So there is now a notice with one
+button, and `/legal/cookies` says plainly what is stored and why.
+
+**The correction.** When putting that choice to the owner I described the beacon
+as counting "impressions, which is what brands are billed on". That is wrong.
+It is the **retired** V1 ad-network model — the CPM the due-diligence review took
+apart, no longer how anything here is billed, and the whole pivot was away from
+it. The owner caught it.
+
+| | |
+|---|---|
+| What a brand actually pays | A **fixed price per challenge**. The invoice line is `quantity: challengesPerGame × unitAmount: challengePrice` |
+| What the counting is for | **Evidence of delivery** — proof the challenge we sold reached the servers it was meant to. It generates no money and meters nothing |
+| `ecpm` in the brand report | Spend ÷ server headcount × 1000, labelled as exactly that. Not a media CPM, and `lib/brand-report.ts` says so where it is defined |
+
+The decision survives the correction and is easier to defend because of it: this
+is first-party counting that earns nobody money and proves we did what we sold,
+not a meter that generates invoices.
+
+**Still open from B80 at the time:** the three remaining scale findings —
+cold-start DDL replay (B106), stat sync throughput (B105), brand report heap
+(already fixed in `lib/ad-delivery.ts`). All closed since.
+
+---
+
+### ▸ B103 — Four holes, closed · **SHIPPED**
+
+Every one of these was a guard that existed and did not cover the case it was
+written for. That is the pattern worth noticing: **none was missing, all were
+slightly wrong**, and slightly wrong is invisible until somebody looks.
+
+| Hole | What was actually there | Now |
+|---|---|---|
+| **Open redirect** | `NextResponse.redirect(new URL(dest, base))` — the URL constructor returns an ABSOLUTE url unchanged, so `?next=https://evil.example` signed somebody in on our domain and dropped them on somebody else's | `lib/safe-next.ts`, applied where the cookie is WRITTEN and again where it is read. Refuses `//host`, `/\host`, `\host`, `javascript:` and control characters |
+| **Open bootstrap** | `if (token && …)` — a deployment that never set `SETUP_TOKEN` had no check at all, and `seed()` mints the first superadmin | Fails closed with a 403 that names the missing variable |
+| **Open image proxy** | `remotePatterns: [{ hostname: "**" }]` — anybody could fetch any https URL through our domain, our bill and our egress address | An explicit list, plus `EXTRA_IMAGE_HOSTS` so nobody reaches for `**` again in a hurry |
+| **Portal lockout** | Counted failures per PORTAL, so four guesses each across two hundred servers never tripped it — guessing was free at exactly the scale an attacker would use | `ipLockState`: `MAX_FAILURES × 3` from one address across every portal, checked before the key is looked at. A success does NOT reset it, or an attacker owning one real portal would clear their own spray counter every fifth attempt |
+
+`tests/db/security-b103.mts` (34) covers all four, including the bypasses a naive
+`startsWith("/")` misses.
+
+**Still open from B80:** the session-JWT fragment in analytics, the 90-day purge
+and cookie consent, plus the four scale findings (cold-start DDL replay, stat
+sync throughput, unbounded event tables, brand report heap).
+
+---
+
+### ▸ B102 — The campaign console · **SHIPPED**
+
+A campaign is the thing a brand actually buys: one to four weekly challenges,
+one bill. Until this screen the only way to see one was to open the brand it
+belongs to, and the only way to see all of them was not to.
+
+**It is sorted by risk, not by date.** The question that costs money is *which
+weeks did somebody pay for that are not going to happen* — a slot with no
+challenge two days before it opens is a refund and an apology; a week later it
+is a refund, an apology and a brand that does not come back. So the worst is at
+the top, in that order:
+
+| Risk | What it means |
+|---|---|
+| A week **already opened** with nothing behind it | A refund conversation, not a backlog item |
+| A week opening within `AT_RISK_DAYS` with nothing built | An afternoon's work, if somebody sees it |
+| Running with nothing invoiced | It is on nobody's money |
+| Running with an unpaid invoice | An email |
+
+Every week is a BOX, and an empty box is a job — a gap in a row of boxes is
+visible from across a room in a way "3 of 4 slots filled" is not. And a console
+that is silent when it is happy and silent when it is broken teaches people to
+distrust it, so "nothing needs you here" is a thing it says out loud.
+
+It computes nothing of its own: the games come from `campaignGames` (a campaign
+can be mixed since C7), the slot state from the same document the brand portal
+reads, and it writes nothing. One query for the whole page rather than one per
+campaign — asserted, because this is the screen most likely to be left open on
+a second monitor.
+
+---
+
+### ▸ B101 — Two brands on one challenge · **SHIPPED**
+
+A co-sponsored challenge is two brands on the same competition — a publisher and
+an energy drink, a hardware brand and a tournament organiser. The owner set the
+ceiling: **at most two.**
+
+**It is a second column, not an array.** `co_sponsor_brand_id` makes "three
+brands" impossible to store, which is cheaper than making it illegal to write —
+no check constraint, no validator, no test for the day somebody wrote four. The
+lead stays `sponsor_brand_id` and every existing read is untouched.
+
+**The rule that matters: it is not paid until BOTH brands have paid.** Running
+it on one brand's money with the other's logo on it means the first funded the
+second's exposure. `billFor` now reads which brand each invoice belongs to and
+`bill.paid` requires one paid invoice per sponsor — and since the announce gate
+reads `bill.paid`, getting this wrong would not have produced a wrong number on
+a screen, it would have produced a promise to the whole network. Proven by
+removal: replacing the rule with `!!paidInvoice` turns `tests/db/co-sponsor.mts`
+red.
+
+The split is a field, not a constant: `leadSharePct` defaults to 50 because a
+publisher putting up prize money beside a drink brand putting up a logo is a
+70/30 deal, and `splitBill` rounds so the two halves always add back to the
+total — a cent missing from an invoice is a support ticket from somebody's
+finance department.
+
+**Was open, now closed by B107:** there was no gamer-facing "presented by" line
+anywhere in the product — not on the challenge page, not in the bot.
+Co-sponsorship was correct in the money and in admin, and the place a gamer would
+READ two brand names did not exist. B107 built it on four surfaces.
+
+---
+
+### ▸ B100 — The public server page · **SHIPPED**
+
+It was the locked-out screen with a badge row on top: three sections, one of
+which was a form asking whether you were the owner. It has two readers and was
+serving neither — a gamer who followed a challenge link and wants to know what
+this community is, and **an owner looking at a rival server**, which makes it
+the most valuable growth page in the product because owners are recruited by
+other owners.
+
+Now: the community in the owner's own words (games, regions, what kind of
+community), then what has actually happened here — gamers linked, trophies won,
+challenges run, what the server has been paid — then this week's standing from
+`livePool`, then the invite, then a door for the reader who runs a server too.
+The key form is last.
+
+**Everything on it is an aggregate.** No member is named, no roster is exposed,
+and a linked count under `PUBLIC_FLOOR` renders as "a few" rather than as a
+number that points at two people. The money shown is the SERVER's payouts —
+never a member's redemptions or CP, which are the gamer's own business.
+`tests/db/server-public.mts` asserts no member id, name or slug can escape the
+function at all.
+
+Also: the `sponsored_campaigns.prizes` ALTER moved after the CREATE it depends
+on. It ran first on a fresh database, failed, was correctly tolerated as an
+expected miss, and printed a warning on every test run — and a warning that is
+always there is one nobody reads the day it means something.
+
+---
+
+### ▸ B99 — The pool, in the open · **SHIPPED**
+
+A server owner's income was decided on a Monday by terms nobody outside the code
+had ever seen. That is an allowance, not a deal.
+
+`/pool` is public: this week's released pool, every server competing for it,
+what each has done, and what each would be paid if the week ended now. Plus the
+reserve, said out loud, because an owner who can see one exists has a reason to
+believe the pool is still there in January.
+
+**The part that matters is that it is not a second implementation.** The scoring
+moved out of `closeWeek` into `lib/week-standing.ts`; the close calls it for the
+week that just ended and the page calls it for the week in progress. Same terms,
+same brackets, same rounding, same flat participation share. `week-standing.ts`
+writes nothing — the close still owns every write it ever owned — which is what
+makes it safe to call from a public page on every request.
+
+A live estimate computed anywhere other than the code that decides the money is
+a number that drifts from the cheque, and the first time it drifts the owner is
+right to say we made it up. `tests/db/pool-live.mts` asserts the close contains
+no scoring of its own, which is the only way that stays true.
+
+---
+
+### ▸ B94–B98 — The account is real before it earns · **SHIPPED**
+
+The sprint that answers one question: *a gamer links a game account, joins a
+challenge, wins a trophy — and then what?* The old answer was that they held a
+locked balance and a trophy while we still did not know their age, their country
+or whether the inbox on file was theirs. Five changes, and the first one is a
+reversal of B83.
+
+| | What changed | Why |
+|---|---|---|
+| **B94** | **Nothing accrues before onboarding is finished.** No CP, no trophies, no challenge entry. The action is still WRITTEN (worth zero), so nothing looks like it vanished | A held balance is a promise made to an account we cannot price, cannot pay, and could not legally have made if the person turns out to be twelve |
+| **B94** | **Nobody is grandfathered.** The `unlocked_at = created_at` backfill is reversed for anybody who has not actually finished; the backfilled `email_verified_at` stamps are lifted too | The two facts we now require were never asked of the early accounts, and they are the two we cannot operate without. **Nothing they earned is taken** — the balance is there, shown as safe, and spendable the moment they finish |
+| **B95** | Bands are **13–17** and **18+**. Under-13 is **not selectable** — it is a link that explains the law, asks for a typed confirmation, and **deletes the account** | A third button that visibly ends the fun teaches a twelve-year-old to press one of the other two |
+| **B95** | A deleted under-13 **cannot sign up again**: a salted SHA-256 of the email and the Discord ID, a reason word and a date. Nothing else | Keeping nothing makes the deletion pointless — they are back in thirty seconds with a different answer |
+| **B95** | **No self-serve age change.** `MAX_BAND_CHANGES = 0`; corrections go through gamer support | The onboarding page designed the mis-tap out, which left the change budget doing one thing: letting a teenager pick 18+ on the day they want to cash out |
+| **B96** | A **check mark, not a label**: gold at 18+, blue under it, tooltip "Confirmed account" and never a number. On the profile and on every Discord card. **Hideable** in one switch | "13–17" written beside a handle on a card that gets posted in public channels is a flag for exactly the wrong readers |
+| **B97** | The third mandatory answer is a **theme**, with a live card preview beside the form. Avatar and bio stay optional | The mandatory part of "make it yours" is the part other people see. A profile builder at signup is a wall |
+| **B98** | The verification code is **sent at signup** on both paths, and the onboarding page shows a **masked** address | They typed it ten seconds ago; making them press a button to have it used is a step nobody wired up |
+
+**Found on the way, and it is the serious one:** `db.delete(users)` did not
+delete most of a user. Every table added after the original generated schema —
+quest events, trophies, redemptions, drafts, payout preference, Discord logs —
+was created by an idempotent `CREATE TABLE IF NOT EXISTS` in the migration list,
+and **none of those statements declares a foreign key**. Nothing read the
+orphans, so nothing complained. `purgeUserRows` in `lib/account-deletion.ts`
+deletes them explicitly and keeps the books (paid redemptions, vault ledger,
+allocations) on purpose. Found by asserting that an under-13 deletion removes
+everything.
+
+Tests: `tests/db/onboarding.mts` (rewritten — the grandfather assertion is now
+its opposite), `tests/db/under13.mts` (new), `tests/db/eligibility.mts`,
+`tests/db/rules.mts`.
+
+---
+
 ### ▸ B83 — The gamer onboarding, properly · **SHIPPED** *(D3; B83.5 still deferred)*
 
 B72.4 closes the legal hole plainly. **This is the version that is good.**
@@ -950,7 +1929,13 @@ quest action; it is simply not a lock.
 become a user → pick an age band on a Discord card → link an account (to compete)
 → tap the flag button → unlocked. They discover what the flag does on their own.
 
-#### B83.2 — The locked balance
+#### B83.2 — The locked balance · **REVERSED BY B94, kept for the reasoning**
+
+> B94 removed all of this: nothing accrues before onboarding is finished, and
+> nobody is grandfathered. Left in place because the argument below is a good
+> one and was right about the thing it was solving — it lost to a different
+> question, which is whether we should be promising anything at all to an
+> account whose age, country and inbox we do not know.
 
 - Accrues **only after the age band is set**. Caps at **5,000 CP**; earning stops
   there until they finish.
@@ -1133,10 +2118,16 @@ their own line in this budget.**
 
 ---
 
-### ▸ B78 — The model, restated · **SHIPPED**
+### ▸ B78 — The model, restated · **SHIPPED** *(and since superseded)*
 
-- `revenue = screens × CPM/1000 × fill`. **Fill was missing from our break-even —
-  our error, not a dispute.**
+⚠ **This entry describes the RETIRED ad-network model.** It is kept as the
+record of an error we corrected, not as a description of the business. Nothing
+here is billed on the retired CPM any more: a brand pays a fixed price per challenge, and
+impressions are delivery evidence rather than an invoice line. See B104.1 and
+`lib/challenge-billing.ts`.
+
+- `revenue = screens × CPM/1000 × fill`, under that retired, no-longer-used model.
+  **Fill was missing from our break-even — our error, not a dispute.**
 - Every rung declares **registered vs daily-active**. That switch alone is worth
   ~30× and our table never said which.
 - Cost and revenue use the **same** engagement assumption in the same paragraph.
@@ -1203,10 +2194,14 @@ the reviewer rated **fatal**.
 
 - Cold-start DDL replay: 219 raw statements, 108 `ALTER TABLE` (ACCESS
   EXCLUSIVE), 11 full-table `UPDATE`, on every cold boot against production. *(fatal)*
+  — **fixed: B80 (fingerprint marker) + B106 (claim, so one instance replays).**
 - Stat sync saturates at ~30 accounts — 60/hr sequential, no queue. *(fatal)*
+  — **fixed: B105.**
 - Per-award query cost: ~12 round-trips × 20 actions × 1M gamers = 240M
   queries/day; `quest_events` and `ad_impressions` unbounded, unpartitioned. *(fatal)*
+  — **unbounded tables fixed: B104 (90-day retention purge).**
 - Brand report loads every impression row into function heap. *(severe)*
+  — **already fixed: `lib/ad-delivery.ts` aggregates in SQL.**
 
 > **The tension we are not hiding:** these are deferrable only if our honest
 > position is "pre-revenue, scale is years away". But then the 1,000,000-gamer
@@ -1232,11 +2227,8 @@ the reviewer rated **fatal**.
 
 | Item | What |
 |---|---|
-| **B62** (web half) | Trophy stacking and no-price-on-your-own-case on `components/TrophyCase.tsx`. |
-| **B63** | The nav bands: today's mission and the streak. |
 | **B59** | A gamer can see and control their own card on the website. *(Largely absorbed by B83.5.)* |
 | **B56** (remainder) | Card kinds not yet on the new shared layout. |
-| **B68** | The social purge — posts, comments, reactions leave the product. |
 | **B66, B67, B69** | Admin sales console, brand portal rebuild, public site — **behind Gate 4**. |
 | **B70** | Component screenshots — **deferred**, the surfaces are all about to change. |
 | `tests/ui/cards.mjs` | Owed since B54. |
@@ -1258,7 +2250,7 @@ the reviewer rated **fatal**.
 
 | Not doing | Why |
 |---|---|
-| Defending the $5 CPM | We cannot prove it. A signed deal proves it or kills it — and even then it proves one deal, revocable if a verification vendor classifies our traffic as incentivised. |
+| Defending the $5 CPM *(from the retired ad-network model — no longer how anything is billed)* | We cannot prove it. A signed deal proves it or kills it — and even then it proves one deal, revocable if a verification vendor classifies our traffic as incentivised. |
 | Building the sales console, brand portal or admin rebuild now | They serve a revenue model that has not cleared Gate 1. |
 | Pivoting to CPA on paper | The strongest constructive idea in the report. A pivot announced without a signed deal is the same error in a new coat. |
 | Chasing the 1,234× number | Three disputed inputs compounded — conceded without reservation. Real numbers arrive within a month of B79. |
@@ -1274,12 +2266,17 @@ the reviewer rated **fatal**.
    number that means nothing?
 2. **Audience composition (B82):** aggregate only, cohort floor 25. Can a brand or
    server owner re-identify anyone? Is 25 the right floor?
-3. **The age design (§2 D3, B72.4, B83):** bands at 13/17, under-13 read-only,
-   no earning before answering, no backfill, self-declared. **Does that close the
-   COPPA exposure, or is a self-declared band worth nothing?** 2–3 paths.
-4. **B83's locked balance:** accrues only after the band is set, caps at 5,000 CP,
-   cannot be spent or redeemed, existing gamers grandfathered. Where is the
-   loophole?
+3. **The age design (§2 D3, B72.4, B95):** two selectable bands — 13–17 and 18+
+   — with under-13 as a link that deletes the account and blocks a re-signup on
+   a salted hash. Self-declared, answered once, no self-serve change. **Does
+   that close the COPPA exposure, or is a self-declared band worth nothing?**
+   2–3 paths.
+4. **B94 replaced B83's locked balance with nothing at all:** an unfinished
+   account earns no CP, wins no trophy and cannot enter a challenge, and every
+   pre-existing account now goes through the same three steps with its balance
+   held safe. Is "no carrot until you finish" the right trade, or did the locked
+   balance do real work in getting people to finish? And where is the loophole
+   in the under-13 delete-and-block — a hash of the email and the Discord ID?
 5. **§1.1 — what else is stale?** Twelve stored card layouts silently overrode a
    redesign and shipped to 15 servers. Where else does this codebase merge old
    stored state over new intent?

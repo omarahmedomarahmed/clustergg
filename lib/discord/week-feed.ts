@@ -11,6 +11,7 @@ import { ButtonStyle } from "@/lib/discord/types";
 import { currentWeek, weekBoard, weekTimezone } from "@/lib/profile-week";
 import { weekFromKey } from "@/lib/week";
 import { challengeStandings } from "@/lib/challenges";
+import { presentersFor, joinNames } from "@/lib/presented-by";
 
 // Profile of the Week, in every server, every day.
 //
@@ -235,28 +236,44 @@ async function sponsoredThisWeek(): Promise<string> {
   try {
     const db = await getDb();
     const since = new Date(Date.now() - 8 * 86400000);
+    // B107. This used to INNER JOIN the lead brand, which made a co-sponsor
+    // structurally impossible to name: the second brand paid half the bill and
+    // could not appear in the one line on the platform that named a sponsor to
+    // a gamer. Now it selects both ids and resolves them through
+    // `presentersFor`, in ONE query for the whole list.
+    //
+    // The join is gone rather than widened. Joining twice would have dropped a
+    // challenge whose co-sponsor row was deleted, which is the same class of
+    // bug in a new place.
     const rows = await db.select({
       id: schema.challenges.id,
       title: schema.challenges.title,
       game: schema.challenges.game,
-      brand: schema.brands.name,
+      sponsorBrandId: schema.challenges.sponsorBrandId,
+      coSponsorBrandId: schema.challenges.coSponsorBrandId,
     }).from(schema.challenges)
-      .innerJoin(schema.brands, eq(schema.challenges.sponsorBrandId, schema.brands.id))
       .where(and(
         sql`${schema.challenges.sponsorPrice} > 0`,
+        sql`${schema.challenges.sponsorBrandId} IS NOT NULL`,
         sql`${schema.challenges.endAt} >= ${since}`,
         sql`${schema.challenges.startAt} <= now()`,
       ))
       .limit(3);
     if (!rows.length) return "";
 
+    const presenters = await presentersFor(rows);
     const parts: string[] = [];
     for (const c of rows) {
+      const names = (presenters.get(c.id) ?? []).map((p) => p.name);
+      // A sponsored challenge whose brand rows have gone is still a real
+      // challenge — it just loses the "sponsored by" clause rather than the
+      // whole line.
+      const by = names.length ? ` — sponsored by ${joinNames(names)}` : "";
       const top = await challengeStandings(c.id, 1);
       const leader = top[0];
       parts.push(leader
-        ? `**${c.title}** — sponsored by ${c.brand}. ${leader.displayName} leads on ${c.game} with ${leader.points.toLocaleString()} points.`
-        : `**${c.title}** — sponsored by ${c.brand}, running on ${c.game} right now.`);
+        ? `**${c.title}**${by}. ${leader.displayName} leads on ${c.game} with ${leader.points.toLocaleString()} points.`
+        : `**${c.title}**${by}, running on ${c.game} right now.`);
     }
     return [`🏆 **This week's sponsored challenges**`, parts.join("\n")].join("\n");
   } catch { return ""; }

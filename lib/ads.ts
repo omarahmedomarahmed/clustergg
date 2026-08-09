@@ -8,6 +8,32 @@ export function hashIp(ip: string): string {
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex").slice(0, 32);
 }
 
+/**
+ * A stable identifier for one browsing session, derived from the session cookie
+ * and never containing any of it. B104.
+ *
+ * THE HOLE: the beacon stored `cluster_session.slice(-16)` — the last sixteen
+ * characters of the session JWT — in `ad_impressions.session_id`. Sixteen
+ * characters of a signature is not enough to forge anything, and that is not
+ * the point. It is a fragment of a CREDENTIAL sitting in an analytics table,
+ * which has a much lower security bar than the cookie jar it came from: staff
+ * read it, reports join on it, and every backup of that table now contains a
+ * piece of everybody's live session.
+ *
+ * Hashing costs nothing, because nothing ever needed the value. The only
+ * property the beacon wants is STABILITY — the same browser producing the same
+ * key so a second view of the same card can be deduped — and a hash has that.
+ *
+ * Salted with the same secret as `hashIp`, so a dump of this table cannot be
+ * matched against a rainbow table built somewhere else.
+ */
+export function hashSession(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  const salt = process.env.AD_ANALYTICS_SALT ?? "cluster-salt";
+  return createHash("sha256").update(`${salt}:session:${v}`).digest("hex").slice(0, 32);
+}
+
 export type ServedCreative = {
   campaignCreativeId: string;
   creativeId: string;

@@ -3,6 +3,7 @@ import Icon from "@/components/Icon";
 import EnquiryForm from "@/components/EnquiryForm";
 import BrandSignupForm from "@/components/BrandSignupForm";
 import ProductAtlas from "@/components/marketing/ProductAtlas";
+import LiveBotCard from "@/components/marketing/LiveBotCard";
 import { pricingLive } from "@/lib/pricing-live";
 import { money, quote } from "@/lib/pricing";
 
@@ -95,6 +96,19 @@ export default async function BrandsPage({
       </div>
 
       <BrandAtlas />
+
+      {/* B109. The deliverable, shown rather than described. A brand buying a
+          weekly challenge is buying this image appearing in servers full of
+          people who play that game — so the pitch should end with the image,
+          not with another paragraph about it. */}
+      <section className="mx-auto max-w-3xl px-4 pb-16">
+        <h2 className="text-2xl font-bold">What you are buying, rendered live</h2>
+        <p className="mt-2 mb-6 text-sm text-muted">
+          Your challenge, in the servers of people who already play the game. The card below is a real
+          render from the live platform — not an illustration of one.
+        </p>
+        <LiveBotCard kind="challenge" caption="A sponsored challenge just went live on this server." />
+      </section>
     </div>
   );
 }

@@ -68,7 +68,7 @@ export type PricingConfig = {
    *
    * They priced a three-shape rate card — placements only, placements plus
    * challenges, the whole network — with a paid Sunday-broadcast add-on on top.
-   * `docs/COMMERCIAL_MODEL_V2.md` merged all of it into ONE package priced per
+   * `docs/MODEL.md` merged all of it into ONE package priced per
    * challenge, with placements included free, and that is the offer the money
    * paths, the vault split and the brand builder now run on.
    *
@@ -145,7 +145,7 @@ export function derivePrizes<T extends PricingConfig>(cfg: T): T {
 export const PRICING_DEFAULTS: PricingConfig = derivePrizes({
   games: 6,
   challengesPerGame: 4,
-  // $350, per `docs/COMMERCIAL_MODEL_V2.md` §2 — one merged package, priced per
+  // $350, per `docs/MODEL.md` §2 — one merged package, priced per
   // challenge, of which half is prize money.
   challengePrice: 350,
   prizePct: 50,
@@ -432,7 +432,7 @@ export type EarnStage = {
 //
 // Every rung used to promise a percentage — "5% of every sponsored challenge",
 // "your share doubles to 10%", "you keep 25 of the 30 points Cluster charges".
-// That is the per-challenge rate `docs/COMMERCIAL_MODEL_V2.md` §4 replaced with
+// That is the per-challenge rate `docs/MODEL.md` §4 replaced with
 // a weekly pool, and this was the fourth place it lived: delete the other three
 // and the live `/servers` page goes on promising it.
 //

@@ -14,6 +14,19 @@ const now = (name: string) => timestamp(name, { withTimezone: true, mode: "date"
 export const users = pgTable("users", {
   id: id(),
   email: text("email").unique(),
+  /**
+   * When they proved they can read that inbox. B93.
+   *
+   * Null means unverified, and unverified means NOT EARNING — an account that
+   * costs nothing to create is an account somebody creates five hundred of, and
+   * the weekly pool now pays real money for linked members. A code in an inbox
+   * is the cheapest thing that makes a fake account cost something.
+   *
+   * Existing accounts are backfilled to their creation date by the migration:
+   * taking earning away from somebody who already had it, to close a hole they
+   * did not open, is the one thing this must not do.
+   */
+  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true, mode: "date" }),
   passwordHash: text("password_hash"),
   displayName: text("display_name").notNull(),
   slug: text("slug").notNull().unique(),
@@ -63,6 +76,17 @@ export const users = pgTable("users", {
    * counted, because a band that can change without limit means nothing.
    */
   ageBandChanges: integer("age_band_changes").notNull().default(0),
+  /**
+   * Draw the confirmed check mark beside this name? B96.
+   *
+   * On by default, because it is worth having. Off is one switch in settings and
+   * it applies everywhere at once — profile, Discord cards, pills. A mark whose
+   * colour distinguishes minors from adults is information a minor may not want
+   * public, and whether it is public is their call rather than ours.
+   *
+   * It changes nothing about what they may DO. See lib/verified-mark.ts.
+   */
+  showAgeMark: boolean("show_age_mark").notNull().default(true),
   /**
    * The address this account was created from. B80.
    *
@@ -124,6 +148,54 @@ export const users = pgTable("users", {
   createdAt: now("created_at"),
   lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: "date" }),
 }, (t) => [index("users_slug_idx").on(t.slug)]);
+
+/**
+ * A one-time code sent to an email, and the attempts against it. B93.
+ *
+ * The code is stored HASHED. It is short-lived and low-entropy by design — six
+ * digits somebody types off a phone — so the database holding it in clear would
+ * be the easiest account takeover in the product.
+ */
+export const emailCodes = pgTable("email_codes", {
+  id: id(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  /** Where it was sent. Kept so a resend to a changed address invalidates this. */
+  email: text("email").notNull(),
+  codeHash: text("code_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true, mode: "date" }).notNull(),
+  /** Wrong guesses. A code with too many is dead — see lib/email-verify.ts. */
+  attempts: integer("attempts").notNull().default(0),
+  usedAt: timestamp("used_at", { withTimezone: true, mode: "date" }),
+  createdAt: now("created_at"),
+}, (t) => [index("email_code_user_idx").on(t.userId, t.createdAt)]);
+
+/**
+ * People who told us they are under 13. B95.
+ *
+ * The account is deleted — genuinely, `db.delete(users)`, cascades and all —
+ * and this is the ONLY thing that survives it: a one-way hash of the Discord ID
+ * and of the email, so the same person cannot make the account again ten
+ * seconds later and pick a different answer.
+ *
+ * WHAT IS IN HERE, EXACTLY: a SHA-256 of an identifier and a date. No name, no
+ * email in readable form, no Discord ID in readable form, no age, no IP, no
+ * history. It cannot be searched by a human, cannot be reversed into a contact
+ * detail, and answers exactly one question — "has this identifier been here
+ * before" — which is the question the whole record exists to answer.
+ *
+ * Keeping something is not the comfortable option and it is the right one:
+ * keeping nothing means the deletion accomplishes nothing at all.
+ */
+export const blockedSignups = pgTable("blocked_signups", {
+  id: id(),
+  /** "discord" | "email". What kind of identifier the hash is of. */
+  kind: text("kind").notNull(),
+  /** SHA-256. Never the value itself, on any path. */
+  keyHash: text("key_hash").notNull(),
+  /** Why. One word — "under13" today, and the column exists so it can be more. */
+  reason: text("reason").notNull().default("under13"),
+  createdAt: now("created_at"),
+}, (t) => [uniqueIndex("blocked_signup_idx").on(t.kind, t.keyHash)]);
 
 export const oauthIdentities = pgTable("oauth_identities", {
   id: id(),
@@ -438,6 +510,24 @@ export const challenges = pgTable("challenges", {
    */
   kind: text("kind").notNull().default("standard"), // standard | welcome
   sponsorBrandId: text("sponsor_brand_id"),
+  /**
+   * The SECOND brand on a co-sponsored challenge. B101.
+   *
+   * A column rather than an array, and that is the design: the owner set a
+   * ceiling of two, and a nullable second column makes "three brands"
+   * impossible to store rather than merely illegal to write. See
+   * lib/co-sponsor.ts, which also owns the rule that a co-sponsored challenge
+   * is not paid until BOTH brands have paid.
+   */
+  coSponsorBrandId: text("co_sponsor_brand_id"),
+  /**
+   * The lead brand's percentage of the bill. The co-sponsor takes the rest.
+   *
+   * 50 is the default and not the rule — a publisher putting up the prize money
+   * beside a drink brand putting up a logo is a 70/30 deal, and that belongs in
+   * a field rather than in a comment explaining why the numbers look odd.
+   */
+  leadSharePct: integer("lead_share_pct").notNull().default(50),
   /** The ad campaign this challenge was bought under, when there is one. */
   sponsorCampaignId: text("sponsor_campaign_id"),
   /** What the brand paid for THIS challenge. Zero for anything unsponsored. */
@@ -531,7 +621,7 @@ export const guildSnapshots = pgTable("guild_snapshots", {
 /**
  * Every movement of money into and out of a vault. B86.
  *
- * The four vaults in `docs/COMMERCIAL_MODEL_V2.md` are only meaningful if their
+ * The four vaults in `docs/MODEL.md` are only meaningful if their
  * balance is a SUM OF ROWS rather than a stored number somebody edits. A stored
  * balance drifts, and there is no way to prove afterwards what it should have
  * been.

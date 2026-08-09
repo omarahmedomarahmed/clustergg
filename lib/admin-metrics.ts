@@ -26,7 +26,6 @@ export const METRICS: MetricDef[] = [
   { key: "users", label: "Gamers", definition: "Every user row. A Discord user is created the first time they run a bot command, so this counts bot users too.", group: "growth", href: "/admin/users", goodWhenUp: true },
   { key: "linkedAccounts", label: "Linked game accounts", definition: "Rows in linked_game_accounts — one per game account a gamer has connected. This is the number advertisers care about.", group: "growth", href: "/admin/linked-accounts", goodWhenUp: true },
   { key: "syncErrors", label: "Accounts failing sync", definition: "Linked accounts whose last sync errored. Each one is a gamer whose stats are stale.", group: "growth", href: "/admin/linked-accounts" },
-  { key: "posts", label: "Posts", definition: "Feed posts that haven't been deleted.", group: "content", goodWhenUp: true },
 
   { key: "guilds", label: "Servers running the bot", definition: "Discord servers with the bot installed and not removed.", group: "discord", href: "/admin/discord", goodWhenUp: true },
   { key: "guildMembers", label: "Reach", definition: "Combined member count of every server running the bot — the audience the bot can address.", group: "discord", href: "/admin/discord", goodWhenUp: true },
@@ -72,7 +71,6 @@ export async function loadMetrics(since?: Date): Promise<Metrics> {
       one("users", () => db.select({ c: count() }).from(schema.users)),
       one("linkedAccounts", () => db.select({ c: count() }).from(schema.linkedGameAccounts)),
       one("syncErrors", () => db.select({ c: count() }).from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.syncStatus, "error"))),
-      one("posts", () => db.select({ c: count() }).from(schema.posts).where(sql`${schema.posts.deletedAt} IS NULL`)),
 
       one("guilds", () => db.select({ c: count() }).from(schema.discordGuilds).where(sql`${schema.discordGuilds.removedAt} IS NULL`)),
       one("guildMembers", () => db.select({ c: sql<number>`coalesce(sum(${schema.discordGuilds.memberCount}), 0)` })

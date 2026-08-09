@@ -1,6 +1,6 @@
 // How a server earns a share of the weekly pool.
 //
-// `docs/COMMERCIAL_MODEL_V2.md` §4. This file is pure arithmetic over rows that
+// `docs/MODEL.md` §4. This file is pure arithmetic over rows that
 // have already been fetched — no queries — so the scoring can be tested against
 // fixtures and argued about without a database.
 //

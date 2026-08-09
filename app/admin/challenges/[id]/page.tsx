@@ -56,6 +56,8 @@ export default async function AdminChallengeLive({ params }: { params: Promise<{
     visibility: challenge.visibility ?? "public", guildId: challenge.guildId, guildIds: challenge.guildIds ?? [],
     accessKey: challenge.accessKey, announceHype: challenge.announceHype ?? false,
     sponsorBrandId: challenge.sponsorBrandId,
+    coSponsorBrandId: challenge.coSponsorBrandId,
+    leadSharePct: challenge.leadSharePct ?? 50,
     sponsorCampaignId: challenge.sponsorCampaignId,
     sponsorPrice: Number(challenge.sponsorPrice ?? 0),
     runsPlanned: challenge.runsPlanned ?? 1, runIndex: challenge.runIndex ?? 1,

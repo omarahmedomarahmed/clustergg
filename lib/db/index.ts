@@ -56,7 +56,28 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_adjust" jsonb NOT NULL DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announced_at" timestamptz`,
-  `ALTER TABLE "sponsored_campaigns" ADD COLUMN IF NOT EXISTS "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL`,
+  // B101. Two brands on one challenge, and never three — see lib/co-sponsor.ts.
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "co_sponsor_brand_id" text`,
+  `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "lead_share_pct" integer DEFAULT 50 NOT NULL`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "email_verified_at" timestamptz`,
+  // THE GRANDFATHER RULE, REVERSED. B94, and it is a decision rather than a fix.
+  //
+  // B93 stamped every pre-existing account as verified, on the principle that
+  // you do not take something away from somebody to close a hole they did not
+  // open. That principle still holds for their MONEY — balances, trophies and
+  // ranks are untouched by any of this.
+  //
+  // It does not hold for the fact itself. A stamp that says "this inbox was
+  // proved" against an inbox nobody ever proved is not a kindness, it is a
+  // false record, and the whole point of the column is to be able to reach a
+  // person about their own prize money. So the backfilled stamps are lifted and
+  // those accounts confirm an address like everybody else.
+  //
+  // `email_verified_at = created_at` identifies backfilled rows EXACTLY: the
+  // backfill copied one column into the other, and a real verification always
+  // lands later than the row was created. So this cannot clear a stamp somebody
+  // earned, and it is a no-op on every subsequent run.
+  `UPDATE "users" SET "email_verified_at" = NULL WHERE "email_verified_at" IS NOT NULL AND "email_verified_at" = "created_at"`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "baseline_at" timestamptz`,
   // ----- Quests & gamification (new tables; idempotent so both fresh and
@@ -314,6 +335,11 @@ const COLUMN_MIGRATIONS = [
     "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
+  // AFTER the CREATE, not before it. On a fresh database this ALTER ran ahead
+  // of the table it alters, failed, was correctly tolerated as an expected
+  // miss — and printed a scary line on every single test run. A warning that is
+  // always there is a warning nobody reads the day it means something.
+  `ALTER TABLE "sponsored_campaigns" ADD COLUMN IF NOT EXISTS "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL`,
   `CREATE INDEX IF NOT EXISTS "spc_brand_idx" ON "sponsored_campaigns" ("brand_id","created_at")`,
   `CREATE INDEX IF NOT EXISTS "spc_game_idx" ON "sponsored_campaigns" ("game","status")`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "sponsor_brand_id" text`,
@@ -820,6 +846,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band_set_at" timestamp with time zone`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "age_band_changes" integer DEFAULT 0 NOT NULL`,
+  `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "show_age_mark" boolean DEFAULT true NOT NULL`,
 
   // B72.2 — one viewer, one creative, one hour. A unique index because two
   // racing beacon calls would both pass a SELECT and both insert.
@@ -888,6 +915,29 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "server_charge_idx" ON "server_charges" ("guild_id","created_at")`,
 
+  `CREATE TABLE IF NOT EXISTS "email_codes" (
+    "id" text PRIMARY KEY NOT NULL,
+    "user_id" text NOT NULL,
+    "email" text NOT NULL,
+    "code_hash" text NOT NULL,
+    "expires_at" timestamp with time zone NOT NULL,
+    "attempts" integer DEFAULT 0 NOT NULL,
+    "used_at" timestamp with time zone,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS "email_code_user_idx" ON "email_codes" ("user_id","created_at")`,
+
+  // B95. The only thing that outlives an under-13 deletion. See the schema
+  // comment: hashes and a date, nothing that can be read back into a person.
+  `CREATE TABLE IF NOT EXISTS "blocked_signups" (
+    "id" text PRIMARY KEY NOT NULL,
+    "kind" text NOT NULL,
+    "key_hash" text NOT NULL,
+    "reason" text DEFAULT 'under13' NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "blocked_signup_idx" ON "blocked_signups" ("kind","key_hash")`,
+
   `CREATE TABLE IF NOT EXISTS "form_drafts" (
     "id" text PRIMARY KEY NOT NULL,
     "owner_type" text NOT NULL,
@@ -933,17 +983,37 @@ const COLUMN_MIGRATIONS = [
 
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "signup_ip" text`,
   `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "unlocked_at" timestamp with time zone`,
-  // B83's grandfather rule, as a migration rather than a runtime check.
+  // EVERY ACCOUNT GOES THROUGH ONBOARDING. B94.
   //
-  // Every account that existed before onboarding gained a lock is unlocked, at
-  // the moment it was created. It runs once (the marker in
-  // `runColumnMigrations` sees to that) and it is the entire promise that
-  // nothing anybody already earned is ever taken away.
+  // B83 unlocked every pre-existing account by copying `created_at` into
+  // `unlocked_at`. This lifts that stamp from anybody who has not actually
+  // finished the three steps — and it is the reversal of a promise, so it is
+  // worth being exact about what is and is not being taken.
   //
-  // Guarded on `created_at` being older than the deploy is NOT what this does,
-  // deliberately: an account created between the column landing and this
-  // statement running is also an account nobody told about a lock.
-  `UPDATE "users" SET "unlocked_at" = "created_at" WHERE "unlocked_at" IS NULL`,
+  //   TAKEN     the ability to earn, spend, redeem or enter a challenge, until
+  //             the steps are done. About a minute of work.
+  //   NOT TAKEN a single point, a single trophy, a rank, a placement, or any
+  //             history whatsoever. Everything is exactly where they left it,
+  //             and the page they land on says so in those words.
+  //
+  // Why it was worth doing: the two facts we now require of everybody — a
+  // confirmed inbox and a declared age band — are the two we cannot operate
+  // without. An account with neither cannot be paid, cannot be contacted about
+  // a prize, and might belong to a twelve-year-old. Grandfathering that is not
+  // generosity, it is carrying the hole forward forever.
+  //
+  // Idempotent by construction: it only ever clears a stamp on an account that
+  // does not meet the bar, and `unlockState` re-stamps the moment one does.
+  `UPDATE "users" SET "unlocked_at" = NULL
+     WHERE "unlocked_at" IS NOT NULL
+       AND (
+         "age_band" IS NULL
+         OR coalesce("country", '') = ''
+         OR "email_verified_at" IS NULL
+         OR NOT EXISTS (
+           SELECT 1 FROM "linked_game_accounts" l WHERE l."user_id" = "users"."id"
+         )
+       )`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "surface" text`,
   `ALTER TABLE "ad_impressions" ADD COLUMN IF NOT EXISTS "card_kind" text`,
   `CREATE INDEX IF NOT EXISTS "imp_kind_idx" ON "ad_impressions" ("campaign_creative_id", "card_kind")`,
@@ -996,7 +1066,7 @@ const COLUMN_MIGRATIONS = [
  * and the failure mode is a migration that silently never runs. Adding,
  * removing or editing any statement changes the hash by construction.
  */
-function migrationsFingerprint(): string {
+export function migrationsFingerprint(): string {
   // FNV-1a. Not cryptographic — it is a change detector, and a 32-bit collision
   // between two versions of a list we wrote ourselves is not a risk worth a
   // dependency.
@@ -1017,7 +1087,7 @@ function migrationsFingerprint(): string {
  * that controls whether migrations run should not sit in a table an admin
  * screen can edit.
  */
-async function migrationsAlreadyRun(db: DB, fingerprint: string): Promise<boolean> {
+export async function migrationsAlreadyRun(db: DB, fingerprint: string): Promise<boolean> {
   try {
     await db.execute(dsql.raw(
       `CREATE TABLE IF NOT EXISTS "schema_state" ("key" text PRIMARY KEY, "value" text NOT NULL, "updated_at" timestamp with time zone DEFAULT now() NOT NULL)`,
@@ -1037,6 +1107,73 @@ async function markMigrationsRun(db: DB, fingerprint: string): Promise<void> {
   } catch { /* the marker is an optimisation; failing to write it costs a replay */ }
 }
 
+/**
+ * How long one instance is allowed to hold the claim before the others stop
+ * believing it. B106.
+ *
+ * Long enough that a genuinely slow migration run is not trampled — the list is
+ * ~1000 statements and a cold Neon compute is not fast — and short enough that a
+ * lambda killed mid-run does not wedge every later boot behind a dead claim.
+ */
+export const MIGRATION_CLAIM_SECONDS = 120;
+/** How long a loser waits for the winner before it gives up and runs anyway. */
+export const MIGRATION_WAIT_MS = 4000;
+const MIGRATION_POLL_MS = 250;
+
+/**
+ * Exactly one instance runs the list. B106.
+ *
+ * THE DEFECT: `migrationsAlreadyRun` makes the STEADY state one tiny read, which
+ * is what B80 was for. It does nothing about the moment the fingerprint changes.
+ * On the deploy that changes it, every cold lambda reads "not run yet" at the
+ * same instant and every one of them starts replaying the same ~1000 statements
+ * — a hundred concurrent `ALTER TABLE`s taking ACCESS EXCLUSIVE on `users`,
+ * against a database that is also serving the traffic that woke them. The
+ * statements are idempotent, so nothing corrupts; the site just stops answering
+ * for the length of the lock queue, on the deploy, which is precisely when
+ * somebody is watching.
+ *
+ * So: an atomic claim. `INSERT … ON CONFLICT DO NOTHING RETURNING` either
+ * returns a row (we own it) or returns nothing (somebody else does), in one
+ * statement, with no read-then-write window for a second instance to slip
+ * through.
+ *
+ * A stale claim is taken over rather than waited on. The holder is a lambda and
+ * lambdas get killed; a claim that outlives its owner must not be able to block
+ * migrations forever, or the failure mode of this fix is worse than the thing it
+ * fixes.
+ */
+export async function claimMigrations(db: DB, fingerprint: string): Promise<boolean> {
+  try {
+    // Take over a claim whose owner has plainly died. Bounded by the same
+    // statement rather than a separate read, so two instances cannot both
+    // decide the claim is stale and both delete-then-insert.
+    await db.execute(dsql.raw(
+      `DELETE FROM "schema_state"
+         WHERE "key" = 'column_migrations:claim'
+           AND "updated_at" < now() - interval '${MIGRATION_CLAIM_SECONDS} seconds'`,
+    ));
+    const r = await db.execute(dsql`
+      INSERT INTO "schema_state" ("key", "value", "updated_at")
+      VALUES ('column_migrations:claim', ${fingerprint}, now())
+      ON CONFLICT ("key") DO NOTHING
+      RETURNING "key"
+    `);
+    return rowsOf(r).length > 0;
+  } catch {
+    // No claim table, no claim — fall through and run. Failing OPEN is the only
+    // safe direction: a migration that does not run is a column that does not
+    // exist, and that breaks the site permanently rather than briefly.
+    return true;
+  }
+}
+
+export async function releaseMigrations(db: DB): Promise<void> {
+  try {
+    await db.execute(dsql`DELETE FROM "schema_state" WHERE "key" = 'column_migrations:claim'`);
+  } catch { /* the stale-takeover above is the backstop */ }
+}
+
 async function runColumnMigrations(db: DB) {
   // The marker is written only after the whole list has run without throwing.
   // A partial run must replay: skipping the rest because we got most of the way
@@ -1044,31 +1181,52 @@ async function runColumnMigrations(db: DB) {
   const fingerprint = migrationsFingerprint();
   if (await migrationsAlreadyRun(db, fingerprint)) return;
 
-  for (const stmt of COLUMN_MIGRATIONS) {
-    try { await db.execute(dsql.raw(stmt)); }
-    catch (e) {
-      // The message we need is on the CAUSE, not on the error.
-      //
-      // Drizzle wraps a failed statement in a DrizzleQueryError whose own
-      // message is "Failed query: ALTER TABLE …" — the reason lives one level
-      // down. Testing only `String(e)` meant every expected miss (an ALTER
-      // against a table a later statement creates) looked unexpected and was
-      // rethrown, which took the whole bootstrap down on a fresh database.
-      const chain = [String(e), String((e as { cause?: unknown })?.cause ?? "")].join(" ");
-      if (!/already exists|does not exist/i.test(chain)) throw e;
-      // Say which one was skipped, and why.
-      //
-      // Most of these are expected — an ALTER against a table a later statement
-      // creates, run again on the next boot. But the swallow used to be
-      // completely silent, and a CREATE TABLE that quietly failed left a table
-      // missing with no trace anywhere: every query against it errored at
-      // request time, far away from the cause, and the migration list looked
-      // fine because it always looks fine. One line of warning is the
-      // difference between a five-minute diagnosis and an afternoon.
-      console.warn(`[migrate] skipped: ${stmt.slice(0, 70).replace(/\s+/g, " ")}… — ${String(e).slice(0, 120)}`);
+  if (!await claimMigrations(db, fingerprint)) {
+    // Somebody else is running the list. Wait a little — usually it finishes and
+    // this boot does nothing at all, which is the whole point.
+    const until = Date.now() + MIGRATION_WAIT_MS;
+    while (Date.now() < until) {
+      await new Promise((r) => setTimeout(r, MIGRATION_POLL_MS));
+      if (await migrationsAlreadyRun(db, fingerprint)) return;
     }
+    // It did not finish in time. Run it anyway rather than boot a process whose
+    // schema might be half a version behind: the statements are idempotent, so
+    // the cost of duplicating is a slow boot, and the cost of skipping is a
+    // request that 500s on a missing column.
+    console.warn("[migrate] claim held elsewhere and not finished — running anyway");
   }
-  await markMigrationsRun(db, fingerprint);
+
+  try {
+    for (const stmt of COLUMN_MIGRATIONS) {
+      try { await db.execute(dsql.raw(stmt)); }
+      catch (e) {
+        // The message we need is on the CAUSE, not on the error.
+        //
+        // Drizzle wraps a failed statement in a DrizzleQueryError whose own
+        // message is "Failed query: ALTER TABLE …" — the reason lives one level
+        // down. Testing only `String(e)` meant every expected miss (an ALTER
+        // against a table a later statement creates) looked unexpected and was
+        // rethrown, which took the whole bootstrap down on a fresh database.
+        const chain = [String(e), String((e as { cause?: unknown })?.cause ?? "")].join(" ");
+        if (!/already exists|does not exist/i.test(chain)) throw e;
+        // Say which one was skipped, and why.
+        //
+        // Most of these are expected — an ALTER against a table a later statement
+        // creates, run again on the next boot. But the swallow used to be
+        // completely silent, and a CREATE TABLE that quietly failed left a table
+        // missing with no trace anywhere: every query against it errored at
+        // request time, far away from the cause, and the migration list looked
+        // fine because it always looks fine. One line of warning is the
+        // difference between a five-minute diagnosis and an afternoon.
+        console.warn(`[migrate] skipped: ${stmt.slice(0, 70).replace(/\s+/g, " ")}… — ${String(e).slice(0, 120)}`);
+      }
+    }
+    await markMigrationsRun(db, fingerprint);
+  } finally {
+    // Released even when a statement throws, so a real migration failure costs
+    // one boot rather than every boot for the next two minutes.
+    await releaseMigrations(db);
+  }
 }
 
 async function ensureProvisioned(db: DB) {

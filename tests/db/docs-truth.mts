@@ -1,0 +1,172 @@
+// The documents describe the product that exists. B112.
+//
+// ===== WHY THIS SUITE EXISTS =====
+//
+// Twice, a wrong statement about the product was written into copy and into the
+// plan, by the same mechanism both times:
+//
+//   1. "Brands are billed on impressions." They are billed a fixed price per
+//      challenge. It reached the COOKIE POLICY — legal copy — before the owner
+//      caught it.
+//   2. "Following, messaging and gifting stay." Gifting was deleted in B72.3
+//      for money-transmission reasons. It reached `docs/PLAN.md` and a pushed
+//      commit message.
+//
+// Neither was a typo. **The code was right both times.** Both came from reading
+// a document written before the change and repeating it as fact — and
+// `docs/legacy/` is full of such documents, because that is the folder's job.
+//
+// `tests/db/marketing-truth.mts` guards the public pages. `dataroom-truth.mts`
+// guards the deck. Nothing guarded the documents an engineer — or a model —
+// actually reads before writing either of them. This is that.
+//
+//   DEMO_DB=1 npx tsx tests/db/docs-truth.mts
+
+process.env.DEMO_DB = "1";
+
+import { readFileSync, existsSync, readdirSync } from "node:fs";
+
+let pass = 0;
+const fails: string[] = [];
+const ok = (name: string, cond: boolean, detail = "") => {
+  if (cond) { pass++; console.log(`  ok   ${name}`); }
+  else { fails.push(name); console.log(`  FAIL ${name}${detail ? ` — ${detail}` : ""}`); }
+};
+
+const at = (p: string) => new URL(`../../${p}`, import.meta.url);
+const read = (p: string) => readFileSync(at(p), "utf8");
+
+const { RETIRED, LIVE_DOCS, RETIRED_QUOTE, NOT_A_MENTION } = await import("../../lib/retired.ts");
+
+/** A mention is excused only by its OWN line, or by an explicit quote marker above it. */
+const excused = (lines: string[], i: number, cleared: string[]) => {
+  const line = lines[i].toLowerCase();
+  if (cleared.some((c) => line.includes(c.toLowerCase()))) return true;
+  // The marker may sit on the line or immediately above it, so a quoted block
+  // does not need the comment inside every line of the quote.
+  return [lines[i], lines[i - 1] ?? "", lines[i - 2] ?? ""].some((l) => l.includes(RETIRED_QUOTE));
+};
+
+console.log("== every retired feature is still retired in the code ==");
+{
+  // The registry is only worth trusting if its claims are checkable. An entry
+  // whose evidence file stopped saying what the entry claims is an entry that
+  // has drifted — which would make this whole suite guard a fiction.
+  for (const r of RETIRED) {
+    ok(`${r.what}: the evidence file exists`, existsSync(at(r.evidence)), r.evidence);
+    ok(`…and still says so`, read(r.evidence).includes(r.evidenceSays),
+      `${r.evidence} no longer contains "${r.evidenceSays}"`);
+    ok(`…and the entry says WHY`, r.why.length > 40,
+      "an entry with no reason is an entry somebody reverses");
+  }
+  ok("there is more than one entry", RETIRED.length >= 4, String(RETIRED.length));
+}
+
+console.log("\n== no live document claims a retired feature exists ==");
+{
+  for (const doc of LIVE_DOCS) {
+    if (!existsSync(at(doc))) { ok(`${doc} exists`, false); continue; }
+    const lines = read(doc).split("\n");
+    const bad: string[] = [];
+
+    for (const r of RETIRED) {
+      const re = new RegExp(r.pattern, "i");
+      lines.forEach((line, i) => {
+        const stripped = line.replace(NOT_A_MENTION, " ");
+        if (!re.test(stripped)) return;
+        if (excused(lines, i, r.cleared)) return;
+        bad.push(`${doc}:${i + 1} [${r.what}] ${line.trim().slice(0, 80)}`);
+      });
+    }
+    ok(`${doc} never mentions a retired feature without saying it is gone`,
+      bad.length === 0, bad.slice(0, 3).join(" | "));
+  }
+}
+
+console.log("\n== the history folder says it is history ==");
+{
+  // `docs/legacy/EXECUTION_PLAN.md` is where B68's brief lives, and quoting it
+  // as current is exactly what produced the gifting error. Only one file in the
+  // folder used to say it was historical.
+  const dir = "docs/legacy";
+  const files = readdirSync(at(dir)).filter((f) => f.endsWith(".md"));
+  ok("there are legacy documents to mark", files.length > 5, String(files.length));
+  for (const f of files) {
+    const src = read(`${dir}/${f}`);
+    ok(`${f} carries the banner`, src.includes("LEGACY-BANNER"),
+      "a stale document that does not announce itself is a trap");
+    ok(`…in the first 40 lines`, src.split("\n").slice(0, 40).join("\n").includes("LEGACY-BANNER"),
+      "a warning below the fold is a warning nobody reads");
+  }
+}
+
+console.log("\n== the banner says the two things that actually went wrong ==");
+{
+  const banner = read("docs/legacy/EXECUTION_PLAN.md").split("\n").slice(0, 40).join("\n");
+  ok("it names the impressions error", /impressions/i.test(banner),
+    "a generic 'this may be out of date' is a warning people skim");
+  ok("…and the gifting one", /gifting/i.test(banner));
+  ok("…and says the code wins", /the code is right/i.test(banner));
+  ok("…and points at what is current", /docs\/PLAN\.md/.test(banner));
+}
+
+console.log("\n== the two known-wrong claims, by name ==");
+{
+  // Belt and braces. The generic rule above should catch these; these assert
+  // the specific sentences that actually shipped can never come back.
+  // Same paragraph window as the generic rule. A flagged QUOTE of a dated
+  // document is allowed — B111's entry quotes B68's brief on purpose, with the
+  // correction directly beneath it — and an unflagged assertion is not.
+  const SHIPPED_WRONG = [
+    {
+      label: "brands pay per impression",
+      re: /brands?\s+(?:are\s+)?(?:pay|billed|charged)[^.\n]{0,40}(?:per\s+impression|impressions|CPM)/i,
+      why: "the invoice line is quantity: challenges × unitAmount: challengePrice",
+    },
+    {
+      label: "gifting listed as a live feature",
+      re: /(?:following|messaging)[^.\n]{0,30}\bgifting\b/i,
+      why: "gifting was deleted in B72.3 — this is the exact sentence that shipped",
+    },
+  ];
+  const CLEARS = /delet|retired|removed|gone|no longer|⚠|out of date|superseded|B72\.3|B104\.1|B111\.1|True when written/i;
+
+  for (const doc of LIVE_DOCS.filter((d) => existsSync(at(d)))) {
+    const lines = read(doc).split("\n");
+    for (const s of SHIPPED_WRONG) {
+      const bad: string[] = [];
+      lines.forEach((line, i) => {
+        if (!s.re.test(line)) return;
+        const own = CLEARS.test(line);
+        const quoted = [line, lines[i - 1] ?? "", lines[i - 2] ?? ""].some((l) => l.includes(RETIRED_QUOTE));
+        if (!own && !quoted) bad.push(`${doc}:${i + 1}: ${line.trim().slice(0, 80)}`);
+      });
+      ok(`${doc}: ${s.label} — never unflagged`, bad.length === 0, `${bad.join(" | ")} — ${s.why}`);
+    }
+  }
+}
+
+console.log("\n== the pricing in the docs is not a second rate card ==");
+{
+  // B110 found the investor deck quoting $250 when the price was $350. The same
+  // numbers had been copied into PAYMENTS.md.
+  const { PRICING_DEFAULTS, money, perGame } = await import("../../lib/pricing.ts");
+  const cfg = PRICING_DEFAULTS;
+  const live = [cfg.challengePrice, cfg.prizePool, perGame(cfg)];
+  for (const doc of ["docs/PAYMENTS.md", "docs/MODEL.md"]) {
+    if (!existsSync(at(doc))) continue;
+    const src = read(doc);
+    for (const n of live) {
+      ok(`${doc} does not restate ${money(n, cfg.currency)}`,
+        !src.includes(money(n, cfg.currency)),
+        "right today, wrong the day the price moves — point at lib/pricing.ts instead");
+    }
+    ok(`${doc} points at the source instead`,
+      !/\$\d[\d,]*\s*(?:\/|per)\s*month/i.test(src) || /lib\/pricing\.ts/.test(src),
+      "a document that quotes a rate is a rate we are held to by whoever read it");
+  }
+}
+
+console.log(`\n${pass} passed, ${fails.length} failed`);
+if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
+process.exit(0);

@@ -6,7 +6,7 @@ import { PRICING_DEFAULTS, prizeSharePct, type PricingConfig } from "@/lib/prici
 //
 // A server's tier used to be a RATE: 5%, 10% or 25% of every sponsored
 // challenge, apportioned by the share of entrants that server contributed.
-// `docs/COMMERCIAL_MODEL_V2.md` §4 replaced it with a weekly competitive pool,
+// `docs/MODEL.md` §4 replaced it with a weekly competitive pool,
 // and the two could not both exist — running them together would pay owners
 // twice out of a 15% line and promise them twice on a public page.
 //

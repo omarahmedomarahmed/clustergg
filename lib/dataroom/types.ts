@@ -148,6 +148,14 @@ export type SectionData = {
 
   // unit — one line per unit of sale.
   units?: { label: string; revenue: number; cost: number; note?: string }[];
+  /**
+   * Compute the unit rows from the live rate card instead of reading `units`.
+   *
+   * B110. The shipped deck sets this. `units` stays for a section somebody
+   * hand-builds in the editor — but a hand-built row is a typed number, and a
+   * typed number is what this flag exists to stop being the default.
+   */
+  liveUnits?: boolean;
 
   // saas — hand-entered metrics shown NEXT TO the live ones, never instead of
   // them. Anything the database can answer is read from the database.

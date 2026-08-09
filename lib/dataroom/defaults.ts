@@ -226,7 +226,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "10 · Always-on",
         title: "Always-on beats weekend-only.",
         subtitle:
-          "A tournament is two days, six figures, and hard to prove. A challenge runs every week for $250 and is scored by the game's own API. Here is where each dollar goes.",
+          "A tournament is two days, six figures, and hard to prove. A challenge runs every week for {{challengePrice}} and is scored by the game's own API. Here is where each dollar goes.",
       },
 
       // ---------- 11. PRODUCT MAGIC ----------
@@ -324,8 +324,8 @@ export const SEED_DOCS: SeedDoc[] = [
             currency: "USD",
           },
           useOfFunds: [
-            { label: "Brand acquisition — the first month free", pct: 30, note: "30 brands × 4 sponsored challenges × $250. Naming rights on challenges we already run, so this is the invoice we don't send rather than cash out — the whole line is customer acquisition cost" },
-            { label: "Prize pools — the competitions themselves", pct: 25, note: "6 games × 4 challenges × 6 months × $175 = $25,200. Every challenge pays out whether or not it's sold; this is what keeps something worth entering live in every game, every week" },
+            { label: "Brand acquisition — the first month free", pct: 30, note: "30 brands × {{challengesPerGame}} sponsored challenges × {{challengePrice}}. Naming rights on challenges we already run, so this is the invoice we don't send rather than cash out — the whole line is customer acquisition cost" },
+            { label: "Prize pools — the competitions themselves", pct: 25, note: "{{games}} games × {{challengesPerGame}} challenges × 6 months × {{prizePool}} of prize money. Every challenge pays out whether or not it's sold; this is what keeps something worth entering live in every game, every week" },
             { label: "Server onboarding — the welcome challenge", pct: 25, note: "1,000 servers × $25. A funded private competition on the day a community installs the bot — the only offer that reaches members rather than owners" },
             { label: "Infrastructure, game APIs & partnerships", pct: 10, note: "Hosting, card rendering, the official game-API access every verified stat depends on, and the partnership work that opens new games" },
             { label: "Team", pct: 10, note: "Four people at early-stage rates for six months. The line that has to rise first, and what the next round is for" },
@@ -421,13 +421,12 @@ export const SEED_DOCS: SeedDoc[] = [
         title: "One transaction, repeated",
         subtitle:
           "Every number here is the live rate card. Cost of goods is the prize — there is no third line, because there is no operations team between the money and the players.",
-        data: {
-          units: [
-            { label: "One weekly challenge", revenue: 250, cost: 175, note: "$175 is the prize, paid as three trophies carrying the sponsor's brand. The only cost of goods." },
-            { label: "One game, one month", revenue: 1000, cost: 700, note: "Four challenges. The prize cost is fixed per month — a second sponsor does not double it." },
-            { label: "Six games, one month", revenue: 6000, cost: 4200, note: "The full catalogue as sold today, before placement revenue and before the add-on." },
-          ],
-        },
+        // B110. These were three typed rows — { revenue: 250, cost: 175 } —
+        // under a subtitle claiming "every number here is the live rate card".
+        // The costs had been kept in step with the prize and the revenues had
+        // not, so every margin on the slide was understated by the gap between
+        // the price we charge and the price somebody typed in another quarter.
+        data: { liveUnits: true },
       },
       {
         kind: "saas",
@@ -449,7 +448,7 @@ export const SEED_DOCS: SeedDoc[] = [
             {
               label: "Today's sellable inventory",
               value: "$6,400 / mo",
-              note: "Six games at $1,000 a month plus the $400 ultimate base — one brand taking the whole network. The rate card is published, so this is checkable.",
+              note: "{{games}} games at {{perGameMonth}} a month — {{networkMonth}} for one brand taking the whole network. The rate card is published, so this is checkable.",
               source: "clustergg.com/pricing · the live rate card this page reads from",
             },
             {
@@ -631,7 +630,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "1 · The unit",
         title: "It all rests on one number.",
         subtitle:
-          "A brand pays $250 for a sponsored challenge. $175 of that is the prize pool and reaches a gamer — we never touch it. The $75 platform fee is the only line the business lives on, and every total in this document is built from it.",
+          "A brand pays {{challengePrice}} for a sponsored challenge. {{prizePool}} of that is the prize pool and reaches a gamer — we never touch it. The {{platformFee}} platform fee is the only line the business lives on, and every total in this document is built from it.",
         data: {},
       },
       {
@@ -676,8 +675,8 @@ export const SEED_DOCS: SeedDoc[] = [
             currency: "USD",
           },
           useOfFunds: [
-            { label: "Brand acquisition — the first month free", pct: 30, note: "30 brands x 4 sponsored challenges x $250. Naming rights on challenges we already run, so this is the invoice we don't send rather than cash out" },
-            { label: "Prize pools — the competitions themselves", pct: 25, note: "6 games x 4 challenges x 6 months x $175 = $25,200. Every challenge pays out whether or not it is sold" },
+            { label: "Brand acquisition — the first month free", pct: 30, note: "30 brands x {{challengesPerGame}} sponsored challenges x {{challengePrice}}. Naming rights on challenges we already run, so this is the invoice we don't send rather than cash out" },
+            { label: "Prize pools — the competitions themselves", pct: 25, note: "{{games}} games x {{challengesPerGame}} challenges x 6 months x {{prizePool}} of prize money. Every challenge pays out whether or not it is sold" },
             { label: "Server onboarding — the welcome challenge", pct: 25, note: "1,000 servers x $25. A funded private competition on the day a community installs the bot" },
             { label: "Infrastructure, game APIs & partnerships", pct: 10, note: "Hosting, card rendering, official game-API access, and the partnership work that opens new games" },
             { label: "Team", pct: 10, note: "Four people at early-stage rates for six months" },

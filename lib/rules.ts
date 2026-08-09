@@ -26,7 +26,7 @@
 // say less and say it exactly.
 
 import { BRACKETS, PARTICIPATION_SHARE } from "@/lib/server-score";
-import { LOCKED_CP_CAP } from "@/lib/unlock";
+import { UNLOCK_STEPS } from "@/lib/unlock";
 import { MIN_WITHDRAWAL } from "@/lib/server-wallet";
 import { PRIVATE_FEE_PCT, MIN_PRIZE_POOL } from "@/lib/private-quote";
 import { US_REPORT_THRESHOLD } from "@/lib/eligibility";
@@ -72,9 +72,10 @@ export const RULES: Record<Audience, Rule[]> = {
     },
     {
       topic: "Getting started",
-      rule: `Points build up to ${LOCKED_CP_CAP.toLocaleString("en-US")} before you finish setting up, and stop there until you do.`,
-      why: "Nothing is taken and nothing expires. You get to see what earning feels like before you "
-        + "commit to anything, and finishing takes about a minute.",
+      rule: `Nothing counts until all ${UNLOCK_STEPS} setup steps are done — no points, no trophies, no challenge entries.`,
+      why: "We will not promise you a balance before we know whether we are allowed to pay you. "
+        + "Anything you earned before we started asking is safe and untouched, and finishing "
+        + "takes about a minute.",
     },
     {
       topic: "Playing",

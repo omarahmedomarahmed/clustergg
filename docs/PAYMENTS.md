@@ -32,7 +32,7 @@ has failed and the answer is a different provider, not a new column.
 
 | | Who | What it looks like | What actually matters |
 |---|---|---|---|
-| **Collect** | Brands pay us | A handful of B2B invoices a month, $600–$5,000, from companies anywhere | A finance department can pay it by card or transfer **without an account**, and the receipt is a real invoice |
+| **Collect** | Brands pay us | A handful of B2B invoices a month, roughly one to ten thousand dollars, from companies anywhere | A finance department can pay it by card or transfer **without an account**, and the receipt is a real invoice |
 | **Payout** | We pay server owners | Recurring, named counterparties, real amounts, tax-reportable | Their bank details are entered **on the provider's page**, and their tax form is the provider's problem |
 | **Rewards** | Gamers cash out trophies | High volume, small amounts, often teenagers, often unbanked, anywhere on earth | We **never ask** where the money should go — they choose for themselves |
 
@@ -214,19 +214,28 @@ and correct; it simply cannot be used until incorporation says otherwise.
 
 An invoice is **derived**, not typed. `lib/invoices.ts` builds it from the same
 `quote()` the public pricing page runs, so a bill can never quote a price the
-website doesn't:
+website doesn't.
+
+**Do not reproduce the numbers here.** They live in `lib/pricing.ts`
+(`PRICING_DEFAULTS`, overridable per-install from the CMS) and this document has
+already been wrong once by copying them: it described a **$600 placements base**,
+a **$100 tier discount** and a **$250** challenge under a heading claiming the
+bill is derived. All three were retired by **C11** — `reachBase`, `challengeBase`
+and `ultimateBase` are now **0** and there is one package, priced per challenge —
+and the price had moved besides. A page that quotes a rate is a rate we are held
+to by whoever read it.
+
+The shape, which is what this document is for:
 
 ```
-Placements only              base $600 / month
-Sponsor one game's challenges  + $1,000   (4 weekly challenges × $250)
-                               −   $100   (the base drops to $500 — you stop
-                                           paying for reach and start paying
-                                           for games)
+Sponsor a game's challenges   games × challengesPerGame × challengePrice
+                              ( → lib/pricing.ts: perGame() )
+Optional add-ons              streamAddon, when taken
+Yearly                        12 months less yearlyDiscountPct
 ```
 
-That $100 is not a promotion somebody remembers to apply. It falls out of
-`reachBase` and `challengeBase` being different numbers, and it's printed as its
-own line so a brand sees the discount rather than a total they have to trust.
+Half of the challenge price is the prize pool and never ours — that split is
+`DEFAULT_SPLIT` in `lib/vaults.ts` and is described in `docs/MODEL.md`.
 
 **Then every line is editable** — label, quantity, amount — and a discount is a
 line with a negative amount. Sales negotiates; a billing system that refuses to

@@ -899,6 +899,12 @@ function joinFailure(reason: string, unmet?: string[]): string {
     case "locked": return "This one needs an entry key — it was sent to the server running the challenge.";
     case "bad_key": return "That key isn't right. Ask a mod in the server running this challenge for the current one.";
     case "not_active": return "That challenge isn't live anymore.";
+    // B94. Said with the reason, because "finish setting up" on its own reads
+    // as a nag rather than as the thing standing between them and a prize.
+    case "onboarding":
+      return "Finish setting up your Cluster account first — it takes a minute at "
+        + "**clustergg.com/onboarding**. We need to know your age and your country before you can "
+        + "win something we might have to pay you for.";
     default: return "Couldn't join that challenge.";
   }
 }

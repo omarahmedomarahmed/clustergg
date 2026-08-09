@@ -4,6 +4,17 @@ import { uid } from "@/lib/utils";
 import { hashIp } from "@/lib/ads";
 import { MAX_FAILURES, LOCKOUT_MS } from "@/lib/portal-auth";
 
+/**
+ * Wrong keys from one address before it is locked out, across every portal.
+ *
+ * Higher than `MAX_FAILURES` on purpose. One address is often one OFFICE — a
+ * brand and their agency behind the same NAT, two people each mistyping their
+ * own key — and a shared address is not evidence of an attack. What it is
+ * evidence of, at three times the per-portal limit, is somebody working through
+ * a list.
+ */
+export const MAX_IP_FAILURES = MAX_FAILURES * 3;
+
 // The record of who tried to open a portal, and whether they got in.
 //
 // Separate from `portal-auth` on purpose: that module is pure crypto and has no
@@ -56,6 +67,61 @@ export async function lockState(kind: PortalKind, portalId: string): Promise<Loc
   } catch {
     // If we can't tell, let them try. Locking every portal because a query
     // failed would turn a database blip into an outage for every customer.
+    return UNLOCKED;
+  }
+}
+
+/**
+ * Too many wrong keys FROM ONE ADDRESS, across every portal. B103.
+ *
+ * ===== WHY THE PER-PORTAL LOCK IS NOT ENOUGH =====
+ *
+ * `lockState` counts failures against ONE portal, so somebody spraying a
+ * guessed key across two hundred servers never trips it: four tries each, no
+ * portal reaches five, and the attempt costs nothing. The whole value of a
+ * short shared secret is that guessing it has to be expensive, and per-portal
+ * counting made it free at exactly the scale an attacker would use.
+ *
+ * So this counts the OTHER way: every failure from one address, whichever
+ * portal it was aimed at. The two locks answer different questions and both are
+ * checked — "is this portal under attack" and "is this person attacking".
+ *
+ * ===== IT COUNTS A HASH, NOT AN ADDRESS =====
+ *
+ * `hashedIp` is what the table already stores, and it is what this reads. The
+ * address itself is never written, so a lockout cannot be turned into a log of
+ * who was where.
+ *
+ * ===== IT IGNORES SUCCESSES DELIBERATELY =====
+ *
+ * `lockState` resets on a success, because getting into your own portal proves
+ * you are not guessing. That reasoning does not carry here: an attacker who
+ * owns one legitimate portal would otherwise reset their own spray counter by
+ * signing into it every fifth attempt.
+ */
+export async function ipLockState(ip: string | null | undefined): Promise<LockState> {
+  if (!ip) return UNLOCKED;
+  try {
+    const db = await getDb();
+    const since = new Date(Date.now() - LOCKOUT_MS);
+    const rows = await db.select({ at: schema.portalLoginAttempts.createdAt })
+      .from(schema.portalLoginAttempts)
+      .where(and(
+        eq(schema.portalLoginAttempts.hashedIp, hashIp(ip)),
+        eq(schema.portalLoginAttempts.ok, false),
+        gte(schema.portalLoginAttempts.createdAt, since),
+      ))
+      .orderBy(desc(schema.portalLoginAttempts.createdAt))
+      .limit(MAX_IP_FAILURES + 1);
+
+    if (rows.length < MAX_IP_FAILURES) {
+      return { locked: false, failures: rows.length, retryInMs: 0 };
+    }
+    const retryInMs = Math.max(0, rows[0].at.getTime() + LOCKOUT_MS - Date.now());
+    return { locked: retryInMs > 0, failures: rows.length, retryInMs };
+  } catch {
+    // Same reasoning as `lockState`: if we cannot tell, let them try. A
+    // database blip must not lock every customer out at once.
     return UNLOCKED;
   }
 }

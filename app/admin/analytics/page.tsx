@@ -78,7 +78,6 @@ export default async function ProductAnalyticsPage({ searchParams }: {
           <Windowed label="Bot interactions" value={window.botCommands} total={total.botCommands} days={days} />
           <Windowed label="Ad impressions" value={window.adImpressions} total={total.adImpressions} days={days} />
           <Windowed label="Ad clicks" value={window.adClicks} total={total.adClicks} days={days} />
-          <Windowed label="Posts" value={window.posts} total={total.posts} days={days} />
         </div>
       </AdminSection>
 

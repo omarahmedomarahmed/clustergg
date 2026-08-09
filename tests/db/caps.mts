@@ -36,6 +36,11 @@ const db = await getDb();
 const id = uid();
 await db.insert(schema.users).values({
   id, slug: `caps-${id.slice(0, 6)}`, displayName: "Caps", email: `${id}@test.invalid`, passwordHash: "x", ageBand: "adult",
+  // B94 gates earning on a finished onboarding, and this fixture predates it.
+  // Without `unlockedAt` every award pays 0 — a red suite that says nothing
+  // about caps. The gate has its own suite (`tests/db/onboarding.mts`); this
+  // one is about what the caps do AFTER it.
+  unlockedAt: new Date(),
 } as never);
 
 console.log("== past the cap, the action still works ==");
@@ -95,6 +100,7 @@ const heavy = uid();
 await db.insert(schema.users).values({
   id: heavy, slug: `caps2-${heavy.slice(0, 6)}`, displayName: "Heavy",
   email: `${heavy}@test.invalid`, passwordHash: "x", ageBand: "adult",
+  unlockedAt: new Date(),
 } as never);
 const [wide] = await db.select().from(schema.quests).where(sqlEq(schema.quests.key, "orbit")).limit(1);
 const wW = { ...(wide.actionWeights as Record<string, number>) };

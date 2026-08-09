@@ -41,6 +41,14 @@ export async function register(_prev: FormState, formData: FormData): Promise<Fo
     .where(eq(schema.users.email, email)).limit(1);
   if (existing) return { error: "An account with this email already exists." };
 
+  // B95. Somebody who told us they were under 13 had their account deleted; the
+  // only thing kept was a hash of this address, precisely so the next signup ten
+  // seconds later does not undo the whole thing.
+  {
+    const { isSignupBlocked, BLOCKED_SIGNUP_MESSAGE } = await import("@/lib/under13");
+    if (await isSignupBlocked(db, { email })) return { error: BLOCKED_SIGNUP_MESSAGE };
+  }
+
   let slug = slugify(displayName);
   const [slugTaken] = await db.select({ id: schema.users.id }).from(schema.users)
     .where(eq(schema.users.slug, slug)).limit(1);
@@ -73,6 +81,16 @@ export async function register(_prev: FormState, formData: FormData): Promise<Fo
     role, primarySignupProvider: "email", lastLoginAt: new Date(),
     signupIp: ip,
   });
+  // The code goes out with the account, not when they get round to asking for
+  // it. B98 — they typed the address ten seconds ago; making them press a
+  // button to have it used is a step that exists only because nobody wired it
+  // up. Never blocks: a mail provider having a bad afternoon must not stop an
+  // account being created.
+  try {
+    const { autoSendSignupCode } = await import("@/lib/email-verify");
+    await autoSendSignupCode(db, id);
+  } catch { /* the page has a "send it again" button */ }
+
   await createSession(id, role);
   redirect("/onboarding");
 }

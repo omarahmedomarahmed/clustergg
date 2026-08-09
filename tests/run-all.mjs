@@ -30,12 +30,38 @@ const list = (dir, ext) => {
   } catch { return []; }
 };
 
+// SHARDING, for CI. `SHARD=1 SHARDS=2 npm test` runs half the db suites.
+//
+// The suite has grown from about thirty files to seventy-six, and the single
+// CI job that runs it was approaching its own 20-minute timeout. Two jobs on
+// two runners halve the wall clock, and the alternative — raising the timeout —
+// makes a slow suite permanent instead of parallel.
+//
+// Round-robin by INDEX rather than splitting the sorted list in half, because
+// the alphabet does not correlate with runtime: `cards.mts` and `split.mts` are
+// the two heaviest and both would land in the same half.
+//
+// The browser band is never sharded. It shares one server and one set of demo
+// rows, so two shards would race each other over the same data.
+const SHARDS = Math.max(1, Number(process.env.SHARDS) || 1);
+const SHARD = Math.min(SHARDS, Math.max(1, Number(process.env.SHARD) || 1));
+
+const allDb = list("db", ".mts").map((f) => `tests/db/${f}`);
+const myDb = allDb.filter((_, i) => (i % SHARDS) + 1 === SHARD);
+
 const suites = [
-  ...list("db", ".mts").map((f) => ({ kind: "db", file: `tests/db/${f}` })),
+  ...myDb.map((file) => ({ kind: "db", file })),
   ...(withUi ? list("ui", ".mjs").map((f) => ({ kind: "ui", file: `tests/ui/${f}` })) : []),
 ];
 
-if (!suites.length) { console.log("No suites found."); process.exit(0); }
+// An empty run is a misconfiguration, not a pass. A typo in SHARD/SHARDS would
+// otherwise print "No suites found", exit 0, and report green on a job that
+// tested nothing — which is the same failure class as the runner that once
+// counted `_nav.mjs` as a passing suite.
+if (!suites.length) {
+  console.log("\x1b[31m✗ No suites to run. Check SHARD/SHARDS, or the tests directory.\x1b[0m");
+  process.exit(1);
+}
 
 /**
  * Kill any production server this repo started.
@@ -104,7 +130,16 @@ if (withUi) {
 //
 // Output is captured per suite and printed when that suite finishes, so the log
 // still reads top-to-bottom instead of interleaving.
-const LANES = Math.max(2, Math.min(8, (cpus().length || 4) - 1));
+// Lanes. One per core, minus one for the parent, and never fewer than two.
+//
+// `TEST_LANES` overrides it, and the measurement that made the override worth
+// having is the one that says DON'T RAISE IT: six lanes on a four-core box took
+// 414s against 302s at three. PGlite is WebAssembly running in-process, so a
+// suite burns a core rather than waiting on a socket, and oversubscribing just
+// makes every lane slower. The knob is here for a machine with more cores, not
+// as a way to hurry a small one.
+const LANES = Number(process.env.TEST_LANES)
+  || Math.max(2, Math.min(8, (cpus().length || 4) - 1));
 
 const runOne = (s) => new Promise((resolve) => {
   const cmd = s.kind === "db" ? ["npx", ["tsx", s.file]] : ["node", [s.file]];
@@ -145,7 +180,27 @@ const failed = results.filter((r) => !r.ok).length;
 
 console.log("\n────────────────────────────────");
 for (const r of results) console.log(`${r.ok ? "\x1b[32m  pass\x1b[0m" : "\x1b[31m  FAIL\x1b[0m"}  ${r.file}`);
-console.log(`${results.length - failed}/${results.length} suites passed in ${((Date.now() - t0) / 1000).toFixed(0)}s (${LANES} lanes)`);
+console.log(`${results.length - failed}/${results.length} suites passed in ${((Date.now() - t0) / 1000).toFixed(0)}s (${LANES} lanes${SHARDS > 1 ? `, shard ${SHARD}/${SHARDS} of ${allDb.length} db suites` : ""})`);
 if (!withUi) console.log("(browser suites skipped — run `npm test -- --ui`, which starts and stops its own server)");
+
+// THE FAILURES GO LAST, ALWAYS.
+//
+// This block exists because of a real and embarrassing miss. Suites finish in
+// whatever order the lanes free up, so a FAIL lands wherever it lands in the
+// list above — and four suites stayed red for ten consecutive commits while
+// every run was checked with `| tail`, which showed the pass lines that happened
+// to finish last and the summary count, and never the four FAIL lines sitting
+// in the middle.
+//
+// The count was right there and was misread every time, so the fix is not "read
+// more carefully". It is: put the bad news where a truncated read cannot miss
+// it, and say the number twice.
+if (failed) {
+  console.log(`\n\x1b[31m✗ ${failed} suite${failed === 1 ? "" : "s"} FAILED:\x1b[0m`);
+  for (const r of results.filter((x) => !x.ok)) console.log(`\x1b[31m    ${r.file}\x1b[0m`);
+  console.log(`\x1b[31m✗ ${failed} of ${results.length} suites failed.\x1b[0m`);
+} else {
+  console.log(`\n\x1b[32m✓ all ${results.length} suites passed.\x1b[0m`);
+}
 killServers();
 process.exit(failed ? 1 : 0);
