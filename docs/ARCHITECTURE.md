@@ -62,7 +62,7 @@ also a button in Mission Control so nothing waits for tomorrow.
 
 | Cadence | Cron | Jobs |
 |---|---|---|
-| hourly | `/api/cron/sync` | Sync due accounts, recompute expert tiers, close finished challenges |
+| hourly | `/api/cron/sync` | Sync due accounts, close finished challenges |
 | daily | `/api/cron/daily` | Challenge reminders, Profile of the Week, Discord ads, bot-list stats, leaderboard feed |
 
 The split is enforced in code: a faster cron cannot turn a once-a-day

@@ -27,6 +27,31 @@ portal key; the guards are in `lib/portal-auth.ts` and they are constant-time.
 
 ---
 
+## 1a. Before you write anything about what the product does
+
+**Check `lib/retired.ts`.** It lists what this product used to have and no
+longer does, why it went, and the file that proves it.
+
+Two wrong statements have shipped from skipping that step, and neither was a
+code defect — both came from reading a document written before a change and
+repeating it as fact:
+
+- *(retired claim)* *"Brands are billed on impressions."* They pay a **fixed
+  price per challenge**. Impressions are delivery evidence, not an invoice line. This one
+  reached the cookie policy.
+- *"Following, messaging and gifting stay."* Gifting was **deleted in B72.3** —
+  a transfer of redeemable value between two accounts is a money-transmission
+  trigger, a 1099 hole and an under-18 cash-out bypass at once.
+
+**`docs/legacy/` is history, not documentation.** Every file in it carries a
+banner saying so. It is where the second error came from. When a legacy document
+and the code disagree, the code is right.
+
+`tests/db/docs-truth.mts` enforces this on the live documents, so a stale claim
+fails the suite rather than reaching a reader.
+
+---
+
 ## 2. The five things that will bite you
 
 ### The bootstrap deadlock

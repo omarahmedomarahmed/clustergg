@@ -153,6 +153,14 @@ console.log("\n== share_card finally fires ==");
     /refType: "share"/.test(route));
 }
 
+// The doc-drift half of B111.1 moved to `tests/db/docs-truth.mts`, which reads
+// `lib/retired.ts` and covers every retired feature rather than this one. It
+// was written here first, twice, and both versions passed against the exact
+// sentence that shipped — a phrase list missed a bare enumeration, and a
+// three-line proximity rule found the word "deleted" in a neighbouring
+// paragraph and read it as permission. The rule that holds is: the
+// acknowledgement must be on the same line as the mention.
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
 process.exit(0);

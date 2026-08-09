@@ -1,5 +1,22 @@
 # What Cluster counts as an ad view
 
+<!-- LEGACY-BANNER -->
+> # ⚠ HISTORICAL — NOT THE PRODUCT
+>
+> **Nothing in this file describes ClusterGG as it is today.** It is kept
+> because the reasoning is still useful and because a decision with no record
+> gets made again.
+>
+> **Do not quote a sentence from this folder as a statement of fact about the
+> product.** Two errors have already been caused by exactly that: a claim that
+> brands are billed on impressions (they are billed a fixed price per
+> challenge) and a claim that gifting is part of the product (it was deleted in
+> B72.3, for money-transmission reasons).
+>
+> **The current truth, in this order:** the code, then `docs/PLAN.md`, then
+> `docs/MODEL.md` and `docs/HANDOVER.md`. Where this file and the code
+> disagree, the code is right and this file is history.
+
 **B81.1. Written for a brand's agency to read, not for us.**
 
 Everything Cluster charges for on the placement side rests on this one
