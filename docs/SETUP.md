@@ -71,8 +71,16 @@ endpoints report "not configured".
 | `BOT_API_SECRET` | You generate. Guards command registration. |
 
 **Optional** — `PORTAL_SECRET` (portal sessions survive a redeploy),
-`AD_ANALYTICS_SALT`, `SETUP_TOKEN`, `DISCORD_DEFAULT_CHANNEL_ID` (a single test
-channel before any server has installed).
+`AD_ANALYTICS_SALT`, `DISCORD_DEFAULT_CHANNEL_ID` (a single test channel before
+any server has installed), `EXTRA_IMAGE_HOSTS` (comma-separated extra image
+hosts, if you serve art from a CDN of your own — the allowlist in
+`next.config.ts` is deliberately not a wildcard).
+
+**`SETUP_TOKEN` is not optional if you want `/api/setup` to work.** With it
+unset the endpoint refuses with a 403 and bootstrap is closed — which is the
+right default, because the alternative is an endpoint on the open internet that
+creates the schema and mints the first superadmin. Set it, call
+`POST /api/setup?token=…` once, and you never need it again.
 
 **Game providers** — each is optional; a provider with no key reports
 `needs_key` and everything else keeps working: `RIOT_API_KEY`, `STEAM_API_KEY`,

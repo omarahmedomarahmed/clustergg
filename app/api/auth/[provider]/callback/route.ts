@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
+import { safeNext } from "@/lib/safe-next";
 import { getDb, schema } from "@/lib/db";
 import { createSession, getSession } from "@/lib/auth";
 import { uid, slugify } from "@/lib/utils";
@@ -35,6 +36,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   const store = await cookies();
   let flow: { state: string; next: string; intent: string; provider: string };
   try { flow = JSON.parse(store.get("oauth_flow")?.value ?? "{}"); } catch { return fail("bad_state"); }
+  // B103. Checked again HERE, not only where the cookie was written. The
+  // redirect below is `new URL(dest, base)`, which returns an absolute URL
+  // unchanged — so an off-site destination that reached this cookie by any
+  // route at all would be honoured. One line, and it closes the class rather
+  // than the instance.
+  flow.next = safeNext(flow.next);
   store.delete("oauth_flow");
   const sp = req.nextUrl.searchParams;
   const returnedState = cfg.kind === "openid" ? sp.get("st") : sp.get("state");

@@ -934,6 +934,28 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B103 — Four holes, closed · **SHIPPED**
+
+Every one of these was a guard that existed and did not cover the case it was
+written for. That is the pattern worth noticing: **none was missing, all were
+slightly wrong**, and slightly wrong is invisible until somebody looks.
+
+| Hole | What was actually there | Now |
+|---|---|---|
+| **Open redirect** | `NextResponse.redirect(new URL(dest, base))` — the URL constructor returns an ABSOLUTE url unchanged, so `?next=https://evil.example` signed somebody in on our domain and dropped them on somebody else's | `lib/safe-next.ts`, applied where the cookie is WRITTEN and again where it is read. Refuses `//host`, `/\host`, `\host`, `javascript:` and control characters |
+| **Open bootstrap** | `if (token && …)` — a deployment that never set `SETUP_TOKEN` had no check at all, and `seed()` mints the first superadmin | Fails closed with a 403 that names the missing variable |
+| **Open image proxy** | `remotePatterns: [{ hostname: "**" }]` — anybody could fetch any https URL through our domain, our bill and our egress address | An explicit list, plus `EXTRA_IMAGE_HOSTS` so nobody reaches for `**` again in a hurry |
+| **Portal lockout** | Counted failures per PORTAL, so four guesses each across two hundred servers never tripped it — guessing was free at exactly the scale an attacker would use | `ipLockState`: `MAX_FAILURES × 3` from one address across every portal, checked before the key is looked at. A success does NOT reset it, or an attacker owning one real portal would clear their own spray counter every fifth attempt |
+
+`tests/db/security-b103.mts` (34) covers all four, including the bypasses a naive
+`startsWith("/")` misses.
+
+**Still open from B80:** the session-JWT fragment in analytics, the 90-day purge
+and cookie consent, plus the four scale findings (cold-start DDL replay, stat
+sync throughput, unbounded event tables, brand report heap).
+
+---
+
 ### ▸ B102 — The campaign console · **SHIPPED**
 
 A campaign is the thing a brand actually buys: one to four weekly challenges,

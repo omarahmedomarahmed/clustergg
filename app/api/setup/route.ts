@@ -16,8 +16,26 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // ===== B103: NO TOKEN CONFIGURED MEANS NO, NOT YES =====
+  //
+  // This read `if (token && …)`, so a deployment that never set SETUP_TOKEN had
+  // no check at all — the endpoint was open to the internet. It refuses once
+  // the schema exists, which bounds the damage, but "bounded" is not the same
+  // as "closed": the window is every moment between a database being created
+  // and this being run, and whoever runs it first gets `seed()`, which mints
+  // the first superadmin.
+  //
+  // A guard that is only present when somebody remembered to configure it is
+  // not a guard. Fails CLOSED, and says which variable is missing so the person
+  // who hits it is not left guessing.
   const token = process.env.SETUP_TOKEN;
-  if (token && req.nextUrl.searchParams.get("token") !== token) {
+  if (!token) {
+    return NextResponse.json({
+      error: "setup_disabled",
+      note: "SETUP_TOKEN is not set on this deployment, so bootstrap is closed. Set it and call this with ?token=…",
+    }, { status: 403 });
+  }
+  if (req.nextUrl.searchParams.get("token") !== token) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
