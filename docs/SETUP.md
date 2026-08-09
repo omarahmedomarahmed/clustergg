@@ -1,4 +1,49 @@
-# Deploy
+# Setup
+
+Everything needed to run Cluster locally, and everything needed to deploy it.
+
+## Run it locally in one command
+
+```bash
+npm install
+DEMO_DB=1 npm run dev
+```
+
+That is a complete platform: PGlite in-process, seeded with servers, brands,
+challenges, trophies and gamers. No database to install, no keys to obtain,
+nothing to configure. Sign in as `admin@clustergg.com` / `cluster-admin`.
+
+`DEMO_DB=1` is also how every test and every build in this repository runs, so
+if it works there it works in CI.
+
+## Check your work
+
+```bash
+npx tsc --noEmit           # types
+DEMO_DB=1 npm test         # every database suite, ~5 minutes
+DEMO_DB=1 npm test -- --ui # plus browser suites; starts and stops its own server
+DEMO_DB=1 npm run build    # the client/server boundary, which tsc cannot see
+```
+
+The build step is not optional before a push. Next traces the module graph
+across the client boundary even for type-only and dynamic imports, so a
+server-only module reached from a client component fails there while the type
+check stays green. It has cost this project days more than once.
+
+## CI
+
+One workflow, `.github/workflows/ci.yml`, on every pull request and on pushes
+to `main`. Three jobs run in parallel — the money gate against a real Postgres,
+the full database suite, and a build — and a fourth job named `ci` succeeds only
+when all three did.
+
+**Branch protection should require exactly one check: `ci`.** That is why the
+job exists: the jobs above it can be split, renamed or added to without anybody
+touching the protection rule.
+
+---
+
+## Deploying
 
 Vercel + Neon Postgres + Vercel Blob. Nothing else is required.
 
@@ -119,6 +164,20 @@ Declared in `vercel.json`. Both are `GET` and authenticate with `CRON_SECRET`.
 |---|---|---|
 | `/api/cron/sync` | hourly | Standings are the product. A board that updates tomorrow is a board nobody refreshes. |
 | `/api/cron/daily` | 12:00 UTC | Everything that posts into someone else's server. |
+
+## Schema changes reach production by deploying
+
+There is no migration command to run and no `drizzle-kit push` against
+production. `lib/db/index.ts` holds two things:
+
+1. an explicit `CREATE TABLE IF NOT EXISTS` list, which is also what builds the
+   demo database — **a new table needs an entry here as well as in
+   `schema.ts`, or it exists in Postgres and not in the demo**;
+2. `COLUMN_MIGRATIONS`, a list of `ALTER TABLE … ADD COLUMN IF NOT EXISTS`
+   statements that run on first connect and are no-ops afterwards.
+
+Add a column to `schema.ts`, add its `ALTER` to that list, deploy. That is the
+whole procedure, and it is why nobody has to be trusted to run anything by hand.
 
 ## Checks after a deploy
 

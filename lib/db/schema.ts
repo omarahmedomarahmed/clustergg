@@ -531,7 +531,7 @@ export const guildSnapshots = pgTable("guild_snapshots", {
 /**
  * Every movement of money into and out of a vault. B86.
  *
- * The four vaults in `docs/COMMERCIAL_MODEL_V2.md` are only meaningful if their
+ * The four vaults in `docs/MODEL.md` are only meaningful if their
  * balance is a SUM OF ROWS rather than a stored number somebody edits. A stored
  * balance drifts, and there is no way to prove afterwards what it should have
  * been.

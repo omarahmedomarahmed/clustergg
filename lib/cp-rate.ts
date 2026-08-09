@@ -53,7 +53,7 @@
  * company: at 4,200 daily-active maximal gamers the vault is exhausted and
  * Cluster's 20% starts subsidising it; at 9,800 the 20% is gone entirely.
  * **We need roughly one brand per 1,400 daily-active gamers just to hold the
- * floor.** `docs/COMMERCIAL_MODEL_V2.md` §3.
+ * floor.** `docs/MODEL.md` §3.
  *
  * A $5 bronze trophy is 50,000 CP at this rate. That is a hundred days at the
  * ceiling: far, expensive, and reachable, which is what a trophy should be.

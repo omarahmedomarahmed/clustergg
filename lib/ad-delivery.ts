@@ -1,7 +1,7 @@
 // What a brand is shown about delivery. B82.
 //
 // Every number here is `count(*)` over `ad_impressions`. That is not a
-// simplification of the design — it IS the design, and `docs/AD_VIEW.md` is the
+// simplification of the design — it IS the design, and `docs/legacy/AD_VIEW.md` is the
 // contract it implements.
 //
 // WHAT THIS REPLACES. The old report computed a "media value" and a return on
@@ -236,7 +236,7 @@ export async function deliveryFor(
       note:
         `${views.toLocaleString()} cards carrying your creative were delivered. `
         + "Every figure here is a count of delivered cards — we do not multiply a public post by a server's "
-        + "member count, and we do not estimate. See docs/AD_VIEW.md for exactly what is and is not counted.",
+        + "member count, and we do not estimate. See docs/legacy/AD_VIEW.md for exactly what is and is not counted.",
     };
   } catch { return EMPTY; }
 }

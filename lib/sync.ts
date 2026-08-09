@@ -119,7 +119,7 @@ export async function syncAccount(db: DB, account: Account): Promise<{ ok: boole
   // A SESSION is a sync that found new activity. That is the honest definition
   // available to us: we cannot see somebody playing, we can see that the numbers
   // a game reports about them changed since we last looked. Anything stronger
-  // would be a claim we cannot support, which is the same rule `docs/AD_VIEW.md`
+  // would be a claim we cannot support, which is the same rule `docs/legacy/AD_VIEW.md`
   // applies to a view.
   if (levelled.size > 0 || changed) {
     await awardQuestAction(db, account.userId, "play_session", {

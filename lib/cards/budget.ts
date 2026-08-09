@@ -25,7 +25,7 @@ import { getDb, schema } from "@/lib/db";
  * ===== B77: THIS NUMBER WAS NEVER CHECKED AGAINST THE MODEL =====
  *
  * 4,000/day is roughly 200 active gamers at ordinary card usage. B46 set it as
- * a bill guard without comparing it to the growth `docs/COMMERCIAL_MODEL_V2.md`
+ * a bill guard without comparing it to the growth `docs/MODEL.md`
  * assumes — two of our own documents contradicted each other, and the one that
  * would have failed first was this one, silently, by serving stale cards to a
  * network that had outgrown it.

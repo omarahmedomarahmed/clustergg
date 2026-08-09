@@ -102,7 +102,7 @@ export async function activeGamers(db: DB, now = new Date()): Promise<ActiveCoun
  *
  *   gamer-days = vault dollars × CP per dollar ÷ daily ceiling
  *
- * `docs/COMMERCIAL_MODEL_V2.md` §3. At $52.50 into the vault per $350
+ * `docs/MODEL.md` §3. At $52.50 into the vault per $350
  * challenge, 10,000 CP/$1 and a 500 CP/day ceiling, one challenge sold funds
  * 1,050 gamer-days of MAXIMAL earning — and a maximal gamer is the worst case,
  * not the forecast, which is why this returns days rather than a date.
