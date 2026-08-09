@@ -18,6 +18,7 @@ import LiveChallengeBoard from "@/components/LiveChallengeBoard";
 import { joinChallenge, switchEntryAccount } from "@/app/actions/social";
 import { joinLocked, unmetEntryRules } from "@/lib/challenges";
 import { stageOf } from "@/lib/challenge-stage";
+import { presentersOf, PRESENTED_BY } from "@/lib/presented-by";
 import { runsOfSeries } from "@/lib/series-plan";
 import { recordServerEvent } from "@/lib/server-portal";
 import { getQuestCompletions } from "@/lib/quests";
@@ -72,6 +73,15 @@ export default async function ChallengePage({
   // call that "live".
   const stage = stageOf(challenge);
   const seriesRuns = challenge.seriesId ? await runsOfSeries(db, challenge.seriesId) : [];
+
+  // Who paid for this. B107.
+  //
+  // Both of them, lead first, on a co-sponsored challenge — this page was the
+  // largest surface where a brand's money bought nothing a gamer could see.
+  // Withheld while the stage is "draft" — which `stageOf` also returns for an
+  // UNPAID challenge, and that is exactly the case that matters: a name printed
+  // before the invoice clears is exposure nobody bought.
+  const presenters = stage === "draft" ? [] : await presentersOf(challenge);
 
   const viewer = await getCurrentUser();
   const { tr, te } = await getT(viewer?.locale);
@@ -251,6 +261,29 @@ export default async function ChallengePage({
             )}
             <h1 className="text-3xl md:text-5xl font-bold drop-shadow-lg">{challenge.title}</h1>
           </div>
+          {/* B107. Under the title, before the rules — the first thing read
+              after what the challenge is. Names and logos, lead first, two of
+              them on a co-sponsored challenge.
+
+              NOT linked. `/brands/[slug]` is the brand's own PORTAL — key-gated,
+              full of their invoices and their reach numbers. Pointing a gamer at
+              it lands them on a key prompt for somebody else's back office. A
+              public brand page is a real thing to build; this is not it. */}
+          {presenters.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+              <span className="uppercase tracking-widest text-[11px] text-muted">{tr(PRESENTED_BY)}</span>
+              {presenters.map((p, i) => (
+                <span key={p.id} className="inline-flex items-center gap-2">
+                  {i > 0 && <span className="text-muted">{tr("and")}</span>}
+                  {p.logoUrl && (
+                    <GameLogo logoUrl={slimImg(p.logoUrl, 120000)} name={p.name} size={22}
+                      rounded="rounded-md" className="ring-1 ring-white/15 shrink-0" />
+                  )}
+                  <span className="font-semibold">{p.name}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

@@ -7,6 +7,7 @@ import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
 import { type PickedAd } from "@/lib/cards/ads";
 import { withSponsorRow } from "@/lib/discord/sponsor";
+import { presentedByLine } from "@/lib/presented-by";
 import { challengeUrl, challengeStandings } from "@/lib/challenges";
 import { reportToHq } from "@/lib/discord/hq";
 
@@ -261,6 +262,14 @@ export async function announceChallengeLaunched(challengeId: string): Promise<nu
   ]);
   if (!card.data || card.data.kind !== "challenge") return 0;
 
+  // Who paid for it, named to the people it reached. B107.
+  //
+  // Two names on a co-sponsored challenge, lead first. Safe here without a
+  // further paid check: announcing is already gated on the bill
+  // (`lib/challenge-billing.ts`), so a challenge that reaches this line has
+  // been paid for by everyone whose name is on it.
+  const presented = await presentedByLine(ch);
+
   const embeds = [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }];
   // An announcement is the first thing most people ever see from this bot, so
   // it carries the whole path: enter this, or start from the beginning.
@@ -295,14 +304,17 @@ export async function announceChallengeLaunched(challengeId: string): Promise<nu
         ch.accessKey
           ? `Entry key: **\`${ch.accessKey}\`** — tap Join now, or enter it on the site.`
           : "Tap Join now to enter.",
-      ].join("\n"),
+        presented,
+      ].filter(Boolean).join("\n"),
       embeds, components,
     }, { only: holders, sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
     return reached;
   }
 
-  const reached = await announce({ content: `**${ch.title}** is live on **${ch.game}**.`, embeds, components },
-    { sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
+  const reached = await announce({
+    content: [`**${ch.title}** is live on **${ch.game}**.`, presented].filter(Boolean).join("\n"),
+    embeds, components,
+  }, { sponsor: card.ad, ledger: { challengeId, kind: "launch" } });
 
   // And into HQ's feed for that game, so our own server carries every game's
   // news in its own channel rather than one undifferentiated stream.
@@ -454,7 +466,8 @@ export async function announceChallengeReminder(
     content: [
       `⏳ **${ch.title}** — ${left}.`,
       `You're playing **${ch.game}** anyway. Every match you play counts towards this while it runs, and one account can be entered in every challenge on this game at once — so there is no reason to be in only one.`,
-    ].join("\n"),
+      await presentedByLine(ch),
+    ].filter(Boolean).join("\n"),
     embeds: [{ color: embedColor(card.data.theme.accent), image: { url: card.url } }],
     components: rows([
       navButton("Join now", frame("challenge", challengeId), [frame("home")], ButtonStyle.Success, "🏆"),
@@ -499,12 +512,20 @@ export async function remindLiveChallenges(): Promise<{ sent: number; skipped: n
 // A challenge finished — the podium, with what each winner actually earned.
 export async function announceChallengeEnded(challengeId: string): Promise<void> {
   if (!(await anyTarget())) return;
-  const [card, standings, url] = await Promise.all([
+  const db = await getDb();
+  const [card, standings, url, [ch]] = await Promise.all([
     cardRef("challenge", { id: challengeId }),
     challengeStandings(challengeId, 3),
     challengeUrl(siteUrl(), challengeId),
+    // Only the two brand ids. B107 — the result post is the most-read of the
+    // three, and it was the one that named nobody.
+    db.select({
+      sponsorBrandId: schema.challenges.sponsorBrandId,
+      coSponsorBrandId: schema.challenges.coSponsorBrandId,
+    }).from(schema.challenges).where(eq(schema.challenges.id, challengeId)).limit(1),
   ]);
   if (!card.data || card.data.kind !== "challenge") return;
+  const presented = ch ? await presentedByLine(ch) : "";
 
   const medals = ["🥇", "🥈", "🥉"];
   const podium = standings.length
@@ -512,7 +533,7 @@ export async function announceChallengeEnded(challengeId: string): Promise<void>
     : "No one joined this one.";
 
   await announce({
-    content: `**${card.data.title}** has ended.`,
+    content: [`**${card.data.title}** has ended.`, presented].filter(Boolean).join("\n"),
     embeds: [{
       description: podium,
       color: embedColor(card.data.theme.accent),

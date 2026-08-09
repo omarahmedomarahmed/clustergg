@@ -934,6 +934,67 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B107 — Two brands, one line · **SHIPPED**
+
+**The gap B101 left open, and the wrong half to have built.**
+
+B101 gave a challenge a second sponsor: a column, a validator, a 50/50 split,
+and a billing rule that refuses to announce until *both* brands have paid. It
+gave them nowhere a gamer reads two names.
+
+A brand buys their name in front of the people playing; the invoice is how they
+pay for it. We had the invoice working perfectly and the thing it bought did not
+exist. To every single person who saw it, a co-sponsored challenge looked exactly
+like a challenge with one sponsor — and the second brand had paid half the bill
+for that.
+
+**The one place a brand name reached a gamer at all** was the weekly Discord
+recap, and it `INNER JOIN`ed the lead brand. The co-sponsor was not merely
+unmentioned; it was *structurally impossible* to mention.
+
+**`lib/presented-by.ts`** — one file, because four surfaces have to say the same
+thing and four call sites writing their own `${a} and ${b}` is four chances to
+disagree about ordering, about a deleted brand, and about what an unsponsored
+challenge prints.
+
+- **The lead is always first.** Not alphabetical, not by amount paid — the lead
+  is what `sponsor_brand_id` says and what the deal says. A line that reorders
+  itself when somebody edits a price is a line we would have to explain. The
+  test fixture is named so the co-sponsor sorts *first* alphabetically, so an
+  accidental sort cannot pass.
+- **Ordering is not restated.** `sponsorsOf` (B101) decides which ids and in
+  what order; this file looks up what that returned.
+- **A deleted brand is dropped, not rendered.** A gap where a name should be is
+  worse than one fewer name.
+- **`presentersFor` batches**, because the recap and the feed render lists and
+  `presentersOf` in a loop is the N+1 this codebase keeps removing.
+
+**Four surfaces:** the challenge page (names + logos under the title), the
+Discord launch post *including the private-challenge branch*, the ending
+reminder, and the result post — which is the most-read of the three and named
+nobody.
+
+**Never printed before it is paid.** The web page withholds the line while
+`stageOf` returns `draft`, which it also returns for an *unpaid* challenge. The
+announcements need no extra check: announcing is already gated on the bill, and
+`tests/db/presented-by.mts` asserts that gate still reads *both* brands rather
+than trusting the comment that says so.
+
+**Not linked.** `/brands/[slug]` is the brand's key-gated back office — invoices,
+reach numbers, their inbox. Pointing a gamer at it lands them on a key prompt for
+somebody else's admin. A public brand page is a real thing to build and this is
+not it.
+
+**Deliberately not on the Satori card.** The card already carries a fixed ad slot
+rendering a *different* brand. Two brand marks on one card meaning two different
+things is worse than one honest line underneath it — and the announcement embeds
+carry the card and the line together anyway.
+
+`tests/db/presented-by.mts` (38). Proved by breaking it: sorting presenters
+alphabetically instead of lead-first turns two assertions red.
+
+---
+
 ### ▸ B106 — One instance replays the list, not all of them · **SHIPPED**
 
 The last of B80's four scale findings.
@@ -1161,10 +1222,10 @@ publisher putting up prize money beside a drink brand putting up a logo is a
 total — a cent missing from an invoice is a support ticket from somebody's
 finance department.
 
-**Still open:** there is no gamer-facing "presented by" line anywhere in the
-product today — not on the challenge card, not in the bot. Co-sponsorship is
-correct in the money and in admin; the place a gamer would READ two brand names
-does not exist yet and belongs with the bot and marketing rewrites.
+**Was open, now closed by B107:** there was no gamer-facing "presented by" line
+anywhere in the product — not on the challenge page, not in the bot.
+Co-sponsorship was correct in the money and in admin, and the place a gamer would
+READ two brand names did not exist. B107 built it on four surfaces.
 
 ---
 
