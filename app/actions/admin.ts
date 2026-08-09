@@ -375,20 +375,48 @@ export async function reviewSpaceRequest(requestId: string, approve: boolean, no
   revalidatePath("/admin/spaces/requests");
 }
 
-export async function adminDeletePost(postId: string) {
-  const admin = await requireStaff();
-  const db = await getDb();
-  await db.update(schema.posts).set({ deletedAt: new Date() }).where(eq(schema.posts.id, postId));
-  await audit(admin.id, "post.delete", "post", postId);
-  revalidatePath("/admin/games");
-}
+// B111. `adminDeletePost` and `togglePinPost` were here. With the feature gone
+// there is nothing to moderate and nothing to pin — and an admin action that
+// writes to a table no surface reads is a button whose only effect is an audit
+// row.
+//
+// The space-deletion paths above still clear `posts` by space id, deliberately:
+// deleting a planet has always taken its content with it, and leaving orphans
+// behind because the reader is gone would be worse than the tidy-up.
 
-export async function togglePinPost(postId: string, pin: boolean, path: string) {
-  const admin = await requireStaff();
+export type SocialPurgeState = { ok?: boolean; error?: string; message?: string };
+
+/**
+ * Destroy every post, comment and reaction. B111.
+ *
+ * ADMIN ONLY, not staff. This is irreversible destruction of user-authored
+ * content — the one thing on this platform that cannot be rebuilt from anything
+ * else — and `requireStaff` covers a support agent clearing a queue.
+ *
+ * Typed confirmation, not a second click. A dialog people click through is a
+ * dialog that does not exist, and the count is on the page next to the box so
+ * nobody presses it blind.
+ */
+export async function purgeSocialContent(
+  _prev: SocialPurgeState, formData: FormData,
+): Promise<SocialPurgeState> {
+  const admin = await requireAdmin();
+  const typed = String(formData.get("confirm") ?? "").trim();
+  if (typed !== "DELETE") {
+    return { error: 'Type DELETE exactly to confirm. Nothing was deleted.' };
+  }
   const db = await getDb();
-  await db.update(schema.posts).set({ isPinned: pin }).where(eq(schema.posts.id, postId));
-  await audit(admin.id, pin ? "post.pin" : "post.unpin", "post", postId);
-  revalidatePath(path);
+  const { purgeSocialRows } = await import("@/lib/social-purge");
+  const result = await purgeSocialRows(db);
+  const total = result.reduce((n, r) => n + r.deleted, 0);
+  await audit(admin.id, "social.purge", "social", String(total));
+  revalidatePath("/admin/games");
+  return {
+    ok: true,
+    message: total === 0
+      ? "Nothing to delete — the tables were already empty."
+      : `Deleted ${total.toLocaleString()} rows: ${result.filter((r) => r.deleted).map((r) => `${r.deleted.toLocaleString()} ${r.table}`).join(", ")}.`,
+  };
 }
 
 // ---------- Challenges ----------

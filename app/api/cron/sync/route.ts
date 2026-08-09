@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { syncDueAccounts } from "@/lib/sync";
-import { recomputeExpertScores } from "@/lib/experts";
 import { runAllJobs } from "@/lib/jobs";
 
 /** Accounts per run. Sequential, so this is bounded by `maxDuration`. */
@@ -34,7 +33,9 @@ export async function GET(req: NextRequest) {
   }
   const db = await getDb();
   const result = await syncDueAccounts(db, SYNC_BATCH);
-  try { await recomputeExpertScores(db); } catch { /* non-fatal */ }
+  // B111. `recomputeExpertScores` ran here. Expert tiers were scored
+  // entirely from posts, comments and likes — with those gone the function had
+  // no inputs, so it was deleted rather than left computing zero every hour.
   // Idempotent, and cheap when nothing is due — a challenge that ended at 3pm
   // should not still be calling itself live at midnight.
   const jobs = await runAllJobs("hourly");

@@ -8,7 +8,7 @@ import { uid } from "@/lib/utils";
 //   { type: "accounts_linked_count", min: number }
 //   { type: "stat_threshold", metric: string, game?: string, min: number }
 //   { type: "follower_count", min: number }
-//   { type: "community_activity", posts_min?: number, reactions_received_min?: number }
+//   { type: "community_activity", … }  — B111: unearnable, posts are gone
 //   { type: "challenge_result", placement: "top1" | "top3" }  (awarded by challenge finalizer)
 //   { type: "expert_tier", tier: "contributor" | "helper" | "expert" }
 
@@ -27,24 +27,17 @@ export async function evaluateBadgesForUser(db: DB, userId: string): Promise<str
   const pending = allBadges.filter((b) => !ownedSet.has(b.id));
   if (pending.length === 0) return [];
 
-  const [accounts, stats, [followerRow], [postRow], reactionRows, expertRows] = await Promise.all([
+  const [accounts, stats, [followerRow], expertRows] = await Promise.all([
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, userId)),
     db.select().from(schema.statCurrent).where(
       inArray(schema.statCurrent.linkedAccountId,
         db.select({ id: schema.linkedGameAccounts.id }).from(schema.linkedGameAccounts)
           .where(eq(schema.linkedGameAccounts.userId, userId)))),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followingId, userId)),
-    db.select({ c: count() }).from(schema.posts)
-      .where(and(eq(schema.posts.authorId, userId), sql`${schema.posts.deletedAt} IS NULL`)),
-    db.select({ c: count() }).from(schema.postReactions)
-      .innerJoin(schema.posts, eq(schema.postReactions.postId, schema.posts.id))
-      .where(and(eq(schema.posts.authorId, userId), eq(schema.postReactions.reactionType, "like"))),
     db.select().from(schema.spaceExpertScores).where(eq(schema.spaceExpertScores.userId, userId)),
   ]);
 
   const followerCount = Number(followerRow?.c ?? 0);
-  const postCount = Number(postRow?.c ?? 0);
-  const likesReceived = Number(reactionRows[0]?.c ?? 0);
   const tiers = new Set(expertRows.map((r) => r.tier).filter(Boolean));
 
   const awarded: string[] = [];
@@ -65,8 +58,12 @@ export async function evaluateBadgesForUser(db: DB, userId: string): Promise<str
       case "follower_count":
         earned = followerCount >= Number(c.min ?? 1);
         break;
+      // B111. `community_activity` counted posts and likes received. Both are
+      // gone, so the criterion can no longer be met by anybody — false rather
+      // than true, because a badge that starts awarding itself to everyone the
+      // day its condition becomes uncountable is worse than one nobody earns.
       case "community_activity":
-        earned = postCount >= Number(c.posts_min ?? 0) && likesReceived >= Number(c.reactions_received_min ?? 0);
+        earned = false;
         break;
       case "expert_tier":
         earned = tiers.has(String(c.tier));

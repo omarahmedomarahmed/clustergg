@@ -16,7 +16,7 @@ export default async function SearchPage({
   const query = (q ?? "").trim();
   const db = await getDb();
 
-  const [gamers, spaces, posts] = query
+  const [gamers, spaces] = query
     ? await Promise.all([
         // Searches every identity a gamer has, not just their Cluster name —
         // people look for the tag they see IN GAME ("hikaru"), and a search
@@ -25,13 +25,6 @@ export default async function SearchPage({
         db.select().from(schema.spaces)
           .where(or(ilike(schema.spaces.name, `%${query}%`), ilike(schema.spaces.description, `%${query}%`)))
           .limit(6),
-        db.select({ post: schema.posts, author: schema.users, space: schema.spaces })
-          .from(schema.posts)
-          .innerJoin(schema.users, sql`${schema.posts.authorId} = ${schema.users.id}`)
-          .innerJoin(schema.spaces, sql`${schema.posts.spaceId} = ${schema.spaces.id}`)
-          .where(ilike(schema.posts.body, `%${query}%`))
-          .orderBy(desc(schema.posts.createdAt))
-          .limit(10),
       ])
     : [[], [], []];
   const { tr } = await getT();
@@ -42,7 +35,7 @@ export default async function SearchPage({
       <form className="mb-10">
         <input
           name="q" defaultValue={query} autoFocus
-          placeholder={tr("Search gamers, spaces, posts…")}
+          placeholder={tr("Search gamers and planets…")}
           className="input-cosmic text-lg !py-3.5"
         />
       </form>
@@ -87,21 +80,7 @@ export default async function SearchPage({
               </div>
             )}
           </section>
-          <section>
-            <h2 className="text-sm uppercase tracking-widest text-muted mb-3">{tr("Posts")}</h2>
-            {posts.length === 0 ? <p className="text-muted text-sm">{tr("No posts found.")}</p> : (
-              <div className="space-y-3">
-                {posts.map(({ post, author, space }) => (
-                  <Link key={post.id} href={`/planets/${space.slug}`} className="glass glass-hover block p-4">
-                    <div className="text-xs text-muted mb-1">
-                      {author.displayName} in {space.name} · {timeAgo(post.createdAt)}
-                    </div>
-                    <p className="text-sm line-clamp-2">{post.body}</p>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </section>
+          {/* B111. The Posts result column is gone with the feature. */}
         </div>
       )}
     </div>

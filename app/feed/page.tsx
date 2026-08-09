@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { and, count, desc, eq, inArray, notInArray, or, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUserFull } from "@/lib/auth";
-import PostCard from "@/components/PostCard";
 import AdSlot from "@/components/AdSlot";
 import Avatar from "@/components/Avatar";
 import GameLogo from "@/components/GameLogo";
@@ -34,7 +33,7 @@ export default async function FeedPage() {
   // The feed adopts the gamer's own profile theme so it feels like their page.
   const theme = resolveTheme(user.theme);
 
-  const [mySpaceRows, myFollowing, accounts, totalCp, [followerRow], [questRow], [postRow], [joinedRow], activeGames, gameSpaces, myParticipations] = await Promise.all([
+  const [mySpaceRows, myFollowing, accounts, totalCp, [followerRow], [questRow], [joinedRow], activeGames, gameSpaces, myParticipations] = await Promise.all([
     db.select({ s: schema.spaces }).from(schema.spaceMembers)
       .innerJoin(schema.spaces, eq(schema.spaceMembers.spaceId, schema.spaces.id))
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(10),
@@ -43,7 +42,6 @@ export default async function FeedPage() {
     getTotalCp(db, user.id),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followingId, user.id)),
     db.select({ c: sql<number>`COALESCE(SUM(${schema.userQuestProgress.completions}), 0)` }).from(schema.userQuestProgress).where(eq(schema.userQuestProgress.userId, user.id)),
-    db.select({ c: count() }).from(schema.posts).where(and(eq(schema.posts.authorId, user.id), sql`${schema.posts.deletedAt} IS NULL`)),
     db.select({ c: count() }).from(schema.challengeParticipants).where(eq(schema.challengeParticipants.userId, user.id)),
     db.select({ name: schema.games.name, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games).where(eq(schema.games.isActive, true)),
     db.select({ slug: schema.spaces.slug, game: schema.spaces.game }).from(schema.spaces).where(eq(schema.spaces.isActive, true)),
@@ -56,19 +54,10 @@ export default async function FeedPage() {
   const slugByGame = new Map(gameSpaces.filter((s) => s.game).map((s) => [s.game as string, s.slug]));
   const joinedChallengeIds = new Set(myParticipations.map((p) => p.id));
 
-  const filters = [];
-  if (mySpaceIds.length) filters.push(inArray(schema.posts.spaceId, mySpaceIds));
-  if (followingIds.length) filters.push(inArray(schema.posts.authorId, followingIds));
-
-  const [posts, challenges] = await Promise.all([
-    filters.length
-      ? db.select({ post: schema.posts, author: schema.publicUserColumns, space: schema.spaces })
-          .from(schema.posts)
-          .innerJoin(schema.users, eq(schema.posts.authorId, schema.users.id))
-          .innerJoin(schema.spaces, eq(schema.posts.spaceId, schema.spaces.id))
-          .where(and(sql`${schema.posts.deletedAt} IS NULL`, or(...filters)))
-          .orderBy(desc(schema.posts.createdAt)).limit(30)
-      : Promise.resolve([]),
+  // B111. The post query and its two filters are gone. What is left is the
+  // signed-in home: live challenges, the planets they play, their trophies and
+  // their missions — which is what people opened this page for anyway.
+  const [challenges] = await Promise.all([
     db.select({ c: schema.challenges, space: schema.spaces }).from(schema.challenges)
       .innerJoin(schema.spaces, eq(schema.challenges.spaceId, schema.spaces.id))
       .where(eq(schema.challenges.status, "active")).orderBy(desc(schema.challenges.startAt)).limit(24),
@@ -106,7 +95,7 @@ export default async function FeedPage() {
   const statValues: Record<string, number> = {
     cp: totalCp, quests: Number(questRow?.c ?? 0), followers: Number(followerRow?.c ?? 0),
     following: followingIds.length, views: user.profileViews ?? 0, games: accounts.length,
-    challenges: Number(joinedRow?.c ?? 0), posts: Number(postRow?.c ?? 0),
+    challenges: Number(joinedRow?.c ?? 0),
   };
 
   // ===== Dashboard-builder sources =====
@@ -237,30 +226,26 @@ export default async function FeedPage() {
             </section>
           )}
 
-          {/* Feed */}
+          {/* B111. The post feed was here.
+              Cluster is a competition and earning layer, not a social network:
+              the feed was the part nobody used and everybody had to moderate.
+              What replaces it is not a smaller feed — it is the rest of this
+              page, which was always the reason to open it. */}
           <section>
-            <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="home" size={18} className="text-violet-300" /> {t("feed.yourFeed")}</h2>
-            {posts.length === 0 ? (
-              <div className="glass p-8 text-center">
-                <Icon name="rocket" size={34} className="text-cyan-300 mx-auto mb-3" />
-                <h3 className="font-bold text-lg">Let&apos;s light up your galaxy</h3>
-                <p className="text-muted text-sm mt-1 max-w-md mx-auto">Your feed fills up as you join planets and follow gamers. Start with a few:</p>
-                <div className="flex flex-wrap justify-center gap-2 mt-4">
-                  <Link href="/planets" className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">{t("common.explorePlanets")}</Link>
-                  <Link href="/search" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">Find gamers</Link>
-                  <Link href="/profile" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">Connect a game</Link>
-                </div>
+            <h2 className="text-lg font-bold flex items-center gap-2 mb-3"><Icon name="rocket" size={18} className="text-violet-300" /> {t("common.explorePlanets")}</h2>
+            <div className="glass p-8 text-center">
+              <Icon name="trophy" size={34} className="text-cyan-300 mx-auto mb-3" />
+              <h3 className="font-bold text-lg">Points come from playing</h3>
+              <p className="text-muted text-sm mt-1 max-w-md mx-auto">
+                Enter a challenge on a game you already play, finish a quest, and climb the board. That is the
+                whole loop.
+              </p>
+              <div className="flex flex-wrap justify-center gap-2 mt-4">
+                <Link href="/planets" className="glow-btn pressable rounded-full px-5 py-2 text-sm font-semibold text-white">{t("common.explorePlanets")}</Link>
+                <Link href="/quests" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">My quests</Link>
+                <Link href="/profile" className="ghost-btn pressable rounded-full px-5 py-2 text-sm">Connect a game</Link>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {posts.map(({ post, author, space }, i) => (
-                  <div key={post.id}>
-                    <PostCard post={post} author={author} viewerId={user.id} path="/feed" spaceName={space.name} />
-                    {(i + 1) % 6 === 0 && i + 1 < posts.length && <div className="mt-4"><AdSlot placement="feed_inline" /></div>}
-                  </div>
-                ))}
-              </div>
-            )}
+            </div>
           </section>
           <AdSlot placement="feed_sidebar" />
         </div>

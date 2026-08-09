@@ -40,7 +40,7 @@ export default async function MetricReport({ params, searchParams }: {
   // Only event-shaped metrics have a meaningful window. For a stock count —
   // how many games exist — "in the last 30 days" is a different number that
   // this loader doesn't compute, so we say so instead of implying one.
-  const windowed = (["botCommands", "adImpressions", "adClicks", "posts"] as MetricKey[]).includes(key);
+  const windowed = (["botCommands", "adImpressions", "adClicks"] as MetricKey[]).includes(key);
   const share = windowed && value > 0 ? Math.round((inWindow / value) * 100) : null;
 
   // Related numbers, so the metric can be read in context rather than alone.

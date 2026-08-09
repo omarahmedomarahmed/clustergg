@@ -40,15 +40,13 @@ export default async function OwnProfilePage() {
 
   // Compact, real data so the builder preview shows the actual profile — real
   // accounts, challenges, planets — not placeholder cards.
-  const [participations, spaceRows, postCountRow, games] = await Promise.all([
+  const [participations, spaceRows, games] = await Promise.all([
     db.select({ p: schema.challengeParticipants, c: schema.challenges }).from(schema.challengeParticipants)
       .innerJoin(schema.challenges, eq(schema.challengeParticipants.challengeId, schema.challenges.id))
       .where(eq(schema.challengeParticipants.userId, user.id)).orderBy(desc(schema.challengeParticipants.joinedAt)).limit(8),
     db.select({ s: schema.spaces }).from(schema.spaceMembers)
       .innerJoin(schema.spaces, eq(schema.spaceMembers.spaceId, schema.spaces.id))
       .where(and(eq(schema.spaceMembers.userId, user.id), eq(schema.spaces.isActive, true))).limit(12),
-    db.select({ c: sql<number>`count(*)` }).from(schema.posts)
-      .where(and(eq(schema.posts.authorId, user.id), sql`${schema.posts.deletedAt} IS NULL`)),
     db.select({ name: schema.games.name, slug: schema.games.slug, logoUrl: schema.games.logoUrl, coverUrl: schema.games.coverUrl }).from(schema.games),
   ]);
 
@@ -71,7 +69,6 @@ export default async function OwnProfilePage() {
     badges: [] as { name: string }[],
     challenges: participations.filter(({ c }) => c.status === "active").map(({ c }) => ({ title: c.title, game: c.game })),
     spaces: spaceRows.map(({ s }) => ({ name: s.name })),
-    postsCount: Number(postCountRow[0]?.c ?? 0),
     standingsCount: accounts.length,
   };
 

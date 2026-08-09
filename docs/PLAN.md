@@ -934,6 +934,71 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B111 — The social purge · **SHIPPED**
+
+B68's brief, unchanged since it was written: *"Posts, comments and reactions
+leave the product — the feature, its pages, its rows. **Following, messaging and
+gifting stay.** The platform is a competition and earning layer, not a social
+network."*
+
+**What went.** The composer and the post feed on `/feed`; the whole Community tab
+on a planet; "recent posts" on a public profile; the Posts column in search; the
+**moderation queue** in admin; `createPost`, `reactToPost`, `addComment`,
+`adminDeletePost`, `togglePinPost`; `PostCard`, `CommentThread`, `ReactionBar`;
+the seeded posts; the `posts` admin metric; and `lib/experts.ts` entirely —
+expert tiers were scored from posts, comments and likes, so with those gone the
+function had no inputs and was deleted rather than left computing zero every
+hour on the cron.
+
+**What stayed, and why.** Following, messaging, gifting, planets and their
+membership. A planet is a game's page and joining one is how a gamer says which
+games they play — neither was ever a social feature. `/feed` stays too: it is the
+signed-in home that OAuth, the login redirect and the bot all land on, and it was
+never only a feed. What replaces the post list is the rest of that page.
+
+**The earning half was already retired.** `write_post`, `write_comment`,
+`reaction_given` and `reaction_received` have sat at weight 0 with "(retired)"
+in their labels since B64, so nothing here paid CP by the time it was removed.
+The `community_activity` badge is now **unearnable rather than free** — a badge
+that starts awarding itself to everyone the day its condition becomes uncountable
+is worse than one nobody earns.
+
+**THE DECISION WORTH DEFENDING is the half this sprint did not do.**
+
+The obvious move is a `DROP TABLE` in `COLUMN_MIGRATIONS`. That list runs on
+**every boot**. A drop in it deletes every post anybody ever wrote, on the next
+deploy, irreversibly, as a *side effect of shipping something else* — no count
+shown, no confirmation, no way back. Removing a feature is a refactor;
+destroying what people wrote in it is the owner's call, and it should look like a
+decision at the moment it is taken.
+
+So the reader is gone today and the rows wait for a button:
+`lib/social-purge.ts` + a panel where the moderation queue used to be. It is
+**admin-only, not staff** — `requireStaff` would cover a support agent clearing a
+queue. The **count is on the page before anything is typed**, because a dialog
+that cannot say "12,431 posts" is a dialog people click through. The confirmation
+is a **typed word**, not a second click, and the button stays disabled until it
+matches.
+
+**One thing found on the way out:** the `feed_inline` ad placement — *"every 6
+posts in a Space feed"* — is now inventory with **no surface**, which is
+something a brand could be sold that would deliver exactly zero. Removed from the
+seed. An install seeded before B111 still carries the row; `/admin/placements` is
+where that shows.
+
+`tests/db/social-purge.mts` (81). Its most important assertion — that nothing
+drops the tables — is deliberately placed **above the `getDb()` import**: a
+`DROP TABLE` in `COLUMN_MIGRATIONS` breaks the demo bootstrap, so the same check
+placed after the import died with a stack trace instead of naming the defect.
+**The assertion that must never fail cannot depend on the database booting.**
+Proved by breaking all three guards: purging `follows`, downgrading the auth
+check to staff, and planting a `DROP TABLE` — the last of which only went red
+after the restructure, and whose first break attempt silently no-opped because
+the declaration had no type annotation. A break-test that does not break proves
+nothing.
+
+---
+
 ### ▸ B110 — The deck quoted a price we had stopped charging · **SHIPPED**
 
 **The most expensive wrong sentence in the repo, in the room where a wrong
@@ -1876,7 +1941,6 @@ the reviewer rated **fatal**.
 | **B63** | The nav bands: today's mission and the streak. |
 | **B59** | A gamer can see and control their own card on the website. *(Largely absorbed by B83.5.)* |
 | **B56** (remainder) | Card kinds not yet on the new shared layout. |
-| **B68** | The social purge — posts, comments, reactions leave the product. |
 | **B66, B67, B69** | Admin sales console, brand portal rebuild, public site — **behind Gate 4**. |
 | **B70** | Component screenshots — **deferred**, the surfaces are all about to change. |
 | `tests/ui/cards.mjs` | Owed since B54. |

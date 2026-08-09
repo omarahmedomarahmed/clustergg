@@ -128,15 +128,11 @@ export default async function ProfilePage({ params }: Props) {
   const vars = themeToVars(theme) as React.CSSProperties;
   const cardCls = `p-card p-card-${theme.cardStyle}`;
 
-  const [accounts, [followerRow], [followingRow], isFollowingRow, recentPosts, participations, allBoards, spaceRows] = await Promise.all([
+  const [accounts, [followerRow], [followingRow], isFollowingRow, participations, allBoards, spaceRows] = await Promise.all([
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, user.id)),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followingId, user.id)),
     db.select({ c: count() }).from(schema.follows).where(eq(schema.follows.followerId, user.id)),
     viewer ? db.select().from(schema.follows).where(and(eq(schema.follows.followerId, viewer.id), eq(schema.follows.followingId, user.id))).limit(1) : Promise.resolve([]),
-    db.select({ post: schema.posts, space: schema.spaces }).from(schema.posts)
-      .innerJoin(schema.spaces, eq(schema.posts.spaceId, schema.spaces.id))
-      .where(and(eq(schema.posts.authorId, user.id), sql`${schema.posts.deletedAt} IS NULL`))
-      .orderBy(desc(schema.posts.createdAt)).limit(5),
     db.select({ p: schema.challengeParticipants, c: schema.challenges }).from(schema.challengeParticipants)
       .innerJoin(schema.challenges, eq(schema.challengeParticipants.challengeId, schema.challenges.id))
       .where(eq(schema.challengeParticipants.userId, user.id)).orderBy(desc(schema.challengeParticipants.joinedAt)).limit(8),
@@ -317,21 +313,12 @@ export default async function ProfilePage({ params }: Props) {
             </div>
           </section>
         );
+      // B111. "Recent posts" was here. The section key stays in the layout
+        // type so a saved profile layout that still lists it does not break —
+        // it simply renders nothing, which is what it should have done for
+        // anybody with no posts anyway.
       case "activity":
-        if (!S.activity || recentPosts.length === 0) return null;
-        return (
-          <section key={key}>
-            <h2 className="text-lg font-bold mb-3 flex items-center gap-2" style={{ color: theme.text }}><Icon name="message" size={19} style={{ color: theme.accent }} /> {poss} {tr("recent posts")}</h2>
-            <div className="space-y-2">
-              {recentPosts.map(({ post, space }) => (
-                <Link key={post.id} href={`/planets/${space.slug}`} className={`${cardCls} block`}>
-                  <div className="text-xs p-muted mb-1">{space.name} · {timeAgo(post.createdAt)}</div>
-                  <p className="text-sm line-clamp-2" style={{ color: theme.text }}>{post.body}</p>
-                </Link>
-              ))}
-            </div>
-          </section>
-        );
+        return null;
       case "spaces":
         if (!S.spaces || spaceRows.length === 0) return null;
         return (

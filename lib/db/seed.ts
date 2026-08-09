@@ -167,7 +167,13 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { key: "leaderboard_inline", pageScope: "Every 10 leaderboard rows", device: "both", width: 728, height: 90, mobileWidth: 300, mobileHeight: 50 },
     { key: "games_top_banner", pageScope: "Top of games pages", device: "both", width: 728, height: 90, mobileWidth: 320, mobileHeight: 50 },
     { key: "feed_top_banner", pageScope: "Top of the feed", device: "both", width: 728, height: 90, mobileWidth: 320, mobileHeight: 50 },
-    { key: "feed_inline", pageScope: "Every 6 posts in a Space feed", device: "both", width: 728, height: 90, mobileWidth: 320, mobileHeight: 100 },
+    // B111. `feed_inline` was here — "Every 6 posts in a Space feed". With the
+    // feed gone it is inventory with no surface, and inventory with no surface
+    // is something a brand can be sold that will deliver exactly zero. Removed
+    // from the seed so a fresh install never offers it.
+    //
+    // ⚠ An install seeded before B111 still has the row and may have a campaign
+    // pointed at it. `/admin/placements` is where that shows up.
     { key: "challenge_sidebar", pageScope: "Challenge detail rail", device: "desktop", width: 300, height: 600, mobileWidth: null, mobileHeight: null },
     { key: "messages_footer", pageScope: "Above message compose box", device: "both", width: 320, height: 50, mobileWidth: 320, mobileHeight: 50 },
     { key: "interstitial_video", pageScope: "Between page transitions", device: "both", width: 640, height: 360, mobileWidth: 320, mobileHeight: 180 },
@@ -381,33 +387,10 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     await db.insert(schema.spaceMembers).values({ spaceId, userId }).onConflictDoNothing();
   }
 
-  const mkPost = async (spaceSlug: string, authorId: string, body: string, pinned = false) => {
-    const id = uid();
-    await db.insert(schema.posts).values({ id, spaceId: spaceIds[spaceSlug], authorId, body, isPinned: pinned });
-    return id;
-  };
-  const p1 = await mkPost("chess", nova, "Just hit a new blitz peak. The trick was giving up bullet entirely — my brain needed the extra 120 seconds. Who else is grinding the blitz ladder this season?", true);
-  const p2 = await mkPost("chess", lyra, "Hot take: puzzle rating is the single best predictor of real improvement. 30 minutes of puzzles > 3 hours of blitz tilt.");
-  const p3 = await mkPost("dota-2", orion, "Mid diff is real. 60 wins this month and I still can't escape my bracket. Watching Miracle- replays tonight — join the watch party in LFG.");
-  const p4 = await mkPost("general-gaming", vega, "New PB attempt stream this weekend. Chasing frame-perfect inputs is 90% suffering, 10% ascension.");
-  await mkPost("hardware-setups", lyra, "Finally finished the all-white battlestation. RGB set to nebula purple, obviously. Pics soon.");
-  const p6 = await mkPost("dota-2", vega, "Techies should be a bannable offense in ranked. This is not a discussion.");
-
-  const c1 = uid();
-  await db.insert(schema.comments).values({ id: c1, postId: p1, authorId: lyra, body: "Respect. Now do the same with rapid and become truly unstoppable." });
-  await db.insert(schema.comments).values({ id: uid(), postId: p1, parentCommentId: c1, authorId: nova, body: "Rapid is next season's arc, trust the process." });
-  await db.insert(schema.comments).values({ id: uid(), postId: p3, authorId: atlas, body: "Watch party is a great idea — count me in." });
-  await db.insert(schema.comments).values({ id: uid(), postId: p6, authorId: orion, body: "Strong agree. Meh from me only because the rant is a classic." });
-
-  const reactions: [string, string, string][] = [
-    [p1, lyra, "like"], [p1, orion, "like"], [p1, vega, "like"], [p1, atlas, "like"],
-    [p2, nova, "like"], [p2, orion, "meh"], [p3, nova, "like"], [p3, vega, "like"],
-    [p4, nova, "like"], [p4, orion, "like"], [p4, lyra, "like"],
-    [p6, atlas, "dislike"], [p6, lyra, "meh"],
-  ];
-  for (const [postId, userId, reactionType] of reactions) {
-    await db.insert(schema.postReactions).values({ postId, userId, reactionType }).onConflictDoNothing();
-  }
+  // B111. Six seeded posts, four comments and thirteen reactions were here.
+  // Seeding a feature the product no longer has would put rows in front of the
+  // purge button on a fresh install — a demo database that immediately reports
+  // content to destroy.
 
   const conv = uid();
   await db.insert(schema.conversations).values({ id: conv });
@@ -564,7 +547,6 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     { campaignId: camp1, creativeId: cr2, placementId: placementIds["games_top_banner"], weight: 1, priority: 0 },
     { campaignId: camp1, creativeId: cr2, placementId: placementIds["profile_footer_banner"], weight: 1, priority: 0 },
     { campaignId: camp2, creativeId: cr3, placementId: placementIds["profile_sidebar"], weight: 1, priority: 1 },
-    { campaignId: camp2, creativeId: cr4, placementId: placementIds["feed_inline"], weight: 1, priority: 0 },
     { campaignId: camp2, creativeId: cr4, placementId: placementIds["feed_top_banner"], weight: 1, priority: 0 },
     { campaignId: camp2, creativeId: cr5, placementId: placementIds["leaderboard_sidebar"], weight: 1, priority: 1 },
     { campaignId: camp2, creativeId: cr5, placementId: placementIds["challenge_sidebar"], weight: 1, priority: 1 },

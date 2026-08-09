@@ -17,7 +17,6 @@ export type PreviewData = {
   badges: { name: string }[];
   challenges: { title: string; game: string }[];
   spaces: { name: string }[];
-  postsCount: number;
   standingsCount: number;
 };
 
@@ -149,7 +148,10 @@ export default function ProfileBuilder({
       case "challenges":
         return pd.challenges.length ? <div className="flex flex-wrap gap-1.5">{pd.challenges.map((c, i) => chip(c.title, i))}</div> : empty(tr("Not competing in any challenges right now."));
       case "activity":
-        return pd.postsCount ? empty(`${pd.postsCount} ${tr(pd.postsCount > 1 ? "posts across your planets." : "post across your planets.")}`) : empty(tr("No posts yet."));
+        // B111. Posts are gone; the "activity" block renders nothing rather
+        // than being removed from the layout type, so a saved layout that still
+        // lists it keeps loading.
+        return null;
       case "spaces":
         return pd.spaces.length ? <div className="flex flex-wrap gap-1.5">{pd.spaces.map((s, i) => chip(s.name, i))}</div> : empty(tr("Join a planet to show it here."));
       default: return null;

@@ -7,7 +7,6 @@ import { getDb, schema } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { uid } from "@/lib/utils";
 import { evaluateBadgesForUser } from "@/lib/badges";
-import { recomputeExpertScores } from "@/lib/experts";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
 import { joinChallengeFor, switchChallengeAccount } from "@/lib/challenges";
 
@@ -109,59 +108,26 @@ export async function toggleSpaceMembership(spaceId: string, path: string) {
   revalidatePath(path);
 }
 
-export async function createPost(spaceId: string, spaceSlug: string, formData: FormData) {
-  const me = await requireUser();
-  const body = String(formData.get("body") ?? "").trim();
-  if (!body || body.length > 5000) return;
-  const db = await getDb();
-  const postId = uid();
-  await db.insert(schema.posts).values({ id: postId, spaceId, authorId: me.id, body });
-  await db.update(schema.spaces).set({ postCount: sql`${schema.spaces.postCount} + 1` })
-    .where(eq(schema.spaces.id, spaceId));
-  await db.insert(schema.spaceMembers).values({ spaceId, userId: me.id }).onConflictDoNothing();
-  try { await recomputeExpertScores(db, spaceId); await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
-  await awardQuestAction(db, me.id, "write_post", { refType: "post", refId: postId });
-  revalidatePath(`/planets/${spaceSlug}`);
-}
-
-export async function reactToPost(postId: string, reactionType: "like" | "dislike" | "meh", path: string) {
-  const me = await requireUser();
-  const db = await getDb();
-  const [existing] = await db.select().from(schema.postReactions).where(and(
-    eq(schema.postReactions.postId, postId),
-    eq(schema.postReactions.userId, me.id),
-  )).limit(1);
-  if (existing?.reactionType === reactionType) {
-    await db.delete(schema.postReactions).where(and(
-      eq(schema.postReactions.postId, postId),
-      eq(schema.postReactions.userId, me.id),
-    ));
-  } else if (existing) {
-    await db.update(schema.postReactions).set({ reactionType }).where(and(
-      eq(schema.postReactions.postId, postId),
-      eq(schema.postReactions.userId, me.id),
-    ));
-  } else {
-    await db.insert(schema.postReactions).values({ postId, userId: me.id, reactionType });
-    await awardQuestAction(db, me.id, "reaction_given", { refType: "reaction", refId: postId });
-    const [post] = await db.select({ authorId: schema.posts.authorId }).from(schema.posts).where(eq(schema.posts.id, postId)).limit(1);
-    if (post && post.authorId !== me.id) {
-      await awardQuestAction(db, post.authorId, "reaction_received", { refType: "reaction", refId: `${postId}:${me.id}` });
-    }
-  }
-  revalidatePath(path);
-}
-
-export async function addComment(postId: string, parentCommentId: string | null, path: string, formData: FormData) {
-  const me = await requireUser();
-  const body = String(formData.get("body") ?? "").trim();
-  if (!body || body.length > 2000) return;
-  const db = await getDb();
-  const commentId = uid();
-  await db.insert(schema.comments).values({ id: commentId, postId, parentCommentId, authorId: me.id, body });
-  await awardQuestAction(db, me.id, "write_comment", { refType: "comment", refId: commentId });
-  revalidatePath(path);
-}
+// ===== POSTS, COMMENTS AND REACTIONS ARE GONE. B111 =====
+//
+// `createPost`, `reactToPost` and `addComment` used to live here. Cluster is a
+// competition and earning layer, not a social network, and the feed was the
+// part of it nobody used and everybody had to moderate.
+//
+// FOLLOWING, MESSAGING AND GIFTING STAY. They are how a gamer keeps track of
+// people they compete against, and none of them need a post to exist.
+//
+// The earning half was already retired: `write_post`, `write_comment`,
+// `reaction_given` and `reaction_received` sit in `lib/quests.ts` with a weight
+// of 0 and "(retired)" in their labels, so nothing here paid CP by the time it
+// was removed.
+//
+// ⚠ THE ROWS ARE STILL THERE, ON PURPOSE. `posts`, `comments`,
+// `post_reactions` and `comment_reactions` are user-authored content on a live
+// product. Dropping them from `COLUMN_MIGRATIONS` would delete somebody's
+// writing on the next boot, irreversibly, as a side effect of a deploy — which
+// is not a decision a refactor gets to take. `lib/social-purge.ts` holds the
+// deletion behind an explicit admin action, with a count shown first.
 
 export async function requestNewSpace(_prev: { error?: string; ok?: boolean } | undefined, formData: FormData) {
   const me = await requireUser();
