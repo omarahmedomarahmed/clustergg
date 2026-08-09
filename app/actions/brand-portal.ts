@@ -327,6 +327,16 @@ export async function portalBuyCampaign(brandId: string, key: string, formData: 
     if (Array.isArray(raw)) slotCovers = raw.map((v) => (typeof v === "string" && v.trim() ? v.trim() : null));
   } catch { slotCovers = []; }
 
+  // B91.9. Which of their trophies they want on each place. Parsed
+  // defensively and sanitised server-side in `buyCampaign` — a brand may ask
+  // only for its own trophies or the general catalogue, because another brand's
+  // logo on a podium is a trophy the winner keeps on their profile forever.
+  let prizes: string[][] = [];
+  try {
+    const raw = JSON.parse(String(formData.get("prizes") ?? "[]"));
+    if (Array.isArray(raw)) prizes = raw.map((p) => (Array.isArray(p) ? p.map(String) : []));
+  } catch { prizes = []; }
+
   let targeting: { regions?: string[]; countries?: string[]; guildIds?: string[] } = {};
   try {
     const raw = JSON.parse(String(formData.get("targeting") ?? "{}"));
@@ -348,7 +358,7 @@ export async function portalBuyCampaign(brandId: string, key: string, formData: 
   } catch { games = []; }
 
   const { buyCampaign } = await import("@/lib/sponsored-campaigns");
-  const res = await buyCampaign({ brandId, game, slots, games, coverUrl, slotCovers, targeting });
+  const res = await buyCampaign({ brandId, game, slots, games, coverUrl, slotCovers, targeting, prizes });
   if (!res.ok) return { error: res.message };
 
   // B91.4. A brand just built a campaign in their own portal. Whether or not

@@ -8,6 +8,7 @@ import { portalSendMessage } from "@/app/actions/brand-portal";
 import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
 import { networkStats } from "@/lib/network";
 import { brandCampaigns, campaignQuote, networkReach, nextMonday, slotWindows } from "@/lib/sponsored-campaigns";
+import { trophiesForBrand } from "@/lib/brand-trophies";
 import { brandChallengeReports, campaignReport, brandTestimonials, brandTier, challengeServers } from "@/lib/brand-report";
 import { pricingConfig } from "@/lib/pricing-live";
 import { listInvoices } from "@/lib/invoices";
@@ -264,6 +265,12 @@ export default async function BrandPortalPage({
   // B36: what is owed, when it is due, and what happens if it is not paid.
   const { brandBlocked } = await import("@/lib/prepay");
   const prepay = await brandBlocked(db, brand.id);
+  // B91.9. Theirs plus the general catalogue — another brand's logo must never
+  // appear in this list, let alone on a podium.
+  const brandTrophies = (await trophiesForBrand(await getDb(), brand.id)).map((t) => ({
+    id: t.id, name: t.name, tier: t.tier, value: t.value, brandId: t.brandId,
+  }));
+
   const buyQuote = campaignQuote();
   const buyWeeks = slotWindows(nextMonday());
 
@@ -424,6 +431,7 @@ export default async function BrandPortalPage({
                 quote={buyQuote}
                 network={{ servers: reach.servers, unlockedServers: reach.unlockedServers, gamers: reach.gamers }}
                 weeks={buyWeeks.map((w) => ({ startAt: w.startAt.toISOString(), endAt: w.endAt.toISOString() }))}
+                trophies={brandTrophies}
               />
             ),
           },

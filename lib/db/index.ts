@@ -56,6 +56,7 @@ const COLUMN_MIGRATIONS = [
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "cover_adjust" jsonb NOT NULL DEFAULT '{"zoom":1,"x":50,"y":50}'::jsonb`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "trophy_id" text`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "announced_at" timestamptz`,
+  `ALTER TABLE "sponsored_campaigns" ADD COLUMN IF NOT EXISTS "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "baseline_at" timestamptz`,
   // ----- Quests & gamification (new tables; idempotent so both fresh and
@@ -310,6 +311,7 @@ const COLUMN_MIGRATIONS = [
     "cover_url" text,
     "slot_state" jsonb DEFAULT '[]'::jsonb NOT NULL,
     "targeting" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS "spc_brand_idx" ON "sponsored_campaigns" ("brand_id","created_at")`,
@@ -1045,7 +1047,15 @@ async function runColumnMigrations(db: DB) {
   for (const stmt of COLUMN_MIGRATIONS) {
     try { await db.execute(dsql.raw(stmt)); }
     catch (e) {
-      if (!/already exists|does not exist/i.test(String(e))) throw e;
+      // The message we need is on the CAUSE, not on the error.
+      //
+      // Drizzle wraps a failed statement in a DrizzleQueryError whose own
+      // message is "Failed query: ALTER TABLE …" — the reason lives one level
+      // down. Testing only `String(e)` meant every expected miss (an ALTER
+      // against a table a later statement creates) looked unexpected and was
+      // rethrown, which took the whole bootstrap down on a fresh database.
+      const chain = [String(e), String((e as { cause?: unknown })?.cause ?? "")].join(" ");
+      if (!/already exists|does not exist/i.test(chain)) throw e;
       // Say which one was skipped, and why.
       //
       // Most of these are expected — an ALTER against a table a later statement

@@ -310,6 +310,13 @@ export async function buyCampaign(input: {
   /** One cover per slot, when a brand wants a different one each week. */
   slotCovers?: (string | null)[];
   targeting?: { regions?: string[]; countries?: string[]; guildIds?: string[] };
+  /**
+   * Which of the brand's trophies they want given out, by place. B91.9.
+   *
+   * Sanitised against what this brand may actually ask for before it is
+   * stored — another brand's logo must never reach a podium.
+   */
+  prizes?: string[][];
   cfg?: PricingConfig;
 }): Promise<BuyResult> {
   const game = (input.game ?? "").trim();
@@ -399,6 +406,10 @@ export async function buyCampaign(input: {
       coverUrl: input.coverUrl ?? null,
       slotState: slots,
       targeting: input.targeting ?? {},
+      prizes: { places: await (async () => {
+        const { sanitisePrizeRequest } = await import("@/lib/brand-trophies");
+        return sanitisePrizeRequest(db, input.brandId, input.prizes ?? []);
+      })() },
     });
 
     // B36: the invoice is issued HERE, at purchase, due the same day.

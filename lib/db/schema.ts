@@ -1434,6 +1434,21 @@ export const sponsoredCampaigns = pgTable("sponsored_campaigns", {
    */
   targeting: jsonb("targeting").$type<{ regions?: string[]; countries?: string[]; guildIds?: string[] }>()
     .notNull().default({}),
+  /**
+   * Which trophies the brand wants given out, by place. B91.9.
+   *
+   * A brand with three different $100 designs has a reason for wanting a
+   * particular one on a particular week — a launch, a colourway, a partner. It
+   * used to be impossible to say so: staff picked from the catalogue and the
+   * brand found out when they saw the podium.
+   *
+   * Stored on the CAMPAIGN rather than on each challenge because it is a
+   * standing instruction for everything bought under it, and because the
+   * challenges do not exist yet at the moment the brand is asked. Index 0 is
+   * first place. It is a REQUEST, not a guarantee — staff still build the
+   * podium, and a trophy that has been retired cannot be given.
+   */
+  prizes: jsonb("prizes").$type<{ places?: string[][] }>().notNull().default({}),
   createdAt: now("created_at"),
 }, (t) => [index("spc_brand_idx").on(t.brandId, t.createdAt), index("spc_game_idx").on(t.game, t.status)]);
 

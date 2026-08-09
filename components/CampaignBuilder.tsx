@@ -37,6 +37,15 @@ export type BuilderGame = {
   owned: boolean;
 };
 
+export type BuilderTrophy = {
+  id: string;
+  name: string;
+  tier: string;
+  value: number;
+  /** Null for the general catalogue. Theirs carries their logo. */
+  brandId: string | null;
+};
+
 export type BuilderQuote = {
   slots: number;
   pricePerChallenge: number;
@@ -48,11 +57,13 @@ export type BuilderQuote = {
 };
 
 export default function CampaignBuilder({
-  brandId, keyStr, games, quote, network, weeks, currency = "USD",
+  brandId, keyStr, games, quote, network, weeks, currency = "USD", trophies = [],
 }: {
   brandId: string;
   keyStr: string;
   games: BuilderGame[];
+  /** Theirs and the general catalogue — see lib/brand-trophies. */
+  trophies?: BuilderTrophy[];
   quote: BuilderQuote;
   network: { servers: number; unlockedServers: number; gamers: number };
   /** The four windows they're buying, already computed server-side. */
@@ -72,6 +83,11 @@ export default function CampaignBuilder({
   const [perWeekGame, setPerWeekGame] = useState<(string | null)[]>([null, null, null, null]);
   const [mixed, setMixed] = useState(false);
   const [regions, setRegions] = useState<string[]>([]);
+  // B91.9. Which trophy on which place. A brand with three $100 designs has a
+  // reason for wanting a particular one this week — a launch, a colourway, a
+  // partner — and until now that was decided by whoever built the challenge and
+  // discovered by the brand when they saw the podium.
+  const [prizePlaces, setPrizePlaces] = useState<string[]>(["", "", ""]);
   const [busy, setBusy] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -126,6 +142,7 @@ export default function CampaignBuilder({
       fd.set("coverUrl", cover ?? "");
       fd.set("slotCovers", JSON.stringify(split ? perWeek.slice(0, slots) : []));
       fd.set("targeting", JSON.stringify({ regions }));
+      fd.set("prizes", JSON.stringify(prizePlaces.map((id) => (id ? [id] : []))));
       const r = await portalBuyCampaign(brandId, keyStr, fd);
       if (r?.error) { setMsg(r.error); return; }
       // Bought. The draft has served its purpose, and leaving it behind would
@@ -140,8 +157,8 @@ export default function CampaignBuilder({
   // it. A campaign is five decisions and an upload; losing it to a closed tab
   // is losing somebody who had already decided to buy.
   const draftValues = useMemo(
-    () => ({ game, cover, perWeek, split, slots, perWeekGame, mixed, regions }),
-    [game, cover, perWeek, split, slots, perWeekGame, mixed, regions],
+    () => ({ game, cover, perWeek, split, slots, perWeekGame, mixed, regions, prizePlaces }),
+    [game, cover, perWeek, split, slots, perWeekGame, mixed, regions, prizePlaces],
   );
   const restore = (p: Record<string, unknown>) => {
     // Read defensively: a draft is data the browser sent us and the shape may
@@ -155,6 +172,7 @@ export default function CampaignBuilder({
     if (Array.isArray(p.perWeekGame)) setPerWeekGame(p.perWeekGame as (string | null)[]);
     if (typeof p.mixed === "boolean") setMixed(p.mixed);
     if (Array.isArray(p.regions)) setRegions((p.regions as string[]).map(String));
+    if (Array.isArray(p.prizePlaces)) setPrizePlaces((p.prizePlaces as string[]).map(String).slice(0, 3));
   };
 
   const working = pending || busy !== null;
@@ -281,6 +299,38 @@ export default function CampaignBuilder({
               </div>
             )}
           </div>
+
+          {/* ===== B91.9: which of your trophies ===== */}
+          {trophies.length > 0 && (
+            <div className="mt-6">
+              <Step n={3} label="Which trophy the winners keep" />
+              <p className="mt-1 text-[11px] leading-relaxed text-muted">
+                A trophy stays on the winner&apos;s profile permanently, so which design goes out is
+                yours to decide. Leave a place blank and we will pick something of the right value.
+                Ask for something we cannot give — a retired design — and we will come back to you
+                rather than quietly substituting it.
+              </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                {["1st place", "2nd place", "3rd place"].map((label, i) => (
+                  <label key={label} className="block text-[11px] text-muted">
+                    {label}
+                    <select
+                      value={prizePlaces[i] ?? ""}
+                      onChange={(e) => setPrizePlaces((p) => p.map((v, j) => (j === i ? e.target.value : v)))}
+                      className="input-cosmic mt-1 w-full !py-1.5 text-xs"
+                    >
+                      <option value="">— your call —</option>
+                      {trophies.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}{t.value ? ` — ${money(t.value)}` : ""}{t.brandId ? " · yours" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* ===== 3. How many weeks ===== */}
           <div className="mt-6">
