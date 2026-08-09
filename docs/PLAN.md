@@ -498,14 +498,15 @@ order it is being built in.
 | B91.2 | Every challenge shows who paid for it, and whether they have | SHIPPED `762061b` |
 | B91.3 | A series is materialised all the way out; announcing publishes it | SHIPPED `8ee1f0b` |
 | B91.4 | The desk: what a customer just did, per desk, clearable by name | SHIPPED `f927206` |
-| B91.5 | Admin builder: type picker (campaign / custom / private / house), a campaign REQUIRED for a sponsored one, repeat shown as "2 months = 8 weeks" | next |
-| B91.6 | Admin builds a campaign FOR a brand; the brand logs in, sees it, confirms and pays | |
-| B91.7 | Draft autosave everywhere — brand, server owner, admin — so a half-built thing survives a closed tab, and every draft is visible here with who built it | |
-| B91.8 | Trophies: several per tier per brand, chosen per PLACE, 1–10 winners on a custom challenge, and a brand picks which of its $100 designs a week uses | |
-| B91.9 | Sales + support sections: the shared brand mailbox, the ops queue for servers and gamers | |
-| B91.10 | Scoring locks at the end date, winners announced, trophies on profiles — end to end, proven | |
-| B91.11 | **Purge** every challenge and challenge request built the old way, at deploy | owner-authorised, not yet done |
-| B91.12 | The three guides, then the website rewrite | |
+| B91.5 | A brand's money always belongs to a campaign — created from the deal being typed, as a draft | SHIPPED `fc01cb9` |
+| B91.6 | The seam between two runs: the next run opens, carries the field, announces | SHIPPED `e50ee81` |
+| B91.7 | A podium of any depth — 1 to 10 places, and the award query that only ever paid three | SHIPPED `8ec81b9` |
+| B91.8 | Draft autosave everywhere — brand, server owner, admin — so a half-built thing survives a closed tab, and every draft visible here with who built it | next |
+| B91.9 | A brand picks WHICH of its $100 designs a week uses; several trophies per tier per brand, visible in the brand portal | |
+| B91.10 | Admin builds a campaign FOR a brand; the brand logs in, sees it, confirms and pays | |
+| B91.11 | Sales + support sections: the shared brand mailbox, the ops queue for servers and gamers | |
+| B91.12 | **Purge** every challenge and challenge request built the old way, at deploy | owner-authorised, not yet done |
+| B91.13 | The three guides, then the website rewrite | |
 
 **The rule that ties B91.3 and B91 together, written down because it is not
 obvious:** a challenge becomes visible and joinable when it is ANNOUNCED, which
