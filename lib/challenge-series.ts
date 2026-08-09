@@ -96,6 +96,49 @@ export type NextRun = { ok: true; challengeId: string; index: number } | { ok: f
  * admin pressing "end now" both land on the run that already exists rather than
  * creating a duplicate week.
  */
+/**
+ * Open a run that already exists, because the whole series was written ahead.
+ *
+ * Three states, and the difference between them is whether its start has
+ * arrived:
+ *
+ *   past its start   activate it, carry the entrants, announce it as live
+ *   still ahead      announce it as UPCOMING, which publishes it and lets
+ *                    people enter early — scoring is gated on the start line
+ *                    (see B91) so entering early buys nothing
+ *   already active   just carry the entrants; somebody announced it by hand
+ *
+ * Entrants are carried in every case. A weekly series where week 1's players
+ * have to find and re-enter week 2 is a weekly series that loses most of its
+ * field in the seam between two runs.
+ */
+async function openExistingRun(
+  db: Awaited<ReturnType<typeof getDb>>,
+  prev: typeof schema.challenges.$inferSelect,
+  nextId: string,
+): Promise<void> {
+  try {
+    const [next] = await db.select().from(schema.challenges)
+      .where(eq(schema.challenges.id, nextId)).limit(1);
+    if (!next || next.status === "completed" || next.status === "cancelled") return;
+
+    const started = next.startAt <= new Date();
+
+    if (next.status === "draft" && started) {
+      await db.update(schema.challenges).set({ status: "active" })
+        .where(eq(schema.challenges.id, nextId));
+    }
+
+    await carryEntrants(prev.id, nextId);
+
+    try {
+      const announce = await import("@/lib/discord/announce");
+      if (started) await announce.announceChallengeLaunched(nextId);
+      else if (!next.announcedAt) await announce.announceChallengeUpcoming(nextId);
+    } catch { /* the run exists whether or not Discord heard about it */ }
+  } catch { /* the finished run is still correctly closed */ }
+}
+
 export async function openNextRun(finishedChallengeId: string): Promise<NextRun> {
   try {
     const db = await getDb();
@@ -113,7 +156,17 @@ export async function openNextRun(finishedChallengeId: string): Promise<NextRun>
       .from(schema.challenges)
       .where(and(eq(schema.challenges.seriesId, seriesId), eq(schema.challenges.runIndex, index)))
       .limit(1);
-    if (existing) return { ok: true, challengeId: existing.id, index };
+    if (existing) {
+      // B91.3 CHANGED WHAT "ALREADY OPENED" MEANS.
+      //
+      // Every run of a series is now written up front, as a draft, so this
+      // branch is no longer the rare double-call case — it is the NORMAL one.
+      // Returning here would leave week 2 sitting as a draft forever: never
+      // activated, never carrying week 1's entrants, never announced. The
+      // series would silently stop after its first week.
+      await openExistingRun(db, prev, existing.id);
+      return { ok: true, challengeId: existing.id, index };
+    }
 
     // The new window starts when the last one ended, not "now". A cron that
     // runs six hours late must not shorten the week it is opening.
@@ -222,6 +275,11 @@ export async function carryEntrants(fromChallengeId: string, toChallengeId: stri
         userId: p.userId,
         linkedAccountId: p.linkedAccountId,
         baseline: byAccount.get(p.linkedAccountId) ?? {},
+        // B91. A carried entrant is a NEW baseline taken now, so it is stamped
+        // now — a null here would read as a row written before the column
+        // existed, and the scorer deliberately never rebaselines those. Week 2
+        // would then measure from a snapshot taken before week 2 started.
+        baselineAt: new Date(),
         joinedFrom: p.joinedFrom,
       })),
     ).onConflictDoNothing();
