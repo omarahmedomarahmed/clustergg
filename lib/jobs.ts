@@ -15,7 +15,7 @@ import { postBotListStats } from "@/lib/botlist-post";
 // Each job must be safe to run repeatedly. Closing challenges is idempotent,
 // and ad posting has its own per-server interval.
 
-export type JobKey = "challenges" | "challenge-reminders" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats" | "guild-snapshots" | "week-close";
+export type JobKey = "challenges" | "challenge-reminders" | "discord-ads" | "leaderboard-feed" | "week-update" | "botlist-stats" | "guild-snapshots" | "week-close" | "purge-observations";
 
 export type JobResult = { key: JobKey; ok: boolean; summary: string };
 
@@ -42,6 +42,14 @@ export type JobCadence = "hourly" | "daily";
 export const WEEKLY_DAY = 1;
 
 export const JOBS: { key: JobKey; label: string; description: string; cadence: JobCadence; weeklyOn?: number }[] = [
+  {
+    // B104. Two findings, one job: the event tables grow without limit, and
+    // every row in them carries a hashed address and a session key we stop
+    // needing after a few weeks.
+    key: "purge-observations", cadence: "daily",
+    label: "Remove observations past the retention window",
+    description: "Deletes impressions, clicks, bot command logs, server events and portal login attempts older than the retention window. Batched, so it can never lock a table. Money and entitlement are never touched — see lib/retention.ts, which lists both sides by name.",
+  },
   {
     // C16. The model is weekly and nothing weekly existed — the pool, the
     // scores and the payouts had no scheduler at all.
@@ -92,6 +100,12 @@ export const JOBS: { key: JobKey; label: string; description: string; cadence: J
 export async function runJob(key: JobKey): Promise<JobResult> {
   try {
     switch (key) {
+      case "purge-observations": {
+        const { getDb } = await import("@/lib/db");
+        const { purgeOldObservations, purgeSummary } = await import("@/lib/retention");
+        const r = await purgeOldObservations(await getDb());
+        return { key, ok: true, summary: purgeSummary(r) };
+      }
       case "challenges": {
         const r = await closeExpiredChallenges();
         return { key, ok: true, summary: r.closed ? `Ended ${r.closed} challenge${r.closed === 1 ? "" : "s"} and awarded their trophies.` : "No challenges were due to end." };

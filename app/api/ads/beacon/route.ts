@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, eq, gte } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getSession } from "@/lib/auth";
-import { hashIp } from "@/lib/ads";
+import { hashIp, hashSession } from "@/lib/ads";
 import { uid } from "@/lib/utils";
 import {
   IMPRESSION_WINDOW_MS, awardRef, impressionKey, originAllowed, rateLimited, viewerKey,
@@ -37,7 +37,12 @@ export async function POST(req: NextRequest) {
   }
 
   const session = await getSession().catch(() => null);
-  const sessionCookie = req.cookies.get("cluster_session")?.value?.slice(-16) ?? null;
+  // B104. HASHED, not sliced. This used to keep the last sixteen characters of
+  // the session JWT — a fragment of a live credential, in a table with a much
+  // lower security bar than the cookie it came from. Nothing here ever needed
+  // the value; it needed a key that is the same for the same browser, and a
+  // hash is that.
+  const sessionCookie = hashSession(req.cookies.get("cluster_session")?.value);
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "0.0.0.0";
   const hashedIp = hashIp(ip);
   const viewer = viewerKey(sessionCookie, hashedIp);

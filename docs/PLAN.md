@@ -934,6 +934,48 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B104 — What we keep, and for how long · **SHIPPED**
+
+B80 raised two findings that are the same thing said twice: *"deletion leaves
+PII"* and *"unbounded event tables"*. A retention window answers both — we stop
+holding what we no longer use, and the tables stop growing without limit.
+
+**90 days, on the daily cron, batched.** It deletes OBSERVATIONS: impressions,
+clicks, bot command logs, server events, portal login attempts. Rows written
+because something happened, counted into a rollup that day, read by nobody
+after.
+
+**It never touches money or entitlement**, and both sides are written down by
+name in `lib/retention.ts` so the test can compare them. Not the vault ledger,
+not invoices, not payouts, not redemptions, not trophies, and above all not
+quest events — a quest event is somebody's CP balance. The delivery ledger is
+excluded for the same reason: a brand is billed on the rollup, and a count of
+rows that have been deleted is zero.
+
+The table list is a LITERAL, not a loop over the schema. A loop would quietly
+include the next table somebody adds, and the next table somebody adds might be
+the ledger.
+
+**Also: the session fragment.** The ad beacon stored
+`cluster_session.slice(-16)` — sixteen characters of a live JWT — in
+`ad_impressions.session_id`. Not enough to forge, and that was never the point:
+it is a piece of a credential in a table that staff read, reports join on, and
+backups copy. Now `hashSession`, salted with the same secret as `hashIp`.
+Nothing needed the value; it needed a key that is stable for the same browser,
+and a hash is that.
+
+**The test caught a live bug in the purge itself.** It read `rowCount`, which
+PGlite leaves at zero on a delete — so the job would have reported "nothing
+older than 90 days to remove" on every run while quietly deleting thousands of
+rows. Deleting correctly and lying about it is the version of that bug that
+survives review. It counts `RETURNING` rows now.
+
+**Still open from B80:** cookie consent — see the question below — and the three
+remaining scale findings (cold-start DDL replay, stat sync throughput, brand
+report heap).
+
+---
+
 ### ▸ B103 — Four holes, closed · **SHIPPED**
 
 Every one of these was a guard that existed and did not cover the case it was

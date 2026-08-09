@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid, slugify } from "@/lib/utils";
+import { hashSession } from "@/lib/ads";
 import { newPortalKey } from "@/lib/portal-auth";
 import { guildStats, type GuildStats } from "@/lib/discord/guilds";
 import { challengeEarning, nextEarnTier } from "@/lib/server-earnings";
@@ -189,7 +190,10 @@ export async function recordServerEvent(
       id: uid(), guildId, type,
       challengeId: opts.challengeId ?? null,
       userId: opts.userId ?? null,
-      sessionId: opts.sessionId ?? null,
+      // HASHED on the way in. B104 found the beacon storing a slice of the
+      // session JWT; no caller passes one here today, and this is what makes
+      // sure the next one cannot reintroduce it by writing the obvious thing.
+      sessionId: hashSession(opts.sessionId),
     });
   } catch { /* non-fatal */ }
 }
