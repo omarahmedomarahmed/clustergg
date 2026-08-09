@@ -121,6 +121,8 @@ export const ADMIN_NAV: AdminGroup[] = [
     blurb: "Where everything is, and what needs you today.",
     items: [
       { href: "/admin", label: "Command centre", desc: "Every console, every live number, in one place.", exact: true },
+      { href: "/admin/sales", label: "Sales desk", desc: "One screen for the people who talk to brands: who signed up, who is half-way through buying, who owes us, and who is waiting on a reply.", queue: true, systems: ["brand", "billing"] },
+      { href: "/admin/support", label: "Support desk", desc: "One screen for the people who look after servers and gamers: everything where somebody outside is blocked on us.", queue: true, systems: ["bot", "trophies"] },
       { href: "/admin/alerts", label: "What needs you", desc: "Everything a brand, a server owner or a gamer just did that somebody here should react to — grouped by the desk that reacts to it.", queue: true, systems: ["brand", "bot", "billing"] },
       { href: "/admin/messages", label: "Messages", desc: "Every conversation with a server owner or a brand, in one queue.", metric: "serverMessages", queue: true, systems: ["bot", "brand"] },
       { href: "/admin/systems", label: "The systems", desc: "What Cluster is made of, what each part is for, and who runs it.", exact: true },
