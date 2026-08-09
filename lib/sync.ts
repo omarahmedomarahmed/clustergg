@@ -306,20 +306,77 @@ export async function finalizeChallenges(db: DB) {
   ));
 }
 
+/**
+ * How many accounts one cron run may take, and how many at once. B105.
+ *
+ * ===== THE DEFECT THIS REPLACES =====
+ *
+ * This was a SERIAL loop over 25 accounts, each one an external HTTP call to a
+ * game provider taking anywhere from 200ms to several seconds. On an hourly
+ * cron that is a hard ceiling of 25 accounts an hour — so at about thirty
+ * linked accounts the queue stops draining, and every account after that falls
+ * further behind every hour, forever. Stats going stale is not a visible crash;
+ * it is a leaderboard that quietly stops moving.
+ *
+ * Two numbers fix it, and they are separate on purpose:
+ *
+ *   TAKE  how many the run claims. Bounded because a run has a wall-clock
+ *         budget and an unbounded one would be killed mid-flight, leaving
+ *         `nextSyncAt` unset on whatever it had not reached.
+ *   POOL  how many run AT ONCE. Bounded because the thing on the other end is
+ *         somebody else's rate limit — Riot's, Steam's — and the fastest way to
+ *         lose an API key is to spike it.
+ *
+ * 120 × 6 is roughly twenty serial rounds: comfortably inside a cron's budget,
+ * and enough headroom that the queue drains rather than grows at any size this
+ * product plausibly reaches before someone revisits it.
+ */
+export const SYNC_TAKE = 120;
+export const SYNC_POOL = 6;
+
+/**
+ * Run `work` over `items`, at most `size` at a time.
+ *
+ * A pool rather than `Promise.all`, which would fire all 120 at once, and rather
+ * than a serial loop, which is what was wrong. Each worker takes the next index
+ * until there are none — no chunking, so one slow account cannot idle five
+ * workers waiting for its batch to finish.
+ */
+async function pool<T>(items: T[], size: number, work: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const workers = Array.from({ length: Math.min(size, items.length) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      await work(items[i]);
+    }
+  });
+  await Promise.all(workers);
+}
+
 // Batch sync for cron: pick accounts whose nextSyncAt has passed.
-export async function syncDueAccounts(db: DB, limit = 25): Promise<{ synced: number; failed: number }> {
+export async function syncDueAccounts(db: DB, limit = SYNC_TAKE): Promise<{ synced: number; failed: number }> {
   const due = await db.select().from(schema.linkedGameAccounts)
     .where(or(
       isNull(schema.linkedGameAccounts.nextSyncAt),
       lt(schema.linkedGameAccounts.nextSyncAt, new Date()),
     ))
+    // Oldest first, nulls first. A never-synced account is the one whose owner
+    // is most likely staring at an empty profile right now.
     .orderBy(asc(schema.linkedGameAccounts.nextSyncAt))
     .limit(limit);
+
   let synced = 0, failed = 0;
-  for (const account of due) {
-    const r = await syncAccount(db, account);
-    if (r.ok) synced++; else failed++;
-  }
+  await pool(due, SYNC_POOL, async (account) => {
+    // `syncAccount` already swallows its own failures and records them on the
+    // row. The catch here is for the case it cannot: a throw would abandon
+    // every remaining account in this worker.
+    try {
+      const r = await syncAccount(db, account);
+      if (r.ok) synced++; else failed++;
+    } catch { failed++; }
+  });
+
   await finalizeChallenges(db);
   return { synced, failed };
 }

@@ -934,6 +934,39 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B105 — The sync queue has to drain · **SHIPPED**
+
+`syncDueAccounts` was a **serial loop over 25 accounts**, each one an external
+HTTP call to a game provider, on an hourly cron. That is a hard ceiling of 25
+accounts an hour — so at about thirty linked accounts the queue stops draining,
+and every account past that falls further behind every hour, forever.
+
+It is the worst shape a scale bug can have: nothing crashes, nothing errors, and
+the only symptom is a leaderboard that quietly stops moving.
+
+**Two numbers, separate on purpose.** `SYNC_TAKE` (120) is how many a run
+claims — bounded because a run has a wall-clock budget and an unbounded one gets
+killed mid-flight with `nextSyncAt` unset on whatever it missed. `SYNC_POOL` (6)
+is how many run at once — bounded because the thing on the other end is somebody
+else's rate limit, and the fastest way to lose a Riot key is to spike it.
+
+A worker POOL, not chunks: each worker takes the next index, so one slow account
+cannot idle five workers waiting for its batch. Each account is caught
+individually, because a throw would otherwise abandon everything that worker had
+left.
+
+`tests/db/sync-throughput.mts` asserts the shape from source *and* drives the
+pool over 50 items to prove it runs each exactly once, in parallel, never
+exceeding the pool size.
+
+**Two of the four scale findings were already fixed and the plan had not caught
+up:** unbounded event tables (B104's retention job) and the brand-report heap
+(`lib/ad-delivery.ts` aggregates in SQL and bounds the server list — its own
+comment says it is "replacing" that defect). **Cold-start DDL replay is the last
+one open.**
+
+---
+
 ### ▸ B104 — What we keep, and for how long · **SHIPPED**
 
 B80 raised two findings that are the same thing said twice: *"deletion leaves
