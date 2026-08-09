@@ -1925,6 +1925,37 @@ export const serverCharges = pgTable("server_charges", {
 }, (t) => [index("server_charge_idx").on(t.guildId, t.createdAt)]);
 
 /**
+ * A half-built thing, kept. B91.8.
+ *
+ * A brand builds a campaign, gets interrupted, closes the tab, and comes back
+ * to an empty form. So do server owners requesting a challenge and staff
+ * building one. Every one of those is somebody who decided to give us money and
+ * then had to start again — the single cheapest place to lose a customer.
+ *
+ * Keyed by (ownerType, ownerId, formKey) so a draft belongs to whoever was
+ * typing it, and one row per form rather than a history: this is a resumption
+ * point, not a version control system, and keeping every keystroke would make
+ * the table bigger than the things it is drafts of.
+ */
+export const formDrafts = pgTable("form_drafts", {
+  id: id(),
+  /** brand | server | staff */
+  ownerType: text("owner_type").notNull(),
+  ownerId: text("owner_id").notNull(),
+  /** Which form. `campaign`, `challenge`, `challenge-request`. */
+  formKey: text("form_key").notNull(),
+  /** Whatever the form had on it. Never trusted on the way back in. */
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+  /** What to call it in a list of drafts. */
+  label: text("label").notNull().default(""),
+  updatedAt: timestamp("updated_at", { withTimezone: true, mode: "date" }).notNull().defaultNow(),
+  createdAt: now("created_at"),
+}, (t) => [
+  uniqueIndex("form_draft_key_idx").on(t.ownerType, t.ownerId, t.formKey),
+  index("form_draft_seen_idx").on(t.updatedAt),
+]);
+
+/**
  * Something happened that a human here should know about. B91.4.
  *
  * NOT the same thing as the audit log, and the difference is who it is for.

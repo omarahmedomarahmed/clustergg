@@ -886,6 +886,19 @@ const COLUMN_MIGRATIONS = [
   )`,
   `CREATE INDEX IF NOT EXISTS "server_charge_idx" ON "server_charges" ("guild_id","created_at")`,
 
+  `CREATE TABLE IF NOT EXISTS "form_drafts" (
+    "id" text PRIMARY KEY NOT NULL,
+    "owner_type" text NOT NULL,
+    "owner_id" text NOT NULL,
+    "form_key" text NOT NULL,
+    "payload" jsonb DEFAULT '{}'::jsonb NOT NULL,
+    "label" text DEFAULT '' NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+    "created_at" timestamp with time zone DEFAULT now() NOT NULL
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "form_draft_key_idx" ON "form_drafts" ("owner_type","owner_id","form_key")`,
+  `CREATE INDEX IF NOT EXISTS "form_draft_seen_idx" ON "form_drafts" ("updated_at")`,
+
   `CREATE TABLE IF NOT EXISTS "staff_alerts" (
     "id" text PRIMARY KEY NOT NULL,
     "kind" text NOT NULL,

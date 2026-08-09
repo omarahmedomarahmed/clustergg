@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import Icon from "@/components/Icon";
 import { downscale } from "@/lib/downscale";
 import { portalBuyCampaign } from "@/app/actions/brand-portal";
+import DraftKeeper from "@/components/DraftKeeper";
+import { discardFormDraft } from "@/app/actions/drafts";
 
 // The media buying tool.
 //
@@ -126,9 +128,33 @@ export default function CampaignBuilder({
       fd.set("targeting", JSON.stringify({ regions }));
       const r = await portalBuyCampaign(brandId, keyStr, fd);
       if (r?.error) { setMsg(r.error); return; }
+      // Bought. The draft has served its purpose, and leaving it behind would
+      // offer to "pick up" a campaign that already exists.
+      void discardFormDraft("brand", brandId, "campaign").catch(() => {});
       setDone(true);
       setMsg(null);
     });
+  };
+
+  // B91.8. Everything on this screen that a brand chose, kept as they choose
+  // it. A campaign is five decisions and an upload; losing it to a closed tab
+  // is losing somebody who had already decided to buy.
+  const draftValues = useMemo(
+    () => ({ game, cover, perWeek, split, slots, perWeekGame, mixed, regions }),
+    [game, cover, perWeek, split, slots, perWeekGame, mixed, regions],
+  );
+  const restore = (p: Record<string, unknown>) => {
+    // Read defensively: a draft is data the browser sent us and the shape may
+    // be from an older version of this form. Anything unrecognised is skipped
+    // rather than trusted into state.
+    if (typeof p.game === "string") setGame(p.game);
+    if (typeof p.cover === "string" || p.cover === null) setCover((p.cover as string) ?? null);
+    if (Array.isArray(p.perWeek)) setPerWeek(p.perWeek as (string | null)[]);
+    if (typeof p.split === "boolean") setSplit(p.split);
+    if (Number.isFinite(Number(p.slots))) setSlots(Math.max(1, Math.min(4, Number(p.slots))));
+    if (Array.isArray(p.perWeekGame)) setPerWeekGame(p.perWeekGame as (string | null)[]);
+    if (typeof p.mixed === "boolean") setMixed(p.mixed);
+    if (Array.isArray(p.regions)) setRegions((p.regions as string[]).map(String));
   };
 
   const working = pending || busy !== null;
@@ -154,6 +180,12 @@ export default function CampaignBuilder({
 
   return (
     <section className="rounded-2xl border border-cyan-400/25 bg-cyan-500/[0.05] p-5 sm:p-6">
+      <DraftKeeper
+        ownerType="brand" ownerId={brandId} formKey="campaign"
+        values={draftValues} onRestore={restore}
+        label={game ? `${game} — ${slots} week${slots === 1 ? "" : "s"}` : "A campaign"}
+      />
+
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[11px] uppercase tracking-[0.2em] text-cyan-300">Buy a campaign</div>

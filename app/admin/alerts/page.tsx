@@ -2,6 +2,7 @@ import { requireSystemFor } from "@/lib/departments";
 import { getDb } from "@/lib/db";
 import { openAlerts, DESKS, type Desk } from "@/lib/staff-alerts";
 import { Page, Section, Table, Tr, Td, Note, AdminLink } from "@/components/admin/kit";
+import { listDrafts } from "@/lib/form-drafts";
 import ClearAlert from "@/components/admin/ClearAlert";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,10 @@ export default async function AlertsPage({
   const only = (Array.isArray(sp.desk) ? sp.desk[0] : sp.desk) as Desk | undefined;
   const db = await getDb();
   const rows = await openAlerts(db, DESK_ORDER.includes(only as Desk) ? only : undefined, 120);
+  // B91.8. A half-built campaign is a SALES LIST, not a debugging tool:
+  // somebody who was trying to buy something and stopped, which is worth a call
+  // the same day rather than a report at the end of the month.
+  const drafts = await listDrafts(db, undefined, 40);
 
   return (
     <Page
@@ -74,6 +79,39 @@ export default async function AlertsPage({
           </Section>
         );
       })}
+
+      {(!only || only === "sales") && (
+        <Section
+          title="Half-built, and still open"
+          note="Somebody started building something and did not finish. Nothing here is a bug — it is a list of people who were trying to buy and stopped, with what they had on screen when they did."
+        >
+          <Table
+            cols={[
+              { key: "who", label: "Who" },
+              { key: "what", label: "What they were building" },
+              { key: "when", label: "Last touched", align: "right" },
+            ]}
+            empty="Nobody has anything half-built."
+          >
+            {drafts.map((d) => (
+              <Tr key={`${d.ownerType}-${d.ownerId}-${d.formKey}`}>
+                <Td>
+                  <span className="text-[10px] uppercase tracking-widest text-muted">{d.ownerType}</span>{" "}
+                  {d.ownerType === "brand"
+                    ? <AdminLink href={`/admin/brands/${d.ownerId}`}>{d.ownerId}</AdminLink>
+                    : d.ownerType === "server"
+                      ? <AdminLink href={`/admin/discord/${d.ownerId}`}>{d.ownerId}</AdminLink>
+                      : d.ownerId}
+                </Td>
+                <Td>{d.label || d.formKey}</Td>
+                <Td align="right" secondary>
+                  {d.updatedAt.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                </Td>
+              </Tr>
+            ))}
+          </Table>
+        </Section>
+      )}
 
       <Note tone="info">
         This is not the audit log. That records what <b>we</b> did, for the question &ldquo;who
