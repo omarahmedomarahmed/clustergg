@@ -425,7 +425,22 @@ export default async function ServerPortalPage({
   );
 }
 
-// ===== Locked / public =====
+// ===== The public page =====
+//
+// B100 rebuilt it. It used to be the locked-out screen with a badge row on top:
+// three sections, one of which was a form asking whether you were the owner.
+//
+// It has two readers and it was serving neither. A gamer who followed a
+// challenge link wants to know what this community IS and whether to join it.
+// An owner looking at a rival server is deciding whether any of this is worth
+// doing — and owners are recruited by other owners, which makes this the most
+// valuable growth page in the product.
+//
+// So it leads with the community in the owner's own words, then what has
+// actually happened here — trophies won, challenges run, what the server has
+// been paid — then the invite, and only then the key form. Everything on it is
+// an AGGREGATE: no member is named, no roster is exposed, and a count too small
+// to be safe is shown as "a few" rather than as a number. See lib/server-public.ts.
 
 async function PublicView({ server, data, base, unlock, left = "", mins = "" }: {
   server: Awaited<ReturnType<typeof getServerBySlugOrId>> & object;
@@ -436,15 +451,130 @@ async function PublicView({ server, data, base, unlock, left = "", mins = "" }: 
   left?: string;
   mins?: string;
 }) {
-  const challenges = await challengesForGuild(server.guildId);
+  const { publicServerProfile, PUBLIC_FLOOR } = await import("@/lib/server-public");
+  const { livePool } = await import("@/lib/pool-live");
+  const { getDb } = await import("@/lib/db");
+  const db = await getDb();
+
+  const [challenges, profile, pub, alreadyIn, pool] = await Promise.all([
+    challengesForGuild(server.guildId),
+    getProfile(server.guildId),
+    publicServerProfile(db, server.guildId),
+    hasPortalSession("server", server.guildId),
+    livePool(db).catch(() => null),
+  ]);
   const live = challenges.filter((c) => c.status === "active");
-  const alreadyIn = await hasPortalSession("server", server.guildId);
+  const standing = pool?.standing.servers.find((x) => x.guildId === server.guildId) ?? null;
+  const share = pool?.standing.payouts
+    .filter((p) => p.guildId === server.guildId)
+    .reduce((a, p) => a + p.amount, 0) ?? 0;
+
+  const region = (k: string) => REGIONS.find((r) => r.key === k)?.label ?? k;
+  const vibe = (k: string) => VIBES.find((v) => v.key === k)?.label.split(" — ")[0] ?? k;
+  const money = (n: number) => `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <div className="min-h-screen">
       <PortalHeader server={server} data={data} publicView />
 
       <div className="mx-auto max-w-5xl px-4 pb-20 space-y-6">
+        {/* ===== Who they are, in the owner's own words ===== */}
+        {profile.profile.about && (
+          <div className="glass p-6">
+            <p className="text-lg leading-relaxed">{profile.profile.about}</p>
+            <div className="mt-4 flex flex-wrap gap-2 text-xs">
+              {profile.profile.games.map((g) => (
+                <span key={g} className="rounded-full border border-violet-400/40 bg-violet-500/10 px-3 py-1.5 text-violet-100">{g}</span>
+              ))}
+              {profile.profile.regions.map((r) => (
+                <span key={r} className="rounded-full border border-white/12 bg-black/25 px-3 py-1.5 text-muted">{region(r)}</span>
+              ))}
+              {profile.profile.vibes.map((v) => (
+                <span key={v} className="rounded-full border border-white/12 bg-black/25 px-3 py-1.5 text-muted">{vibe(v)}</span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ===== What has actually happened here =====
+            Counted things only. Every one of these is a number both sides can
+            check, which is the whole difference between this model and the ad
+            network it replaced. */}
+        <div className="grid gap-3 sm:grid-cols-4">
+          <div className="glass rounded-xl px-4 py-3">
+            <div className="text-[10px] uppercase tracking-widest text-muted">Gamers linked</div>
+            <div className="text-xl font-black text-cyan-300">
+              {/* A count under the floor is not printed. A public page saying
+                  "2 gamers" points at two people. */}
+              {pub.showLinked ? pub.linked.toLocaleString() : "a few"}
+            </div>
+          </div>
+          <div className="glass rounded-xl px-4 py-3">
+            <div className="text-[10px] uppercase tracking-widest text-muted">Trophies won here</div>
+            <div className="text-xl font-black">{pub.trophyCount.toLocaleString()}</div>
+          </div>
+          <div className="glass rounded-xl px-4 py-3">
+            <div className="text-[10px] uppercase tracking-widest text-muted">Challenges run</div>
+            <div className="text-xl font-black">{pub.challengesRun.toLocaleString()}</div>
+          </div>
+          <div className="glass rounded-xl px-4 py-3">
+            <div className="text-[10px] uppercase tracking-widest text-muted">Paid to this server</div>
+            <div className="text-xl font-black text-emerald-300">{money(pub.earnedAllTime)}</div>
+          </div>
+        </div>
+
+        {/* ===== This week, from the same arithmetic as the cheque ===== */}
+        {standing && (
+          <div className="glass border border-emerald-400/25 bg-emerald-500/[0.05] p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-3">
+              <h2 className="font-bold">In this week&apos;s pool</h2>
+              <Link href="/pool" className="text-xs text-emerald-300 hover:underline">
+                The whole table →
+              </Link>
+            </div>
+            <div className="mt-3 flex flex-wrap items-end gap-6">
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-muted">Share so far</div>
+                <div className="text-3xl font-black tabular-nums text-emerald-300">{money(share)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-muted">Score</div>
+                <div className="text-3xl font-black tabular-nums">{standing.final}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-widest text-muted">Entrants brought</div>
+                <div className="text-3xl font-black tabular-nums">{standing.exclusiveEntrants.toFixed(2)}</div>
+              </div>
+            </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-muted">
+              Computed by the same code that writes Monday&apos;s payout — not an estimate beside it.
+              It moves until the week ends.
+            </p>
+          </div>
+        )}
+
+        {/* ===== The trophy case, by trophy and never by person ===== */}
+        {pub.trophies.length > 0 && (
+          <div className="glass p-6">
+            <h2 className="font-bold">What members have won</h2>
+            <p className="mt-1 text-xs text-muted">
+              Counted by trophy. Who holds which is theirs to show, on their own profile.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {pub.trophies.map((t) => (
+                <div key={t.name} className="flex items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/[0.07] px-3 py-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={t.imageUrl} alt="" className="h-8 w-8 rounded-lg object-cover" />
+                  <div>
+                    <div className="text-xs font-bold text-amber-100">{t.name}</div>
+                    <div className="text-[10px] text-muted">×{t.count}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="glass p-6">
           <h2 className="font-bold mb-4">Badges</h2>
           <div className="flex flex-wrap gap-2">
@@ -481,6 +611,26 @@ async function PublicView({ server, data, base, unlock, left = "", mins = "" }: 
             )}
           </div>
         )}
+
+        {/* ===== The pitch to the reader who is another owner =====
+            The most valuable thing on this page. Somebody looking at a rival
+            server has already been sold the idea; what they need is the door. */}
+        <div className="glass border border-violet-400/25 bg-violet-500/[0.06] p-6">
+          <h2 className="font-bold">Run a server like this one?</h2>
+          <p className="mt-1 text-sm leading-relaxed text-muted">
+            Brands fund the challenges. Your members enter from inside your Discord, and your server
+            takes a share of the weekly pool for the ones it brought. Nothing is charged to you and
+            nothing is asked of your members beyond playing the games they already play.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3">
+            <Link href="/pool" className="glow-btn pressable rounded-full px-6 py-2.5 text-sm font-semibold text-white">
+              See this week&apos;s pool
+            </Link>
+            <Link href="/rules/owner" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm">
+              Every rule, and why it exists
+            </Link>
+          </div>
+        </div>
 
         <div className="glass p-6">
           <h2 className="font-bold mb-1">Are you this server&apos;s owner?</h2>

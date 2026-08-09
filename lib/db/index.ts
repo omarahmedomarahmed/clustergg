@@ -75,7 +75,6 @@ const COLUMN_MIGRATIONS = [
   // lands later than the row was created. So this cannot clear a stamp somebody
   // earned, and it is a no-op on every subsequent run.
   `UPDATE "users" SET "email_verified_at" = NULL WHERE "email_verified_at" IS NOT NULL AND "email_verified_at" = "created_at"`,
-  `ALTER TABLE "sponsored_campaigns" ADD COLUMN IF NOT EXISTS "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "final_placement" integer`,
   `ALTER TABLE "challenge_participants" ADD COLUMN IF NOT EXISTS "baseline_at" timestamptz`,
   // ----- Quests & gamification (new tables; idempotent so both fresh and
@@ -333,6 +332,11 @@ const COLUMN_MIGRATIONS = [
     "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL,
     "created_at" timestamp with time zone DEFAULT now() NOT NULL
   )`,
+  // AFTER the CREATE, not before it. On a fresh database this ALTER ran ahead
+  // of the table it alters, failed, was correctly tolerated as an expected
+  // miss — and printed a scary line on every single test run. A warning that is
+  // always there is a warning nobody reads the day it means something.
+  `ALTER TABLE "sponsored_campaigns" ADD COLUMN IF NOT EXISTS "prizes" jsonb DEFAULT '{}'::jsonb NOT NULL`,
   `CREATE INDEX IF NOT EXISTS "spc_brand_idx" ON "sponsored_campaigns" ("brand_id","created_at")`,
   `CREATE INDEX IF NOT EXISTS "spc_game_idx" ON "sponsored_campaigns" ("game","status")`,
   `ALTER TABLE "challenges" ADD COLUMN IF NOT EXISTS "sponsor_brand_id" text`,

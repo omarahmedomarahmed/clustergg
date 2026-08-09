@@ -934,6 +934,35 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B100 — The public server page · **SHIPPED**
+
+It was the locked-out screen with a badge row on top: three sections, one of
+which was a form asking whether you were the owner. It has two readers and was
+serving neither — a gamer who followed a challenge link and wants to know what
+this community is, and **an owner looking at a rival server**, which makes it
+the most valuable growth page in the product because owners are recruited by
+other owners.
+
+Now: the community in the owner's own words (games, regions, what kind of
+community), then what has actually happened here — gamers linked, trophies won,
+challenges run, what the server has been paid — then this week's standing from
+`livePool`, then the invite, then a door for the reader who runs a server too.
+The key form is last.
+
+**Everything on it is an aggregate.** No member is named, no roster is exposed,
+and a linked count under `PUBLIC_FLOOR` renders as "a few" rather than as a
+number that points at two people. The money shown is the SERVER's payouts —
+never a member's redemptions or CP, which are the gamer's own business.
+`tests/db/server-public.mts` asserts no member id, name or slug can escape the
+function at all.
+
+Also: the `sponsored_campaigns.prizes` ALTER moved after the CREATE it depends
+on. It ran first on a fresh database, failed, was correctly tolerated as an
+expected miss, and printed a warning on every test run — and a warning that is
+always there is one nobody reads the day it means something.
+
+---
+
 ### ▸ B99 — The pool, in the open · **SHIPPED**
 
 A server owner's income was decided on a Monday by terms nobody outside the code
