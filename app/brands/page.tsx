@@ -2,6 +2,7 @@ import Link from "next/link";
 import Icon from "@/components/Icon";
 import EnquiryForm from "@/components/EnquiryForm";
 import BrandSignupForm from "@/components/BrandSignupForm";
+import ProductAtlas from "@/components/marketing/ProductAtlas";
 import { pricingLive } from "@/lib/pricing-live";
 import { money, quote } from "@/lib/pricing";
 
@@ -92,9 +93,16 @@ export default async function BrandsPage({
           <EnquiryForm cfg={cfg} initialGames={initialGames} initialAddon={initialAddon} initialYearly={initialYearly} />
         </div>
       </div>
+
+      <BrandAtlas />
     </div>
   );
 }
+
+// B92. What a brand is actually buying, in the product's own components —
+// the ladder their campaign climbs, the two gates, and where half their money
+// goes. Compact: a brand does not need the server owner's wallet.
+function BrandAtlas() { return <ProductAtlas compact />; }
 
 function Point({ icon, title, children }: { icon: string; title: string; children: React.ReactNode }) {
   return (

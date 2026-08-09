@@ -22,7 +22,7 @@ export function OrganizationSchema() {
     url: SITE,
     logo: `${SITE}/assets/logo.png`,
     description:
-      "Cluster is the media-buying and monetization platform for Discord gaming communities. Brands buy sponsored weekly challenges and in-bot ad placements with real analytics; server owners earn a share of the platform fee on every challenge that runs in their community; and gamers get ranked profiles, live stats from the games they play, and real prize money for winning.",
+      "Cluster is the media-buying and monetization platform for Discord gaming communities. Brands buy sponsored weekly challenges and in-bot ad placements with real analytics; server owners share a weekly pool of what brands paid, scored on how many of their own members entered; and gamers get ranked profiles, live stats from the games they play, and real prize money for winning.",
     sameAs: [] as string[],
   };
   return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data) }} />;
@@ -150,7 +150,7 @@ export const SEARCH_FAQ: [string, string][] = [
   ["How do I make money from my Discord server?",
     "Install Cluster and brands pay to run weekly gaming challenges in your server. You take a share of the fee on every sponsored challenge that runs there, rising as more of your members link a game account. You sell nothing, negotiate nothing and fund no prizes — the brand funds them. It is free to install and free to run."],
   ["How do I monetize a gaming community?",
-    "Sell what a gaming community actually has: the attention of people who play. Cluster turns that into sponsored weekly competitions — a brand funds the prize pool, your members enter with one tap, and you take a share of the platform fee. Nothing is asked of your members except playing the games they already play."],
+    "Sell what a gaming community actually has: the attention of people who play. Cluster turns that into sponsored weekly competitions — a brand funds the prize pool, your members enter with one tap, and every Monday the servers that carried a challenge share a pool of what those brands paid. Nothing is asked of your members except playing the games they already play."],
   ["Can you advertise on Discord?",
     "Discord itself has no ads manager, so brands cannot buy it directly. Cluster is the layer that makes it buyable: you sponsor the weekly challenge for a game you choose, your creative runs on every card the bot draws inside opted-in servers, and you get entrants, clicks, cost-per-entrant and eCPM back per week."],
   ["What does it cost to advertise to gamers on Discord?",

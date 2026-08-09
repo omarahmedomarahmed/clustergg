@@ -18,7 +18,7 @@ import { DEFAULT_SPLIT } from "@/lib/vaults";
 export default function ServerEarnCards({
   stages = EARN_STAGES_DEFAULT,
   title = "Your community is media. Get paid like it.",
-  subtitle = "You bring the audience; Cluster brings the monetization layer. Brands sponsor weekly challenges in the games your members already play, your members win the prize money, and you take a share of the platform fee on every one. Installing is free, and every stage below unlocks on one number: how many of them link a game account.",
+  subtitle = "You bring the audience; Cluster brings the monetization layer. Brands sponsor weekly challenges in the games your members already play, your members win the prize money, and every Monday the servers that carried one share a pool of what brands paid that week. Installing is free, and every stage below unlocks on one number: how many of them link a game account.",
   installUrl,
   compact = false,
 }: {

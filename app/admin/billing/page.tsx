@@ -252,9 +252,10 @@ export default async function BillingPage({
       <section className="glass mt-6 p-6">
         <h2 className="font-bold">What servers are owed</h2>
         <p className="mt-1 text-sm text-muted">
-          An owner takes a share of the platform fee once their community passes the thresholds — 5% at 500
-          linked gamers, 10% at 1,000, 25% at 5,000 — apportioned by how many of a challenge&apos;s entrants
-          came from their server.
+          Owners are paid out of the WEEKLY POOL, not a per-challenge rate. C3 deleted the tier
+          percentage this paragraph used to quote — running both would have paid an owner twice out of
+          one line. Monday&apos;s close scores the servers that carried a public challenge, divides the
+          released pool between them inside their size bracket, and opens a draft payout for each.
         </p>
         {b.servers.length === 0 ? (
           <p className="mt-4 text-sm text-muted">No servers with linked gamers yet.</p>

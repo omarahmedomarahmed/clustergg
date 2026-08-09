@@ -11,6 +11,7 @@ import { PRICING_NUMBER_KEYS } from "@/lib/pricing";
 import BotShowcase from "@/components/BotShowcase";
 import BrandGlyph from "@/components/BrandGlyph";
 import Icon from "@/components/Icon";
+import ProductAtlas from "@/components/marketing/ProductAtlas";
 import { BotSchema, BotFaqSchema, BOT_FAQ } from "@/components/StructuredData";
 
 export const dynamic = "force-dynamic";
@@ -200,9 +201,10 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
                   A brand buys a game&apos;s weekly challenge — {money(cfg.challengePrice, cfg.currency)} each,{" "}
                   {money(perGame(cfg), cfg.currency)} a month for all {cfg.challengesPerGame}. Of every one of those,{" "}
                   <strong className="text-ink">{money(cfg.prizePool, cfg.currency)}</strong> is prize money —{" "}
-                  {prizeSharePct(cfg)}% of what the brand pays, handed to the three gamers who win as trophies carrying
-                  that brand&apos;s name. The challenges run where the players are, so if yours is a League server,
-                  League sponsorship money is won by your members. We take the difference and run the whole thing.
+                  {prizeSharePct(cfg)}% of what the brand pays, handed to the gamers who win it as trophies carrying that
+                  brand&apos;s name. A challenge can pay one place or ten — whoever bought it decides. The challenges
+                  run where the players are, so if yours is a League server, League sponsorship money is won by your
+                  members. What is left funds the weekly pool your server shares in, and us.
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
                   <Link href="/pricing" className="ghost-btn pressable rounded-full px-5 py-2.5 text-sm">
@@ -229,6 +231,12 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
           </p>
         </div>
       </section>
+
+      {/* B92. The mechanism itself, rendered with the product's own
+          components — the pool an owner is paid from, the balance they spend,
+          and the two gates on a challenge. An owner deciding whether to install
+          should not have to install to find out how they get paid. */}
+      <ProductAtlas />
 
       {/* ===== WHAT INSTALL ACTUALLY DOES ===== */}
       <section className="mx-auto max-w-6xl px-4 py-14">
