@@ -934,6 +934,79 @@ return a user id, name, slug or handle**; no query loads unbounded rows.
 
 ---
 
+### ▸ B110 — The deck quoted a price we had stopped charging · **SHIPPED**
+
+**The most expensive wrong sentence in the repo, in the room where a wrong
+sentence costs the most.**
+
+`/dataroom` told every reader on its front page:
+
+> *"Every figure in these documents is counted from production when you load
+> them. Nothing is modelled or projected."*
+
+The investor deck underneath it said a challenge runs for **$250**, that *"the
+**$75** platform fee is the only line the business lives on, and every total in
+this document is built from it"*, that six games are **$1,000** a month each, and
+showed three unit-economics cards reading `{ revenue: 250, cost: 175 }` under a
+subtitle promising *"every number here is the live rate card"*.
+
+| | Live (`lib/pricing.ts`) | Deck said |
+|---|---|---|
+| Challenge price | **$350** | $250 |
+| Prize pool | $175 | $175 ✓ |
+| **Platform fee** | **$175** | **$75** |
+| Per game / month | **$1,400** | $1,000 |
+| Whole network / month | **$8,400** | $6,400 |
+
+Out by **2.33×** on the one line the deck said every other total was built from.
+And the front page's blanket promise was doubly unkeepable: the deck also
+contains a six-month plan, a free-to-paid conversion assumption and an MRR run
+rate — all projections, all labelled as such *inside* the deck, which had the
+honesty the front page then took away.
+
+**The model was never wrong.** `lib/finance.ts` derives price, prize and fee from
+the config and always has. Only the *prose* was — a sentence typed once against a
+rate card that moved underneath it. `tests/db/marketing-truth.mts` exists to stop
+precisely this on the public pages; the data room had no equivalent, which is why
+the worse copy of the bug lived in the more expensive document.
+
+Understating our own revenue is not the commercially dangerous direction. The
+dangerous part is an investor opening `/pricing` in the next tab and finding a
+fundraising document that contradicts the product.
+
+**The fix is tokens, not retyping.** Writing $350 where $250 was is the same bug
+with a fresh date on it. `lib/dataroom/tokens.ts` gives the prose
+`{{challengePrice}}`, `{{prizePool}}`, `{{platformFee}}`, `{{perGameMonth}}`,
+`{{networkMonth}}`, filled from the same config the rate card, the invoice and
+the finance model read. Filling is **deep and at one choke point** — because the
+drifted numbers were spread across a subtitle, a body, and a `note` buried in a
+use-of-funds row, and a filler covering only the obvious fields would have left
+the worst of them untouched. An **unknown** token is left visible rather than
+blanked: `{{whatever}}` in a deck is embarrassing and gets fixed in an hour,
+while *"a brand pays  for a sponsored challenge"* reads as a typo and survives
+for months.
+
+**The unit-economics slide now computes** (`liveUnitRows`, `data.liveUnits`)
+instead of storing three typed rows under a sentence claiming it did not.
+
+**The front page tells the two kinds of number apart.** *Counted* — traction and
+prices, read from production on load. *Planned* — the raise and anything with a
+future date, each carrying its assumption, with the deck's own "what would break
+this" slide behind it.
+
+**Existing installs need the reseed.** Seeded prose lives in the database, so
+changing `defaults.ts` fixes a fresh install and does nothing for a deployed
+one. `reseedDoc` is already wired to an admin action, and the suite asserts that
+path exists — a fix only in the seed leaves the live deck quoting the old price.
+
+`tests/db/dataroom-truth.mts` (48) walks **every string in every seeded
+document** and fails on any currency figure that has a live source. That general
+rule caught **two more hard-coded prices than the known-bad list did**. Proved by
+breaking it: restoring the old sentence turns three assertions red, and rendering
+the unfilled section instead of the filled one turns a fourth.
+
+---
+
 ### ▸ B109 — A component, not a screenshot · **SHIPPED**
 
 B89.6 wrote the rule down and nobody built it: *"Sections render the real

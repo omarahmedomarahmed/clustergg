@@ -5,6 +5,7 @@ import BotShowcase from "@/components/BotShowcase";
 import { Milestones, GtmStages, TeamGrid, Gallery, MetricTiles, Explainer, CardShowcase } from "@/components/dataroom/Interactive";
 import { RaiseSection, UnitSection, SaasSection, MarketSection } from "@/components/dataroom/Investor";
 import FinanceModel from "@/components/dataroom/FinanceModel";
+import { fillTokens, pricingTokens, type TokenValues } from "@/lib/dataroom/tokens";
 import CompareMatrix from "@/components/viz/CompareMatrix";
 import OpsSplit from "@/components/viz/OpsSplit";
 import PlacementMap from "@/components/viz/PlacementMap";
@@ -16,6 +17,39 @@ import { optImg } from "@/lib/img";
 import { money, perGame, marginPerChallenge, prizeSharePct } from "@/lib/pricing";
 
 const nf = (n: number) => n.toLocaleString();
+
+
+/**
+ * Fill every string in a section from the live rate card. B110.
+ *
+ * Deep, because the numbers that drifted were not only in `body`: one was a
+ * subtitle and one was a `note` inside a use-of-funds row. A filler that only
+ * covered the obvious fields would have left the worst of them — a sentence
+ * naming the platform fee — untouched.
+ *
+ * Only `{{token}}` patterns are rewritten, so URLs, colours and class names
+ * pass through byte-for-byte.
+ */
+function fillDeep<T>(value: T, tokens: TokenValues): T {
+  if (typeof value === "string") return fillTokens(value, tokens) as unknown as T;
+  if (Array.isArray(value)) return value.map((v) => fillDeep(v, tokens)) as unknown as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = fillDeep(v, tokens);
+    return out as T;
+  }
+  return value;
+}
+
+function fillSection(section: Section, tokens: TokenValues): Section {
+  return {
+    ...section,
+    title: fillTokens(section.title, tokens),
+    subtitle: section.subtitle === null ? null : fillTokens(section.subtitle, tokens),
+    body: section.body === null ? null : fillTokens(section.body, tokens),
+    data: fillDeep(section.data, tokens),
+  };
+}
 
 // One section, drawn.
 //
@@ -34,6 +68,12 @@ export function SectionBand({ section, doc, live, people, steps, installUrl, ind
 }) {
   const { accent, accent2 } = doc;
   const hero = section.kind === "hero";
+  // B110. Every string in the section is filled from the LIVE rate card before
+  // anything renders it. One choke point rather than an interpolation in each
+  // of twenty render paths — and the reason it has to be all of them is that
+  // the drifted numbers were spread across a subtitle, a body, and a `note`
+  // buried in a use-of-funds row.
+  const filled = fillSection(section, pricingTokens(live.pricing));
 
   return (
     <section
@@ -54,7 +94,7 @@ export function SectionBand({ section, doc, live, people, steps, installUrl, ind
       <div aria-hidden className="absolute inset-x-0 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${accent}55, transparent)` }} />
 
       <div className={`relative mx-auto w-full max-w-6xl px-4 ${hero ? "" : "lg:pl-4"}`}>
-        <Body section={section} doc={doc} live={live} people={people} steps={steps} installUrl={installUrl} />
+        <Body section={filled} doc={doc} live={live} people={people} steps={steps} installUrl={installUrl} />
       </div>
     </section>
   );
@@ -418,7 +458,7 @@ function Body({ section, doc, live, people, steps, installUrl }: {
       return (
         <>
           <Heading section={section} accent={accent} />
-          <UnitSection d={d} accent={accent} />
+          <UnitSection d={d} accent={accent} pricing={live.pricing} />
         </>
       );
 

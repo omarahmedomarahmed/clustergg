@@ -1,5 +1,6 @@
 import Icon from "@/components/Icon";
-import { money } from "@/lib/pricing";
+import { money, type PricingConfig } from "@/lib/pricing";
+import { liveUnitRows } from "@/lib/finance";
 import type { SectionData } from "@/lib/dataroom/types";
 import type { CommercialStats } from "@/lib/dataroom/index";
 
@@ -95,8 +96,14 @@ function Allocation({ title, rows }: { title: string; rows: { label: string; pct
 
 // ===== Unit economics =====
 
-export function UnitSection({ d, accent }: { d: SectionData; accent: string }) {
-  const units = d.units ?? [];
+export function UnitSection({ d, accent, pricing }: {
+  d: SectionData; accent: string; pricing?: PricingConfig;
+}) {
+  // B110. `liveUnits` computes the rows from the rate card the invoice, the
+  // pricing page and the finance model all read. The stored `units` path stays
+  // for a section somebody hand-builds — but the shipped deck no longer types
+  // its own revenue under a subtitle promising it did not.
+  const units = d.liveUnits ? liveUnitRows(pricing) : (d.units ?? []);
   if (!units.length) return null;
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
