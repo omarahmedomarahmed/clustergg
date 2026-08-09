@@ -1,31 +1,50 @@
-# B74 / Gate 2 — the first gate on this project that is a control rather than a
-# sentence.
+# The gate on the money paths, and the only check branch protection needs.
 #
-# The due-diligence review's sharpest point was that every gate in our plan was
-# a paragraph in a markdown file: nothing in the repository prevented the gated
-# work from proceeding. This file is the answer to that for the money paths. A
-# push that breaks the ceiling, the double-spend guard or the redemption claim
-# fails here, visibly, before anybody has to notice it in production.
+# B74 / Gate 2 made this a control rather than a paragraph: a push that breaks
+# the daily ceiling, the double-spend guard or the redemption claim fails here,
+# visibly, before anybody notices it in production.
 #
-# It runs on every push and every pull request, and nothing in it needs a
-# database: the suites stand up PGlite in-process (DEMO_DB=1).
+# ===== WHY IT USED TO RUN TWICE FOR EVERY CHANGE =====
+#
+# It triggered on `push` AND `pull_request`. For a branch in this repository
+# with a PR open, GitHub fires both — the same commit, the same suites, twice,
+# and branch protection waited for both. It now runs on every pull request and
+# on pushes to `main` ONLY, which is one run per change plus one after a merge.
+#
+# ===== AND WHY IT WAS SLOW =====
+#
+# One job ran everything in series: type-check, then the money gate twice, then
+# the whole database suite (which re-ran those same two suites inside it), then
+# a build. That is a sum of every part. The work is now three jobs that run at
+# the same time, so the wall clock is the slowest one rather than the total —
+# and the duplicated runs inside `npm test` are gone.
+#
+# ===== ONE REQUIRED CHECK =====
+#
+# `ci` at the bottom does nothing except succeed when the other three have. It
+# exists so branch protection can require a single name and keep requiring it
+# while the jobs above are split, renamed or added to. Require `ci` and nothing
+# else.
 
 name: CI
 
 on:
-  push:
   pull_request:
+  push:
+    branches: [main]
 
 concurrency:
-  # A newer push supersedes an in-flight run on the same branch. Green on stale
+  # A newer push supersedes an in-flight run on the same ref. Green on stale
   # code is worse than no signal, because somebody will read it as current.
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  check:
+  # ===== The money gate. Fastest, and the one that must never be merged around.
+  gate:
+    name: Money gate
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 12
 
     # A REAL Postgres, with real separate connections.
     #
@@ -50,58 +69,90 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
-
       - run: npm ci
-
-      # tsx runs every suite. It was not in package.json at all, so CI would
-      # have fetched an unpinned copy on each run — a test runner that can
-      # change under you between two green builds. Pinned as a devDependency
-      # instead; `npm ci` installs it above.
 
       # Types first: it is the fastest thing that can be wrong, and a type error
       # makes every failure after it harder to read.
       - name: Type-check
         run: npx tsc --noEmit
 
-      # No lint step, on purpose. This project has no ESLint configuration, so
-      # `npm run lint` drops into an interactive setup prompt — a CI runner
-      # hangs on it rather than failing. Found by running it, not by reading it.
-      # Adding a real config is worth doing; shipping a workflow that stalls is
-      # not.
-
-      # THE GATE. Named as its own step rather than folded into `npm test` so
-      # that a red X on this repository says which invariant broke, and so a
-      # branch-protection rule can require this specific check.
-      #
-      # If this step is failing, the daily CP ceiling, the trophy purchase or
-      # the cash redemption is racing. None of those may be merged around.
-      #
-      # Run TWICE, and the second run is the one that means something: once on
-      # PGlite for the logic, once against the Postgres service above where the
-      # row lock is actually contended across connections.
-      - name: Money integrity — logic (Gate 2)
-        run: DEMO_DB=1 npx tsx tests/db/concurrency.mts
-
+      # The PGlite run of this suite happens inside the full suite job. What is
+      # unique here is the REAL lock across real connections, so that is what
+      # this job runs — running both again would be the duplication this
+      # workflow was rewritten to remove.
       - name: Money integrity — real Postgres, real lock (Gate 2)
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/clustertest
         run: npx tsx tests/db/concurrency.mts
 
-      - name: Phase-0 integrity
-        run: DEMO_DB=1 npx tsx tests/db/integrity.mts
-
+  # ===== Everything else the database can prove.
+  suite:
+    name: Database suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Includes Phase-0 integrity and the PGlite half of the money gate.
       - name: Full database suite
+        # No lane override. I assumed these suites were I/O-bound and would
+        # benefit from more lanes than cores; measured, six lanes took 414s
+        # against 302s at three. PGlite is WebAssembly running in-process — it
+        # burns CPU, it does not wait on a socket — so the core count is the
+        # right number and oversubscribing costs a third of the run.
         run: npm test
 
-      # A build catches the whole class of failure `tsc` does not: Next traces
-      # the module graph across the client boundary even for type-only and
-      # dynamic imports, so a server-only module reached from a client component
-      # fails HERE while the type-check stays green. It has cost this project
-      # days more than once.
+  # ===== The failure class `tsc` cannot see.
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Next's own cache, keyed on the lockfile and the source. A cold build is
+      # most of this job.
+      - name: Cache the Next build
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: next-${{ hashFiles('package-lock.json') }}-${{ hashFiles('app/**', 'components/**', 'lib/**') }}
+          restore-keys: |
+            next-${{ hashFiles('package-lock.json') }}-
+
+      # Next traces the module graph across the client boundary even for
+      # type-only and dynamic imports, so a server-only module reached from a
+      # client component fails HERE while the type-check stays green. It has
+      # cost this project days more than once.
       - name: Build
         run: DEMO_DB=1 npm run build
+
+  # ===== The one name branch protection should require.
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    needs: [gate, suite, build]
+    if: always()
+    steps:
+      # `needs` alone does not fail this job when a dependency fails while
+      # `if: always()` is set — it would be skipped, and a skipped required
+      # check reads as passing on some settings. So the result is asserted.
+      - name: Every check passed
+        run: |
+          echo "gate=${{ needs.gate.result }} suite=${{ needs.suite.result }} build=${{ needs.build.result }}"
+          test "${{ needs.gate.result }}" = "success"
+          test "${{ needs.suite.result }}" = "success"
+          test "${{ needs.build.result }}" = "success"

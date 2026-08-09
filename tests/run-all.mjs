@@ -104,7 +104,16 @@ if (withUi) {
 //
 // Output is captured per suite and printed when that suite finishes, so the log
 // still reads top-to-bottom instead of interleaving.
-const LANES = Math.max(2, Math.min(8, (cpus().length || 4) - 1));
+// Lanes. One per core, minus one for the parent, and never fewer than two.
+//
+// `TEST_LANES` overrides it, and the measurement that made the override worth
+// having is the one that says DON'T RAISE IT: six lanes on a four-core box took
+// 414s against 302s at three. PGlite is WebAssembly running in-process, so a
+// suite burns a core rather than waiting on a socket, and oversubscribing just
+// makes every lane slower. The knob is here for a machine with more cores, not
+// as a way to hurry a small one.
+const LANES = Number(process.env.TEST_LANES)
+  || Math.max(2, Math.min(8, (cpus().length || 4) - 1));
 
 const runOne = (s) => new Promise((resolve) => {
   const cmd = s.kind === "db" ? ["npx", ["tsx", s.file]] : ["node", [s.file]];
