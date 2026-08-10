@@ -30,7 +30,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.hero.title": "Gamers live on Discord.",
   "brand.hero.title2": "Now you can advertise there.",
   "brand.hero.subtitle":
-    "The media-buying layer for Discord gaming communities. Sponsor the weekly competition your audience was going to enter anyway — your name on it, your logo on the trophy, cost-per-entrant reported back. $250 a challenge; $175 goes to the gamers.",
+    "The media-buying layer for Discord gaming communities. Sponsor the weekly competition your audience was going to enter anyway — your name on it, your logo on the trophy, cost-per-entrant reported back. Half of what you pay is prize money that reaches a gamer.",
   "brand.hero.cta.primary": "See pricing",
   "brand.hero.cta.secondary": "Read the profile",
 
@@ -67,7 +67,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "brand.loop.items":
     "Brands buy | A month of challenges on a published rate card, with the reach stated before you spend.\n"
     + "Gamers play | One verified account, as many challenges as they like, a trophy that stays on their profile.\n"
-    + "Owners earn | A share of the fee on every challenge that runs in their server. No sales team, no admin.\n"
+    + "Owners earn | A weekly pool, shared between the servers that carried a challenge. No sales team, no admin.\n"
     + "Cluster runs it | The bot posts it, scores it, announces it and pays out. Nobody operates anything.",
 
   "brand.prize.title": "Most of it isn't ad spend. It's prize money.",
@@ -79,7 +79,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "discord.badge": "ClusterBot for Discord",
   "discord.title": "Monetize your Discord server without selling anything.",
   "discord.subtitle":
-    "Install the bot and your members get ranked profiles, live stats and weekly challenges with real prize money. Brands fund the prizes; you take a share of every challenge that runs here. Free forever, and it never reads a message.",
+    "Install the bot and your members get ranked profiles, live stats and weekly challenges with real prize money. Brands fund the prizes; every Monday the servers that carried a challenge share a pool of what those brands paid. Free forever, and it never reads a message.",
   "discord.cta.primary": "Add ClusterBot to your server",
   "discord.cta.secondary": "See who's running it",
 
@@ -93,7 +93,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // never quote a figure the product isn't using.
   "discord.hero.title": "Earn money from your Discord server.",
   "discord.hero.subtitle":
-    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Link {threshold} gamers and you earn a share of every sponsored challenge here. Free forever, and it never reads a message.",
+    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Carry a challenge and you compete for the weekly pool with the servers your size — {threshold} linked gamers moves you up a bracket. Free forever, and it never reads a message.",
 
   // ===== The gamer-facing hero (still the entry point for players) =====
   "hero.badge": "Live stats from the games you already play",

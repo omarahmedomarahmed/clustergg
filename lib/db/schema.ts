@@ -1388,10 +1388,11 @@ export const serverEvents = pgTable("server_events", {
  * A brand buying a month of sponsored challenges on one game.
  *
  * This is the media buy. A brand picks a game, sees who it reaches, and buys
- * four weekly challenges — one month, one payment, no subscription. Every
- * challenge is $250: $175 of prize money and a $75 platform fee. Four of them
- * on one game is $1,000, and four is the minimum, because one challenge is a
- * post and four is a campaign.
+ * four weekly challenges — one month, one payment, no subscription. The price
+ * of a challenge and the prize share are in `lib/pricing.ts`; retyping either
+ * here would put a second rate card in a schema comment, which is where the
+ * first stale one lived. Four is the minimum, because one challenge is a post
+ * and four is a campaign.
  *
  * The four are NOT created at once. Only the first becomes a live challenge;
  * the next opens when it ends. A game runs one sponsored challenge at a time —

@@ -178,7 +178,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "7 · For owners",
         title: "Server owners finally get paid for the community they built.",
         subtitle:
-          "A share of every sponsored challenge that runs there, and of every placement. No sales team, no admin, no prize money of their own. This is the live ladder.",
+          "A weekly pool, competed for against the servers their own size and scored on entrants, newly linked members and conversion. No sales team, no admin, no prize money of their own. A tier is a bracket, not a rate. This is the live ladder.",
       },
 
       // ---------- 8. VALUE FOR GAMERS ----------
@@ -270,8 +270,8 @@ export const SEED_DOCS: SeedDoc[] = [
           steps: [
             { icon: "target", label: "Brands spend", note: "On a published rate card. A month of sponsored challenges for a game, plus placements across the network." },
             { icon: "gamepad", label: "Gamers engage", note: "They enter, they play the week under the brand's name, and they appear on its leaderboard. Engagement, not exposure." },
-            { icon: "crown", label: "Server owners earn", note: "A share of the platform fee on every sponsored challenge that runs in their community, rising as they connect more gamers." },
-            { icon: "diamond", label: "Cluster takes platform revenue", note: "What is left after the prize pool and the owner's share. There is no operations line under it, which is where the margin comes from." },
+            { icon: "crown", label: "Server owners earn", note: "A weekly pool, shared between the servers that carried a challenge and scored on entrants, newly linked members and conversion. Never a per-challenge rate — a rate quoted is a rate we are held to." },
+            { icon: "diamond", label: "Cluster takes platform revenue", note: "One of four vault shares, set by an operator rather than fixed in code. There is no operations line under it, which is where the margin comes from." },
           ],
         },
       },

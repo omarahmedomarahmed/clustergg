@@ -4,6 +4,9 @@ What somebody taking this over needs to know, in the order they will need it.
 Not a tour of the code — the code is readable. This is the part that is not
 obvious from reading it.
 
+**Read `docs/SOURCE_OF_TRUTH.md` first.** That file is the product; this one is
+the potholes.
+
 ---
 
 ## 1. What the product actually is
@@ -110,7 +113,8 @@ this before anybody noticed the pattern.
 
 | Question | File |
 |---|---|
-| What did we build, when, and what did it cost? | `docs/PLAN.md` — the dev log |
+| What is the product, end to end? | `docs/SOURCE_OF_TRUTH.md` — read this first |
+| What did we build, when, and why? | `git log`. Every build item is its own commit message |
 | What do we sell and why is it priced that way? | `docs/MODEL.md` |
 | What may we never do with payment data? | `docs/PAYMENTS.md` |
 | What did counsel research say? | `docs/B73_RESEARCH.md` |
@@ -144,13 +148,16 @@ why it flipped is the most valuable line in the file.
 
 ## 6. What is not finished
 
-`docs/PLAN.md` is authoritative and current. The short version:
+There is no plan file. A plan states facts in the present tense, which is how
+a document that was true in March becomes a wrong answer in August — twice, on
+this project, one of them into legal copy. `docs/SOURCE_OF_TRUTH.md` describes
+what exists; what is left is this table and the git history.
 
 | Area | State |
 |---|---|
 | Challenge lifecycle, campaigns, pool, wallets, private challenges | Built and tested |
-| Public `/pool` page, public server profile rebuild | Not built |
-| Co-sponsored challenges (two brands, one competition) | Not built |
+| Public `/pool` page, public server profile | Built and tested |
+| Co-sponsored challenges (two brands, one competition) | Built and tested (`lib/co-sponsor.ts`) |
 | Scale: cold-start DDL replay, stat-sync throughput, unbounded event tables | Known, unfixed, and the reviewer called them fatal |
 | Sybil defence: no email verification, no captcha | Known, unfixed, and load-bearing now that the pool pays for member counts |
 | Legal: non-US withholding, under-18 ad profiling | Open questions, documented in `docs/B73_RESEARCH.md` |

@@ -9,7 +9,7 @@
 //      challenge. It reached the COOKIE POLICY — legal copy — before the owner
 //      caught it.
 //   2. "Following, messaging and gifting stay." Gifting was deleted in B72.3
-//      for money-transmission reasons. It reached `docs/PLAN.md` and a pushed
+//      for money-transmission reasons. It reached the dev log and a pushed
 //      commit message.
 //
 // Neither was a typo. **The code was right both times.** Both came from reading
@@ -107,7 +107,7 @@ console.log("\n== the banner says the two things that actually went wrong ==");
     "a generic 'this may be out of date' is a warning people skim");
   ok("…and the gifting one", /gifting/i.test(banner));
   ok("…and says the code wins", /the code is right/i.test(banner));
-  ok("…and points at what is current", /docs\/PLAN\.md/.test(banner));
+  ok("…and points at what is current", /docs\/SOURCE_OF_TRUTH\.md/.test(banner));
 }
 
 console.log("\n== the two known-wrong claims, by name ==");

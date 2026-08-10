@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Earn money from your Discord server",
   description:
-    "Install ClusterBot free and brands fund weekly challenges in your gaming community. Your members win real prize money, you take a share of the fee, and the bot never reads a message.",
+    "Install ClusterBot free and brands fund weekly challenges in your gaming community. Your members win real prize money, the servers that carried a challenge share a weekly pool, and the bot never reads a message.",
   alternates: { canonical: "/discord-bot" },
   openGraph: {
     title: "ClusterBot for Discord",

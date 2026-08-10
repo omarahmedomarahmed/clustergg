@@ -12,7 +12,7 @@
 //   2. "Following, messaging and gifting stay." **Gifting was deleted in
 //      B72.3**, because a transfer of redeemable value between two accounts is
 //      a money-transmission trigger, a 1099 aggregation hole and an under-18
-//      cash-out bypass at once. It reached `docs/PLAN.md` and a commit message.
+//      cash-out bypass at once. It reached the dev log and a commit message.
 //
 // Neither was a typo and neither was a code defect. **The code was right both
 // times.** Both came from reading a document written before the change and
@@ -104,7 +104,7 @@ export const RETIRED: Retired[] = [
 /** Live documents. Anything under `docs/legacy/` is history and exempt by design. */
 export const LIVE_DOCS = [
   "README.md",
-  "docs/PLAN.md",
+  "docs/SOURCE_OF_TRUTH.md",
   "docs/MODEL.md",
   "docs/HANDOVER.md",
   "docs/ARCHITECTURE.md",
@@ -134,7 +134,7 @@ export const CLEAR_SAME_LINE = true;
 /**
  * The opt-out, for quoting a document that was true when it was written.
  *
- * Explicit and ugly on purpose. `docs/PLAN.md` quotes B68's brief — which says
+ * Explicit and ugly on purpose. The dev log quoted B68's brief — which says
  * gifting stays — because the quote is the point of the entry. Marking it costs
  * one comment; leaving the rule loose enough to allow it unmarked cost two
  * shipped errors.

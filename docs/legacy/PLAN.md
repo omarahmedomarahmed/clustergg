@@ -1,5 +1,27 @@
 # ClusterGG — The Live Plan
 
+<!-- LEGACY-BANNER -->
+> # ⚠ HISTORICAL — NOT THE PRODUCT
+>
+> **Nothing in this file describes ClusterGG as it is today.** It is the dev log
+> of a build that has since changed under it: two thousand lines written across
+> a hundred and sixteen items, each one true on the day it was typed and none of
+> them re-checked since.
+>
+> That is what made it dangerous. A plan file states facts in the present tense,
+> so a reader — a person or a model — takes the nearest matching sentence as
+> current. Two wrong claims about this product shipped that way, one of them
+> into legal copy.
+>
+> **Do not quote a sentence from this file as a statement of fact about the
+> product.** It is kept because a decision with no record gets made again, and
+> because the reasoning behind the ones that stuck is still worth reading.
+>
+> **The current truth, in this order:** the code, then `docs/SOURCE_OF_TRUTH.md`,
+> then `docs/MODEL.md` and `docs/HANDOVER.md`. Where this file and the code
+> disagree, the code is right and this file is history.
+
+
 **Updated 7 August 2026. All owner decisions are made. This is the whole
 remaining build, in order, with the gates that stop it.**
 

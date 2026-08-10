@@ -61,7 +61,7 @@ export async function generateMetadata(): Promise<Metadata> {
       template: "%s · Cluster",
     },
     description:
-      "The media-buying and monetization layer for gaming communities. Server owners earn money from their Discord server without selling anything; brands advertise on Discord by sponsoring the weekly challenge — $250, of which $175 is prize money that reaches a gamer; gamers link every game they play into one profile and compete for real prizes.",
+      "The media-buying and monetization layer for gaming communities. Server owners earn money from their Discord server without selling anything; brands advertise on Discord by sponsoring the weekly challenge, half of which is prize money that reaches a gamer; gamers link every game they play into one profile and compete for real prizes.",
     openGraph: {
       title: "Cluster — monetize your Discord server, or advertise to gamers on it",
       description: "Sponsored weekly challenges inside gaming communities. Brands reach gamers. Owners earn. Gamers win real prizes.",

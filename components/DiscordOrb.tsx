@@ -48,8 +48,8 @@ export default function DiscordOrb({ installUrl, servers, reach, color = "#5865f
           </p>
           <p className="text-xs text-muted mt-1.5 leading-relaxed">
             Your members get ranked profiles and live stats from the games they already play, plus challenges
-            with real prize money — without leaving your server. Brands sponsor the challenges; you take a
-            share of the platform fee.
+            with real prize money — without leaving your server. Brands sponsor the challenges; every Monday
+            the servers that carried one share a pool of what those brands paid.
           </p>
 
           {(servers ?? 0) > 0 && (

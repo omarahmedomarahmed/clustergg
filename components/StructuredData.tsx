@@ -1,3 +1,5 @@
+import { PRICING_DEFAULTS, money } from "@/lib/pricing";
+
 const SITE = process.env.NEXT_PUBLIC_APP_URL || "https://clustergg.com";
 
 // Structured data, for search engines and for assistants.
@@ -148,13 +150,13 @@ export function BotFaqSchema({ threshold = 500, gameCount }: { threshold?: numbe
  */
 export const SEARCH_FAQ: [string, string][] = [
   ["How do I make money from my Discord server?",
-    "Install Cluster and brands pay to run weekly gaming challenges in your server. You take a share of the fee on every sponsored challenge that runs there, rising as more of your members link a game account. You sell nothing, negotiate nothing and fund no prizes — the brand funds them. It is free to install and free to run."],
+    "Install Cluster and brands pay to run weekly gaming challenges in your server. Every Monday the servers that carried a challenge share a pool of what those brands paid, scored on how many of your members entered and how many newly linked a game account. You sell nothing, negotiate nothing and fund no prizes — the brand funds them. It is free to install and free to run."],
   ["How do I monetize a gaming community?",
     "Sell what a gaming community actually has: the attention of people who play. Cluster turns that into sponsored weekly competitions — a brand funds the prize pool, your members enter with one tap, and every Monday the servers that carried a challenge share a pool of what those brands paid. Nothing is asked of your members except playing the games they already play."],
   ["Can you advertise on Discord?",
     "Discord itself has no ads manager, so brands cannot buy it directly. Cluster is the layer that makes it buyable: you sponsor the weekly challenge for a game you choose, your creative runs on every card the bot draws inside opted-in servers, and you get entrants, clicks, cost-per-entrant and eCPM back per week."],
   ["What does it cost to advertise to gamers on Discord?",
-    "A sponsored challenge on Cluster is $250. $175 of that becomes the prize pool the players compete for and $75 is the platform fee, so most of the spend reaches a gamer rather than an agency. A month is four challenges on one game."],
+    `A sponsored challenge on Cluster is ${money(PRICING_DEFAULTS.challengePrice, PRICING_DEFAULTS.currency)}. Half of that becomes the prize pool the players compete for, so most of the spend reaches a gamer rather than an agency. A month is four challenges on one game.`],
   ["How do I reach gamers with marketing?",
     "Reach them where they are between matches rather than where the clips end up. Gamers organise on Discord and play continuously; Cluster puts a brand inside the competition they were already going to enter, and reports back who entered, from which communities, and what each entrant cost."],
   ["What is Discord marketing?",
@@ -162,7 +164,7 @@ export const SEARCH_FAQ: [string, string][] = [
   ["How do gamers earn money on Cluster?",
     "Link the game accounts you already play, then enter challenges. Every challenge you join scores from the same account, so one win moves every board you are on, and prizes are paid to the podium. There is no entry fee and nothing to buy."],
   ["Is the Cluster bot free for server owners?",
-    "Yes. Installing it, the profiles, the leaderboards and the challenges are all free, forever. Cluster is paid by brands, and server owners are paid out of the same fee."],
+    "Yes. Installing it, the profiles, the leaderboards and the challenges are all free, forever. Cluster is paid by brands, and the servers that carry a challenge are paid out of the same money."],
 ];
 
 export const BOT_FAQ: [string, string][] = [

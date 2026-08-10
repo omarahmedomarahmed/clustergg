@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "How to monetize a Discord server, and how to advertise on Discord",
   description:
-    "Straight answers: how server owners earn money from a Discord gaming community, what it costs a brand to advertise on Discord, and how gamers win real prize money. $250 a challenge, $175 of it to the players.",
+    "Straight answers: how server owners earn money from a Discord gaming community, what it costs a brand to advertise on Discord, and how gamers win real prize money. One price a challenge, half of it to the players.",
   alternates: { canonical: "/answers" },
   ...cardMeta("planets", {}, "Cluster — how Discord monetization works"),
 };
