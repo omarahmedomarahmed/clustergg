@@ -130,6 +130,27 @@ and you can stop after any step.
 | `EMAIL_REPLY_TO` | optional | Where a human reply should land — usually the forwarding address from step 2. |
 | `RESEND_WEBHOOK_SECRET` | for delivery status | Any long random string. Set the same value in Resend's webhook config. Without it the webhook endpoint returns 503 and refuses everything, which is deliberate. |
 
+### Taking money — Stripe
+
+| Variable | Required | What it is |
+|---|---|---|
+| `STRIPE_SECRET_KEY` | to bill at all | From the Stripe dashboard. Without it, collection falls back to the manual adapter and a pasted pay link. |
+| `STRIPE_WEBHOOK_SECRET` | **to get paid automatically** | The signing secret Stripe shows when you add the endpoint. Without it the endpoint returns 503 and refuses everything — deliberate, because an open endpoint here lets anybody mark an invoice paid and post money into the vaults. |
+
+Webhook URL to paste into Stripe (events: `invoice.paid`,
+`invoice.payment_succeeded`):
+
+```
+https://yourdomain.com/api/payments/webhook
+```
+
+**This endpoint is what makes a payment move money.** Without it a brand can pay
+and nothing happens — no vault posting, no receipt — until somebody opens
+`/admin/billing` and clicks "Mark paid". And because nothing is announced before
+its bill is paid, an unnoticed payment silently withholds the challenge the
+brand just bought. The button still works and still goes through the same code;
+the webhook simply means nobody has to press it.
+
 **Verify the domain in Resend before sending anything real.** It walks you
 through SPF, DKIM and DMARC records. This is not optional polish: billing mail
 that lands in spam is worse than no billing mail, because you believe it was
