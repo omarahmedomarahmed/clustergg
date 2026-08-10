@@ -3,7 +3,7 @@ import { verifyInteraction } from "@/lib/discord/verify";
 import { canVerify, canAct, appId, publicKeyShape, siteUrl } from "@/lib/discord/config";
 import {
   InteractionType, InteractionResponseType, MessageFlags,
-  actor, readCommand, isGuildManager, ButtonStyle, type Interaction,
+  actor, readCommand, isGuildManager, isPublicMessage, ButtonStyle, type Interaction,
 } from "@/lib/discord/types";
 import { parseId, frame, rows, button, navButton, linkButton, actionId, type Frame } from "@/lib/discord/components";
 import { openChoices } from "@/lib/discord/catalog";
@@ -499,6 +499,12 @@ function componentPress(i: Interaction) {
   const parsed = parseId(customId);
   if (!who || !parsed) return json({ type: InteractionResponseType.DeferredUpdateMessage });
 
+  // Decided ONCE, here, from the message the button was actually attached to.
+  // Reading it inside the deferred work would be reading it after the response
+  // has already been chosen, which is the wrong order — the acknowledgement
+  // type below has to match what the deferred work is about to do.
+  const publicCard = isPublicMessage(i);
+
   const started = Date.now();
   after(async () => {
     let ctx: Awaited<ReturnType<typeof loadCtx>> | null = null;
@@ -513,11 +519,27 @@ function componentPress(i: Interaction) {
         : [parsed.target, parsed.trail];
 
       const payload = await renderScreen(target, trail, ctx);
-      await editOriginal(i.token, {
+      const body = {
         content: payload.content ?? "",
         embeds: payload.embeds ?? [],
         components: payload.components ?? [],
-      });
+      };
+      // ===== A PUBLIC CARD IS NEVER EDITED. M5 =====
+      //
+      // On an ephemeral card, editing the original is the whole point: the card
+      // belongs to one person and navigation happens in place.
+      //
+      // On a PUBLIC announcement it was a bug with an audience. The bot posts a
+      // challenge announcement into a server's channel, one member taps a
+      // button, and the announcement is REPLACED — for everyone — with that
+      // member's private screen. The server was paid to carry that
+      // announcement and the next person to scroll past sees a stranger's
+      // stats instead.
+      //
+      // `followUp` sends a NEW message on the same interaction token, so the
+      // public card stays exactly as posted and the member gets their own.
+      if (publicCard) await followUp(i.token, { ...body, flags: MessageFlags.Ephemeral });
+      else await editOriginal(i.token, body);
     } catch {
       await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
     } finally {
@@ -529,9 +551,17 @@ function componentPress(i: Interaction) {
     }
   });
 
-  // Acknowledge by editing the SAME message — this is what makes navigation
-  // feel in-place instead of spawning a new message per click.
-  return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  // The acknowledgement has to agree with what the deferred work will do.
+  //
+  //   DeferredUpdateMessage (6)         "I am about to edit this message"
+  //   DeferredChannelMessageWithSource  "I am about to send a new one"
+  //
+  // Answering a public press with type 6 and then calling `followUp` leaves the
+  // public card showing a loading state it never comes out of. So the type is
+  // chosen from the same fact the work is: was this a public card or not.
+  return json(publicCard
+    ? { type: InteractionResponseType.DeferredChannelMessageWithSource, data: { flags: MessageFlags.Ephemeral } }
+    : { type: InteractionResponseType.DeferredUpdateMessage });
 }
 
 // Render a screen into the message that was clicked. Used by the few buttons
@@ -679,20 +709,42 @@ async function rerender(
 function navigate(i: Interaction, target: Frame, trail: Frame[]) {
   const who = actor(i);
   if (!who) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  // Same rule as the main component handler, and it has to be here too: this is
+  // the path the few buttons that carry no nav trail take, and they sit on the
+  // same public announcements as everything else.
+  const publicCard = isPublicMessage(i);
   after(async () => {
     try {
       const ctx = await loadCtx(who.id, who.global_name || who.username, i.guild_id, who.avatar, isGuildManager(i));
       const payload = await renderScreen(target, trail, ctx);
-      await editOriginal(i.token, {
+      const body = {
         content: payload.content ?? "",
         embeds: payload.embeds ?? [],
         components: payload.components ?? [],
-      });
+      };
+      // ===== A PUBLIC CARD IS NEVER EDITED. M5 =====
+      //
+      // On an ephemeral card, editing the original is the whole point: the card
+      // belongs to one person and navigation happens in place.
+      //
+      // On a PUBLIC announcement it was a bug with an audience. The bot posts a
+      // challenge announcement into a server's channel, one member taps a
+      // button, and the announcement is REPLACED — for everyone — with that
+      // member's private screen. The server was paid to carry that
+      // announcement and the next person to scroll past sees a stranger's
+      // stats instead.
+      //
+      // `followUp` sends a NEW message on the same interaction token, so the
+      // public card stays exactly as posted and the member gets their own.
+      if (publicCard) await followUp(i.token, { ...body, flags: MessageFlags.Ephemeral });
+      else await editOriginal(i.token, body);
     } catch {
       await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
     }
   });
-  return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  return json(publicCard
+    ? { type: InteractionResponseType.DeferredChannelMessageWithSource, data: { flags: MessageFlags.Ephemeral } }
+    : { type: InteractionResponseType.DeferredUpdateMessage });
 }
 
 async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awaited<ReturnType<typeof loadCtx>>) {

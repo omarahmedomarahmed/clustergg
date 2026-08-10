@@ -55,6 +55,18 @@ export type Interaction = {
   locale?: string;
   member?: { user: DiscordUser; permissions?: string; nick?: string | null };
   user?: DiscordUser;
+  /**
+   * The message the component was attached to. Present on component
+   * interactions only.
+   *
+   * `flags` is the field that matters: Discord sets bit 64 (`Ephemeral`) on a
+   * message only that one person can see. Its ABSENCE means the message is
+   * public — visible to the whole channel — which is the difference between a
+   * button press being private navigation and a button press rewriting an
+   * announcement for everybody. Nothing could read this before M5, so nothing
+   * could tell the two apart.
+   */
+  message?: { id?: string; flags?: number; channel_id?: string };
   data?: {
     id?: string;
     name?: string;
@@ -65,6 +77,29 @@ export type Interaction = {
     components?: { components: { custom_id: string; value: string }[] }[];
   };
 };
+
+/**
+ * Was the button pressed on a message the whole channel can see?
+ *
+ * ===== WHY THIS DECIDES HOW WE ANSWER =====
+ *
+ * Every button press used to be answered with `DeferredUpdateMessage` and an
+ * edit of the original message. On an EPHEMERAL card that is exactly right —
+ * the card belongs to one person, and editing it in place is what makes
+ * navigation feel like an app rather than a stack of new messages.
+ *
+ * On a PUBLIC announcement it is a bug with an audience. The bot posts a
+ * challenge announcement into a server's channel; one member taps a button on
+ * it; the announcement is REPLACED, for everyone, with that member's private
+ * screen. The next person to scroll past sees a stranger's stats where the
+ * challenge used to be, and the announcement the server was paid to carry is
+ * gone.
+ *
+ * So a press on a public message gets a NEW EPHEMERAL MESSAGE instead, and the
+ * public card is left exactly as posted.
+ */
+export const isPublicMessage = (i: Interaction): boolean =>
+  i.message != null && ((i.message.flags ?? 0) & MessageFlags.Ephemeral) === 0;
 
 // The person who triggered an interaction: `member.user` in a guild, `user` in a DM.
 export function actor(i: Interaction): DiscordUser | null {
