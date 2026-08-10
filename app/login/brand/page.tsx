@@ -26,7 +26,7 @@ export default async function BrandLoginPage({
         </div>
         <h1 className="text-2xl font-bold">Open your campaign portal</h1>
         <p className="mt-1.5 text-sm text-muted">
-          Your creatives, your delivery numbers and your Discord card campaign. No Cluster account needed —
+          Your campaigns, your creatives and your delivery numbers. No Cluster account needed —
           just the access key your contact shared.
         </p>
 

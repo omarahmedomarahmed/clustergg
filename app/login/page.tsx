@@ -47,7 +47,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </span>
           <span className="mt-1.5 block font-bold">Campaign portal</span>
           <span className="mt-0.5 block text-xs leading-snug text-muted">
-            Creatives, delivery and your Discord card campaign.
+            Campaigns, creatives and delivery numbers.
           </span>
           <span className="mt-2 inline-flex items-center gap-1 text-xs brand-text">
             Sign in <Icon name="arrowRight" size={11} className="transition-transform group-hover:translate-x-0.5" />

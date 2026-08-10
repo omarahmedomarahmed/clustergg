@@ -13,6 +13,27 @@
  */
 import { chromium } from "playwright-core";
 import { after, open, settle } from "./_nav.mjs";
+// The ladder is READ, never retyped. This suite hard-coded 500 / 1,000 / 5,000
+// and four tier names; M3 replaced all of it with one array and the suite went
+// red on six assertions that were each describing a product that no longer
+// existed. Importing it means the next change to the ladder cannot leave a
+// stale number here to be "fixed" by loosening the regex.
+// PARSED, not imported: browser suites run under plain `node`, which cannot
+// load a .ts module. `tests/ui/admin-sweep.mjs` reads `lib/admin-nav.ts` the
+// same way for the same reason.
+const LADDER_SRC = (await import("node:fs")).readFileSync(
+  new URL("../../lib/ladder.ts", import.meta.url), "utf8");
+const RUNGS = [...LADDER_SRC.matchAll(
+  /threshold:\s*(\d+),[\s\S]*?name:\s*"([^"]+)",[\s\S]*?blurb:\s*"([^"]+)"/g)]
+  .map((m) => ({ threshold: Number(m[1]), name: m[2], blurb: m[3] }));
+const EARN_FLOOR = RUNGS[0]?.threshold;
+const RANKS = [...LADDER_SRC.matchAll(/rank:\s*"([^"]+)"/g)].map((m) => m[1]);
+const PORTAL_SRC = (await import("node:fs")).readFileSync(
+  new URL("../../components/ServerPortal.tsx", import.meta.url), "utf8");
+if (RUNGS.length !== 3 || !EARN_FLOOR) {
+  console.log(`  FAIL could not read the ladder from lib/ladder.ts — got ${RUNGS.length} rungs`);
+  process.exit(1);
+}
 
 const BASE = "http://localhost:3031";
 const SHOTS = "/tmp/claude-0/-home-user-clustergg/f1b2f374-59b4-5577-bf34-0df216698fe3/scratchpad";
@@ -73,8 +94,12 @@ try {
   console.log("\n== The tier is a label, not an icon ==");
   const header = await boss.locator("header, .glass").first().innerText().catch(() => "");
   const head = await boss.locator("body").innerText();
-  ok("the server's rank is named on the header", /tier (i|ii|iii|iv)\b/i.test(head),
-    head.slice(0, 300).replace(/\n/g, " | "));
+  // "Tier I…IV" until M3; the ranks are "Rung 1…3" now and there are three of
+  // them. Read from the ladder so a future rename cannot leave this asserting a
+  // word the product stopped using.
+  ok("the server's rank is named on the header",
+    RANKS.some((r) => head.toLowerCase().includes(r.toLowerCase())),
+    `${RANKS.join("/")} — ${head.slice(0, 200).replace(/\n/g, " | ")}`);
   // INVERTED. This used to require the badge to say "· 25% share". C3 removed
   // the rate: a tier decides which servers you compete against in the weekly
   // pool and nothing else, and a badge quoting a percentage is a promise the
@@ -95,27 +120,47 @@ try {
     /the lever/i.test(body) && /link a game account/i.test(body));
   ok("it says a member who only joins doesn't count",
     /one who just joins does not/i.test(body), body.slice(0, 900).replace(/\n/g, " | "));
-  ok("it explains 500 unlocks brand money", /500 .*brands start paying|crosses? 500/i.test(body));
+  ok("it explains what puts a server on the ladder",
+    new RegExp(`cross ${EARN_FLOOR} linked`, "i").test(body)
+      || new RegExp(`${EARN_FLOOR} linked members puts you on the ladder`, "i").test(body),
+    body.slice(0, 900).replace(/\n/g, " | "));
   ok("and that we never touch their bank", /never touch your bank/i.test(body));
 
   console.log("\n== The journey ==");
-  ok("there is a journey to the top tier", /your journey to 5,000/i.test(body),
+  const top = RUNGS[RUNGS.length - 1];
+  ok("there is a journey to the top rung",
+    new RegExp(`your journey to ${top.threshold.toLocaleString()}`, "i").test(body),
     body.slice(0, 600).replace(/\n/g, " | "));
-  for (const gate of ["500", "1,000", "5,000"]) {
-    ok(`the ${gate} gate is on it`, body.includes(gate));
+  for (const r of RUNGS) {
+    ok(`the ${r.threshold} gate is on it`, body.includes(String(r.threshold)));
   }
-  ok("every rung says what it makes you", /you're on the map|brands start paying you|runs through you|ask for you by name/i.test(body));
-  ok("and how many more members it needs",
-    /more members to link/i.test(body), body.slice(0, 900).replace(/\n/g, " | "));
-  ok("all four tier names are rendered as labels",
-    ["Seed Server", "Sponsored Server", "Broadcaster", "Flagship Server"].every((n) => body.includes(n)));
+  ok("every rung says what it makes you",
+    RUNGS.every((r) => body.includes(r.blurb)),
+    RUNGS.filter((r) => !body.includes(r.blurb)).map((r) => r.blurb).join(" · "));
+  // Every rung reports its own state, and WHICH state depends on the fixture.
+  // The demo server has more linked members than the top rung's threshold, so
+  // every rung reads "Unlocked" and the to-go line cannot render — asserting it
+  // unconditionally was asserting that this server had somewhere left to climb,
+  // which stopped being true when M3 brought the top rung down to 100.
+  const climbing = /more members to link/i.test(body);
+  const arrived = /you are here/i.test(body);
+  ok("each rung says either what it still needs, or that it is unlocked",
+    climbing || arrived, body.slice(0, 900).replace(/\n/g, " | "));
+  // …and the to-go wording still EXISTS for a server that has somewhere to go.
+  // Read from source, because this fixture can never render it.
+  ok("…and the to-go line is still there for a server below a rung",
+    /more members to link/.test(PORTAL_SRC),
+    "a server below a rung must still be told how many more it needs");
+  ok("every rung name is rendered as a label",
+    RUNGS.every((r) => body.includes(r.name)),
+    RUNGS.filter((r) => !body.includes(r.name)).map((r) => r.name).join(", "));
 
   console.log("\n== Members' winnings: itemised, and not theirs ==");
   // Said in words, on the tab where an owner reads what they are paid. Not on
   // the overview header, where the badge lives — that one only has to avoid
   // quoting a rate, which is the assertion above.
-  ok("the page says a tier is not a rate",
-    /not a rate|different set of servers to compete against/i.test(body),
+  ok("the page says a rung is not a rate",
+    /not a rate|no per-challenge percentage|different set of servers to compete against/i.test(body),
     body.slice(0, 600).replace(/\n/g, " | "));
   // THE COLUMN THAT SAID "You earned" OVER THE MEMBERS' PRIZE MONEY.
   //

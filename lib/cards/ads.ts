@@ -3,28 +3,40 @@ import { getDb, schema } from "@/lib/db";
 import { serveAds, type ServedCreative } from "@/lib/ads";
 import { uid } from "@/lib/utils";
 import type { CardAdSlot, CardData } from "@/lib/cards/types";
+import { HOUSE_BRAND_ID } from "@/lib/house-brand";
 
-// The sponsor on a card.
+// The house panel on a card.
 //
-// There is no way to buy a banner inside Discord. What there IS, on this
-// platform, is a PNG the bot draws every time somebody presses a button — their
-// profile, a leaderboard, a challenge, a planet. So the cards are the ad
-// inventory, and this module decides which brand appears on the one about to be
-// drawn.
+// ===== M4: THIS SLOT IS NOT SOLD TO BRANDS ANY MORE =====
 //
-// Three rules make it a real product rather than a logo in a corner:
+// It used to be. The cards are PNGs the bot draws every time somebody presses a
+// button, and selling the top-right corner of them made this the ad inventory
+// of a Discord bot — a brand's creative, with a "Sponsored:" button under it,
+// posted into somebody else's community.
 //
-//   1. **Different brands on adjacent cards.** Creatives are interleaved by
-//      brand, so consecutive picks come from different brands whenever more
-//      than one is live. A server that opens five cards sees five sponsors, not
-//      one repeated five times.
-//   2. **Rotation without re-rendering everything.** The pick is a pure
+// That is advertising inside Discord, and it is not what Cluster sells. What
+// Cluster sells is a SPONSORED CHALLENGE: a brand funds a prize pool, the bot
+// delivers the competition to gamers in the servers they already live in, and
+// the brand gets counted entrants — real people who played — rather than
+// impressions. A brand logo on a challenge card is part of the challenge that
+// brand paid for. A brand logo on somebody's profile card is an advert.
+//
+// So the slot stays and the inventory does not: `pickCardAd` now serves ONLY
+// the house brand. Nothing is deleted — the placement, the tables and the
+// rotation all still work, and a house creative still fills the space with
+// Cluster's own message to server owners. What changed is who may buy it,
+// which is nobody.
+//
+// Two rules still make it a real panel rather than a logo in a corner:
+//
+//   1. **Rotation without re-rendering everything.** The pick is a pure
 //      function of the card's identity and the current rotation window, so
 //      within a window a given card maps to a given creative — the cached PNG
 //      is reused — and the next window moves everyone along.
-//   3. **Every serve is an impression**, written to the SAME `ad_impressions`
-//      table as web placements, with the guild when we know it. Brands read one
-//      dashboard, not two.
+//   2. **Every serve is still an impression**, written to the same
+//      `ad_impressions` table as the web placements. Kept because the count is
+//      how we know what the bot's reach actually is — a number the sponsored-
+//      challenge pitch rests on — not because anybody is billed for it.
 
 export const CARD_AD_PLACEMENT = "discord_card";
 
@@ -47,23 +59,27 @@ export type PickedAd = CardAdSlot & {
 export const HOUSE_CTA = "monetize your Discord server";
 
 /**
- * The Discord button under a sponsored card.
+ * The Discord button under the house panel.
  *
- * An image in a Discord message is not a link — there is no click on a card, no
- * matter how good the creative is. A link button underneath it is the only
- * clickable surface Discord gives us, so every card the bot posts carries one
- * for whoever paid for that card.
+ * An image in a Discord message is not a link, so a link button underneath it
+ * is the only clickable surface Discord gives us.
  *
- * The label is not fully the brand's: it always opens with "Sponsored:" and the
- * brand's name, because a button in a community's own server that reads like a
- * recommendation from that server is exactly the thing that gets a bot removed.
- * Brands write the tagline after it.
+ * ===== THE WORD "SPONSORED" IS GONE. M4 =====
+ *
+ * It used to read `Sponsored: <brand> — <the brand's tagline>`, which was
+ * honest labelling of what it was: a paid placement in somebody else's
+ * community. The placement is house-only now, so the label would have been
+ * announcing Cluster as its own sponsor — and, worse, would have kept the
+ * vocabulary of an ad product on a bot that no longer runs one.
+ *
+ * What is left is Cluster's own line to server owners, in Cluster's own name.
+ * There is nobody to disclose, because nobody paid.
  */
 export function sponsorButtonLabel(ad: { brandName: string; ctaLabel?: string | null }): string {
   const tagline = (ad.ctaLabel || HOUSE_CTA).trim();
   // Discord hard-caps a button label at 80 characters and rejects the whole
   // message — every button in it — if one is longer.
-  return `Sponsored: ${ad.brandName} — ${tagline}`.slice(0, 80);
+  return `${ad.brandName} — ${tagline}`.slice(0, 80);
 }
 
 // Stable per-card seed: the same card asks for the same slot in a window, and
@@ -102,9 +118,19 @@ export async function pickCardAd(seed: string, at = Date.now()): Promise<PickedA
   try {
     const db = await getDb();
     const placement = await serveAds(db, CARD_AD_PLACEMENT, "both");
-    // Video creatives can't be drawn into a PNG. A brand that only uploaded a
-    // video isn't shown here rather than shown as a broken box.
-    const live = interleaveByBrand((placement?.creatives ?? []).filter((c) => c.fileUrl && c.type !== "video"));
+    // ===== HOUSE ONLY. M4 =====
+    //
+    // The filter is here, at the serve, rather than at the upload — because an
+    // upload guard only governs what arrives NEXT. Any brand creative already
+    // attached to this placement, from before M4 or from a hand-written admin
+    // row, would keep going out to every server on the network. Filtering at
+    // the moment of serving means the slot is house-only for rows that already
+    // exist, whatever else changes upstream.
+    //
+    // Video creatives can't be drawn into a PNG either — a creative that is
+    // only a video is skipped rather than shown as a broken box.
+    const live = interleaveByBrand((placement?.creatives ?? [])
+      .filter((c) => c.fileUrl && c.type !== "video" && c.brandId === HOUSE_BRAND_ID));
     if (!live.length) return null;
 
     const window = Math.max(MIN_ROTATION_SECONDS, placement!.rotationIntervalSeconds || 300) * 1000;
@@ -132,8 +158,8 @@ export async function pickCardAd(seed: string, at = Date.now()): Promise<PickedA
  * exactly like a brand's upload.
  */
 export const PREVIEW_AD: CardAdSlot = {
-  brandName: "Your brand",
-  label: "Sponsored",
+  brandName: "Cluster",
+  label: null,
   imageUrl:
     "data:image/svg+xml;base64," +
     Buffer.from(
@@ -142,8 +168,8 @@ export const PREVIEW_AD: CardAdSlot = {
           <stop offset="0" stop-color="#7c3aed"/><stop offset="1" stop-color="#2563eb"/>
         </linearGradient></defs>
         <rect width="640" height="200" fill="url(#g)"/>
-        <text x="320" y="92" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="34" font-weight="bold">YOUR CREATIVE HERE</text>
-        <text x="320" y="132" text-anchor="middle" fill="#e9e9ff" font-family="sans-serif" font-size="20">640 × 200 · every card the bot draws</text>
+        <text x="320" y="92" text-anchor="middle" fill="#ffffff" font-family="sans-serif" font-size="34" font-weight="bold">CLUSTER PANEL</text>
+        <text x="320" y="132" text-anchor="middle" fill="#e9e9ff" font-family="sans-serif" font-size="20">640 × 200 · house only, not sold</text>
       </svg>`,
     ).toString("base64"),
 };

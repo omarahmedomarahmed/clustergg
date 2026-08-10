@@ -43,6 +43,8 @@ export type ServedCreative = {
   /** The brand's own words on the Discord button under this creative. */
   ctaLabel: string | null;
   brandName: string;
+  /** Whose creative this is. M4 uses it to keep the Discord slot house-only. */
+  brandId: string;
   durationSeconds: number | null;
 };
 
@@ -78,6 +80,7 @@ export async function serveAds(db: DB, placementKey: string, device: string): Pr
     ctaLabel: schema.adCreatives.ctaLabel,
     durationSeconds: schema.adCreatives.durationSeconds,
     brandName: schema.brands.name,
+    brandId: schema.brands.id,
     targetDevice: schema.adCampaigns.targetDevice,
   })
     .from(schema.adCampaignCreatives)
@@ -158,6 +161,7 @@ export async function serveAds(db: DB, placementKey: string, device: string): Pr
       clickUrl: r.clickUrl,
       ctaLabel: r.ctaLabel,
       brandName: r.brandName,
+      brandId: r.brandId,
       durationSeconds: r.durationSeconds,
     })),
   };

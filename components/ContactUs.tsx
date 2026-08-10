@@ -5,9 +5,11 @@ import Icon from "@/components/Icon";
 
 // "Contact us to set it up", where the thing isn't set up.
 //
-// Some of what a brand can buy is self-serve — the Discord card and the monthly
-// sponsored-challenge buy both go live without a human. The rest (the website
-// placements, anything bespoke) needs us. Sending those brands to an email
+// Some of what a brand can buy is self-serve — the monthly sponsored-challenge
+// buy goes live without a human. The rest (the website placements, anything
+// bespoke) needs us. The Discord card was self-serve too until M4 took it off
+// the market: that slot is house-only now, because selling it made the bot an
+// ad network instead of a delivery engine for challenges. Sending those brands to an email
 // address loses them: the message lands in an inbox nobody on the account
 // watches, and the brand has no record they ever asked.
 //
