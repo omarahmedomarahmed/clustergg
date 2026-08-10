@@ -142,11 +142,9 @@ suggests.
 
 | # | Item | State |
 |---|---|---|
-| **Repost button** | Every bot announcement — challenge, Profile of the Week, winners — needs a button that re-posts that exact announcement to the same channel as a **new** message, triggered per server. | Not started. The privacy fix it depends on (a public card must answer privately) is done and tested. |
-| **Challenge dashboard** | One dashboard to manage every challenge from. | Not started. |
-| **M6** | Private challenges: `MIN_PRIZE_POOL` $20 → $5, prize pools in $5 increments, surfaced in the server wallet at $5. A server owner buys a private challenge for their own members out of their wallet balance. | Not started. |
-| **M7** | One end-to-end test of the money loop: brand pays → vaults post → week closes → server wallet credited → withdrawal opens. | Not started. |
-| **M10** | The data room rebuild (§3.3 above). | Not started. |
+| **Repost button** | Every bot announcement — challenge, Profile of the Week, winners — needs a button that re-posts that exact announcement to the same channel as a **new** message, triggered per server. | **Not started.** The privacy fix it depends on is done and tested: a button on a public card now answers with a new private message instead of rewriting the announcement for the channel. |
+| **Challenge dashboard** | One dashboard to manage every challenge from. Today they are managed from several places. | **Not started.** |
+| **Data room** | The rebuild described in §3.3. | **Not started** — this one is yours by design, not by neglect. It wants a fresh view of the company more than it wants continuity. |
 
 Two things need the owner rather than an agent:
 
@@ -181,6 +179,8 @@ Two things need the owner rather than an agent:
 | Payment rules | `docs/PAYMENTS.md` |
 | What a delivered view means | `docs/DELIVERY.md` |
 | The server ladder | `lib/ladder.ts` — one array; rung, bracket and label at once |
+| The money loop, end to end | `tests/db/money-loop.mts` — the fastest way to see the whole chain |
+| The two wallet thresholds | `lib/private-quote.ts` (spend, $5) and `lib/server-wallet.ts` (withdraw, $10) |
 | The weekly close | `lib/week-close.ts`, `lib/week-standing.ts`, `lib/server-score.ts` |
 | The four vaults | `lib/vaults.ts`, `lib/vault-split.ts` |
 | The bot | `lib/discord/`, `app/api/discord/interactions/route.ts` |
