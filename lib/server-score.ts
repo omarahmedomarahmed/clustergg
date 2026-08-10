@@ -20,6 +20,8 @@
 // So: every term is either DEDUPLICATED, QUALIFIED, or PER-CAPITA, and the raw
 // member count scores nothing at all.
 
+import { RUNGS, type RungKey } from "@/lib/ladder";
+
 /**
  * Each term is percentile-ranked within its bracket, so one outlier cannot own
  * the pool.
@@ -131,36 +133,16 @@ export function scoreWeek(me: ServerWeek, tier: ServerWeek[]): number {
   ) * 100) / 100;
 }
 
-/**
- * ===== SIZE BRACKETS =====
- *
- * The pool is split by bracket BEFORE anything is scored, and that split is the
- * answer to the only fairness question owners actually ask: can four big servers
- * take everything?
- *
- * They cannot. A large server competes for the large bracket's share and can
- * never reach the small one's. Fixed per-server percentages could never do this
- * — 20 small servers at 5% is 100%, 21 is 105%, and four large servers at 25% is
- * the whole pool with nothing left for anybody else. Percentages only add up
- * when they are computed, not assigned.
- *
- * An EMPTY bracket gives its share to the others, pro-rata. Money set aside for
- * servers that did not turn up is money nobody can be paid, and holding it back
- * would shrink a pool that was already announced.
- */
-export const BRACKETS = [
-  { key: "small", label: "Small", floor: 0, share: 60 },
-  { key: "mid", label: "Mid", floor: 500, share: 25 },
-  { key: "large", label: "Large", floor: 1000, share: 15 },
-] as const;
-export type BracketKey = (typeof BRACKETS)[number]["key"];
-
-/** Which bracket a server competes in, by qualified linked members. */
-export function bracketOf(qualifiedLinked: number): BracketKey {
-  let k: BracketKey = "small";
-  for (const b of BRACKETS) if (qualifiedLinked >= b.floor) k = b.key;
-  return k;
-}
+// ===== SIZE BRACKETS ARE THE LADDER. M3 =====
+//
+// There used to be a `BRACKETS` array here — small/mid/large at 0/500/1,000 —
+// alongside three other lists of server sizes elsewhere in the codebase. The
+// one in `lib/week-tiers.ts` put "large" at 5,000, so the label a server was
+// shown and the bracket its money came out of disagreed by a factor of five.
+//
+// A rung, a bracket and a label were only ever three readings of one number.
+// They are one list now: `lib/ladder.ts`. The reasoning for splitting the pool
+// by rung rather than assigning per-server percentages lives there.
 
 /**
  * **20% flat to every server that took part**, whether or not they placed.
@@ -197,47 +179,61 @@ export type Payout = { guildId: string; amount: number; kind: "participation" | 
  * Score-proportional needs none of them: every qualifying server is paid, there
  * is no cliff to fall off, and there is nothing left over to redistribute.
  *
- * **A payout floor survives.** A $7.88 transfer costs more in provider fees than
- * it delivers, so below the floor it accrues and the owner is paid when it
- * crosses. That is the one piece of the old design that was about reality
- * rather than about the ranking.
+ * ===== THERE IS NO FLOOR ON A DISTRIBUTION. M2 =====
+ *
+ * There used to be one, at $25, justified by provider fees: "a $7.88 transfer
+ * costs more in fees than it delivers". That reasoning is about a WITHDRAWAL —
+ * money leaving for somebody's bank — and this function does not do that.
+ *
+ * This is a DISTRIBUTION: the week's pool divided into server wallets. It is a
+ * number moving between two rows in our own database. No provider is involved
+ * and no fee is charged, so $0.50 costs exactly as much to distribute as $500.
+ *
+ * The floor also did not do what its comment claimed. Money under it was added
+ * to a variable called `carried`, which was printed into a summary string —
+ * "$8.00 held under the floor" — and never credited to the server, never rolled
+ * into the next week's pool, and never paid to anyone. It had no consumer. A
+ * small server earned $8 and the $8 ceased to exist.
+ *
+ * The only real floor is on the WITHDRAWAL, where a provider fee is real. See
+ * `MIN_WITHDRAWAL` in `lib/server-wallet.ts`.
  */
 export function weekPayouts(
   pool: number,
-  ranked: { guildId: string; score: number; bracket?: BracketKey }[],
-  opts: { participationShare?: number; floor?: number } = {},
-): { payouts: Payout[]; carried: number } {
+  ranked: { guildId: string; score: number; rung?: RungKey }[],
+  opts: { participationShare?: number } = {},
+): { payouts: Payout[] } {
   const partPct = opts.participationShare ?? PARTICIPATION_SHARE;
-  const floor = opts.floor ?? 25;
   const payouts: Payout[] = [];
-  if (!ranked.length || !(pool > 0)) return { payouts: [], carried: 0 };
+  if (!ranked.length || !(pool > 0)) return { payouts: [] };
 
-  // ===== Split the pool by bracket, then give empty brackets away =====
-  const present = new Set(ranked.map((r) => r.bracket ?? "small"));
-  const liveShare = BRACKETS.filter((b) => present.has(b.key)).reduce((a, b) => a + b.share, 0);
-  const poolOf = (k: BracketKey) => {
+  // ===== Split the pool by rung, then give empty rungs away =====
+  const bottom = RUNGS[0].key;
+  const present = new Set(ranked.map((r) => r.rung ?? bottom));
+  const liveShare = RUNGS.filter((r) => present.has(r.key)).reduce((a, r) => a + r.share, 0);
+  const poolOf = (k: RungKey) => {
     if (!liveShare) return 0;
-    const b = BRACKETS.find((x) => x.key === k)!;
-    // Normalised against only the brackets that turned up, so an empty one's
-    // share flows to the others rather than stranding money with no destination.
-    return pool * (b.share / liveShare);
+    const r = RUNGS.find((x) => x.key === k)!;
+    // Normalised against only the rungs that turned up, so an empty one's share
+    // flows to the others rather than stranding money with no destination.
+    return pool * (r.share / liveShare);
   };
 
-  for (const b of BRACKETS) {
-    if (!present.has(b.key)) continue;
-    const inBracket = ranked.filter((r) => (r.bracket ?? "small") === b.key);
-    const bracketPool = poolOf(b.key);
+  for (const rungRow of RUNGS) {
+    if (!present.has(rungRow.key)) continue;
+    const inRung = ranked.filter((r) => (r.rung ?? bottom) === rungRow.key);
+    const rungPool = poolOf(rungRow.key);
 
     // Flat, to everyone who took part.
-    const partPool = bracketPool * (partPct / 100);
-    const each = partPool / inBracket.length;
-    for (const r of inBracket) payouts.push({ guildId: r.guildId, amount: each, kind: "participation" });
+    const partPool = rungPool * (partPct / 100);
+    const each = partPool / inRung.length;
+    for (const r of inRung) payouts.push({ guildId: r.guildId, amount: each, kind: "participation" });
 
     // Competitive, in proportion to score.
-    const compPool = bracketPool - partPool;
-    const total = inBracket.reduce((a, r) => a + Math.max(0, r.score), 0);
+    const compPool = rungPool - partPool;
+    const total = inRung.reduce((a, r) => a + Math.max(0, r.score), 0);
     if (total > 0) {
-      for (const r of inBracket) {
+      for (const r of inRung) {
         const share = Math.max(0, r.score) / total;
         if (share > 0) payouts.push({ guildId: r.guildId, amount: compPool * share, kind: "placement" });
       }
@@ -245,21 +241,24 @@ export function weekPayouts(
       // Nobody scored. The competitive money joins the flat share rather than
       // vanishing — it was announced as this week's pool and it is owed to the
       // servers that turned up.
-      const extra = compPool / inBracket.length;
-      for (const r of inBracket) payouts.push({ guildId: r.guildId, amount: extra, kind: "participation" });
+      const extra = compPool / inRung.length;
+      for (const r of inRung) payouts.push({ guildId: r.guildId, amount: extra, kind: "participation" });
     }
   }
 
-  // Merge per guild, then hold anything under the floor.
+  // Merge per guild. Every cent lands — a distribution has no minimum, because
+  // it costs nothing to make. A server owed $0.50 is credited $0.50 and can
+  // watch it accumulate toward the one threshold that is real, the withdrawal.
   const byGuild = new Map<string, number>();
   for (const p of payouts) byGuild.set(p.guildId, (byGuild.get(p.guildId) ?? 0) + p.amount);
 
   const out: Payout[] = [];
-  let carried = 0;
   for (const [guildId, amount] of byGuild) {
     const rounded = Math.round(amount * 100) / 100;
-    if (rounded < floor) { carried += rounded; continue; }
+    // Zero is still skipped: a payout row for nothing is a row that clutters a
+    // statement and tells the owner nothing they did not know.
+    if (rounded <= 0) continue;
     out.push({ guildId, amount: rounded, kind: "placement" });
   }
-  return { payouts: out, carried: Math.round(carried * 100) / 100 };
+  return { payouts: out };
 }

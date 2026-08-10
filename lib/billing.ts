@@ -1,7 +1,8 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing";
-import { tierOf, WEEK_CLOSE_ACTOR } from "@/lib/week-close";
+import { WEEK_CLOSE_ACTOR } from "@/lib/week-close";
+import { rungOf } from "@/lib/ladder";
 
 // The books.
 //
@@ -58,7 +59,7 @@ export type ServerEarningRow = {
   /** Every member with a first-link timestamp. What an owner already sees. */
   linked: number;
   /**
-   * The ones that count toward a tier (B35): linked for a week, holding at
+   * The ones that count toward a rung (B35): linked for a week, holding at
    * least one game account whose ownership is proven.
    *
    * Both numbers are carried, always. Showing only the qualified count reads as
@@ -73,7 +74,8 @@ export type ServerEarningRow = {
    * rate used to be this row's `owed`. The weekly pool replaced it, and running
    * both would have paid owners twice out of a 15% line.
    */
-  tier: string;
+  /** Null below EARN_FLOOR — the server is not on the ladder yet. */
+  tier: string | null;
   profileComplete: boolean;
   challenges: number;
   owed: number;
@@ -288,7 +290,7 @@ export async function billingSummary(
           name: g.name || g.guildId,
           linked: c.raw,
           qualifiedLinked: c.qualified,
-          tier: tierOf(linked),
+          tier: rungOf(linked),
           profileComplete: completeBy.get(g.guildId) ?? false,
           challenges: o?.challenges ?? 0,
           owed: o?.owed ?? 0,

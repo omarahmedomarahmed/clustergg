@@ -122,7 +122,7 @@ export default async function ServerPortalPage({
 
       <div className="mx-auto max-w-6xl px-4 pb-20">
         {/* The gate, stated BEFORE they reach the threshold (B47).
-            An owner who finds out at 500 linked members that they are earning
+            An owner who finds out at the earning floor that they are earning
             nothing was misled the whole way up, so this sits above the tabs on
             every visit until the profile is finished. */}
         {!community.complete && (
@@ -150,7 +150,7 @@ export default async function ServerPortalPage({
             key: "overview", label: "Overview", icon: "chart",
             node: (
               <div className="space-y-6">
-                <TierLadder tiers={TIERS} linked={data.stats.linked} current={data.tier.current.key} />
+                <TierLadder tiers={TIERS} linked={data.stats.linked} current={data.tier.current?.key ?? null} />
                 {/* The profile lives on Overview rather than behind a settings
                     tab, because it is not settings — it is the switch that turns
                     the revenue share on, and it belongs beside the ladder that
@@ -206,12 +206,12 @@ export default async function ServerPortalPage({
               <EarningGuide
                 tiers={TIERS}
                 linked={data.stats.linked}
-                currentKey={data.tier.current.key}
+                currentKey={data.tier.current?.key ?? null}
                 inviteUrl={server.inviteUrl}
                 slug={server.slug ?? server.guildId}
               />
               <EarningsPanel
-                tier={data.tier.current}
+                tier={data.badge}
                 nextAt={data.earnings.nextAt}
                 linked={data.stats.linked}
                 earned={data.earnings.earned}
@@ -697,7 +697,7 @@ function PortalHeader({ server, data, publicView }: {
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-3xl font-black">{server.name}</h1>
-            <TierBadge tier={data.tier.current} />
+            <TierBadge tier={data.badge} />
           </div>
           <p className="text-sm text-muted mt-1">
             <b className="text-cyan-300">{data.stats.linked.toLocaleString()}</b> gamers brought to Cluster

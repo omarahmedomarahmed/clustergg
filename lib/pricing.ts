@@ -15,6 +15,7 @@
 // `lib/pricing-live.ts`.
 
 import { DEFAULT_SPLIT } from "@/lib/vault-split";
+import { RUNGS } from "@/lib/ladder";
 
 export type TierKey = "reach" | "challenge" | "ultimate";
 
@@ -466,65 +467,67 @@ export type EarnStage = {
   perks: string[];
 };
 
-// The public server ladder. Rewritten by C3.
+// The public server ladder. Rewritten by C3, re-derived from `lib/ladder.ts` by M3.
 //
 // Every rung used to promise a percentage — "5% of every sponsored challenge",
 // "your share doubles to 10%", "you keep 25 of the 30 points Cluster charges".
-// That is the per-challenge rate `docs/MODEL.md` §4 replaced with
-// a weekly pool, and this was the fourth place it lived: delete the other three
-// and the live `/servers` page goes on promising it.
+// That is the per-challenge rate `docs/MODEL.md` §4 replaced with a weekly pool,
+// and this was one of the places it lived: delete it elsewhere and the live
+// `/servers` page goes on promising it.
 //
-// What replaces it is not vaguer. A rung says which pool you compete in, what
-// the pool is funded by, and what the tier unlocks that is not money — priority,
-// exclusivity, being named on the broadcast. Those were always the parts a
-// percentage could not buy.
-export const EARN_STAGES_DEFAULT: EarnStage[] = [
-  {
-    key: "monetized",
-    name: "Sponsored",
-    threshold: 500,
-    icon: "diamond",
-    headline: "Brand-sponsored challenges start landing in your server",
-    detail:
-      "Link 500 gamers and your server switches on. Brands sponsoring the games your members already play start running their weekly challenges here — every dollar of the prize money is won by your members, and you enter the weekly server pool that every sponsored challenge funds.",
-    perks: [
+// M3 found the second half of the same problem. This array ALSO carried its own
+// thresholds — 500 / 1,000 / 5,000 — which made it the fifth list of server
+// sizes in the codebase and the one on the most-visited page. The marketing copy
+// said "link 500 gamers and your server switches on" while the weekly close was
+// paying on a different set of numbers entirely.
+//
+// The thresholds, names and icons now come from `RUNGS`. Only the SELLING —
+// headline, detail, perks — is written here, because that is the part that is
+// genuinely copy and not a fact. Every number inside the prose is interpolated
+// from the rung, so there is nothing left to retype and nothing left to drift.
+export const EARN_STAGES_DEFAULT: EarnStage[] = RUNGS.map((r, i) => ({
+  key: r.key,
+  name: r.label,
+  threshold: r.threshold,
+  icon: r.icon,
+  headline: [
+    "You are on the ladder and earning",
+    "A bigger slice, divided fewer ways",
+    "Brands buy your community by name",
+  ][i],
+  detail: [
+    `Link ${r.threshold} gamers and your server switches on. Brands sponsoring the games your members `
+      + `already play run their weekly challenges here — every dollar of the prize money is won by your `
+      + `members, and you enter the weekly server pool that every sponsored challenge funds.`,
+    `At ${r.threshold} linked gamers you move out of the biggest rung and into a smaller one. Its slice `
+      + `of the pool is ${r.share}%, and far fewer servers divide it — which is where the higher share `
+      + `per server comes from. There is still no rate, and there never will be.`,
+    `At ${r.threshold} linked gamers you are an audience in your own right. Brands ask for challenges in `
+      + `your server specifically, and you compete in the smallest rung for its own ${r.share}% of every `
+      + `week's pool.`,
+  ][i],
+  perks: [
+    [
+      `A place in the weekly server pool from ${r.threshold} linked members`,
+      "A flat share for every week you carry a challenge, placed or not",
       "Sponsored weekly challenges in your community's games",
-      "A place in the weekly server pool, with a flat share for every week you carry a challenge",
       "Prize money paid straight to your members who win",
       "Owner portal: who linked, who entered, what they won",
       "Your server listed publicly with its own page",
     ],
-  },
-  {
-    key: "broadcaster",
-    name: "Broadcaster",
-    threshold: 1000,
-    icon: "satellite",
-    headline: "More games, more weeks, more money into your community",
-    detail:
-      "At 1,000 linked gamers you become a distribution point. Challenges from across the network run in your server, so more of your members are playing for real prizes in more games at once — and you compete in a bigger tier of the pool, against fewer servers.",
-    perks: [
-      "Everything in Sponsored",
-      "A bigger tier of the weekly pool, with fewer servers competing for its slots",
+    [
+      `Everything in ${RUNGS[0].label}`,
+      `${r.share}% of the weekly pool, contested only by servers this size`,
       "Network-wide challenges carried in your server",
       "Priority on sponsored challenges in your top game",
       "Featured in the public server directory",
     ],
-  },
-  {
-    key: "sponsored",
-    name: "Flagship",
-    threshold: 5000,
-    icon: "crown",
-    headline: "Brands buy your community by name",
-    detail:
-      "At 5,000 linked gamers you are an audience in your own right. Brands ask for challenges in your server specifically, smaller servers carry yours instead of the other way round, and you compete for the largest slots in the weekly pool.",
-    perks: [
-      "Everything in Broadcaster",
-      "The largest slots in the weekly server pool",
+    [
+      `Everything in ${RUNGS[1].label}`,
+      `${r.share}% of the weekly pool, and the fewest servers dividing it`,
       "Brands request your community by name",
       "Exclusive challenges only your members can enter",
       "Named on the Sunday broadcast",
     ],
-  },
-];
+  ][i],
+}));

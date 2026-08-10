@@ -286,13 +286,13 @@ function Body({ section, doc, live, people, steps, installUrl }: {
       return (
         <>
           <Heading section={section} accent={accent} />
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid sm:grid-cols-3 gap-3">
             {live.tiers.map((t) => (
               <div key={t.key} className="glass rounded-2xl p-5">
                 <Icon name={t.icon} size={28} style={{ color: accent2 }} />
                 <div className="font-bold mt-2">{t.name}</div>
                 <div className="text-xs mt-0.5" style={{ color: accent2 }}>
-                  {t.threshold === 0 ? "From day one" : `${nf(t.threshold)}+ verified members`}
+                  {nf(t.threshold)}+ verified members · {t.share}% of the pool
                 </div>
                 <div className="text-xs font-semibold mt-3">{t.unlocks}</div>
                 <p className="text-xs text-muted mt-1.5 leading-snug">{t.detail}</p>

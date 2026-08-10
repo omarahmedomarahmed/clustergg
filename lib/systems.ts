@@ -1,3 +1,4 @@
+import { EARN_FLOOR } from "@/lib/ladder";
 // Cluster, as systems.
 //
 // Forty-odd admin pages arranged by what they edit is a filing cabinet. The
@@ -100,7 +101,7 @@ export const SYSTEMS: SystemDef[] = [
         "Watch installs and removals. A server that removes the bot is the single most important number on your screen — find out why.",
         "Answer server owners in the messages inbox. Same day. An owner who waits three days for an answer stops recommending us.",
         "Check bot analytics for commands that error or time out, and screens nobody ever opens.",
-        "Help owners get to 500 linked gamers — that is when their server starts earning, and an earning owner recruits for us.",
+        `Help owners get to ${EARN_FLOOR} linked gamers — that is when their server starts earning, and an earning owner recruits for us. It is a low bar on purpose; getting somebody over it is the highest-leverage hour of the week.`,
         "Keep the HQ server tidy; it is the one server we control end to end.",
       ],
       bigger:

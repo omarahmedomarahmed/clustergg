@@ -20,7 +20,7 @@ const eq = (name: string, got: unknown, want: unknown) =>
 const { payoutHold, PAYOUT_HOLD_DAYS, QUALIFY_AFTER_DAYS, QUALIFY_RULE,
   linkedCountsFor, markTierUnlocked, payoutHoldFor, hasBeenPaid, anomalousGrowth } =
   await import("../../lib/abuse.ts");
-const { tierOf } = await import("../../lib/week-close.ts");
+const { rungOf, EARN_FLOOR } = await import("../../lib/ladder.ts");
 const { getDb, schema } = await import("../../lib/db/index.ts");
 const { eq: sqlEq, and: sqlAnd } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
@@ -89,10 +89,18 @@ console.log("\n== the tier reads the qualified count ==");
 //
 // There is no rate any more: owners are paid from the weekly pool. The property
 // still matters and still has to be checked, so it moved to the thing that now
-// decides money — `tierOf`, which sorts servers into who they compete against —
+// decides money — `rungOf`, which sorts servers into who they compete against —
 // and the ASSERTION IS THE SAME ONE: a raw count buys nothing.
-eq("0 qualified is the bottom tier however many linked rows exist", tierOf(0), "small");
-eq("500 qualified moves up", tierOf(500), "mid");
+//
+// M3 sharpened it. The bottom rung used to be 0, so "0 qualified is the bottom
+// tier" was true of a server that had linked nobody AND of one that had linked
+// 499 — the check could not tell them apart. `rungOf` returns null below the
+// floor now, so a raw count buys not just less, but literally nothing.
+eq("0 qualified is off the ladder however many linked rows exist", rungOf(0), null);
+eq(`${EARN_FLOOR - 1} qualified is still off it`, rungOf(EARN_FLOOR - 1), null);
+eq("the floor puts you on the bottom rung", rungOf(EARN_FLOOR), "linked");
+eq("50 qualified moves up", rungOf(50), "growing");
+eq("100 qualified moves up again", rungOf(100), "established");
 ok("…and the rate that used to sit here is gone entirely",
   !("ownerPctFor" in (await import("../../lib/server-earnings.ts"))));
 

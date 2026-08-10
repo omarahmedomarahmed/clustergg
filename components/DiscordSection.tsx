@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EARN_FLOOR } from "@/lib/ladder";
 import Icon from "@/components/Icon";
 import AddBotButton from "@/components/AddBotButton";
 import BotShowcase, { type BotStep } from "@/components/BotShowcase";
@@ -90,7 +91,7 @@ export function DiscordSection({ stats, servers, copy, steps, installUrl }: {
           <Step
             n={3}
             title="You get paid"
-            body="Hit 500 linked members and brands start sponsoring challenges in your server — with the prize money won by your own members."
+            body={`Hit ${EARN_FLOOR} linked members and you are on the ladder — brands sponsor challenges in your server, and every Monday you take a share of what they paid.`}
           />
         </div>
 

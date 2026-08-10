@@ -147,8 +147,8 @@ export async function markMemberLinked(userId: string): Promise<void> {
     // different threshold and a different consequence.
     void (async () => {
       const { linkedCounts, markTierUnlocked } = await import("@/lib/abuse");
-      const { EARN_TIERS } = await import("@/lib/server-earnings");
-      const first = Math.min(...EARN_TIERS.map((t) => t.threshold));
+      const { EARN_FLOOR } = await import("@/lib/ladder");
+      const first = EARN_FLOOR;
       const counts = await linkedCounts(db, pending.map((r) => r.guildId));
       for (const [guildId, c] of counts) {
         if (c.qualified >= first) await markTierUnlocked(db, guildId);

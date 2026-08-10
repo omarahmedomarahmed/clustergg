@@ -3,7 +3,8 @@ import { requireSystemFor } from "@/lib/departments";
 import { getDb, schema } from "@/lib/db";
 import { balances } from "@/lib/vaults";
 import { weekStartOf } from "@/lib/guild-snapshot";
-import { WEEK_CLOSE_ACTOR, weekKey, TIERS } from "@/lib/week-close";
+import { WEEK_CLOSE_ACTOR, weekKey } from "@/lib/week-close";
+import { RUNGS } from "@/lib/ladder";
 import { PARTICIPATION_SHARE, SCORE_WEIGHTS } from "@/lib/server-score";
 import { PAYOUT_HOLD_PHRASE } from "@/lib/abuse";
 import {
@@ -189,11 +190,11 @@ export default async function WeekPage() {
           </Tr>
         </Table>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
-          {TIERS.map((t) => (
+          {RUNGS.map((t) => (
             <div key={t.key} className="rounded-xl border border-white/10 bg-black/25 px-3 py-2">
-              <div className="text-xs font-bold capitalize">{t.key}</div>
+              <div className="text-xs font-bold">{t.name}</div>
               <div className="text-[11px] text-muted">
-                {t.floor === 0 ? "Any size" : `${num(t.floor)}+ qualified members`}
+                {num(t.threshold)}+ linked members · {t.share}% of the pool
               </div>
             </div>
           ))}

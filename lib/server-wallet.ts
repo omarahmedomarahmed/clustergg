@@ -308,14 +308,37 @@ export async function chargeWallet(
 }
 
 /**
- * The smallest withdrawal we will open.
+ * The smallest withdrawal we will open. **The only minimum on this platform.**
  *
- * Not a fee and not a trap: a provider transfer costs roughly a fixed amount
- * whatever it carries, so a $3 withdrawal spends most of itself getting there.
+ * ===== A DISTRIBUTION AND A WITHDRAWAL ARE NOT THE SAME THING =====
+ *
+ * They were treated as the same thing and it cost small servers real money.
+ *
+ *   DISTRIBUTION   the weekly pool divided into server wallets. A number moving
+ *                  between two rows of our own database. No provider, no fee,
+ *                  and therefore NO MINIMUM. If it is $0.50 it is $0.50. M2
+ *                  removed the $25 floor that used to sit on it — and the money
+ *                  under that floor was never held for later, it was printed
+ *                  into a summary string and lost.
+ *
+ *   WITHDRAWAL     money leaving the wallet through Tremendous, to a person.
+ *                  A provider transfer costs roughly a fixed amount whatever it
+ *                  carries, so a $3 withdrawal spends most of itself getting
+ *                  there. This is where a minimum is honest.
+ *
+ * ===== WHY $10 AND NOT $20 =====
+ *
+ * M3 lowered it with the ladder. The bar to start earning is now
+ * `EARN_FLOOR` linked members, so the servers we are inviting are small and
+ * their weekly share is small with it. A $20 gate on a server earning $2 a week
+ * is ten weeks of watching a number climb before anything is real, which is
+ * long enough to stop believing the number.
+ *
  * Below this the money stays in the wallet, where it is still theirs and still
- * spendable on a private challenge.
+ * spendable on a private challenge for their own members — which starts lower
+ * still, at `MIN_PRIZE_POOL`.
  */
-export const MIN_WITHDRAWAL = 20;
+export const MIN_WITHDRAWAL = 10;
 
 /**
  * The owner asking for their balance.

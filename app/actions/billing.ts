@@ -11,6 +11,8 @@ import {
   nextInvoiceNumber, payToken,
 } from "@/lib/invoices";
 import { uid } from "@/lib/utils";
+import { emailBrandAboutInvoice } from "@/lib/billing-email";
+import { settleInvoicePaid } from "@/lib/billing-settle";
 import {
   allocateInvoice as allocatePaidInvoice,
   reverseInvoiceAllocation as reverseAllocation,
@@ -199,44 +201,6 @@ export async function deleteInvoiceLine(lineId: string): Promise<Res> {
 }
 
 
-/**
- * Email a brand about one of its invoices.
- *
- * Reads the brand's contact address and the invoice's own totals rather than
- * being handed them, so the figure in the email is the figure on the invoice by
- * construction — a receipt that quotes a number computed separately from the
- * thing it is a receipt for is a receipt that will eventually disagree with it.
- *
- * Never throws (`sendEmail` cannot), so a mail problem can never stop an
- * invoice being issued or marked paid.
- */
-async function emailBrandAboutInvoice(
-  db: Awaited<ReturnType<typeof getDb>>,
-  invoiceId: string,
-  template: "invoice.issued" | "invoice.due" | "invoice.paid",
-): Promise<void> {
-  try {
-    const { sendEmail } = await import("@/lib/email");
-    const { getInvoice } = await import("@/lib/invoices");
-    const inv = await getInvoice(invoiceId);
-    if (!inv) return;
-    const [brand] = await db.select({ name: schema.brands.name, email: schema.brands.contactEmail })
-      .from(schema.brands).where(eq(schema.brands.id, inv.brandId)).limit(1);
-    if (!brand?.email) return;
-    const day = (d: Date | null | undefined) => (d ? new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—");
-    const total = { amount: Math.round(inv.total * 100) / 100, currency: inv.currency };
-    // The pay page is a token URL, never a payment instrument — see
-    // docs/PAYMENTS.md. Nothing about a card or an account is in this email.
-    const payUrl = `${process.env.NEXT_PUBLIC_SITE_URL || "https://clustergg.com"}/pay/${inv.payToken ?? ""}`;
-    const common = { brand: brand.name, number: inv.number, total };
-    if (template === "invoice.paid") {
-      await sendEmail({ to: brand.email, template, data: { ...common, paidOn: day(inv.paidAt) }, ref: { type: "invoice", id: inv.id } });
-    } else {
-      await sendEmail({ to: brand.email, template, data: { ...common, dueOn: day(inv.dueAt), payUrl }, ref: { type: "invoice", id: inv.id } });
-    }
-  } catch { /* a receipt must never break the thing it is a receipt for */ }
-}
-
 /** Terms, period label, notes — the parts of a bill that are words. */
 export async function updateInvoice(invoiceId: string, formData: FormData): Promise<Res> {
   const admin = await guard();
@@ -342,31 +306,22 @@ export async function markInvoicePaid(invoiceId: string, formData: FormData): Pr
   const db = await getDb();
   const paidVia = String(formData.get("paidVia") ?? "").trim() || null;
   const paidRef = String(formData.get("paidRef") ?? "").trim() || null;
-  const [inv] = await db.select().from(schema.brandInvoices).where(eq(schema.brandInvoices.id, invoiceId)).limit(1);
-  if (!inv) return { error: "That invoice no longer exists." };
-  await db.update(schema.brandInvoices)
-    .set({ status: "paid", paidAt: new Date(), paidVia, paidRef })
-    .where(eq(schema.brandInvoices.id, invoiceId));
+
+  // Everything that follows from money arriving lives in `settleInvoicePaid`,
+  // because the Stripe webhook has to do exactly the same thing and a webhook
+  // cannot call a server action. Two copies of "what happens when a brand
+  // pays" is two copies that drift. M1.
+  const res = await settleInvoicePaid(db, invoiceId, { via: paidVia, ref: paidRef });
+  if (!res.ok) return { error: res.error };
+
   await audit(admin.id, "invoice.paid", invoiceId, { paidVia, paidRef });
-  // C13. The vaults hold money that has ARRIVED, so this is the moment the
-  // four shares are posted — idempotent, because `setInvoiceStatus` can reach
-  // the same state and a webhook may reach it a third time.
-  await allocatePaidInvoice(db, invoiceId);
-  await emailBrandAboutInvoice(db, invoiceId, "invoice.paid");
-  // B91.4. Money landing is the alert everybody actually wants, and it is also
-  // the one that unblocks work: a paid invoice is a campaign that can now be
-  // announced.
-  {
-    const { raiseAlert } = await import("@/lib/staff-alerts");
-    await raiseAlert(db, {
-      kind: "invoice.paid", desk: "money",
-      title: `${inv.number} is paid`,
-      body: "The vaults have been posted. Anything this invoice covers can be announced now.",
-      href: `/admin/billing?invoice=${invoiceId}`, refType: "invoice", refId: invoiceId, once: true,
-    });
-  }
   refresh();
-  return { ok: true, message: `${inv.number} marked paid.` };
+  return {
+    ok: true,
+    message: res.changed
+      ? `${res.number} marked paid.`
+      : `${res.number} was already paid — nothing changed.`,
+  };
 }
 
 export async function setInvoiceStatus(invoiceId: string, status: string): Promise<Res> {

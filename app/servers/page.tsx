@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { networkStats, publicServers } from "@/lib/network";
-import { tierFor } from "@/lib/server-portal";
+import { ladderBadge } from "@/lib/ladder";
 import { installHref } from "@/lib/discord/config";
 import { getContent } from "@/lib/cms";
 import { buildCardBgMap, cardBgCmsKeys, cardBgStyle } from "@/lib/card-bg";
@@ -122,7 +122,7 @@ export default async function ServersDirectoryPage() {
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {servers.map((s) => {
-              const tier = tierFor(s.linked).current;
+              const tier = ladderBadge(s.linked);
               return (
                 <div key={s.guildId} className="glass rounded-2xl p-5 flex flex-col">
                   <div className="flex items-center gap-3">

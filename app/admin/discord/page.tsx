@@ -7,7 +7,7 @@ import { RegisterCommands, GuideTools, JobRunner } from "@/components/DiscordBot
 import { listGuilds } from "@/lib/discord/guilds";
 import { countPendingRequests } from "@/lib/challenge-requests";
 import { hqStatus } from "@/lib/discord/hq";
-import { tierFor } from "@/lib/server-portal";
+import { ladderBadge } from "@/lib/ladder";
 import { AdminHeader, AdminSection, AdminSettings, EmptyState } from "@/components/AdminPage";
 import { JOBS } from "@/lib/jobs";
 import FoundingOffers from "@/components/FoundingOffers";
@@ -179,7 +179,7 @@ export default async function AdminDiscordPage() {
               </thead>
               <tbody>
                 {guilds.map((g) => {
-                  const { current } = tierFor(g.linked);
+                  const current = ladderBadge(g.linked);
                   return (
                     <tr key={g.guildId} className="border-t border-white/5 hover:bg-white/[0.03]">
                       <td className="px-3 py-2.5">

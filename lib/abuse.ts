@@ -5,11 +5,19 @@
 // numbers is $2.50 a day rather than $63 — but **the server-owner side is
 // untouched by the repricing and is where the real money is**.
 //
-// Owners take 5% of sponsored spend at 500 linked members, 10% at 1,000, 25% at
-// 5,000. That is a standing incentive to manufacture linked members, fake
-// Discord accounts are cheap, and a tier is worth a share of brand spend for as
-// long as the server exists. This file is the three defences, in the order they
-// are worth building:
+// Owners used to take 5% of sponsored spend at 500 linked members, 10% at 1,000
+// and 25% at 5,000. That was a standing incentive to manufacture linked members,
+// fake Discord accounts are cheap, and a rate was worth a share of brand spend
+// for as long as the server existed.
+//
+// The rate is gone (C3) and M3 lowered the ladder to 10 / 50 / 100 — which cuts
+// the reward for faking and raises the relative cost of the defences below, but
+// does NOT remove the incentive. A rung is still worth a bigger slice per
+// server, and the bar being lower makes it cheaper to fake, not dearer. What
+// actually holds is that the count is QUALIFIED — linked for a week, holding a
+// game account whose ownership is proven — which is the same defence at any
+// threshold. This file is the three defences, in the order they are worth
+// building:
 //
 //   1. A payout holding period. Money that has left through a payout provider
 //      cannot be clawed back, so a delay is the ONLY reversal mechanism that

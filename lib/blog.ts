@@ -19,7 +19,8 @@
 // live ladder or the live network. That rule exists because a bar chart is the
 // easiest place in a document to state a number nobody checked.
 
-import { EARN_TIERS, platformFeePct } from "@/lib/server-earnings";
+import { platformFeePct } from "@/lib/server-earnings";
+import { RUNGS, EARN_FLOOR } from "@/lib/ladder";
 import { DEFAULT_SPLIT } from "@/lib/vaults";
 import { money, PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing";
 import type { NetworkStats } from "@/lib/network";
@@ -95,7 +96,7 @@ export function blogVars(net: NetworkStats | null, cfg: PricingConfig | null): B
     linked: n(net?.linked),
     games: n(net?.games),
     live: n(net?.challenges),
-    unlock: (EARN_TIERS[1]?.threshold ?? 500).toLocaleString(),
+    unlock: EARN_FLOOR.toLocaleString(),
     // The share of every sale that funds the weekly server pool.
     poolPct: `${DEFAULT_SPLIT.server}%`,
     // C3: `{ownerPct}` used to be a per-server TIER RATE. It is kept only so a
@@ -177,20 +178,18 @@ export function chartData(
     }
     case "ladder": {
       // C3 — the rungs used to be RATES: 5%, 10%, 25% of every challenge. They
-      // are size labels now, and what they gate is which servers you compete
-      // against for the weekly pool. Drawn on the threshold, which is the only
-      // number a rung still carries.
-      const top = EARN_TIERS[EARN_TIERS.length - 1]?.threshold || 1;
+      // are sizes now, and what they gate is which servers you compete against
+      // for the weekly pool. M3 brought the numbers down to 10/50/100 and made
+      // them one list; this reads that list rather than a copy of it.
+      const top = RUNGS[RUNGS.length - 1].threshold || 1;
       return {
-        source: "lib/server-earnings.ts · the same table the owner portal reads",
-        bars: EARN_TIERS.map((t, i) => ({
-          label: t.threshold === 0 ? "From day one" : `${t.threshold.toLocaleString()} linked`,
+        source: "lib/ladder.ts · the one list the portal, the bot and the weekly close all read",
+        bars: RUNGS.map((t, i) => ({
+          label: `${t.threshold.toLocaleString()} linked`,
           value: Math.max((t.threshold / top) * 100, 0.6),
-          display: t.threshold === 0 ? "—" : t.threshold.toLocaleString(),
-          hint: t.threshold === 0
-            ? "Private challenges and a public server page — the pool opens once challenges run here"
-            : "A bigger tier of the weekly server pool, and fewer servers competing for its slots",
-          accent: i >= 3 ? "emerald" : i >= 2 ? "cyan" : "violet",
+          display: t.threshold.toLocaleString(),
+          hint: `${t.name} — ${t.share}% of the weekly pool, contested only by servers this size`,
+          accent: i >= 2 ? "emerald" : i >= 1 ? "cyan" : "violet",
         })),
       };
     }

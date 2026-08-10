@@ -25,7 +25,8 @@
 // are held to — the same reason C3 deleted the tier percentage. When in doubt,
 // say less and say it exactly.
 
-import { BRACKETS, PARTICIPATION_SHARE } from "@/lib/server-score";
+import { PARTICIPATION_SHARE } from "@/lib/server-score";
+import { RUNGS, EARN_FLOOR } from "@/lib/ladder";
 import { UNLOCK_STEPS } from "@/lib/unlock";
 import { MIN_WITHDRAWAL } from "@/lib/server-wallet";
 import { PRIVATE_FEE_PCT, MIN_PRIZE_POOL } from "@/lib/private-quote";
@@ -128,7 +129,7 @@ export const RULES: Record<Audience, Rule[]> = {
     },
     {
       topic: "The pool",
-      rule: `Servers compete inside a size bracket — ${BRACKETS.map((b) => `${b.label} takes ${b.share}%`).join(", ")}.`,
+      rule: `Servers compete inside a rung — ${RUNGS.map((b) => `${b.label} takes ${b.share}%`).join(", ")}.`,
       why: "A bracket is who you are compared against and nothing else. It means four large servers "
         + "can never take the share set aside for small ones.",
     },

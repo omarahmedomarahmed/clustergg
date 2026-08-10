@@ -38,10 +38,11 @@ import { and, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { weekStartOf } from "@/lib/guild-snapshot";
 import {
-  SCORE_WEIGHTS, exclusiveEntrants, percentile, weekPayouts, bracketOf, BRACKETS,
+  SCORE_WEIGHTS, exclusiveEntrants, percentile, weekPayouts,
   PARTICIPATION_SHARE, type Payout,
 } from "@/lib/server-score";
 import { createPayout } from "@/lib/payouts";
+import { EARN_FLOOR } from "@/lib/ladder";
 import type { StandingServer } from "@/lib/week-standing";
 
 /**
@@ -57,15 +58,13 @@ export const WEEK_CLOSE_ACTOR = "system:week-close";
 export const weekKey = (d: Date): string => d.toISOString().slice(0, 10);
 
 /**
- * Size tiers, re-exported.
+ * The ladder, re-exported for the callers that already reach for it here.
  *
- * They live in `lib/week-tiers.ts` since B99: the scoring moved to
- * `lib/week-standing.ts`, this file calls it, and a tier constant owned here
- * would have made that import circular. Re-exported rather than moved outright
- * because five call sites and four suites import them from this module, and
- * churning them would have been a rename pretending to be a refactor.
+ * `lib/week-tiers.ts` used to own a second, disagreeing copy of it — small/mid/
+ * large at 0/500/5,000, against the brackets' 0/500/1,000. Both files are gone
+ * and there is one list, in `lib/ladder.ts`. Prefer importing from there.
  */
-export { TIERS, tierOf, type TierKey } from "@/lib/week-tiers";
+export { RUNGS, rungOf, earning, EARN_FLOOR, type RungKey } from "@/lib/ladder";
 
 // `slotsFor` lived here and is DELETED, not stubbed.
 //
@@ -100,13 +99,11 @@ export type WeekCloseResult = {
   terms: Record<string, number>;
   servers: ScoredServer[];
   payouts: Payout[];
-  /** Held back because it was under the payout floor. Stays in the vault. */
-  carried: number;
   summary: string;
 };
 
 const EMPTY = (week: string, summary: string, skipped = false): WeekCloseResult => ({
-  week, skipped, pool: 0, terms: {}, servers: [], payouts: [], carried: 0, summary,
+  week, skipped, pool: 0, terms: {}, servers: [], payouts: [], summary,
 });
 
 /**
@@ -200,7 +197,7 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
     const standing = await standingFor(db, { weekStart, weekEnd, pool });
     if (standing.reason) return EMPTY(key, `Week of ${key}: ${standing.reason}`);
 
-    const { servers, terms, payouts, carried, skippedForProfile } = standing;
+    const { servers, terms, payouts, skippedForProfile, skippedUnderFloor } = standing;
 
     // ===== Write them, as DRAFTS =====
     //
@@ -217,7 +214,7 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
         periodStart: weekStart,
         periodEnd: weekEnd,
         requestedBy: WEEK_CLOSE_ACTOR,
-        note: `Week of ${key} — ${s?.tier ?? "?"} tier, score ${s?.final ?? 0}/100.`,
+        note: `Week of ${key} — ${s?.rung ?? "?"} rung, score ${s?.final ?? 0}/100.`,
         lines: [{
           kind: "pool",
           label: `Server pool, week of ${key} — ${(s?.exclusiveEntrants ?? 0).toFixed(2)} exclusive entrants, ${s?.newlyQualified ?? 0} newly qualified`,
@@ -234,12 +231,11 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
       terms,
       servers: servers.sort((a, b) => b.final - a.final),
       payouts,
-      carried: Math.round(carried * 100) / 100,
       summary:
         `Week of ${key}: $${pool.toFixed(2)} across ${servers.length} server${servers.length === 1 ? "" : "s"}, `
         + `${opened} payout${opened === 1 ? "" : "s"} opened`
-        + (carried > 0 ? `, $${carried.toFixed(2)} held under the floor` : "")
         + (skippedForProfile > 0 ? `, ${skippedForProfile} skipped for an incomplete server profile` : "")
+        + (skippedUnderFloor > 0 ? `, ${skippedUnderFloor} skipped for fewer than ${EARN_FLOOR} linked members` : "")
         + `. Scored on ${Object.keys(terms).length} of ${Object.keys(SCORE_WEIGHTS).length} terms `
         + `(${Object.keys(terms).join(", ")}) — ${PARTICIPATION_SHARE}% of the pool was paid flat to everyone who took part.`,
     };

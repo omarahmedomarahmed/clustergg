@@ -17,6 +17,8 @@
 
 process.env.DEMO_DB = "1";
 
+import { readFileSync } from "node:fs";
+
 let pass = 0;
 const fails: string[] = [];
 const ok = (name: string, cond: boolean, detail = "") => {
@@ -28,7 +30,8 @@ const eq = (name: string, got: unknown, want: unknown) =>
 const near = (name: string, got: number, want: number, tol = 0.001) =>
   ok(name, Math.abs(got - want) < tol, `got ${got}, want ${want}`);
 
-const { exclusiveEntrants, percentile, scoreWeek, weekPayouts, bracketOf, BRACKETS, SCORE_WEIGHTS } =
+const { RUNGS, rungOf, EARN_FLOOR } = await import("../../lib/ladder.ts");
+const { exclusiveEntrants, percentile, scoreWeek, weekPayouts, SCORE_WEIGHTS } =
   await import("../../lib/server-score.ts");
 const { DEFAULT_SPLIT, SPLIT_PRESETS, splitProblems, allocate, VAULTS, transfer, balances, postToLedger } =
   await import("../../lib/vaults.ts");
@@ -102,51 +105,91 @@ console.log("\n== decay, not a cooldown ==");
   ok("…and so is the slot ladder", !("slotsFor" in score));
 }
 
-console.log("\n== brackets: big servers cannot eat the small pool ==");
+console.log("\n== rungs: big servers cannot eat the small rung's pool ==");
 {
-  eq("the three brackets total 100%", BRACKETS.reduce((a, b) => a + b.share, 0), 100);
-  eq("a 0-member server is small", bracketOf(0), "small");
-  eq("499 is still small", bracketOf(499), "small");
-  eq("500 is mid", bracketOf(500), "mid");
-  eq("1,000 is large", bracketOf(1000), "large");
+  eq("the three rungs total 100%", RUNGS.reduce((a, b) => a + b.share, 0), 100);
+  // M3: the bottom of the ladder is a BAR, not zero. Below it there is no rung
+  // at all, which is what stops a guild with one linked member taking a
+  // percentile position and a flat share off servers that did the work.
+  eq("a server with nobody linked is on no rung", rungOf(0), null);
+  eq(`${EARN_FLOOR - 1} linked is still off the ladder`, rungOf(EARN_FLOOR - 1), null);
+  eq("the floor is the bottom rung", rungOf(EARN_FLOOR), "linked");
+  eq("49 is still the bottom rung", rungOf(49), "linked");
+  eq("50 is the middle rung", rungOf(50), "growing");
+  eq("100 is the top rung", rungOf(100), "established");
 
-  // THE QUESTION THIS ANSWERS: four large servers turn up. Can they take
+  // THE QUESTION THIS ANSWERS: two big servers turn up. Can they take
   // everything? Under fixed per-server percentages they could — 4 × 25% is the
-  // whole pool. Under brackets they take the large bracket's share and no more.
+  // whole pool. Split by rung they take their own rung's share and no more.
   const ranked = [
-    { guildId: "s1", score: 80, bracket: "small" as const },
-    { guildId: "s2", score: 40, bracket: "small" as const },
-    { guildId: "L1", score: 90, bracket: "large" as const },
-    { guildId: "L2", score: 90, bracket: "large" as const },
+    { guildId: "s1", score: 80, rung: "linked" as const },
+    { guildId: "s2", score: 40, rung: "linked" as const },
+    { guildId: "L1", score: 90, rung: "established" as const },
+    { guildId: "L2", score: 90, rung: "established" as const },
   ];
-  const { payouts, carried } = weekPayouts(10_000, ranked, { floor: 0 });
+  const { payouts } = weekPayouts(10_000, ranked);
   const by = Object.fromEntries(payouts.map((p) => [p.guildId, p.amount]));
   const smallTotal = (by.s1 ?? 0) + (by.s2 ?? 0);
   const largeTotal = (by.L1 ?? 0) + (by.L2 ?? 0);
 
-  eq("nothing is carried when the floor is 0", carried, 0);
   ok("every share adds back to the pool",
     Math.abs(smallTotal + largeTotal - 10_000) < 0.05, `${smallTotal + largeTotal}`);
-  // 60 : 15 with the mid bracket empty → 80% / 20%.
-  ok("the small bracket keeps the larger share even against higher scores",
-    smallTotal > largeTotal * 3, `small ${smallTotal.toFixed(2)} vs large ${largeTotal.toFixed(2)}`);
-  ok("…and two identical large servers split their bracket evenly",
+  // 60 : 15 with the middle rung empty → 80% / 20%.
+  ok("the bottom rung keeps the larger share even against higher scores",
+    smallTotal > largeTotal * 3, `bottom ${smallTotal.toFixed(2)} vs top ${largeTotal.toFixed(2)}`);
+  ok("…and two identical top-rung servers split their rung evenly",
     Math.abs((by.L1 ?? 0) - (by.L2 ?? 0)) < 0.05);
-  // Within the small bracket: 80 vs 40 is 2:1 on the competitive half, plus a
-  // flat share each. The higher scorer must be ahead — that is the whole
-  // incentive to climb, which an equal split would have removed.
-  ok("a higher score is paid more inside a bracket", (by.s1 ?? 0) > (by.s2 ?? 0),
+  // Within a rung: 80 vs 40 is 2:1 on the competitive half, plus a flat share
+  // each. The higher scorer must be ahead — that is the incentive to compete,
+  // which an equal split would have removed.
+  ok("a higher score is paid more inside a rung", (by.s1 ?? 0) > (by.s2 ?? 0),
     `${by.s1} vs ${by.s2}`);
 }
 
-console.log("\n== an empty bracket gives its share away ==");
+console.log("\n== climbing pays, and WHY it pays ==");
+{
+  // THE CLAIM THE LADDER MAKES TO AN OWNER: link more members, get a bigger
+  // share. It is true, and it is worth being exact about why, because the
+  // reason is not a rate and cannot be turned into one.
+  //
+  // A rung's share of the pool goes DOWN as you climb — 60 / 25 / 15. What goes
+  // up is the share PER SERVER, because the top rung is divided between far
+  // fewer servers. So the effect depends on the shape of the network, not on a
+  // promise: rung 2 beats rung 1 per server only while rung 1 holds more than
+  // 2.4× as many servers.
+  //
+  // That is the true statement and it is the one the copy makes. A guaranteed
+  // per-server percentage is the thing that cannot add up — twenty servers at
+  // 5% is 100% of a number we collected once, twenty-one is 105%.
+  const field = [
+    ...Array.from({ length: 40 }, (_, i) => ({ guildId: `b${i}`, score: 50, rung: "linked" as const })),
+    ...Array.from({ length: 8 }, (_, i) => ({ guildId: `m${i}`, score: 50, rung: "growing" as const })),
+    ...Array.from({ length: 2 }, (_, i) => ({ guildId: `t${i}`, score: 50, rung: "established" as const })),
+  ];
+  const { payouts } = weekPayouts(10_000, field);
+  const amt = (id: string) => payouts.find((p) => p.guildId === id)?.amount ?? 0;
+
+  near("the whole pool is distributed", payouts.reduce((a, p) => a + p.amount, 0), 10_000, 0.05);
+  ok("rung 2 pays more per server than rung 1", amt("m0") > amt("b0"), `${amt("m0")} vs ${amt("b0")}`);
+  ok("…and rung 3 more than rung 2", amt("t0") > amt("m0"), `${amt("t0")} vs ${amt("m0")}`);
+
+  // And the guard in the other direction: the whole bottom rung together still
+  // out-earns the whole top rung, so a network of small servers is never a
+  // network being farmed by a handful of large ones.
+  const bottom = payouts.filter((p) => p.guildId.startsWith("b")).reduce((a, p) => a + p.amount, 0);
+  const top = payouts.filter((p) => p.guildId.startsWith("t")).reduce((a, p) => a + p.amount, 0);
+  ok("…while the small servers still take the most money in total", bottom > top * 3,
+    `bottom ${bottom.toFixed(2)} vs top ${top.toFixed(2)}`);
+}
+
+console.log("\n== an empty rung gives its share away ==");
 {
   // Money set aside for servers that did not turn up is money nobody can be
   // paid, and holding it back would shrink a pool that was already announced.
-  const only = [{ guildId: "a", score: 10, bracket: "small" as const }];
-  const { payouts } = weekPayouts(1000, only, { floor: 0 });
+  const only = [{ guildId: "a", score: 10, rung: "linked" as const }];
+  const { payouts } = weekPayouts(1000, only);
   const total = payouts.reduce((a, p) => a + p.amount, 0);
-  ok("one small server alone takes the whole pool", Math.abs(total - 1000) < 0.05, String(total));
+  ok("one bottom-rung server alone takes the whole pool", Math.abs(total - 1000) < 0.05, String(total));
 }
 
 console.log("\n== everyone who took part is paid something ==");
@@ -154,47 +197,86 @@ console.log("\n== everyone who took part is paid something ==");
   // No cliff at #21. The old slot ladder paid the top 20% and nothing to the
   // rest, so 20th place got a cheque and 21st got nothing over one entrant.
   const many = Array.from({ length: 30 }, (_, i) => ({
-    guildId: `g${i}`, score: 30 - i, bracket: "small" as const,
+    guildId: `g${i}`, score: 30 - i, rung: "linked" as const,
   }));
-  const { payouts } = weekPayouts(10_000, many, { floor: 0 });
+  const { payouts } = weekPayouts(10_000, many);
   eq("all thirty are paid", payouts.length, 30);
   ok("…and the last one is not zero",
     (payouts.find((p) => p.guildId === "g29")?.amount ?? 0) > 0);
 }
 
-console.log("\n== the floor holds small amounts back rather than sending them ==");
+console.log("\n== a distribution has no floor, and loses nothing. M2 ==");
 {
-  // A $7.88 transfer costs more in provider fees than it delivers.
+  // WHAT THIS REPLACED, AND WHY IT WAS THE WRONG TEST.
+  //
+  // It used to assert `carried` held the money — "the money is carried, not
+  // lost" — and passed. But `carried` was a number printed into a summary
+  // string. It was never credited to a server, never rolled into the next
+  // week's pool, never paid. The test checked that a variable held a figure,
+  // not that anybody received it, so forty small servers could earn $200
+  // between them and receive nothing while this stayed green.
+  //
+  // The property worth testing is CONSERVATION: what goes into the week comes
+  // out in wallets. A distribution is a number moving between two rows in our
+  // own database, so there is no fee to justify a minimum and nothing may be
+  // withheld.
   const many = Array.from({ length: 40 }, (_, i) => ({
-    guildId: `t${i}`, score: 1, bracket: "small" as const,
+    guildId: `t${i}`, score: 1, rung: "linked" as const,
   }));
-  const { payouts, carried } = weekPayouts(200, many, { floor: 25 });
-  eq("nobody is paid under the floor", payouts.length, 0);
-  ok("…and the money is carried, not lost", Math.abs(carried - 200) < 0.5, String(carried));
+  const { payouts } = weekPayouts(200, many);
+
+  eq("forty tiny servers are all paid", payouts.length, 40);
+  const total = payouts.reduce((a, p) => a + p.amount, 0);
+  ok("…and the whole pool reaches them", Math.abs(total - 200) < 0.5, String(total));
+  ok("…even though each share is only a few dollars",
+    payouts.every((p) => p.amount > 0 && p.amount < 25),
+    JSON.stringify(payouts.slice(0, 3)));
+
+  // The extreme case the old floor swallowed whole: a pool small enough that
+  // every share is under a dollar. It still lands.
+  const tiny = weekPayouts(4, many).payouts;
+  eq("a $4 pool across forty servers still pays all forty", tiny.length, 40);
+  ok("…and still adds up", Math.abs(tiny.reduce((a, p) => a + p.amount, 0) - 4) < 0.5);
+
+  // A floor is not an option any more. Passing one must not resurrect it.
+  ok("weekPayouts takes no floor option",
+    !/floor/.test(readFileSync(new URL("../../lib/server-score.ts", import.meta.url), "utf8")
+      .split("export function weekPayouts")[1].split("\n}")[0]),
+    "a floor on a distribution is money nobody can be paid");
 }
 
 console.log("\n== a week's pool leaves nothing stranded ==");
 {
-  // Ten servers, twenty slots — the "Launch" preset against a small network.
-  // Half the pool would have had no destination and no rule.
+  // THREE STALE BLOCKS WERE HERE, AND THEY HAD STOPPED TESTING ANYTHING. M2.
+  //
+  // They called `weekPayouts(pool, ranked, slots, { floor })` — a FOUR-argument
+  // signature from the retired slot ladder. The function has taken three
+  // arguments for a long time, so `slots` was being read as the options object
+  // and `{ floor }` was dropped on the floor entirely. Every assertion about a
+  // floor in them was checking a parameter the function never received, and
+  // `carried` was `undefined`, which `> 0` quietly answers `false` for.
+  //
+  // They were green because nothing they asserted could fail.
+  //
+  // What they were reaching for is worth keeping: a pool must be conserved, and
+  // an empty week must pay nobody. Both, against the real signature.
   const ranked = Array.from({ length: 10 }, (_, i) => ({ guildId: `g${i}`, score: 100 - i }));
-  const slots = Array.from({ length: 20 }, () => ({ share: 5 }));
-  const { payouts, carried } = weekPayouts(1000, ranked, slots, { floor: 0 });
+  const { payouts } = weekPayouts(1000, ranked);
   const total = payouts.reduce((a, p) => a + p.amount, 0);
-  near("every dollar of the pool has a destination", total + carried, 1000, 0.02);
+  near("every dollar of the pool has a destination", total, 1000, 0.02);
+  ok("…and every server got some of it", payouts.length === 10, String(payouts.length));
 }
 {
-  // The floor. A $7.88 transfer costs more in fees than it delivers.
+  // An awkward number, to catch a rounding rule that loses cents. Rounding is
+  // absorbed by the largest share, never dropped.
   const ranked = Array.from({ length: 10 }, (_, i) => ({ guildId: `g${i}`, score: 100 - i }));
-  const { payouts, carried } = weekPayouts(157.5, ranked, [{ share: 100 }], { floor: 25 });
-  ok("nothing is paid below the floor", payouts.every((p) => p.amount >= 25), JSON.stringify(payouts));
-  ok("…and what is held is carried, not lost", carried > 0, String(carried));
-  near("pool is conserved", payouts.reduce((a, p) => a + p.amount, 0) + carried, 157.5, 0.02);
+  const { payouts } = weekPayouts(157.5, ranked);
+  near("an odd pool is still conserved", payouts.reduce((a, p) => a + p.amount, 0), 157.5, 0.02);
+  ok("…with nobody dropped for being small", payouts.length === 10, String(payouts.length));
 }
 {
-  const { payouts, carried } = weekPayouts(1000, [], [{ share: 100 }], { floor: 0 });
+  const { payouts } = weekPayouts(1000, []);
   eq("a week with no participants pays nobody", payouts.length, 0);
-  eq("…and strands nothing", carried, 0);
 }
 
 console.log("\n== the split is a money invariant ==");

@@ -24,7 +24,8 @@ const eq = (name: string, got: unknown, want: unknown) =>
 const { RULES, AUDIENCES, rulesByTopic } = await import("../../lib/rules.ts");
 const { MIN_WITHDRAWAL } = await import("../../lib/server-wallet.ts");
 const { PRIVATE_FEE_PCT, MIN_PRIZE_POOL } = await import("../../lib/private-quote.ts");
-const { PARTICIPATION_SHARE, BRACKETS } = await import("../../lib/server-score.ts");
+const { PARTICIPATION_SHARE } = await import("../../lib/server-score.ts");
+const { RUNGS } = await import("../../lib/ladder.ts");
 const { UNLOCK_STEPS } = await import("../../lib/unlock.ts");
 const { US_REPORT_THRESHOLD } = await import("../../lib/eligibility.ts");
 
@@ -69,8 +70,8 @@ console.log("\n== every number comes from the code that enforces it ==");
     owner.includes(`$${MIN_PRIZE_POOL}`), owner);
   ok("the flat share of the pool is the real one",
     owner.includes(`${PARTICIPATION_SHARE}%`), owner);
-  for (const b of BRACKETS) {
-    ok(`the ${b.key} bracket's share is the real one`, owner.includes(`${b.share}%`), owner);
+  for (const b of RUNGS) {
+    ok(`the ${b.key} rung's share is the real one`, owner.includes(`${b.share}%`), owner);
   }
   ok("the number of setup steps is the real one",
     gamer.includes(String(UNLOCK_STEPS)), gamer);
