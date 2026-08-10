@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "Trophy marketplace · Cluster",
   description:
-    "Spend the Cluster Points you earn playing on real trophies — keep them on your profile or redeem them for cash. Buy one for yourself or gift it to another gamer.",
+    "Spend the Cluster Points you earn playing on real trophies — keep them on your profile or redeem them for cash from 18.",
 };
 
 export default async function MarketplacePage() {
@@ -36,8 +36,8 @@ export default async function MarketplacePage() {
         <h1 className="text-2xl font-black">What your points are for</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted">
           Cluster Points are earned free, just by playing — every quest action pays, whether or not you win
-          the challenge. Here is where they turn into something real: a trophy on your profile that can be
-          redeemed for cash, or a gift to another gamer.
+          the challenge. Here is where they turn into something real: a trophy on your profile, and a
+          trophy is the one thing here that converts into money.
         </p>
         <div className="mt-4 flex flex-wrap gap-3 text-xs">
           <span className="rounded-full border border-white/12 px-3 py-1.5">

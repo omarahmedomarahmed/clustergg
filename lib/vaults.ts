@@ -19,40 +19,14 @@ import { and, eq, gte, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
+import { VAULTS, DEFAULT_SPLIT, SPLIT_PRESETS, platformSharePct, obligationSharePct, type Vault } from "@/lib/vault-split";
 
-/** The four pools money is divided into. Prizes were missing from v2's first draft. */
-export const VAULTS = ["prize", "server", "cp", "cluster"] as const;
-export type Vault = (typeof VAULTS)[number];
-
-/**
- * The default split of a challenge, as PERCENTAGES.
- *
- * Percentages, never fixed dollars, so the price is a dial: move
- * `challengePrice` and every pool moves with it. The old model hard-coded
- * `prizePool: 175` and *derived* the percentage from it, which meant $350 gave
- * 50% by coincidence and $400 would have silently given 44%.
- *
- * The prize half is fixed. The other half splits three ways with ONE of the
- * three holding 20 while the other two hold 15 — see `SPLIT_PRESETS`.
- */
-export const DEFAULT_SPLIT: Record<Vault, number> = {
-  prize: 50,
-  cluster: 20,
-  server: 15,
-  cp: 15,
-};
-
-/**
- * The three positions of the one switch an operator actually touches.
- *
- * Deliberately a switch and not four number inputs: whoever runs this day to
- * day should never have to do arithmetic to keep a money invariant true.
- */
-export const SPLIT_PRESETS: Record<string, Record<Vault, number>> = {
-  default: { prize: 50, cluster: 20, server: 15, cp: 15 },
-  "grow-servers": { prize: 50, cluster: 15, server: 20, cp: 15 },
-  "grow-gamers": { prize: 50, cluster: 15, server: 15, cp: 20 },
-};
+// The split itself moved to `lib/vault-split.ts` in B120 so the pure modules —
+// the rate card, the financial model — can read it without pulling a database
+// client into the browser bundle. Re-exported here because thirty call sites
+// import it from this module and every one of them is right to.
+export { VAULTS, DEFAULT_SPLIT, SPLIT_PRESETS, platformSharePct, obligationSharePct };
+export type { Vault };
 
 /**
  * Does a split add up?

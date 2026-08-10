@@ -39,7 +39,13 @@ export default function EnquiryRow({ row, currency }: { row: Row; currency: stri
   const [open, setOpen] = useState(row.status === "new");
   const [state, action, pending] = useActionState<EnquiryState, FormData>(updateEnquiry, {});
 
-  const tier = row.tier === "reach" ? "Reach" : row.tier === "ultimate" ? "Ultimate" : "Challenge";
+  // What they asked about, in plain words. The `tier` column still holds the
+  // key the quote produced, and older rows hold the names of the three plans on
+  // the retired rate card — rendering those back would put "Ultimate" in front
+  // of a salesperson for a package that no longer exists. B118.
+  const plan = row.games > 0
+    ? `${row.games} ${row.games === 1 ? "game" : "games"}`
+    : row.tier === "ultimate" ? "Every game" : "Placements only";
   const when = new Date(row.createdAt);
 
   return (
@@ -57,7 +63,7 @@ export default function EnquiryRow({ row, currency }: { row: Row; currency: stri
         <span className="text-right shrink-0 hidden sm:block">
           <span className="font-bold text-cyan-300 block">{money(row.quotedMonthly, currency)}/mo</span>
           <span className="text-[11px] text-muted">
-            {tier}{row.games > 0 ? ` · ${row.games} ${row.games === 1 ? "game" : "games"}` : ""}{row.addon ? " · +broadcast" : ""}
+            {plan}{row.addon ? " · +broadcast" : ""}
           </span>
         </span>
         <span className="text-[11px] text-muted shrink-0 hidden md:block">
@@ -77,7 +83,7 @@ export default function EnquiryRow({ row, currency }: { row: Row; currency: stri
               </Detail>
             )}
             <Detail label="Billing">{row.billing === "yearly" ? "Annual" : "Monthly"}</Detail>
-            <Detail label="Plan">{tier}{row.games > 0 ? ` · ${row.games} games` : ""}{row.addon ? " · Sunday broadcast" : ""}</Detail>
+            <Detail label="Plan">{plan}{row.addon ? " · Sunday broadcast" : ""}</Detail>
             <Detail label="Sent">{when.toLocaleString()}</Detail>
           </div>
 

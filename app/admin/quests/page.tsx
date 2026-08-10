@@ -4,6 +4,8 @@ import { getDb, schema } from "@/lib/db";
 import { createQuest } from "@/app/actions/quests-admin";
 import Icon from "@/components/Icon";
 import SubmitButton from "@/components/SubmitButton";
+import MilestonesPanel from "@/components/MilestonesPanel";
+import { currentMilestones } from "@/app/actions/milestones";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin · Quests" };
@@ -13,6 +15,16 @@ const ICONS = ["trophy", "users", "chart", "zap", "rocket", "star", "shield", "f
 export default async function AdminQuestsPage() {
   const db = await getDb();
   const quests = await db.select().from(schema.quests).orderBy(asc(schema.quests.sortOrder));
+  // The streak ladder lives on this desk because a streak is quest progress —
+  // it is counted from the daily CP ceiling, and the rungs are shown in the
+  // same band as the daily mission. B122.
+  const [{ milestones, isDefault }, trophyRows] = await Promise.all([
+    currentMilestones(),
+    db.select({
+      id: schema.trophies.id, name: schema.trophies.name,
+      tier: schema.trophies.tier, value: schema.trophies.value,
+    }).from(schema.trophies).orderBy(asc(schema.trophies.name)),
+  ]);
 
   return (
     <div>
@@ -31,6 +43,10 @@ export default async function AdminQuestsPage() {
           <select name="icon" className="input-cosmic sm:col-span-2">{ICONS.map((i) => <option key={i} value={i}>{i}</option>)}</select>
           <div className="sm:col-span-2"><SubmitButton pendingText="Creating…" className="glow-btn rounded-full px-6 py-2 text-sm font-semibold text-white">Create quest</SubmitButton></div>
         </form>
+      </div>
+
+      <div className="mb-8">
+        <MilestonesPanel initial={milestones} trophies={trophyRows} isDefault={isDefault} />
       </div>
 
       <div className="space-y-3">

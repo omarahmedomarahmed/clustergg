@@ -38,7 +38,7 @@ export default async function QuestsPage() {
           it exists belongs here too. */}
       <a href="/rules/gamer" className="mb-6 flex items-center gap-2 text-xs text-muted hover:text-ink">
         <Icon name="spark" size={13} className="text-violet-300" />
-        Every rule that decides what you earn — and why each one is there
+        How this works, step by step — and every rule that decides what you earn
       </a>
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-cyan-300 mb-2">

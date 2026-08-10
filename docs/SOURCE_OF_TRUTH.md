@@ -81,10 +81,29 @@ after it goes wrong, and eventually every one of them goes wrong. Same for every
 wallet and every total on every screen. See `lib/vaults.ts`,
 `lib/server-wallet.ts`.
 
+**Our share is the Cluster vault, not everything that is not a prize.** Of a
+sponsored challenge, half is prize money, the server pool and the points vault
+take their shares next, and what is left is ours. The other three are
+obligations that leave. `marginPerChallenge()` is the only place that figure is
+computed.
+
 **The prices are in `lib/pricing.ts` and nowhere else.** A document that quotes
 a rate is a rate we are held to by whoever read it, so no document here quotes
 one. Every page, guide, invoice and deck imports the figure from the module that
 enforces it.
+
+### The constraint that sizes the whole business
+
+**A game runs one sponsored challenge at a time.** Two on the same game in the
+same week split the field and make both look empty.
+
+A campaign is four consecutive weekly challenges — one month, on one game. So a
+game serves exactly one paying brand per month, and the network serves as many
+sponsors as it has games. Six games is six sponsors, whatever the demand.
+
+This is the ceiling on revenue and it is not moved by selling harder. It is
+moved by adding games. `lib/finance.ts` computes it as `payingBrandCapacity`
+and caps every projection with it.
 
 ---
 

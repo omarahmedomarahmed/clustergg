@@ -45,7 +45,7 @@ export default async function PlanetsDirectory() {
         )}
       </div>
       <p className="text-muted max-w-xl mb-10">
-        {tr("Each game has its own planet — leaderboards, challenges, players and a community feed, all in one world.")}
+        {tr("Each game has its own planet — its leaderboards, its live challenges and the players who compete on them, all in one world.")}
       </p>
 
       <AdSlot placement="games_top_banner" className="mb-10" />

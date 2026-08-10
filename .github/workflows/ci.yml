@@ -194,11 +194,22 @@ jobs:
     name: ci
     runs-on: ubuntu-latest
     needs: [gate, suite, build]
-    if: always()
+    # `!cancelled()` rather than `always()`.
+    #
+    # `always()` runs this job even when the WORKFLOW was cancelled, and the
+    # assertions below then compare "cancelled" against "success" and go red.
+    # Since the concurrency group started superseding in-flight runs, every
+    # superseded run left a failed `ci` on the pull request — a required check
+    # reporting failure for work that was simply replaced by a newer push.
+    #
+    # `!cancelled()` skips it in exactly that case and nowhere else: a genuine
+    # failure in gate, suite or build is not a cancellation, so this still runs
+    # and still asserts. The newer run reports the real status for the SHA.
+    if: ${{ !cancelled() }}
     steps:
-      # `needs` alone does not fail this job when a dependency fails while
-      # `if: always()` is set — it would be skipped, and a skipped required
-      # check reads as passing on some settings. So the result is asserted.
+      # `needs` alone does not fail this job when a dependency fails — it would
+      # be skipped, and a skipped required check reads as passing on some
+      # settings. So the result is asserted.
       - name: Every check passed
         run: |
           echo "gate=${{ needs.gate.result }} suite=${{ needs.suite.result }} build=${{ needs.build.result }}"

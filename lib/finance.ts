@@ -1,4 +1,5 @@
-import { PRICING_DEFAULTS, prizeSharePct, money, type PricingConfig } from "@/lib/pricing";
+import { PRICING_DEFAULTS, prizeSharePct, marginPerChallenge, perGame, money, type PricingConfig } from "@/lib/pricing";
+import { DEFAULT_SPLIT } from "@/lib/vault-split";
 
 // The plan for the money, as arithmetic instead of a slide.
 //
@@ -41,7 +42,15 @@ export type FinanceConfig = {
   freeChallengesPerBrand: number;
   /** How many of those stay, and pay. */
   brandsConverting: number;
-  /** What a paying brand pays a month: base + one game of challenges. */
+  /**
+   * What a paying brand pays a month.
+   *
+   * DEFAULTED FROM THE RATE CARD, not typed. It sat at $1,500 while one game
+   * of challenges invoiced at $1,400 — a model projecting revenue the product
+   * cannot bill, which is the same defect as a marketing page quoting a price
+   * we do not charge. Still editable, because a plan may assume brands buy
+   * more than one game; it just may not silently assume a different rate.
+   */
   revenuePerBrand: number;
 
   // ===== Server acquisition =====
@@ -55,8 +64,19 @@ export type FinanceConfig = {
   linkedPerServer: number;
 
   // ===== The network we run =====
-  /** Games we operate challenges on. */
+  /**
+   * Games we operate challenges on. ALSO THE CAPACITY CONSTRAINT — see
+   * `payingBrandCapacity` below.
+   */
   games: number;
+  /**
+   * How many games a paying brand buys at once.
+   *
+   * One by default: a campaign is four consecutive weekly challenges on ONE
+   * game. It matters here because a game runs a single sponsored challenge at a
+   * time, so this is the divisor on how many brands can be served at all.
+   */
+  gamesPerPayingBrand: number;
   /** Challenges per game per month. One a week. */
   challengesPerGamePerMonth: number;
   // A switch called `sponsorsUseHouseInventory` was here. C8.
@@ -81,27 +101,80 @@ export type FinanceConfig = {
   hireMonthlyCost: number;
 };
 
+// ===== THE ROUND, REPRICED. B120 =====
+//
+// It was $100,000 for 20%, over six months. Three things were wrong with that,
+// and the first two only became visible once `marginPerChallenge` was corrected.
+//
+//  1. IT PRICED THE COMPANY AT 1.2× THE ARR ITS OWN PLAN PROJECTS. A $500,000
+//     post-money against $420,000 of projected ARR is not a seed price, it is a
+//     discount to revenue that has not been earned yet — which is the wrong way
+//     round.
+//
+//  2. IT SOLD 20% FOR MONEY THE PLAN DOES NOT SPEND. At the modelled burn, only
+//     about two thirds of the $100,000 was allocated; the rest sat as buffer.
+//     Dilution is the most expensive thing a founder pays with, and paying it
+//     for cash that stays in the account is the one form of waste that cannot
+//     be undone later.
+//
+//  3. THE BASE CASE ASSUMED 25 OF 30 BRANDS CONVERT. 83% free-to-paid is a
+//     number an investor discounts to nothing, and discounting the base case
+//     discounts everything built on it. The base case is now 50% — the "Strong"
+//     rung of our own stress test — and 83% is upside rather than the plan.
+//
+// $150,000 for 12% instead: $1.25M post, $1.1M pre, nine months. That is about
+// 3.4× projected ARR on a base case that survives every rung of the stress test
+// down to one brand in six, against a five-month payback and roughly 4× LTV to
+// CAC. The extra $50,000 is spent, not banked — 45 brands through the funnel
+// instead of 30, 2,000 servers instead of 1,000, and a team line that is
+// actually funded. `levers()` shows which of those moves ARR and which does
+// not.
 export const FINANCE_DEFAULTS: FinanceConfig = {
-  raise: 100_000,
-  equityPct: 20,
-  months: 6,
+  raise: 150_000,
+  equityPct: 12,
+  months: 9,
 
-  targetBrands: 30,
+  // The plan SPENDS the raise. Scaling the money without scaling the funnel
+  // would have left $79,000 of $150,000 unallocated — a worse version of the
+  // second problem above, since dilution paid for cash that sits in the account
+  // is the one cost that cannot be recovered later. The buffer is now about
+  // $5,000: enough to absorb a bad month, not enough to be a rounding error
+  // somebody raised 12% of the company for.
+  // Sized to FILL the game slots at a 50% conversion rate, not to a brand
+  // count picked independently of them. 36 through the funnel, 18 stay, 18
+  // slots. Onboarding more than the network can serve is spending cash on
+  // brands we would have to turn away.
+  targetBrands: 36,
   freeChallengesPerBrand: 4,
-  brandsConverting: 25,
-  revenuePerBrand: 1_500,
+  brandsConverting: 18,
+  revenuePerBrand: perGame(PRICING_DEFAULTS),
 
-  targetServers: 1_000,
+  targetServers: 2_000,
   welcomeChallengeCost: 25,
   membersPerServer: 1_000,
   linkedPerServer: 10,
 
-  games: 6,
+  // EIGHTEEN, and this is what the round is actually for.
+  //
+  // A game runs one sponsored challenge at a time, so a game is one paying
+  // brand's slot. At the six games we run today the network can serve six
+  // sponsors — about $100,000 of ARR — against a cost base of roughly $7,000 a
+  // month. It does not reach breakeven at any conversion rate, because
+  // conversion was never the binding constraint. Inventory was.
+  //
+  // Twelve new game integrations over nine months takes capacity to eighteen
+  // and the plan to breakeven in month seven. `levers()` now shows the same
+  // thing from the other side: with capacity fixed, brand acquisition and
+  // conversion both move ARR by exactly zero.
+  games: 18,
+  gamesPerPayingBrand: 1,
   challengesPerGamePerMonth: 4,
 
-  techBudget: 10_000,
+  techBudget: 20_000,
   hires: 4,
-  hireMonthlyCost: 416,
+  // Nine months at a rate that is still part-time, but not the $416 that was
+  // here — a figure low enough that the team line was not really being funded.
+  hireMonthlyCost: 1_200,
 };
 
 export const FINANCE_NUMBER_KEYS = (Object.keys(FINANCE_DEFAULTS) as (keyof FinanceConfig)[])
@@ -158,6 +231,27 @@ export type Finance = {
   /** How long the raise lasts at that rate, in months. */
   runwayMonths: number;
 
+  /**
+   * How many brands the network can serve at once. B120.
+   *
+   * ===== THE CONSTRAINT THE PLAN WAS IGNORING =====
+   *
+   * A game runs ONE sponsored challenge at a time — two on the same game in the
+   * same week split the field and make both look empty. A campaign is four
+   * consecutive weekly challenges, which is one month on one game. So a game
+   * serves exactly one paying brand per month, and the whole network serves
+   * `games ÷ gamesPerPayingBrand` of them.
+   *
+   * At six games that is SIX. The plan projected twenty-two, and every figure
+   * built on it — MRR, ARR, the valuation multiple, breakeven — was a
+   * projection of revenue the network had no inventory to deliver.
+   *
+   * `payingBrands` below is now the smaller of what converts and what fits.
+   */
+  payingBrandCapacity: number;
+  /** True when conversion is no longer the binding constraint — inventory is. */
+  capacityBound: boolean;
+
   // The network we run, and what it costs to run it
   challengesPerMonth: number;
   challengesTotal: number;
@@ -203,8 +297,61 @@ export type Finance = {
     nextRound: { multiple: number; valuation: number; stepUp: number }[];
   };
 
+  /**
+   * The four numbers an investor actually underwrites. B120.
+   *
+   * Everything above answers "what does the plan cost". None of it answered
+   * "does a customer pay for itself, and how fast" — which is the question that
+   * decides whether spending more is growth or a hole.
+   */
+  unit: UnitEconomics;
+
+  /** What moves the outcome most, measured rather than asserted. B120. */
+  levers: Lever[];
+
   /** Month-by-month, so the shape of the plan is visible rather than asserted. */
   months: FinanceMonth[];
+};
+
+export type UnitEconomics = {
+  /** What it costs to land one PAYING brand — including the ones that did not stay. */
+  cacBrand: number;
+  /** What it costs to land one server. */
+  cacServer: number;
+  /** Our share of what a brand pays, per month. */
+  contributionPerBrand: number;
+  /** Our share as a percentage of what they pay. */
+  grossMarginPct: number;
+  /** Months of contribution to repay the cost of acquiring that brand. */
+  paybackMonths: number;
+  /**
+   * Lifetime value at an assumed retention, and the assumption stated with it.
+   *
+   * A single LTV number with the churn hidden inside it is the figure most
+   * often wrong on a seed deck, so both halves are returned.
+   */
+  assumedMonthlyChurnPct: number;
+  lifetimeMonths: number;
+  ltv: number;
+  /** LTV ÷ CAC. Under 1 means every sale loses money. */
+  ltvToCac: number;
+  /** What one linked gamer costs to acquire. */
+  costPerLinkedGamer: number;
+};
+
+export type Lever = {
+  key: string;
+  label: string;
+  /** What is being changed, in words. */
+  change: string;
+  /** Month-six ARR if this lever moves and nothing else does. */
+  arr: number;
+  /** Against the base case. */
+  deltaArr: number;
+  /** Does the raise still survive the period? */
+  survives: boolean;
+  /** Why this one is worth pulling, or why it is not. */
+  note: string;
 };
 
 export type FinanceMonth = {
@@ -248,7 +395,18 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
   // pays IS the prize pool. So the house funds the prizes on challenges nobody
   // bought, and only those. Charging the house for all of them while also taking
   // 50% of every sale for prizes funded the same money twice.
-  const soldPerMonth = Math.min(challengesPerMonth, cfg.brandsConverting * cfg.freeChallengesPerBrand);
+  // Sold is bounded by INVENTORY, not by how many brands said yes. Using
+  // `brandsConverting` here let 22 brands "buy" 88 challenges out of a network
+  // that runs 24, which zeroed the house prize line — the plan looked cheaper
+  // precisely where it was least deliverable.
+  const sellableSlots = Math.max(0, Math.floor(cfg.games / Math.max(1, cfg.gamesPerPayingBrand)))
+    * cfg.gamesPerPayingBrand * cfg.challengesPerGamePerMonth;
+  const soldPerMonth = Math.min(
+    challengesPerMonth,
+    sellableSlots,
+    Math.min(cfg.brandsConverting, Math.floor(cfg.games / Math.max(1, cfg.gamesPerPayingBrand)))
+      * cfg.gamesPerPayingBrand * cfg.challengesPerGamePerMonth,
+  );
   const housePrizeChallengesPerMonth = Math.max(0, challengesPerMonth - soldPerMonth);
   const prizeCostPerMonth = housePrizeChallengesPerMonth * prize;
   const prizeCostTotal = prizeCostPerMonth * cfg.months;
@@ -312,9 +470,19 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
   const monthlyBurn = cashTotal / cfg.months;
 
   // ===== Where we land =====
+  //
+  // CAPACITY FIRST. A game runs one sponsored challenge at a time and a
+  // campaign is a month on one game, so the network serves `games ÷
+  // gamesPerPayingBrand` paying brands at once — six, at six games. Everything
+  // downstream reads `payingBrands`, never `brandsConverting`, because the plan
+  // projected twenty-two against inventory for six.
+  const payingBrandCapacity = Math.max(0, Math.floor(cfg.games / Math.max(1, cfg.gamesPerPayingBrand)));
+  const payingBrands = Math.min(cfg.brandsConverting, payingBrandCapacity);
+  const capacityBound = cfg.brandsConverting > payingBrandCapacity;
+
   const reachable = cfg.targetServers * cfg.membersPerServer;
   const linkedGamers = cfg.targetServers * cfg.linkedPerServer;
-  const mrr = cfg.brandsConverting * cfg.revenuePerBrand;
+  const mrr = payingBrands * cfg.revenuePerBrand;
 
   // A steady month once acquisition stops: we still run the network and still
   // pay people. Server onboarding and the free months are one-off by design.
@@ -327,8 +495,20 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
   // The old model set this to zero on the "the challenge runs either way"
   // argument, which flattered breakeven by exactly the prize line — the same
   // money the prizes row above was already spending.
-  const perBrandPrizeCost = cfg.freeChallengesPerBrand * prize;
-  const contributionPerBrand = Math.max(1, cfg.revenuePerBrand - perBrandPrizeCost);
+  // B120. This subtracted only the PRIZE from a brand's payment and called the
+  // rest contribution. A sale divides four ways: the prize pool, the server
+  // pool at 15%, the points vault at 15%, and us. The server pool is paid out
+  // every Monday and the points vault funds every point a gamer earns — both
+  // leave the bank on a sale exactly as the prize does.
+  //
+  // Counting them as margin overstated contribution per brand by 30% of
+  // revenue and pulled breakeven in by the same distance. `marginPerChallenge`
+  // is now our real share, and this reads it rather than repeating the
+  // subtraction that was wrong there too.
+  const ourSharePct = pricing.challengePrice > 0
+    ? marginPerChallenge(pricing) / pricing.challengePrice
+    : 0;
+  const contributionPerBrand = Math.max(1, cfg.revenuePerBrand * ourSharePct);
   const brandsNeeded = Math.ceil(steadyMonthlyCost / contributionPerBrand);
   const conversionNeededPct = cfg.targetBrands > 0 ? (brandsNeeded / cfg.targetBrands) * 100 : 0;
 
@@ -347,7 +527,10 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
     const brandsOnboardedByNow = Math.round(brandsPerMonth * m);
     const brandsOnboardedLastMonth = Math.round(brandsPerMonth * (m - 1));
     const convRate = cfg.targetBrands > 0 ? cfg.brandsConverting / cfg.targetBrands : 0;
-    const payingBrands = Math.round(brandsOnboardedLastMonth * convRate);
+    const payingBrands = Math.min(
+      Math.round(brandsOnboardedLastMonth * convRate),
+      payingBrandCapacity,
+    );
     const monthMrr = payingBrands * cfg.revenuePerBrand;
 
     const spend = prizeCostPerMonth
@@ -385,9 +568,52 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
     stepUp: post > 0 ? (arr * multiple) / post : 0,
   }));
 
+  // ===== Unit economics =====
+  //
+  // CAC is measured against the brands that STAYED, not the ones we onboarded.
+  // Dividing acquisition spend by everybody who took a free month is the
+  // flattering version and it is the one that hides a conversion problem: at
+  // 25 of 30 converting it understates CAC by a sixth, and at 5 of 30 it
+  // understates it fivefold.
+  const brandAcquisitionCash = brandOfferCash;
+  const cacBrand = payingBrands > 0
+    ? brandAcquisitionCash / payingBrands
+    : brandAcquisitionCash;
+  const cacServer = cfg.targetServers > 0 ? serverCash / cfg.targetServers : 0;
+  const grossMarginPct = cfg.revenuePerBrand > 0
+    ? (contributionPerBrand / cfg.revenuePerBrand) * 100
+    : 0;
+  const paybackMonths = contributionPerBrand > 0 ? cacBrand / contributionPerBrand : Infinity;
+
+  // Churn is an ASSUMPTION with no evidence behind it yet, so it is returned
+  // beside the LTV it produces rather than folded into it. 5% monthly is a
+  // twenty-month life — deliberately conservative for a product a brand can
+  // stop buying at the end of any month.
+  const assumedMonthlyChurnPct = 5;
+  const lifetimeMonths = 100 / assumedMonthlyChurnPct;
+  const ltv = contributionPerBrand * lifetimeMonths;
+  const costPerLinkedGamer = linkedGamers > 0 ? serverCash / linkedGamers : 0;
+
+  const unit: UnitEconomics = {
+    cacBrand: round(cacBrand),
+    cacServer: round(cacServer),
+    contributionPerBrand: round(contributionPerBrand),
+    grossMarginPct: round(grossMarginPct),
+    paybackMonths: Number.isFinite(paybackMonths) ? round(paybackMonths) : 0,
+    assumedMonthlyChurnPct,
+    lifetimeMonths,
+    ltv: round(ltv),
+    ltvToCac: cacBrand > 0 ? round(ltv / cacBrand) : 0,
+    costPerLinkedGamer: round(costPerLinkedGamer),
+  };
+
   return {
     cfg,
     lines,
+    unit,
+    levers: [],
+    payingBrandCapacity,
+    capacityBound,
     cashTotal: round(cashTotal),
     foregoneTotal: round(foregoneTotal),
     investedTotal: round(cashTotal + foregoneTotal),
@@ -401,12 +627,12 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
       servers: cfg.targetServers,
       reachable,
       linkedGamers,
-      payingBrands: cfg.brandsConverting,
+      payingBrands,
       mrr: round(mrr),
       arr: round(arr),
       steadyMonthlyCost: round(steadyMonthlyCost),
       monthlyProfit: round(mrr - steadyMonthlyCost),
-      conversionPct: cfg.targetBrands > 0 ? round((cfg.brandsConverting / cfg.targetBrands) * 100) : 0,
+      conversionPct: cfg.targetBrands > 0 ? round((payingBrands / cfg.targetBrands) * 100) : 0,
     },
     breakeven: {
       monthlyCost: round(steadyMonthlyCost),
@@ -423,6 +649,91 @@ export function finance(cfg: FinanceConfig = FINANCE_DEFAULTS, pricing: PricingC
     },
     months,
   };
+}
+
+/**
+ * What actually moves the outcome. B120.
+ *
+ * ===== WHY THESE ARE MEASURED AND NOT LISTED =====
+ *
+ * "Growth levers" on a seed deck are usually a bullet list of things somebody
+ * would like to be true. The only useful version answers a different question:
+ * if exactly one assumption moves and nothing else does, what happens to ARR at
+ * month six, and does the raise still survive?
+ *
+ * So each lever RE-RUNS the whole model with one number changed. That makes
+ * them comparable — and it makes the honest answer visible when a lever people
+ * are fond of turns out to move almost nothing.
+ */
+export function levers(
+  cfg: FinanceConfig = FINANCE_DEFAULTS,
+  pricing: PricingConfig = PRICING_DEFAULTS,
+): Lever[] {
+  const base = finance(cfg, pricing);
+  const at = (over: Partial<FinanceConfig>, overPricing: Partial<PricingConfig> = {}) =>
+    finance({ ...cfg, ...over }, { ...pricing, ...overPricing });
+
+  const mk = (
+    key: string, label: string, change: string, f: Finance, note: string,
+  ): Lever => ({
+    key, label, change,
+    arr: f.exit.arr,
+    deltaArr: round(f.exit.arr - base.exit.arr),
+    survives: f.months[f.months.length - 1]?.cashLeft >= 0,
+    note,
+  });
+
+  return [
+    mk("conversion", "Free-to-paid conversion",
+      `${cfg.brandsConverting} of ${cfg.targetBrands} → ${Math.round(cfg.targetBrands * 0.9)} of ${cfg.targetBrands}`,
+      at({ brandsConverting: Math.round(cfg.targetBrands * 0.9) }),
+      "The assumption the whole projection turns on, and the one with no evidence behind it yet. It is first because it costs nothing to move — the spend is already committed the moment a brand takes its free month."),
+
+    // The price has to move `revenuePerBrand` WITH it. The first version of
+    // this lever changed only `challengePrice` and reported a delta of exactly
+    // zero — because what a brand pays is an editable override, so raising the
+    // rate card without raising the invoice changed nothing but the cost side.
+    // A lever that silently measures nothing is worse than one that is absent.
+    mk("price", "The rate card",
+      `${money(pricing.challengePrice, pricing.currency)} → ${money(Math.round(pricing.challengePrice * 1.2), pricing.currency)} a challenge`,
+      at(
+        { revenuePerBrand: round(cfg.revenuePerBrand * 1.2) },
+        { challengePrice: Math.round(pricing.challengePrice * 1.2) },
+      ),
+      "Every dollar of a price rise is margin at the same percentage, and the prize pool rises with it because the split is a percentage — so the offer gets BETTER as the price goes up, which is the unusual property of this model."),
+
+    // Games and brands have to move TOGETHER, and the plan is sized so that
+    // they are already balanced — eighteen slots, eighteen sponsors. Moving
+    // either one alone therefore reports zero, which is the finding rather than
+    // a broken lever: capacity without demand runs unsold challenges the house
+    // pays prizes on, and demand without capacity is brands we turn away.
+    mk("games", "Game coverage, with the sponsors to fill it",
+      `${cfg.games} → ${cfg.games + 6} games, ${cfg.targetBrands} → ${cfg.targetBrands + 12} brands`,
+      at({
+        games: cfg.games + 6,
+        targetBrands: cfg.targetBrands + 12,
+        brandsConverting: cfg.brandsConverting + 6,
+      }),
+      "The main line of the raise. A game runs one sponsored challenge at a time, so a game IS a sponsor's slot — six more games is six more brands the network can serve at all."),
+
+    mk("capacity-only", "More games, no more brands",
+      `${cfg.games} → ${cfg.games + 6} games alone`,
+      at({ games: cfg.games + 6 }),
+      "Zero, and worth showing. An unsold challenge still pays out a prize pool every week, so opening a game ahead of demand is a cost with no revenue behind it. This is the mistake the plan is built to avoid."),
+
+    mk("brands", "Brands through the funnel",
+      `${cfg.targetBrands} → ${Math.round(cfg.targetBrands * 1.5)}`,
+      at({
+        targetBrands: Math.round(cfg.targetBrands * 1.5),
+        brandsConverting: Math.round(cfg.brandsConverting * 1.5),
+      }),
+      "Straightforward and the most expensive of the four: each one takes a free month, and a free month is real cash because nothing funds its prize pool."),
+
+    mk("basket", "Games per paying brand",
+      `1 → 2 games each`,
+      at({ revenuePerBrand: cfg.revenuePerBrand * 2 }),
+      "The cheapest revenue on the list — no new brand to find and no new free month to fund. It is why the rate card is per game rather than a single package price."),
+  ];
 }
 
 export type Scenario = {
@@ -493,35 +804,67 @@ export function stress(
 export function liveUnitRows(pricing: PricingConfig = PRICING_DEFAULTS) {
   const u = challengeUnit(pricing);
   const perMonth = pricing.challengesPerGame;
+  // B120. `cost` was the PRIZE alone, under a note reading "the only cost of
+  // goods". There are three obligations on a sale, not one: the prize pool, the
+  // weekly server pool and the points vault. Counting only the first left the
+  // server pool and the points vault inside the margin on every row of the
+  // slide an investor reads to check our unit economics.
+  const cost = u.prize + u.pools;
   return [
     {
       label: "One weekly challenge",
       revenue: u.price,
-      cost: u.prize,
-      note: `${money(u.prize, pricing.currency)} is the prize, paid as three trophies carrying the sponsor's brand. The only cost of goods.`,
+      cost,
+      note: `${money(u.prize, pricing.currency)} is the prize, paid as trophies carrying the sponsor's brand; ${money(u.pools, pricing.currency)} is the weekly server pool and the points vault. All three are owed to somebody else — ${money(u.ours, pricing.currency)} is ours.`,
     },
     {
       label: "One game, one month",
       revenue: u.price * perMonth,
-      cost: u.prize * perMonth,
-      note: `${perMonth} challenges. The prize cost is fixed per month — a second sponsor does not double it.`,
+      cost: cost * perMonth,
+      note: `${perMonth} challenges — one month, one sponsor. A game runs a single sponsored challenge at a time, so this row IS the per-game ceiling.`,
     },
     {
       label: `${pricing.games} games, one month`,
       revenue: u.price * perMonth * pricing.games,
-      cost: u.prize * perMonth * pricing.games,
-      note: "The full catalogue as sold today, before placement revenue.",
+      cost: cost * perMonth * pricing.games,
+      note: `The full catalogue as sold today. ${pricing.games} games is ${pricing.games} sponsors at once — the ceiling on revenue moves by adding games, not by selling harder.`,
     },
   ];
 }
 
+/**
+ * One challenge, divided FOUR ways. B120.
+ *
+ * ===== `fee` WAS PRICE MINUS PRIZE, AND THE DECK CALLED IT OURS =====
+ *
+ * It returned `challengePrice − prizePool` as `fee`, and the investor model
+ * printed it under the sentence "the platform fee is the only line the business
+ * lives on". It is not. Of a $350 challenge, $52.50 goes to the server pool and
+ * $52.50 to the points vault — both paid out — and $70 is ours.
+ *
+ * That is the third place this same subtraction was wrong, after
+ * `marginPerChallenge` and the contribution line in the model. All three had
+ * the same cause: the split lived in a module the pure code could not import.
+ *
+ * `fee` is kept, honestly labelled: it is everything that is not prize money,
+ * which is a real figure and the one the ownerless-cost argument rests on. What
+ * the deck must print beside "the business lives on" is `ours`.
+ */
 export function challengeUnit(pricing: PricingConfig = PRICING_DEFAULTS) {
-  const fee = pricing.challengePrice - pricing.prizePool;
+  const price = pricing.challengePrice;
+  const ours = marginPerChallenge(pricing);
   return {
-    price: pricing.challengePrice,
+    price,
     prize: pricing.prizePool,
     prizePct: prizeSharePct(pricing),
-    fee,
+    /** Everything that is not the prize pool. NOT our margin. */
+    fee: round(price - pricing.prizePool),
     feePct: 100 - prizeSharePct(pricing),
+    /** The server pool and the points vault: owed to somebody, not income. */
+    poolsPct: DEFAULT_SPLIT.server + DEFAULT_SPLIT.cp,
+    pools: round(price * ((DEFAULT_SPLIT.server + DEFAULT_SPLIT.cp) / 100)),
+    /** OURS. The line the business actually lives on. */
+    ours,
+    oursPct: price > 0 ? round((ours / price) * 100) : 0,
   };
 }

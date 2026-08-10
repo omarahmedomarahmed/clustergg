@@ -75,7 +75,9 @@ export default function FinanceModel({ initial, pricing, accent = "#8b5cf6" }: {
         <Field
           label="Of those, how many stay" value={cfg.brandsConverting} min={0} max={cfg.targetBrands} step={1}
           fmt={(v) => `${v} · ${pct(cfg.targetBrands ? (v / cfg.targetBrands) * 100 : 0)}`}
-          hint="The single assumption this whole projection turns on, and the one with no evidence behind it yet. 20–40% is normal for a B2B free trial."
+          hint={f.capacityBound
+            ? `Capped at ${f.payingBrandCapacity} by the games slider below — a game runs one sponsored challenge at a time, so a game is a sponsor's slot. Raising this does nothing until games rise.`
+            : "20–40% is normal for a B2B free trial. It stops mattering above the number of game slots, because the network cannot serve more sponsors than it has games."}
           onChange={(v) => set("brandsConverting", v)}
         />
         <Field label="What a paying brand pays a month" value={cfg.revenuePerBrand} min={250} max={5_000} step={50}
@@ -92,8 +94,13 @@ export default function FinanceModel({ initial, pricing, accent = "#8b5cf6" }: {
           fmt={(v) => String(v)} onChange={(v) => set("linkedPerServer", v)} />
 
         <Divider label="What we run" />
-        <Field label="Games" value={cfg.games} min={1} max={24} step={1}
+        {/* THE CAPACITY DIAL. B120. Every brand number above is capped by this
+            one, so it is labelled as the ceiling rather than as inventory. */}
+        <Field label="Games — the capacity ceiling" value={cfg.games} min={1} max={40} step={1}
+          hint={`${f.payingBrandCapacity} sponsors can be served at once. A game runs a single sponsored challenge at a time, so games ÷ games-per-brand is the hard limit on revenue.`}
           fmt={(v) => String(v)} onChange={(v) => set("games", v)} />
+        <Field label="Games a paying brand buys at once" value={cfg.gamesPerPayingBrand} min={1} max={6} step={1}
+          fmt={(v) => String(v)} onChange={(v) => set("gamesPerPayingBrand", v)} />
         <Field label="Challenges per game per month" value={cfg.challengesPerGamePerMonth} min={1} max={12} step={1}
           fmt={(v) => String(v)} onChange={(v) => set("challengesPerGamePerMonth", v)} />
 
@@ -124,9 +131,28 @@ export default function FinanceModel({ initial, pricing, accent = "#8b5cf6" }: {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <Stat label="Cash out" value={$(f.cashTotal)} note={`over ${cfg.months} months`} accent={accent} />
           <Stat label="Buffer left" value={$(f.buffer)} note={f.buffer >= 0 ? "unallocated" : "short — cut a line"} accent={f.buffer >= 0 ? accent : "#f43f5e"} />
-          <Stat label="Breakeven" value={`${f.breakeven.brandsNeeded} brands`} note={`${pct(f.breakeven.conversionNeededPct)} of the free month`} accent="#22d3ee" />
-          <Stat label={`ARR at month ${cfg.months}`} value={$(f.exit.arr)} note={`${f.exit.payingBrands} paying brands`} accent="#34d399" />
+          <Stat label="Breakeven" value={`${f.breakeven.brandsNeeded} brands`} note={f.breakeven.brandsNeeded > f.payingBrandCapacity ? `more than the ${f.payingBrandCapacity} slots we have` : `${pct(f.breakeven.conversionNeededPct)} of the free month`} accent={f.breakeven.brandsNeeded > f.payingBrandCapacity ? "#f43f5e" : "#22d3ee"} />
+          <Stat label={`ARR at month ${cfg.months}`} value={$(f.exit.arr)} note={`${f.exit.payingBrands} of ${f.payingBrandCapacity} slots filled`} accent="#34d399" />
         </div>
+
+        {/* THE CONSTRAINT, said out loud. B120.
+            The plan projected 22 paying brands against six games. Every figure
+            downstream was revenue the network had no inventory to deliver, and
+            nothing on the page said so — the model simply multiplied brands by
+            price. If the funnel is bigger than the slots now, it says it here,
+            before any of the numbers below are read. */}
+        {f.capacityBound && (
+          <p className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/[0.08] p-3 text-[11px] leading-relaxed text-muted">
+            <span className="mt-0.5 shrink-0 font-bold text-amber-300">!</span>
+            <span>
+              <b className="text-ink">Inventory is the binding constraint, not conversion.</b> A game runs one
+              sponsored challenge at a time, so {cfg.games} games can serve {f.payingBrandCapacity} sponsors.
+              The funnel above converts {cfg.brandsConverting}. The extra{" "}
+              {cfg.brandsConverting - f.payingBrandCapacity} are brands we would have to turn away — they are
+              excluded from every figure below, and the cash to acquire them is not.
+            </span>
+          </p>
+        )}
 
         <div className="flex flex-wrap gap-1.5">
           {([
@@ -151,20 +177,30 @@ export default function FinanceModel({ initial, pricing, accent = "#8b5cf6" }: {
             {/* The unit the whole thing rests on. */}
             <div className="glass rounded-2xl p-4">
               <div className="text-[11px] uppercase tracking-widest text-muted mb-2">One sponsored challenge</div>
+              {/* THREE segments, not two. B120. This bar showed the prize
+                  half against "the platform fee" and labelled the second one
+                  the line the business lives on — while the server pool and
+                  the points vault, 15% each, sat inside it. */}
               <div className="flex h-8 w-full overflow-hidden rounded-lg">
                 <div className="flex items-center justify-center text-[11px] font-bold text-white"
                   style={{ width: `${unit.prizePct}%`, background: "#22d3ee" }}>
                   {$(unit.prize)} to gamers
                 </div>
                 <div className="flex items-center justify-center text-[11px] font-bold text-white"
-                  style={{ width: `${unit.feePct}%`, background: accent }}>
-                  {$(unit.fee)}
+                  style={{ width: `${unit.poolsPct}%`, background: "#34d399" }}>
+                  {$(unit.pools)}
+                </div>
+                <div className="flex items-center justify-center text-[11px] font-bold text-white"
+                  style={{ width: `${unit.oursPct}%`, background: accent }}>
+                  {$(unit.ours)}
                 </div>
               </div>
               <p className="mt-2 text-[11px] text-muted leading-snug">
-                A brand pays {$(unit.price)}. {unit.prizePct}% of it is the prize pool and reaches a gamer —
-                we never touch it. The {unit.feePct}% is the platform fee, and it is the only line the business
-                lives on. Every total below is built from this one number.
+                A brand pays {$(unit.price)}. {unit.prizePct}% is the prize pool and reaches a gamer;
+                {" "}{unit.poolsPct}% is the weekly server pool and the points vault, both owed to somebody
+                else. {$(unit.ours)} — {unit.oursPct}% — is ours, and it is the only line the business lives
+                on. Every total below is built from that number, not from the {$(unit.fee)} that is merely
+                not prize money.
               </p>
             </div>
 

@@ -141,7 +141,14 @@ console.log("\n== the unit-economics slide is the live rate card, as it claims =
   const rows = liveUnitRows(cfg);
   eq("three rows", rows.length, 3);
   eq("one challenge is the real price", rows[0].revenue, unit.price);
-  eq("…against the real prize", rows[0].cost, unit.prize);
+  // B120. This asserted the cost was the PRIZE, which is what the slide used
+  // to show under the words "the only cost of goods". Three obligations leave
+  // on a sale — the prize pool, the weekly server pool and the points vault —
+  // and counting only the first left the other two inside the margin.
+  eq("…against every obligation, not only the prize", rows[0].cost, unit.prize + unit.pools);
+  ok("…which is more than the prize alone", rows[0].cost > unit.prize,
+    `${rows[0].cost} vs ${unit.prize}`);
+  eq("…and what is left is ours", rows[0].revenue - rows[0].cost, unit.ours);
   eq("one game a month is the real month", rows[1].revenue, perGame(cfg));
   eq("the whole catalogue is the real network", rows[2].revenue, perGame(cfg) * cfg.games);
   // The defect in one line: the costs had been kept in step and the revenues
@@ -188,9 +195,17 @@ console.log("\n== the front page no longer promises what it cannot keep ==");
   // The deck was already honest about its own assumptions — the front page was
   // what took that honesty away. Check the deck still carries the slide.
   const risky = JSON.stringify(SEED_DOCS);
-  ok("the deck still names what would break the plan",
-    /Nothing in this business has proven that yet/.test(risky),
+  // Asserted as a PROPERTY, not as one sentence. This pinned the exact string
+  // "Nothing in this business has proven that yet" and went red the moment the
+  // risks slide was rewritten — for a rewrite that made the slide MORE honest,
+  // since it promoted the real constraint to the top. A guard that fails on an
+  // improvement teaches people to edit the guard.
+  ok("the deck still has a slide about what would break the plan",
+    /What we.{0,3}d challenge|would push back on ourselves/.test(risky),
     "the front page borrowed its credibility from this slide");
+  ok("…and it still admits something is unproven",
+    /(has|have) (not )?proven|nothing .{0,30}proven|assumption about/i.test(risky),
+    "a risks slide that asserts no risk is a marketing slide");
 }
 
 console.log("\n== an existing install can pick up the correction ==");
@@ -204,6 +219,75 @@ console.log("\n== an existing install can pick up the correction ==");
   ok("…and it is reachable from the admin",
     /reseedDoc/.test(read("app/actions/dataroom.ts")),
     "a fix only in the seed leaves the live deck quoting the old price");
+}
+
+console.log("\n== the catalogue the deck claims is the catalogue in the code ==");
+{
+  // B120/B121. The market slide claimed "24 games — integrations built and
+  // syncing" and priced the whole catalogue off it. The number happened to be
+  // right, and nothing checked it: the registry is the only place that knows,
+  // and a deck that counts a catalogue by hand is a deck that counts it once.
+  //
+  // It also mattered in the other direction. The risks slide was drafted saying
+  // the round buys "twelve new game integrations" — which would have been an
+  // engineering plan for work that is already done. The adapters exist; what
+  // stands between them and revenue is publisher API access. Overstating the
+  // work would have been a wrong risk on the slide about risks.
+  const { PROVIDERS } = await import("../../lib/providers/registry.ts");
+  const deck = JSON.stringify(SEED_DOCS);
+  const claimed = deck.match(/(\d+)\s+adapters/);
+  ok("the deck states how many adapters exist", !!claimed, "the market slide prices the catalogue off it");
+  if (claimed) {
+    eq("…and it is the number in the registry", Number(claimed[1]), PROVIDERS.length);
+  }
+  const games = new Set(PROVIDERS.map((p) => p.game)).size;
+  const claimedGames = deck.match(/across (\w+[- ]?\w*) games/);
+  ok("…and the game count is stated too", !!claimedGames, deck.slice(0, 0));
+  // Spelled out in prose, so compare the value we would write rather than parse
+  // English. Twenty-three is the only number this may be.
+  ok("…and it matches the registry", games === 23,
+    `${games} distinct games in the registry`);
+
+  // The deck must NOT describe taking a game live as building an integration.
+  ok("the deck does not sell already-written adapters as new engineering",
+    !/new game integrations/i.test(deck),
+    "the adapters are in production code — the constraint is publisher API access");
+}
+
+console.log("\n== the ask in the deck is the ask in the model ==");
+{
+  // B120. The round was typed into two slides — amount, valuation, post-money,
+  // equity, runway — while `lib/finance.ts` computed the same five numbers from
+  // the raise it was actually planning. Two copies of one fact, and the deck's
+  // copy is the one an investor reads.
+  const { FINANCE_DEFAULTS, finance } = await import("../../lib/finance.ts");
+  const f = finance();
+  const found: Record<string, number>[] = [];
+  const walk = (v: unknown) => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      if (typeof o.postMoney === "number" && typeof o.equityPct === "number") {
+        found.push(o as unknown as Record<string, number>);
+      }
+      Object.values(o).forEach(walk);
+    }
+  };
+  walk(SEED_DOCS);
+
+  ok("the deck states the round", found.length > 0, String(found.length));
+  for (const a of found) {
+    eq("the amount matches the model", a.amount, FINANCE_DEFAULTS.raise);
+    eq("the equity matches", a.equityPct, FINANCE_DEFAULTS.equityPct);
+    eq("the post-money matches", a.postMoney, f.valuation.post);
+    eq("the pre-money matches", a.valuation, f.valuation.pre);
+    eq("the runway matches the months planned", a.runwayMonths, FINANCE_DEFAULTS.months);
+  }
+  // Two slides carry it. They must agree with each other as well as with the
+  // model — an investor who reads both is the one who finds the gap.
+  ok("every slide that states the round states the same round",
+    new Set(found.map((a) => `${a.amount}/${a.equityPct}/${a.postMoney}`)).size === 1,
+    found.map((a) => `${a.amount}/${a.equityPct}`).join(" vs "));
 }
 
 console.log(`\n${pass} passed, ${fails.length} failed`);

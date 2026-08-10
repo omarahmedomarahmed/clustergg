@@ -25,7 +25,7 @@ const near = (name: string, got: number, want: number, tol = 0.011) =>
 
 const {
   PRICING_DEFAULTS, buildPricing, derivePrizes, prizeSharePct,
-  marginPerChallenge, PRICING_NUMBER_KEYS, quote: quoteOf,
+  marginPerChallenge, paidOutPerChallenge, PRICING_NUMBER_KEYS, quote: quoteOf,
 } = await import("../../lib/pricing.ts");
 const { DEFAULT_SPLIT, SPLIT_PRESETS, VAULTS, splitProblems, allocate } =
   await import("../../lib/vaults.ts");
@@ -81,7 +81,15 @@ console.log("\n== a derived field cannot be set by hand ==");
   // The percentage IS editable, and moves everything under it.
   const generous = buildPricing({ "pricing.challengePrice": "350", "pricing.prizePct": "60" });
   near("raising the percentage raises the pool", generous.prizePool, 210);
-  near("…and the platform's share falls by the same amount", marginPerChallenge(generous), 140);
+  // B120. This asserted 140 — `price − prizePool` — and that is not our share.
+  // A sale divides FOUR ways: the prize pool, the server pool at 15%, the
+  // points vault at 15%, and us. At a 60% prize share we keep 10% of $350.
+  // The old number was on the investor deck under the words "gross margin".
+  near("…and the platform's share falls by the same amount", marginPerChallenge(generous), 35);
+  near("…while everything owed to somebody else is the rest", paidOutPerChallenge(generous), 315);
+  // At the standard rate card we keep the cluster vault's 20%, not half.
+  near("our share of a standard challenge is the cluster vault's",
+    marginPerChallenge(PRICING_DEFAULTS), PRICING_DEFAULTS.challengePrice * 0.20);
 }
 
 console.log("\n== the split totals 100, at every preset ==");
@@ -135,6 +143,126 @@ console.log("\n== C8: a sold challenge's prize is not funded twice ==");
     (brands?.foregone ?? 0) > 0);
   ok("the switch that hid the double count is gone",
     !("sponsorsUseHouseInventory" in (FINANCE_DEFAULTS as Record<string, unknown>)));
+}
+
+console.log("\n== B120: our share is the cluster vault, not everything that is not a prize ==");
+{
+  const { finance, levers, FINANCE_DEFAULTS } = await import("../../lib/finance.ts");
+  const { platformSharePct, obligationSharePct } = await import("../../lib/vault-split.ts");
+
+  // THE ERROR THIS BLOCK EXISTS FOR.
+  //
+  // `marginPerChallenge` returned `price − prizePool` and the investor deck
+  // printed it under the words "gross margin per challenge". A sale divides
+  // FOUR ways: the prize pool, the server pool, the points vault and us. Two of
+  // those three obligations were being counted as our money — the deck showed a
+  // margin two and a half times the real one, and the financial model computed
+  // contribution per brand the same wrong way underneath it.
+  const price = PRICING_DEFAULTS.challengePrice;
+  near("our share of a challenge is the cluster vault's share",
+    marginPerChallenge(PRICING_DEFAULTS), price * (platformSharePct() / 100));
+  ok("…which is well under what is NOT prize money",
+    marginPerChallenge(PRICING_DEFAULTS) < price - PRICING_DEFAULTS.prizePool,
+    `${marginPerChallenge(PRICING_DEFAULTS)} vs ${price - PRICING_DEFAULTS.prizePool}`);
+  near("…and everything owed to somebody else is the rest",
+    paidOutPerChallenge(PRICING_DEFAULTS), price * (obligationSharePct() / 100));
+  near("the two halves add back to the price",
+    marginPerChallenge(PRICING_DEFAULTS) + paidOutPerChallenge(PRICING_DEFAULTS), price);
+
+  // The same correction, downstream. Contribution per brand must be our SHARE
+  // of what they pay, not their payment minus the prize.
+  const f = finance();
+  const cfg = FINANCE_DEFAULTS;
+  near("contribution per brand is our share of what they pay",
+    f.unit.contributionPerBrand, cfg.revenuePerBrand * (marginPerChallenge(PRICING_DEFAULTS) / price));
+  near("…so gross margin is the cluster vault's percentage",
+    f.unit.grossMarginPct, platformSharePct());
+  ok("…and it is not the old, flattering figure",
+    f.unit.contributionPerBrand < cfg.revenuePerBrand - cfg.freeChallengesPerBrand * PRICING_DEFAULTS.prizePool);
+
+  // What a brand pays must be a rate we can actually invoice. It sat at $1,500
+  // while one game of challenges billed at $1,400.
+  near("a paying brand pays a rate the rate card can produce",
+    cfg.revenuePerBrand, PRICING_DEFAULTS.challengePrice * PRICING_DEFAULTS.challengesPerGame);
+
+  // Unit economics have to be present and sane, or the round is priced on
+  // nothing. A payback longer than the runway means the plan cannot compound.
+  ok("payback is inside the raise's runway",
+    f.unit.paybackMonths > 0 && f.unit.paybackMonths < cfg.months,
+    `${f.unit.paybackMonths} months against ${cfg.months}`);
+  ok("LTV covers CAC more than once", f.unit.ltvToCac > 1, String(f.unit.ltvToCac));
+  ok("…and the churn behind LTV is stated rather than hidden",
+    f.unit.assumedMonthlyChurnPct > 0 && f.unit.lifetimeMonths === 100 / f.unit.assumedMonthlyChurnPct);
+  // CAC is measured against brands that STAYED. Dividing by everyone who took a
+  // free month is the flattering version and it hides a conversion problem.
+  ok("CAC counts only the brands that converted",
+    f.unit.cacBrand > (cfg.targetBrands * cfg.freeChallengesPerBrand * PRICING_DEFAULTS.prizePool) / cfg.targetBrands,
+    String(f.unit.cacBrand));
+
+  // The raise has to be SPENT. Selling equity for cash that sits in the account
+  // is the one cost a founder cannot recover.
+  ok("most of the raise is allocated", f.cashTotal > cfg.raise * 0.85,
+    `${f.cashTotal} of ${cfg.raise}`);
+  ok("…and it is not overspent", f.buffer >= 0, String(f.buffer));
+
+  // The base case may not be the heroic one. 83% free-to-paid was the plan;
+  // an investor discounts that to nothing and everything built on it with it.
+  ok("the base case assumes at most half of brands convert",
+    cfg.brandsConverting / cfg.targetBrands <= 0.5,
+    `${cfg.brandsConverting} of ${cfg.targetBrands}`);
+
+  // ===== THE CAPACITY CONSTRAINT =====
+  //
+  // A game runs ONE sponsored challenge at a time and a campaign is four
+  // consecutive weekly challenges — one month on one game. So a game serves one
+  // paying brand per month and the network serves `games ÷ gamesPerPayingBrand`
+  // of them.
+  //
+  // The plan projected 22 paying brands against six games. Every figure built
+  // on that — MRR, ARR, the valuation multiple, breakeven — was revenue the
+  // network had no inventory to deliver, and the house prize line read ZERO
+  // because 22 brands "bought" 88 challenges out of a network that runs 24. The
+  // plan looked cheapest exactly where it was least deliverable.
+  ok("the capacity ceiling is games divided by games per brand",
+    f.payingBrandCapacity === Math.floor(cfg.games / Math.max(1, cfg.gamesPerPayingBrand)),
+    `${f.payingBrandCapacity} against ${cfg.games} games`);
+  ok("paying brands never exceed it", f.exit.payingBrands <= f.payingBrandCapacity,
+    `${f.exit.payingBrands} of ${f.payingBrandCapacity}`);
+  ok("…and MRR is built from what fits, not from what converts",
+    Math.abs(f.exit.mrr - f.exit.payingBrands * cfg.revenuePerBrand) < 0.5,
+    `${f.exit.mrr}`);
+  ok("no month projects more sponsors than slots",
+    f.months.every((m) => m.payingBrands <= f.payingBrandCapacity),
+    f.months.map((m) => m.payingBrands).join(","));
+
+  // Onboarding more brands than the network can serve is cash spent on brands
+  // we would have to turn away.
+  ok("the funnel is sized to the slots, not past them",
+    cfg.brandsConverting <= f.payingBrandCapacity,
+    `${cfg.brandsConverting} converting against ${f.payingBrandCapacity} slots`);
+
+  // Prove the ceiling BINDS: starve the games and revenue must fall, whatever
+  // conversion says. An assertion that only holds at the planned numbers is not
+  // an assertion about the model.
+  {
+    const starved = finance({ ...cfg, games: 2 });
+    ok("halving the games halves the revenue, whatever converts",
+      starved.exit.mrr < f.exit.mrr && starved.capacityBound,
+      `${starved.exit.mrr} at capacity ${starved.payingBrandCapacity}`);
+    const flooded = finance({ ...cfg, targetBrands: cfg.targetBrands * 4, brandsConverting: cfg.brandsConverting * 4 });
+    ok("…and quadrupling the brands does not, once the slots are full",
+      flooded.exit.mrr === f.exit.mrr,
+      `${flooded.exit.mrr} vs ${f.exit.mrr}`);
+  }
+
+  // Every lever re-runs the model rather than asserting a number, so a lever
+  // that moves nothing reports zero instead of a hope.
+  const ls = levers();
+  ok("there are levers, and they are measured", ls.length >= 4);
+  ok("…at least one moves ARR materially", ls.some((l) => l.deltaArr > f.exit.arr * 0.2),
+    ls.map((l) => `${l.key}:${l.deltaArr}`).join(" "));
+  ok("…and every one says whether the raise still survives",
+    ls.every((l) => typeof l.survives === "boolean"));
 }
 
 console.log("\n== C12: an active gamer is a definition, not a slider ==");

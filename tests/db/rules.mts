@@ -113,5 +113,68 @@ console.log("\n== the rules that exist because the product does ==");
     /grows you, it does not pay you twice/i.test(owner), owner);
 }
 
+console.log("\n== the visual guide shows the same product the rules describe ==");
+{
+  // B119 put a walkable journey and two diagrams above the rule list. Both are
+  // built from the same modules the rules import, so the risk is not that a
+  // number drifts — it is that the PATH drifts: a step nobody can take, a page
+  // that has moved, or an audience quietly left with three steps while the
+  // other two got eight.
+  const { JOURNEYS, MONEY_FLOW, LIFECYCLE } = await import("../../lib/journeys.ts");
+  const { readFileSync, existsSync } = await import("node:fs");
+  const { DEFAULT_SPLIT } = await import("../../lib/vaults.ts");
+  const { STAGE_ORDER } = await import("../../lib/challenge-stage.ts");
+
+  for (const who of ["gamer", "owner", "brand"] as const) {
+    const steps = JOURNEYS[who];
+    ok(`${who}: the journey has enough steps to be a path`, steps.length >= 5, String(steps.length));
+    ok(`…every step says what happens`, steps.every((s) => s.body.trim().length > 40));
+    // The helper line is the reason this component exists. Most steps carry
+    // one; a journey where none do is a journey that became a list of titles.
+    const helped = steps.filter((s) => (s.helper ?? "").length > 30).length;
+    ok(`…and most steps carry the sentence that stops them going wrong`,
+      helped >= Math.ceil(steps.length * 0.6), `${helped} of ${steps.length}`);
+    // A step pointing at a route that does not exist is a dead end in a guide,
+    // which is worse than no link: it is the one place a lost reader clicks.
+    const dead = steps.filter((s) => s.href && !s.href.includes("[")).filter((s) => {
+      const p = `app${s.href}/page.tsx`;
+      return !existsSync(new URL(`../../${p}`, import.meta.url));
+    });
+    ok(`…and every link goes somewhere real`, dead.length === 0,
+      dead.map((s) => s.href).join(", "));
+  }
+
+  // The split is READ, never drawn. A guide with the percentages painted into
+  // its bar widths would be wrong the day an operator moves the switch — and
+  // this is the number the whole pitch rests on.
+  for (const v of MONEY_FLOW) {
+    ok(`the ${v.key} share matches the vault split`, v.pct === DEFAULT_SPLIT[v.key],
+      `guide ${v.pct}%, vaults ${DEFAULT_SPLIT[v.key]}%`);
+  }
+  ok("…and the four shares total 100",
+    MONEY_FLOW.reduce((n, v) => n + v.pct, 0) === 100);
+
+  const flow = readFileSync("components/rules/MoneyFlow.tsx", "utf8");
+  ok("the bar is drawn from the shares, not from fixed widths",
+    /\$\{\(v\.pct \/ total\) \* 100\}%/.test(flow),
+    "a hardcoded width is a share that lies the day the split changes");
+
+  // The lifecycle is the stage machine, not a second copy of it.
+  ok("the lifecycle shows every rung the product has",
+    LIFECYCLE.length === STAGE_ORDER.length && LIFECYCLE.every((s, i) => s.key === STAGE_ORDER[i]),
+    LIFECYCLE.map((s) => s.key).join(" → "));
+  const life = readFileSync("components/rules/Lifecycle.tsx", "utf8");
+  ok("…and both gates are called out", /Announced<\/b> is the first gate/.test(life) && /Live<\/b> is the second/.test(life));
+
+  // The page has to actually render all three, or this is a suite guarding
+  // components nobody reaches.
+  const page = readFileSync("app/rules/[who]/page.tsx", "utf8");
+  for (const c of ["Journey", "MoneyFlow", "Lifecycle"]) {
+    ok(`the guide renders ${c}`, new RegExp(`<${c}[\\s/>]`).test(page));
+  }
+  ok("…and the rules are still on it in full", /rulesByTopic\(audience\)/.test(page),
+    "the diagrams are an addition to the fine print, not a replacement for it");
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

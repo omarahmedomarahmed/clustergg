@@ -309,21 +309,26 @@ function Body({ section, doc, live, people, steps, installUrl }: {
       // last one that can be allowed to go stale. Nothing here is typed into the
       // deck — change a price in Admin → Site content and this slide changes.
       const p = live.pricing;
-      const { reach, entry, full } = live.quotes;
+      const { entry, full } = live.quotes;
+      // ONE package. B118 removed the three-tier shells from the pricing page;
+      // a deck that still shows an investor a Reach plan and an Ultimate plan
+      // is showing them revenue lines that do not exist.
       const plans = [
-        { name: "Reach", price: reach.monthly, note: "Every placement, the brand portal, full analytics.", detail: "Placements only" },
-        { name: "Challenge", price: entry.monthly, note: `${money(p.challengeBase, p.currency)} base + ${money(perGame(p), p.currency)} per game. ${p.challengesPerGame} sponsored challenges a month, per game, with naming rights.`, detail: "From one game" },
-        { name: "Ultimate", price: full.monthly, note: `All ${p.games} games, ${full.challengesPerMonth} challenges a month, premium and Discord placement, the Sunday shout-out.`, detail: "The whole network" },
+        { name: "One game", price: entry.monthly, note: `${money(perGame(p), p.currency)} per game. ${p.challengesPerGame} sponsored challenges a month, with naming rights on that game's weekly competition.`, detail: "Entry" },
+        { name: `All ${p.games} games`, price: full.monthly, note: `${full.challengesPerMonth} challenges a month across the network. Same per-game rate — there is no volume tier, and no base fee under either.`, detail: "The whole network" },
+        { name: "Custom", price: 0, note: "More weeks, mixed games, or anything off the rate card. An operator builds it and the brand confirms it in their own portal.", detail: "Anything larger" },
       ];
       return (
         <>
           <Heading section={section} accent={accent} />
           <div className="grid sm:grid-cols-3 gap-3">
             {plans.map((pl, i) => (
-              <div key={pl.name} className={`glass rounded-2xl p-5 ${i === 2 ? "ring-1" : ""}`} style={i === 2 ? { borderColor: accent2 } : undefined}>
+              <div key={pl.name} className={`glass rounded-2xl p-5 ${i === 1 ? "ring-1" : ""}`} style={i === 1 ? { borderColor: accent2 } : undefined}>
                 <div className="text-[11px] uppercase tracking-widest" style={{ color: accent2 }}>{pl.detail}</div>
                 <div className="font-bold text-lg mt-1.5">{pl.name}</div>
-                <div className="text-3xl font-black mt-2">{money(pl.price, p.currency)}<span className="text-sm font-normal text-muted">/mo</span></div>
+                <div className="text-3xl font-black mt-2">
+                  {pl.price > 0 ? <>{money(pl.price, p.currency)}<span className="text-sm font-normal text-muted">/mo</span></> : <span className="text-muted">Quoted</span>}
+                </div>
                 <p className="text-xs text-muted mt-2.5 leading-snug">{pl.note}</p>
               </div>
             ))}
@@ -331,14 +336,15 @@ function Body({ section, doc, live, people, steps, installUrl }: {
           {/* The unit, so the margin question is answered before it's asked. */}
           <div className="grid sm:grid-cols-4 gap-3 mt-4">
             <PriceFact label="charged per sponsored challenge" value={money(p.challengePrice, p.currency)} accent={accent2} />
-            <PriceFact label="paid out to the three winners" value={money(p.prizePool, p.currency)} accent={accent2} />
+            <PriceFact label="paid out to the winners" value={money(p.prizePool, p.currency)} accent={accent2} />
             <PriceFact label="gross margin per challenge" value={money(marginPerChallenge(p), p.currency)} accent={accent2} />
             <PriceFact label={`of brand spend reaches players (${nf(p.games * p.challengesPerGame)} challenges a month)`} value={`${prizeSharePct(p)}%`} accent={accent2} />
           </div>
           <p className="text-xs text-muted mt-4 max-w-2xl leading-relaxed">
-            Prizes are paid as three trophies carrying the sponsor&apos;s brand — {money(p.prize1, p.currency)},{" "}
-            {money(p.prize2, p.currency)} and {money(p.prize3, p.currency)}. Annual is {Math.round(p.yearlyDiscountPct)}% off,
-            and the Sunday broadcast sponsorship is a {money(p.streamAddon, p.currency)}/month add-on on any plan.
+            Prizes are paid as trophies carrying the sponsor&apos;s brand, one to ten places deep at the
+            buyer&apos;s choice — {money(p.prize1, p.currency)}, {money(p.prize2, p.currency)} and{" "}
+            {money(p.prize3, p.currency)} on a three-place podium. Annual is {Math.round(p.yearlyDiscountPct)}% off,
+            and the Sunday broadcast sponsorship comes with the package rather than being sold on top.
             Every figure here is read from the live rate card, not written into this document.
           </p>
           <LiveNote takenAt={live.takenAt} />

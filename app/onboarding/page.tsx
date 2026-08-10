@@ -216,7 +216,7 @@ export default async function OnboardingPage() {
 
       <p className="mt-8 text-center text-xs leading-relaxed text-muted">
         Everything you have already done is kept. Nothing starts counting until you finish —{" "}
-        <Link href="/rules/gamer" className="text-cyan-300 hover:underline">every rule, and why it exists</Link>.
+        <Link href="/rules/gamer" className="text-cyan-300 hover:underline">the whole path, drawn, with every rule under it</Link>.
       </p>
     </div>
   );

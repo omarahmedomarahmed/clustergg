@@ -150,6 +150,24 @@ console.log("\n== no surface quotes a price or a rate the product does not have 
   ok("no surface promises an owner a per-challenge rate",
     promised.length === 0,
     `${promised.slice(0, 6).join(", ")} — C3 deleted it; the model is a weekly pool`);
+
+  // B118. The three-tier rate card — Reach, Challenge, Ultimate — was merged
+  // into one package by C11, but the pricing page kept rendering all three
+  // cards, two of them priced off bases of zero. A brand could pick a plan we
+  // do not sell. The deck showed the same three to investors, the enquiry form
+  // labelled the buyer with one, and the brand portal put "Reach tier" at the
+  // top of their own dashboard.
+  //
+  // Rendered text only — the config fields survive at 0 on purpose, guarded by
+  // `tests/db/split.mts`, and the comments explaining why they went are the
+  // notes that stop somebody reviving them.
+  const planName = /["'`>][^"'`<]*\b(?:Reach|Ultimate)\s+(?:tier|plan)\b|["'`]Ultimate["'`]\s*[,)}]|tier\.(?:reach|ultimate)\./;
+  const named = files.filter((f) => {
+    const src = strip(readFileSync(f, "utf8"));
+    return planName.test(src);
+  });
+  ok("no surface renders a retired plan name", named.length === 0,
+    `${named.slice(0, 6).join(", ")} — C11 merged the three tiers into one package`);
 }
 
 console.log("\n== the showcase is actually on the pages ==");
