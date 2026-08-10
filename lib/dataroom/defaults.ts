@@ -774,13 +774,13 @@ export const SEED_DOCS: SeedDoc[] = [
         anchor: "activations",
         navLabel: "Activations",
         title: "What we can run for you.",
-        subtitle: "Four products, all bought on the same published rate card, all live inside Discord.",
+        subtitle: "One package on a published rate card, and everything below is in it.",
         data: {
           steps: [
-            { icon: "trophy", label: "Sponsored challenge", note: "Your name on the weekly competition for a game you choose — scored from the game's own API, with the prize pool funded and paid by us." },
-            { icon: "send", label: "Network placement", note: "Your creatives across clustergg.com and inside every opted-in community, with your own click button, swapped by you from the brand portal whenever you want." },
-            { icon: "planet", label: "Game world takeover", note: "A game's whole planet in your colours: its leaderboards, its challenges, its landing page." },
-            { icon: "play", label: "Sunday broadcast", note: "Presenting sponsor of the live Profile of the Week final, on the winners card posted to every server, and named in every clip cut from it." },
+            { icon: "trophy", label: "The sponsored challenge", note: "Your name on the weekly competition for a game you choose — scored from the game's own API, with the prize pool funded and paid by us. This is the thing you are buying; the rest comes with it." },
+            { icon: "send", label: "Network placement", note: "Included. Your creatives across clustergg.com and inside every opted-in community, with your own click button, swapped by you from the brand portal whenever you want — there is no separate media fee." },
+            { icon: "medal", label: "The trophy", note: "Included. Your logo on the trophy the winner keeps on their profile permanently — and can redeem for real money. Not seen, kept." },
+            { icon: "play", label: "The Sunday broadcast", note: "Included. Presenting sponsor of the live Profile of the Week final, on the winners card posted to every server, and named in every clip cut from it." },
           ],
         },
       },
