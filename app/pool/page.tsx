@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { livePool } from "@/lib/pool-live";
-import { BRACKETS, PARTICIPATION_SHARE, SCORE_WEIGHTS } from "@/lib/server-score";
+import { PARTICIPATION_SHARE, SCORE_WEIGHTS } from "@/lib/server-score";
+import { RUNGS, EARN_FLOOR } from "@/lib/ladder";
 import { installHref } from "@/lib/discord/config";
 
 export const dynamic = "force-dynamic";
@@ -116,7 +117,7 @@ export default async function PoolPage() {
                 {standing.servers.map((s) => (
                   <tr key={s.guildId} className="border-b border-white/[0.06] last:border-0">
                     <td className="px-5 py-3 font-semibold">{s.name}</td>
-                    <td className="px-3 py-3 text-xs capitalize text-muted">{s.tier}</td>
+                    <td className="px-3 py-3 text-xs capitalize text-muted">{s.rung}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{s.exclusiveEntrants.toFixed(2)}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{s.newlyQualified}</td>
                     <td className="px-3 py-3 text-right tabular-nums">{s.final}</td>
@@ -146,6 +147,19 @@ export default async function PoolPage() {
                 so {standing.skippedForProfile === 1 ? "it is" : "they are"} not in the run. A brand buys a
               described community, not a number.
             </div>
+          </div>
+        )}
+        {/* M3. The other reason a server is not in the run, and the one an owner
+            can actually act on the same afternoon. Said out loud with the exact
+            bar in it — a server that quietly does not appear reads as a bug,
+            and "8 of 10" reads as a to-do. */}
+        {standing.skippedUnderFloor > 0 && (
+          <div className="border-t border-white/10 px-5 py-3 text-[11px] leading-relaxed text-muted">
+            {standing.skippedUnderFloor} server{standing.skippedUnderFloor === 1 ? "" : "s"} carried an
+            entrant but {standing.skippedUnderFloor === 1 ? "has" : "have"} fewer
+            than {EARN_FLOOR} linked members, so {standing.skippedUnderFloor === 1 ? "it is" : "they are"} not
+            on the ladder yet. {EARN_FLOOR} is the whole bar — members who have connected a game
+            account, not members who joined.
           </div>
         )}
       </section>
@@ -178,17 +192,18 @@ export default async function PoolPage() {
         })}
       </section>
 
-      {/* ===== The brackets ===== */}
+      {/* ===== The rungs ===== */}
       <section className="glass mt-6 p-5">
         <h2 className="text-sm font-bold">You compete with servers your own size</h2>
         <p className="mt-1 text-[11px] leading-relaxed text-muted">
-          A bracket decides who you are ranked against and what slice of the pool that group divides.
-          It is not a rate — nobody earns a percentage for being big.
+          Your rung decides who you are ranked against and what slice of the pool that group divides.
+          It is not a rate — nobody earns a percentage for being big. Climbing moves you into a smaller
+          room with a smaller pot, which is what makes the share per server go up.
         </p>
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          {BRACKETS.map((b) => (
+          {RUNGS.map((b) => (
             <span key={b.key} className="rounded-full border border-white/12 bg-black/25 px-3 py-1.5">
-              <b className="capitalize">{b.key}</b> · {b.share}% of the pool
+              <b>{b.name}</b> · {b.threshold}+ linked · {b.share}% of the pool
             </span>
           ))}
         </div>

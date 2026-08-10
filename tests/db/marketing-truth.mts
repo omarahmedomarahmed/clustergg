@@ -20,7 +20,8 @@ const ok = (name: string, cond: boolean, extra = "") => {
 };
 
 const { readFileSync } = await import("node:fs");
-const { BRACKETS, PARTICIPATION_SHARE } = await import("../../lib/server-score.ts");
+const { PARTICIPATION_SHARE } = await import("../../lib/server-score.ts");
+const { RUNGS } = await import("../../lib/ladder.ts");
 const { STAGE_ORDER } = await import("../../lib/challenge-stage.ts");
 const { PRIVATE_FEE_PCT } = await import("../../lib/private-quote.ts");
 
@@ -42,7 +43,7 @@ console.log("== the showcase imports the product, it does not paraphrase it ==")
   // …and specifically NOT retyped. These are the numbers most likely to be
   // hand-copied by somebody "just fixing the copy".
   const literals = [
-    [`${BRACKETS[0].share}`, "a bracket share"],
+    [`${RUNGS[0].share}`, "a rung's share of the pool"],
     [`${PARTICIPATION_SHARE}`, "the flat share"],
     [`${PRIVATE_FEE_PCT}`, "the private fee"],
   ] as const;

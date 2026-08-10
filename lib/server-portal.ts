@@ -4,7 +4,8 @@ import { uid, slugify } from "@/lib/utils";
 import { hashSession } from "@/lib/ads";
 import { newPortalKey } from "@/lib/portal-auth";
 import { guildStats, type GuildStats } from "@/lib/discord/guilds";
-import { challengeEarning, nextEarnTier } from "@/lib/server-earnings";
+import { challengeEarning } from "@/lib/server-earnings";
+import { RUNGS, ladderBadge, ladderProgress, nextRung, type Rung } from "@/lib/ladder";
 import { WEEK_CLOSE_ACTOR } from "@/lib/week-close";
 import { PRICING_DEFAULTS } from "@/lib/pricing";
 
@@ -18,107 +19,35 @@ import { PRICING_DEFAULTS } from "@/lib/pricing";
 // number, so an owner recruiting for us is doing it for something concrete
 // rather than for goodwill.
 
-export type TierKey = "seed" | "monetized" | "broadcaster" | "sponsored";
+// ===== THE LADDER LIVES IN `lib/ladder.ts`. M3 =====
+//
+// A second copy of it was here — seed / monetized / broadcaster / flagship at
+// 0 / 500 / 1,000 / 5,000 — with its own labels, colours and blurbs. It was the
+// marketing face of a ladder whose money was decided by a DIFFERENT list in
+// `lib/server-score.ts` and labelled by a THIRD in `lib/week-tiers.ts`. The
+// portal could tell an owner they were a Broadcaster while the weekly close
+// paid them out of the mid bracket and called them "mid".
+//
+// The identity fields moved onto the rung itself, so the badge an owner sees and
+// the group their cheque comes out of are the same row of the same array.
 
-export type Tier = {
-  key: TierKey;
-  name: string;
-  threshold: number;
-  /** Icon name from components/Icon — never an emoji; the site renders SVG. */
-  icon: string;
-  /**
-   * The rung's own identity.
-   *
-   * A tier is the thing an owner tells other owners about, so each one is a
-   * LABEL with its own colour and its own two-word rank — not four rows sharing
-   * a gold icon. `rank` is what goes on the badge, `tone` is the colour it
-   * carries everywhere it appears, and `blurb` is the one line that says what
-   * you are once you're there.
-   */
-  rank: string;
-  tone: string;
-  blurb: string;
-  unlocks: string;
-  detail: string;
-  /**
-   * The owner's share of a sponsored challenge at this tier, as a % of what the
-   * brand paid. Read from `lib/server-earnings.ts` so the ladder, the portal
-   * and the payout arithmetic can never quote three different numbers.
-   *
-   * C3 removed `ownerPct` from here. A tier decides who a server competes
-   * against in the weekly pool and what it unlocks — never a rate. The field
-   * was deleted rather than zeroed so no surface can print "0% share" and read
-   * as something taken away.
-   */
-};
+export type { RungKey as TierKey, Rung as Tier } from "@/lib/ladder";
+export { RUNGS as TIERS, EARN_FLOOR } from "@/lib/ladder";
 
-export const TIERS: Tier[] = [
-  {
-    key: "seed",
-    name: "Seed Server",
-    threshold: 0,
-    icon: "spark",
-    rank: "Tier I",
-    tone: "#94a3b8",
-    blurb: "You're on the map.",
-    unlocks: "Private challenges for your community",
-    detail: "Request challenges, run them for your members, and appear on Cluster with your own logo and invite.",
-  },
-  {
-    key: "monetized",
-    name: "Sponsored Server",
-    threshold: 500,
-    icon: "diamond",
-    rank: "Tier II",
-    tone: "#22d3ee",
-    blurb: "Brands start paying you.",
-    unlocks: "Brand-sponsored challenges, with real prize money",
-    detail:
-      "Brands sponsoring the games your members play start running their weekly challenges here. Every dollar "
-      + "of the prize money is won by your members, and you enter the weekly server pool that every sponsored challenge funds.",
-  },
-  {
-    key: "broadcaster",
-    name: "Broadcaster",
-    threshold: 1000,
-    icon: "satellite",
-    rank: "Tier III",
-    tone: "#a78bfa",
-    blurb: "The whole network runs through you.",
-    unlocks: "Carry the whole network's challenges",
-    detail:
-      "Challenges from across the network run in your server, so more of your members are playing for real "
-      + "prizes in more games at once — and you compete in a bigger tier of the weekly pool.",
-  },
-  {
-    key: "sponsored",
-    name: "Flagship Server",
-    threshold: 5000,
-    icon: "crown",
-    rank: "Tier IV",
-    tone: "#fbbf24",
-    blurb: "Brands ask for you by name.",
-    unlocks: "Brands ask for your community by name",
-    detail:
-      "Brands buy challenges in your server specifically, and smaller servers carry yours instead of the "
-      + "other way round, and you compete for the largest slots in the weekly pool.",
-  },
-];
-
-export function tierFor(linked: number): { current: Tier; next: Tier | null; progressPct: number } {
-  const sorted = [...TIERS].sort((a, b) => a.threshold - b.threshold);
-  let current = sorted[0];
-  for (const t of sorted) if (linked >= t.threshold) current = t;
-  const next = sorted.find((t) => t.threshold > linked) ?? null;
-  const span = next ? next.threshold - current.threshold : 1;
-  const done = next ? linked - current.threshold : span;
-  // Floored, not rounded: at 499 of 500 this must not read "100%". Telling an
-  // owner they've arrived when they haven't is the one error this bar can make.
-  return { current, next, progressPct: Math.max(0, Math.min(100, Math.floor((done / span) * 100))) };
+/**
+ * Where a server stands, for the portal's progress bar.
+ *
+ * `current` is null below `EARN_FLOOR` — a server with three linked members is
+ * not on the bottom rung, it is not on the ladder, and the bar measures its
+ * progress toward getting on.
+ */
+export function tierFor(linked: number): { current: Rung | null; next: Rung | null; progressPct: number } {
+  const { current, next, pct } = ladderProgress(linked);
+  return { current, next, progressPct: pct };
 }
 
 export function badgesFor(linked: number, challengesRun: number): { icon: string; name: string; earned: boolean }[] {
-  const out = TIERS.map((t) => ({ icon: t.icon, name: t.name, earned: linked >= t.threshold }));
+  const out = RUNGS.map((t) => ({ icon: t.icon, name: t.name, earned: linked >= t.threshold }));
   out.push({ icon: "trophy", name: "First Challenge", earned: challengesRun >= 1 });
   out.push({ icon: "flame", name: "Five Challenges", earned: challengesRun >= 5 });
   return out;
@@ -312,7 +241,7 @@ export type Earnings = {
  * screen disagrees with is how an owner stops believing either.
  */
 export async function serverEarnings(guildId: string, linked: number): Promise<Earnings> {
-  const next = nextEarnTier(linked);
+  const next = nextRung(linked);
   const empty: Earnings = {
     nextAt: next?.threshold ?? null,
     earned: 0, pending: 0, membersWon: 0, rows: [], memberWins: [], winners: 0,
@@ -468,7 +397,9 @@ function round2(n: number): number { return Math.round(n * 100) / 100; }
 
 export type BoardRow = {
   guildId: string; slug: string | null; name: string; iconUrl: string | null;
-  linked: number; challenges: number; tier: Tier; rank: number;
+  linked: number; challenges: number;
+  /** Always renderable: off-ladder servers get the OFF_LADDER card, not null. */
+  tier: ReturnType<typeof ladderBadge>; rank: number;
 };
 
 // Every server, ranked by the number that actually matters: how many gamers
@@ -500,7 +431,7 @@ export async function serverBoard(limit = 100): Promise<BoardRow[]> {
           iconUrl: g.iconUrl,
           linked,
           challenges: chBy.get(g.guildId) ?? 0,
-          tier: tierFor(linked).current,
+          tier: ladderBadge(linked),
           rank: 0,
         };
       })
@@ -514,6 +445,8 @@ export type PortalData = {
   server: PortalServer;
   stats: GuildStats;
   tier: ReturnType<typeof tierFor>;
+  /** The badge to render. Never null — see `OFF_LADDER`. */
+  badge: ReturnType<typeof ladderBadge>;
   badges: ReturnType<typeof badgesFor>;
   funnel: Awaited<ReturnType<typeof serverFunnel>>;
   /** What sponsored challenges have paid this server, challenge by challenge. */
@@ -543,6 +476,7 @@ export async function portalData(server: PortalServer): Promise<PortalData | nul
     server,
     stats,
     tier: tierFor(stats.linked),
+    badge: ladderBadge(stats.linked),
     badges: badgesFor(stats.linked, challenges),
     earnings,
     funnel,

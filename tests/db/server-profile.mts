@@ -63,8 +63,13 @@ const earnings = await import("../../lib/server-earnings.ts");
 for (const fn of ["ownerPctFor", "earningOwnerPct", "clusterPctFor", "monthlyCeiling"]) {
   ok(`${fn} no longer exists to be gated`, !(fn in earnings));
 }
-ok("a tier carries no rate at all",
-  !earnings.EARN_TIERS.some((t: Record<string, unknown>) => "ownerPct" in t));
+// M3 deleted `EARN_TIERS` outright — it was one of five lists of server sizes
+// and they did not agree. The assertion is stronger as a result: there is no
+// second list left for a rate to be re-added to.
+ok("the duplicate tier list is gone", !("EARN_TIERS" in earnings));
+const ladder = await import("../../lib/ladder.ts");
+ok("…and the one that replaced it carries no rate at all",
+  !ladder.RUNGS.some((t: Record<string, unknown>) => "ownerPct" in t));
 
 // The gate itself, where it lives now. Read from source rather than run,
 // because running it needs a whole week of fixtures — and what is being checked

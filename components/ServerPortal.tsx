@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { PAYOUT_HOLD_PHRASE } from "@/lib/abuse";
+import { EARN_FLOOR, RUNGS } from "@/lib/ladder";
 
 // Panels for the server-owner portal. Server components — nothing here needs
 // interactivity, and keeping them server-rendered means the owner's numbers
@@ -56,7 +57,8 @@ export function TierBadge({ tier, size = "md", earned = true }: {
 export function TierLadder({ tiers, linked, current }: {
   tiers: TierView[];
   linked: number;
-  current: string;
+  /** Null when the server is below the earning floor — no rung is highlighted. */
+  current: string | null;
 }) {
   return (
     <div className="glass p-6">
@@ -616,7 +618,8 @@ export function EarningsPanel({
 export function EarningGuide({ tiers, linked, currentKey, inviteUrl, slug }: {
   tiers: TierView[];
   linked: number;
-  currentKey: string;
+  /** Null below the earning floor — no rung is marked current. */
+  currentKey: string | null;
   inviteUrl: string | null;
   slug: string;
 }) {
@@ -635,15 +638,19 @@ export function EarningGuide({ tiers, linked, currentKey, inviteUrl, slug }: {
     {
       n: 2,
       title: "Your members link a game account",
-      body: "This is the only lever. A member who joins Cluster and links League, Valorant, PUBG, Dota, Apex or Fortnite counts toward your tier. One who just joins does not — linking is what makes them an audience a brand can be sold.",
+      body: "This is the only lever. A member who joins Cluster and links League, Valorant, PUBG, Dota, Apex or Fortnite counts toward your rung. One who just joins does not — linking is what makes them an audience a brand can be sold.",
       done: linked > 0,
       lever: true,
     },
     {
       n: 3,
-      title: "You cross 500 linked and brands start paying you",
-      body: "At 500 you are monetized: brands sponsoring the games your members play run their weekly challenges in your server, and 5% of what they paid is yours. Below 500 you can still run challenges — they just aren't sponsored yet.",
-      done: linked >= 500,
+      title: `You cross ${EARN_FLOOR} linked and you are earning`,
+      body: `${EARN_FLOOR} linked members puts you on the ladder. From there your server is scored every `
+        + `week against other servers your size, and every server that carried a challenge is paid something `
+        + `whether it placed or not. There is no per-challenge percentage — what you get is a share of the `
+        + `weekly pool, and ${RUNGS[1].threshold} and ${RUNGS[2].threshold} linked move you into smaller rungs `
+        + `where fewer servers divide the slice.`,
+      done: linked >= EARN_FLOOR,
     },
     {
       n: 4,

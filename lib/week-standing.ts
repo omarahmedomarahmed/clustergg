@@ -24,17 +24,24 @@ import { and, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import {
-  SCORE_WEIGHTS, exclusiveEntrants, percentile, weekPayouts, bracketOf,
+  SCORE_WEIGHTS, exclusiveEntrants, percentile, weekPayouts,
   type Payout,
 } from "@/lib/server-score";
-import { tierOf, type TierKey } from "@/lib/week-tiers";
+import { rungOf, earning, EARN_FLOOR, type RungKey } from "@/lib/ladder";
 
 export type StandingServer = {
   guildId: string;
   name: string;
-  /** The LABEL. Decides nothing about money — see `bracket`. */
-  tier: TierKey;
-  /** Qualified linked members, the number both the tier and the bracket read. */
+  /**
+   * The rung. M3 made this one thing rather than two: it is the label an owner
+   * is shown AND the group whose slice of the pool they compete for. There used
+   * to be a separate `tier` label and `bracket` grouping, off two lists that
+   * disagreed about the top threshold by a factor of five.
+   *
+   * Never null here — a server below `EARN_FLOOR` is filtered out before this.
+   */
+  rung: RungKey;
+  /** Qualified linked members. The one number the whole ladder reads. */
   qualified: number;
   exclusiveEntrants: number;
   newlyQualified: number;
@@ -52,12 +59,20 @@ export type Standing = {
   payouts: Payout[];
   /** How many servers carried an entrant but cannot be paid for want of a profile. */
   skippedForProfile: number;
+  /**
+   * How many carried an entrant but have fewer than `EARN_FLOOR` linked members.
+   *
+   * Counted and named rather than silently dropped: this is the number that says
+   * whether the bar is in the right place, and an owner who is told "8 of 10" can
+   * do something about it.
+   */
+  skippedUnderFloor: number;
   /** Empty when there is something to divide. Otherwise, why not, in a sentence. */
   reason: string;
 };
 
 const NOTHING = (reason: string): Standing => ({
-  terms: {}, servers: [], payouts: [], skippedForProfile: 0, reason,
+  terms: {}, servers: [], payouts: [], skippedForProfile: 0, skippedUnderFloor: 0, reason,
 });
 
 /**
@@ -138,14 +153,14 @@ export async function standingFor(
   const skippedForProfile = guildIds.length - payable.size;
   const names = new Map(guildRows.map((g) => [g.guildId, g.name ?? g.guildId]));
 
-  const base = guildIds.filter((g) => payable.has(g)).map((guildId) => {
+  const scored = guildIds.filter((g) => payable.has(g)).map((guildId) => {
     const now_ = thisSnap.get(guildId);
     const before = prevSnap.get(guildId);
     const qualified = Number(now_?.qualifiedLinked ?? 0);
     return {
       guildId,
       name: names.get(guildId) ?? guildId,
-      tier: tierOf(qualified),
+      rung: rungOf(qualified),
       qualified,
       exclusiveEntrants: exclusive.get(guildId) ?? 0,
       // A first-ever week has no "before", so everyone qualified in it is newly
@@ -156,6 +171,16 @@ export async function standingFor(
       linked: Number(now_?.linked ?? 0),
     };
   });
+
+  // ===== M3's gate: the bottom of the ladder is a rung, not zero =====
+  //
+  // Below `EARN_FLOOR` linked members a server is not scored and not paid. The
+  // old bottom tier was 0, which is not a bar — every guild the bot happened to
+  // sit in was "on the ladder", took a percentile position off servers that had
+  // done the work, and diluted the flat participation share. Ten linked members
+  // is a low bar deliberately; it is still a bar.
+  const base = scored.filter((s): s is typeof s & { rung: RungKey } => s.rung !== null);
+  const skippedUnderFloor = scored.length - base.length;
 
   // ===== Which terms have anything to say =====
   const TERM_VALUE: Record<string, (s: typeof base[number]) => number> = {
@@ -172,19 +197,21 @@ export async function standingFor(
     terms[k] = Math.round((SCORE_WEIGHTS[k as keyof typeof SCORE_WEIGHTS] / liveWeight) * 10000) / 100;
   }
   if (!base.length) {
-    return {
-      ...NOTHING(`${guildIds.length} server${guildIds.length === 1 ? "" : "s"} carried an entrant, but none has a complete profile, so none can be paid.`),
-      skippedForProfile,
-    };
+    const why = skippedUnderFloor > 0 && skippedForProfile === 0
+      ? `${guildIds.length} server${guildIds.length === 1 ? "" : "s"} carried an entrant, but none has ${EARN_FLOOR} linked members yet, so none is on the ladder.`
+      : `${guildIds.length} server${guildIds.length === 1 ? "" : "s"} carried an entrant, but none has a complete profile, so none can be paid.`;
+    return { ...NOTHING(why), skippedForProfile, skippedUnderFloor };
   }
-  if (!live.length) return { ...NOTHING("No term had any data to score on."), skippedForProfile };
+  if (!live.length) {
+    return { ...NOTHING("No term had any data to score on."), skippedForProfile, skippedUnderFloor };
+  }
 
-  // ===== Score, within bracket =====
+  // ===== Score, within rung =====
   //
   // Percentile-ranked against the servers you actually compete with, so one
   // enormous server cannot flatten everybody else's terms to zero.
   const servers: StandingServer[] = base.map((s) => {
-    const peers = base.filter((p) => bracketOf(p.qualified) === bracketOf(s.qualified));
+    const peers = base.filter((p) => p.rung === s.rung);
     const score = Math.round(live.reduce((a, k) =>
       a + percentile(TERM_VALUE[k](s), peers.map(TERM_VALUE[k])) * terms[k], 0) * 100) / 100;
     return { ...s, score, decay: 1, final: score };
@@ -193,10 +220,10 @@ export async function standingFor(
   // ===== Divide: your share of the pool is your share of the score =====
   const { payouts } = weekPayouts(
     pool,
-    servers.map((s) => ({ guildId: s.guildId, score: s.final, bracket: bracketOf(s.qualified) })),
+    servers.map((s) => ({ guildId: s.guildId, score: s.final, rung: s.rung })),
   );
 
-  return { terms, servers, payouts, skippedForProfile, reason: "" };
+  return { terms, servers, payouts, skippedForProfile, skippedUnderFloor, reason: "" };
 }
 
 /** What one server is owed in a standing, or zero. */

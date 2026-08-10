@@ -26,20 +26,31 @@ const near = (name: string, got: number, want: number, tol = 0.02) =>
 const { getDb, schema } = await import("../../lib/db/index.ts");
 const { and, eq, inArray } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
-const { closeWeek, weekKey, tierOf, TIERS } = await import("../../lib/week-close.ts");
+const { closeWeek, weekKey } = await import("../../lib/week-close.ts");
+const { rungOf, RUNGS, EARN_FLOOR } = await import("../../lib/ladder.ts");
 const { weekStartOf } = await import("../../lib/guild-snapshot.ts");
 const { JOBS, WEEKLY_DAY, runAllJobs } = await import("../../lib/jobs.ts");
 
 const db = await getDb();
 
-console.log("== tiers are labels, and slots scale with the field ==");
+console.log("== one ladder, and slots scale with the field ==");
 {
-  ok("a new server is small", tierOf(0) === "small");
-  ok("500 qualified is mid", tierOf(500) === "mid");
-  ok("5,000 is large", tierOf(5000) === "large");
-  ok("…and 4,999 is not", tierOf(4999) === "mid");
+  // M3. There were four of these lists and they disagreed: the one this module
+  // used to own put "large" at 5,000 while the brackets that decided the money
+  // put it at 1,000. A server with 2,000 qualified members was labelled one
+  // thing and paid out of another. There is one array now.
+  ok("a server below the floor is on no rung at all", rungOf(EARN_FLOOR - 1) === null);
+  ok("the floor puts you on the bottom rung", rungOf(EARN_FLOOR) === RUNGS[0].key);
+  ok("50 qualified is the middle rung", rungOf(50) === "growing");
+  ok("…and 49 is not", rungOf(49) === "linked");
+  ok("100 qualified is the top rung", rungOf(100) === "established");
+  ok("…and 99 is not", rungOf(99) === "growing");
   ok("there are exactly three, and none of them names a rate",
-    TIERS.length === 3 && !TIERS.some((t) => "ownerPct" in t));
+    RUNGS.length === 3 && !RUNGS.some((t) => "ownerPct" in t));
+  ok("…and their shares total 100", RUNGS.reduce((a, t) => a + t.share, 0) === 100);
+  // The bar is LOW on purpose, and a test is where that intent survives a
+  // future edit that thinks 500 sounded more serious.
+  ok("the bar to start earning is deliberately low", EARN_FLOOR <= 10, String(EARN_FLOOR));
 
   // SLOTS ARE RETIRED. `slotsFor` paid the top 20% on a 1/(rank+1) ladder,
   // which put a cliff at #21 — 20th got a cheque and 21st got nothing over one

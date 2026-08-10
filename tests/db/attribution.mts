@@ -30,7 +30,8 @@ const eq = (name: string, got: unknown, want: unknown) =>
 const near = (name: string, got: number, want: number, tol = 0.001) =>
   ok(name, Math.abs(got - want) < tol, `got ${got}, want ${want}`);
 
-const { exclusiveEntrants, percentile, scoreWeek, weekPayouts, bracketOf, BRACKETS, SCORE_WEIGHTS } =
+const { RUNGS, rungOf, EARN_FLOOR } = await import("../../lib/ladder.ts");
+const { exclusiveEntrants, percentile, scoreWeek, weekPayouts, SCORE_WEIGHTS } =
   await import("../../lib/server-score.ts");
 const { DEFAULT_SPLIT, SPLIT_PRESETS, splitProblems, allocate, VAULTS, transfer, balances, postToLedger } =
   await import("../../lib/vaults.ts");
@@ -104,22 +105,27 @@ console.log("\n== decay, not a cooldown ==");
   ok("…and so is the slot ladder", !("slotsFor" in score));
 }
 
-console.log("\n== brackets: big servers cannot eat the small pool ==");
+console.log("\n== rungs: big servers cannot eat the small rung's pool ==");
 {
-  eq("the three brackets total 100%", BRACKETS.reduce((a, b) => a + b.share, 0), 100);
-  eq("a 0-member server is small", bracketOf(0), "small");
-  eq("499 is still small", bracketOf(499), "small");
-  eq("500 is mid", bracketOf(500), "mid");
-  eq("1,000 is large", bracketOf(1000), "large");
+  eq("the three rungs total 100%", RUNGS.reduce((a, b) => a + b.share, 0), 100);
+  // M3: the bottom of the ladder is a BAR, not zero. Below it there is no rung
+  // at all, which is what stops a guild with one linked member taking a
+  // percentile position and a flat share off servers that did the work.
+  eq("a server with nobody linked is on no rung", rungOf(0), null);
+  eq(`${EARN_FLOOR - 1} linked is still off the ladder`, rungOf(EARN_FLOOR - 1), null);
+  eq("the floor is the bottom rung", rungOf(EARN_FLOOR), "linked");
+  eq("49 is still the bottom rung", rungOf(49), "linked");
+  eq("50 is the middle rung", rungOf(50), "growing");
+  eq("100 is the top rung", rungOf(100), "established");
 
-  // THE QUESTION THIS ANSWERS: four large servers turn up. Can they take
+  // THE QUESTION THIS ANSWERS: two big servers turn up. Can they take
   // everything? Under fixed per-server percentages they could — 4 × 25% is the
-  // whole pool. Under brackets they take the large bracket's share and no more.
+  // whole pool. Split by rung they take their own rung's share and no more.
   const ranked = [
-    { guildId: "s1", score: 80, bracket: "small" as const },
-    { guildId: "s2", score: 40, bracket: "small" as const },
-    { guildId: "L1", score: 90, bracket: "large" as const },
-    { guildId: "L2", score: 90, bracket: "large" as const },
+    { guildId: "s1", score: 80, rung: "linked" as const },
+    { guildId: "s2", score: 40, rung: "linked" as const },
+    { guildId: "L1", score: 90, rung: "established" as const },
+    { guildId: "L2", score: 90, rung: "established" as const },
   ];
   const { payouts } = weekPayouts(10_000, ranked);
   const by = Object.fromEntries(payouts.map((p) => [p.guildId, p.amount]));
@@ -128,26 +134,62 @@ console.log("\n== brackets: big servers cannot eat the small pool ==");
 
   ok("every share adds back to the pool",
     Math.abs(smallTotal + largeTotal - 10_000) < 0.05, `${smallTotal + largeTotal}`);
-  // 60 : 15 with the mid bracket empty → 80% / 20%.
-  ok("the small bracket keeps the larger share even against higher scores",
-    smallTotal > largeTotal * 3, `small ${smallTotal.toFixed(2)} vs large ${largeTotal.toFixed(2)}`);
-  ok("…and two identical large servers split their bracket evenly",
+  // 60 : 15 with the middle rung empty → 80% / 20%.
+  ok("the bottom rung keeps the larger share even against higher scores",
+    smallTotal > largeTotal * 3, `bottom ${smallTotal.toFixed(2)} vs top ${largeTotal.toFixed(2)}`);
+  ok("…and two identical top-rung servers split their rung evenly",
     Math.abs((by.L1 ?? 0) - (by.L2 ?? 0)) < 0.05);
-  // Within the small bracket: 80 vs 40 is 2:1 on the competitive half, plus a
-  // flat share each. The higher scorer must be ahead — that is the whole
-  // incentive to climb, which an equal split would have removed.
-  ok("a higher score is paid more inside a bracket", (by.s1 ?? 0) > (by.s2 ?? 0),
+  // Within a rung: 80 vs 40 is 2:1 on the competitive half, plus a flat share
+  // each. The higher scorer must be ahead — that is the incentive to compete,
+  // which an equal split would have removed.
+  ok("a higher score is paid more inside a rung", (by.s1 ?? 0) > (by.s2 ?? 0),
     `${by.s1} vs ${by.s2}`);
 }
 
-console.log("\n== an empty bracket gives its share away ==");
+console.log("\n== climbing pays, and WHY it pays ==");
+{
+  // THE CLAIM THE LADDER MAKES TO AN OWNER: link more members, get a bigger
+  // share. It is true, and it is worth being exact about why, because the
+  // reason is not a rate and cannot be turned into one.
+  //
+  // A rung's share of the pool goes DOWN as you climb — 60 / 25 / 15. What goes
+  // up is the share PER SERVER, because the top rung is divided between far
+  // fewer servers. So the effect depends on the shape of the network, not on a
+  // promise: rung 2 beats rung 1 per server only while rung 1 holds more than
+  // 2.4× as many servers.
+  //
+  // That is the true statement and it is the one the copy makes. A guaranteed
+  // per-server percentage is the thing that cannot add up — twenty servers at
+  // 5% is 100% of a number we collected once, twenty-one is 105%.
+  const field = [
+    ...Array.from({ length: 40 }, (_, i) => ({ guildId: `b${i}`, score: 50, rung: "linked" as const })),
+    ...Array.from({ length: 8 }, (_, i) => ({ guildId: `m${i}`, score: 50, rung: "growing" as const })),
+    ...Array.from({ length: 2 }, (_, i) => ({ guildId: `t${i}`, score: 50, rung: "established" as const })),
+  ];
+  const { payouts } = weekPayouts(10_000, field);
+  const amt = (id: string) => payouts.find((p) => p.guildId === id)?.amount ?? 0;
+
+  near("the whole pool is distributed", payouts.reduce((a, p) => a + p.amount, 0), 10_000, 0.05);
+  ok("rung 2 pays more per server than rung 1", amt("m0") > amt("b0"), `${amt("m0")} vs ${amt("b0")}`);
+  ok("…and rung 3 more than rung 2", amt("t0") > amt("m0"), `${amt("t0")} vs ${amt("m0")}`);
+
+  // And the guard in the other direction: the whole bottom rung together still
+  // out-earns the whole top rung, so a network of small servers is never a
+  // network being farmed by a handful of large ones.
+  const bottom = payouts.filter((p) => p.guildId.startsWith("b")).reduce((a, p) => a + p.amount, 0);
+  const top = payouts.filter((p) => p.guildId.startsWith("t")).reduce((a, p) => a + p.amount, 0);
+  ok("…while the small servers still take the most money in total", bottom > top * 3,
+    `bottom ${bottom.toFixed(2)} vs top ${top.toFixed(2)}`);
+}
+
+console.log("\n== an empty rung gives its share away ==");
 {
   // Money set aside for servers that did not turn up is money nobody can be
   // paid, and holding it back would shrink a pool that was already announced.
-  const only = [{ guildId: "a", score: 10, bracket: "small" as const }];
+  const only = [{ guildId: "a", score: 10, rung: "linked" as const }];
   const { payouts } = weekPayouts(1000, only);
   const total = payouts.reduce((a, p) => a + p.amount, 0);
-  ok("one small server alone takes the whole pool", Math.abs(total - 1000) < 0.05, String(total));
+  ok("one bottom-rung server alone takes the whole pool", Math.abs(total - 1000) < 0.05, String(total));
 }
 
 console.log("\n== everyone who took part is paid something ==");
@@ -155,7 +197,7 @@ console.log("\n== everyone who took part is paid something ==");
   // No cliff at #21. The old slot ladder paid the top 20% and nothing to the
   // rest, so 20th place got a cheque and 21st got nothing over one entrant.
   const many = Array.from({ length: 30 }, (_, i) => ({
-    guildId: `g${i}`, score: 30 - i, bracket: "small" as const,
+    guildId: `g${i}`, score: 30 - i, rung: "linked" as const,
   }));
   const { payouts } = weekPayouts(10_000, many);
   eq("all thirty are paid", payouts.length, 30);
@@ -179,7 +221,7 @@ console.log("\n== a distribution has no floor, and loses nothing. M2 ==");
   // own database, so there is no fee to justify a minimum and nothing may be
   // withheld.
   const many = Array.from({ length: 40 }, (_, i) => ({
-    guildId: `t${i}`, score: 1, bracket: "small" as const,
+    guildId: `t${i}`, score: 1, rung: "linked" as const,
   }));
   const { payouts } = weekPayouts(200, many);
 

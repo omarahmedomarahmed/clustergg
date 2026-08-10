@@ -99,7 +99,7 @@ export default function PayoutQueue({ payouts, guilds, providerLabel, manual }: 
             </label>
             <label className="min-w-[16rem] flex-1 text-[10px] uppercase tracking-widest text-muted">
               What it&apos;s for — the owner reads this
-              <input name="label" required placeholder="e.g. Launch bonus for hitting 1,000 linked" className={`${field} mt-0.5 block w-full`} />
+              <input name="label" required placeholder="e.g. Launch bonus for hitting the top rung" className={`${field} mt-0.5 block w-full`} />
             </label>
             <label className="text-[10px] uppercase tracking-widest text-muted">
               Amount

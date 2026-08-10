@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Icon from "@/components/Icon";
 import { STAGES, STAGE_ORDER } from "@/lib/challenge-stage";
-import { BRACKETS, PARTICIPATION_SHARE } from "@/lib/server-score";
+import { PARTICIPATION_SHARE } from "@/lib/server-score";
+import { RUNGS, EARN_FLOOR } from "@/lib/ladder";
 import { quotePrivate, PRIVATE_FEE_PCT } from "@/lib/private-quote";
 import { MIN_WITHDRAWAL } from "@/lib/server-wallet";
 
@@ -11,7 +12,7 @@ import { MIN_WITHDRAWAL } from "@/lib/server-wallet";
 //
 // The marketing pages described a version of Cluster that stopped being true
 // three sprints ago. They talked about tiers and per-challenge percentages;
-// the product has a status ladder, a bracketed weekly pool, a wallet an owner
+// the product has one ladder, a weekly pool split across its rungs, a wallet an owner
 // spends from, and two separate gates on a challenge. None of it was on a
 // public page, so the only way to find out how the thing works was to install
 // it.
@@ -19,7 +20,7 @@ import { MIN_WITHDRAWAL } from "@/lib/server-wallet";
 // ===== SHOWN, NOT DESCRIBED =====
 //
 // Every panel below renders the SAME vocabulary the product uses, from the same
-// modules: `STAGES` is the admin's ladder, `BRACKETS` is what the weekly close
+// modules: `STAGES` is the admin's ladder, `RUNGS` is what the weekly close
 // divides by, `quotePrivate` is the function that charges a wallet. A marketing
 // page that paraphrases the product drifts from it within a month; one that
 // imports it cannot.
@@ -143,15 +144,15 @@ function Gate({ icon, tone, when, what, why }: {
 
 /** The weekly pool, drawn from the shares the close actually uses. */
 function PoolPanel() {
-  const total = BRACKETS.reduce((a, b) => a + b.share, 0);
+  const total = RUNGS.reduce((a, b) => a + b.share, 0);
   return (
     <Panel
-      title="A weekly pool, split by size bracket"
-      lede="Every Monday the servers that carried a public challenge share what brands paid that week. A bracket decides who you are compared against — nothing else."
+      title="A weekly pool, split by rung"
+      lede="Every Monday the servers that carried a public challenge share what brands paid that week. Your rung decides who you are compared against — nothing else."
       wide
     >
       <div className="flex h-10 w-full overflow-hidden rounded-xl border border-white/10">
-        {BRACKETS.map((b, i) => (
+        {RUNGS.map((b, i) => (
           <div
             key={b.key}
             style={{ width: `${(b.share / total) * 100}%` }}
@@ -166,11 +167,11 @@ function PoolPanel() {
         ))}
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-3">
-        {BRACKETS.map((b) => (
+        {RUNGS.map((b) => (
           <div key={b.key} className="rounded-xl border border-white/10 bg-black/25 px-3 py-2.5">
-            <div className="text-sm font-bold">{b.label} servers</div>
+            <div className="text-sm font-bold">{b.name}</div>
             <div className="text-[11px] text-muted">
-              {b.floor === 0 ? "Under 500 qualified members" : `${b.floor.toLocaleString("en-US")}+ qualified members`}
+              {b.threshold.toLocaleString("en-US")}+ linked members
             </div>
             <div className="mt-1 text-[11px] text-cyan-200">{b.share}% of the pool</div>
           </div>
@@ -179,8 +180,13 @@ function PoolPanel() {
       <p className="mt-3 text-xs leading-relaxed text-muted">
         <b className="text-ink">{PARTICIPATION_SHARE}% of the pool is split evenly</b> between everybody
         who carried a challenge, placed or not — turning up is worth something. The rest is shared in
-        proportion to score, inside your bracket, so four large servers can never take the share set
-        aside for small ones. There are no places and no cliff.
+        proportion to score, inside your rung, so the biggest servers can never take the share set
+        aside for the smallest. There are no places and no cliff.
+      </p>
+      <p className="mt-2 text-xs leading-relaxed text-muted">
+        The whole bar to start earning is <b className="text-ink">{EARN_FLOOR} linked members</b>.
+        Not {EARN_FLOOR} joins and not {EARN_FLOOR} people online — {EARN_FLOOR} who have connected a
+        game account.
       </p>
     </Panel>
   );

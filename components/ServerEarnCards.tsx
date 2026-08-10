@@ -125,7 +125,7 @@ export default function ServerEarnCards({
       <p className="mt-5 text-center text-xs text-muted max-w-2xl mx-auto leading-relaxed">
         <Icon name="alert" size={12} className="inline mr-1.5 -mt-0.5 text-amber-300" />
         Size alone doesn&apos;t unlock anything. A server with 50,000 members and no linked accounts earns nothing —
-        the {first ? first.threshold.toLocaleString() : "500"} is how we prove to a brand that the audience is real,
+        the {first ? first.threshold.toLocaleString() : "10"} is how we prove to a brand that the audience is real,
         and it is the same number for everyone.
       </p>
     </div>

@@ -13,7 +13,7 @@ import { listRequests, requestableGames } from "@/lib/challenge-requests";
 import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { hqInviteUrl } from "@/lib/discord/hq";
-import { nextEarnTier } from "@/lib/server-earnings";
+import { nextRung } from "@/lib/ladder";
 import { DEFAULT_SPLIT } from "@/lib/vaults";
 import { PARTICIPATION_SHARE } from "@/lib/server-score";
 import { PAYOUT_HOLD_PHRASE } from "@/lib/abuse";
@@ -1169,7 +1169,7 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
   if (done.length) lines.push(`**${done.length} finished** — trophies already handed out.`);
   if (portal) {
     lines.push("");
-    lines.push(`**Your portal:** ${siteUrl()}/servers/${portal.slug} — every member's progress, the traffic your challenges send you, your tier and your badges. The key was DM'd to you at install; tap below to have it sent again.`);
+    lines.push(`**Your portal:** ${siteUrl()}/servers/${portal.slug} — every member's progress, the traffic your challenges send you, your rung and your badges. The key was DM'd to you at install; tap below to have it sent again.`);
   }
   if (!lines.length) {
     lines.push("You haven't run a challenge yet.");
@@ -1628,13 +1628,15 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   // to quote a per-server RATE ("you keep 25% of every sponsored challenge"),
   // which is the promise the weekly pool replaced. Quoting both would promise
   // the same money twice, in the one place an owner is most likely to screenshot.
-  const next = nextEarnTier(stats.linked);
+  const next = nextRung(stats.linked);
   const rate = `**${DEFAULT_SPLIT.server}%** of every sponsored challenge goes into the weekly server pool. `
     + `**${PARTICIPATION_SHARE}%** of it is split evenly between every server that carried a challenge that week; `
     + `the rest is competed for. ${PAYOUT_HOLD_PHRASE}`;
   const upgrade = next
-    ? `**${(next.threshold - stats.linked).toLocaleString()} more** moves you into the next tier — a different set of servers to compete against, not a different rate.`
-    : "You are in the top tier, competing for the largest slots in the pool.";
+    ? `**${(next.threshold - stats.linked).toLocaleString()} more** moves you up to ${next.name} — `
+      + `${next.share}% of the pool, contested only by servers that size. It is not a rate: what goes up `
+      + `is your share per server, because far fewer servers divide it.`
+    : `You are on the top rung, competing with the fewest servers for its own slice of every week's pool.`;
 
   const lines = stats.unlocked
     ? [

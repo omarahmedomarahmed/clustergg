@@ -139,7 +139,7 @@ export const SHOT_REGISTRY: ShotDef[] = [
   { key: "gamer.planet.page", group: "gamer", claim: "A planet per game, with its own world", capturedFrom: "/planets", as: "guest" },
 
   // ---- The server owner ----
-  { key: "server.tier.flagship", group: "server", claim: "Owners take 25% at 5,000 linked", capturedFrom: "/servers", as: "guest" },
+  { key: "server.tier.flagship", group: "server", claim: "One ladder: 10, 50, 100 linked", capturedFrom: "/servers", as: "guest" },
   { key: "server.earnings.ledger", group: "server", claim: "Every line itemised", capturedFrom: "/servers/demo-guild-nebula-1?key=DEMO-DNEBULA1", as: "server", openText: "Earnings" },
   { key: "server.members.winnings", group: "server", claim: "Your members' winnings, paid to them", capturedFrom: "/servers/demo-guild-nebula-2?key=DEMO-DNEBULA2", as: "server", openText: "Server board" },
   { key: "server.growth.journey", group: "server", claim: "A ladder you can see yourself climbing", capturedFrom: "/servers/demo-guild-nebula-3?key=DEMO-DNEBULA3", as: "server" },

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { EARN_FLOOR } from "@/lib/ladder";
 import ProductAtlas from "@/components/marketing/ProductAtlas";
 import LiveBotCard from "@/components/marketing/LiveBotCard";
 import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
@@ -578,7 +579,7 @@ export default async function LandingPage() {
           />
           <DoorCard
             icon="satellite" tone="emerald" title="I run a Discord"
-            body="Install the bot free, link 500 gamers, and brands start sponsoring challenges in your server — with the prize money won by your members."
+            body={`Install the bot free, link ${EARN_FLOOR} gamers, and you are earning — brands sponsor the challenges, your members win the prize money, and every Monday you take a share of what those brands paid.`}
             href="/discord-bot" cta="Add ClusterBot"
           />
           <DoorCard

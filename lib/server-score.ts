@@ -20,6 +20,8 @@
 // So: every term is either DEDUPLICATED, QUALIFIED, or PER-CAPITA, and the raw
 // member count scores nothing at all.
 
+import { RUNGS, type RungKey } from "@/lib/ladder";
+
 /**
  * Each term is percentile-ranked within its bracket, so one outlier cannot own
  * the pool.
@@ -131,36 +133,16 @@ export function scoreWeek(me: ServerWeek, tier: ServerWeek[]): number {
   ) * 100) / 100;
 }
 
-/**
- * ===== SIZE BRACKETS =====
- *
- * The pool is split by bracket BEFORE anything is scored, and that split is the
- * answer to the only fairness question owners actually ask: can four big servers
- * take everything?
- *
- * They cannot. A large server competes for the large bracket's share and can
- * never reach the small one's. Fixed per-server percentages could never do this
- * — 20 small servers at 5% is 100%, 21 is 105%, and four large servers at 25% is
- * the whole pool with nothing left for anybody else. Percentages only add up
- * when they are computed, not assigned.
- *
- * An EMPTY bracket gives its share to the others, pro-rata. Money set aside for
- * servers that did not turn up is money nobody can be paid, and holding it back
- * would shrink a pool that was already announced.
- */
-export const BRACKETS = [
-  { key: "small", label: "Small", floor: 0, share: 60 },
-  { key: "mid", label: "Mid", floor: 500, share: 25 },
-  { key: "large", label: "Large", floor: 1000, share: 15 },
-] as const;
-export type BracketKey = (typeof BRACKETS)[number]["key"];
-
-/** Which bracket a server competes in, by qualified linked members. */
-export function bracketOf(qualifiedLinked: number): BracketKey {
-  let k: BracketKey = "small";
-  for (const b of BRACKETS) if (qualifiedLinked >= b.floor) k = b.key;
-  return k;
-}
+// ===== SIZE BRACKETS ARE THE LADDER. M3 =====
+//
+// There used to be a `BRACKETS` array here — small/mid/large at 0/500/1,000 —
+// alongside three other lists of server sizes elsewhere in the codebase. The
+// one in `lib/week-tiers.ts` put "large" at 5,000, so the label a server was
+// shown and the bracket its money came out of disagreed by a factor of five.
+//
+// A rung, a bracket and a label were only ever three readings of one number.
+// They are one list now: `lib/ladder.ts`. The reasoning for splitting the pool
+// by rung rather than assigning per-server percentages lives there.
 
 /**
  * **20% flat to every server that took part**, whether or not they placed.
@@ -218,39 +200,40 @@ export type Payout = { guildId: string; amount: number; kind: "participation" | 
  */
 export function weekPayouts(
   pool: number,
-  ranked: { guildId: string; score: number; bracket?: BracketKey }[],
+  ranked: { guildId: string; score: number; rung?: RungKey }[],
   opts: { participationShare?: number } = {},
 ): { payouts: Payout[] } {
   const partPct = opts.participationShare ?? PARTICIPATION_SHARE;
   const payouts: Payout[] = [];
   if (!ranked.length || !(pool > 0)) return { payouts: [] };
 
-  // ===== Split the pool by bracket, then give empty brackets away =====
-  const present = new Set(ranked.map((r) => r.bracket ?? "small"));
-  const liveShare = BRACKETS.filter((b) => present.has(b.key)).reduce((a, b) => a + b.share, 0);
-  const poolOf = (k: BracketKey) => {
+  // ===== Split the pool by rung, then give empty rungs away =====
+  const bottom = RUNGS[0].key;
+  const present = new Set(ranked.map((r) => r.rung ?? bottom));
+  const liveShare = RUNGS.filter((r) => present.has(r.key)).reduce((a, r) => a + r.share, 0);
+  const poolOf = (k: RungKey) => {
     if (!liveShare) return 0;
-    const b = BRACKETS.find((x) => x.key === k)!;
-    // Normalised against only the brackets that turned up, so an empty one's
-    // share flows to the others rather than stranding money with no destination.
-    return pool * (b.share / liveShare);
+    const r = RUNGS.find((x) => x.key === k)!;
+    // Normalised against only the rungs that turned up, so an empty one's share
+    // flows to the others rather than stranding money with no destination.
+    return pool * (r.share / liveShare);
   };
 
-  for (const b of BRACKETS) {
-    if (!present.has(b.key)) continue;
-    const inBracket = ranked.filter((r) => (r.bracket ?? "small") === b.key);
-    const bracketPool = poolOf(b.key);
+  for (const rungRow of RUNGS) {
+    if (!present.has(rungRow.key)) continue;
+    const inRung = ranked.filter((r) => (r.rung ?? bottom) === rungRow.key);
+    const rungPool = poolOf(rungRow.key);
 
     // Flat, to everyone who took part.
-    const partPool = bracketPool * (partPct / 100);
-    const each = partPool / inBracket.length;
-    for (const r of inBracket) payouts.push({ guildId: r.guildId, amount: each, kind: "participation" });
+    const partPool = rungPool * (partPct / 100);
+    const each = partPool / inRung.length;
+    for (const r of inRung) payouts.push({ guildId: r.guildId, amount: each, kind: "participation" });
 
     // Competitive, in proportion to score.
-    const compPool = bracketPool - partPool;
-    const total = inBracket.reduce((a, r) => a + Math.max(0, r.score), 0);
+    const compPool = rungPool - partPool;
+    const total = inRung.reduce((a, r) => a + Math.max(0, r.score), 0);
     if (total > 0) {
-      for (const r of inBracket) {
+      for (const r of inRung) {
         const share = Math.max(0, r.score) / total;
         if (share > 0) payouts.push({ guildId: r.guildId, amount: compPool * share, kind: "placement" });
       }
@@ -258,8 +241,8 @@ export function weekPayouts(
       // Nobody scored. The competitive money joins the flat share rather than
       // vanishing — it was announced as this week's pool and it is owed to the
       // servers that turned up.
-      const extra = compPool / inBracket.length;
-      for (const r of inBracket) payouts.push({ guildId: r.guildId, amount: extra, kind: "participation" });
+      const extra = compPool / inRung.length;
+      for (const r of inRung) payouts.push({ guildId: r.guildId, amount: extra, kind: "participation" });
     }
   }
 

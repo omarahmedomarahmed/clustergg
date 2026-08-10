@@ -29,35 +29,16 @@ import { PRICING_DEFAULTS, prizeSharePct, type PricingConfig } from "@/lib/prici
 // competed for on things that cost real effort to move. `lib/server-score.ts`
 // holds the scoring; `lib/week-close.ts` runs it.
 //
-// ===== WHAT TIERS ARE NOW =====
+// ===== THE TIER LIST THAT LIVED HERE IS GONE. M3 =====
 //
-// Labels. A tier decides who a server competes against in the weekly pool and
-// nothing else. The thresholds are unchanged so an owner's badge does not move
-// under them, and the perks that were never money — priority, exclusivity,
-// being named on the broadcast — are unchanged too.
-
-export type EarnTier = {
-  key: string;
-  /** Linked gamers required. Linked — not members, not joins. */
-  threshold: number;
-};
-
-/** Size labels. There is deliberately no rate on them any more — C3. */
-export const EARN_TIERS: EarnTier[] = [
-  { key: "seed", threshold: 0 },
-  { key: "monetized", threshold: 500 },
-  { key: "broadcaster", threshold: 1000 },
-  { key: "sponsored", threshold: 5000 },
-];
+// `EARN_TIERS` was one of four lists of server sizes, and the four did not
+// agree. There is one now, in `lib/ladder.ts`, and it is a rung, a bracket and
+// a label at once because those were only ever three readings of the same
+// number. `nextEarnTier` is `nextRung` there.
 
 /** The whole platform fee, as a % of the challenge price. 100 − the prize share. */
 export function platformFeePct(cfg: PricingConfig = PRICING_DEFAULTS): number {
   return Math.max(0, 100 - prizeSharePct(cfg));
-}
-
-/** The next rung, and what it takes to reach it. Null at the top. */
-export function nextEarnTier(linked: number): EarnTier | null {
-  return EARN_TIERS.find((t) => t.threshold > linked) ?? null;
 }
 
 export type ChallengeEarning = {
