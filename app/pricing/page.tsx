@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 export const metadata = {
   title: "What it costs to advertise to gamers on Discord",
   description:
-    "$250 a sponsored challenge — $175 of it is the prize pool that reaches a gamer. The published rate card for Discord gaming advertising, with reach stated before you spend.",
+    "One price for a sponsored challenge, half of it the prize pool that reaches a gamer. The published rate card for Discord gaming advertising, with reach stated before you spend.",
 };
 
 // The rate card.

@@ -12,7 +12,7 @@
 //   2. "Following, messaging and gifting stay." **Gifting was deleted in
 //      B72.3**, because a transfer of redeemable value between two accounts is
 //      a money-transmission trigger, a 1099 aggregation hole and an under-18
-//      cash-out bypass at once. It reached `docs/PLAN.md` and a commit message.
+//      cash-out bypass at once. It reached the dev log and a commit message.
 //
 // Neither was a typo and neither was a code defect. **The code was right both
 // times.** Both came from reading a document written before the change and
@@ -77,9 +77,19 @@ export const RETIRED: Retired[] = [
     what: "posts, comments and reactions",
     pattern: "\\b(?:post feed|community feed|comment thread|post reaction|write a post)\\b",
     cleared: ["B111", "B68", "delet", "removed", "retired", "no longer", "⚠", "used to", "purge"],
-    evidence: "lib/social-purge.ts",
-    evidenceSays: "SOCIAL_TABLES",
-    why: "Cluster is a competition and earning layer, not a social network. The feed was the part nobody used and everybody had to moderate.",
+    evidence: "lib/legacy-drop.ts",
+    evidenceSays: "DROPPED_TABLES",
+    why: "Cluster is a competition and earning layer, not a social network. The feed was the part nobody used and everybody had to moderate. B116 dropped the five tables outright — production held zero rows in every one of them, so there was never a post on this platform a person wrote.",
+  },
+  {
+    what: "the badge system on gamer profiles",
+    pattern: "\\bbadge (?:catalogue|shelf|criteria)\\b|earn(?:s|ed)? a badge|badges on (?:your|their|the gamer\'s) profile",
+    // "quest badge" / "tier badge" is the LIVE quest progression and must not be
+    // cleared by accident — those phrases are not matched by the pattern above.
+    cleared: ["B116", "delet", "removed", "retired", "no longer", "⚠", "used to", "dropped"],
+    evidence: "lib/legacy-drop.ts",
+    evidenceSays: "user_badges",
+    why: "Badges were the pre-pivot achievement shelf: twelve definitions with criteria like \"20 posts with 50 likes received\" and \"earn Expert tier in a Space\" — rules that count things this platform no longer has. Trophies replaced them, and a trophy carries a dollar value a gamer can redeem. A badge was a picture.",
   },
   {
     what: "the placements / reach / ultimate pricing tiers",
@@ -94,7 +104,7 @@ export const RETIRED: Retired[] = [
 /** Live documents. Anything under `docs/legacy/` is history and exempt by design. */
 export const LIVE_DOCS = [
   "README.md",
-  "docs/PLAN.md",
+  "docs/SOURCE_OF_TRUTH.md",
   "docs/MODEL.md",
   "docs/HANDOVER.md",
   "docs/ARCHITECTURE.md",
@@ -124,7 +134,7 @@ export const CLEAR_SAME_LINE = true;
 /**
  * The opt-out, for quoting a document that was true when it was written.
  *
- * Explicit and ugly on purpose. `docs/PLAN.md` quotes B68's brief — which says
+ * Explicit and ugly on purpose. The dev log quoted B68's brief — which says
  * gifting stays — because the quote is the point of the entry. Marking it costs
  * one comment; leaving the rule loose enough to allow it unmarked cost two
  * shipped errors.

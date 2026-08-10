@@ -58,7 +58,7 @@ export type Metrics = Record<MetricKey, number>;
 const ZERO = Object.fromEntries(METRICS.map((m) => [m.key, 0])) as Metrics;
 
 // `since` narrows the time-bounded metrics (interactions, impressions, clicks,
-// posts). The stock counts — how many games exist — ignore it, because "games
+// challenges). The stock counts — how many games exist — ignore it, because "games
 // created in the last 7 days" is not a useful reading of that number.
 export async function loadMetrics(since?: Date): Promise<Metrics> {
   const out: Metrics = { ...ZERO };

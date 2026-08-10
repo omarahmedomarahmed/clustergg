@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { eq, inArray } from "drizzle-orm";
+import { and, count, eq, gt, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getT } from "@/lib/i18n/t-server";
@@ -22,6 +22,16 @@ export default async function PlanetsDirectory() {
     ? await db.select().from(schema.games).where(inArray(schema.games.name, gameNames))
     : [];
   const gameByName = new Map(gameRows.map((g) => [g.name, g]));
+
+  // Live challenges per planet — the number that means something now. The tile
+  // used to print a post count next to the member count; posts are gone, and a
+  // planet's worth to somebody deciding where to spend an evening is how much
+  // is running on it, not how much was once written there.
+  const liveRows = await db.select({ spaceId: schema.challenges.spaceId, n: count() })
+    .from(schema.challenges)
+    .where(and(eq(schema.challenges.status, "active"), gt(schema.challenges.endAt, new Date())))
+    .groupBy(schema.challenges.spaceId);
+  const liveBySpace = new Map(liveRows.map((r) => [r.spaceId, Number(r.n)]));
   const { tr } = await getT(user?.locale);
 
   return (
@@ -68,7 +78,7 @@ export default async function PlanetsDirectory() {
                 <p className="text-sm text-muted flex-1">{s.description}</p>
                 <div className="mt-4 flex gap-4 text-xs text-muted">
                   <span className="inline-flex items-center gap-1.5"><Icon name="users" size={13} /> {s.memberCount}</span>
-                  <span className="inline-flex items-center gap-1.5"><Icon name="message" size={13} /> {s.postCount}</span>
+                  <span className="inline-flex items-center gap-1.5"><Icon name="zap" size={13} /> {liveBySpace.get(s.id) ?? 0} {tr("live")}</span>
                   {s.game && <span className="ml-auto text-cyan-300">{s.game}</span>}
                 </div>
               </div>

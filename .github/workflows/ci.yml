@@ -47,9 +47,24 @@ on:
     branches: [main, "claude/**"]
 
 concurrency:
-  # A newer push supersedes an in-flight run on the same ref. Green on stale
-  # code is worse than no signal, because somebody will read it as current.
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # Keyed on the HEAD BRANCH, not on `github.ref`. B116.
+  #
+  # A newer push must supersede an in-flight run on the same code — green on
+  # stale code is worse than no signal, because somebody reads it as current.
+  # That was already true. What was NOT handled is the same commit arriving
+  # twice under two different event names.
+  #
+  # B114.1 added `claude/**` to the push trigger so CI would run before a PR
+  # exists — a real fix for a real hole, nine commits having gone unchecked.
+  # But once a PR IS open, GitHub fires `push` AND `pull_request` for the same
+  # commit, and `github.ref` differs between them (`refs/heads/claude/x` versus
+  # `refs/pull/108/merge`). Two groups, no cancellation, every suite twice.
+  # Measured on #108: eight jobs for one push.
+  #
+  # `pull_request.head.ref` and `github.ref_name` are the same branch name, so
+  # keying on that puts both events in ONE group and the later arrival cancels
+  # the earlier. Pre-PR feedback is kept; the double bill is not.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.head.ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:

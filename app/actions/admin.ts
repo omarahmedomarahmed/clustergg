@@ -231,45 +231,6 @@ export async function adminResyncAccount(accountId: string) {
   revalidatePath("/admin/linked-accounts");
 }
 
-// ---------- Badges ----------
-//
-// Guarded by the page they belong to, not by "is staff". Defining what earns a
-// badge is the trophies desk's job; before this, anybody with a staff account
-// could rewrite the criteria of every badge on the platform.
-export async function saveBadge(formData: FormData) {
-  const { user: admin } = await requireSystemFor("/admin/badges");
-  const db = await getDb();
-  const badgeId = String(formData.get("badgeId") ?? "");
-  let criteria: Record<string, unknown> = {};
-  try { criteria = JSON.parse(String(formData.get("criteria") ?? "{}")); } catch { /* keep {} */ }
-  const values = {
-    code: slugify(String(formData.get("code") ?? "")),
-    name: String(formData.get("name") ?? "").trim(),
-    description: String(formData.get("description") ?? "").trim(),
-    icon: String(formData.get("icon") ?? "b1"),
-    category: String(formData.get("category") ?? "platform"),
-    criteria,
-    isActive: formData.get("isActive") === "on",
-  };
-  if (!values.name || !values.code) return;
-  if (badgeId) {
-    await db.update(schema.badges).set(values).where(eq(schema.badges.id, badgeId));
-    await audit(admin.id, "badge.update", "badge", badgeId);
-  } else {
-    await db.insert(schema.badges).values({ id: uid(), ...values }).onConflictDoNothing();
-    await audit(admin.id, "badge.create", "badge", values.code);
-  }
-  revalidatePath("/admin/badges");
-}
-
-export async function deleteBadge(badgeId: string) {
-  const { user: admin } = await requireSystemFor("/admin/badges");
-  const db = await getDb();
-  await db.delete(schema.badges).where(eq(schema.badges.id, badgeId));
-  await audit(admin.id, "badge.delete", "badge", badgeId);
-  revalidatePath("/admin/badges");
-}
-
 // ---------- Spaces ----------
 export async function saveSpace(formData: FormData) {
   const admin = await requireStaff();
@@ -296,14 +257,13 @@ export async function saveSpace(formData: FormData) {
   revalidatePath("/planets");
 }
 
-// Delete a planet (space) and its posts/members. Blocked when it still has
+// Delete a planet (space) and its members. Blocked when it still has
 // challenges, so we never orphan competition data.
 export async function deleteSpace(spaceId: string) {
   const admin = await requireStaff();
   const db = await getDb();
   const [ch] = await db.select({ c: count() }).from(schema.challenges).where(eq(schema.challenges.spaceId, spaceId));
   if (Number(ch?.c ?? 0) > 0) return; // keep planets that still have challenges
-  await db.delete(schema.posts).where(eq(schema.posts.spaceId, spaceId));
   await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, spaceId));
   await db.delete(schema.spaces).where(eq(schema.spaces.id, spaceId));
   await audit(admin.id, "space.delete", "space", spaceId);
@@ -341,7 +301,6 @@ export async function deleteLegacyPlanets() {
   for (const s of empties) {
     const [ch] = await db.select({ c: count() }).from(schema.challenges).where(eq(schema.challenges.spaceId, s.id));
     if (Number(ch?.c ?? 0) > 0) continue;
-    await db.delete(schema.posts).where(eq(schema.posts.spaceId, s.id));
     await db.delete(schema.spaceMembers).where(eq(schema.spaceMembers.spaceId, s.id));
     await db.delete(schema.spaces).where(eq(schema.spaces.id, s.id));
   }
@@ -375,49 +334,10 @@ export async function reviewSpaceRequest(requestId: string, approve: boolean, no
   revalidatePath("/admin/spaces/requests");
 }
 
-// B111. `adminDeletePost` and `togglePinPost` were here. With the feature gone
-// there is nothing to moderate and nothing to pin — and an admin action that
-// writes to a table no surface reads is a button whose only effect is an audit
-// row.
-//
-// The space-deletion paths above still clear `posts` by space id, deliberately:
-// deleting a planet has always taken its content with it, and leaving orphans
-// behind because the reader is gone would be worse than the tidy-up.
-
-export type SocialPurgeState = { ok?: boolean; error?: string; message?: string };
-
-/**
- * Destroy every post, comment and reaction. B111.
- *
- * ADMIN ONLY, not staff. This is irreversible destruction of user-authored
- * content — the one thing on this platform that cannot be rebuilt from anything
- * else — and `requireStaff` covers a support agent clearing a queue.
- *
- * Typed confirmation, not a second click. A dialog people click through is a
- * dialog that does not exist, and the count is on the page next to the box so
- * nobody presses it blind.
- */
-export async function purgeSocialContent(
-  _prev: SocialPurgeState, formData: FormData,
-): Promise<SocialPurgeState> {
-  const admin = await requireAdmin();
-  const typed = String(formData.get("confirm") ?? "").trim();
-  if (typed !== "DELETE") {
-    return { error: 'Type DELETE exactly to confirm. Nothing was deleted.' };
-  }
-  const db = await getDb();
-  const { purgeSocialRows } = await import("@/lib/social-purge");
-  const result = await purgeSocialRows(db);
-  const total = result.reduce((n, r) => n + r.deleted, 0);
-  await audit(admin.id, "social.purge", "social", String(total));
-  revalidatePath("/admin/games");
-  return {
-    ok: true,
-    message: total === 0
-      ? "Nothing to delete — the tables were already empty."
-      : `Deleted ${total.toLocaleString()} rows: ${result.filter((r) => r.deleted).map((r) => `${r.deleted.toLocaleString()} ${r.table}`).join(", ")}.`,
-  };
-}
+// B116. Post moderation, pinning and the social purge were all here. Posts,
+// comments, reactions and expert scores are dropped tables now — see
+// `lib/legacy-drop.ts` — so there is nothing to moderate, nothing to pin, and
+// nothing left to purge.
 
 // ---------- Challenges ----------
 /**

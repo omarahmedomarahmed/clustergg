@@ -1,5 +1,6 @@
 import { sql as dsql } from "drizzle-orm";
 import * as schema from "./schema";
+import { LEGACY_DROP_STATEMENTS } from "@/lib/legacy-drop";
 
 export type DB = ReturnType<typeof import("drizzle-orm/neon-http").drizzle<typeof schema>> |
   ReturnType<typeof import("drizzle-orm/node-postgres").drizzle<typeof schema>> |
@@ -1044,6 +1045,11 @@ const COLUMN_MIGRATIONS = [
      WHERE "payout_method" IS NOT NULL AND "payout_method" ? 'details'`,
   `UPDATE "users" SET "payout_method" = jsonb_set("payout_method", '{method}', '"bank"')
      WHERE "payout_method" IS NOT NULL AND "payout_method"->>'method' IN ('ach','instapay')`,
+  // The badge system and the social tables, gone. B116. Kept in their own
+  // module because this is the only entry in this list that DESTROYS rather
+  // than adds, and it should read as one decision with its reasons attached
+  // rather than as nine lines buried in a thousand-line array.
+  ...LEGACY_DROP_STATEMENTS,
 ];
 
 /**

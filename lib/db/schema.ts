@@ -273,26 +273,6 @@ export const statCurrent = pgTable("stat_current", {
   index("sc_game_metric_idx").on(t.game, t.metricKey),
 ]);
 
-// ===== Badges =====
-export const badges = pgTable("badges", {
-  id: id(),
-  code: text("code").notNull().unique(),
-  name: text("name").notNull(),
-  description: text("description").notNull(),
-  icon: text("icon").notNull().default("star"), // sprite key or emoji
-  category: text("category").notNull().default("platform"), // game | community | challenge | platform
-  criteria: jsonb("criteria").$type<Record<string, unknown>>().notNull().default({}),
-  isActive: boolean("is_active").notNull().default(true),
-});
-
-export const userBadges = pgTable("user_badges", {
-  id: id(),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  badgeId: text("badge_id").notNull().references(() => badges.id, { onDelete: "cascade" }),
-  context: text("context"),
-  awardedAt: now("awarded_at"),
-}, (t) => [uniqueIndex("ub_user_badge_idx").on(t.userId, t.badgeId)]);
-
 // ===== Social =====
 export const follows = pgTable("follows", {
   followerId: text("follower_id").notNull().references(() => users.id, { onDelete: "cascade" }),
@@ -354,9 +334,6 @@ export const spaces = pgTable("spaces", {
   isActive: boolean("is_active").notNull().default(true),
   createdBy: text("created_by"),
   memberCount: integer("member_count").notNull().default(0),
-  postCount: integer("post_count").notNull().default(0),
-  expertThresholds: jsonb("expert_thresholds").$type<{ contributor: number; helper: number; expert: number }>()
-    .notNull().default({ contributor: 10, helper: 50, expert: 150 }),
   createdAt: now("created_at"),
 });
 
@@ -378,50 +355,6 @@ export const spaceRequests = pgTable("space_requests", {
   reviewedAt: timestamp("reviewed_at", { withTimezone: true, mode: "date" }),
   createdAt: now("created_at"),
 });
-
-export const posts = pgTable("posts", {
-  id: id(),
-  spaceId: text("space_id").notNull().references(() => spaces.id, { onDelete: "cascade" }),
-  authorId: text("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  body: text("body").notNull(),
-  mediaUrl: text("media_url"),
-  isPinned: boolean("is_pinned").notNull().default(false),
-  createdAt: now("created_at"),
-  editedAt: timestamp("edited_at", { withTimezone: true, mode: "date" }),
-  deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
-}, (t) => [index("posts_space_idx").on(t.spaceId, t.createdAt)]);
-
-export const postReactions = pgTable("post_reactions", {
-  postId: text("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  reactionType: text("reaction_type").notNull(), // like | dislike | meh
-  createdAt: now("created_at"),
-}, (t) => [primaryKey({ columns: [t.postId, t.userId] })]);
-
-export const comments = pgTable("comments", {
-  id: id(),
-  postId: text("post_id").notNull().references(() => posts.id, { onDelete: "cascade" }),
-  parentCommentId: text("parent_comment_id"),
-  authorId: text("author_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  body: text("body").notNull(),
-  createdAt: now("created_at"),
-  deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
-}, (t) => [index("comments_post_idx").on(t.postId, t.createdAt)]);
-
-export const commentReactions = pgTable("comment_reactions", {
-  commentId: text("comment_id").notNull().references(() => comments.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  reactionType: text("reaction_type").notNull(),
-  createdAt: now("created_at"),
-}, (t) => [primaryKey({ columns: [t.commentId, t.userId] })]);
-
-export const spaceExpertScores = pgTable("space_expert_scores", {
-  spaceId: text("space_id").notNull().references(() => spaces.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  points: integer("points").notNull().default(0),
-  tier: text("tier"), // contributor | helper | expert
-  computedAt: now("computed_at"),
-}, (t) => [primaryKey({ columns: [t.spaceId, t.userId] })]);
 
 // ===== Challenges =====
 export const challenges = pgTable("challenges", {
@@ -1455,10 +1388,11 @@ export const serverEvents = pgTable("server_events", {
  * A brand buying a month of sponsored challenges on one game.
  *
  * This is the media buy. A brand picks a game, sees who it reaches, and buys
- * four weekly challenges — one month, one payment, no subscription. Every
- * challenge is $250: $175 of prize money and a $75 platform fee. Four of them
- * on one game is $1,000, and four is the minimum, because one challenge is a
- * post and four is a campaign.
+ * four weekly challenges — one month, one payment, no subscription. The price
+ * of a challenge and the prize share are in `lib/pricing.ts`; retyping either
+ * here would put a second rate card in a schema comment, which is where the
+ * first stale one lived. Four is the minimum, because one challenge is a post
+ * and four is a campaign.
  *
  * The four are NOT created at once. Only the first becomes a live challenge;
  * the next opens when it ends. A game runs one sponsored challenge at a time —

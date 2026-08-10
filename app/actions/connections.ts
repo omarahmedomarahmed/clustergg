@@ -8,7 +8,6 @@ import { uid, slugify } from "@/lib/utils";
 import { ADAPTERS } from "@/lib/providers/adapters";
 import { getProvider, isProviderLive } from "@/lib/providers/registry";
 import { syncAccount } from "@/lib/sync";
-import { evaluateBadgesForUser } from "@/lib/badges";
 import { awardQuestAction } from "@/lib/quests";
 import { linkGameAccountFor } from "@/lib/link-account";
 
@@ -97,7 +96,6 @@ export async function mlbbConfirmLink(_prev: LinkState, formData: FormData): Pro
   const [account] = await db.select().from(schema.linkedGameAccounts)
     .where(eq(schema.linkedGameAccounts.id, accountId)).limit(1);
   if (account) await syncAccount(db, account);
-  try { await evaluateBadgesForUser(db, me.id); } catch { /* non-fatal */ }
 
   revalidatePath("/settings/connections");
   revalidatePath("/profile");

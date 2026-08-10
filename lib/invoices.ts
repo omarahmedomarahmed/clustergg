@@ -11,17 +11,13 @@ import { uid } from "@/lib/utils";
 // never quote a price the website doesn't. The shape a brand actually
 // experiences, in the platform's own numbers:
 //
-//   Placements only          base $600/month
-//   Buy one game's challenges  + $1,000  (four weekly challenges at $250)
-//                              − $100    (the base drops to $500 once a game
-//                                         is sponsored — you stop paying for
-//                                         reach alone and start paying for
-//                                         games)
+//   Four weekly challenges on one game, at the price in `lib/pricing.ts`.
 //
-// That "−$100" is not a promotion somebody remembers to apply. It falls out of
-// `quote()` because `reachBase` and `challengeBase` are different numbers, and
-// it is printed as its own line so a brand can see the discount they were
-// given rather than a total they have to trust.
+// No figure is written here on purpose: a comment that quotes a rate is a
+// second rate card, and the reader who believes it is the one it costs. The
+// arithmetic falls out of `quote()`, and any discount is printed as its own
+// line so a brand can see what they were given rather than a total they have
+// to trust.
 //
 // Then every line is editable. Label, amount, quantity, all of it, plus manual
 // discounts staff add by hand — because a billing system sales has to work

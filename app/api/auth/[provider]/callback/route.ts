@@ -192,7 +192,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ prov
   const finish = async (userId: string, role: string, dest: string) => {
     joinOurServer();
     await db.update(schema.users).set({ lastLoginAt: new Date() }).where(eq(schema.users.id, userId));
-    try { const { evaluateBadgesForUser } = await import("@/lib/badges"); await evaluateBadgesForUser(db, userId); } catch { /* non-fatal */ }
     await createSession(userId, role);
     return NextResponse.redirect(new URL(dest, base));
   };

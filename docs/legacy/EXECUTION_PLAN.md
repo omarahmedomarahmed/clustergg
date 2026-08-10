@@ -13,8 +13,8 @@
 > challenge) and a claim that gifting is part of the product (it was deleted in
 > B72.3, for money-transmission reasons).
 >
-> **The current truth, in this order:** the code, then `docs/PLAN.md`, then
-> `docs/MODEL.md` and `docs/HANDOVER.md`. Where this file and the code
+> **The current truth, in this order:** the code, then `docs/SOURCE_OF_TRUTH.md`,
+> then `docs/MODEL.md` and `docs/HANDOVER.md`. Where this file and the code
 > disagree, the code is right and this file is history.
 
 **Status:** Part I is **open** and being added to. Part II has **not started**

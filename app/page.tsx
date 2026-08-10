@@ -367,7 +367,7 @@ export default async function LandingPage() {
               />
               <DoorCard
                 icon="satellite" tone="emerald" title="I run a Discord server"
-                body="Install the bot free. Brands fund the prizes, your members win them, and your server takes a share of the fee."
+                body="Install the bot free. Brands fund the prizes, your members win them, and every Monday the servers that carried a challenge share a pool of what those brands paid."
                 href="#servers" cta="What you earn"
               />
               <DoorCard

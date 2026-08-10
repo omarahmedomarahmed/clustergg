@@ -114,8 +114,8 @@ Full instructions, environment variables and deployment: **`docs/SETUP.md`**.
 | `lib/` | Every rule. If a number matters, it lives here and is imported, never retyped |
 | `lib/db/` | `schema.ts` is the tables; `index.ts` holds the DDL and the idempotent column migrations that reach production by deploying |
 | `components/` | UI. `components/admin/kit.tsx` is the console's vocabulary |
-| `tests/db/` | 58 suites. They run the real functions against a real database |
-| `docs/PLAN.md` | The dev log: every build item, what shipped, and what each decision cost |
+| `tests/db/` | 75 suites. They run the real functions against a real database |
+| `docs/SOURCE_OF_TRUTH.md` | The whole product in one file. Read it before writing anything about what Cluster does |
 | `docs/legacy/` | The platform before the pivots, kept because the reasoning is still useful |
 
 ---
@@ -128,4 +128,5 @@ Full instructions, environment variables and deployment: **`docs/SETUP.md`**.
 | Taking it over | `docs/HANDOVER.md` |
 | Deciding something | `docs/MODEL.md` — what we sell and why it is priced that way |
 | Touching money | `docs/PAYMENTS.md` — **we never store a payment detail. Ever.** |
-| Wondering what happened | `docs/PLAN.md`, then `docs/legacy/LEGACY_PRODUCT_AND_CHANGELOG.md` |
+| Wondering what it does | `docs/SOURCE_OF_TRUTH.md` |
+| Wondering what happened | `git log`, then `docs/legacy/` |

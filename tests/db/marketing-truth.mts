@@ -95,6 +95,63 @@ console.log("\n== the claims we retired are gone from public pages ==");
   }
 }
 
+console.log("\n== no surface quotes a price or a rate the product does not have ==");
+{
+  // B117. Five customer-facing surfaces still said "$250 a challenge" — the
+  // site-wide meta description, the pricing page's, the /answers page's, the
+  // CMS default copy, and the FAQ schema that Google and the answer engines
+  // index. The price had been $350 for three sprints.
+  //
+  // Five more still promised the PER-CHALLENGE OWNER RATE deleted in C3 — "you
+  // take a share of the fee on every sponsored challenge that runs there". The
+  // check above walked past every one of them, because it greps for the exact
+  // phrase "share of the platform fee" and these all said "share of the fee".
+  // A guard pinned to one wording is a guard that catches one file.
+  //
+  // So both checks are widened, and widened over EVERY page and component
+  // rather than a list of six that somebody has to remember to extend.
+  const { readdirSync, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { PRICING_DEFAULTS, money } = await import("../../lib/pricing.ts");
+
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir)) {
+      if (e.startsWith(".") || e === "node_modules") continue;
+      const rel = join(dir, e);
+      if (statSync(rel).isDirectory()) walk(rel);
+      else if (/\.(ts|tsx)$/.test(e)) files.push(rel);
+    }
+  };
+  for (const d of ["app", "components", "lib"]) walk(d);
+
+  const strip = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/^\s*\/\/.*$/gm, " ");
+
+  // Any dollar figure sitting immediately before "a challenge" / "a sponsored
+  // challenge" is a rate card. There is exactly one right answer for it.
+  const live = money(PRICING_DEFAULTS.challengePrice, PRICING_DEFAULTS.currency);
+  const rateRe = /\$[\d,]+(?:\.\d\d)?(?=\s+(?:a|per)\s+(?:sponsored\s+)?challenge\b)/g;
+  const wrongPrice: string[] = [];
+  for (const f of files) {
+    for (const hit of strip(readFileSync(f, "utf8")).match(rateRe) ?? []) {
+      if (hit !== live) wrongPrice.push(`${f}: "${hit} a challenge" (live: ${live})`);
+    }
+  }
+  ok("no surface quotes a challenge price that is not the live one",
+    wrongPrice.length === 0, wrongPrice.slice(0, 6).join(" | "));
+
+  // The owner rate, in every phrasing anybody actually wrote. C3 deleted it
+  // because running it alongside the weekly pool pays an owner twice out of
+  // one line — so a page promising it is a term we are held to for money we
+  // never agreed to pay.
+  const ownerRate = /\b(?:you|your server|owners?|they)\s+(?:take|takes|earn|earns|get|gets)\s+a\s+share\s+of\s+(?:the\s+)?(?:fee|platform fee|revenue)|share of (?:the )?(?:platform )?fee on every|share of every (?:sponsored )?challenge/i;
+  const promised = files.filter((f) => ownerRate.test(strip(readFileSync(f, "utf8"))));
+  ok("no surface promises an owner a per-challenge rate",
+    promised.length === 0,
+    `${promised.slice(0, 6).join(", ")} — C3 deleted it; the model is a weekly pool`);
+}
+
 console.log("\n== the showcase is actually on the pages ==");
 {
   // A component nobody renders is a component that rots. All three public
