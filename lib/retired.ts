@@ -77,9 +77,19 @@ export const RETIRED: Retired[] = [
     what: "posts, comments and reactions",
     pattern: "\\b(?:post feed|community feed|comment thread|post reaction|write a post)\\b",
     cleared: ["B111", "B68", "delet", "removed", "retired", "no longer", "⚠", "used to", "purge"],
-    evidence: "lib/social-purge.ts",
-    evidenceSays: "SOCIAL_TABLES",
-    why: "Cluster is a competition and earning layer, not a social network. The feed was the part nobody used and everybody had to moderate.",
+    evidence: "lib/legacy-drop.ts",
+    evidenceSays: "DROPPED_TABLES",
+    why: "Cluster is a competition and earning layer, not a social network. The feed was the part nobody used and everybody had to moderate. B116 dropped the five tables outright — production held zero rows in every one of them, so there was never a post on this platform a person wrote.",
+  },
+  {
+    what: "the badge system on gamer profiles",
+    pattern: "\\bbadge (?:catalogue|shelf|criteria)\\b|earn(?:s|ed)? a badge|badges on (?:your|their|the gamer\'s) profile",
+    // "quest badge" / "tier badge" is the LIVE quest progression and must not be
+    // cleared by accident — those phrases are not matched by the pattern above.
+    cleared: ["B116", "delet", "removed", "retired", "no longer", "⚠", "used to", "dropped"],
+    evidence: "lib/legacy-drop.ts",
+    evidenceSays: "user_badges",
+    why: "Badges were the pre-pivot achievement shelf: twelve definitions with criteria like \"20 posts with 50 likes received\" and \"earn Expert tier in a Space\" — rules that count things this platform no longer has. Trophies replaced them, and a trophy carries a dollar value a gamer can redeem. A badge was a picture.",
   },
   {
     what: "the placements / reach / ultimate pricing tiers",

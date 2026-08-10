@@ -4,8 +4,6 @@ import { getDb, schema } from "@/lib/db";
 import {
   saveGame, deleteGame, saveSpace, deleteSpace, ensurePlanetsForGames, deleteLegacyPlanets,
 } from "@/app/actions/admin";
-import SocialPurgePanel from "@/components/SocialPurgePanel";
-import { socialRowCounts } from "@/lib/social-purge";
 import GameLogo from "@/components/GameLogo";
 import ImageUpload from "@/components/ImageUpload";
 import CoverFramer from "@/components/CoverFramer";
@@ -113,10 +111,9 @@ function PlanetForm({ planet, gameName, games }: {
 
 export default async function AdminGamesPage() {
   const db = await getDb();
-  const [games, planets, socialCounts] = await Promise.all([
+  const [games, planets] = await Promise.all([
     db.select().from(schema.games).orderBy(asc(schema.games.sortOrder)),
     db.select().from(schema.spaces).orderBy(asc(schema.spaces.name)),
-    socialRowCounts(db),
   ]);
 
   const planetFor = new Map(planets.filter((p) => p.game).map((p) => [p.game as string, p]));
@@ -263,11 +260,6 @@ export default async function AdminGamesPage() {
         </section>
       )}
 
-      {/* B111. The moderation queue was here. Removing posts removed the only
-          thing on this platform that needed moderating, which was most of the
-          argument for removing them. What sits in its place is the one button
-          the removal deliberately did not press. */}
-      <SocialPurgePanel counts={socialCounts} />
     </div>
   );
 }

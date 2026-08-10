@@ -92,7 +92,7 @@ export type MetricKey =
   | "games" | "planets" | "planetRequests"
   | "challenges" | "quests" | "leaderboards" | "trophies" | "redeems"
   | "brandEnquiries" | "brands" | "creatives" | "placements" | "adImpressions" | "adClicks"
-  | "posts" | "images";
+  | "images";
 
 export function accessOf(area: string | undefined): AdminAccess {
   if (!area) return "staff";
@@ -202,7 +202,6 @@ export const ADMIN_NAV: AdminGroup[] = [
       { href: "/admin/cp-calculator", label: "CP calculator", desc: "What every action pays, what it costs at a million gamers, and what a second account would farm first.", system: "quests" },
       { href: "/admin/leaderboards", label: "Leaderboards", desc: "Every board on every game — a game can run several.", metric: "leaderboards" , system: "challenges" },
       { href: "/admin/trophies", label: "Trophies", desc: "The prize catalogue and what each is worth.", metric: "trophies" , system: "trophies" },
-      { href: "/admin/badges", label: "Badges", desc: "The badge catalogue: what each one is, and the rule that earns it. Grants are automatic — this defines the rule, it does not award anything.", system: "trophies" },
       { href: "/admin/marketplace", label: "Marketplace", desc: "Trophies bought with Cluster Points — the shelf, the ledger and what we owe.", system: "trophies" },
     ],
   },

@@ -4,7 +4,6 @@ import { uid } from "@/lib/utils";
 import { ADAPTERS } from "@/lib/providers/adapters";
 import { getProvider, isProviderLive } from "@/lib/providers/registry";
 import { syncAccount } from "@/lib/sync";
-import { evaluateBadgesForUser } from "@/lib/badges";
 import { awardQuestAction } from "@/lib/quests";
 import { announceAccountLinked } from "@/lib/discord/announce";
 import { markMemberLinked } from "@/lib/discord/guilds";
@@ -84,7 +83,6 @@ export async function linkGameAccountFor(
   const [account] = await db.select().from(schema.linkedGameAccounts)
     .where(eq(schema.linkedGameAccounts.id, id)).limit(1);
   if (account) await syncAccount(db, account);
-  try { await evaluateBadgesForUser(db, userId); } catch { /* non-fatal */ }
   await awardQuestAction(db, userId, "connect_account", { refType: "account", refId: id });
 
   // A linked game account is what counts toward a server's ad-revenue unlock,

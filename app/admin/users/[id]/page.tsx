@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import Avatar from "@/components/Avatar";
-import { BadgeIcon } from "@/components/BadgeChip";
 import { adminUnlinkAccount, adminResyncAccount, setUserStatus } from "@/app/actions/admin";
 import AdminPasswordReset from "@/components/AdminPasswordReset";
 import { getProvider } from "@/lib/providers/registry";
@@ -17,12 +16,17 @@ export default async function AdminUserDetail({ params }: { params: Promise<{ id
   const [user] = await db.select().from(schema.users).where(eq(schema.users.id, id)).limit(1);
   if (!user) notFound();
 
-  const [accounts, badges, participations] = await Promise.all([
+  // The trophy case, not a badge shelf. A trophy is the only award on this
+  // platform a gamer can convert into money, so it is the one an admin looking
+  // at a gamer actually needs on the screen: what they hold, and whether it is
+  // still held, pending a redemption, or already paid out.
+  const [accounts, awards, participations] = await Promise.all([
     db.select().from(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.userId, id)),
-    db.select({ b: schema.badges, ub: schema.userBadges })
-      .from(schema.userBadges)
-      .innerJoin(schema.badges, eq(schema.userBadges.badgeId, schema.badges.id))
-      .where(eq(schema.userBadges.userId, id)),
+    db.select({ t: schema.trophies, ut: schema.userTrophies })
+      .from(schema.userTrophies)
+      .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
+      .where(eq(schema.userTrophies.userId, id))
+      .orderBy(desc(schema.userTrophies.awardedAt)),
     db.select({ p: schema.challengeParticipants, c: schema.challenges })
       .from(schema.challengeParticipants)
       .innerJoin(schema.challenges, eq(schema.challengeParticipants.challengeId, schema.challenges.id))
@@ -85,15 +89,21 @@ export default async function AdminUserDetail({ params }: { params: Promise<{ id
 
       <div className="grid md:grid-cols-2 gap-6">
         <section className="glass p-6">
-          <h2 className="font-bold mb-4">Badges ({badges.length})</h2>
+          <h2 className="font-bold mb-4">Trophies ({awards.length})</h2>
           <div className="flex flex-wrap gap-3">
-            {badges.map(({ b }) => (
-              <div key={b.id} className="flex items-center gap-2 border border-violet-400/15 rounded-full px-3 py-1.5">
-                <BadgeIcon icon={b.icon} size={22} />
-                <span className="text-xs">{b.name}</span>
+            {awards.map(({ t, ut }) => (
+              <div key={ut.id} className="flex items-center gap-2 border border-violet-400/15 rounded-full py-1.5 pl-1.5 pr-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={t.imageUrl} alt="" width={22} height={22} className="h-[22px] w-[22px] rounded-full object-cover" />
+                <span className="text-xs">{t.name}</span>
+                {/* The status is the money question — held is a liability we owe,
+                    paid is one we have settled. Worth a word, not just a dot. */}
+                <span className={`text-[10px] uppercase tracking-wider ${ut.status === "paid" ? "text-emerald-300" : ut.status === "pending" ? "text-amber-300" : "text-muted"}`}>
+                  {ut.status}
+                </span>
               </div>
             ))}
-            {badges.length === 0 && <p className="text-sm text-muted">None earned yet.</p>}
+            {awards.length === 0 && <p className="text-sm text-muted">None won yet.</p>}
           </div>
         </section>
         <section className="glass p-6">

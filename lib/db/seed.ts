@@ -3,10 +3,10 @@ import type { DB } from "./index";
 import * as schema from "./schema";
 import { hashPassword } from "@/lib/password";
 import { uid } from "@/lib/utils";
-import { BADGE_ART, TROPHY_ART, BANNER_ART } from "@/lib/assets";
+import { TROPHY_ART, BANNER_ART } from "@/lib/assets";
 import { CARD_AD_PLACEMENT, HOUSE_CTA } from "@/lib/cards/ads";
 
-// Seeds platform defaults (badges, games, spaces, placements, leaderboards,
+// Seeds platform defaults (games, spaces, placements, leaderboards,
 // trophies) and the superadmin from env. Demo mode additionally seeds a demo
 // universe with real public game accounts so the keyless providers pull REAL
 // data. Production (`demo:false`) seeds NO demo users.
@@ -62,7 +62,7 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   }
 
   // ---------- Trophies (challenge prize art) ----------
-  // Values, because a trophy worth $0 is a badge.
+  // Values, because a trophy worth $0 is a picture.
   //
   // The whole economy rests on these redeeming for real money, and the demo
   // shipped the entire catalogue at the column default of 0 — so every surface
@@ -80,28 +80,6 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     const tid = uid();
     trophyIds.push(tid);
     await db.insert(schema.trophies).values({ id: tid, ...t }).onConflictDoNothing();
-  }
-
-  // ---------- Badges (individual generated art) ----------
-  const badgeDefs = [
-    { code: "star_forged", name: "Star Forged", description: "Linked your first game account", icon: BADGE_ART.b1, category: "platform", criteria: { type: "account_linked" } },
-    { code: "constellation", name: "Constellation", description: "Linked 3+ game accounts", icon: BADGE_ART.b2, category: "platform", criteria: { type: "accounts_linked_count", min: 3 } },
-    { code: "galaxy_brain", name: "Galaxy Brain", description: "Linked 5+ game accounts", icon: BADGE_ART.b3, category: "platform", criteria: { type: "accounts_linked_count", min: 5 } },
-    { code: "verified_knight", name: "Verified Knight", description: "Connected a Chess.com account", icon: BADGE_ART.b2, category: "game", criteria: { type: "account_linked", provider: "chesscom" } },
-    { code: "grandmaster_cluster", name: "Grandmaster Cluster", description: "Reached 2500+ blitz rating", icon: BADGE_ART.b4, category: "game", criteria: { type: "stat_threshold", metric: "blitz_rating", min: 2500 } },
-    { code: "rising_star", name: "Rising Star", description: "Reached 1500+ rapid rating", icon: BADGE_ART.b1, category: "game", criteria: { type: "stat_threshold", metric: "rapid_rating", min: 1500 } },
-    { code: "immortal_ancient", name: "Ancient One", description: "Reached Ancient rank or above in Dota 2", icon: BADGE_ART.b6, category: "game", criteria: { type: "stat_threshold", metric: "rank_tier", game: "Dota 2", min: 60 } },
-    { code: "signal_boost", name: "Signal Boost", description: "Reached 10 followers", icon: BADGE_ART.b5, category: "community", criteria: { type: "follower_count", min: 10 } },
-    { code: "voice_of_the_void", name: "Voice of the Void", description: "20 posts with 50 likes received", icon: BADGE_ART.b3, category: "community", criteria: { type: "community_activity", posts_min: 20, reactions_received_min: 50 } },
-    { code: "space_expert", name: "Space Expert", description: "Earned Expert tier in a community Space", icon: BADGE_ART.b6, category: "community", criteria: { type: "expert_tier", tier: "expert" } },
-    { code: "challenge_top1", name: "Supernova", description: "Won 1st place in a Challenge", icon: BADGE_ART.b4, category: "challenge", criteria: { type: "challenge_result", placement: "top1" } },
-    { code: "challenge_top3", name: "Orbit Breaker", description: "Placed top 3 in a Challenge", icon: BADGE_ART.b1, category: "challenge", criteria: { type: "challenge_result", placement: "top3" } },
-  ] as const;
-  const badgeIds: Record<string, string> = {};
-  for (const b of badgeDefs) {
-    const bid = uid();
-    badgeIds[b.code] = bid;
-    await db.insert(schema.badges).values({ id: bid, ...b, criteria: { ...b.criteria } }).onConflictDoNothing();
   }
 
   // ---------- Spaces ----------
@@ -387,10 +365,6 @@ export async function seed(db: DB, opts: { demo: boolean }) {
     await db.insert(schema.spaceMembers).values({ spaceId, userId }).onConflictDoNothing();
   }
 
-  // B111. Six seeded posts, four comments and thirteen reactions were here.
-  // Seeding a feature the product no longer has would put rows in front of the
-  // purge button on a fresh install — a demo database that immediately reports
-  // content to destroy.
 
   const conv = uid();
   await db.insert(schema.conversations).values({ id: conv });
@@ -489,14 +463,6 @@ export async function seed(db: DB, opts: { demo: boolean }) {
   await joinChallenge(ch3, lyra, lyraChess, 310, 1);
   await joinChallenge(ch3, nova, novaChess, 280, 2);
 
-  const grant = async (userId: string, code: string) => {
-    await db.insert(schema.userBadges).values({ id: uid(), userId, badgeId: badgeIds[code] }).onConflictDoNothing();
-  };
-  await grant(nova, "star_forged"); await grant(nova, "verified_knight"); await grant(nova, "grandmaster_cluster"); await grant(nova, "challenge_top3");
-  await grant(lyra, "star_forged"); await grant(lyra, "verified_knight"); await grant(lyra, "challenge_top1");
-  await grant(orion, "star_forged"); await grant(orion, "constellation"); await grant(orion, "challenge_top3");
-  await grant(vega, "star_forged"); await grant(vega, "challenge_top3");
-  await grant(atlas, "star_forged");
 
   // Demo partners for the "Trusted by" slider
   const partnerDefs = [
@@ -823,7 +789,7 @@ export async function rehostImagesToBlob(db: DB) {
     else if (isExternal(cr.fileUrl)) await db.update(schema.adCreatives).set({ fileUrl: await uploadUrlToBlob(cr.fileUrl, "creative") }).where(eq(schema.adCreatives.id, cr.id));
   }
 
-  // 6) Trophies (badge art rendered on Higgsfield).
+  // 6) Trophies (award art rendered on Higgsfield).
   const trophies = await db.select({ id: schema.trophies.id, imageUrl: schema.trophies.imageUrl }).from(schema.trophies);
   for (const t of trophies) if (isExternal(t.imageUrl)) await db.update(schema.trophies).set({ imageUrl: await uploadUrlToBlob(t.imageUrl!, "trophy") }).where(eq(schema.trophies.id, t.id));
 
@@ -948,7 +914,6 @@ const IMAGE_COLUMNS: { table: string; col: string; scope: string }[] = [
   { table: "quests", col: "card_bg_url", scope: "quest" },
   { table: "quests", col: "cover_url", scope: "quest" },
   { table: "quest_tiers", col: "icon_url", scope: "quest" },
-  { table: "badges", col: "icon", scope: "badge" },
   { table: "trophies", col: "image_url", scope: "trophy" },
   { table: "partners", col: "logo_url", scope: "partner" },
   { table: "brands", col: "logo_url", scope: "brand" },

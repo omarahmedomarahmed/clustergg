@@ -6,7 +6,6 @@ import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireUser } from "@/lib/auth";
 import { uid } from "@/lib/utils";
-import { evaluateBadgesForUser } from "@/lib/badges";
 import { awardQuestAction, getQuestCompletions } from "@/lib/quests";
 import { joinChallengeFor, switchChallengeAccount } from "@/lib/challenges";
 
@@ -78,7 +77,6 @@ export async function toggleFollow(targetUserId: string, path: string) {
       id: uid(), userId: targetUserId, type: "follow",
       title: `${me.displayName} started following you`, href: `/u/${me.slug}`,
     });
-    try { await evaluateBadgesForUser(db, targetUserId); } catch { /* non-fatal */ }
     await awardQuestAction(db, targetUserId, "follower_gained", { refType: "follow", refId: me.id });
   }
   revalidatePath(path);
