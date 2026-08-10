@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Icon from "@/components/Icon";
 import { AUDIENCES, rulesByTopic, type Audience } from "@/lib/rules";
-import { JOURNEYS } from "@/lib/journeys";
+import { JOURNEYS, MONEY_FLOW } from "@/lib/journeys";
 import Journey from "@/components/rules/Journey";
 import MoneyFlow from "@/components/rules/MoneyFlow";
 import Lifecycle from "@/components/rules/Lifecycle";
@@ -103,7 +103,7 @@ export default async function RulesPage({ params }: { params: Promise<{ who: str
         <h2 className="text-[11px] uppercase tracking-[0.2em]" style={{ color: accent }}>
           How the money and the week work
         </h2>
-        <MoneyFlow highlight={HIGHLIGHT[audience]} />
+        <MoneyFlow shares={MONEY_FLOW} highlight={HIGHLIGHT[audience]} />
         <Lifecycle />
       </section>
 

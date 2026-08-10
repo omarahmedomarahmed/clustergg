@@ -56,6 +56,11 @@ export function pricingTokens(cfg: PricingConfig = PRICING_DEFAULTS): TokenValue
     challengePrice: money(unit.price, cfg.currency),
     prizePool: money(unit.prize, cfg.currency),
     platformFee: money(unit.fee, cfg.currency),
+    // What we KEEP, as distinct from what is merely not prize money. B120 —
+    // the deck used `platformFee` in the sentence "the only line the business
+    // lives on", and that sentence needs this one.
+    ourShare: money(unit.ours, cfg.currency),
+    ourSharePct: `${unit.oursPct}%`,
     prizePct: `${prizeSharePct(cfg)}%`,
     challengesPerGame: String(cfg.challengesPerGame),
     games: String(cfg.games),

@@ -21,6 +21,13 @@ Anything longer, mixed across more games, or priced outside the rate card is a
 typed, and the brand confirms it in their own portal. There is no upper limit on
 weeks in a custom deal, and no way for a brand to self-serve past four.
 
+**One game, one sponsor, one month.** A game runs a single sponsored challenge
+at a time — two on the same game in the same week split the field and make both
+look empty. Since a campaign is four consecutive weeks on one game, a game
+serves one paying brand per month and the network serves as many sponsors as it
+has games. That is the ceiling on revenue, and it moves by adding games rather
+than by selling harder.
+
 **We do not sell display inventory inside Discord.** Brand imagery lives on our
 own domain and the bot links to it. That was a legal read (`docs/B73_RESEARCH.md`)
 and it turned out to be the better product anyway.

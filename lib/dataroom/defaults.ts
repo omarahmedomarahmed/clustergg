@@ -310,29 +310,28 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "raise",
         anchor: "raise",
         navLabel: "16 · The ask",
-        title: "We are raising $100,000 for 20%.",
+        title: "We are raising $150,000 for 12%.",
         subtitle:
-          "$500,000 post-money, six months, and a plan for every dollar. The product is built — this round buys distribution: a thousand communities, thirty brands through a free first month, and funded prize pools while the first sponsors ramp.",
+          "$1.25M post-money, nine months, and a plan for every dollar. The product is built — this round buys CAPACITY. A game runs one sponsored challenge at a time, so the six games we run today can serve six sponsors and no more. Twelve new integrations takes that to eighteen, and eighteen is where the business covers its own costs.",
         data: {
           ask: {
-            amount: 100000,
+            amount: 150000,
             instrument: "Priced equity round",
-            valuation: 400000,
-            postMoney: 500000,
-            equityPct: 20,
-            runwayMonths: 6,
+            valuation: 1100000,
+            postMoney: 1250000,
+            equityPct: 12,
+            runwayMonths: 9,
             currency: "USD",
           },
           useOfFunds: [
-            { label: "Brand acquisition — the first month free", pct: 30, note: "30 brands × {{challengesPerGame}} sponsored challenges × {{challengePrice}}. Naming rights on challenges we already run, so this is the invoice we don't send rather than cash out — the whole line is customer acquisition cost" },
-            { label: "Prize pools — the competitions themselves", pct: 25, note: "{{games}} games × {{challengesPerGame}} challenges × 6 months × {{prizePool}} of prize money. Every challenge pays out whether or not it's sold; this is what keeps something worth entering live in every game, every week" },
-            { label: "Server onboarding — the welcome challenge", pct: 25, note: "1,000 servers × $25. A funded private competition on the day a community installs the bot — the only offer that reaches members rather than owners" },
-            { label: "Infrastructure, game APIs & partnerships", pct: 10, note: "Hosting, card rendering, the official game-API access every verified stat depends on, and the partnership work that opens new games" },
-            { label: "Team", pct: 10, note: "Four people at early-stage rates for six months. The line that has to rise first, and what the next round is for" },
+            { label: "Game coverage — twelve new integrations", pct: 36, note: "A game runs one sponsored challenge at a time, so a game IS a sponsor's slot. Six games serve six brands; eighteen serve eighteen. This is the line that lifts the ceiling on revenue, and 2,000 server onboardings ride on the same work" },
+            { label: "Team", pct: 31, note: "Four people at early-stage rates for nine months. The line that has to rise first, and what the next round is for" },
+            { label: "Brand acquisition — the first month free", pct: 18, note: "36 brands x {{challengesPerGame}} sponsored challenges x {{challengePrice}}. Sized to FILL eighteen slots at a 50% conversion rate — onboarding past what the network can serve is cash spent on brands we would have to turn away" },
+            { label: "Infrastructure, game APIs & partnerships", pct: 14, note: "Hosting, card rendering, the official game-API access every verified stat depends on, and the partnership work that opens each new game" },
           ],
           capTable: [
-            { holder: "Founders", pct: 70, note: "Fully vesting, 4 years" },
-            { holder: "This round", pct: 20, note: "$100,000 at $500,000 post-money" },
+            { holder: "Founders", pct: 78, note: "Fully vesting, 4 years" },
+            { holder: "This round", pct: 12, note: "$150,000 at $1,250,000 post-money" },
             { holder: "Option pool", pct: 10, note: "Reserved for the first engineering and sales hires" },
           ],
         },
@@ -350,7 +349,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "17 · The model",
         title: "The plan for the money, as a model you can argue with.",
         subtitle:
-          "Every figure is computed from the assumptions on the left, and the assumptions are sliders. Breakeven is six paying brands. If you don't believe a number, move it and watch what happens.",
+          "Every figure is computed from the assumptions on the left, and the assumptions are sliders. If you don't believe a number, move it and watch what happens — including the games slider, which is the one that moves everything else.",
         data: {},
       },
 
@@ -581,7 +580,7 @@ export const SEED_DOCS: SeedDoc[] = [
             },
             {
               q: "What are you raising, and for what?",
-              a: "$100,000 for 20%, at $500,000 post-money. The terms are on slide sixteen with the use of funds and the cap table beside them. In short: brand partnerships, prize pools while the first sponsors ramp, more communities onboarded, and the game coverage and campaign tools that let us scale the platform faster.",
+              a: "$150,000 for 12%, at $1.25M post-money. The terms are on slide sixteen with the use of funds and the cap table beside them. In short: twelve new game integrations, because a game runs one sponsored challenge at a time and each one is a sponsor's slot; the communities and brands to fill them; and nine months of team.",
             },
           ],
         },
@@ -607,7 +606,7 @@ export const SEED_DOCS: SeedDoc[] = [
     slug: "financial-model",
     kind: "deck",
     title: "Cluster — the financial model",
-    subtitle: "Where $100,000 goes, what it buys, and what has to be true",
+    subtitle: "Where $150,000 goes, what it buys, and what has to be true",
     summary:
       "Use of funds split into cash and foregone revenue, month-by-month cash flow, the breakeven point, four downside scenarios and the valuation the round implies. Every number is computed from the assumptions shown, and the assumptions are editable — including the ones that make us look worse.",
     accent: "#34d399",
@@ -621,7 +620,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "Overview",
         title: "Every dollar of the raise, accounted for.",
         subtitle:
-          "$100,000 buys six months, a thousand Discord communities, thirty brands through a free first month, and a funded competition in every game every week. Breakeven is six paying brands. Here is the arithmetic, with nothing rounded in our favour.",
+          "$150,000 buys nine months, twelve new game integrations, two thousand Discord communities and thirty-six brands through a free first month. The constraint is inventory, not demand: a game serves one sponsor at a time, so capacity goes from six to eighteen and the business covers its costs in month seven. Here is the arithmetic, with nothing rounded in our favour.",
         data: {},
       },
       {
@@ -630,7 +629,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "1 · The unit",
         title: "It all rests on one number.",
         subtitle:
-          "A brand pays {{challengePrice}} for a sponsored challenge. {{prizePool}} of that is the prize pool and reaches a gamer — we never touch it. The {{platformFee}} platform fee is the only line the business lives on, and every total in this document is built from it.",
+          "A brand pays {{challengePrice}} for a sponsored challenge. {{prizePool}} of it is the prize pool and reaches a gamer; the weekly server pool and the points vault take their shares next, and both are owed to somebody else. {{ourShare}} — {{ourSharePct}} — is ours, and that is the only line the business lives on. Every total in this document is built from it.",
         data: {},
       },
       {
@@ -651,9 +650,9 @@ export const SEED_DOCS: SeedDoc[] = [
           "A model that only flatters the people who built it is not worth reading. These are the assumptions we think an investor should press hardest, and what happens to the plan under each.",
         data: {
           bullets: [
-            "Free-to-paid conversion. The plan shows 25 of 30 brands staying — 83%. Nothing in this business has proven that yet, and 20-40% is normal for a B2B free trial. Breakeven is at 20%, so the plan survives the pessimistic case; the difference between 20% and 83% is the difference between a business and a good business, not between surviving and not.",
-            "Server acquisition at $25. A thousand communities in six months is roughly five and a half a day, every day, sustained. The $25 welcome challenge is what makes the offer concrete rather than a cold DM, but the rate is an assumption about outbound effort, not about money.",
-            "The month-six revenue figure. $37,500 MRR is the run rate once every brand has been through its free month — not revenue earned inside month six, which is lower because a brand starts paying the month after it joins. Both numbers are in the cash-flow table and neither is hidden.",
+            "Twelve new game integrations in nine months. This is the plan's real risk and it has replaced conversion as the thing to press hardest. A game runs one sponsored challenge at a time, so a game is a sponsor's slot — the six we run today cap revenue at roughly $100,000 of ARR against a $7,000 monthly cost base, and no conversion rate fixes that. Every integration is an official game API with its own approval. Nothing in this business has proven that pace yet, and one that does not land is a slot that does not exist.",
+            "Free-to-paid conversion, now the second question rather than the first. The plan shows 18 of 36 staying — 50%, the middle of the 20-40% normal for a B2B free trial with room above it. It matters less than it used to precisely because capacity binds first: at eighteen slots, a conversion rate above 50% sells nothing extra.",
+            "Server acquisition at $25. Two thousand communities in nine months is about seven a day, every day, sustained. The $25 welcome challenge is what makes the offer concrete rather than a cold DM, but the rate is an assumption about outbound effort, not about money.",
           ],
         },
       },
@@ -661,29 +660,28 @@ export const SEED_DOCS: SeedDoc[] = [
         kind: "raise",
         anchor: "raise",
         navLabel: "4 · The round",
-        title: "$100,000 for 20%, at $500,000 post-money.",
+        title: "$150,000 for 12%, at $1.25M post-money.",
         subtitle:
-          "Six months of runway against a product that is already built and already running. The use-of-funds split below is the same one the model computes — 30% brand acquisition, 25% prize pools, 25% server onboarding, 10% infrastructure, 10% team.",
+          "Nine months of runway against a product that is already built and already running. The use-of-funds split below is the one the model computes — 36% game coverage and server onboarding, 31% team, 18% brand acquisition, 14% infrastructure. Every figure is derived, not typed.",
         data: {
           ask: {
-            amount: 100000,
+            amount: 150000,
             instrument: "Priced equity round",
-            valuation: 400000,
-            postMoney: 500000,
-            equityPct: 20,
-            runwayMonths: 6,
+            valuation: 1100000,
+            postMoney: 1250000,
+            equityPct: 12,
+            runwayMonths: 9,
             currency: "USD",
           },
           useOfFunds: [
-            { label: "Brand acquisition — the first month free", pct: 30, note: "30 brands x {{challengesPerGame}} sponsored challenges x {{challengePrice}}. Naming rights on challenges we already run, so this is the invoice we don't send rather than cash out" },
-            { label: "Prize pools — the competitions themselves", pct: 25, note: "{{games}} games x {{challengesPerGame}} challenges x 6 months x {{prizePool}} of prize money. Every challenge pays out whether or not it is sold" },
-            { label: "Server onboarding — the welcome challenge", pct: 25, note: "1,000 servers x $25. A funded private competition on the day a community installs the bot" },
-            { label: "Infrastructure, game APIs & partnerships", pct: 10, note: "Hosting, card rendering, official game-API access, and the partnership work that opens new games" },
-            { label: "Team", pct: 10, note: "Four people at early-stage rates for six months" },
+            { label: "Game coverage — twelve new integrations", pct: 36, note: "A game runs one sponsored challenge at a time, so a game IS a sponsor's slot. Six games serve six brands; eighteen serve eighteen. This is the line that lifts the ceiling on revenue, and 2,000 server onboardings ride on the same work" },
+            { label: "Team", pct: 31, note: "Four people at early-stage rates for nine months. The line that has to rise first, and what the next round is for" },
+            { label: "Brand acquisition — the first month free", pct: 18, note: "36 brands x {{challengesPerGame}} sponsored challenges x {{challengePrice}}. Sized to FILL eighteen slots at a 50% conversion rate — onboarding past what the network can serve is cash spent on brands we would have to turn away" },
+            { label: "Infrastructure, game APIs & partnerships", pct: 14, note: "Hosting, card rendering, the official game-API access every verified stat depends on, and the partnership work that opens each new game" },
           ],
           capTable: [
-            { holder: "Founders", pct: 70, note: "Fully vesting, 4 years" },
-            { holder: "This round", pct: 20, note: "$100,000 at $500,000 post-money" },
+            { holder: "Founders", pct: 78, note: "Fully vesting, 4 years" },
+            { holder: "This round", pct: 12, note: "$150,000 at $1,250,000 post-money" },
             { holder: "Option pool", pct: 10, note: "Reserved for the first engineering and sales hires" },
           ],
         },

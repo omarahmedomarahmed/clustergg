@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Icon from "@/components/Icon";
-import { MONEY_FLOW } from "@/lib/journeys";
+import type { MoneyShare } from "@/lib/journeys";
 
 // Where a brand's dollar goes, drawn. B119.
 //
@@ -21,10 +21,20 @@ import { MONEY_FLOW } from "@/lib/journeys";
 // `/admin/vaults`. A guide with 50/15/15/20 painted into its widths would be
 // wrong the day somebody moved the switch — and wrong in the most expensive
 // possible way, since this is the number the whole pitch rests on.
+//
+// They arrive as a PROP rather than an import, and that is a build constraint
+// rather than a style choice: this is a client component, `MONEY_FLOW` lives
+// beside the journeys, and the journeys read the withdrawal floor out of
+// `lib/server-wallet.ts`, which reaches `next/headers`. Importing the data
+// here pulls a server module into the browser bundle and the build refuses —
+// correctly. The server page reads the split and hands it down.
 
-export default function MoneyFlow({ highlight }: { highlight?: "prize" | "server" | "cp" | "cluster" }) {
+export default function MoneyFlow({ shares, highlight }: {
+  shares: MoneyShare[];
+  highlight?: "prize" | "server" | "cp" | "cluster";
+}) {
   const [open, setOpen] = useState<string | null>(highlight ?? null);
-  const total = MONEY_FLOW.reduce((n, v) => n + v.pct, 0) || 100;
+  const total = shares.reduce((n, v) => n + v.pct, 0) || 100;
 
   return (
     <div className="glass rounded-3xl p-6">
@@ -36,7 +46,7 @@ export default function MoneyFlow({ highlight }: { highlight?: "prize" | "server
 
       {/* The bar. One flex row, widths from the real percentages. */}
       <div className="mt-5 flex h-12 overflow-hidden rounded-2xl border border-white/12">
-        {MONEY_FLOW.map((v) => {
+        {shares.map((v) => {
           const on = open === v.key;
           return (
             <button
@@ -61,7 +71,7 @@ export default function MoneyFlow({ highlight }: { highlight?: "prize" | "server
       {/* The legend doubles as the detail panel: the selected share expands
           rather than opening a second box somewhere else on the page. */}
       <div className="mt-4 space-y-1.5">
-        {MONEY_FLOW.map((v) => {
+        {shares.map((v) => {
           const on = open === v.key;
           return (
             <button

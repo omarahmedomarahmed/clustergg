@@ -202,9 +202,18 @@ export const JOURNEYS: Record<Audience, JourneyStep[]> = {
  * The shares are read from `DEFAULT_SPLIT` — an operator can change them, and a
  * guide that hard-coded 50/15/15/20 would be wrong the day they did.
  */
-export const MONEY_FLOW = [
+export type MoneyShare = {
+  key: "prize" | "server" | "cp" | "cluster";
+  label: string;
+  pct: number;
+  to: string;
+  note: string;
+  tone: string;
+};
+
+export const MONEY_FLOW: MoneyShare[] = [
   {
-    key: "prize" as const,
+    key: "prize",
     label: "Prize money",
     pct: DEFAULT_SPLIT.prize,
     to: "Gamers, as trophies",
@@ -212,7 +221,7 @@ export const MONEY_FLOW = [
     tone: "#fbbf24",
   },
   {
-    key: "server" as const,
+    key: "server",
     label: "Server pool",
     pct: DEFAULT_SPLIT.server,
     to: "The servers that carried it",
@@ -220,7 +229,7 @@ export const MONEY_FLOW = [
     tone: "#34d399",
   },
   {
-    key: "cp" as const,
+    key: "cp",
     label: "Points vault",
     pct: DEFAULT_SPLIT.cp,
     to: "Every gamer who plays",
@@ -228,7 +237,7 @@ export const MONEY_FLOW = [
     tone: "#22d3ee",
   },
   {
-    key: "cluster" as const,
+    key: "cluster",
     label: "Cluster",
     pct: DEFAULT_SPLIT.cluster,
     to: "Us",

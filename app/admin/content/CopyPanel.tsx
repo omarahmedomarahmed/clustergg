@@ -85,13 +85,18 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
       { key: "finance.months", label: "Months the raise has to last" },
       { key: "finance.targetBrands", label: "Brands given a free first month" },
       { key: "finance.freeChallengesPerBrand", label: "Free challenges each of them gets" },
-      { key: "finance.brandsConverting", label: "Of those, how many stay and pay" },
+      { key: "finance.brandsConverting", label: "Of those, how many stay and pay (capped by the games below)" },
       { key: "finance.revenuePerBrand", label: "What a paying brand pays per month" },
       { key: "finance.targetServers", label: "Discord servers onboarded" },
       { key: "finance.welcomeChallengeCost", label: "Welcome challenge funded per server" },
       { key: "finance.membersPerServer", label: "Members in a typical server" },
       { key: "finance.linkedPerServer", label: "Of those, how many link a game account" },
-      { key: "finance.games", label: "Games we run challenges on" },
+      // The capacity dial, and it is labelled as one. A game runs a single
+      // sponsored challenge at a time, so games ÷ games-per-brand is the hard
+      // ceiling on how many sponsors the network can serve at all — moving any
+      // brand number above this one does nothing until this one moves. B120.
+      { key: "finance.games", label: "Games we run challenges on — THE CAPACITY CEILING" },
+      { key: "finance.gamesPerPayingBrand", label: "Games a paying brand buys at once" },
       { key: "finance.challengesPerGamePerMonth", label: "Challenges per game per month" },
       { key: "finance.techBudget", label: "Infrastructure, APIs & partnerships (whole period)" },
       { key: "finance.hires", label: "People" },

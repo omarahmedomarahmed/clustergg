@@ -188,9 +188,17 @@ console.log("\n== the front page no longer promises what it cannot keep ==");
   // The deck was already honest about its own assumptions — the front page was
   // what took that honesty away. Check the deck still carries the slide.
   const risky = JSON.stringify(SEED_DOCS);
-  ok("the deck still names what would break the plan",
-    /Nothing in this business has proven that yet/.test(risky),
+  // Asserted as a PROPERTY, not as one sentence. This pinned the exact string
+  // "Nothing in this business has proven that yet" and went red the moment the
+  // risks slide was rewritten — for a rewrite that made the slide MORE honest,
+  // since it promoted the real constraint to the top. A guard that fails on an
+  // improvement teaches people to edit the guard.
+  ok("the deck still has a slide about what would break the plan",
+    /What we.{0,3}d challenge|would push back on ourselves/.test(risky),
     "the front page borrowed its credibility from this slide");
+  ok("…and it still admits something is unproven",
+    /(has|have) (not )?proven|nothing .{0,30}proven|assumption about/i.test(risky),
+    "a risks slide that asserts no risk is a marketing slide");
 }
 
 console.log("\n== an existing install can pick up the correction ==");
@@ -204,6 +212,42 @@ console.log("\n== an existing install can pick up the correction ==");
   ok("…and it is reachable from the admin",
     /reseedDoc/.test(read("app/actions/dataroom.ts")),
     "a fix only in the seed leaves the live deck quoting the old price");
+}
+
+console.log("\n== the ask in the deck is the ask in the model ==");
+{
+  // B120. The round was typed into two slides — amount, valuation, post-money,
+  // equity, runway — while `lib/finance.ts` computed the same five numbers from
+  // the raise it was actually planning. Two copies of one fact, and the deck's
+  // copy is the one an investor reads.
+  const { FINANCE_DEFAULTS, finance } = await import("../../lib/finance.ts");
+  const f = finance();
+  const found: Record<string, number>[] = [];
+  const walk = (v: unknown) => {
+    if (Array.isArray(v)) return v.forEach(walk);
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      if (typeof o.postMoney === "number" && typeof o.equityPct === "number") {
+        found.push(o as unknown as Record<string, number>);
+      }
+      Object.values(o).forEach(walk);
+    }
+  };
+  walk(SEED_DOCS);
+
+  ok("the deck states the round", found.length > 0, String(found.length));
+  for (const a of found) {
+    eq("the amount matches the model", a.amount, FINANCE_DEFAULTS.raise);
+    eq("the equity matches", a.equityPct, FINANCE_DEFAULTS.equityPct);
+    eq("the post-money matches", a.postMoney, f.valuation.post);
+    eq("the pre-money matches", a.valuation, f.valuation.pre);
+    eq("the runway matches the months planned", a.runwayMonths, FINANCE_DEFAULTS.months);
+  }
+  // Two slides carry it. They must agree with each other as well as with the
+  // model — an investor who reads both is the one who finds the gap.
+  ok("every slide that states the round states the same round",
+    new Set(found.map((a) => `${a.amount}/${a.equityPct}/${a.postMoney}`)).size === 1,
+    found.map((a) => `${a.amount}/${a.equityPct}`).join(" vs "));
 }
 
 console.log(`\n${pass} passed, ${fails.length} failed`);

@@ -14,6 +14,8 @@
 // two can never disagree. Live inventory and audience come from
 // `lib/pricing-live.ts`.
 
+import { DEFAULT_SPLIT } from "@/lib/vault-split";
+
 export type TierKey = "reach" | "challenge" | "ultimate";
 
 export type PricingConfig = {
@@ -294,9 +296,45 @@ export function perGame(cfg: PricingConfig): number {
   return cfg.challengePrice * cfg.challengesPerGame;
 }
 
-/** What we keep on one challenge, after the prize. */
+/**
+ * What WE keep on one challenge. B120.
+ *
+ * ===== THIS USED TO RETURN TWO AND A HALF TIMES THE RIGHT NUMBER =====
+ *
+ * It returned `challengePrice − prizePool`: $175 out of $350, and the investor
+ * deck printed that under the label "gross margin per challenge".
+ *
+ * It is not margin. A sale divides FOUR ways, not two — the prize pool at 50%,
+ * the server pool at 15%, the points vault at 15%, and us at 20%. The server
+ * pool is paid out every Monday and the points vault funds every point a gamer
+ * earns; both are obligations that leave the bank. Our share of a $350
+ * challenge is $70.
+ *
+ * The cause is worth keeping: this module is PURE, `DEFAULT_SPLIT` lived in a
+ * module that imports the database, so the only subtraction available here was
+ * price minus prize. B120 moved the split to `lib/vault-split.ts` precisely so
+ * this function can compute what it claims to.
+ */
 export function marginPerChallenge(cfg: PricingConfig): number {
-  return Math.max(0, cfg.challengePrice - cfg.prizePool);
+  // The prize share comes from the RATE CARD, because that is the promise the
+  // pricing page makes and the one an operator moves. The other two
+  // obligations come from the vault split. Raising the prize percentage still
+  // lowers our share, which is the property the old definition got right — it
+  // just also has to subtract the two pools it was ignoring.
+  const ours = 100 - prizeSharePct(cfg) - DEFAULT_SPLIT.server - DEFAULT_SPLIT.cp;
+  return round2(Math.max(0, cfg.challengePrice * (ours / 100)));
+}
+
+/**
+ * Everything that is NOT ours: prizes, the server pool and the points vault.
+ *
+ * Kept as its own function because it is a real and useful figure — it is what
+ * "most of the spend reaches a gamer rather than an agency" means — and giving
+ * it a name is what stops somebody reaching for `price − prizePool` again the
+ * next time they want it.
+ */
+export function paidOutPerChallenge(cfg: PricingConfig): number {
+  return round2(Math.max(0, cfg.challengePrice - marginPerChallenge(cfg)));
 }
 
 /**
