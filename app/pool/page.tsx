@@ -202,7 +202,7 @@ export default async function PoolPage() {
           Add the bot to your server
         </a>
         <Link href="/rules/owner" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm">
-          Every rule, and why it exists
+          How the pool works, step by step
         </Link>
       </div>
     </div>

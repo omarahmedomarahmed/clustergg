@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { PRICING_DEFAULTS, type PricingConfig, type TierKey } from "@/lib/pricing";
+import { PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing";
 import { deliveryTotalsFor, deliveriesFor, type DeliveryTotals } from "@/lib/challenge-delivery";
 import { challengeStandings } from "@/lib/challenges";
 import { type Slot, type Campaign } from "@/lib/sponsored-campaigns";
@@ -289,50 +289,47 @@ export async function campaignReport(
   };
 }
 
-// ===== The tier a brand is on =====
+// ===== How much of the network a brand carries =====
+//
+// B118. This was a TIER — Reach, Challenge, Ultimate — named after the three
+// plans on the old rate card. There is one package now, so a badge reading
+// "Reach tier" over a brand's own dashboard named a product they could not
+// have bought and implied a ladder they could not climb.
+//
+// What it actually measures is worth keeping: how many of the games we
+// commercialise this brand currently sponsors, derived from the campaigns
+// running rather than from anything signed, so the line at the top of the
+// portal can never disagree with the list underneath it.
 
-export type BrandTier = {
-  key: TierKey;
-  label: string;
+export type BrandStanding = {
   /** Games they currently sponsor. */
   games: number;
   /** Of the games we commercialise. */
   ofGames: number;
+  /** A plain description of that, never a plan name. */
+  label: string;
   /** What they are spending a month on sponsored challenges. */
   monthly: number;
-  /** What reaching the next tier takes, or null at the top. */
-  next: { key: TierKey; label: string; games: number } | null;
+  /** The next step up, or null when they carry every game. */
+  next: { label: string; games: number } | null;
 };
 
-const TIER_LABELS: Record<TierKey, string> = {
-  reach: "Reach",
-  challenge: "Challenge",
-  ultimate: "Ultimate",
-};
-
-/**
- * Which tier a brand is on — from what they actually run, not what they signed.
- *
- * A tier here is a description of current activity: no live game is Reach, some
- * games is Challenge, every game we commercialise is Ultimate. Deriving it
- * rather than storing it means the badge on the portal can never disagree with
- * the campaigns listed underneath it.
- */
-export function brandTier(
+export function brandStanding(
   activeGames: string[],
   cfg: PricingConfig = PRICING_DEFAULTS,
-): BrandTier {
+): BrandStanding {
   const games = new Set(activeGames).size;
-  const key: TierKey = games <= 0 ? "reach" : games >= cfg.games ? "ultimate" : "challenge";
-  const next: BrandTier["next"] =
-    key === "reach" ? { key: "challenge", label: TIER_LABELS.challenge, games: 1 }
-      : key === "challenge" ? { key: "ultimate", label: TIER_LABELS.ultimate, games: cfg.games }
-        : null;
+  const ofGames = cfg.games;
+  const label = games <= 0
+    ? "No game running"
+    : games >= ofGames ? "Every game on the network" : `${games} of ${ofGames} games`;
+  const next: BrandStanding["next"] = games >= ofGames
+    ? null
+    : { label: games + 1 >= ofGames ? "every game on the network" : `${games + 1} of ${ofGames} games`, games: games + 1 };
   return {
-    key,
-    label: TIER_LABELS[key],
     games,
-    ofGames: cfg.games,
+    ofGames,
+    label,
     monthly: round2(games * cfg.challengePrice * cfg.challengesPerGame),
     next,
   };

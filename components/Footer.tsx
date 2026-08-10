@@ -66,7 +66,7 @@ export default async function Footer() {
       <div className="mx-auto max-w-6xl px-4 pb-8">
         <div className="rounded-2xl border border-white/10 bg-black/25 px-5 py-4">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
-            <span className="font-semibold text-ink">Every rule, and why it exists:</span>
+            <span className="font-semibold text-ink">How it works, and every rule:</span>
             <Link href="/rules/gamer" className="text-muted hover:text-ink">If you play</Link>
             <Link href="/rules/owner" className="text-muted hover:text-ink">If you run a server</Link>
             <Link href="/rules/brand" className="text-muted hover:text-ink">If you buy</Link>

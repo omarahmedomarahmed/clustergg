@@ -83,6 +83,71 @@ console.log("\n== no live document claims a retired feature exists ==");
   }
 }
 
+console.log("\n== no page offers a retired feature to a customer ==");
+{
+  // B118. The documents were guarded; the PRODUCT was not.
+  //
+  // `/marketplace` was still telling gamers a trophy could be "a gift to
+  // another gamer", in the page description Google indexes and in the header
+  // copy on the page itself. Gifting was deleted in B72.3 for
+  // money-transmission reasons. Nothing checked, because this suite only ever
+  // read `docs/`.
+  //
+  // A stale document misleads whoever reads it. A stale PAGE offers a customer
+  // something we will not do, which is the worse of the two, so the same rule
+  // now runs over every rendered surface.
+  //
+  // Comments are stripped first, and that is the whole reason this is
+  // survivable: `lib/discord/screens.ts` and `app/actions/social.ts` carry long
+  // notes naming what went and why, and those notes are what stop somebody
+  // rebuilding it. Failing the suite for explaining a deletion would delete the
+  // explanation.
+  const { readdirSync: rd, statSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const root = new URL("../../", import.meta.url).pathname;
+
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of rd(join(root, dir))) {
+      if (e.startsWith(".") || e === "node_modules") continue;
+      const rel = join(dir, e);
+      if (statSync(join(root, rel)).isDirectory()) walk(rel);
+      else if (/\.tsx?$/.test(e)) files.push(rel);
+    }
+  };
+  for (const d of ["app", "components"]) walk(d);
+
+  // Comments blanked, NEWLINES KEPT. Collapsing a block comment to one space
+  // shifts every line number after it, and a failure that points at the wrong
+  // line is a failure somebody spends ten minutes disbelieving.
+  const blank = (m: string) => m.replace(/[^\n]/g, " ");
+  const stripCode = (src: string) =>
+    src.replace(/\{\/\*[\s\S]*?\*\/\}/g, blank)
+       .replace(/\/\*[\s\S]*?\*\//g, blank)
+       .replace(/^\s*\/\/.*$/gm, blank);
+
+  const bad: string[] = [];
+  for (const f of files) {
+    const raw = read(f).split("\n");
+    const code = stripCode(read(f)).split("\n");
+    for (const r of RETIRED) {
+      const re = new RegExp(r.pattern, "i");
+      code.forEach((line, i) => {
+        if (!re.test(line.replace(NOT_A_MENTION, " "))) return;
+        // The MENTION is looked for in the stripped line; the CLEARING is
+        // looked for in the raw one, at the same index. That keeps the
+        // same-line rule that `CLEAR_SAME_LINE` exists to enforce while
+        // letting a trailing `/* retired */` do the clearing — which is the
+        // only way to annotate a line of JSX without inventing a prop.
+        if (r.cleared.some((c) => raw[i].toLowerCase().includes(c.toLowerCase()))) return;
+        bad.push(`${f}:${i + 1} [${r.what}] ${line.trim().slice(0, 70)}`);
+      });
+    }
+  }
+  ok("no rendered surface offers a retired feature", bad.length === 0,
+    bad.slice(0, 5).join(" | "));
+}
+
 console.log("\n== the history folder says it is history ==");
 {
   // `docs/legacy/EXECUTION_PLAN.md` is where B68's brief lives, and quoting it

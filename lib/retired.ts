@@ -142,4 +142,9 @@ export const CLEAR_SAME_LINE = true;
 export const RETIRED_QUOTE = "<!-- retired-quote -->";
 
 /** Mentions that are a different thing wearing the same word. */
-export const NOT_A_MENTION = /gift\s?cards?|giftcard|gifting one moved/i;
+// The `g` flag is load-bearing. Without it `String.replace` swaps only the
+// FIRST match, so a line reading `{ key: "giftcard", label: "Prepaid / gift
+// card" }` had "giftcard" excused and "gift card" left behind — and the payout
+// method a gamer picks got reported as a claim that gifting exists. The hyphen
+// matters for the same reason: "gift-card business" is prose about payouts.
+export const NOT_A_MENTION = /gift[\s-]?cards?|gift\s*\/\s*prepaid\s*card|prepaid\s*\/\s*gift\s*card|giftcard|gifting one moved/gi;

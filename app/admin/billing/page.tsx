@@ -100,8 +100,8 @@ export default async function BillingPage({
           </div>
         </div>
         <p className="mt-1 text-sm text-muted">
-          A month&apos;s bill is built from the same pricing model the website quotes: the placements base,
-          plus <b className="text-ink">{money(cfg.challengePrice * cfg.challengesPerGame, cur)}</b> for each
+          A month&apos;s bill is built from the same pricing model the website quotes:
+          <b className="text-ink">{money(cfg.challengePrice * cfg.challengesPerGame, cur)}</b> for each
           game&apos;s {cfg.challengesPerGame} weekly challenges, minus the base reduction that buying a game
           earns. Terms run {"30"} days from the day it&apos;s issued. Every line is then yours to edit.
         </p>

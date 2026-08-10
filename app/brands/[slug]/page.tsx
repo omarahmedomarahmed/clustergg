@@ -13,7 +13,7 @@ import BrandDraftCampaigns from "@/components/BrandDraftCampaigns";
 import BrandAudience from "@/components/BrandAudience";
 import { audienceSegments } from "@/lib/segments";
 import { campaignGames } from "@/lib/sponsored-campaigns";
-import { brandChallengeReports, campaignReport, brandTestimonials, brandTier, challengeServers } from "@/lib/brand-report";
+import { brandChallengeReports, campaignReport, brandTestimonials, brandStanding, challengeServers } from "@/lib/brand-report";
 import { pricingConfig } from "@/lib/pricing-live";
 import { listInvoices } from "@/lib/invoices";
 import { money } from "@/lib/pricing";
@@ -312,7 +312,7 @@ export default async function BrandPortalPage({
   const serversByChallenge = new Map(
     await Promise.all(ranIds.map(async (id) => [id, await challengeServers(id)] as const)),
   );
-  const tier = brandTier(
+  const standing = brandStanding(
     sponsored.filter((c) => c.status === "submitted" || c.status === "running").map((c) => c.game),
     cfg,
   );
@@ -381,7 +381,7 @@ export default async function BrandPortalPage({
                 {/* Where they stand, before anything they can buy. A brand opening
                     their own dashboard should see their position on it first. */}
                 <BrandTierStrip
-                  tier={tier}
+                  standing={standing}
                   spend={campaignViews.reduce((a, c) => a + c.totals.spend, 0)}
                   membersInServers={campaignViews.reduce((a, c) => a + c.totals.members, 0)}
                   entrants={campaignViews.reduce((a, c) => a + c.totals.entrants, 0)}

@@ -72,11 +72,17 @@ export type PricingConfig = {
    * challenge, with placements included free, and that is the offer the money
    * paths, the vault split and the brand builder now run on.
    *
-   * They default to 0 rather than being deleted: they are read in a dozen
-   * places across the marketing pages and the invoice builder, and the full
-   * page rewrite is a later item. Zero is the honest value — a base nobody is
-   * charged — and a zero base is skipped rather than printed, so no page says
-   * "$0/month". When the pages are rewritten these fields go with them.
+   * B118 finished the page rewrite: the pricing configurator, the deck slide,
+   * the enquiry form, the admin queue and the brand portal all describe one
+   * package now, and no surface renders a plan name.
+   *
+   * The fields stay at 0 anyway, and that is deliberate rather than unfinished.
+   * They are the SUBJECT of the guards that keep this retired —
+   * `tests/db/split.mts` asserts each one is zero, which is a check that stops
+   * working the moment the field it names stops existing. A retired price
+   * pinned at zero by a test is safer than a deleted price nothing can watch,
+   * and if one is ever charged again it reappears on its own: every consumer
+   * skips a zero base rather than printing "$0/month".
    */
   reachBase: number;
   challengeBase: number;
@@ -191,32 +197,26 @@ export const PRICING_COPY_DEFAULTS: Record<string, string> = {
   "pricing.note":
     "All prices in USD, per month, billed monthly unless you choose annual. No setup fees, no administration fees, no minimum term — cancel before the next cycle.",
 
-  "pricing.tier.reach.name": "Reach",
-  "pricing.tier.reach.tagline": "Show up where gamers already are.",
-  "pricing.tier.reach.features":
-    "Your creatives in every placement across clustergg.com\nPlacements inside every opted-in Discord server\nImpressions and clicks counted per placement and per community\nSelf-serve brand portal — upload and swap creatives yourself, any time\nFull analytics dashboard, filterable and downloadable\nNo lead time, no ticket, no account manager in the way",
+  // ONE package. C11 merged the three tiers; B118 removed the last shells of
+  // them from the page. The name is deliberately what a brand would say out
+  // loud rather than a tier word — nobody buys a "tier", they buy the weekly
+  // challenge on their game.
+  "pricing.package.name": "Sponsored challenges",
+  "pricing.package.tagline": "Sponsor the gameplay, not the content.",
+  "pricing.package.features":
+    "One sponsored challenge a week, per game, carrying your brand\nNaming rights — that game's weekly competition is yours\nCluster funds and pays every prize pool\nEntrants are verified players of that game, read from its official API\nYour creatives in every placement across clustergg.com, included\nPlacements inside every opted-in Discord server, included\nSelf-serve brand portal — swap creatives yourself, any time\nPer-challenge reporting: entrants, completion, reach, standings",
 
-  "pricing.tier.challenge.name": "Challenge",
-  "pricing.tier.challenge.tagline": "Sponsor the gameplay, not the content.",
-  "pricing.tier.challenge.features":
-    "Everything in Reach, with the base rate reduced\nFour sponsored community challenges a month, per game\nNaming rights — that game's weekly challenge carries your brand\nCluster funds and pays every prize pool\nEntrants are verified players of that game, read from its official API\nPer-challenge reporting: entrants, completion, reach, standings",
-
-  "pricing.tier.ultimate.name": "Ultimate",
-  "pricing.tier.ultimate.tagline": "Own the whole network.",
-  "pricing.tier.ultimate.features":
-    "All six games, all twenty-four challenges a month\nPremium placement — first position in every rotation\nDiscord placement in every server on the network\nWeekly shout-out on the Sunday live-stream\nBase rate at its lowest — you are only paying for games\nYour brand on every planet, every leaderboard, every challenge card",
-
-  "pricing.addon.name": "Sunday Broadcast",
-  "pricing.addon.tagline": "Sponsor Profile of the Week.",
+  "pricing.addon.name": "The Sunday Broadcast",
+  "pricing.addon.tagline": "Profile of the Week, decided live.",
   "pricing.addon.features":
-    "Presenting sponsor of the Sunday live-stream\nYour brand on the winners card posted to every server\nNamed in every clip cut from the broadcast\nAddable to any plan, cancel any time",
+    "Presenting sponsor of the Sunday live-stream\nYour brand on the winners card posted to every server\nNamed in every clip cut from the broadcast\nIncluded with the package, not sold separately",
 
   // "Question | answer" per line.
   "pricing.faq":
-    "What am I actually buying? | Structured gamer attention on Discord: placements across clustergg.com and inside every opted-in server, and — from the Challenge tier up — sponsored weekly competitions carrying your brand in the games you choose. Not vague awareness, and not a banner next to the audience.\n"
+    "What am I actually buying? | Structured gamer attention on Discord: placements across clustergg.com and inside every opted-in server, and sponsored weekly competitions carrying your brand in the games you choose. Not vague awareness, and not a banner next to the audience.\n"
     + "Who pays the prize money? | We do. Every challenge has a guaranteed minimum pool that Cluster funds and pays out. You're buying the competition and the name on it — no setup fee, no administration fee, no payout risk.\n"
     + "How do you know these are real gamers? | Every account is linked and verified against the game's own official API — rank, matches, wins. Nothing on Cluster is self-reported, which is the whole reason the audience can be described at all.\n"
-    + "Can I change my creative myself? | Yes. Every plan includes the brand portal: upload, swap and pause creatives whenever you want, and watch impressions and clicks per placement and per community. No ticket, no lead time.\n"
+    + "Can I change my creative myself? | Yes. The package includes the brand portal: upload, swap and pause creatives whenever you want, and watch impressions and clicks per placement and per community. No ticket, no lead time.\n"
     + "Is the impression figure guaranteed? | No, and we won't pretend otherwise. Reach and placement counts are measured; the forward-looking impression number is a projection with its formula printed next to it. What is contractual is the placements and the challenges.\n"
     + "What does naming rights mean? | The weekly challenge for that game runs under your brand — on the card posted to every server, on the leaderboard, on the challenge page, and in the winners announcement.\n"
     + "Can I sponsor inside my own Discord? | Yes, and it's often better. We install the bot in your server, build the competitive layer and run the activation for the community you already have.\n"

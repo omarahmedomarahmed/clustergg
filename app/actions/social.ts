@@ -106,26 +106,33 @@ export async function toggleSpaceMembership(spaceId: string, path: string) {
   revalidatePath(path);
 }
 
-// ===== POSTS, COMMENTS AND REACTIONS ARE GONE. B111 =====
+// ===== POSTS, COMMENTS AND REACTIONS ARE GONE =====
 //
 // `createPost`, `reactToPost` and `addComment` used to live here. Cluster is a
 // competition and earning layer, not a social network, and the feed was the
-// part of it nobody used and everybody had to moderate.
+// part of it nobody used and everybody had to moderate. B116 dropped the five
+// tables outright — production held zero rows in every one of them, so there
+// was never a post on this platform a person wrote. See `lib/legacy-drop.ts`.
 //
-// FOLLOWING, MESSAGING AND GIFTING STAY. They are how a gamer keeps track of
-// people they compete against, and none of them need a post to exist.
-//
-// The earning half was already retired: `write_post`, `write_comment`,
+// The earning half was retired before that: `write_post`, `write_comment`,
 // `reaction_given` and `reaction_received` sit in `lib/quests.ts` with a weight
 // of 0 and "(retired)" in their labels, so nothing here paid CP by the time it
 // was removed.
 //
-// ⚠ THE ROWS ARE STILL THERE, ON PURPOSE. `posts`, `comments`,
-// `post_reactions` and `comment_reactions` are user-authored content on a live
-// product. Dropping them from `COLUMN_MIGRATIONS` would delete somebody's
-// writing on the next boot, irreversibly, as a side effect of a deploy — which
-// is not a decision a refactor gets to take. `lib/social-purge.ts` holds the
-// deletion behind an explicit admin action, with a count shown first.
+// ===== WHAT IS STILL HERE, AND WHAT IS NOT =====
+//
+// FOLLOWING AND MESSAGING STAY. They are how a gamer keeps track of the people
+// they compete against, and neither needs a post to exist.
+//
+// GIFTING IS NOT ON THAT LIST. It was deleted in B72.3 — a transfer of
+// redeemable value between two accounts is a money-transmission trigger, a 1099
+// aggregation hole and an under-18 cash-out bypass at once.
+//
+// This sentence used to read "FOLLOWING, MESSAGING AND GIFTING STAY", and that
+// line is worth naming rather than quietly editing: it was written before the
+// deletion, never revisited, and later read back as current — which put a
+// feature that does not exist into a summary of the product. If a note here
+// says a feature lives, check `lib/retired.ts` before repeating it.
 
 export async function requestNewSpace(_prev: { error?: string; ok?: boolean } | undefined, formData: FormData) {
   const me = await requireUser();

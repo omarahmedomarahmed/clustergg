@@ -73,7 +73,7 @@ export const AR_TEXT: Record<string, string> = {
   "Explore": "استكشف",
   "Planets": "الكواكب",
   "Request a new planet": "اطلب كوكبًا جديدًا",
-  "Each game has its own planet — leaderboards, challenges, players and a community feed, all in one world.": "لكل لعبة كوكبها الخاص — لوحات الصدارة والتحديات واللاعبون وخلاصة المجتمع، في عالم واحد.",
+  "Each game has its own planet — its leaderboards, its live challenges and the players who compete on them, all in one world.": "لكل لعبة كوكبها الخاص — لوحات الصدارة والتحديات الحيّة واللاعبون الذين يتنافسون عليها، في عالم واحد.",
   "All planets": "كل الكواكب",
   "Explore the planet": "استكشف الكوكب",
   "Full →": "المزيد →",
@@ -452,7 +452,7 @@ export const AR_TEXT: Record<string, string> = {
 
 // Registry of editable page strings, grouped by page, for the admin editor.
 export const PAGE_STRINGS: { page: string; strings: string[] }[] = [
-  { page: "Planets", strings: ["Explore", "Planets", "Request a new planet", "Each game has its own planet — leaderboards, challenges, players and a community feed, all in one world."] },
+  { page: "Planets", strings: ["Explore", "Planets", "Request a new planet", "Each game has its own planet — its leaderboards, its live challenges and the players who compete on them, all in one world."] },
   { page: "Quests", strings: ["Quests", "Play the Cluster.", "Earn your legend.", "Each quest is a guided path across the galaxy. Tap a quest to open its map, track your Cluster Points, and see who's leading the way.", "Sign in with Discord to start earning quest badges.", "Your total Cluster Points", "Quests are being forged — check back shortly.", "Your complete CP history"] },
   { page: "Quest detail", strings: ["milestone leaderboard", "quester", "questers", "No questers yet — be the first to earn Cluster Points here.", "you", "Reached", "CP history"] },
   { page: "Quest card", strings: ["CP", "✓ Unlocked", "How to reach", "Reach", "Cluster Points to unlock", "reached this step", "My progress", "Leaderboard", "★ Max tier reached — legend status.", "CP to", "No questers yet.", "Full leaderboard →"] },

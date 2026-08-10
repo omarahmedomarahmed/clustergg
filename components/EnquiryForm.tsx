@@ -27,7 +27,12 @@ export default function EnquiryForm({
 
   const q = quote(cfg, { games, addon, yearly });
   const rate = yearly ? q.yearlyMonthly : q.monthly;
-  const tierName = q.tier === "reach" ? "Reach" : q.tier === "ultimate" ? "Ultimate" : "Challenge";
+  // What they are asking about, in their own words. There is one package, so
+  // the line names the SIZE of the buy rather than a tier — a brand told they
+  // are on "Reach" has to ask what that means before they can send the form.
+  const planName = games <= 0
+    ? "Placements only"
+    : games >= cfg.games ? `All ${cfg.games} games` : `${games} ${games === 1 ? "game" : "games"}`;
 
   if (state?.ok) {
     return (
@@ -49,7 +54,10 @@ export default function EnquiryForm({
           <div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-muted">Your plan</div>
             <div className="text-lg font-bold mt-1">
-              {tierName}{games > 0 && <span className="text-muted font-normal"> · {games} {games === 1 ? "game" : "games"}</span>}
+              {planName}
+              {games > 0 && games < cfg.games && (
+                <span className="text-muted font-normal"> · {q.challengesPerMonth} challenges a month</span>
+              )}
             </div>
           </div>
           <div className="text-right">
@@ -71,9 +79,14 @@ export default function EnquiryForm({
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
-          <Chip on={addon} onClick={() => setAddon(!addon)}>
-            + Sunday Broadcast {money(cfg.streamAddon, cfg.currency)}
-          </Chip>
+          {/* The broadcast comes with the package. The chip stays only if it
+              is ever priced back up — offering a paid extra at $0 reads as a
+              fee somebody forgot to fill in. */}
+          {cfg.streamAddon > 0 && (
+            <Chip on={addon} onClick={() => setAddon(!addon)}>
+              + Sunday Broadcast {money(cfg.streamAddon, cfg.currency)}
+            </Chip>
+          )}
           <Chip on={yearly} onClick={() => setYearly(!yearly)}>
             Annual −{Math.round(cfg.yearlyDiscountPct)}%
           </Chip>

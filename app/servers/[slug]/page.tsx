@@ -261,7 +261,7 @@ export default async function ServerPortalPage({
                 >
                   <Icon name="spark" size={16} className="shrink-0 text-violet-300" />
                   <span>
-                    <b>Every rule that applies to you</b>
+                    <b>How this works, and every rule that applies to you</b>
                     <span className="block text-xs text-muted">
                       What the pool counts, what it does not, and why each one is the way it is.
                     </span>
@@ -627,7 +627,7 @@ async function PublicView({ server, data, base, unlock, left = "", mins = "" }: 
               See this week&apos;s pool
             </Link>
             <Link href="/rules/owner" className="ghost-btn pressable rounded-full px-6 py-2.5 text-sm">
-              Every rule, and why it exists
+              How it works, step by step
             </Link>
           </div>
         </div>

@@ -108,7 +108,7 @@ export default async function AdminMarketplacePage() {
                     <td className="text-sm font-semibold">{o.trophyName}</td>
                     <td className="text-sm"><Link href={`/u/${o.buyerSlug}`} className="hover:text-cyan-300">{o.buyerName}</Link></td>
                     <td className="text-sm">
-                      {o.kind === "gift"
+                      {o.kind === "gift" /* retired in B72.3 — history only */
                         ? <><Icon name="spark" size={11} className="mr-1 inline text-violet-300" /><Link href={`/u/${o.recipientSlug}`} className="hover:text-cyan-300">{o.recipientName}</Link></>
                         : <span className="text-muted">themselves</span>}
                     </td>

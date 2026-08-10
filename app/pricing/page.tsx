@@ -117,39 +117,33 @@ export default async function PricingPage() {
             placements={{ total: live.placements, web: live.webPlacements, discord: live.discordPlacements }}
           />
 
-          {/* The add-on, given its own card because it sells on any plan. */}
-          <div className="mt-6 glass rounded-3xl p-6 md:p-8 grid md:grid-cols-[1.4fr_1fr] gap-8 items-center border border-amber-400/20">
+          {/* The Sunday broadcast. It was a paid add-on on the old rate card;
+              it comes with the package now, so it is presented as what you get
+              rather than as a checkbox with a price beside it. B118. */}
+          <div className="mt-6 glass rounded-3xl border border-amber-400/20 p-6 md:p-8 grid md:grid-cols-[1.4fr_1fr] gap-8 items-center">
             <div>
-              <div className="inline-flex items-center gap-2 text-xs text-amber-200 bg-amber-500/10 border border-amber-400/30 rounded-full px-3 py-1.5">
-                <Icon name="play" size={12} /> {cfg.streamAddon > 0 ? "Add-on · any plan" : "Included with every package"}
+              <div className="inline-flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-200">
+                <Icon name="play" size={12} /> Included with every package
               </div>
-              <h3 className="text-2xl font-bold mt-4">{copy["pricing.addon.name"]}</h3>
-              <p className="text-muted mt-2 leading-relaxed">
+              <h3 className="mt-4 text-2xl font-bold">{copy["pricing.addon.name"]}</h3>
+              <p className="mt-2 leading-relaxed text-muted">
                 {copy["pricing.addon.tagline"]} Every Sunday the week&apos;s Best Profile competition is decided live,
                 announced in every server on the network, and cut into clips.
               </p>
-              <ul className="mt-4 grid sm:grid-cols-2 gap-2">
+              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                 {lines(copy["pricing.addon.features"]).map((f) => (
                   <li key={f} className="flex items-start gap-2 text-sm">
                     <Icon name="check" size={14} className="mt-1 shrink-0 text-amber-300" />
-                    <span className="text-muted leading-snug">{f}</span>
+                    <span className="leading-snug text-muted">{f}</span>
                   </li>
                 ))}
               </ul>
             </div>
-            {/* C11: the broadcast was a paid add-on on the old three-tier rate
-                card. v2 merged it into the one package. Priced back up, it
-                shows its price again — at zero it says what it now is rather
-                than printing "$0 per month". */}
-            <div className="text-center rounded-3xl bg-black/30 border border-white/10 p-8">
-              <div className="text-5xl font-bold text-amber-300 leading-none">
-                {cfg.streamAddon > 0 ? money(cfg.streamAddon, cfg.currency) : "Included"}
-              </div>
-              <div className="text-xs uppercase tracking-widest text-muted mt-3">
-                {cfg.streamAddon > 0 ? "per month" : "with every package"}
-              </div>
-              <Link href="/brands" className="pressable mt-6 block rounded-full px-6 py-3 font-semibold bg-amber-500 text-[#1a1200]">
-                {cfg.streamAddon > 0 ? "Add it to a plan" : "See the package"}
+            <div className="rounded-3xl border border-white/10 bg-black/30 p-8 text-center">
+              <div className="text-5xl font-bold leading-none text-amber-300">Included</div>
+              <div className="mt-3 text-xs uppercase tracking-widest text-muted">no extra charge</div>
+              <Link href="/brands" className="pressable mt-6 block rounded-full bg-amber-500 px-6 py-3 font-semibold text-[#1a1200]">
+                See the package
               </Link>
             </div>
           </div>
