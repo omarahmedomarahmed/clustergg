@@ -131,6 +131,29 @@ console.log("\n== the same nav for everybody ==");
     "two copies is how the two audiences drift apart again");
 }
 
+console.log("\n== the two PLACES stay one click away ==");
+{
+  // B123.1. The first version of this rewrite moved the planets and
+  // marketplace badges into the Play menu along with the game logos, and
+  // `tests/ui/marketplace-ui.mjs` failed on an assertion named "It is
+  // reachable without knowing it exists". It was right: two interactions deep
+  // is not discoverable, and B9 had promoted the marketplace OUT of the utility
+  // icons for exactly that reason — so it would read as a place, not a control.
+  //
+  // A menu carries ROUTES. A badge carries a PLACE. The distinction is the
+  // reason the row is allowed to hold anything at all.
+  const nav = read("components/Nav.tsx");
+  ok("the destination badges are rendered in the row", /navBadges\(\{/.test(nav),
+    "the marketplace and planets badges are places, not menu leaves");
+  // `lastIndexOf`, not `indexOf`. `navBadges({` is called TWICE — once to build
+  // the mobile drawer's link list near the top of the file, and once to render
+  // the row. The first version of this check found the drawer call, concluded
+  // the badges were above the menu bar, and failed on correct code.
+  ok("…outside any dropdown", nav.lastIndexOf("navBadges({") > nav.indexOf("<NavMenuBar"),
+    "a badge inside the menu is the regression this check exists for");
+  ok("…and still admin-gated", /show\("marketplaceBadge"\)|show,/.test(read("lib/site-chrome.ts")) || /show,/.test(nav));
+}
+
 console.log("\n== the doors are no longer hidden by breakpoint ==");
 {
   const nav = read("components/Nav.tsx");

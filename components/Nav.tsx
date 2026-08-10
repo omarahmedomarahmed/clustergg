@@ -248,6 +248,32 @@ export default async function Nav() {
           signedIn={!!user}
         />
 
+        {/* THE TWO PLACES, kept in the row. B123.1.
+            My first pass moved these into the Play menu with the game logos,
+            and `tests/ui/marketplace-ui.mjs` went red on an assertion named
+            "It is reachable without knowing it exists" — which is exactly the
+            property that was lost. Two interactions deep is not discoverable.
+
+            It also undid B9 on purpose-built grounds: the marketplace was
+            promoted OUT of the utility icons precisely so it would read as a
+            place rather than as a control. A dropdown is further from a place
+            than the icon row it was rescued from.
+
+            So the menus carry the ROUTES and these two carry the PLACES. Two
+            badges beside three menus is still a short row — the twelve-item
+            version is what was wrong, not the idea of a visible destination. */}
+        <nav className="hidden md:flex items-center gap-2 shrink-0">
+          {navBadges({ hidePlanets, show, planetsIcon, marketIcon, marketLabel, marketFirst })
+            .map((b) => (
+              <Link key={b.id} href={b.href} title={b.label}
+                className={`shrink-0 flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 text-muted transition-colors ${b.hover}`}>
+                {b.art
+                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={b.art} alt={b.label} className="h-full w-full object-cover" />
+                  : <Icon name={b.glyph} size={17} />}
+              </Link>
+            ))}
+        </nav>
+
         {/* One quest card (with a dropdown to switch) fills the nav space (lg+).
             Members only: a quest tracker means nothing to somebody who has no
             quests, and the space is better spent on the two doors a guest is
