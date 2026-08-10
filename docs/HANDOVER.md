@@ -87,12 +87,52 @@ Run the bands with `node tests/run-all.mjs` (database) and
 import a `.ts` module, so read source and parse it as `tests/ui/admin-sweep.mjs`
 does).
 
-### 3.3 The data room
+### 3.3 The data room — rebuild it from nothing
 
-Rebuild it. Every document, full-page rewrite. It should read as real materials
-for a startup raising money — pitch deck, company profile, financial model — not
-a side-scrolling slide toggle. Some of the current content is stale and the
-visualisation engine in it is poor.
+Every document, a full-page rewrite. It should read as real materials for a
+startup raising money — pitch deck, company profile, financial model — not a
+side-scrolling slide toggle with a chart engine bolted on. Assume none of the
+current content survives. Some of it is stale, and the visualisation in it is
+poor.
+
+**Start with research, not with writing.** Before a single number goes on a
+page, go and find out what the market actually looks like:
+
+- **Comparable companies and products.** Who else sits between brands and
+  gaming communities, or between creators/communities and advertiser money?
+  What do they actually sell, to whom, and at what price?
+- **Their rounds.** At what stage did they raise, how much, at what valuation,
+  and on what traction? Pre-seed and seed specifically — the ones raised on a
+  product and a thesis rather than on revenue.
+- **Their investors.** Who funds this category? What do those funds write
+  cheques for, and what do they ask to see first?
+
+Then price **our** round against that evidence and say, in the document, what
+you priced it against.
+
+> **This matters because the round is currently priced on internal arithmetic
+> and nothing else.** `lib/finance.ts` carries a raise, an equity percentage
+> and a runway that were derived by working backwards from what the plan costs
+> to execute — a defensible way to size a budget and **not** a way to price a
+> round. No comparable, no market rate, and no investor expectation went into
+> them. Treat every one of those numbers as an open question, not as a starting
+> point to adjust.
+
+**Rewrite the financial model from scratch**, on your own structure. Do not
+inherit the current one's shape. The two constraints that are real, and that
+the current model learned the hard way, are worth carrying across as
+*constraints* rather than as numbers:
+
+- **Margin is the platform's own vault share, not price minus prize pool.** A
+  model that treats everything above the prize money as margin overstates it
+  several times over, because the server pool and the points vault are
+  obligations that leave too.
+- **Capacity binds demand.** A game runs one sponsored challenge at a time, so
+  the number of paying brands cannot exceed the number of commercialised games.
+  A projection that ignores this sells the same inventory twice.
+
+Everything else — the drivers, the shape, the horizon, what a scenario toggle
+should even do — is yours to decide.
 
 ---
 
@@ -144,7 +184,7 @@ suggests.
 |---|---|---|
 | **Repost button** | Every bot announcement — challenge, Profile of the Week, winners — needs a button that re-posts that exact announcement to the same channel as a **new** message, triggered per server. | **Not started.** The privacy fix it depends on is done and tested: a button on a public card now answers with a new private message instead of rewriting the announcement for the channel. |
 | **Challenge dashboard** | One dashboard to manage every challenge from. Today they are managed from several places. | **Not started.** |
-| **Data room** | The rebuild described in §3.3. | **Not started** — this one is yours by design, not by neglect. It wants a fresh view of the company more than it wants continuity. |
+| **Data room** | The full rebuild described in §3.3, including the comparables research and a financial model written from scratch. | **Not started, and deliberately left for you.** It needs market research before it needs writing, and a fresh read of the company more than it needs continuity with mine. |
 
 Two things need the owner rather than an agent:
 
