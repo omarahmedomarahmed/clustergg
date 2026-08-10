@@ -11,6 +11,7 @@ import AddBotButton from "@/components/AddBotButton";
 import BrandHeader from "@/components/BrandHeader";
 import NavQuestCard from "@/components/NavQuestCard";
 import NavMenus, { type NavNotif, type NavConvo } from "@/components/NavMenus";
+import NavMenuBar from "@/components/nav/NavMenuBar";
 import MobileHud from "@/components/MobileHud";
 import UnlockChecklist from "@/components/UnlockChecklist";
 import { unlockState } from "@/lib/unlock";
@@ -233,31 +234,19 @@ export default async function Nav() {
           <BrandHeader placement="nav" />
         </Link>
 
-        {/* Game planets — bigger, glorified logos. */}
-        <nav className="hidden md:flex items-center gap-2.5 shrink-0">
-          {show("gameLogos") && navGames.map((g) => (
-            <Link key={g.id} href={planetHref(g)} title={g.name}
-              className="group shrink-0 relative rounded-xl transition-transform hover:scale-110">
-              <span className="absolute -inset-1 rounded-xl bg-gradient-to-br from-violet-500/0 to-cyan-500/0 group-hover:from-violet-500/25 group-hover:to-cyan-500/25 blur-md transition-all" />
-              <GameLogo logoUrl={slimImg(g.logoUrl, 300000)} name={g.name} size={40} rounded="rounded-xl"
-                className="relative ring-1 ring-violet-400/25 group-hover:ring-cyan-400/60 shadow-lg" />
-            </Link>
-          ))}
-          {/* The two destination badges, in admin-set order. Rendered from one
-              list rather than two hand-written blocks so they cannot drift out
-              of the same visual family — which is the whole point of B9: the
-              marketplace was a bare 18px glyph parked among the right-hand
-              utility icons, so it read as a control rather than as a place. */}
-          {navBadges({ hidePlanets, show, planetsIcon, marketIcon, marketLabel, marketFirst })
-            .map((b) => (
-              <Link key={b.id} href={b.href} title={b.label}
-                className={`shrink-0 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-violet-400/25 text-muted transition-colors ${b.hover}`}>
-                {b.art
-                  ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={b.art} alt={b.label} className="h-full w-full object-cover" />
-                  : <Icon name={b.glyph} size={18} />}
-              </Link>
-            ))}
-        </nav>
+        {/* ===== THE THREE MENUS. B123. =====
+            Play / Earn / Advertise, identical for every visitor. What used to
+            be here — up to six game logos, a planets badge and a marketplace
+            badge, then two text links stranded behind `hidden lg:inline` — is
+            now inside them, which is what gives the row back its space.
+            `gameLogos` still gates the logo grid inside the Play panel, so the
+            admin switch keeps meaning what it says. */}
+        <NavMenuBar
+          games={show("gameLogos") ? navGames.map((g) => ({
+            id: g.id, name: g.name, href: planetHref(g), logoUrl: slimImg(g.logoUrl, 300000) as string | null,
+          })) : []}
+          signedIn={!!user}
+        />
 
         {/* One quest card (with a dropdown to switch) fills the nav space (lg+).
             Members only: a quest tracker means nothing to somebody who has no
@@ -284,8 +273,10 @@ export default async function Nav() {
                   <Icon name="search" size={18} />
                 </Link>
               )}
-              {show("brandsLink") && <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>}
-              {show("serversLink") && <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>}
+              {/* B123. "For brands" and "For Discord servers" were here behind
+                  `hidden lg:inline` — the two commercial doors, and so the first
+                  things to vanish on a laptop. They are Earn and Advertise in
+                  the menu bar now, at every width, for every visitor. */}
               {show("alerts") && <NavMenus notifications={navNotifs} unread={unread} conversations={navConvos} />}
               {show("profileMenu") && (
                 <UserMenu
@@ -312,8 +303,10 @@ export default async function Nav() {
                   <Icon name="search" size={18} />
                 </Link>
               )}
-              {show("brandsLink") && <Link href="/pricing" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For brands</Link>}
-              {show("serversLink") && <Link href="/discord-bot" className="text-sm text-muted hover:text-ink hidden lg:inline whitespace-nowrap">For Discord servers</Link>}
+              {/* B123. "For brands" and "For Discord servers" were here behind
+                  `hidden lg:inline` — the two commercial doors, and so the first
+                  things to vanish on a laptop. They are Earn and Advertise in
+                  the menu bar now, at every width, for every visitor. */}
               {show("loginLink") && <Link href="/login" className="text-sm text-muted hover:text-ink hidden sm:inline">{t("nav.login")}</Link>}
               {show("addBot") && <span className="hidden md:inline-flex"><AddBotButton size="sm" /></span>}
               {show("discordSignIn") && (
