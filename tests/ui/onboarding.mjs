@@ -21,7 +21,7 @@
  *   scripts/with-server.sh 3031 node tests/ui/onboarding.mjs
  */
 import { chromium } from "playwright-core";
-import { after, settle } from "./_nav.mjs";
+import { after, open, settle } from "./_nav.mjs";
 
 const BASE = process.env.BASE_URL || "http://localhost:3031";
 let pass = 0, fail = 0;
@@ -45,7 +45,7 @@ const email = `onb-${tag}@demo.gg`;
 
 console.log("== a brand-new gamer is asked, without going looking ==");
 {
-  await page.goto(`${BASE}/signup`, { waitUntil: "domcontentloaded" });
+  await open(page, `${BASE}/signup`);
   await page.fill('input[name="displayName"]', `Onb ${tag}`).catch(() => {});
   await page.fill('input[name="email"]', email);
   await page.fill('input[name="password"]', "cluster-demo");
@@ -59,14 +59,14 @@ console.log("== a brand-new gamer is asked, without going looking ==");
   ok("…and there are three steps", /0 of 3|1 of 3/.test(text));
 
   // The point of putting the bar in the layout: it does not depend on the page.
-  await page.goto(`${BASE}/quests`, { waitUntil: "domcontentloaded" });
+  await open(page, `${BASE}/quests`);
   ok("the bar follows them to another page",
     /steps? left before you can earn/i.test(await body()));
 }
 
 console.log("\n== the email is confirmed in place, and never printed ==");
 {
-  await page.goto(`${BASE}/onboarding`, { waitUntil: "domcontentloaded" });
+  await open(page, `${BASE}/onboarding`);
   ok("the address is masked, not printed", !(await body()).includes(email), email);
 
   // B98 already sent one at signup. Asking for another proves the resend path,
@@ -116,7 +116,7 @@ console.log("\n== the email is confirmed in place, and never printed ==");
 
 console.log("\n== the third step is three answers and a live card ==");
 {
-  await page.goto(`${BASE}/onboarding`, { waitUntil: "domcontentloaded" });
+  await open(page, `${BASE}/onboarding`);
 
   // SELECT → READ WHAT IT MEANS → CONFIRM. The middle one is the whole design.
   await page.locator('button[aria-pressed]:has-text("13 to 17")').first().click();
@@ -154,6 +154,13 @@ console.log("\n== the third step is three answers and a live card ==");
 
 console.log("\n== two of three done, and the count is honest ==");
 {
+  // Every navigation in this file goes through `open()`, which is `goto` plus
+  // `settle`. It used to be a bare `goto` followed immediately by reading the
+  // body, and this block is the one that caught it: /onboarding reads the step
+  // state from the database, so the first paint is the "Traversing the cluster…"
+  // loader. The assertion was matching the loading screen, and it failed with a
+  // dump that contained the nav and nothing else. `networkidle` never fires
+  // here — `settle` is the reason `_nav.mjs` exists.
   // The LINK step is not driven here, and the reason is worth stating: it means
   // proving ownership of a real account at a real provider, which a browser
   // test cannot do without inventing a fake provider — and a fake provider
@@ -161,12 +168,12 @@ console.log("\n== two of three done, and the count is honest ==");
   //
   // So what is asserted is the count. A bar still saying "3 steps" after two
   // were finished is the bug this catches.
-  await page.goto(`${BASE}/onboarding`, { waitUntil: "domcontentloaded" });
+  await open(page, `${BASE}/onboarding`);
   const text = await body();
   ok("the page counts two of three", /2 of 3/.test(text), text.slice(0, 400));
   ok("…and the answers are shown back", /18 or over/.test(text) && /US/.test(text));
 
-  await page.goto(`${BASE}/quests`, { waitUntil: "domcontentloaded" });
+  await open(page, `${BASE}/quests`);
   const bar = await body();
   ok("the bar says one step left", /1 step left before you can earn/i.test(bar), bar.slice(0, 200));
   ok("…and names the one that is left", /Next: link a game account/i.test(bar));
@@ -175,7 +182,7 @@ console.log("\n== two of three done, and the count is honest ==");
 
 console.log("\n== the age answer cannot be changed back ==");
 {
-  await page.goto(`${BASE}/settings/earning`, { waitUntil: "domcontentloaded" });
+  await open(page, `${BASE}/settings/earning`);
   const text = await body();
   ok("settings shows the answer they gave", /18 or over/.test(text));
   ok("…and says a human has to change it", /support/i.test(text));
