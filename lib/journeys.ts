@@ -27,6 +27,7 @@
 import { STAGE_ORDER, STAGES } from "@/lib/challenge-stage";
 import { DEFAULT_SPLIT } from "@/lib/vaults";
 import { MIN_WITHDRAWAL } from "@/lib/server-wallet";
+import { MIN_PRIZE_POOL } from "@/lib/private-quote";
 import { PRIVATE_FEE_PCT } from "@/lib/private-quote";
 import { PARTICIPATION_SHARE } from "@/lib/server-score";
 import { MAX_PLACES } from "@/lib/prize-places";
@@ -148,7 +149,7 @@ export const JOURNEYS: Record<Audience, JourneyStep[]> = {
     },
     {
       title: "Withdraw or spend",
-      body: `Take it out from ${money(MIN_WITHDRAWAL)}, or spend it on a private challenge for your own members — the prize pool plus ${PRIVATE_FEE_PCT}%.`,
+      body: `Two thresholds, and the lower one comes first. From ${money(MIN_PRIZE_POOL)} you can buy a private challenge for your own members — the prize pool plus ${PRIVATE_FEE_PCT}%. From ${money(MIN_WITHDRAWAL)} you can take the money out instead. Spending inside opens sooner because moving a number between two rows of our database costs nothing, while a transfer out pays a provider fee.`,
       helper: "Asking to withdraw makes the money unspendable immediately, so it can never go out twice.",
       icon: "send",
     },

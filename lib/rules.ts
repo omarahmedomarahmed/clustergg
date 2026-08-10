@@ -29,7 +29,7 @@ import { PARTICIPATION_SHARE } from "@/lib/server-score";
 import { RUNGS, EARN_FLOOR } from "@/lib/ladder";
 import { UNLOCK_STEPS } from "@/lib/unlock";
 import { MIN_WITHDRAWAL } from "@/lib/server-wallet";
-import { PRIVATE_FEE_PCT, MIN_PRIZE_POOL } from "@/lib/private-quote";
+import { PRIVATE_FEE_PCT, MIN_PRIZE_POOL, PRIZE_POOL_STEP } from "@/lib/private-quote";
 import { US_REPORT_THRESHOLD } from "@/lib/eligibility";
 import { MAX_PLACES } from "@/lib/prize-places";
 
@@ -170,7 +170,7 @@ export const RULES: Record<Audience, Rule[]> = {
     },
     {
       topic: "Your own challenges",
-      rule: `You can buy a challenge for your own members: the prize pool plus ${PRIVATE_FEE_PCT}%, minimum ${money(MIN_PRIZE_POOL)} in prizes.`,
+      rule: `You can buy a challenge for your own members: the prize pool plus ${PRIVATE_FEE_PCT}%, from ${money(MIN_PRIZE_POOL)} in prizes and in ${money(PRIZE_POOL_STEP)} steps.`,
       why: "The margin is what makes it something we sell you rather than us moving your money "
         + "around — and that is what lets us owe your members the prize directly.",
     },
