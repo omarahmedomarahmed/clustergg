@@ -36,9 +36,13 @@ const { deliveryFor, brandCreativeIds, MIN_COHORT, AUDIENCE_NOTE } =
 
 const db = await getDb();
 
-console.log("== B81.1: the definition is written down, and honestly ==");
+console.log("== the definition is written down, and honestly ==");
 {
-  const doc = src("docs/legacy/AD_VIEW.md");
+  // Moved from docs/legacy to docs/DELIVERY.md when the legacy folder was
+  // purged. The commitment is the PRODUCT'S, not a former product's: we report
+  // what happened and never model, estimate or multiply it. Deleting it with
+  // the rest of the old plan would have thrown away a promise we still keep.
+  const doc = src("docs/DELIVERY.md");
   ok("the document exists and states the rule", /One card carrying a creative/i.test(doc));
   // The three admissions that make it worth reading. Each of them costs us
   // something, which is exactly why a reviewer should check they survived.

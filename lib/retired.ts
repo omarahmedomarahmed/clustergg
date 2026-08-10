@@ -16,8 +16,10 @@
 //
 // Neither was a typo and neither was a code defect. **The code was right both
 // times.** Both came from reading a document written before the change and
-// repeating its words as a statement of fact about today — and `docs/legacy/`
-// is full of documents like that, because that is what the folder is for.
+// repeating its words as a statement of fact about today. There used to be a
+// whole folder of documents like that; it has been deleted, which removes the
+// commonest source of this error but not the error itself — a code comment, an
+// admin page's blurb or a marketing line can go stale the same way.
 //
 // A person cannot be trusted to remember which of forty documents predates
 // which of a hundred and twelve changes. So the list is here, in code, and
@@ -101,7 +103,7 @@ export const RETIRED: Retired[] = [
   },
 ];
 
-/** Live documents. Anything under `docs/legacy/` is history and exempt by design. */
+/** Live documents. There is no history folder any more — everything under docs/ is current. */
 export const LIVE_DOCS = [
   "README.md",
   "docs/SOURCE_OF_TRUTH.md",

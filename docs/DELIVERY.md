@@ -1,27 +1,14 @@
-# What Cluster counts as an ad view
+# What Cluster counts as a delivered view
 
-<!-- LEGACY-BANNER -->
-> # ⚠ HISTORICAL — NOT THE PRODUCT
->
-> **Nothing in this file describes ClusterGG as it is today.** It is kept
-> because the reasoning is still useful and because a decision with no record
-> gets made again.
->
-> **Do not quote a sentence from this folder as a statement of fact about the
-> product.** Two errors have already been caused by exactly that: a claim that
-> brands are billed on impressions (they are billed a fixed price per
-> challenge) and a claim that gifting is part of the product (it was deleted in
-> B72.3, for money-transmission reasons).
->
-> **The current truth, in this order:** the code, then `docs/SOURCE_OF_TRUTH.md`,
-> then `docs/MODEL.md` and `docs/HANDOVER.md`. Where this file and the code
-> disagree, the code is right and this file is history.
+**This is current and it governs every delivery figure a brand is shown.**
 
-**B81.1. Written for a brand's agency to read, not for us.**
+It survived the move out of the old plan folder because the commitment in it is
+the product's, not a former product's: we report what happened and we do not
+model, estimate or multiply it. The Discord card is house-only now (nobody buys
+that slot), so what this document governs is the WEB placements and the
+challenge delivery report — but the rule is unchanged and the refusals below
+are the reason a brand can believe the number.
 
-Everything Cluster charges for on the placement side rests on this one
-definition. If we cannot state it honestly, we cannot sell it — so it is stated
-here first, including the parts that do not flatter us.
 
 ---
 

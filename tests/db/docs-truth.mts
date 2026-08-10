@@ -13,8 +13,10 @@
 //      commit message.
 //
 // Neither was a typo. **The code was right both times.** Both came from reading
-// a document written before the change and repeating it as fact — and
-// `docs/legacy/` is full of such documents, because that is the folder's job.
+// a document written before the change and repeating it as fact. The old plan
+// folder was full of documents like that; it has been deleted, which removes
+// the commonest source of the error without removing the error itself — a live
+// doc goes stale the same way, just more quietly.
 //
 // `tests/db/marketing-truth.mts` guards the public pages. `dataroom-truth.mts`
 // guards the deck. Nothing guarded the documents an engineer — or a model —
@@ -148,31 +150,34 @@ console.log("\n== no page offers a retired feature to a customer ==");
     bad.slice(0, 5).join(" | "));
 }
 
-console.log("\n== the history folder says it is history ==");
+console.log("\n== there is no history folder to mistake for the product ==");
 {
-  // `docs/legacy/EXECUTION_PLAN.md` is where B68's brief lives, and quoting it
-  // as current is exactly what produced the gifting error. Only one file in the
-  // folder used to say it was historical.
-  const dir = "docs/legacy";
-  const files = readdirSync(at(dir)).filter((f) => f.endsWith(".md"));
-  ok("there are legacy documents to mark", files.length > 5, String(files.length));
-  for (const f of files) {
-    const src = read(`${dir}/${f}`);
-    ok(`${f} carries the banner`, src.includes("LEGACY-BANNER"),
-      "a stale document that does not announce itself is a trap");
-    ok(`…in the first 40 lines`, src.split("\n").slice(0, 40).join("\n").includes("LEGACY-BANNER"),
-      "a warning below the fold is a warning nobody reads");
-  }
-}
+  // `docs/legacy/` held thirteen documents describing the platform before the
+  // pivots, each behind a warning banner. Banners are a weaker guard than
+  // deletion: they rely on somebody reading before quoting, and the gifting
+  // error came from exactly that not happening.
+  //
+  // The folder is gone. A fresh session opening this repo now finds only what
+  // is true, which is the entire point — there is nothing left to misread.
+  ok("the legacy folder is deleted, not merely banner-ed",
+    !existsSync(at("docs/legacy")),
+    "a stale document behind a warning is still a stale document somebody will quote");
 
-console.log("\n== the banner says the two things that actually went wrong ==");
-{
-  const banner = read("docs/legacy/EXECUTION_PLAN.md").split("\n").slice(0, 40).join("\n");
-  ok("it names the impressions error", /impressions/i.test(banner),
-    "a generic 'this may be out of date' is a warning people skim");
-  ok("…and the gifting one", /gifting/i.test(banner));
-  ok("…and says the code wins", /the code is right/i.test(banner));
-  ok("…and points at what is current", /docs\/SOURCE_OF_TRUTH\.md/.test(banner));
+  // The ONE thing in there worth keeping was the delivery definition, because
+  // the commitment in it is still ours. It moved rather than died.
+  ok("…but the delivery definition survived the purge", existsSync(at("docs/DELIVERY.md")));
+  const delivery = read("docs/DELIVERY.md");
+  ok("…and it no longer carries a legacy banner", !delivery.includes("LEGACY-BANNER"));
+  ok("…and still refuses to multiply a post by an audience estimate",
+    /do not multiply a public post/i.test(delivery),
+    "that refusal is why a brand can believe the number");
+
+  // Nothing may point at the folder that no longer exists.
+  const dead: string[] = [];
+  for (const f of ["README.md", "docs/SOURCE_OF_TRUTH.md", "docs/ARCHITECTURE.md", "docs/OPERATIONS.md"]) {
+    if (read(f).includes("docs/legacy")) dead.push(f);
+  }
+  ok("…and nothing still points at it", dead.length === 0, dead.join(", "));
 }
 
 console.log("\n== the two known-wrong claims, by name ==");

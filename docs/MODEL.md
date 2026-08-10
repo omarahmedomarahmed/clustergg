@@ -1,9 +1,9 @@
 # The model
 
-What Cluster sells, what it costs, and where every dollar goes. Current as of
-the B92 sprint. Supersedes `docs/legacy/COMMERCIAL_MODEL.md` and
-`docs/legacy/COMMERCIAL_MODEL_V2.md`, both of which are kept because the
-reasoning that got us here is still worth reading.
+What Cluster sells, what it costs, and where every dollar goes. This is
+current. The earlier commercial-model documents it replaced have been deleted
+rather than archived — a document describing a product that no longer exists is
+something somebody eventually quotes as fact.
 
 ---
 

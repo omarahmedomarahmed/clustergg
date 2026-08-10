@@ -24,7 +24,7 @@
 // changed: B23 rewrites the marketing pages, B41 replaces the homepage, B2 puts
 // the coin on every CP figure, B27 changes every bot card's buttons, B34
 // reprices the currency. A full recapture is owed once Part I closes — see V1.R
-// in docs/legacy/EXECUTION_PLAN.md.
+// in the execution plan that preceded the pivots.
 //
 // Do NOT recapture piecemeal in the meantime. A visibly stale shot between now
 // and then is expected, and refreshing one mid-item is the waste the single-pass

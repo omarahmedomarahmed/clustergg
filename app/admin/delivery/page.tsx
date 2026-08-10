@@ -212,7 +212,7 @@ export default async function AdminDeliveryPage({ searchParams }: {
 
       <Note tone="info">
         <b>Every figure here is a count of delivered cards.</b> A public post is never multiplied by a
-        server&apos;s member count, and nothing is modelled or estimated — <code>docs/legacy/AD_VIEW.md</code> is the
+        server&apos;s member count, and nothing is modelled or estimated — that is the
         contract, and it is the same one the brand&apos;s portal implements.
       </Note>
 

@@ -60,7 +60,7 @@ export default function AdDelivery({ delivery }: { delivery: Delivery }) {
               key={r.label}
               label={r.label}
               // Member count is CONTEXT and is labelled as context. It is never
-              // multiplied by anything — see docs/legacy/AD_VIEW.md.
+              // multiplied by anything.
               note={r.members != null ? `${n(r.members)} members` : undefined}
               value={n(r.views)}
             />
