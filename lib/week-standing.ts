@@ -50,8 +50,6 @@ export type Standing = {
   terms: Record<string, number>;
   servers: StandingServer[];
   payouts: Payout[];
-  /** Held back because it was under the payout floor. Stays in the vault. */
-  carried: number;
   /** How many servers carried an entrant but cannot be paid for want of a profile. */
   skippedForProfile: number;
   /** Empty when there is something to divide. Otherwise, why not, in a sentence. */
@@ -59,7 +57,7 @@ export type Standing = {
 };
 
 const NOTHING = (reason: string): Standing => ({
-  terms: {}, servers: [], payouts: [], carried: 0, skippedForProfile: 0, reason,
+  terms: {}, servers: [], payouts: [], skippedForProfile: 0, reason,
 });
 
 /**
@@ -193,12 +191,12 @@ export async function standingFor(
   }).sort((a, b) => b.final - a.final || a.name.localeCompare(b.name));
 
   // ===== Divide: your share of the pool is your share of the score =====
-  const { payouts, carried } = weekPayouts(
+  const { payouts } = weekPayouts(
     pool,
     servers.map((s) => ({ guildId: s.guildId, score: s.final, bracket: bracketOf(s.qualified) })),
   );
 
-  return { terms, servers, payouts, carried, skippedForProfile, reason: "" };
+  return { terms, servers, payouts, skippedForProfile, reason: "" };
 }
 
 /** What one server is owed in a standing, or zero. */

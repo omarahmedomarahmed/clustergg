@@ -270,11 +270,15 @@ console.log("\n== a week with money and entrants pays out ==");
     Object.values(r.terms).reduce((a, b) => a + b, 0), 100, 0.05);
   ok("the summary says which terms ran", /Scored on \d+ of 3 terms/.test(r.summary), r.summary);
 
-  // Everything that took part is paid something — the participation floor is
-  // what makes a pool a ladder rather than a taunt.
+  // Everything that took part is paid something. Not "paid or held" — M2 removed
+  // the $25 floor, and with it the `carried` bucket that the old version of this
+  // assertion accepted as an outcome. `carried` was never credited to anyone, so
+  // a test that treated it as a valid result was a test that passed while money
+  // disappeared. A distribution moves a number between two rows of our own
+  // database: there is no fee to clear and therefore no amount too small to move.
   const paid = new Set(r.payouts.map((p) => p.guildId));
-  ok("every participating server is paid or held",
-    r.payouts.length + (r.carried > 0 ? 1 : 0) > 0, JSON.stringify(r.payouts));
+  const unpaid = r.servers.filter((s) => !paid.has(s.guildId)).map((s) => s.guildId);
+  ok("every scored server is paid something", unpaid.length === 0, unpaid.join(", "));
   ok("…and nobody who did not take part is", [...paid].every((g) => r.servers.some((s) => s.guildId === g)));
 
   // The gate, on real rows.

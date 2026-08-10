@@ -17,6 +17,8 @@
 
 process.env.DEMO_DB = "1";
 
+import { readFileSync } from "node:fs";
+
 let pass = 0;
 const fails: string[] = [];
 const ok = (name: string, cond: boolean, detail = "") => {
@@ -119,12 +121,11 @@ console.log("\n== brackets: big servers cannot eat the small pool ==");
     { guildId: "L1", score: 90, bracket: "large" as const },
     { guildId: "L2", score: 90, bracket: "large" as const },
   ];
-  const { payouts, carried } = weekPayouts(10_000, ranked, { floor: 0 });
+  const { payouts } = weekPayouts(10_000, ranked);
   const by = Object.fromEntries(payouts.map((p) => [p.guildId, p.amount]));
   const smallTotal = (by.s1 ?? 0) + (by.s2 ?? 0);
   const largeTotal = (by.L1 ?? 0) + (by.L2 ?? 0);
 
-  eq("nothing is carried when the floor is 0", carried, 0);
   ok("every share adds back to the pool",
     Math.abs(smallTotal + largeTotal - 10_000) < 0.05, `${smallTotal + largeTotal}`);
   // 60 : 15 with the mid bracket empty → 80% / 20%.
@@ -144,7 +145,7 @@ console.log("\n== an empty bracket gives its share away ==");
   // Money set aside for servers that did not turn up is money nobody can be
   // paid, and holding it back would shrink a pool that was already announced.
   const only = [{ guildId: "a", score: 10, bracket: "small" as const }];
-  const { payouts } = weekPayouts(1000, only, { floor: 0 });
+  const { payouts } = weekPayouts(1000, only);
   const total = payouts.reduce((a, p) => a + p.amount, 0);
   ok("one small server alone takes the whole pool", Math.abs(total - 1000) < 0.05, String(total));
 }
@@ -156,45 +157,84 @@ console.log("\n== everyone who took part is paid something ==");
   const many = Array.from({ length: 30 }, (_, i) => ({
     guildId: `g${i}`, score: 30 - i, bracket: "small" as const,
   }));
-  const { payouts } = weekPayouts(10_000, many, { floor: 0 });
+  const { payouts } = weekPayouts(10_000, many);
   eq("all thirty are paid", payouts.length, 30);
   ok("…and the last one is not zero",
     (payouts.find((p) => p.guildId === "g29")?.amount ?? 0) > 0);
 }
 
-console.log("\n== the floor holds small amounts back rather than sending them ==");
+console.log("\n== a distribution has no floor, and loses nothing. M2 ==");
 {
-  // A $7.88 transfer costs more in provider fees than it delivers.
+  // WHAT THIS REPLACED, AND WHY IT WAS THE WRONG TEST.
+  //
+  // It used to assert `carried` held the money — "the money is carried, not
+  // lost" — and passed. But `carried` was a number printed into a summary
+  // string. It was never credited to a server, never rolled into the next
+  // week's pool, never paid. The test checked that a variable held a figure,
+  // not that anybody received it, so forty small servers could earn $200
+  // between them and receive nothing while this stayed green.
+  //
+  // The property worth testing is CONSERVATION: what goes into the week comes
+  // out in wallets. A distribution is a number moving between two rows in our
+  // own database, so there is no fee to justify a minimum and nothing may be
+  // withheld.
   const many = Array.from({ length: 40 }, (_, i) => ({
     guildId: `t${i}`, score: 1, bracket: "small" as const,
   }));
-  const { payouts, carried } = weekPayouts(200, many, { floor: 25 });
-  eq("nobody is paid under the floor", payouts.length, 0);
-  ok("…and the money is carried, not lost", Math.abs(carried - 200) < 0.5, String(carried));
+  const { payouts } = weekPayouts(200, many);
+
+  eq("forty tiny servers are all paid", payouts.length, 40);
+  const total = payouts.reduce((a, p) => a + p.amount, 0);
+  ok("…and the whole pool reaches them", Math.abs(total - 200) < 0.5, String(total));
+  ok("…even though each share is only a few dollars",
+    payouts.every((p) => p.amount > 0 && p.amount < 25),
+    JSON.stringify(payouts.slice(0, 3)));
+
+  // The extreme case the old floor swallowed whole: a pool small enough that
+  // every share is under a dollar. It still lands.
+  const tiny = weekPayouts(4, many).payouts;
+  eq("a $4 pool across forty servers still pays all forty", tiny.length, 40);
+  ok("…and still adds up", Math.abs(tiny.reduce((a, p) => a + p.amount, 0) - 4) < 0.5);
+
+  // A floor is not an option any more. Passing one must not resurrect it.
+  ok("weekPayouts takes no floor option",
+    !/floor/.test(readFileSync(new URL("../../lib/server-score.ts", import.meta.url), "utf8")
+      .split("export function weekPayouts")[1].split("\n}")[0]),
+    "a floor on a distribution is money nobody can be paid");
 }
 
 console.log("\n== a week's pool leaves nothing stranded ==");
 {
-  // Ten servers, twenty slots — the "Launch" preset against a small network.
-  // Half the pool would have had no destination and no rule.
+  // THREE STALE BLOCKS WERE HERE, AND THEY HAD STOPPED TESTING ANYTHING. M2.
+  //
+  // They called `weekPayouts(pool, ranked, slots, { floor })` — a FOUR-argument
+  // signature from the retired slot ladder. The function has taken three
+  // arguments for a long time, so `slots` was being read as the options object
+  // and `{ floor }` was dropped on the floor entirely. Every assertion about a
+  // floor in them was checking a parameter the function never received, and
+  // `carried` was `undefined`, which `> 0` quietly answers `false` for.
+  //
+  // They were green because nothing they asserted could fail.
+  //
+  // What they were reaching for is worth keeping: a pool must be conserved, and
+  // an empty week must pay nobody. Both, against the real signature.
   const ranked = Array.from({ length: 10 }, (_, i) => ({ guildId: `g${i}`, score: 100 - i }));
-  const slots = Array.from({ length: 20 }, () => ({ share: 5 }));
-  const { payouts, carried } = weekPayouts(1000, ranked, slots, { floor: 0 });
+  const { payouts } = weekPayouts(1000, ranked);
   const total = payouts.reduce((a, p) => a + p.amount, 0);
-  near("every dollar of the pool has a destination", total + carried, 1000, 0.02);
+  near("every dollar of the pool has a destination", total, 1000, 0.02);
+  ok("…and every server got some of it", payouts.length === 10, String(payouts.length));
 }
 {
-  // The floor. A $7.88 transfer costs more in fees than it delivers.
+  // An awkward number, to catch a rounding rule that loses cents. Rounding is
+  // absorbed by the largest share, never dropped.
   const ranked = Array.from({ length: 10 }, (_, i) => ({ guildId: `g${i}`, score: 100 - i }));
-  const { payouts, carried } = weekPayouts(157.5, ranked, [{ share: 100 }], { floor: 25 });
-  ok("nothing is paid below the floor", payouts.every((p) => p.amount >= 25), JSON.stringify(payouts));
-  ok("…and what is held is carried, not lost", carried > 0, String(carried));
-  near("pool is conserved", payouts.reduce((a, p) => a + p.amount, 0) + carried, 157.5, 0.02);
+  const { payouts } = weekPayouts(157.5, ranked);
+  near("an odd pool is still conserved", payouts.reduce((a, p) => a + p.amount, 0), 157.5, 0.02);
+  ok("…with nobody dropped for being small", payouts.length === 10, String(payouts.length));
 }
 {
-  const { payouts, carried } = weekPayouts(1000, [], [{ share: 100 }], { floor: 0 });
+  const { payouts } = weekPayouts(1000, []);
   eq("a week with no participants pays nobody", payouts.length, 0);
-  eq("…and strands nothing", carried, 0);
 }
 
 console.log("\n== the split is a money invariant ==");

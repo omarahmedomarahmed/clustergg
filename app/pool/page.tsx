@@ -133,22 +133,19 @@ export default async function PoolPage() {
         {/* Every number that did not make it into the table, said rather than
             quietly dropped. A total that does not add up is the fastest way to
             lose somebody's trust in the rest of it. */}
-        {(standing.carried > 0 || standing.skippedForProfile > 0) && (
+        {/* M2. A "held under the payout floor" line was here, and it told owners
+            the money "is in next week's pool". It was not. It went into a
+            variable with no consumer and ceased to exist. There is no floor on
+            a distribution now — every cent lands in a wallet — so there is
+            nothing to explain away. */}
+        {standing.skippedForProfile > 0 && (
           <div className="border-t border-white/10 px-5 py-3 text-[11px] leading-relaxed text-muted">
-            {standing.carried > 0 && (
-              <div>
-                {money(standing.carried)} is under the payout floor and stays in the vault rather than
-                being split into cheques too small to send. It is in next week&apos;s pool.
-              </div>
-            )}
-            {standing.skippedForProfile > 0 && (
-              <div>
+            <div>
                 {standing.skippedForProfile} server{standing.skippedForProfile === 1 ? "" : "s"} carried an
                 entrant but {standing.skippedForProfile === 1 ? "has" : "have"} not finished a server profile,
                 so {standing.skippedForProfile === 1 ? "it is" : "they are"} not in the run. A brand buys a
-                described community, not a number.
-              </div>
-            )}
+              described community, not a number.
+            </div>
           </div>
         )}
       </section>

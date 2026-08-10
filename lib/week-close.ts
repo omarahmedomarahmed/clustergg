@@ -100,13 +100,11 @@ export type WeekCloseResult = {
   terms: Record<string, number>;
   servers: ScoredServer[];
   payouts: Payout[];
-  /** Held back because it was under the payout floor. Stays in the vault. */
-  carried: number;
   summary: string;
 };
 
 const EMPTY = (week: string, summary: string, skipped = false): WeekCloseResult => ({
-  week, skipped, pool: 0, terms: {}, servers: [], payouts: [], carried: 0, summary,
+  week, skipped, pool: 0, terms: {}, servers: [], payouts: [], summary,
 });
 
 /**
@@ -200,7 +198,7 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
     const standing = await standingFor(db, { weekStart, weekEnd, pool });
     if (standing.reason) return EMPTY(key, `Week of ${key}: ${standing.reason}`);
 
-    const { servers, terms, payouts, carried, skippedForProfile } = standing;
+    const { servers, terms, payouts, skippedForProfile } = standing;
 
     // ===== Write them, as DRAFTS =====
     //
@@ -234,11 +232,9 @@ export async function closeWeek(now = new Date()): Promise<WeekCloseResult> {
       terms,
       servers: servers.sort((a, b) => b.final - a.final),
       payouts,
-      carried: Math.round(carried * 100) / 100,
       summary:
         `Week of ${key}: $${pool.toFixed(2)} across ${servers.length} server${servers.length === 1 ? "" : "s"}, `
         + `${opened} payout${opened === 1 ? "" : "s"} opened`
-        + (carried > 0 ? `, $${carried.toFixed(2)} held under the floor` : "")
         + (skippedForProfile > 0 ? `, ${skippedForProfile} skipped for an incomplete server profile` : "")
         + `. Scored on ${Object.keys(terms).length} of ${Object.keys(SCORE_WEIGHTS).length} terms `
         + `(${Object.keys(terms).join(", ")}) — ${PARTICIPATION_SHARE}% of the pool was paid flat to everyone who took part.`,

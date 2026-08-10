@@ -197,20 +197,33 @@ export type Payout = { guildId: string; amount: number; kind: "participation" | 
  * Score-proportional needs none of them: every qualifying server is paid, there
  * is no cliff to fall off, and there is nothing left over to redistribute.
  *
- * **A payout floor survives.** A $7.88 transfer costs more in provider fees than
- * it delivers, so below the floor it accrues and the owner is paid when it
- * crosses. That is the one piece of the old design that was about reality
- * rather than about the ranking.
+ * ===== THERE IS NO FLOOR ON A DISTRIBUTION. M2 =====
+ *
+ * There used to be one, at $25, justified by provider fees: "a $7.88 transfer
+ * costs more in fees than it delivers". That reasoning is about a WITHDRAWAL —
+ * money leaving for somebody's bank — and this function does not do that.
+ *
+ * This is a DISTRIBUTION: the week's pool divided into server wallets. It is a
+ * number moving between two rows in our own database. No provider is involved
+ * and no fee is charged, so $0.50 costs exactly as much to distribute as $500.
+ *
+ * The floor also did not do what its comment claimed. Money under it was added
+ * to a variable called `carried`, which was printed into a summary string —
+ * "$8.00 held under the floor" — and never credited to the server, never rolled
+ * into the next week's pool, and never paid to anyone. It had no consumer. A
+ * small server earned $8 and the $8 ceased to exist.
+ *
+ * The only real floor is on the WITHDRAWAL, where a provider fee is real. See
+ * `MIN_WITHDRAWAL` in `lib/server-wallet.ts`.
  */
 export function weekPayouts(
   pool: number,
   ranked: { guildId: string; score: number; bracket?: BracketKey }[],
-  opts: { participationShare?: number; floor?: number } = {},
-): { payouts: Payout[]; carried: number } {
+  opts: { participationShare?: number } = {},
+): { payouts: Payout[] } {
   const partPct = opts.participationShare ?? PARTICIPATION_SHARE;
-  const floor = opts.floor ?? 25;
   const payouts: Payout[] = [];
-  if (!ranked.length || !(pool > 0)) return { payouts: [], carried: 0 };
+  if (!ranked.length || !(pool > 0)) return { payouts: [] };
 
   // ===== Split the pool by bracket, then give empty brackets away =====
   const present = new Set(ranked.map((r) => r.bracket ?? "small"));
@@ -250,16 +263,19 @@ export function weekPayouts(
     }
   }
 
-  // Merge per guild, then hold anything under the floor.
+  // Merge per guild. Every cent lands — a distribution has no minimum, because
+  // it costs nothing to make. A server owed $0.50 is credited $0.50 and can
+  // watch it accumulate toward the one threshold that is real, the withdrawal.
   const byGuild = new Map<string, number>();
   for (const p of payouts) byGuild.set(p.guildId, (byGuild.get(p.guildId) ?? 0) + p.amount);
 
   const out: Payout[] = [];
-  let carried = 0;
   for (const [guildId, amount] of byGuild) {
     const rounded = Math.round(amount * 100) / 100;
-    if (rounded < floor) { carried += rounded; continue; }
+    // Zero is still skipped: a payout row for nothing is a row that clutters a
+    // statement and tells the owner nothing they did not know.
+    if (rounded <= 0) continue;
     out.push({ guildId, amount: rounded, kind: "placement" });
   }
-  return { payouts: out, carried: Math.round(carried * 100) / 100 };
+  return { payouts: out };
 }
