@@ -29,10 +29,10 @@ import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
 import { chargeWallet, walletFor } from "@/lib/server-wallet";
-import { PRIVATE_FEE_PCT, MIN_PRIZE_POOL, MAX_PRIZE_POOL, quotePrivate } from "@/lib/private-quote";
+import { PRIVATE_FEE_PCT, MIN_PRIZE_POOL, MAX_PRIZE_POOL, PRIZE_POOL_STEP, poolIsLegal, roundPool, quotePrivate } from "@/lib/private-quote";
 
 export {
-  PRIVATE_FEE_PCT, MIN_PRIZE_POOL, MAX_PRIZE_POOL, quotePrivate, type PrivateQuote,
+  PRIVATE_FEE_PCT, MIN_PRIZE_POOL, MAX_PRIZE_POOL, PRIZE_POOL_STEP, poolIsLegal, roundPool, quotePrivate, type PrivateQuote,
 } from "@/lib/private-quote";
 
 export type BuyResult =
@@ -74,10 +74,17 @@ export async function buyPrivateChallenge(
 
   const quote = quotePrivate(input.prizePool, input.feePct ?? PRIVATE_FEE_PCT);
   if (quote.prizePool < MIN_PRIZE_POOL) {
-    return { ok: false, error: `The smallest prize pool is $${MIN_PRIZE_POOL}. Below that the fee is more than the prize.` };
+    return { ok: false, error: `The smallest prize pool is $${MIN_PRIZE_POOL}.` };
   }
   if (quote.prizePool > MAX_PRIZE_POOL) {
     return { ok: false, error: `The largest we can take from a wallet is $${MAX_PRIZE_POOL.toLocaleString("en-US")}. Message us for anything bigger and we will invoice it.` };
+  }
+  // M6: whole $5 steps. Checked on the SERVER as well as the form, because the
+  // form's `step` attribute is a hint to a browser and this function is reached
+  // by a server action anybody can post to. A pool of $23.47 divides into
+  // places worth $7.82 — numbers no member can read off a card.
+  if (!poolIsLegal(quote.prizePool)) {
+    return { ok: false, error: `Prize pools go in $${PRIZE_POOL_STEP} steps — $${roundPool(quote.prizePool)} is the nearest one at or below that.` };
   }
   if (input.endAt <= input.startAt) {
     return { ok: false, error: "It has to end after it starts." };

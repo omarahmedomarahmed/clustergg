@@ -7,6 +7,19 @@ import {
   portalLaunchCardCreative, portalRemoveCardCreative, portalSetCardCampaignRunning, portalEditCreative,
 } from "@/app/actions/brand-portal";
 
+// ===== UNMOUNTED BY M4. NOT DELETED =====
+//
+// This panel let a brand upload a creative that went out on every card
+// ClusterBot draws, network-wide, with a "Sponsored: <brand>" button under it.
+// That is advertising inside Discord, and it is not what Cluster sells — so the
+// brand portal no longer renders it and the three server actions it calls now
+// refuse (see `app/actions/brand-portal.ts`).
+//
+// Kept on disk deliberately: M4 removes the OFFER, not the machinery. The
+// placement, its rotation and its impression counting are all still live for
+// the house creative, and the reviewed history of what ran here is still worth
+// reading. Nothing about this file is reachable from the product.
+//
 // The card campaign panel — the first and biggest thing in the brand portal.
 //
 // Every other placement is a rectangle on a web page. This one is the product:

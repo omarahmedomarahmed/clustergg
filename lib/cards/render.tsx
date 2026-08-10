@@ -462,17 +462,30 @@ function Frame({ theme, children, panes: bodyPanes, corner: proposedCorner, corn
   );
 }
 
-// The ad box: creative on top, the disclosure strip under it.
+// The panel: image on top, a name strip under it.
 //
-// The label is not decoration. A sponsored image dropped into artwork with no
-// marking is the kind of thing that gets a bot removed from servers and a
-// platform written about, so every card says who paid for the box.
+// ===== IT NO LONGER SAYS "SPONSORED". M4 =====
+//
+// It used to, and the reasoning was sound for what this was: a paid image
+// dropped into somebody's community with no marking is what gets a bot removed
+// from servers and a platform written about. So every card disclosed who had
+// paid for the box.
+//
+// The box is house-only now (see `lib/cards/ads.ts`) — nobody buys it, so there
+// is nobody to disclose, and a card stamping "SPONSORED" over Cluster's own
+// message would be declaring a sponsor that does not exist. Worse, it would
+// keep the vocabulary of an ad product on a bot that stopped running one, which
+// is the exact impression M4 exists to remove.
+//
+// The label is therefore OPT-IN rather than defaulted. If anything is ever
+// placed here that somebody did pay for, it must pass its own label and say so
+// — the strip renders whatever it is given and invents nothing.
 function AdSlot({ ad, box, opacity }: {
   ad: CardAdSlot;
   box: { left: number; top: number; width: number; height: number; imageHeight: number };
   opacity?: number;
 }) {
-  const label = (ad.label || "Sponsored").toUpperCase();
+  const label = (ad.label || "").toUpperCase();
   const brand = (ad.brandName || "").toUpperCase();
   return (
     <div style={{

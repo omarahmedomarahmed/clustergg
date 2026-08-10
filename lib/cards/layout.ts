@@ -296,7 +296,7 @@ export type CardLayout = {
  */
 export const AD_RATIO = 0.3125;
 
-/** The "Sponsored · Brand" strip drawn under the creative, in canvas pixels. */
+/** The name strip drawn under the panel image, in canvas pixels. M4 took "Sponsored" off it. */
 export const AD_LABEL_H = 22;
 
 // THE SHARED CARD LAYOUT (B56.0).

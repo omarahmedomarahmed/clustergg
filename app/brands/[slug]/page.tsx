@@ -2,10 +2,9 @@ import { notFound } from "next/navigation";
 import { hasPortalSession } from "@/lib/portal-auth";
 import { and, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness, getCardCampaign } from "@/lib/brands";
+import { getBrandBySlugOrId, getBrandPortalData, getBrandAnalytics, getCampaignReadiness } from "@/lib/brands";
 import { readThread, unreadCount, markThreadRead } from "@/lib/threads";
 import { portalSendMessage } from "@/app/actions/brand-portal";
-import { CARD_AD_PLACEMENT } from "@/lib/cards/ads";
 import { networkStats } from "@/lib/network";
 import { brandCampaigns, campaignQuote, networkReach, nextMonday, slotWindows } from "@/lib/sponsored-campaigns";
 import { trophiesForBrand } from "@/lib/brand-trophies";
@@ -27,7 +26,6 @@ import ContactUs from "@/components/ContactUs";
 import BrandAnalyticsPanel from "@/components/BrandAnalyticsPanel";
 import BrandAppearanceEditor from "@/components/BrandAppearanceEditor";
 import BrandCreativesTab from "@/components/BrandCreativesTab";
-import BrandCardCampaign from "@/components/BrandCardCampaign";
 import CampaignBuilder from "@/components/CampaignBuilder";
 import BrandChartBuilder from "@/components/BrandChartBuilder";
 import Tabs from "@/components/Tabs";
@@ -218,10 +216,9 @@ export default async function BrandPortalPage({
   }
 
   // ---- Overview: all campaigns + brand-wide intelligence ----
-  const [data, brandAnalytics, cardCampaign, net, reach, sponsored, invoices] = await Promise.all([
+  const [data, brandAnalytics, net, reach, sponsored, invoices] = await Promise.all([
     getBrandPortalData(db, brand.id),
     getBrandAnalytics(db, brand.id, { days: 90 }),
-    getCardCampaign(db, brand.id, CARD_AD_PLACEMENT),
     networkStats().catch(() => null),
     networkReach(),
     brandCampaigns(brand.id),
@@ -324,12 +321,14 @@ export default async function BrandPortalPage({
   // What needs them, rather than what is merely empty.
   //
   // A red dot is a promise that something is wrong, and it is spent the first
-  // time it turns out to mean "you haven't bought this yet". So each one below
-  // names a thing the brand has ALREADY paid for that isn't working: an empty
-  // card slot is house art running where their creative should be, and a live
-  // campaign short of creatives is a placement they own showing somebody
-  // else's. The buy tab has no dot at all — not buying is not a fault.
-  const cardEmpty = cardCampaign.creatives.length === 0;
+  // time it turns out to mean "you haven't bought this yet". So it names a
+  // thing the brand has ALREADY paid for that isn't working: a live campaign
+  // short of creatives is a placement they own showing somebody else's. The
+  // buy tab has no dot at all — not buying is not a fault.
+  //
+  // The "empty Discord card slot" dot was here too and went with M4: that slot
+  // is house-only now, so a brand having nothing in it is not a fault, it is
+  // the design.
   const adsIncomplete = data.campaigns.some((c) => (c.status === "active" || c.status === "paused") && !c.ready);
 
   return (
@@ -606,28 +605,25 @@ export default async function BrandPortalPage({
             ),
           },
           {
-            // Every creative, both surfaces, on one page. A brand uploading art
-            // should not have to work out which tab a given surface lives
-            // behind — the Discord card had a tab of its own and the website
-            // placements were inside the analytics tab.
-            key: "creatives", label: "Creatives", icon: "image", dot: cardEmpty || adsIncomplete,
+            // ===== THE DISCORD CARD PANEL IS GONE FROM THIS TAB. M4 =====
+            //
+            // A brand used to upload a creative here and it went out on every
+            // card ClusterBot drew, network-wide, with a "Sponsored: <brand>"
+            // button under it. That is advertising inside Discord, and it is
+            // not what Cluster sells.
+            //
+            // What a brand buys is a SPONSORED CHALLENGE: they fund a prize
+            // pool, the bot delivers the competition into the servers where
+            // gamers already are, and what comes back is counted entrants —
+            // people who played — instead of impressions. The brand's logo
+            // appears because it is on the challenge they paid for, not because
+            // they rented space on somebody's profile card.
+            //
+            // So this tab is the WEBSITE placements only. The bot is our
+            // delivery engine, not our billboard.
+            key: "creatives", label: "Creatives", icon: "image", dot: adsIncomplete,
             node: (
               <div className="space-y-8">
-                <BrandCardCampaign
-                  brandId={brand.id} keyStr={key} brandName={brand.name}
-                  creatives={cardCampaign.creatives.map((c) => ({
-                    campaignCreativeId: c.campaignCreativeId, fileUrl: c.fileUrl,
-                    ctaLabel: c.ctaLabel, clickUrl: c.clickUrl,
-                    impressions: c.impressions, clicks: c.clicks,
-                    reviewStatus: c.reviewStatus,
-                  }))}
-                  live={cardCampaign.live}
-                  status={cardCampaign.campaign?.status ?? null}
-                  impressions={cardCampaign.impressions}
-                  clicks={cardCampaign.clicks}
-                  reach={{ servers: net?.servers ?? 0, gamers: net?.reach ?? 0 }}
-                />
-
                 <section>
                   <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
                     <Icon name="grid" size={18} className="text-cyan-300" /> Website placements
@@ -635,7 +631,7 @@ export default async function BrandPortalPage({
                   {data.totals.total === 0 ? (
                     <ContactUs
                       title="Want the website placements too?"
-                      body="Your Discord card runs from the panel above — that part needs nobody. The banner and rail placements across clustergg.com are sold per campaign, so we open those with you."
+                      body="The banner and rail placements across clustergg.com are sold per campaign, so we open those with you. Reaching gamers inside Discord is a sponsored challenge, not a placement — see the Campaigns tab."
                       topic="We'd like the website placements on clustergg.com set up."
                       send={sendToCluster}
                     />
@@ -656,7 +652,7 @@ export default async function BrandPortalPage({
             node: data.totals.total === 0 ? (
               <ContactUs
                 title="Want the website placements too?"
-                body="Your Discord card runs from the tab next door — that part needs nobody. The banner and rail placements across clustergg.com are sold per campaign, so we open those with you."
+                body="The banner and rail placements across clustergg.com are sold per campaign, so we open those with you. Reaching gamers inside Discord is a sponsored challenge, not a placement — see the Campaigns tab."
                 topic="We'd like the website placements on clustergg.com set up."
                 send={sendToCluster}
               />

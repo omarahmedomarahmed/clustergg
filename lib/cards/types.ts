@@ -21,7 +21,14 @@ export type CardAdSlot = {
   brandName: string;
   /** The campaign-creative that was served; what an impression is counted against. */
   campaignCreativeId?: string | null;
-  /** Overrides the "SPONSORED" label — a house promo says "FROM CLUSTER". */
+  /**
+   * The small strip under the image, on the left.
+   *
+   * Empty by default since M4. It used to default to "SPONSORED", which was
+   * correct disclosure while brands could buy this box; they cannot, so the
+   * card would have been declaring a sponsor that does not exist. Anything
+   * genuinely paid for has to pass its own label — the renderer invents none.
+   */
   label?: string | null;
 };
 

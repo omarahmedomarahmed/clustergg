@@ -85,7 +85,35 @@ async function cardPlacement(db: Awaited<ReturnType<typeof getDb>>) {
   return p ?? null;
 }
 
+// ===== THE DISCORD CARD IS NOT SOLD TO BRANDS. M4 =====
+//
+// These three actions launched, removed and paused a brand's creative on the
+// Discord card placement. The UI that called them is gone, and that is not
+// enough: a server action is a live HTTP endpoint whose only gate is
+// `requireBrand`, so any brand holding their own portal key could still post to
+// it long after the form disappeared. Hiding a form does not close a door.
+//
+// They are kept rather than deleted — nothing is being removed in M4, and a
+// brand that reaches one deserves an explanation rather than a 404 — and they
+// refuse before touching the database.
+//
+// The refusal says what to do instead, because the brand's underlying want is
+// real and we do sell it: reaching gamers inside Discord is a SPONSORED
+// CHALLENGE, where the bot delivers a competition they funded and the report
+// comes back as counted entrants rather than impressions.
+const CARD_SLOT_CLOSED = {
+  error: "The Discord card isn't sold as ad space. To reach gamers inside Discord, "
+    + "sponsor a challenge — the bot delivers it to the servers they already play in, "
+    + "and you are reported on entrants who took part, not impressions. Open one from the Campaigns tab.",
+} as const;
+
 export async function portalLaunchCardCreative(brandId: string, key: string, formData: FormData) {
+  void formData;
+  await requireBrand(brandId, key);
+  return CARD_SLOT_CLOSED;
+}
+
+async function retiredLaunchCardCreative(brandId: string, key: string, formData: FormData) {
   const { db, brand } = await requireBrand(brandId, key);
   const fileUrl = String(formData.get("fileUrl") ?? "").trim();
   // Three things, not one, and all three are required to launch on Discord.
@@ -223,6 +251,12 @@ export async function portalEditCreative(brandId: string, key: string, formData:
 
 /** Pull one creative out of the rotation. The campaign and its stats stay. */
 export async function portalRemoveCardCreative(brandId: string, key: string, campaignCreativeId: string) {
+  void campaignCreativeId;
+  await requireBrand(brandId, key);
+  return CARD_SLOT_CLOSED;
+}
+
+async function retiredRemoveCardCreative(brandId: string, key: string, campaignCreativeId: string) {
   const { db, brand } = await requireBrand(brandId, key);
   const placement = await cardPlacement(db);
   if (!placement) return { error: "Nothing to remove." };
@@ -250,6 +284,12 @@ export async function portalRemoveCardCreative(brandId: string, key: string, cam
 
 /** Stop or restart the card campaign without deleting anything. */
 export async function portalSetCardCampaignRunning(brandId: string, key: string, running: boolean) {
+  void running;
+  await requireBrand(brandId, key);
+  return CARD_SLOT_CLOSED;
+}
+
+async function retiredSetCardCampaignRunning(brandId: string, key: string, running: boolean) {
   const { db, brand } = await requireBrand(brandId, key);
   const placement = await cardPlacement(db);
   if (!placement) return { error: "No card campaign yet." };

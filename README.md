@@ -116,7 +116,6 @@ Full instructions, environment variables and deployment: **`docs/SETUP.md`**.
 | `components/` | UI. `components/admin/kit.tsx` is the console's vocabulary |
 | `tests/db/` | 75 suites. They run the real functions against a real database |
 | `docs/SOURCE_OF_TRUTH.md` | The whole product in one file. Read it before writing anything about what Cluster does |
-| `docs/legacy/` | The platform before the pivots, kept because the reasoning is still useful |
 
 ---
 
@@ -129,4 +128,4 @@ Full instructions, environment variables and deployment: **`docs/SETUP.md`**.
 | Deciding something | `docs/MODEL.md` — what we sell and why it is priced that way |
 | Touching money | `docs/PAYMENTS.md` — **we never store a payment detail. Ever.** |
 | Wondering what it does | `docs/SOURCE_OF_TRUTH.md` |
-| Wondering what happened | `git log`, then `docs/legacy/` |
+| Wondering what happened | `git log` |

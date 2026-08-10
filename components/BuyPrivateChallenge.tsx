@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Icon from "@/components/Icon";
 import { buyPrivateChallengeAction, type BuyState } from "@/app/actions/private-challenge";
-import { quotePrivate, MIN_PRIZE_POOL, PRIVATE_FEE_PCT } from "@/lib/private-quote";
+import { quotePrivate, MIN_PRIZE_POOL, PRIZE_POOL_STEP, poolIsLegal, PRIVATE_FEE_PCT } from "@/lib/private-quote";
 
 // An owner buying a competition for their own members. B90.4.
 //
@@ -81,9 +81,9 @@ export default function BuyPrivateChallenge({ guildId, available, games }: {
       </div>
 
       <label className="mt-4 block text-[10px] uppercase tracking-widest text-muted">
-        Prize money
+        Prize money — from ${MIN_PRIZE_POOL}, in ${PRIZE_POOL_STEP}s
         <input
-          name="prizePool" type="number" min={MIN_PRIZE_POOL} step={10} value={pool}
+          name="prizePool" type="number" min={MIN_PRIZE_POOL} step={PRIZE_POOL_STEP} value={pool}
           onChange={(e) => setPool(Math.max(0, Number(e.target.value) || 0))}
           className="input-cosmic mt-1 block w-40 text-sm tabular-nums"
         />
@@ -103,7 +103,7 @@ export default function BuyPrivateChallenge({ guildId, available, games }: {
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <button
-          disabled={busy || !afford || quote.prizePool < MIN_PRIZE_POOL}
+          disabled={busy || !afford || !poolIsLegal(quote.prizePool)}
           className="money-btn pressable rounded-full px-6 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           {busy ? "Buying…" : `Buy it for ${usd(quote.total)}`}

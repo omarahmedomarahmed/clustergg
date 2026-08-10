@@ -73,7 +73,7 @@ export const SYSTEMS: SystemDef[] = [
         "Check every campaign has a creative for each placement it bought. A paid placement running house art is money we took for nothing.",
         "Watch the schedule: what runs where, this week and next.",
         "Read the analytics daily. A placement whose click rate collapses overnight is usually a broken image, not a bored audience.",
-        "Own the delivery report a brand sees (B82). Every figure on it is a count of delivered cards — if anybody asks you to add a number that is not, the answer is no, and `docs/legacy/AD_VIEW.md` is why.",
+        "Own the delivery report a brand sees. Every figure on it is a count of things that actually happened — if anybody asks you to add a number that is modelled, estimated or multiplied, the answer is no.",
         "Hold the privacy bound: aggregate only, nothing reported below 25 viewers. It is not a setting and it is not negotiable for a big spender.",
         "Run staff broadcasts into servers when we have something worth saying — sparingly, because the bot's welcome is the thing we spend when we post.",
       ],

@@ -81,7 +81,7 @@ export async function postAdsToGuilds(opts: ManualAdOptions = {}): Promise<AdRun
           id: uid(), campaignCreativeId: creative.campaignCreativeId,
           pagePath: `discord:${g.guildId}`, deviceType: "discord", guildId: g.guildId,
           // B81.2. A scheduled ad post lands in a public channel. ONE row for
-          // it — not one per member. `docs/legacy/AD_VIEW.md` says why we do not
+          // it — not one per member. `docs/DELIVERY.md` says why we do not
           // multiply a public post by an audience estimate.
           surface: "discord_public", cardKind: "ad_post",
         });
