@@ -804,24 +804,30 @@ export function stress(
 export function liveUnitRows(pricing: PricingConfig = PRICING_DEFAULTS) {
   const u = challengeUnit(pricing);
   const perMonth = pricing.challengesPerGame;
+  // B120. `cost` was the PRIZE alone, under a note reading "the only cost of
+  // goods". There are three obligations on a sale, not one: the prize pool, the
+  // weekly server pool and the points vault. Counting only the first left the
+  // server pool and the points vault inside the margin on every row of the
+  // slide an investor reads to check our unit economics.
+  const cost = u.prize + u.pools;
   return [
     {
       label: "One weekly challenge",
       revenue: u.price,
-      cost: u.prize,
-      note: `${money(u.prize, pricing.currency)} is the prize, paid as three trophies carrying the sponsor's brand. The only cost of goods.`,
+      cost,
+      note: `${money(u.prize, pricing.currency)} is the prize, paid as trophies carrying the sponsor's brand; ${money(u.pools, pricing.currency)} is the weekly server pool and the points vault. All three are owed to somebody else — ${money(u.ours, pricing.currency)} is ours.`,
     },
     {
       label: "One game, one month",
       revenue: u.price * perMonth,
-      cost: u.prize * perMonth,
-      note: `${perMonth} challenges. The prize cost is fixed per month — a second sponsor does not double it.`,
+      cost: cost * perMonth,
+      note: `${perMonth} challenges — one month, one sponsor. A game runs a single sponsored challenge at a time, so this row IS the per-game ceiling.`,
     },
     {
       label: `${pricing.games} games, one month`,
       revenue: u.price * perMonth * pricing.games,
-      cost: u.prize * perMonth * pricing.games,
-      note: "The full catalogue as sold today, before placement revenue.",
+      cost: cost * perMonth * pricing.games,
+      note: `The full catalogue as sold today. ${pricing.games} games is ${pricing.games} sponsors at once — the ceiling on revenue moves by adding games, not by selling harder.`,
     },
   ];
 }

@@ -141,7 +141,14 @@ console.log("\n== the unit-economics slide is the live rate card, as it claims =
   const rows = liveUnitRows(cfg);
   eq("three rows", rows.length, 3);
   eq("one challenge is the real price", rows[0].revenue, unit.price);
-  eq("…against the real prize", rows[0].cost, unit.prize);
+  // B120. This asserted the cost was the PRIZE, which is what the slide used
+  // to show under the words "the only cost of goods". Three obligations leave
+  // on a sale — the prize pool, the weekly server pool and the points vault —
+  // and counting only the first left the other two inside the margin.
+  eq("…against every obligation, not only the prize", rows[0].cost, unit.prize + unit.pools);
+  ok("…which is more than the prize alone", rows[0].cost > unit.prize,
+    `${rows[0].cost} vs ${unit.prize}`);
+  eq("…and what is left is ours", rows[0].revenue - rows[0].cost, unit.ours);
   eq("one game a month is the real month", rows[1].revenue, perGame(cfg));
   eq("the whole catalogue is the real network", rows[2].revenue, perGame(cfg) * cfg.games);
   // The defect in one line: the costs had been kept in step and the revenues
@@ -212,6 +219,39 @@ console.log("\n== an existing install can pick up the correction ==");
   ok("…and it is reachable from the admin",
     /reseedDoc/.test(read("app/actions/dataroom.ts")),
     "a fix only in the seed leaves the live deck quoting the old price");
+}
+
+console.log("\n== the catalogue the deck claims is the catalogue in the code ==");
+{
+  // B120/B121. The market slide claimed "24 games — integrations built and
+  // syncing" and priced the whole catalogue off it. The number happened to be
+  // right, and nothing checked it: the registry is the only place that knows,
+  // and a deck that counts a catalogue by hand is a deck that counts it once.
+  //
+  // It also mattered in the other direction. The risks slide was drafted saying
+  // the round buys "twelve new game integrations" — which would have been an
+  // engineering plan for work that is already done. The adapters exist; what
+  // stands between them and revenue is publisher API access. Overstating the
+  // work would have been a wrong risk on the slide about risks.
+  const { PROVIDERS } = await import("../../lib/providers/registry.ts");
+  const deck = JSON.stringify(SEED_DOCS);
+  const claimed = deck.match(/(\d+)\s+adapters/);
+  ok("the deck states how many adapters exist", !!claimed, "the market slide prices the catalogue off it");
+  if (claimed) {
+    eq("…and it is the number in the registry", Number(claimed[1]), PROVIDERS.length);
+  }
+  const games = new Set(PROVIDERS.map((p) => p.game)).size;
+  const claimedGames = deck.match(/across (\w+[- ]?\w*) games/);
+  ok("…and the game count is stated too", !!claimedGames, deck.slice(0, 0));
+  // Spelled out in prose, so compare the value we would write rather than parse
+  // English. Twenty-three is the only number this may be.
+  ok("…and it matches the registry", games === 23,
+    `${games} distinct games in the registry`);
+
+  // The deck must NOT describe taking a game live as building an integration.
+  ok("the deck does not sell already-written adapters as new engineering",
+    !/new game integrations/i.test(deck),
+    "the adapters are in production code — the constraint is publisher API access");
 }
 
 console.log("\n== the ask in the deck is the ask in the model ==");

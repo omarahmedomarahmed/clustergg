@@ -271,7 +271,7 @@ export const SEED_DOCS: SeedDoc[] = [
             { icon: "target", label: "Brands spend", note: "On a published rate card. A month of sponsored challenges for a game, plus placements across the network." },
             { icon: "gamepad", label: "Gamers engage", note: "They enter, they play the week under the brand's name, and they appear on its leaderboard. Engagement, not exposure." },
             { icon: "crown", label: "Server owners earn", note: "A weekly pool, shared between the servers that carried a challenge and scored on entrants, newly linked members and conversion. Never a per-challenge rate — a rate quoted is a rate we are held to." },
-            { icon: "diamond", label: "Cluster takes platform revenue", note: "One of four vault shares, set by an operator rather than fixed in code. There is no operations line under it, which is where the margin comes from." },
+            { icon: "diamond", label: "Cluster takes platform revenue", note: "{{ourSharePct}} of a sale — one of four vault shares, set by an operator rather than fixed in code. The other three are owed out. There is no operations line under ours, which is where the margin comes from." },
           ],
         },
       },
@@ -312,7 +312,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "16 · The ask",
         title: "We are raising $150,000 for 12%.",
         subtitle:
-          "$1.25M post-money, nine months, and a plan for every dollar. The product is built — this round buys CAPACITY. A game runs one sponsored challenge at a time, so the six games we run today can serve six sponsors and no more. Twelve new integrations takes that to eighteen, and eighteen is where the business covers its own costs.",
+          "$1.25M post-money, nine months, and a plan for every dollar. The product is built — this round buys CAPACITY. A game runs one sponsored challenge at a time, so the six games we commercialise today can serve six sponsors and no more. Twenty-four adapters are already written; taking twelve more of them live takes capacity to eighteen, and eighteen is where the business covers its own costs.",
         data: {
           ask: {
             amount: 150000,
@@ -324,7 +324,7 @@ export const SEED_DOCS: SeedDoc[] = [
             currency: "USD",
           },
           useOfFunds: [
-            { label: "Game coverage — twelve new integrations", pct: 36, note: "A game runs one sponsored challenge at a time, so a game IS a sponsor's slot. Six games serve six brands; eighteen serve eighteen. This is the line that lifts the ceiling on revenue, and 2,000 server onboardings ride on the same work" },
+            { label: "Game coverage — twelve more games taken live", pct: 36, note: "A game runs one sponsored challenge at a time, so a game IS a sponsor's slot. Six games serve six brands; eighteen serve eighteen. The adapters exist — twenty-four are in production code — so this line buys API access, publisher approvals and the 2,000 server onboardings that ride on the same work" },
             { label: "Team", pct: 31, note: "Four people at early-stage rates for nine months. The line that has to rise first, and what the next round is for" },
             { label: "Brand acquisition — the first month free", pct: 18, note: "36 brands x {{challengesPerGame}} sponsored challenges x {{challengePrice}}. Sized to FILL eighteen slots at a 50% conversion rate — onboarding past what the network can serve is cash spent on brands we would have to turn away" },
             { label: "Infrastructure, game APIs & partnerships", pct: 14, note: "Hosting, card rendering, the official game-API access every verified stat depends on, and the partnership work that opens each new game" },
@@ -419,7 +419,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "Unit economics",
         title: "One transaction, repeated",
         subtitle:
-          "Every number here is the live rate card. Cost of goods is the prize — there is no third line, because there is no operations team between the money and the players.",
+          "Every number here is the live rate card. Cost of goods is the prize pool plus the weekly server pool and the points vault — three obligations, all owed to somebody else. What is left is ours, and there is no operations line under it because software reads each game's own API.",
         // B110. These were three typed rows — { revenue: 250, cost: 175 } —
         // under a subtitle claiming "every number here is the live rate card".
         // The costs had been kept in step with the prize and the revenues had
@@ -446,14 +446,14 @@ export const SEED_DOCS: SeedDoc[] = [
           market: [
             {
               label: "Today's sellable inventory",
-              value: "$6,400 / mo",
-              note: "{{games}} games at {{perGameMonth}} a month — {{networkMonth}} for one brand taking the whole network. The rate card is published, so this is checkable.",
+              value: "{{networkMonth}} / mo",
+              note: "{{games}} games at {{perGameMonth}} a month. A game runs one sponsored challenge at a time, so that is also {{games}} sponsors — the ceiling, not a target. The rate card is published, so this is checkable.",
               source: "clustergg.com/pricing · the live rate card this page reads from",
             },
             {
-              label: "The catalogue we already run",
-              value: "24 games",
-              note: "Integrations built and syncing. Selling the same weekly challenge across all of them is $24,000 a month of game inventory at today's price, with no new engineering.",
+              label: "The catalogue already built",
+              value: "24 adapters",
+              note: "Twenty-four providers across twenty-three games, written and in production code. Commercialising all of them is twenty-three sponsor slots at today's rate card with no new engineering — what stands in the way is publisher API access, not build time. That gap is what this round closes.",
               source: "lib/providers/registry.ts · the integrations in production",
             },
             {
@@ -580,7 +580,7 @@ export const SEED_DOCS: SeedDoc[] = [
             },
             {
               q: "What are you raising, and for what?",
-              a: "$150,000 for 12%, at $1.25M post-money. The terms are on slide sixteen with the use of funds and the cap table beside them. In short: twelve new game integrations, because a game runs one sponsored challenge at a time and each one is a sponsor's slot; the communities and brands to fill them; and nine months of team.",
+              a: "$150,000 for 12%, at $1.25M post-money. The terms are on slide sixteen with the use of funds and the cap table beside them. In short: twelve more games taken live, because a game runs one sponsored challenge at a time and each one is a sponsor's slot; the communities and brands to fill them; and nine months of team.",
             },
           ],
         },
@@ -620,7 +620,7 @@ export const SEED_DOCS: SeedDoc[] = [
         navLabel: "Overview",
         title: "Every dollar of the raise, accounted for.",
         subtitle:
-          "$150,000 buys nine months, twelve new game integrations, two thousand Discord communities and thirty-six brands through a free first month. The constraint is inventory, not demand: a game serves one sponsor at a time, so capacity goes from six to eighteen and the business covers its costs in month seven. Here is the arithmetic, with nothing rounded in our favour.",
+          "$150,000 buys nine months, twelve more games taken live out of the twenty-four already built, two thousand Discord communities and thirty-six brands through a free first month. The constraint is inventory, not demand: a game serves one sponsor at a time, so capacity goes from six to eighteen and the business covers its costs in month seven. Here is the arithmetic, with nothing rounded in our favour.",
         data: {},
       },
       {
@@ -650,7 +650,7 @@ export const SEED_DOCS: SeedDoc[] = [
           "A model that only flatters the people who built it is not worth reading. These are the assumptions we think an investor should press hardest, and what happens to the plan under each.",
         data: {
           bullets: [
-            "Twelve new game integrations in nine months. This is the plan's real risk and it has replaced conversion as the thing to press hardest. A game runs one sponsored challenge at a time, so a game is a sponsor's slot — the six we run today cap revenue at roughly $100,000 of ARR against a $7,000 monthly cost base, and no conversion rate fixes that. Every integration is an official game API with its own approval. Nothing in this business has proven that pace yet, and one that does not land is a slot that does not exist.",
+            "Game coverage, and it has replaced conversion as the thing to press hardest. A game runs one sponsored challenge at a time, so a game IS a sponsor's slot — the six we commercialise today cap revenue at roughly $100,000 of ARR against a $7,000 monthly cost base, and no conversion rate fixes that. The adapters are already written: twenty-four providers across twenty-three games are in production code. What stands between them and being sellable is API ACCESS — publisher keys and approvals, most of which are an application and a wait rather than an engineering task. Nothing in this business has proven that pace yet, and the honest version is that the timing is not entirely ours: an approval we are waiting on is a slot that does not exist until it lands.",
             "Free-to-paid conversion, now the second question rather than the first. The plan shows 18 of 36 staying — 50%, the middle of the 20-40% normal for a B2B free trial with room above it. It matters less than it used to precisely because capacity binds first: at eighteen slots, a conversion rate above 50% sells nothing extra.",
             "Server acquisition at $25. Two thousand communities in nine months is about seven a day, every day, sustained. The $25 welcome challenge is what makes the offer concrete rather than a cold DM, but the rate is an assumption about outbound effort, not about money.",
           ],
@@ -674,7 +674,7 @@ export const SEED_DOCS: SeedDoc[] = [
             currency: "USD",
           },
           useOfFunds: [
-            { label: "Game coverage — twelve new integrations", pct: 36, note: "A game runs one sponsored challenge at a time, so a game IS a sponsor's slot. Six games serve six brands; eighteen serve eighteen. This is the line that lifts the ceiling on revenue, and 2,000 server onboardings ride on the same work" },
+            { label: "Game coverage — twelve more games taken live", pct: 36, note: "A game runs one sponsored challenge at a time, so a game IS a sponsor's slot. Six games serve six brands; eighteen serve eighteen. The adapters exist — twenty-four are in production code — so this line buys API access, publisher approvals and the 2,000 server onboardings that ride on the same work" },
             { label: "Team", pct: 31, note: "Four people at early-stage rates for nine months. The line that has to rise first, and what the next round is for" },
             { label: "Brand acquisition — the first month free", pct: 18, note: "36 brands x {{challengesPerGame}} sponsored challenges x {{challengePrice}}. Sized to FILL eighteen slots at a 50% conversion rate — onboarding past what the network can serve is cash spent on brands we would have to turn away" },
             { label: "Infrastructure, game APIs & partnerships", pct: 14, note: "Hosting, card rendering, the official game-API access every verified stat depends on, and the partnership work that opens each new game" },
