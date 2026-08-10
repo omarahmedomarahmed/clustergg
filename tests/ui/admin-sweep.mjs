@@ -101,6 +101,14 @@ console.log("\n== every tab of every merged page ==");
   // An unknown tab must fall back, not blank. `?tab=` is in a URL staff paste
   // to each other, and a typo that renders nothing looks like a broken page.
   await page.goto(`${BASE}/admin/content?tab=nonsense`, { waitUntil: "domcontentloaded" });
+  // Wait for the PANEL, not for the document. This was the only check in the
+  // file that read `innerText` straight after a `goto`, so it raced the app's
+  // loading screen and passed or failed on how fast the panel happened to
+  // render. `activeTab` falls back correctly and always did.
+  await page.waitForFunction(
+    () => /Homepage hero|Site content/i.test(document.body.innerText),
+    null, { timeout: 15000 },
+  ).catch(() => {});
   const fallback = await page.locator("body").innerText();
   ok("an unknown ?tab= falls back to the first tab", /Homepage hero|Site content/i.test(fallback));
 }

@@ -82,7 +82,36 @@ try {
 
   console.log("\n== Still the SEO surface it was ==");
   ok("the monetize phrase survives", /monetize your discord server/i.test(html));
-  ok("so does the price", /\$250/.test(html) && /\$175/.test(html));
+  // B121.2. This asserted the homepage contains "$250" — a price we stopped
+  // charging three sprints ago. A guard that pins a literal holds the page to
+  // whatever was true the day it was written, and this one went red for a fix
+  // rather than for a regression.
+  //
+  // The live figures instead, read from the module the page renders from. It
+  // now fails when the homepage and the rate card disagree, which is the thing
+  // actually worth catching.
+  // Checked ACROSS PAGES rather than against an import. The browser band runs
+  // under plain `node`, and `lib/pricing.ts` reaches `@/lib/vault-split` — an
+  // alias only `tsx` resolves — so importing it here throws.
+  //
+  // Cross-checking the homepage against the published rate card is the better
+  // test anyway: it catches the two pages disagreeing, which is what a visitor
+  // would actually notice. Whether the figure equals the live constant is
+  // already guarded in the db band, where the import works
+  // (`tests/db/marketing-truth.mts`).
+  // Both phrasings the site actually uses: "$350 a challenge" and "$175 of
+  // every $350 challenge". The first version of this matched only the former
+  // and found nothing on /pricing, which would have made the comparison below
+  // vacuously true rather than red.
+  const priceOf = (src) =>
+    (src.match(/\$[\d,]+(?=\s+(?:a\s+|per\s+)?(?:sponsored\s+)?challenge\b)/i) ?? [null])[0];
+  const rateCard = await (await fetch(`${BASE}/pricing`)).text();
+  const cardPrice = priceOf(rateCard);
+  ok("the rate card states a challenge price", !!cardPrice, "nothing matched on /pricing");
+  const homePrice = priceOf(html);
+  ok("the homepage agrees with the rate card",
+    !homePrice || homePrice === cardPrice,
+    `homepage ${homePrice} vs /pricing ${cardPrice}`);
 
   console.log("\n== Clicking a door goes to its section ==");
   await page.locator('a[href="#servers"]').first().click();

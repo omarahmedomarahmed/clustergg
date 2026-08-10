@@ -52,10 +52,18 @@ try {
     }
 
     // ===== The journey, walked end to end =====
-    const counter = page.getByText(/^Step \d+ of \d+$/);
+    //
+    // EVERY MATCH HERE IS CASE-INSENSITIVE, and that is not defensive coding.
+    // The counter is styled `uppercase`, so `innerText` returns the RENDERED
+    // text — "STEP 1 OF 8", not "Step 1 of 8". The first version of this file
+    // split on " of ", got `undefined`, and produced a total of NaN; the walk
+    // loop then ran zero times and six assertions failed on a page that works
+    // perfectly. `textContent` would dodge it, but `innerText` is what a reader
+    // actually sees, so the reader is what gets fixed.
+    const counter = page.getByText(/^step \d+ of \d+$/i);
     ok(`${who}: the journey shows which step you are on`, (await counter.count()) > 0);
     const label = (await counter.first().innerText()).trim();
-    const total = Number(label.split(" of ")[1]);
+    const total = Number(label.split(/\s+of\s+/i)[1]);
     ok(`${who}: …and it is a real count`, Number.isFinite(total) && total >= 5, label);
 
     const next = page.getByRole("button", { name: "Next step" });
@@ -76,7 +84,7 @@ try {
         // on it rather than sleeping means a component that renders slowly
         // still passes and one that never advances still fails.
         await page.waitForFunction(
-          (n) => document.body.innerText.includes(`Step ${n} of`),
+          (n) => new RegExp(`step\\s+${n}\\s+of`, "i").test(document.body.innerText),
           i + 2,
           { timeout: 5000 },
         ).catch(() => {});
@@ -129,14 +137,14 @@ try {
 
     // ===== The lifecycle, and the fine print underneath =====
     ok(`${who}: the challenge lifecycle is shown`,
-      /What a challenge does, week by week/.test(body));
+      /what a challenge does, week by week/i.test(body));
     ok(`${who}: …with both gates named`,
       /Announced/.test(body) && /Live/.test(body));
 
     // The diagrams are an ADDITION to the rules, never a replacement. A guide
     // that lost the fine print in a redesign is a guide that lost the promises.
     ok(`${who}: every rule is still on the page`,
-      /Every rule, and why it exists/.test(body));
+      /every rule, and why it exists/i.test(body));
     ok(`${who}: …and the reasons came with them`,
       (await page.locator("div.glass p.font-semibold").count()) >= 5);
   }

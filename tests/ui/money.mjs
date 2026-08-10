@@ -113,7 +113,14 @@ try {
   await tap(boss.locator(`a:has-text("${number}")`).first());
   await settle(boss);
   body = await boss.locator("body").innerText();
-  ok("the editor opens on the invoice", body.includes(number) && /placements/i.test(body));
+  // B121.2. The second half of this was `/placements/i`, and it never meant
+  // anything: `reachBase` is 0, so no placements line is ever generated. It was
+  // passing on a sentence about "the placements base" on the billing page —
+  // prose describing a fee of zero, which B118 deleted. Eight lines below, this
+  // same suite asserts that no placements line is printed. Both could not be
+  // right, and the one below is the one worth keeping.
+  ok("the editor opens on the invoice", body.includes(number),
+    body.slice(0, 200).replace(/\n/g, " | "));
   ok("it is billed to the brand we picked", body.includes(brandName.trim()), brandName);
   ok("it starts as a draft", /draft/i.test(body));
   // C11 retired the placements base to $0, and a $0 line is OMITTED rather
