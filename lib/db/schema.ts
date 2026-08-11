@@ -2,6 +2,7 @@ import {
   pgTable, text, timestamp, integer, boolean, jsonb, doublePrecision,
   primaryKey, uniqueIndex, index,
 } from "drizzle-orm/pg-core";
+import { AD_OPT_IN_DEFAULT } from "@/lib/discord/config";
 
 const id = () => text("id").primaryKey();
 const now = (name: string) => timestamp(name, { withTimezone: true, mode: "date" }).defaultNow().notNull();
@@ -1258,7 +1259,7 @@ export const discordGuilds = pgTable("discord_guilds", {
   channelId: text("channel_id"),                       // the #clustergg channel we created
   status: text("status").notNull().default("active"),  // active | removed | paused
   announcementsEnabled: boolean("announcements_enabled").notNull().default(true),
-  adOptIn: boolean("ad_opt_in").notNull().default(true),
+  adOptIn: boolean("ad_opt_in").notNull().default(AD_OPT_IN_DEFAULT),
   adUnlockedAt: timestamp("ad_unlocked_at", { withTimezone: true, mode: "date" }),
   /**
    * When this server first crossed a paying tier (B35).

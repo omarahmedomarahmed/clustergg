@@ -6,7 +6,7 @@ import { buttonCopy } from "@/lib/discord/button-store";
 import { cardRef, currentCardGuild, currentSponsor, embedColor, liveCardUrl, setCardGuild } from "@/lib/discord/cards";
 import { withSponsorRow } from "@/lib/discord/sponsor";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
-import { siteUrl } from "@/lib/discord/config";
+import { siteUrl, AD_OPT_IN_DEFAULT } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
 import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild, entryAccounts } from "@/lib/challenges";
 import { listRequests, requestableGames } from "@/lib/challenge-requests";
@@ -1202,6 +1202,15 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
 
   // Managing a specific challenge: pause/resume/end, owner-only.
   const ownedLive = live.filter((c) => c.guildId === ctx.guildId);
+
+  // ONE READ OF THE DEFAULT, from the one place that states it.
+  //
+  // Note the daily-post toggle below gets this right by accident of phrasing —
+  // it tests `=== false`, so a missing row falls to "on", which matches its
+  // column default. The ad toggle tested `guild?.adOptIn` and a missing row fell
+  // to "off", which does not. Two toggles, two spellings, one of them inverted
+  // for exactly the servers with no row yet (B7).
+  const adOptIn = guild?.adOptIn ?? AD_OPT_IN_DEFAULT;
   const controls: Button[] = ownedLive.slice(0, 2).flatMap((c) => ([
     c.status === "paused"
       ? button(`Resume ${c.title}`.slice(0, 40), actionId("ch-resume", [c.id], [here]), ButtonStyle.Success, "▶")
@@ -1241,9 +1250,14 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
       // bot instead. Both say what they currently are, because a toggle whose
       // state you can't see is a toggle nobody trusts.
       button(
-        guild?.adOptIn ? "Sponsored posts: on" : "Sponsored posts: off",
-        actionId("ad-optin", [guild?.adOptIn ? "0" : "1"], [here]),
-        guild?.adOptIn ? ButtonStyle.Success : ButtonStyle.Secondary, "💸",
+        // `?? AD_OPT_IN_DEFAULT`, not `guild?.adOptIn`. A server we have no row
+        // for is not opted out — it is at the default, and the default is on.
+        // Rendering `undefined` as "off" told an owner they had declined
+        // something they had not, and the label then flipped to "on" the moment
+        // any unrelated button created the row (B7).
+        adOptIn ? "Sponsored posts: on" : "Sponsored posts: off",
+        actionId("ad-optin", [adOptIn ? "0" : "1"], [here]),
+        adOptIn ? ButtonStyle.Success : ButtonStyle.Secondary, "💸",
       ),
       button(
         guild?.announcementsEnabled === false ? "Daily post: off" : "Daily post: on",
