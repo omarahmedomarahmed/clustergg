@@ -809,6 +809,28 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
   // posted. Discord refuses DMs from people who have them closed, and the
   // difference matters to the person waiting for it — so say which happened.
   if (target.screen === "portal-key" && i.guild_id) {
+    // MANAGER ONLY. B6.
+    //
+    // Every neighbouring action here is gated — the settings below on
+    // `ctx.isManager`, the community profile on `maySetup()` — and this one,
+    // which hands over the key to the server's whole dashboard, was not. The
+    // render is manager-gated so an ordinary member is never shown the button,
+    // but a Discord button lives forever: a moderator who has since been
+    // demoted still has the card in their DMs, and pressing it both MINTED the
+    // key (`ensurePortal` creates it) and sent it.
+    //
+    // Checked with `maySetup` rather than `ctx.isManager` alone, because the
+    // card is also reachable in a DM from the account recorded as the server's
+    // owner, which is where the install message went.
+    if (!(await maySetup(i, i.guild_id))) {
+      await editOriginal(i.token, {
+        embeds: [{
+          color: 0xf59e0b,
+          description: "Only this server's admins can request the portal key. It opens your growth numbers, your challenges and your earnings.",
+        }],
+      });
+      return;
+    }
     const portal = await ensurePortal(i.guild_id);
     const sent = portal
       ? await dmUser(ctx.discordId, {

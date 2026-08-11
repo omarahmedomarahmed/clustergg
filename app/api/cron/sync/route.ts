@@ -39,5 +39,29 @@ export async function GET(req: NextRequest) {
   // Idempotent, and cheap when nothing is due — a challenge that ended at 3pm
   // should not still be calling itself live at midnight.
   const jobs = await runAllJobs("hourly");
-  return NextResponse.json({ ok: true, ...result, jobs, at: new Date().toISOString() });
+
+  // ===== A GREEN CRON MUST MEAN A GREEN CRON. F1 =====
+  //
+  // This answered `{ok: true, synced: 7, failed: 53}` and the scheduler saw
+  // success. The standings are the product; a run that failed 88% of its work
+  // and reported health is a run nobody will ever look at again.
+  //
+  // The health signal is NOT a failure count — that number gets tuned upwards
+  // the first time it pages somebody and never comes back. It is whether any
+  // single provider failed everything it attempted, which is the difference
+  // between "the Riot key expired" (act tonight) and "3% scattered" (a normal
+  // hour). Non-2xx so the scheduler's own alerting sees it, with the detail in
+  // the body rather than in a log somebody has to go and find.
+  const down = result.down;
+  const body = {
+    ok: down.length === 0,
+    ...result,
+    jobs,
+    at: new Date().toISOString(),
+    ...(down.length ? {
+      problem: `Every account synced for ${down.length === 1 ? "this provider" : "these providers"} failed: `
+        + `${down.join(", ")}. Usually an expired or missing API key.`,
+    } : {}),
+  };
+  return NextResponse.json(body, { status: down.length ? 500 : 200 });
 }

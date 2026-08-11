@@ -431,8 +431,24 @@ function accountButtonLabel(a: { game: string; tag: string }): string {
 // Works for ANY gamer on the platform, from any server: that's what makes the
 // bot worth having in a server where nobody has signed up yet.
 async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
+  // ===== `*` MEANS "NO GAME NAMED". B2. =====
+  //
+  // `screenForCommand` routed `gamer:<name>` as `frame("gamer", name)`, which
+  // put the NAME into `what` — the game slot — and left `gamer` empty. So every
+  // gamer the autocomplete offered led to
+  //
+  //     No one on Cluster has linked **** on **auditgamer** yet.
+  //
+  // an empty bold where a game should be, for a gamer who certainly exists.
+  // That is the bot's own suggestion list walking people into a dead end, on
+  // the main way anybody looks anybody up.
+  //
+  // It cannot be fixed by passing an empty string: `frame()` drops empty args
+  // by design, so `frame("gamer", "", name)` collapses straight back to the
+  // broken shape. Hence an explicit marker.
+  const anyGame = what === "*" || !what;
   const isDiscordLookup = /^discord$/i.test(what);
-  const game = what.startsWith("game:") ? what.slice(5) : what;
+  const game = anyGame ? "" : what.startsWith("game:") ? what.slice(5) : what;
 
   // `/cluster <a name>` is now the main way anyone looks somebody up, and a
   // person typing a name knows the name — not whether it's that gamer's Discord
@@ -442,13 +458,20 @@ async function otherGamerScreen(what: string, gamer: string, ctx: ScreenCtx, tra
   // real in-game name.
   const found = isDiscordLookup
     ? (await findByDiscordName(gamer)) ?? (await searchGamers(gamer, 1))[0] ?? null
-    : (await findByInGameName(game, gamer)) ?? (await findByDiscordName(gamer)) ?? (await searchGamers(gamer, 1))[0] ?? null;
+    : anyGame
+      // No game named, so there is no in-game-name lookup to try: go straight
+      // to the handle and the broad search, which is what "find this person"
+      // means when all you were given is a name.
+      ? (await findByDiscordName(gamer)) ?? (await searchGamers(gamer, 1))[0] ?? null
+      : (await findByInGameName(game, gamer)) ?? (await findByDiscordName(gamer)) ?? (await searchGamers(gamer, 1))[0] ?? null;
 
   if (!found) {
     return notYet(
       isDiscordLookup
         ? `No Cluster gamer with the Discord handle **${gamer}**.`
-        : `No one on Cluster has linked **${gamer}** on **${game}** yet.`,
+        : anyGame
+          ? `Nobody on Cluster goes by **${gamer}** yet.`
+          : `No one on Cluster has linked **${gamer}** on **${game}** yet.`,
       trail,
       [linkableProvider(game)
         ? button("Connect yours", `open-link|${game}`, ButtonStyle.Success, "🎮")
@@ -2059,7 +2082,9 @@ function fromToken(raw: string): Frame | null {
     case "leaderboard": return frame("leaderboard", arg);
     case "quest": return arg ? frame("quest", arg) : frame("quests");
     case "guide": return frame("guide", arg);
-    case "gamer": return frame("gamer", arg);
+    // `*` rather than nothing: `frame()` drops empty args, so the marker has to
+    // be a real string or the game slot swallows the name again (B2).
+    case "gamer": return frame("gamer", "*", arg);
     case "link": return frame("link", arg);
     case "challenge": return frame("challenge", arg);
     case "challenges": return frame("challenges", arg);

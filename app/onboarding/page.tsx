@@ -15,7 +15,8 @@ import { tryUnlock } from "@/lib/unlock";
 import EmailStep from "@/components/onboarding/EmailStep";
 import ProfileStep from "@/components/onboarding/ProfileStep";
 import { getCountries } from "@/lib/countries-server";
-import { pendingCodeEmail, maskEmail } from "@/lib/email-verify";
+import { pendingCodeEmail, maskEmail, codeShownOnScreen } from "@/lib/email-verify";
+import { emailConfigured } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set up your account · Cluster" };
@@ -183,6 +184,8 @@ export default async function OnboardingPage() {
           masked={maskEmail(sentTo ?? user.email)}
           done={!!step("email")?.done}
           alreadySent={!!sentTo}
+          mailOff={!emailConfigured()}
+          codeOnScreen={codeShownOnScreen(emailConfigured())}
         />
       </Step>
 

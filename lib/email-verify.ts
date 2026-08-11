@@ -39,6 +39,27 @@ export const MAX_ATTEMPTS = 5;
 /** How many codes one account may ask for in an hour. */
 export const MAX_SENDS_PER_HOUR = 5;
 
+/**
+ * May a verification code be PRINTED ON THE PAGE? G3.
+ *
+ * It used to be decided by `emailConfigured()` alone: no mail provider, show
+ * the code. That is right for a local copy and wrong for anything else, and the
+ * two are not distinguishable by that question. A production deployment whose
+ * RESEND_API_KEY was never set, or was rotated out, would quietly start
+ * rendering every account's live verification code into the HTML of a page
+ * anybody can reach with a session — turning one missing environment variable
+ * into account takeover.
+ *
+ * So it takes BOTH: mail genuinely unavailable, AND an in-process demo (PGlite,
+ * no DATABASE_URL). On a real database the code is never on screen, however
+ * broken the mail configuration is; what appears instead is an honest failure,
+ * which is the thing an operator can act on.
+ */
+export function codeShownOnScreen(mailConfigured: boolean): boolean {
+  const demo = process.env.DEMO_DB === "1" || !process.env.DATABASE_URL;
+  return !mailConfigured && demo;
+}
+
 const hash = (code: string) => createHash("sha256").update(`cluster:${code}`).digest("hex");
 
 /** Six digits, uniformly random. `randomInt` rather than `Math.random`. */

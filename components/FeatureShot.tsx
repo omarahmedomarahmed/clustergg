@@ -42,6 +42,25 @@ export default async function FeatureShot({
   const staff = isStaff(user);
   const text = caption ?? shot.caption;
 
+  // ===== AN EMPTY SLOT IS INVISIBLE TO EVERYBODY BUT STAFF. G4 =====
+  //
+  // The placeholder is deliberately loud — dashed, labelled with the key, and
+  // stating the claim it stands in for — and that is right for the person who
+  // has to go and capture it. It was rendered to EVERYONE, so a signed-in gamer
+  // opening /wallet read
+  //
+  //     GAMER.WALLET
+  //     Screenshot pending — proves: "Your points, your trophies, what they
+  //     are worth"
+  //
+  // twice, on the page that shows them their money. Internal tooling, in a
+  // customer's face, on the surface where looking unfinished costs the most.
+  //
+  // Nothing is rendered rather than an empty frame: a bordered box with nothing
+  // in it is still a hole in the page, and the slots are empty by design until
+  // they are captured.
+  if (!shot.imageUrl && !staff) return null;
+
   return (
     <figure className={`relative ${className}`} data-shot-key={shotKey}>
       {/* An EMPTY slot does not reserve a hero.
