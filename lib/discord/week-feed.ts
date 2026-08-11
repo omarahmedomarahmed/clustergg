@@ -1,4 +1,4 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { canAct, siteUrl } from "@/lib/discord/config";
@@ -33,8 +33,14 @@ import { presentersFor, joinNames } from "@/lib/presented-by";
 
 export type WeekPostResult = { considered: number; posted: number; skipped: number; kind: "update" | "result" };
 
-/** The day, in the competition's own clock — so "one a day" means one Cluster day. */
-async function dayKey(): Promise<string> {
+/**
+ * The day, in the competition's own clock — so "one a day" means one Cluster day.
+ *
+ * Exported since C1: every job that wants "at most once a day per server" has to
+ * agree on where the day boundary is, or two of them disagree by up to a day and
+ * the guarantee is only as good as the timezone each happened to pick.
+ */
+export async function dayKey(): Promise<string> {
   const tz = await weekTimezone();
   try {
     return new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" })
@@ -44,7 +50,17 @@ async function dayKey(): Promise<string> {
   }
 }
 
-async function alreadyPosted(guildId: string, postKey: string): Promise<boolean> {
+/**
+ * Has this exact post already gone into this server?
+ *
+ * Exported since C1. It was private, so the guarantee in the comment at the top
+ * of this file — "one post per server per day, enforced by a unique index rather
+ * than by the cron's timing" — held for the weekly update and for nothing else.
+ * `challenge-reminders` had no such check: running the daily cron twice reminded
+ * the same three challenges in the same servers twice, and `docs/SETUP.md` tells
+ * an operator to "run each job once" after every deploy, which is the second run.
+ */
+export async function alreadyPosted(guildId: string, postKey: string): Promise<boolean> {
   try {
     const db = await getDb();
     const rows = await db.select({ id: schema.discordWeekPosts.id })
@@ -61,7 +77,50 @@ async function alreadyPosted(guildId: string, postKey: string): Promise<boolean>
   }
 }
 
-async function record(guildId: string, postKey: string, weekKey: string, kind: string, channelId: string, messageId: string | null, ok: boolean) {
+/**
+ * The same question for a whole fan-out, in ONE query.
+ *
+ * `alreadyPosted` is per server, which is right for `postWeekUpdate` — it is
+ * already looping servers to post to them one at a time. It is wrong for
+ * `announce`, which does not loop at all: it builds a payload per recipient and
+ * hands the whole list to the queue. Calling the per-server version from there
+ * put a sequential database round trip per guild back inside a server action —
+ * the exact bug class `tests/db/announce-queue.mts` exists to catch, and it
+ * caught it.
+ */
+export async function postedGuilds(guildIds: string[], postKey: string): Promise<Set<string>> {
+  if (!guildIds.length) return new Set();
+  try {
+    const db = await getDb();
+    const rows = await db.select({ guildId: schema.discordWeekPosts.guildId })
+      .from(schema.discordWeekPosts)
+      .where(and(
+        eq(schema.discordWeekPosts.postKey, postKey),
+        inArray(schema.discordWeekPosts.guildId, guildIds),
+      ));
+    return new Set(rows.map((r) => r.guildId));
+  } catch {
+    // Can't tell? Treat everybody as already posted — same reasoning as
+    // `alreadyPosted`. A missed post is invisible; a duplicate is not.
+    return new Set(guildIds);
+  }
+}
+
+/** The write half, also in one statement. */
+export async function recordPosts(
+  rows: { guildId: string; channelId: string }[], postKey: string, weekKey: string, kind: string,
+): Promise<void> {
+  if (!rows.length) return;
+  try {
+    const db = await getDb();
+    await db.insert(schema.discordWeekPosts).values(rows.map((r) => ({
+      id: uid(), guildId: r.guildId, postKey, weekKey, kind,
+      channelId: r.channelId, messageId: null, status: "posted",
+    }))).onConflictDoNothing();
+  } catch { /* the post already happened; bookkeeping failing is not worse */ }
+}
+
+export async function recordPost(guildId: string, postKey: string, weekKey: string, kind: string, channelId: string, messageId: string | null, ok: boolean) {
   try {
     const db = await getDb();
     await db.insert(schema.discordWeekPosts).values({
@@ -136,7 +195,7 @@ export async function postWeekUpdate(opts: { guildIds?: string[]; force?: boolea
       ]),
     }, ad, g.guildId));
 
-    await record(g.guildId, postKey, week.key, "update", g.channelId, res.ok ? res.data.id : null, res.ok);
+    await recordPost(g.guildId, postKey, week.key, "update", g.channelId, res.ok ? res.data.id : null, res.ok);
     if (res.ok) out.posted++; else out.skipped++;
   }
 
@@ -217,7 +276,7 @@ export async function announceWeekWinners(weekKey: string, opts: { force?: boole
       ]),
     }, ad, g.guildId));
 
-    await record(g.guildId, postKey, weekKey, "result", g.channelId, res.ok ? res.data.id : null, res.ok);
+    await recordPost(g.guildId, postKey, weekKey, "result", g.channelId, res.ok ? res.data.id : null, res.ok);
     if (res.ok) out.posted++; else out.skipped++;
   }
 

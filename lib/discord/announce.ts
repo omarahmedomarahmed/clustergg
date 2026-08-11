@@ -50,6 +50,26 @@ type Scope = {
    * of servers taken afterwards.
    */
   ledger?: { challengeId: string; kind: "launch" | "ending" | "result" };
+  /**
+   * POST THIS AT MOST ONCE PER SERVER. C1.
+   *
+   * Set it and `announce` drops any server that has already received this exact
+   * key, then records the ones it sent to. Unset and the fan-out behaves as it
+   * always did — announcements that are meant to fire once per event (a launch,
+   * a result) do not need it, because the event happens once.
+   *
+   * What needed it was the RECURRING fan-out. `challenge-reminders` runs from
+   * the daily cron with no idempotency of any kind, so a retried cron — or an
+   * operator following `docs/SETUP.md`'s instruction to "run each job once"
+   * after a deploy, on a day the schedule had already fired — reminded the same
+   * challenges in the same servers a second time. Duplicate bot posts in
+   * somebody else's community is how a bot gets removed from it.
+   *
+   * Keyed per server rather than globally on purpose: a run that reaches half
+   * the network and dies must be able to finish the other half, and a global
+   * "done today" flag would call the whole thing done.
+   */
+  postKey?: string | null;
 };
 
 const asList = (v: Scope["only"]): string[] =>
@@ -107,9 +127,51 @@ async function targets(scope: Scope = {}): Promise<Target[]> {
  * later would attribute a click to the wrong server.
  */
 async function announce(payload: Record<string, unknown>, scope: Scope = {}): Promise<number> {
-  if (!canAct()) return 0;
-  const list = await targets(scope);
-  if (!list.length) return 0;
+  return (await announceWithStats(payload, scope)).queued;
+}
+
+/**
+ * `announce`, plus how many servers were suppressed as duplicates.
+ *
+ * Split out because "queued 0" and "queued 0 because everybody already has it"
+ * are different facts, and a caller that cannot tell them apart reports the
+ * wrong one. The daily reminder pass got this wrong the moment C1 landed: its
+ * second run truthfully queued nothing and then explained it as "just launched,
+ * or not running", which is a sentence about a state the challenge was not in.
+ */
+async function announceWithStats(
+  payload: Record<string, unknown>, scope: Scope = {},
+): Promise<{ queued: number; deduped: number }> {
+  if (!canAct()) return { queued: 0, deduped: 0 };
+  let list = await targets(scope);
+  if (!list.length) return { queued: 0, deduped: 0 };
+
+  // At most once per server, when the caller asked for that (C1). Filtered
+  // BEFORE the queue rather than inside the worker, so a duplicate is never
+  // enqueued at all — a queued duplicate is one retry away from being sent.
+  // SET-BASED, NOT A LOOP. One query for the whole fan-out, both ways.
+  //
+  // The first version of this asked per guild. That is a sequential database
+  // round trip per server inside a server action with no `maxDuration` — the
+  // precise bug class B33 removed from this function and that
+  // `tests/db/announce-queue.mts` guards, and it went red on the first full
+  // run. At a thousand servers it would have been two thousand round trips
+  // before a single message was queued.
+  //
+  // `guildId` is null only for the DISCORD_DEFAULT_CHANNEL_ID test override,
+  // which has no guild — keyed on the channel there, so the guarantee holds for
+  // the one target that exists before any server has installed.
+  const { postedGuilds, recordPosts, dayKey } = await import("@/lib/discord/week-feed");
+  const keyOf = (t: Target) => t.guildId ?? t.channelId;
+  let deduped = 0;
+  if (scope.postKey) {
+    const done = await postedGuilds(list.map(keyOf), scope.postKey);
+    const fresh = list.filter((t) => !done.has(keyOf(t)));
+    deduped = list.length - fresh.length;
+    list = fresh;
+    if (!list.length) return { queued: 0, deduped };
+  }
+
   const { enqueuePosts } = await import("@/lib/discord/post-queue");
   const { queued } = await enqueuePosts(
     list.map((t) => ({
@@ -119,7 +181,17 @@ async function announce(payload: Record<string, unknown>, scope: Scope = {}): Pr
     })),
     scope.ledger,
   );
-  return queued;
+
+  // Recorded on ENQUEUE, not on delivery. The queue owns retries from here, so
+  // the thing that must not happen twice is the enqueue; waiting for a message
+  // id would leave the window open for exactly as long as the queue is deep.
+  if (scope.postKey) {
+    await recordPosts(
+      list.map((t) => ({ guildId: keyOf(t), channelId: t.channelId })),
+      scope.postKey, await dayKey(), "reminder",
+    );
+  }
+  return { queued, deduped };
 }
 
 // Nothing to announce into? Then skip the (expensive) card rendering entirely.
@@ -425,6 +497,12 @@ export async function announceChallengeUpcoming(
  * Same targeting rules as a launch: public goes everywhere, private stays in
  * the servers that own it, and nothing is sent for a challenge that has ended.
  */
+/** The Cluster day, for the once-per-day reminder key. */
+async function reminderDay(): Promise<string> {
+  const { dayKey } = await import("@/lib/discord/week-feed");
+  return dayKey();
+}
+
 export async function announceChallengeReminder(
   challengeId: string,
   opts: { only?: string[]; manual?: boolean } = {},
@@ -462,7 +540,7 @@ export async function announceChallengeReminder(
     : asked;
   if (isPrivate && !only?.length) return { ok: false, reason: "no_matching_server" };
 
-  const landed = await announce({
+  const landed = await announceWithStats({
     content: [
       `⏳ **${ch.title}** — ${left}.`,
       `You're playing **${ch.game}** anyway. Every match you play counts towards this while it runs, and one account can be entered in every challenge on this game at once — so there is no reason to be in only one.`,
@@ -474,12 +552,29 @@ export async function announceChallengeReminder(
       navButton("Standings", frame("standings", challengeId), [frame("home")], ButtonStyle.Secondary, "📊"),
       linkButton("Details", url, "🔗"),
     ]),
-  }, { only, sponsor: card.ad, ledger: { challengeId, kind: "ending" } });
+  }, {
+    only, sponsor: card.ad, ledger: { challengeId, kind: "ending" },
+    // ONE REMINDER PER CHALLENGE PER SERVER PER DAY (C1).
+    //
+    // Not set when a staff member sends one BY HAND: that is a person choosing
+    // to send it, having presumably just been asked to, and refusing them
+    // silently because the cron already ran is the wrong answer to the wrong
+    // question. The automated pass is what needed bounding.
+    postKey: opts.manual ? null : `reminder:${challengeId}:${await reminderDay()}`,
+  });
 
   // Nothing landed is not success. A server list that matched no server, a bot
   // that can't post in any of their channels — both look identical to the
   // person who pressed the button unless we say so.
-  if (!landed) return { ok: false, reason: "reached_nobody", days };
+  //
+  // …and "everybody already had it today" is a THIRD thing, which is neither a
+  // failure nor a send. Named separately so the daily pass can report what
+  // actually happened rather than reaching for the nearest other reason.
+  if (!landed.queued) {
+    return landed.deduped
+      ? { ok: false, reason: "already_sent_today", days }
+      : { ok: false, reason: "reached_nobody", days };
+  }
   return { ok: true, days };
 }
 
@@ -491,9 +586,9 @@ export async function announceChallengeReminder(
  * countdown is that it counts down. So the first day is skipped and the last
  * day is always sent.
  */
-export async function remindLiveChallenges(): Promise<{ sent: number; skipped: number }> {
-  if (!canAct()) return { sent: 0, skipped: 0 };
-  let sent = 0, skipped = 0;
+export async function remindLiveChallenges(): Promise<{ sent: number; skipped: number; alreadySent: number }> {
+  if (!canAct()) return { sent: 0, skipped: 0, alreadySent: 0 };
+  let sent = 0, skipped = 0, alreadySent = 0;
   try {
     const db = await getDb();
     const live = await db.select({ id: schema.challenges.id, startAt: schema.challenges.startAt })
@@ -503,10 +598,12 @@ export async function remindLiveChallenges(): Promise<{ sent: number; skipped: n
       // challenge in one day is exactly the noise this is meant to avoid.
       if (c.startAt && Date.now() - c.startAt.getTime() < 20 * 3600000) { skipped++; continue; }
       const res = await announceChallengeReminder(c.id);
-      if (res.ok) sent++; else skipped++;
+      if (res.ok) sent++;
+      else if (res.reason === "already_sent_today") alreadySent++;
+      else skipped++;
     }
   } catch { /* a reminder pass that fails is not worth failing a cron over */ }
-  return { sent, skipped };
+  return { sent, skipped, alreadySent };
 }
 
 // A challenge finished — the podium, with what each winner actually earned.
