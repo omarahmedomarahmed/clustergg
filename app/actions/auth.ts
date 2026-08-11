@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { count, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { createSession, destroySession, hashPassword, verifyPassword } from "@/lib/auth";
 import { slugify, uid } from "@/lib/utils";
@@ -71,9 +71,14 @@ export async function register(_prev: FormState, formData: FormData): Promise<Fo
     if (!v.ok) return { error: v.message };
   }
 
-  // First user on a fresh database becomes superadmin (bootstrap).
-  const [{ c }] = await db.select({ c: count() }).from(schema.users);
-  const role = Number(c) === 0 ? "superadmin" : "user";
+  // Bootstrap, bound to SETUP_TOKEN rather than to being early (B104).
+  //
+  // This was `count() === 0 ? "superadmin" : "user"`, which handed full admin
+  // to whoever signed up first on a fresh deployment — a race anybody who found
+  // the domain could enter. The operator now names the address through
+  // `/api/setup`, which already requires the token. See `lib/bootstrap.ts`.
+  const { bootstrapRoleFor } = await import("@/lib/bootstrap");
+  const role = await bootstrapRoleFor(db, email);
 
   const id = uid();
   await db.insert(schema.users).values({

@@ -58,6 +58,7 @@ Vercel + Neon Postgres + Vercel Blob. Nothing else is required.
 | `NEXT_PUBLIC_APP_URL` | `https://clustergg.com` — used for absolute links and OAuth redirects |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob. Uploads and rendered cards live here. |
 | `CRON_SECRET` | Vercel Cron sends it automatically; the routes reject anything else. |
+| `PORTAL_SECRET` | Signs every brand and server portal session. `openssl rand -hex 32`. **The app throws without it** — see below. |
 
 **The bot** — with none of these set, the site behaves normally and the bot
 endpoints report "not configured".
@@ -70,8 +71,18 @@ endpoints report "not configured".
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | OAuth2 → for "Sign in with Discord" |
 | `BOT_API_SECRET` | You generate. Guards command registration. |
 
-**Optional** — `PORTAL_SECRET` (portal sessions survive a redeploy),
-`AD_ANALYTICS_SALT`, `DISCORD_DEFAULT_CHANNEL_ID` (a single test channel before
+**`PORTAL_SECRET` is required, and it may not be shared.** A portal session
+cookie is `HMAC(secret, "<kind>:<id>")` and depends on nothing else — not on the
+key, not on a nonce — so whoever holds this value can mint a session for **any**
+brand and **any** server without ever seeing a key. It used to fall back to
+`CRON_SECRET`, then `BOT_API_SECRET`, then a per-process random value. The first
+two are handed out for scheduling and for command registration, which put three
+trust boundaries on one secret; the third made an unconfigured deployment look
+healthy while signing every portal session out on each cold start. All three
+fallbacks are gone and the app now throws on startup instead. The in-process
+demo (`DEMO_DB=1`) uses a fixed development value, so local work needs nothing.
+
+**Optional** — `AD_ANALYTICS_SALT`, `DISCORD_DEFAULT_CHANNEL_ID` (a single test channel before
 any server has installed), `EXTRA_IMAGE_HOSTS` (comma-separated extra image
 hosts, if you serve art from a CDN of your own — the allowlist in
 `next.config.ts` is deliberately not a wildcard).
@@ -80,7 +91,20 @@ hosts, if you serve art from a CDN of your own — the allowlist in
 unset the endpoint refuses with a 403 and bootstrap is closed — which is the
 right default, because the alternative is an endpoint on the open internet that
 creates the schema and mints the first superadmin. Set it, call
-`POST /api/setup?token=…` once, and you never need it again.
+
+```
+POST /api/setup?token=…&admin=you@yourdomain.com
+```
+
+once, and you never need it again.
+
+**`admin=` is how the first superadmin is chosen, and it is not optional
+either.** Signing up used to promote whoever arrived while the users table was
+empty, so on a fresh deployment the first person to find the URL became
+superadmin. That address now has to be named here, by somebody holding the
+token, and it is promoted only while no superadmin exists yet. Call setup
+without `admin=` and **no superadmin is created at all** — the response says so.
+See `lib/bootstrap.ts`.
 
 **Game providers** — each is optional; a provider with no key reports
 `needs_key` and everything else keeps working: `RIOT_API_KEY`, `STEAM_API_KEY`,

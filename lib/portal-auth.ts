@@ -23,26 +23,54 @@ import { cookies } from "next/headers";
 const COOKIE_PREFIX = "portal_";
 const MAX_AGE = 60 * 60 * 12; // 12 hours
 
-// Signing secret. Falls back to a per-PROCESS random value, which is safe (it
-// just means sessions don't survive a redeploy).
+// ===== THE SIGNING SECRET IS `PORTAL_SECRET`, AND ONLY `PORTAL_SECRET`. =====
 //
-// The fallback is cached on `globalThis`, not in a module variable, and that
-// is not a nicety. Next bundles server code per entry point and the same
-// module can end up instantiated more than once in one process — the route
-// handler that MINTS the session and the server action that CHECKS it were
-// landing in different bundles. With a module-local secret they each rolled
-// their own, so a portal page rendered unlocked (its bundle had signed the
-// cookie) while every action on that page threw "Invalid brand access key".
-// One process, one secret, whichever bundle asks.
-const SECRET_KEY = Symbol.for("cluster.portal.secret");
-type SecretHolder = { [SECRET_KEY]?: string };
+// This used to read
+//
+//     process.env.PORTAL_SECRET || process.env.CRON_SECRET || process.env.BOT_API_SECRET
+//     || <a per-process random value>
+//
+// and both halves of that were wrong.
+//
+// THE CROSS-DOMAIN FALLBACKS. A portal session cookie is `HMAC(secret,
+// "<kind>:<id>")` and depends on nothing else — not on the key, not on a
+// nonce. So whoever holds the signing secret can mint a valid session for ANY
+// brand and ANY server without ever seeing a key. `BOT_API_SECRET` is handed
+// to whoever registers slash commands and `CRON_SECRET` is pasted into a
+// scheduler; neither is a credential we would knowingly let open a customer's
+// billing page. Three trust boundaries were sharing one value, and the two
+// weaker ones decided the strongest.
+//
+// THE RANDOM FALLBACK. It looked safe — "sessions just don't survive a
+// redeploy" — and it was the reason nobody noticed the secret was unset. Every
+// cold start silently invalidated every portal session, so a brand contact was
+// re-typing their key at intervals nobody could predict and reading it as
+// normal. A deployment with no secret configured must be a startup failure, not
+// a slow leak of usability.
+//
+// So: required, and it fails LOUDLY. The one concession is the in-process demo
+// (`DEMO_DB` / no `DATABASE_URL`), which gets a fixed, obviously-named
+// development value — fixed rather than random precisely so a dev server
+// restart does not sign people out. It is checked here rather than imported
+// from `lib/db` on purpose: this module is pure crypto with no database, which
+// is what lets middleware and the edge use it.
+const DEMO_SECRET = "cluster-demo-portal-secret-NOT-FOR-PRODUCTION";
+
+function isDemo(): boolean {
+  return process.env.DEMO_DB === "1" || !process.env.DATABASE_URL;
+}
+
+export const PORTAL_SECRET_MISSING =
+  "PORTAL_SECRET is not set. It signs every brand and server portal session, "
+  + "and it may not be shared with CRON_SECRET or BOT_API_SECRET — anyone holding "
+  + "those could otherwise forge a session for any portal. Generate one with "
+  + "`openssl rand -hex 32`, set it, and redeploy.";
 
 function secret(): string {
-  const configured = process.env.PORTAL_SECRET || process.env.CRON_SECRET || process.env.BOT_API_SECRET;
+  const configured = process.env.PORTAL_SECRET?.trim();
   if (configured) return configured;
-  const holder = globalThis as SecretHolder;
-  if (!holder[SECRET_KEY]) holder[SECRET_KEY] = randomBytes(32).toString("hex");
-  return holder[SECRET_KEY]!;
+  if (isDemo()) return DEMO_SECRET;
+  throw new Error(PORTAL_SECRET_MISSING);
 }
 
 /**
