@@ -163,7 +163,9 @@ export async function pinMessage(channelId: string, messageId: string): Promise<
 
 // ===== Direct messages =====
 
-// Owner DMs (install welcome, 500-gamer unlock) go through a one-off DM channel.
+// Owner DMs (install welcome, the ladder's earning unlock) go through a one-off
+// DM channel. The number is `EARN_FLOOR` in lib/ladder.ts and is deliberately
+// not repeated here — this comment used to say "500-gamer unlock" (B1).
 /**
  * Put a gamer into a server, using the token THEY granted us.
  *

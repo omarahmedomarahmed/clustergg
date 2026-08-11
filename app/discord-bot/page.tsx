@@ -14,6 +14,7 @@ import Icon from "@/components/Icon";
 import ProductAtlas from "@/components/marketing/ProductAtlas";
 import LiveBotCard from "@/components/marketing/LiveBotCard";
 import { BotSchema, BotFaqSchema, BOT_FAQ } from "@/components/StructuredData";
+import { EARN_FLOOR } from "@/lib/ladder";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -51,7 +52,11 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
     publicServers(8).catch(() => []),
     botShowcaseSteps().catch(() => []),
   ]);
-  const threshold = Number(c["discord.unlock.threshold"]) || 500;
+  // `|| 500` was a fourth copy of the retired gate, on the PUBLIC page a server
+  // owner lands on — so the page selling "earn money from your Discord server"
+  // quoted a bar fifty times the real one whenever the setting was unset, which
+  // is its default state. The ladder decides it (B1).
+  const threshold = Number(c["discord.unlock.threshold"]) || EARN_FLOOR;
   const cfg = buildPricing(c);
   const installed = sp.installed;
   const nf = (n: number) => n.toLocaleString();

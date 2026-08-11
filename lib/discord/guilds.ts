@@ -4,6 +4,7 @@ import { uid } from "@/lib/utils";
 import { getContent } from "@/lib/cms";
 import { dmUser, getGuild, guildIconUrl } from "@/lib/discord/rest";
 import { canAct, siteUrl } from "@/lib/discord/config";
+import { EARN_FLOOR } from "@/lib/ladder";
 import { linkButton, rows } from "@/lib/discord/components";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 
@@ -14,14 +15,40 @@ import { cardRef, embedColor } from "@/lib/discord/cards";
 // is the whole reason a server owner would actively recruit for us rather than
 // passively host a bot, so the counter has to be honest and always available.
 
-export const DEFAULT_UNLOCK_THRESHOLD = 500;
-
+// ===== THE BAR IS THE LADDER'S BAR. B1 =====
+//
+// This was `DEFAULT_UNLOCK_THRESHOLD = 500`, and it survived the consolidation
+// that `lib/ladder.ts` was written to perform — that file names the four
+// modules it merged and this was a fifth, missed because it is a lone constant
+// rather than a list and is not spelled `threshold:`.
+//
+// It was not inert. It decided:
+//
+//   * what the BOT tells an owner — "0 / 500 members have joined Cluster and
+//     linked a game account", on the one screen an owner actually reads, while
+//     /servers and /pool both say the bar is 10;
+//   * when `checkUnlock` flips `ad_unlocked_at`, which gates `adEligibleGuilds`
+//     (sponsor posts) and the `unlockedServers` count a BRAND is shown.
+//
+// And it contradicted the money. `lib/week-standing.ts` scores the weekly pool
+// only on entrants to PUBLIC challenges, so a server that reaches rung 1 at ten
+// linked members is told by /servers that it "switches on" — while this number
+// kept it out of the brand-facing count and the sponsor posts for another 490
+// members.
+//
+// There is one bar, it lives in `lib/ladder.ts`, and it is `EARN_FLOOR`.
+//
+// The operator override survives because it is a real control, exposed in
+// Admin → Content as "Linked gamers required to unlock monetization". Note that
+// it is itself a second source of truth by construction: an operator who sets
+// it moves this gate away from the ladder without moving the ladder. That is a
+// product decision rather than a defect, and it is flagged rather than removed.
 export async function unlockThreshold(): Promise<number> {
   try {
     const c = await getContent(["discord.unlock.threshold"]);
     const n = Number(c["discord.unlock.threshold"]);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_UNLOCK_THRESHOLD;
-  } catch { return DEFAULT_UNLOCK_THRESHOLD; }
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : EARN_FLOOR;
+  } catch { return EARN_FLOOR; }
 }
 
 export type GuildRow = typeof schema.discordGuilds.$inferSelect;
