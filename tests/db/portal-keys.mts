@@ -39,6 +39,7 @@ const ok = (name: string, cond: boolean, detail = "") => {
 const eq = <T,>(name: string, got: T, want: T) =>
   ok(name, got === want, `got ${String(got)}, want ${String(want)}`);
 const at = (p: string) => new URL(`../../${p}`, import.meta.url);
+const read = (p: string) => readFileSync(at(p), "utf8");
 /** Source with comments stripped — every file here explains the hole it closed. */
 const code = (p: string) => readFileSync(at(p), "utf8")
   .replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l)).join("\n");
@@ -139,6 +140,37 @@ console.log("== boot runs the rotation ==");
 {
   const src = code("lib/db/index.ts");
   ok("ensureProvisioned calls rotateDemoKeys", /rotateDemoKeys\(db\)/.test(src));
+}
+
+console.log("== and generating a key does not drag the server runtime into a client bundle ==");
+{
+  // THIS IS A BUILD FAILURE THE TYPE CHECKER CANNOT SEE, and it happened.
+  //
+  // Rotating on boot put key generation into lib/db/index.ts, which is
+  // reachable from a client component:
+  //
+  //   components/VerifyAccount.tsx → lib/account-ownership.ts
+  //     → lib/db/index.ts → lib/demo-keys.ts → lib/portal-auth.ts → next/headers
+  //
+  // `npx tsc --noEmit` was green and `next build` failed, which is exactly what
+  // docs/SETUP.md says the build step is for. The generators moved to a leaf
+  // module so the chain is cut at its source.
+  //
+  // Asserted here as well as by the build because a build failure is a wall of
+  // webpack output that names a component, and this names the rule.
+  const keys = read("lib/keys.ts");
+  const imports = [...keys.matchAll(/^\s*import[^;]*from\s+"([^"]+)"/gm)].map((m) => m[1]);
+  eq("lib/keys.ts imports exactly one thing", imports.length, 1);
+  eq("…and it is node's crypto", imports[0], "crypto");
+
+  for (const p of ["lib/demo-keys.ts", "lib/db/index.ts"]) {
+    const src = read(p);
+    ok(`${p} does not import portal-auth`, !/from "@\/lib\/portal-auth"/.test(src));
+    ok(`${p} does not import next/headers`, !/from "next\/headers"/.test(src));
+  }
+  // The re-exports have to still be there, or every existing call site broke.
+  ok("portal-auth still exports newPortalKey", /export \{ newPortalKey \} from "@\/lib\/keys"/.test(read("lib/portal-auth.ts")));
+  ok("brands still exports newAccessKey", /export \{ newAccessKey \} from "@\/lib\/keys"/.test(read("lib/brands.ts")));
 }
 
 console.log(`\n${pass} passed, ${fails.length} failed`);

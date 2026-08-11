@@ -1,8 +1,9 @@
 import { eq, like, or, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { newPortalKey } from "@/lib/portal-auth";
-import { newAccessKey } from "@/lib/brands";
+// From the leaf module, never from portal-auth/brands: this file is reachable
+// from lib/db/index.ts, which is reachable from a client component.
+import { newAccessKey, newPortalKey } from "@/lib/keys";
 
 // A PREDICTABLE CREDENTIAL IS NOT A CREDENTIAL. BR1.
 //

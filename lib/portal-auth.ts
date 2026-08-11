@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual, randomBytes } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 
 // Shared security for the key-gated portals (brands, and now Discord servers).
@@ -236,15 +236,8 @@ export function clearThrottle(kind: string, id: string): void {
   failures.delete(`${kind}:${id}`);
 }
 
-// A fresh key: short enough to paste from a DM, long enough to be unguessable
-// (32^12 ≈ 2^60), and free of characters that get misread.
-export function newPortalKey(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  const bytes = randomBytes(12);
-  let out = "";
-  for (let i = 0; i < 12; i++) {
-    out += alphabet[bytes[i] % alphabet.length];
-    if (i === 3 || i === 7) out += "-";
-  }
-  return out;
-}
+// Moved to `lib/keys.ts`, re-exported here so every call site is unchanged.
+// This module imports `next/headers`, so anything that generates a key had to
+// drag that into its bundle — which is how the boot-time key rotation reached a
+// client component and failed the build. See the note in lib/keys.ts.
+export { newPortalKey } from "@/lib/keys";

@@ -1,14 +1,10 @@
-import { randomBytes } from "crypto";
 import { and, desc, eq, gte, inArray, sql, isNull} from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import { schema } from "@/lib/db";
 
-// A short, human-typable brand access key (portal gate). Not a secret token in
-// the cryptographic sense — it just gates a read-mostly analytics dashboard.
-export function newAccessKey(): string {
-  const raw = randomBytes(9).toString("base64url").replace(/[-_]/g, "").toUpperCase().slice(0, 12);
-  return `CLSTR-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
-}
+// Moved to `lib/keys.ts`, re-exported here so every call site is unchanged.
+// This module imports the database; a leaf module cannot. See lib/keys.ts.
+export { newAccessKey } from "@/lib/keys";
 
 // ===== The card campaign =====
 //
