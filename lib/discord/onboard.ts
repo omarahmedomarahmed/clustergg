@@ -4,7 +4,8 @@ import { allGuideTopics } from "@/lib/cards/guides";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { frame, navButton, linkButton, rows } from "@/lib/discord/components";
 import { ButtonStyle } from "@/lib/discord/types";
-import { upsertGuild, getGuildRow, unlockThreshold } from "@/lib/discord/guilds";
+import { upsertGuild, getGuildRow } from "@/lib/discord/guilds";
+import { EARN_FLOOR } from "@/lib/ladder";
 import { ensurePortal } from "@/lib/server-portal";
 import { reportToHq } from "@/lib/discord/hq";
 
@@ -111,7 +112,7 @@ export async function postGuides(channelId: string): Promise<{ posted: number; p
 }
 
 async function welcomeOwner(ownerDiscordId: string, guildId: string, channelId: string): Promise<void> {
-  const threshold = await unlockThreshold();
+  const threshold = EARN_FLOOR;
   // Their own dashboard, and the key that opens it. This is the ONLY place the
   // key is delivered, which is what makes a DM to the server owner the proof of
   // ownership — nobody else ever sees it.

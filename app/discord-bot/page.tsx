@@ -46,17 +46,17 @@ export default async function DiscordBotPage({ searchParams }: { searchParams: P
   const ready = discordConfigured() && !!url;
 
   const [c, network, servers, steps] = await Promise.all([
-    getContent(["discord.hero.title", "discord.hero.subtitle", "discord.unlock.threshold", ...PRICING_NUMBER_KEYS])
+    getContent(["discord.hero.title", "discord.hero.subtitle", ...PRICING_NUMBER_KEYS])
       .catch(() => ({} as Record<string, string>)),
     networkStats().catch(() => ({ servers: 0, reach: 0, linked: 0, challenges: 0, games: 0 })),
     publicServers(8).catch(() => []),
     botShowcaseSteps().catch(() => []),
   ]);
-  // `|| 500` was a fourth copy of the retired gate, on the PUBLIC page a server
-  // owner lands on — so the page selling "earn money from your Discord server"
-  // quoted a bar fifty times the real one whenever the setting was unset, which
-  // is its default state. The ladder decides it (B1).
-  const threshold = Number(c["discord.unlock.threshold"]) || EARN_FLOOR;
+  // The ladder, not a CMS key with a hardcoded fallback. This read
+  // `Number(c["discord.unlock.threshold"]) || 500`, so the PUBLIC page selling
+  // "earn money from your Discord server" quoted a bar fifty times the real one
+  // whenever that setting was unset — which is its default state (B1).
+  const threshold = EARN_FLOOR;
   const cfg = buildPricing(c);
   const installed = sp.installed;
   const nf = (n: number) => n.toLocaleString();

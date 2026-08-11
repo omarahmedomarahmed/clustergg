@@ -15,41 +15,28 @@ import { cardRef, embedColor } from "@/lib/discord/cards";
 // is the whole reason a server owner would actively recruit for us rather than
 // passively host a bot, so the counter has to be honest and always available.
 
-// ===== THE BAR IS THE LADDER'S BAR. B1 =====
+// ===== THE BAR IS THE LADDER'S BAR, AND THERE IS NO SECOND OPINION. B1 =====
 //
-// This was `DEFAULT_UNLOCK_THRESHOLD = 500`, and it survived the consolidation
-// that `lib/ladder.ts` was written to perform — that file names the four
-// modules it merged and this was a fifth, missed because it is a lone constant
-// rather than a list and is not spelled `threshold:`.
+// There used to be `DEFAULT_UNLOCK_THRESHOLD = 500` and an `unlockThreshold()`
+// that let a CMS setting override it. Both are gone.
 //
-// It was not inert. It decided:
+// The constant survived the consolidation `lib/ladder.ts` was written to
+// perform — that file names the four modules it merged, and this was a fifth,
+// missed because it is a lone constant rather than a list. It was not inert: it
+// decided what the bot told an owner ("0 / 500 members"), while /servers and
+// /pool both said the bar was 10, and it gated the `unlockedServers` count a
+// BRAND is shown.
 //
-//   * what the BOT tells an owner — "0 / 500 members have joined Cluster and
-//     linked a game account", on the one screen an owner actually reads, while
-//     /servers and /pool both say the bar is 10;
-//   * when `checkUnlock` flips `ad_unlocked_at`, which gates `adEligibleGuilds`
-//     (sponsor posts) and the `unlockedServers` count a BRAND is shown.
+// The OVERRIDE went with it, and that is the less obvious half. A setting named
+// "Linked gamers required to unlock monetization" is a second source of truth by
+// construction: an operator who moves it moves this gate away from the ladder
+// without moving the ladder, and every surface that reads `EARN_FLOOR` directly
+// — /servers, /pool, the weekly close, the payout-hold clock — would carry on
+// saying 10. That is precisely the drift that produced five disagreeing lists in
+// the first place, rebuilt as a feature and handed to an operator.
 //
-// And it contradicted the money. `lib/week-standing.ts` scores the weekly pool
-// only on entrants to PUBLIC challenges, so a server that reaches rung 1 at ten
-// linked members is told by /servers that it "switches on" — while this number
-// kept it out of the brand-facing count and the sponsor posts for another 490
-// members.
-//
-// There is one bar, it lives in `lib/ladder.ts`, and it is `EARN_FLOOR`.
-//
-// The operator override survives because it is a real control, exposed in
-// Admin → Content as "Linked gamers required to unlock monetization". Note that
-// it is itself a second source of truth by construction: an operator who sets
-// it moves this gate away from the ladder without moving the ladder. That is a
-// product decision rather than a defect, and it is flagged rather than removed.
-export async function unlockThreshold(): Promise<number> {
-  try {
-    const c = await getContent(["discord.unlock.threshold"]);
-    const n = Number(c["discord.unlock.threshold"]);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : EARN_FLOOR;
-  } catch { return EARN_FLOOR; }
-}
+// So: one array, one number, no override. Changing the bar is a code change to
+// `lib/ladder.ts`, which is the only thing that makes "one ladder" true.
 
 export type GuildRow = typeof schema.discordGuilds.$inferSelect;
 
@@ -204,15 +191,15 @@ export type GuildStats = {
 export async function guildStats(guildId: string): Promise<GuildStats | null> {
   try {
     const db = await getDb();
-    const [row, counts, threshold] = await Promise.all([
+    const [row, counts] = await Promise.all([
       getGuildRow(guildId),
       db.select({
         joined: sql<number>`count(*)`,
         linked: sql<number>`count(${schema.discordGuildMembers.firstLinkedAt})`,
         left: sql<number>`count(${schema.discordGuildMembers.leftAt})`,
       }).from(schema.discordGuildMembers).where(eq(schema.discordGuildMembers.guildId, guildId)),
-      unlockThreshold(),
     ]);
+    const threshold = EARN_FLOOR;
 
     const joined = Number(counts[0]?.joined ?? 0);
     const linked = Number(counts[0]?.linked ?? 0);

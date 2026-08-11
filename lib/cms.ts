@@ -47,10 +47,22 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
     "A gamer might open TikTok. They might watch a tournament. But before and after both, they're on Discord — it's where the squad is and where the next match gets organised.\n\n"
     + "Every other audience this size has a Business Suite, targeting and a self-serve buy. Discord has none of it. That's not a gap in a media plan; it's the whole gaming audience behind a door with no handle.\n\n"
     + "Cluster is the handle.",
-  "brand.insight.stat": "100%",
-  "brand.insight.statLabel": "of gamers are on Discord",
-  "brand.insight.stat2": "0",
-  "brand.insight.stat2Label": "ads managers to buy it with",
+  // ===== NO FABRICATED MARKET STATISTIC =====
+  //
+  // This said "100% — of gamers are on Discord". That is not true, it is not
+  // sourced, and it is the first number a media buyer or an investor checks. A
+  // claim that cannot survive one question costs more than it buys, and it sat
+  // directly above copy asking somebody to trust our counting.
+  //
+  // Both numbers are now about the thing we can actually stand behind: there is
+  // no way to buy this audience, and half of what a brand pays leaves as prize
+  // money. The second is enforced by `lib/pricing.ts` rather than asserted here
+  // — see `prizeSharePct` — so the words say "half" and the page shows the
+  // computed figure.
+  "brand.insight.stat": "0",
+  "brand.insight.statLabel": "ads managers for Discord",
+  "brand.insight.stat2": "1",
+  "brand.insight.stat2Label": "way in — a competition they already wanted to enter",
 
   "brand.solution.title": "How to advertise on Discord, without asking anyone.",
   "brand.solution.subtitle":
@@ -70,7 +82,9 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
     + "Owners earn | A weekly pool, shared between the servers that carried a challenge. No sales team, no admin.\n"
     + "Cluster runs it | The bot posts it, scores it, announces it and pays out. Nobody operates anything.",
 
-  "brand.prize.title": "Most of it isn't ad spend. It's prize money.",
+  // Said "Most of it isn't ad spend" directly above a body saying "Half of what
+  // you pay". Half is not most, and the two lines are read together.
+  "brand.prize.title": "Half of it isn't ad spend. It's prize money.",
   "brand.prize.body":
     "Half of what you pay goes to the players as prizes, on trophies carrying your logo. No setup fee, no admin fee, no agency. That's why the rest buys reach instead of overhead.",
 
@@ -93,7 +107,11 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // never quote a figure the product isn't using.
   "discord.hero.title": "Earn money from your Discord server.",
   "discord.hero.subtitle":
-    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Carry a challenge and you compete for the weekly pool with the servers your size — {threshold} linked gamers moves you up a bracket. Free forever, and it never reads a message.",
+    // `{threshold}` is EARN_FLOOR, and this sentence used to say it "moves you up a
+  // bracket". It does not: it is the bar where a server STARTS earning at all,
+  // and the brackets above it are separate rungs. Told an owner the wrong thing
+  // about the only number on the page they care about.
+    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Carry a challenge and you share the weekly pool with the servers your size — {threshold} linked gamers is where a server starts earning. Free forever, and it never reads a message.",
 
   // ===== The gamer-facing hero (still the entry point for players) =====
   "hero.badge": "Live stats from the games you already play",
@@ -105,7 +123,11 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "hero.cta.secondary": "Explore leaderboards",
   "hero.image": "/assets/hero.png",
   "hero.banner.label": "The Cluster galaxy",
-  "hero.banner.note": "Six worlds, one weekly challenge each. Tap a game to open its planet.",
+  // COUNTS NOTHING. It said "Six worlds, one weekly challenge each" while the
+  // product ran fourteen games, and a hardcoded count in a CMS string is a count
+  // that is wrong the day somebody adds a game. The strip beside it lists the
+  // worlds; it does not need to be told how many there are.
+  "hero.banner.note": "Every world we run, each with its own weekly challenge. Tap a game to open its planet.",
   "section.challenges.title": "Live Challenges",
   "section.challenges.subtitle": "Join, play the game you were going to play, watch the board move. One account, as many as you like.",
   "section.games.title": "The Game Galaxy",
