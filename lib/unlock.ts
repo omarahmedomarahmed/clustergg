@@ -74,9 +74,53 @@ export type UnlockState = {
   achieved: string[];
 };
 
-const UNLOCKED: UnlockState = {
-  unlocked: true, unlockedAt: null, steps: [], heldCp: 0, achieved: [],
-};
+/**
+ * The finished state. G1.
+ *
+ * ===== `steps` USED TO BE `[]`, AND THAT WAS THE BUG =====
+ *
+ * `unlockedAt` is set only when all three steps are done, and it is never
+ * unset — so an unlocked account has, by definition, done all three. Returning
+ * an empty list said the opposite to every surface that reads the list rather
+ * than the boolean, and three of them do:
+ *
+ *   app/onboarding/page.tsx   `done={!!step("link")?.done}` — `step()` finds
+ *                             nothing in an empty array, so `done` is false for
+ *                             ALL THREE. The page rendered a finished gamer the
+ *                             whole of onboarding again: a live "we sent a
+ *                             six-digit code" form for an address they had
+ *                             already confirmed, and a live age selector on an
+ *                             account whose age is answered ONCE and which they
+ *                             are told they cannot change themselves. The hero
+ *                             above it said "Everything is on. Go and win
+ *                             something." at the same time.
+ *   lib/discord/screens.ts    the unlock card counts `steps.filter(done)` and
+ *                             lists them — zero and empty.
+ *   components/OnboardingBar  `total = steps.length` — zero, and `done/total`
+ *                             is NaN.
+ *
+ * The symptom looked exactly like a state regression, because it appears the
+ * instant the LAST step completes: finish onboarding by linking an account and
+ * the page you are standing on redraws as though you had done nothing. It
+ * survives a reload too, which is what makes it read as lost data — but a
+ * server-rendered page renders the same wrong thing every time, so surviving a
+ * reload proves only that the render is deterministic.
+ *
+ * Nothing was ever lost. `email_verified_at`, `age_band` and `country` are all
+ * intact throughout; only the description of them was empty.
+ *
+ * A FUNCTION, not a shared constant: `stepsFor` builds a fresh array, and
+ * handing every caller the same array is how one of them eventually mutates it
+ * for everybody. It stays free — no extra query, because the answer is implied
+ * by `unlockedAt` alone, which is the whole reason for the early return.
+ */
+const unlockedState = (): UnlockState => ({
+  unlocked: true,
+  unlockedAt: null,
+  steps: stepsFor({ linked: true, email: true, profile: true }),
+  heldCp: 0,
+  achieved: [],
+});
 
 /**
  * Has this gamer customized anything?
@@ -161,7 +205,7 @@ export const UNLOCK_STEPS =
 /**
  * Where this gamer stands.
  *
- * Returns `UNLOCKED` for anybody with `unlockedAt` set, without doing any
+ * Returns the finished state for anybody with `unlockedAt` set, without doing any
  * further work — which is every existing account, and every account that has
  * finished. The expensive half of this function only runs for the small set of
  * people it is actually about.
@@ -178,8 +222,8 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
       title: schema.users.title,
       theme: schema.users.theme,
     }).from(schema.users).where(eq(schema.users.id, userId)).limit(1);
-    if (!u) return UNLOCKED;
-    if (u.unlockedAt) return { ...UNLOCKED, unlockedAt: u.unlockedAt };
+    if (!u) return unlockedState();
+    if (u.unlockedAt) return { ...unlockedState(), unlockedAt: u.unlockedAt };
 
     const [linkRow] = await db.select({ n: sql<number>`count(*)` })
       .from(schema.linkedGameAccounts)
@@ -213,7 +257,7 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
       await db.update(schema.users)
         .set({ unlockedAt: now })
         .where(and(eq(schema.users.id, userId), sql`${schema.users.unlockedAt} is null`));
-      return { ...UNLOCKED, unlockedAt: now };
+      return { ...unlockedState(), unlockedAt: now };
     }
 
     const [cp] = await db.select({ n: sql<number>`coalesce(sum(${schema.questEvents.cpAwarded}), 0)` })
@@ -228,7 +272,7 @@ export async function unlockState(db: DB, userId: string): Promise<UnlockState> 
     };
   } catch {
     // A read that fails must not lock somebody out of their own balance.
-    return UNLOCKED;
+    return unlockedState();
   }
 }
 
@@ -255,7 +299,7 @@ export async function tryUnlock(db: DB, userId: string): Promise<UnlockState> {
     "You confirmed your email",
     "You told us your age and where you are",
   ];
-  return { ...UNLOCKED, unlockedAt: now, achieved };
+  return { ...unlockedState(), unlockedAt: now, achieved };
 }
 
 /** Every gamer who has not finished. Admin only — never a brand-facing count. */
