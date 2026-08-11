@@ -15,7 +15,11 @@ export function resolveGame<T extends { name: string; slug?: string }>(games: T[
   // 2) one name is a prefix of the other (handles ": Battlegrounds" suffixes)
   if (!g) g = games.find((x) => { const n = norm(x.name); return n.length >= 3 && (t.startsWith(n) || n.startsWith(t)); });
   // 3) slug match
-  if (!g) g = games.find((x) => x.slug && x.slug === slugify(gameName));
+  // Guarded on a non-empty slug: `slugify` can now return "" for a name with
+  // no Latin transliteration, and `x.slug === ""` would match nothing useful
+  // while `"" === ""` would match the wrong row if one ever had an empty slug.
+  const wanted = slugify(gameName);
+  if (!g && wanted) g = games.find((x) => x.slug && x.slug === wanted);
   return g;
 }
 

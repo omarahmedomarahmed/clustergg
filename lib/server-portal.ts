@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
-import { uid, slugify } from "@/lib/utils";
+import { uid, slugifyOr } from "@/lib/utils";
 import { hashSession } from "@/lib/ads";
 import { newPortalKey } from "@/lib/portal-auth";
 import { guildStats, type GuildStats } from "@/lib/discord/guilds";
@@ -79,7 +79,14 @@ export async function ensurePortal(guildId: string): Promise<{ slug: string; key
     if (!row) return null;
     if (row.slug && row.portalKey) return { slug: row.slug, key: row.portalKey };
 
-    let slug = row.slug ?? (slugify(row.name || "") || `server-${guildId.slice(-6)}`);
+    // `slugifyOr`, and the fallback says SERVER. This read
+    // `slugify(name) || \`server-…\`` — which looked like a per-domain default
+    // and was dead code, because slugify never returned empty: it returned the
+    // word "gamer". So a Discord server whose name we did not have, or whose
+    // name was written in a script the old slugify stripped to nothing, was
+    // published at /servers/gamer — and the first one to install took the bare
+    // slug permanently (S1/S2).
+    let slug = row.slug ?? slugifyOr(row.name || "", `server-${guildId.slice(-6)}`);
     if (!row.slug) {
       const [taken] = await db.select({ guildId: schema.discordGuilds.guildId })
         .from(schema.discordGuilds).where(eq(schema.discordGuilds.slug, slug)).limit(1);

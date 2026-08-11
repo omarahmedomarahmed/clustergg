@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { createSession, destroySession, hashPassword, verifyPassword } from "@/lib/auth";
-import { slugify, uid } from "@/lib/utils";
+import { slugifyOr, uid } from "@/lib/utils";
 
 /**
  * The address a signup came from. B80.
@@ -49,7 +49,10 @@ export async function register(_prev: FormState, formData: FormData): Promise<Fo
     if (await isSignupBlocked(db, { email })) return { error: BLOCKED_SIGNUP_MESSAGE };
   }
 
-  let slug = slugify(displayName);
+  // A display name in a script with no Latin transliteration (Han, Kana,
+  // Hangul, Thai, emoji) now yields an empty slug rather than the word
+  // "gamer", so the fallback has to be here — see lib/utils.ts (S1/S2).
+  let slug = slugifyOr(displayName, `gamer-${uid().slice(0, 6).toLowerCase()}`);
   const [slugTaken] = await db.select({ id: schema.users.id }).from(schema.users)
     .where(eq(schema.users.slug, slug)).limit(1);
   if (slugTaken) slug = `${slug}-${uid().slice(0, 4).toLowerCase()}`;
