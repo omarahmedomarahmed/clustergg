@@ -157,6 +157,92 @@ console.log("\n== nothing declares a second ladder ==");
   }
   ok("no other module writes its own list of server sizes", offenders.length === 0,
     offenders.join(" · "));
+
+  // ===== AND NOTHING DECLARES A SINGLE ONE EITHER (B1) =====
+  //
+  // The check above looks for TWO OR MORE `threshold: <number>` literals in one
+  // file, on the reasoning that a size LIST is what went wrong before. That is
+  // exactly why `DEFAULT_UNLOCK_THRESHOLD = 500` in lib/discord/guilds.ts sat
+  // there through the whole consolidation: it is one number, not a list, and it
+  // is not spelled `threshold:`.
+  //
+  // It was not harmless. It is the number the BOT quotes to server owners —
+  // "0 / 500 members have joined Cluster and linked a game account", on the one
+  // screen an owner reads — while /servers, /pool and the ladder all say the
+  // bar is 10. And it is a live gate: `checkUnlock` flips a server to
+  // ad-eligible on it, and `networkReach` counts eligible servers by it.
+  //
+  // So the rule is the strong form: any identifier that NAMES a member
+  // threshold, bound to a number, outside lib/ladder.ts. A single constant is
+  // caught, whatever it is called and however it is spelled.
+  const NAMES = /\b([A-Z][A-Z0-9_]*(?:THRESHOLD|FLOOR|UNLOCK|MIN_MEMBERS)[A-Z0-9_]*)\s*(?::\s*number\s*)?=\s*(\d+)/g;
+
+  // Constants that match the pattern and are NOT a member threshold. Each was
+  // read before it was listed, and each carries the reason.
+  //
+  // An allowlist rather than a narrower regex, deliberately. Narrowing the
+  // pattern until these five stopped matching would also stop it matching the
+  // next `SOMETHING_FLOOR = 500` about linked members, which is the whole thing
+  // being guarded. This fails CLOSED: anything new has to be looked at and
+  // named here, and the existence check below deletes entries that go stale.
+  const NOT_A_MEMBER_BAR: Record<string, string> = {
+    "lib/daily-ceiling.ts:CEILING_FLOOR": "CP per gamer per day, not members",
+    "lib/discord/audience.ts:BATCH_FLOOR": "how many suppressed events are worth one message",
+    "lib/eligibility.ts:US_REPORT_THRESHOLD": "dollars of earnings that trigger tax reporting",
+    "lib/segments.ts:COHORT_FLOOR": "the k-anonymity floor — never describe a group under 25 people",
+    // The one genuinely about linked members, and still not this bar: it decides
+    // what a passer-by may READ off a public page, not who earns. Its own
+    // comment says the two 'happen to agree today' and move for different
+    // reasons, which is exactly the argument for keeping them separate.
+    "lib/server-public.ts:PUBLIC_FLOOR": "privacy floor for printing a server's linked count",
+  };
+
+  // Known, named and TEMPORARY. `DEFAULT_UNLOCK_THRESHOLD` is a live gate on
+  // who may carry a sponsored challenge, so moving it to EARN_FLOOR changes who
+  // earns — a product decision, not a refactor, and it is with the owner.
+  // Measured against production first: 15 active servers, the largest holding 2
+  // linked members, so the change moves the eligible count by ZERO today. This
+  // entry must be DELETED when the decision lands, and this test fails if the
+  // constant is removed while the entry remains — an allowance that outlives
+  // its subject is how the last one survived.
+  const PENDING: Record<string, string> = {
+    "lib/discord/guilds.ts": "DEFAULT_UNLOCK_THRESHOLD",
+  };
+
+  const found = new Map<string, string[]>();
+  for (const file of [...walk("lib"), ...walk("components"), ...walk("app")]) {
+    if (ALLOWED.has(file)) continue;
+    const src = read(file)
+      .replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l)).join("\n");
+    const hits = [...src.matchAll(NAMES)].map((m) => `${m[1]}=${m[2]}`);
+    if (hits.length) found.set(file, hits);
+  }
+
+  const unexpected: string[] = [];
+  const seen = new Set<string>();
+  for (const [file, hits] of found) {
+    for (const hit of hits) {
+      const name = hit.split("=")[0];
+      seen.add(`${file}:${name}`);
+      if (PENDING[file] === name) continue;
+      if (`${file}:${name}` in NOT_A_MEMBER_BAR) continue;
+      unexpected.push(`${file}: ${hit}`);
+    }
+  }
+  ok("no module binds a member threshold to a number of its own", unexpected.length === 0,
+    unexpected.join(" · "));
+
+  // Both lists expire with their subjects. An allowance that outlives the thing
+  // it excused is how `DEFAULT_UNLOCK_THRESHOLD` survived the consolidation
+  // that was supposed to delete it.
+  for (const key of Object.keys(NOT_A_MEMBER_BAR)) {
+    ok(`the allowance for ${key.split(":")[1]} still describes something real`, seen.has(key),
+      `${key} is gone — delete its NOT_A_MEMBER_BAR entry in this file`);
+  }
+  for (const [file, name] of Object.entries(PENDING)) {
+    ok(`the pending exception for ${name} still describes something real`, seen.has(`${file}:${name}`),
+      `${name} is gone from ${file} — delete its PENDING entry in this file`);
+  }
 }
 
 console.log("\n== the surfaces read it rather than retyping it ==");

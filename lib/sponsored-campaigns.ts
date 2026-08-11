@@ -3,7 +3,7 @@ import { getDb, schema } from "@/lib/db";
 import { uid } from "@/lib/utils";
 import { PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing";
 import { parseCommunity } from "@/lib/discord/community";
-import { DEFAULT_UNLOCK_THRESHOLD } from "@/lib/discord/guilds";
+import { unlockThreshold } from "@/lib/discord/guilds";
 
 // Buying a month of sponsored challenges.
 //
@@ -178,7 +178,16 @@ export async function networkReach(): Promise<NetworkReach> {
   const empty: NetworkReach = { servers: 0, unlockedServers: 0, gamers: 0, byGame: [] };
   try {
     const db = await getDb();
-    const [guilds, counts, games, accounts] = await Promise.all([
+    // THE SAME THRESHOLD THE REST OF THE PRODUCT USES.
+    //
+    // This read `DEFAULT_UNLOCK_THRESHOLD` directly, while `guildStats` and
+    // `checkUnlock` both go through `unlockThreshold()` — which honours the
+    // operator's `discord.unlock.threshold` setting. So lowering that setting
+    // moved the bar for the bot's growth card and for the flip that sets
+    // `ad_unlocked_at`, and did NOT move it here: a server could be unlocked
+    // everywhere an owner can see and still be missing from the eligible count
+    // a brand is quoted. One number, one source.
+    const [guilds, counts, games, accounts, threshold] = await Promise.all([
       db.select({
         guildId: schema.discordGuilds.guildId,
         community: schema.discordGuilds.community,
@@ -196,6 +205,7 @@ export async function networkReach(): Promise<NetworkReach> {
       // is what an account records; the provider registry maps it to the game.
       db.select({ provider: schema.linkedGameAccounts.provider, n: sql<number>`count(distinct ${schema.linkedGameAccounts.userId})` })
         .from(schema.linkedGameAccounts).groupBy(schema.linkedGameAccounts.provider),
+      unlockThreshold(),
     ]);
 
     const linkedBy = new Map(counts.map((c) => [c.guildId, Number(c.linked ?? 0)]));
@@ -230,7 +240,7 @@ export async function networkReach(): Promise<NetworkReach> {
     for (const guild of guilds) {
       const profile = parseCommunity(guild.community);
       const linked = linkedBy.get(guild.guildId) ?? 0;
-      const unlocked = !!guild.unlockedAt || linked >= DEFAULT_UNLOCK_THRESHOLD;
+      const unlocked = !!guild.unlockedAt || linked >= threshold;
       gamers += linked;
       if (unlocked) unlockedServers++;
 
