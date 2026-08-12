@@ -139,5 +139,19 @@ console.log("== and nothing quotes the retired ladder ==");
     bad.length === 0, bad.map(([k]) => k).join(", "));
 }
 
+console.log("== the retire-prepivot script can still read every default it names ==");
+{
+  // The script deletes production rows so those keys fall through to
+  // CONTENT_DEFAULTS. If a key it names is renamed or removed from cms.ts, the
+  // script silently skips it — and the stale copy stays live with nobody told.
+  const script = readFileSync(new URL("../../scripts/retire-prepivot-copy.mjs", import.meta.url), "utf8");
+  const block = script.slice(script.indexOf("const KEYS = ["), script.indexOf("];", script.indexOf("const KEYS = [")));
+  const keys = [...block.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  ok("the script names some keys", keys.length > 0, String(keys.length));
+  const orphans = keys.filter((k) => typeof CONTENT_DEFAULTS[k] !== "string");
+  ok("…and every one of them has a default to fall through to", orphans.length === 0,
+    `${orphans.join(", ")} — the script would skip these and leave the stale copy live`);
+}
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { for (const f of fails) console.log(`  - ${f}`); process.exit(1); }
