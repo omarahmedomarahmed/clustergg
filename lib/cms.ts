@@ -78,7 +78,7 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
     "Brands spend, gamers play, owners earn. No side works without the other two, which is what makes it run without us.",
   "brand.loop.items":
     "Brands buy | A month of challenges on a published rate card, with the reach stated before you spend.\n"
-    + "Gamers play | One verified account, as many challenges as they like, a trophy that stays on their profile.\n"
+    + "Gamers play | One account, synced from the game's own API, as many challenges as they like, a trophy that stays on their profile.\n"
     + "Owners earn | A weekly pool, shared between the servers that carried a challenge. No sales team, no admin.\n"
     + "Cluster runs it | The bot posts it, scores it, announces it and pays out. Nobody operates anything.",
 
@@ -140,7 +140,17 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "section.games.title": "The Game Galaxy",
   "section.games.subtitle": "Every world we run — each with its own weekly challenge, leaderboards and community.",
   "section.leaderboards.title": "Leaderboards",
-  "section.leaderboards.subtitle": "Live standings from verified, API-synced accounts.",
+  // "verified" was the wrong word, and it is our own word. `lib/account-ownership.ts`
+  // reserves it for PROVEN OWNERSHIP — linking an account writes
+  // `verified: false, verifiedMethod: "exists"`, and the profile renders that as
+  // "Account exists — ownership not proven". Production holds ten linked accounts
+  // and zero verified ones, so this line claimed something the product's own
+  // profile page contradicts on every account it has.
+  //
+  // What is true is the stronger half of the sentence anyway: the numbers are
+  // read from each game's official API and nothing is self-reported. That is the
+  // actual differentiator, and it does not need a word we cannot back.
+  "section.leaderboards.subtitle": "Live standings read from each game's own API. Nothing self-reported.",
   "section.badges.title": "Badges forged in the void",
   "section.badges.subtitle": "Earned from linked accounts, rank thresholds, community reputation and challenge placements. The criteria are code.",
   "section.partners.title": "Trusted by",

@@ -36,9 +36,29 @@ export type NewRequest = {
 
 export type SubmitResult =
   | { ok: true; id: string }
-  | { ok: false; reason: "no_game" | "no_title" | "unknown_game" | "too_many_pending" | "error" };
+  | { ok: false; reason: "no_game" | "no_title" | "unknown_game" | "too_many_pending" | "bad_days" | "bad_prize" | "error" };
 
 const MAX_PENDING_PER_GUILD = 3;
+
+// ===== A REQUEST WITH NONSENSE IN IT USED TO ANSWER "REQUEST SENT". B9. =====
+//
+// `days: 999999` and `prize: -50` were both accepted. Not stored as typed —
+// `clampDays` quietly rewrote 999999 to 90, and `Math.max(0, …)` turned -50
+// into 0 — and that is the actual problem. The owner was told their request
+// was sent, and what got sent was something they never asked for. They find
+// out when staff approve a 90-day challenge they meant to run for a week.
+//
+// So these reject, with named reasons, while the owner is still looking at the
+// modal and can retype the number. Silently correcting somebody's input is only
+// kind when they can see the correction.
+export const REQUEST_MIN_DAYS = 1;
+export const REQUEST_MAX_DAYS = 28;
+
+// A ceiling on prize money exists because this number flows into a staff review
+// queue and then into a real payout. A slipped keypress on "1000" is "10000",
+// and the difference between catching that here and catching it at approval is
+// whether a human has to notice.
+export const REQUEST_MAX_PRIZE = 100_000;
 
 export async function submitChallengeRequest(input: NewRequest): Promise<SubmitResult> {
   const title = (input.title ?? "").trim();
@@ -50,6 +70,17 @@ export async function submitChallengeRequest(input: NewRequest): Promise<SubmitR
   // be scored and the owner would be promising something we can't deliver.
   const provider = providerForGame(game);
   if (!provider) return { ok: false, reason: "unknown_game" };
+
+  // B9. Checked before any database work: nothing about a malformed request
+  // deserves a row, and the owner gets the error while the modal is still open.
+  const days = Math.floor(Number(input.days ?? 7));
+  if (!Number.isFinite(days) || days < REQUEST_MIN_DAYS || days > REQUEST_MAX_DAYS) {
+    return { ok: false, reason: "bad_days" };
+  }
+  const prize = Number(input.prizeValue ?? 0);
+  if (!Number.isFinite(prize) || prize < 0 || prize > REQUEST_MAX_PRIZE) {
+    return { ok: false, reason: "bad_prize" };
+  }
 
   try {
     const db = await getDb();
@@ -73,8 +104,8 @@ export async function submitChallengeRequest(input: NewRequest): Promise<SubmitR
       description: (input.description ?? "").slice(0, 1000),
       format: ["top1", "top3", "threshold_race"].includes(input.format ?? "") ? input.format! : "top3",
       metric: input.metric ?? null,
-      days: clampDays(input.days),
-      prizeValue: Math.max(0, Math.floor(input.prizeValue ?? 0)),
+      days,
+      prizeValue: Math.floor(prize),
       prizeCurrency: (input.prizeCurrency ?? "USD").slice(0, 8).toUpperCase(),
       prizeDescription: input.prizeDescription ?? null,
       prizes: input.prizes ?? null,
@@ -83,9 +114,15 @@ export async function submitChallengeRequest(input: NewRequest): Promise<SubmitR
   } catch { return { ok: false, reason: "error" }; }
 }
 
+// The approval-side net. Submission now REJECTS an out-of-range length rather
+// than rewriting it, so nothing reaching here should be out of range — but a
+// staff override goes through this path too, and a stored row can predate the
+// check. Bounds imported, not retyped: this clamped to 90 while the modal was
+// about to start refusing anything over 28, and two numbers for one rule is how
+// they drift apart.
 function clampDays(d?: number): number {
   const n = Math.floor(Number(d ?? 7));
-  return Number.isFinite(n) ? Math.min(90, Math.max(1, n)) : 7;
+  return Number.isFinite(n) ? Math.min(REQUEST_MAX_DAYS, Math.max(REQUEST_MIN_DAYS, n)) : 7;
 }
 
 // Which provider backs a game name. Identity-only providers (Discord, Epic)

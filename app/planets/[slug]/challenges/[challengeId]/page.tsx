@@ -357,6 +357,25 @@ export default async function ChallengePage({
                     {tr("Only until this challenge starts. After that the account is locked in — otherwise anyone could play on two and keep the better score.")}
                   </p>
                 </form>
+              ) : joined ? (
+                /* ===== ONCE YOU ARE IN, THERE IS NO JOIN BUTTON. G5. =====
+
+                   Every branch below this one ends at the join form, and
+                   `joined` did not stop the fall-through: an entered gamer read
+                   "You're in — go play Chess" and was offered "Join with
+                   anishgiri" directly underneath it. Pressing it again did
+                   nothing visible, so the page contradicted itself on the one
+                   action that decides whether a week of play counts, and gave
+                   no answer either way.
+
+                   Nothing is rendered here on purpose — the green banner above,
+                   naming the account that is carrying the standing, IS the
+                   entered state. A disabled button repeating it would be a
+                   second control for something that is no longer a choice.
+                   (The one thing still worth offering an entered gamer — a
+                   switch between accounts before the start — is the branch
+                   above, which is why it is tested first.) */
+                null
               ) : myAccounts.length === 0 ? (
                 <div className="text-sm text-muted inline-flex items-center gap-2">
                   <Icon name="link" size={15} />
@@ -491,7 +510,11 @@ export default async function ChallengePage({
             <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
               <Icon name="chart" size={18} className="text-cyan-300" /> {tr("Live standings & scoring log")}
             </h2>
-            <LiveChallengeBoard challengeId={challenge.id} />
+            {/* The viewer's slug, so the board can mark their row and pin it
+                when they placed outside the window it shows (G6). Public data
+                either way — this identifies which row to highlight, it does not
+                unlock anything. */}
+            <LiveChallengeBoard challengeId={challenge.id} meSlug={viewer?.slug ?? null} />
           </section>
         </div>
 

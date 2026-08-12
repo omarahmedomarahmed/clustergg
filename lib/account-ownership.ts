@@ -189,11 +189,45 @@ export async function accountHeldByOther(
   };
 }
 
-/** The message a gamer sees when the account is taken. */
-export function conflictMessage(conflict: ClaimConflict, gameName: string): string {
-  return conflict.proven
-    ? `That ${gameName} account is already verified by another gamer. If it's yours, contact support — we can move it once you prove ownership.`
-    : `That ${gameName} account is already linked to another Cluster gamer. If it's really yours, verify ownership and it moves to you.`;
+/**
+ * The message a gamer sees when the account is taken.
+ *
+ * ===== IT USED TO NAME AN ACTION THAT DOES NOT EXIST. G7. =====
+ *
+ * The unproven branch said "If it's really yours, verify ownership and it moves
+ * to you", and there was no link, button or route anywhere on the page that
+ * verified anything. Worse, for most games there could not be: the proof flow
+ * lives on a LINKED account's row, and this message is exactly the moment we
+ * refused to create that row. So the one instruction given was, for a Riot or
+ * Chess.com account, impossible in principle rather than merely missing a link.
+ *
+ * There IS a real transfer path, and it is narrower than the old sentence
+ * implied: signing in with the game's own account — Steam, Epic, Riot's own
+ * OAuth — takes the account from somebody who only typed the name
+ * (`app/api/auth/[provider]/callback`, which calls `transferClaim`). That works
+ * without a linked row, because signing in creates one.
+ *
+ * So the message now branches on whether such a sign-in exists for this game,
+ * and says the true thing in each case. `signInPath` is passed by the caller
+ * rather than built here: this module knows about ownership, not about routes.
+ */
+export function conflictMessage(
+  conflict: ClaimConflict,
+  gameName: string,
+  providerId?: string,
+): string {
+  if (conflict.proven) {
+    return `That ${gameName} account is already verified by another gamer. If it's yours, contact support — we can move it once you prove ownership.`;
+  }
+  // A sign-in we can actually offer. `wired` matters as much as `kind`: Epic
+  // OAuth exists and is declared, and the step that matches a signed-in Epic
+  // account to a Fortnite row is not built — offering it would put us straight
+  // back to naming an action that does not work.
+  const proof = providerId ? proofFor(providerId) : null;
+  const canSignIn = !!proof?.wired && /oauth|openid/.test(proof.kind);
+  return canSignIn
+    ? `That ${gameName} account is already linked to another Cluster gamer. ${proof!.label} instead and it moves to you — signing in proves it is yours, and a typed-in name doesn't.`
+    : `That ${gameName} account is already linked to another Cluster gamer, and ${gameName} gives us no way for you to prove otherwise from here. Contact support if it's really yours.`;
 }
 
 /**

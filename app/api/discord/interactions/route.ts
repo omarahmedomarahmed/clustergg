@@ -12,9 +12,9 @@ import { editOriginal, editWithError, followUp } from "@/lib/discord/reply";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 import { shareMessage } from "@/lib/discord/share";
 import { joinChallengeFor, challengeGate, keyVisibleTo, setChallengeState, entryAccounts } from "@/lib/challenges";
-import { submitChallengeRequest } from "@/lib/challenge-requests";
+import { submitChallengeRequest, REQUEST_MIN_DAYS, REQUEST_MAX_DAYS, REQUEST_MAX_PRIZE } from "@/lib/challenge-requests";
 import { linkGameAccountFor } from "@/lib/link-account";
-import { PROVIDERS, linkableProvider } from "@/lib/providers/registry";
+import { PROVIDERS, isProviderLive, linkableProvider } from "@/lib/providers/registry";
 import { logCommand, upsertGuild, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { reportToHq } from "@/lib/discord/hq";
@@ -105,7 +105,10 @@ type Who = NonNullable<ReturnType<typeof actor>>;
 function modalSubmit(i: Interaction) {
   const who = actor(i);
   const [kind, arg] = (i.data?.custom_id ?? "").split("|");
-  if (!who || !arg) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  // B11 again, and worse here than on a button: this is somebody who has TYPED
+  // something into a form and pressed Submit. Dropping that silently reads as
+  // the submission having been eaten.
+  if (!who || !arg) return staleCard();
 
   const fields = new Map(
     (i.data?.components ?? []).flatMap((row) => row.components.map((c) => [c.custom_id, c.value] as const)),
@@ -117,7 +120,7 @@ function modalSubmit(i: Interaction) {
   if (kind === "about") return aboutSubmit(i, arg, (fields.get("about") ?? "").trim());
   if (kind === "contactemail") return contactEmailSubmit(i, arg, (fields.get("email") ?? "").trim());
   if (kind === "msg") return contactSubmit(i, who, arg, (fields.get("body") ?? "").trim());
-  return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  return staleCard();
 }
 
 function linkSubmit(i: Interaction, who: Who, provider: string, fields: Map<string, string>) {
@@ -240,7 +243,18 @@ function requestSubmit(i: Interaction, who: Who, game: string, fields: Map<strin
         title: fields.get("title") ?? "",
         description: fields.get("description") ?? "",
         days: Number(fields.get("days") ?? 7),
-        prizeValue: Number((fields.get("prize") ?? "").replace(/[^0-9]/g, "")) || 0,
+        // ===== THE MINUS SIGN USED TO BE STRIPPED. B9. =====
+        //
+        // `.replace(/[^0-9]/g, "")` was meant to tolerate "$100" and "1,000",
+        // and it does — but it also turned "-50" into "50". An owner who typed
+        // a negative prize got a POSITIVE one of the same size, silently, and
+        // "Request sent."
+        //
+        // Currency symbols and separators are still stripped, because people
+        // really do type them. The sign and the digits are not: they are the
+        // number, and `submitChallengeRequest` is the thing entitled to judge
+        // it — where a bad one comes back as `bad_prize` and the owner is told.
+        prizeValue: Number((fields.get("prize") ?? "").replace(/[^0-9.-]/g, "")) || 0,
         prizeCurrency: (fields.get("currency") ?? "USD").trim() || "USD",
         requestedByDiscordId: who.id,
         requestedByUserId: ctx.gamer?.userId ?? null,
@@ -296,6 +310,11 @@ function requestFailure(reason: string): string {
     case "no_game": return "Pick a game first.";
     case "unknown_game": return "We don't sync stats for that game yet, so we couldn't score the challenge fairly.";
     case "too_many_pending": return "You already have three requests waiting on us. We'll get to them shortly.";
+    // B9. Both used to be accepted and quietly rewritten, then confirmed as
+    // "Request sent" — so the numbers say what the limits are, because the
+    // owner is about to retype one of them.
+    case "bad_days": return `Pick a length between ${REQUEST_MIN_DAYS} and ${REQUEST_MAX_DAYS} days. A week is the usual one.`;
+    case "bad_prize": return `Prize money has to be zero or more, and no higher than ${REQUEST_MAX_PRIZE.toLocaleString("en-US")}. Leave it blank for a trophies-only challenge.`;
     default: return "Couldn't send that request. Try again in a moment.";
   }
 }
@@ -387,6 +406,30 @@ function command(i: Interaction) {
 
 // ===== Buttons =====
 
+/**
+ * One refusal, one wording. B8.
+ *
+ * A button and a select menu on the same card refused the same person for the
+ * same reason and said two different things — one of them nothing at all.
+ */
+const MANAGER_ONLY = "Only this server's admins and moderators can change that.";
+
+/**
+ * The answer to a press we cannot make sense of. B11.
+ *
+ * Every branch below that used to `return json({ type: DeferredUpdateMessage })`
+ * on a malformed custom_id was answering with silence, which is what a dead bot
+ * looks like. Discord messages never expire, so this path is reached by real
+ * people pressing real cards — ones posted before a grammar change, or carrying
+ * a button whose feature has since been removed.
+ */
+function staleCard(content = "That button is from an older card and doesn't work any more. Run `/cluster` for a fresh one.") {
+  return json({
+    type: InteractionResponseType.ChannelMessageWithSource,
+    data: { content, flags: MessageFlags.Ephemeral },
+  });
+}
+
 function componentPress(i: Interaction) {
   const who = actor(i);
   const customId = i.data?.custom_id ?? "";
@@ -402,6 +445,22 @@ function componentPress(i: Interaction) {
     // bot, and the exact symptom VALORANT produced for months. The screens no
     // longer render such a button; this is the backstop for old messages that
     // still carry one, since a pinned card lives forever.
+    //
+    // The liveness check is the same backstop for G8: the picker no longer
+    // offers a game whose stats key is missing, but a card posted before that
+    // change — or before the key was removed — still carries the button.
+    // Opening a modal that is certain to fail on submit wastes somebody's
+    // typing to tell them what we already know.
+    const def = linkableProvider(game);
+    if (def && !isProviderLive(def)) {
+      return json({
+        type: InteractionResponseType.ChannelMessageWithSource,
+        data: {
+          content: `**${def.game}**'s stats connection isn't switched on yet, so there's nothing to link it to. Run \`/cluster show:link\` for the games that are ready.`,
+          flags: MessageFlags.Ephemeral,
+        },
+      });
+    }
     if (!provider) {
       return json({
         type: InteractionResponseType.ChannelMessageWithSource,
@@ -420,7 +479,7 @@ function componentPress(i: Interaction) {
   // verified on submit anyway.
   if (customId.startsWith("open-key|")) {
     const id = customId.slice("open-key|".length);
-    if (!id) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    if (!id) return staleCard();
     return json(keyModal(id));
   }
   // The community profile's select menus.
@@ -432,12 +491,32 @@ function componentPress(i: Interaction) {
   if (customId.startsWith("set|")) {
     const [, field, guildId] = customId.split("|");
     const values = i.data?.values ?? [];
-    if (!field || !guildId) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    if (!field || !guildId) return staleCard();
     after(async () => {
       // Checked here rather than inline because the DM case needs a database
       // read: in a DM there is no member and no permissions, so the only proof
       // of authority is being the account we recorded as the server's owner.
-      if (!(await maySetup(i, guildId))) return;
+      //
+      // ===== A REFUSED SELECT USED TO SAY NOTHING AT ALL. B8. =====
+      //
+      // This was a bare `return`. The interaction was already ACKed with
+      // DeferredUpdateMessage, so the deferred edit simply never came: the menu
+      // snapped back to its old value and the member got no explanation. The
+      // button beside it, refused for the identical reason, answers "Only this
+      // server's admins and moderators can change that."
+      //
+      // Two controls on one card giving two different answers to the same
+      // question reads as a broken bot, not a permission boundary — and a
+      // member who thinks it's broken presses it again.
+      // The same embed the button refusal sends, deliberately: same words, same
+      // amber, same shape. `editWithError` would have titled it "Something went
+      // wrong", which a permission boundary is not.
+      if (!(await maySetup(i, guildId))) {
+        await editOriginal(i.token, {
+          embeds: [{ color: 0xf59e0b, description: MANAGER_ONLY }],
+        });
+        return;
+      }
       try {
         const { saveCommunity } = await import("@/lib/discord/community");
         await saveCommunity(guildId, { [field]: values });
@@ -451,14 +530,14 @@ function componentPress(i: Interaction) {
   // time for a database read.
   if (customId.startsWith("open-email|")) {
     const guildId = customId.slice("open-email|".length);
-    if (!guildId) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    if (!guildId) return staleCard();
     return json(contactEmailModal(guildId));
   }
   // The one free-text box in that profile. A modal has to be the immediate
   // answer to a fresh interaction, so no database work happens here.
   if (customId.startsWith("open-about|")) {
     const guildId = customId.slice("open-about|".length);
-    if (!guildId) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    if (!guildId) return staleCard();
     // Authority is re-checked on submit, where there is time for a database
     // read. Opening the box is harmless; saving what's in it is not.
     return json(aboutModal(guildId));
@@ -481,13 +560,13 @@ function componentPress(i: Interaction) {
   // interaction, so authority is re-checked on submit where there is time.
   if (customId.startsWith("open-msg|")) {
     const guildId = customId.slice("open-msg|".length);
-    if (!guildId) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    if (!guildId) return staleCard();
     return json(contactModal(guildId));
   }
   // A server owner filling in their challenge request.
   if (customId.startsWith("open-req|")) {
     const game = customId.slice("open-req|".length);
-    if (!game) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+    if (!game) return staleCard();
     return json(requestModal(game));
   }
   // "Request a challenge" — a plain nav to the game picker, but it can't use the
@@ -496,8 +575,28 @@ function componentPress(i: Interaction) {
     return navigate(i, frame("req-game"), [frame("admin", "")]);
   }
 
+  // ===== A PRESS WE CANNOT PARSE GETS AN ANSWER. B11. =====
+  //
+  // This was `DeferredUpdateMessage` and nothing else: the interaction was
+  // acknowledged and then abandoned, so the button visibly did nothing. That is
+  // the exact failure the `open-link|` handler above calls out in its own
+  // comment — "a press we can't answer gets an ANSWER, not silence" — sitting
+  // unfixed on the branch every button in the product actually falls through.
+  //
+  // It is not hypothetical: a Discord message lives forever. Every card posted
+  // before a nav-grammar change, and every retired feature's buttons (`open-gift|`
+  // among them), lands here. Someone pressing a pinned card from three months
+  // ago should learn the card is old, not that the bot is dead.
   const parsed = parseId(customId);
-  if (!who || !parsed) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  if (!who || !parsed) {
+    return json({
+      type: InteractionResponseType.ChannelMessageWithSource,
+      data: {
+        content: `That button is from an older card and doesn't work any more. Run \`/cluster\` for a fresh one.`,
+        flags: MessageFlags.Ephemeral,
+      },
+    });
+  }
 
   // Decided ONCE, here, from the message the button was actually attached to.
   // Reading it inside the deferred work would be reading it after the response
@@ -708,7 +807,11 @@ async function rerender(
 
 function navigate(i: Interaction, target: Frame, trail: Frame[]) {
   const who = actor(i);
-  if (!who) return json({ type: InteractionResponseType.DeferredUpdateMessage });
+  // B11's rule, and the copy is different on purpose: this is not an old card,
+  // it is an interaction Discord sent with no user attached. Reusing the stale
+  // wording would explain the wrong thing. What matters is that the press gets
+  // an answer rather than an acknowledgement it never comes back from.
+  if (!who) return staleCard("Cluster couldn't tell who pressed that. Run `/cluster` and try again.");
   // Same rule as the main component handler, and it has to be here too: this is
   // the path the few buttons that carry no nav trail take, and they sit on the
   // same public announcements as everything else.
@@ -868,7 +971,7 @@ async function runAction(i: Interaction, target: Frame, trail: Frame[], ctx: Awa
   if (SETTINGS.has(target.screen)) {
     if (!i.guild_id || !ctx.isManager) {
       await editOriginal(i.token, {
-        embeds: [{ color: 0xf59e0b, description: "Only this server's admins and moderators can change that." }],
+        embeds: [{ color: 0xf59e0b, description: MANAGER_ONLY }],
       });
       return;
     }

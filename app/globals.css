@@ -211,6 +211,48 @@ a, button, [role="button"], select, summary { cursor: pointer; }
 .pressable:hover { filter: brightness(1.08); }
 .pressable:active { transform: scale(.96); }
 
+/* ===== TOUCH TARGETS. M2 =====
+ *
+ * The audit counted 58 controls under 32px on a phone. Most of this product is
+ * used from a phone, next to Discord, and a control you have to aim at is one
+ * people mis-tap — which on a page with "Release payout" and "Redeem" on it is
+ * not a cosmetic problem.
+ *
+ * Fixed here rather than in 58 components on purpose. Editing each call site
+ * would mean 58 chances to change a layout, and the ones that matter are all
+ * built from the same handful of classes.
+ *
+ * `pointer: coarse` scopes it to touch input, so the desktop density — which is
+ * fine, because a mouse is precise — is untouched. Two rules:
+ *
+ *   1. Named controls get a real 44px minimum box. `min-height` and not
+ *      `height`, so anything already taller keeps its size.
+ *   2. `.tap` expands the HIT AREA without changing the visual size, for the
+ *      small icon buttons where a 44px box would wreck the layout. The overlay
+ *      is inset-negative and unstyled, so nothing moves and nothing is drawn.
+ *      Opt-in, because it needs a positioned parent.
+ *
+ * 44px is Apple's and Google's shared floor, and the WCAG 2.2 AA target is
+ * 24px — so this clears both rather than sitting between them. */
+@media (pointer: coarse) {
+  .glow-btn, .brand-btn, .money-btn, .ghost-btn, .pressable,
+  button.pressable, a.pressable {
+    min-height: 44px;
+  }
+  /* Inputs too: a field you cannot hit is a form you cannot fill. */
+  .input-cosmic { min-height: 44px; }
+
+  .tap { position: relative; }
+  .tap::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px; min-height: 44px;
+    width: 100%; height: 100%;
+  }
+}
+
 .nav-link { position: relative; transition: color .2s; }
 .nav-link:hover { color: #e8eaf6; }
 .nav-link::after {

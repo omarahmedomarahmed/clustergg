@@ -85,8 +85,27 @@ try {
     (await accountHeldByOther(db, "riot-lol", PUUID, alice)) === null);
   ok("a different account is free", (await accountHeldByOther(db, "riot-lol", "puuid-other", bob)) === null);
 
-  const msg = conflictMessage(seen!, "League of Legends");
-  ok("the message tells them what to do about it", /verify ownership/i.test(msg), msg);
+  // ===== THIS ASSERTION USED TO PIN THE DEFECT. G7. =====
+  //
+  // It read `/verify ownership/i`, and "verify ownership" was the whole problem:
+  // the message named an action with no link, button or route behind it — and
+  // for Riot, none that is even possible from that screen, because the icon
+  // proof needs a linked row and this is the moment we refuse to create one.
+  // So a test written to protect the message was holding the wrong sentence in
+  // place, and it went red against the fix rather than against a regression.
+  //
+  // Rewritten against the property. What matters is not which words appear but
+  // that every action named is one the reader can actually take.
+  const msg = conflictMessage(seen!, "League of Legends", "riot-lol");
+  ok("the message says the account is taken", /already linked/i.test(msg), msg);
+  ok("…and does not name an action that does not exist here",
+    !/verify ownership/i.test(msg), msg);
+  ok("…and offers the one route that does", /support/i.test(msg), msg);
+
+  // A game whose proof is a sign-in gets the sign-in, because there the
+  // instruction is real: signing in creates the row and takes the claim.
+  const steamMsg = conflictMessage(seen!, "Counter-Strike 2", "steam");
+  ok("a game with a working sign-in offers it instead", /sign in/i.test(steamMsg), steamMsg);
 
   // The database refuses it too, not just the code path that checks first.
   let dbRefused = false;

@@ -8,8 +8,8 @@ import { withSponsorRow } from "@/lib/discord/sponsor";
 import { ensureGamerForDiscord, discordAvatarUrl, signInUrl, type LinkedGamer } from "@/lib/discord/identity";
 import { siteUrl, AD_OPT_IN_DEFAULT } from "@/lib/discord/config";
 import { catalog } from "@/lib/discord/catalog";
-import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild, entryAccounts } from "@/lib/challenges";
-import { listRequests, requestableGames } from "@/lib/challenge-requests";
+import { liveChallenges, challengeUrl, challengeGate, keyVisibleTo, challengesForGuild, entryAccounts, challengeExistence } from "@/lib/challenges";
+import { listRequests, requestableGames, REQUEST_MIN_DAYS, REQUEST_MAX_DAYS } from "@/lib/challenge-requests";
 import { guildStats, attributeMember, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { hqInviteUrl } from "@/lib/discord/hq";
@@ -20,7 +20,7 @@ import { PAYOUT_HOLD_PHRASE } from "@/lib/abuse";
 import { PROFILE_FIELDS, REGIONS, VIBES, completeness, getProfile, regionLabel, vibeLabel } from "@/lib/discord/community";
 import { findByInGameName, findByDiscordName, searchGamers } from "@/lib/gamer-lookup";
 import { recordProfileView, hasVoted } from "@/lib/identity";
-import { getProvider, linkableGames, linkableProvider, PROVIDERS } from "@/lib/providers/registry";
+import { getProvider, isProviderLive, linkableGames, linkableProvider, PROVIDERS } from "@/lib/providers/registry";
 
 // Every screen is "a PNG card + buttons underneath it".
 //
@@ -1022,7 +1022,22 @@ async function challengesScreen(game: string, ctx: ScreenCtx, trail: Frame[]): P
 
 async function challengeScreen(id: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
   const { url, data } = await cardRef("challenge", { id });
-  if (!data || data.kind !== "challenge") return notYet("That challenge is no longer live.", trail, [], ctx);
+  if (!data || data.kind !== "challenge") {
+    // B10. One sentence used to cover three situations — a typo, a finished
+    // competition, and a live one whose card failed to draw — and described
+    // only the middle one. Ask the database which it is.
+    const been = await challengeExistence(id);
+    const msg = !been.exists
+      ? "There's no challenge with that id. Try `/cluster challenges` for what's live right now."
+      : been.status === "active" || been.status === "unknown"
+        ? "Cluster couldn't draw that challenge just now. Try again in a moment."
+        : been.title
+          ? `**${been.title}** has finished.`
+          : "That challenge has finished.";
+    return notYet(msg, trail, [
+      navButton("Live challenges", frame("challenges"), trail, ButtonStyle.Secondary, "🏆"),
+    ], ctx);
+  }
 
   const [joined, webUrl, gate, mine] = await Promise.all([
     ctx.gamer ? hasJoined(ctx.gamer.userId, id) : Promise.resolve(false),
@@ -1192,7 +1207,21 @@ async function adminScreen(arg: string, ctx: ScreenCtx, trail: Frame[]): Promise
   if (done.length) lines.push(`**${done.length} finished** — trophies already handed out.`);
   if (portal) {
     lines.push("");
-    lines.push(`**Your portal:** ${siteUrl()}/servers/${portal.slug} — every member's progress, the traffic your challenges send you, your rung and your badges. The key was DM'd to you at install; tap below to have it sent again.`);
+    // ===== "THE KEY WAS DM'd TO YOU AT INSTALL" WAS OFTEN FALSE. S3. =====
+    //
+    // Said to every server with a portal, including ones that never went
+    // through the install flow — a guild the bot met some other way, or one
+    // whose owner had DMs closed, or one whose portal was minted just now by
+    // this very screen. `ensurePortal` creates the row and the key on demand;
+    // it does not send anything, and nothing records whether a DM ever
+    // arrived.
+    //
+    // A false statement about where a credential was sent is worse than no
+    // statement: an owner who cannot find it goes looking through old DMs for
+    // a message that does not exist, and concludes we lost it. So the sentence
+    // now claims only the thing that is true at the moment it is read — there
+    // is a button right there, and pressing it sends the key.
+    lines.push(`**Your portal:** ${siteUrl()}/servers/${portal.slug} — every member's progress, the traffic your challenges send you, your rung and your badges. Tap below and we'll DM you the key.`);
   }
   if (!lines.length) {
     lines.push("You haven't run a challenge yet.");
@@ -1307,7 +1336,10 @@ export function requestModal(game: string) {
       components: [
         textRow("title", "Challenge name", 1, true, `e.g. ${game} Ladder Week`, 80),
         textRow("description", "What are they competing for?", 2, false, "Tell your members what winning looks like", 400),
-        textRow("days", "How many days should it run?", 1, true, "7", 3),
+        // The bound is in the label, not just in the refusal: telling somebody
+        // the rule after they have typed is worse than telling them before.
+        // Imported from the validator so the two cannot disagree (B9).
+        textRow("days", `How many days should it run? (${REQUEST_MIN_DAYS}–${REQUEST_MAX_DAYS})`, 1, true, "7", 3),
         textRow("prize", "Prize money you're putting up", 1, false, "e.g. 100 — leave blank for trophies only", 8),
         textRow("currency", "Currency", 1, false, "USD", 8),
       ],
@@ -1478,13 +1510,17 @@ const REGION_HINTS: Record<string, { label: string; hint: string }> = {
 // nothing at all, which is worse than not offering the game.
 async function linkableFromCatalog(): Promise<{ name: string; value: string }[]> {
   const c = await catalog();
-  const known = new Set(linkableGames().map((g) => g.game.toLowerCase()));
+  // `{ live: true }` — the same readiness predicate `/onboarding` uses. G8.
+  // Without it the picker offered thirteen games while the website marked eight
+  // of them NEEDS KEY, and the bot was the one lying.
+  const live = linkableGames({ live: true });
+  const known = new Set(live.map((g) => g.game.toLowerCase()));
   const fromCatalog = c.games.filter((g) => known.has(g.value.toLowerCase()));
   // A platform with no games configured still has providers, so the picker is
   // never empty just because the catalog is.
   return fromCatalog.length
     ? fromCatalog
-    : linkableGames().map((g) => ({ name: g.game, value: g.game }));
+    : live.map((g) => ({ name: g.game, value: g.game }));
 }
 
 async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPayload> {
@@ -1493,12 +1529,21 @@ async function linkScreen(game: string, ctx: ScreenCtx, trail: Frame[]): Promise
 
   // Asked for a game we can't link? Say which, say why, and offer the ones we
   // can — rather than rendering a button that does nothing when pressed.
-  if (game && !linkableProvider(game)) {
+  // Two ways a game can be unlinkable, and they are not the same thing (G8).
+  // "No API is open to us" is permanent until Riot or Epic change their minds.
+  // "We haven't got the key in yet" is our own to fix and is temporary — and
+  // saying the first when the second is true blames the game publisher for our
+  // configuration.
+  const asked = game ? linkableProvider(game) : null;
+  const notLive = !!asked && !isProviderLive(asked);
+  if (game && (!asked || notLive)) {
     const { url } = await cardRef("planets", {});
     return {
       embeds: [embed(url, {
         title: `${game} can't be linked yet`,
-        description: `We track ${game} on the site, but its stats API isn't open to us yet, so there's no account to connect. Pick another game below — or link ${game} on the site and we'll switch it on the moment it opens up.`,
+        description: notLive
+          ? `${game} is on Cluster, but its stats connection isn't switched on for this deployment yet. It'll appear here the moment it is. Pick another game below in the meantime.`
+          : `We track ${game} on the site, but its stats API isn't open to us yet, so there's no account to connect. Pick another game below — or link ${game} on the site and we'll switch it on the moment it opens up.`,
         color: "#fbbf24",
       })],
       components: rows([
@@ -1655,6 +1700,10 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
   // The portal link is only useful to someone who can act on it, and the key
   // must never appear in a channel — so it's offered to managers as a DM.
   const portal = ctx.isManager ? await ensurePortal(ctx.guildId) : null;
+  // The viewer is themselves inside `stats.joined`: `loadCtx` calls
+  // `attributeMember` for whoever is looking, so opening this screen creates
+  // the row it then counts. S4.
+  const mine = !!ctx.gamer;
 
   // A text bar reads better than a number in Discord, and it makes progress feel
   // like progress even at 3%.
@@ -1691,7 +1740,20 @@ async function serverScreen(ctx: ScreenCtx, trail: Frame[]): Promise<ScreenPaylo
       `**${stats.linked.toLocaleString()} / ${stats.threshold.toLocaleString()}** members have joined Cluster *and* linked a game account.`,
       `**${stats.remaining.toLocaleString()} more** unlocks brand-sponsored challenges here — real prize money for the members who win them, and a place in the **weekly server pool** that ${DEFAULT_SPLIT.server}% of every sponsored challenge funds.`,
       "",
-      `${stats.joined.toLocaleString()} have a Cluster profile so far — linking a game is what counts.`,
+      // ===== "1 HAVE A CLUSTER PROFILE SO FAR". S4. =====
+      //
+      // Two things wrong on an empty server, which is exactly where an owner
+      // first reads this. The grammar, and the number: `attributeMember` in
+      // `loadCtx` records anyone who opens the bot here, so on a server where
+      // nobody has signed up the only profile counted is the manager's own —
+      // created by the act of looking at this screen. An owner reading "1"
+      // reasonably concludes a member joined.
+      //
+      // `mine` is subtracted from the sentence rather than the number: the
+      // count is right, what was missing is that they are in it.
+      stats.joined === 0
+        ? "Nobody here has a Cluster profile yet — linking a game is what counts."
+        : `${stats.joined.toLocaleString()} ${stats.joined === 1 ? "has" : "have"} a Cluster profile so far${mine && stats.joined === 1 ? " — that's you" : mine ? ", including you" : ""}. Linking a game is what counts.`,
     ];
 
   const { url } = await cardRef("guide", { topic: "everything" });
@@ -2099,6 +2161,20 @@ function fromToken(raw: string): Frame | null {
     // `*` rather than nothing: `frame()` drops empty args, so the marker has to
     // be a real string or the game slot swallows the name again (B2).
     case "gamer": return frame("gamer", "*", arg);
+    // ===== `discord:` WAS UNROUTED. B3. =====
+    //
+    // `otherGamerScreen` carries a whole `isDiscordLookup` branch — exact handle
+    // match first, its own error copy — and nothing could reach it. `discord:Nova`
+    // fell past this switch to the fuzzy search, which answered
+    // "Nothing on Cluster matches **discord:Nova**": the bot rejecting its own
+    // grammar. Maintained copy behind an unreachable door is how a pivot leaves
+    // wreckage that looks like a feature.
+    //
+    // Routed rather than deleted, because the branch is the better answer for
+    // this question. `/cluster discord:Nova` says "I mean the Discord handle",
+    // and answering "no gamer with that HANDLE" is more use than "nobody goes
+    // by Nova" when the person may well be here under another name.
+    case "discord": return arg ? frame("gamer", "discord", arg) : frame("home");
     case "link": return frame("link", arg);
     case "challenge": return frame("challenge", arg);
     case "challenges": return frame("challenges", arg);

@@ -346,6 +346,50 @@ export async function liveChallenges(game?: string | null, limit = 8) {
   return db.select().from(schema.challenges).where(where).orderBy(schema.challenges.endAt).limit(limit);
 }
 
+/**
+ * How many rows the live standings board shows at once. G6.
+ *
+ * Here rather than in the route because a route module may only export the
+ * handler and Next's own config keys — and because the number belongs to the
+ * product, not to one endpoint: the client renders "Top 50 of 214" from it and
+ * decides whether to pin the viewer's own row, so both sides must read the
+ * same value or the board will claim a truncation that did not happen.
+ */
+export const BOARD_LIMIT = 50;
+
+// ===== "NEVER EXISTED" IS NOT "ENDED". B10. =====
+//
+// `/cluster challenge:nope` and a fabricated id both answered "That challenge
+// is no longer live." So did a challenge that really had ended, and so did a
+// live challenge whose card image failed to render — one sentence covering
+// three different situations, only one of which it described.
+//
+// The one it gets most wrong is the typo: telling somebody they just missed a
+// competition that never existed invents a loss. On a product where challenges
+// carry prize money that is a bad thing to invent.
+//
+// Deliberately never throws, same contract as `challengeGate` below: a lookup
+// that fails should degrade to a vaguer message, never to a broken screen.
+export type ChallengeExistence =
+  | { exists: false }
+  | { exists: true; status: string; title: string; endAt: Date | null };
+
+export async function challengeExistence(challengeId: string): Promise<ChallengeExistence> {
+  try {
+    const db = await getDb();
+    const [c] = await db.select({
+      status: schema.challenges.status,
+      title: schema.challenges.title,
+      endAt: schema.challenges.endAt,
+    }).from(schema.challenges).where(eq(schema.challenges.id, challengeId)).limit(1);
+    return c ? { exists: true, status: c.status, title: c.title, endAt: c.endAt ?? null } : { exists: false };
+  } catch {
+    // A database hiccup is not evidence that the challenge is absent, and
+    // saying "no such challenge" here would be the same lie in a new place.
+    return { exists: true, status: "unknown", title: "", endAt: null };
+  }
+}
+
 // Does joining this challenge need a key?
 export function joinLocked(challenge: { visibility?: string | null; accessKey?: string | null }): boolean {
   return (challenge.visibility ?? "public") === "private" && !!challenge.accessKey;

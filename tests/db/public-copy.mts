@@ -139,6 +139,42 @@ console.log("== and nothing quotes the retired ladder ==");
     bad.length === 0, bad.map(([k]) => k).join(", "));
 }
 
+console.log("== 'verified' is our own word, and it means something stronger ==");
+{
+  // ===== THE COPY CLAIMED A THING THE PROFILE PAGE DENIES =====
+  //
+  // Four customer-facing lines said accounts and entrants were "verified":
+  // the homepage leaderboard strip, the three-sided-loop card, a rate-card
+  // bullet sold to brands, and the pricing FAQ answer to "how do you know these
+  // are real gamers?".
+  //
+  // `lib/account-ownership.ts` reserves that word for PROVEN OWNERSHIP. Linking
+  // writes `verified: false, verifiedMethod: "exists"`, and `VerifyAccount`
+  // renders exactly that as "Account exists — ownership not proven". Production
+  // holds ten linked accounts and ZERO verified ones — so the pages contradicted
+  // our own profile page on every account the platform has, and did it hardest
+  // in the material a brand pays against.
+  //
+  // The true claim is the stronger one and was already in the same sentences:
+  // the numbers come from each game's official API and nothing is self-reported.
+  //
+  // Scoped to accounts and players deliberately. "Verified" is a fine word about
+  // an email address or a payout, and a blanket ban would go red on copy that is
+  // telling the truth.
+  const OURS = /\bverified\b[^.\n]{0,30}\b(account|accounts|player|players|gamer|gamers|entrant|entrants)\b/i;
+  const THEIRS = /\b(account|accounts|player|players|gamer|gamers|entrant|entrants)\b[^.\n]{0,30}\b(are|is|and)\s+verified\b/i;
+  const bad = prose.filter(([, v]) => OURS.test(v) || THEIRS.test(v));
+  ok("no CMS default calls an account or a player verified",
+    bad.length === 0,
+    bad.map(([k, v]) => `${k}: ${(v.match(OURS) ?? v.match(THEIRS) ?? [""])[0]}`).join(" · "));
+
+  // …and the claim that replaced it is actually made, rather than the sentence
+  // being quietly emptied. A guard that only forbids is satisfied by silence.
+  const sub = String(CONTENT_DEFAULTS["section.leaderboards.subtitle"] ?? "");
+  ok("the leaderboard line still says where the numbers come from",
+    /api/i.test(sub) && /self-reported|own api/i.test(sub), sub);
+}
+
 console.log("== the retire-prepivot script can still read every default it names ==");
 {
   // The script deletes production rows so those keys fall through to

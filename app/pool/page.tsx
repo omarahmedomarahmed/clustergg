@@ -75,7 +75,19 @@ export default async function PoolPage() {
 
         <div className="mt-5 flex flex-wrap gap-2 text-xs">
           <span className="rounded-full border border-white/12 bg-black/25 px-3 py-1.5">
-            <b className="tabular-nums">{standing.servers.length}</b> server{standing.servers.length === 1 ? "" : "s"} competing
+            {/* ===== A LABEL, NOT A DATA BUG. E2. =====
+
+                The audit read this as "0 servers competing" beside `/servers`
+                saying "7 servers · 529 accounts linked" and called it a
+                contradiction. It is not: this counts servers that carried an
+                entrant into a SPONSORED challenge THIS WEEK, and `/servers`
+                counts every install. Both numbers were right and the page gave
+                a visitor no way to know they were counting different things.
+
+                Two public pages appearing to disagree about whether the
+                business is running is exactly what a brand notices, so the
+                label now carries its own scope. */}
+            <b className="tabular-nums">{standing.servers.length}</b> server{standing.servers.length === 1 ? "" : "s"} in this week&apos;s pool
           </span>
           <span className="rounded-full border border-white/12 bg-black/25 px-3 py-1.5">
             <b className="tabular-nums">{PARTICIPATION_SHARE}%</b> paid flat to everyone who took part
