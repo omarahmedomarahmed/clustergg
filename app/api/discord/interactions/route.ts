@@ -15,6 +15,7 @@ import { joinChallengeFor, challengeGate, keyVisibleTo, setChallengeState, entry
 import { submitChallengeRequest, REQUEST_MIN_DAYS, REQUEST_MAX_DAYS, REQUEST_MAX_PRIZE } from "@/lib/challenge-requests";
 import { linkGameAccountFor } from "@/lib/link-account";
 import { PROVIDERS, isProviderLive, linkableProvider } from "@/lib/providers/registry";
+import { scrubSecrets } from "@/lib/providers/adapters";
 import { logCommand, upsertGuild, getGuildRow } from "@/lib/discord/guilds";
 import { ensurePortal } from "@/lib/server-portal";
 import { reportToHq } from "@/lib/discord/hq";
@@ -387,7 +388,8 @@ function command(i: Interaction) {
       const target = await screenForCommand(query);
       const payload = await renderScreen(target, target.screen === "home" ? [] : [frame("home")], ctx);
       await editOriginal(i.token, { ...payload, flags: payload.flags ?? flags });
-    } catch {
+    } catch (e) {
+      botFailed("command", e, { guildId: i.guild_id, discordId: who?.id });
       await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
     } finally {
       void logCommand({
@@ -402,6 +404,32 @@ function command(i: Interaction) {
     type: InteractionResponseType.DeferredChannelMessageWithSource,
     ...(flags ? { data: { flags } } : {}),
   });
+}
+
+
+// ===== A BOT FAILURE THAT SAYS NOTHING CANNOT BE FIXED =====
+//
+// Four `catch` blocks in this file showed "Cluster couldn't load that just
+// now" and threw the error away — not stored, not logged, not even BOUND. So
+// when the bot broke in production there was nothing in Vercel, nothing in
+// `discord_command_logs`, and no way to find out why. The only evidence was a
+// screenshot of the friendly sentence.
+//
+// This is the identical disease `lib/providers/adapters.ts` had, where a Riot
+// `HTTP 400` was recorded with the explanation discarded, and it cost a day of
+// guessing before the body was captured and the answer read "Exception
+// decrypting" in one line.
+//
+// The gamer still gets the friendly sentence — a stack trace helps nobody
+// mid-game. What changes is that the reason now reaches the place an operator
+// can read it. Scrubbed through the same helper the provider errors use, since
+// a thrown error can carry a URL with a token in it.
+function botFailed(where: string, e: unknown, ctx: Record<string, unknown> = {}): void {
+  let why = "";
+  try {
+    why = scrubSecrets(e instanceof Error ? `${e.message}\n${e.stack ?? ""}` : String(e));
+  } catch { why = "unprintable error"; }
+  console.error(`[bot] ${where} failed`, { ...ctx, error: why.slice(0, 2000) });
 }
 
 // ===== Buttons =====
@@ -639,7 +667,8 @@ function componentPress(i: Interaction) {
       // public card stays exactly as posted and the member gets their own.
       if (publicCard) await followUp(i.token, { ...body, flags: MessageFlags.Ephemeral });
       else await editOriginal(i.token, body);
-    } catch {
+    } catch (e) {
+      botFailed("button", e, { screen: parsed.target.screen, arg: parsed.target.args[0], guildId: i.guild_id, discordId: who.id });
       await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
     } finally {
       void logCommand({
@@ -800,7 +829,8 @@ async function rerender(
       embeds: payload.embeds ?? [],
       components: payload.components ?? [],
     });
-  } catch {
+  } catch (e) {
+    botFailed("render", e, { guildId: i.guild_id });
     await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
   }
 }
@@ -841,7 +871,8 @@ function navigate(i: Interaction, target: Frame, trail: Frame[]) {
       // public card stays exactly as posted and the member gets their own.
       if (publicCard) await followUp(i.token, { ...body, flags: MessageFlags.Ephemeral });
       else await editOriginal(i.token, body);
-    } catch {
+    } catch (e) {
+      botFailed("navigate", e, { guildId: i.guild_id, screen: target.screen });
       await editWithError(i.token, `Cluster couldn't load that just now. Try again, or open ${siteUrl()}.`);
     }
   });
