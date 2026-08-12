@@ -45,7 +45,21 @@ function pack(kind: "n" | "b" | "a", frames: Frame[]): string {
 }
 
 export function navId(target: Frame, trail: Frame[] = []): string {
-  return pack("n", [target, ...trail]);
+  // DON'T PUSH THE SCREEN YOU ARE ALREADY ON. B4.
+  //
+  // `More` on the More card produced `n|more|more`, and Home on Home produced
+  // `n|unlock|home|home`. Pressing Back then returned you to the screen you were
+  // already looking at — the most-pressed control on every card, doing nothing
+  // visible. Repeat it and the trail grows a frame per press until `pack()`
+  // truncates the real history away.
+  const deduped = trail.length && sameFrame(trail[0], target) ? trail.slice(1) : trail;
+  return pack("n", [target, ...deduped]);
+}
+
+/** Two frames are the same destination if the screen and every arg match. */
+function sameFrame(a: Frame, b: Frame): boolean {
+  return a.screen === b.screen && a.args.length === b.args.length
+    && a.args.every((x, i) => x === b.args[i]);
 }
 
 export function backId(trail: Frame[]): string {

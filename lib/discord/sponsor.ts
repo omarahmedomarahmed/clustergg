@@ -41,7 +41,12 @@ export function withSponsorRow<T extends { components?: unknown }>(
   type Row = { type: number; components: unknown[] };
   const existing = (Array.isArray(payload.components) ? [...(payload.components as Row[])] : [])
     .map((r) => ({ ...r, components: [...(r.components ?? [])] }));
-  const btn = linkButton(sponsorButtonLabel(ad), url);
+  // `group` is OURS, not Discord's. `rows()` strips it on the way out; this
+  // button is appended AFTER rows() has run, so it shipped `"group":"nav"` on
+  // every card the bot sent while a sponsor was live. components.ts states the
+  // rule in its own comment — an unknown field is a rejected message, and a
+  // rejected message is a card that never appears.
+  const { group: _group, ...btn } = linkButton(sponsorButtonLabel(ad), url);
 
   // Discord allows five action rows and rejects the WHOLE message if there are
   // six, so an ad on a full card has to displace something. What it displaces
