@@ -8,7 +8,7 @@
  *
  *   "100% — of gamers are on Discord"   fabricated, unsourced, and the first
  *                                       number a media buyer or investor checks
- *   "Six worlds, one weekly challenge"  the product runs fourteen games
+ *   "Six worlds, one weekly challenge"  RIGHT, and I broke it — see below
  *   "{threshold} linked gamers moves    it is where a server STARTS earning;
  *    you up a bracket"                  the brackets above it are other rungs
  *   "Most of it isn't ad spend"         directly above "Half of what you pay",
@@ -20,9 +20,20 @@
  * red the first time somebody improved a sentence, and would catch nothing when
  * somebody added a fifth false claim next to it.
  *
+ * ===== AND THE FIXTURE IS NOT THE PRODUCT =====
+ *
+ * Three of the four were false. "Six worlds" was TRUE: production runs six
+ * games. I called it wrong by counting the PGlite demo, which seeds fourteen,
+ * and the first version of this suite then asserted that count — enforcing a
+ * falsehood about production from inside the file meant to prevent exactly
+ * that. No count is asserted here now; the copy asks the page, and the page
+ * reads the live table.
+ *
  *   DEMO_DB=1 npx tsx tests/db/public-copy.mts
  */
 process.env.DEMO_DB = "1";
+
+import { readFileSync } from "node:fs";
 
 let pass = 0;
 const fails: string[] = [];
@@ -61,16 +72,33 @@ console.log("== no unsourced claim about a whole population ==");
 
 console.log("== no copy hardcodes a count the product decides ==");
 {
-  // "Six worlds" while fourteen games were live. A number written into a string
-  // is wrong the day somebody adds a game.
-  const games = await db.select({ n: schema.games.name }).from(schema.games)
-    .where(eq(schema.games.isActive, true));
-  ok("the product has more games than the old copy claimed", games.length > 6, String(games.length));
-
+  // ===== THIS SUITE RUNS ON THE DEMO. THE DEMO IS NOT THE PRODUCT. =====
+  //
+  // The first version of this block read the game count out of the database it
+  // was running against and asserted "the product has more games than the old
+  // copy claimed". That database is the PGlite demo, which seeds fourteen games.
+  // Production runs six. So the assertion was true of the fixture, false of the
+  // product, and would have passed in CI forever while enforcing a falsehood —
+  // exactly the failure mode this whole file exists to catch, committed inside
+  // the file that catches it.
+  //
+  // It was also how I broke the copy in the first place: "Six worlds" was RIGHT,
+  // and I replaced it with vague prose because the demo said fourteen.
+  //
+  // So no count is asserted here at all. The rule is that copy must not STATE
+  // one — it asks the page for it, and the page reads the live table.
   const WORDS = /\b(two|three|four|five|six|seven|eight|nine|ten|\d+)\s+(worlds|games|planets)\b/i;
-  const bad = prose.filter(([, v]) => WORDS.test(v));
+  const bad = prose.filter(([, v]) => WORDS.test(v) && !/\{games\}/.test(v));
   ok("no CMS default states a number of games", bad.length === 0,
     bad.map(([k, v]) => `${k}: ${(v.match(WORDS) ?? [""])[0]}`).join(" · "));
+
+  const note = String(CONTENT_DEFAULTS["hero.banner.note"] ?? "");
+  ok("the banner note asks for the live count", note.includes("{games}"), note);
+
+  // …and the page actually substitutes it, or the placeholder ships to a visitor.
+  const page = readFileSync(new URL("../../app/page.tsx", import.meta.url), "utf8");
+  ok("…and the page substitutes it", /replace\("\{games\}"/.test(page),
+    "{games} would render literally on the homepage");
 }
 
 console.log("== the earning bar is described as what it is ==");

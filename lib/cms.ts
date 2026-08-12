@@ -123,11 +123,18 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "hero.cta.secondary": "Explore leaderboards",
   "hero.image": "/assets/hero.png",
   "hero.banner.label": "The Cluster galaxy",
-  // COUNTS NOTHING. It said "Six worlds, one weekly challenge each" while the
-  // product ran fourteen games, and a hardcoded count in a CMS string is a count
-  // that is wrong the day somebody adds a game. The strip beside it lists the
-  // worlds; it does not need to be told how many there are.
-  "hero.banner.note": "Every world we run, each with its own weekly challenge. Tap a game to open its planet.",
+  // `{games}` IS SUBSTITUTED WITH THE LIVE COUNT.
+  //
+  // This said "Six worlds, one weekly challenge each", and six was RIGHT —
+  // production runs six games. I changed it to vague prose on the strength of
+  // the demo seed, which carries fourteen, and so replaced a true sentence with
+  // a woollier one. Reading a count off the demo and calling it the product is
+  // the same mistake as reading it off a comment.
+  //
+  // Neither hardcoding is the answer. A literal is right until somebody adds a
+  // game; vague prose is never wrong and never says anything. The page already
+  // knows the number — it renders it in the stat strip — so the copy asks for it.
+  "hero.banner.note": "{games} worlds, one weekly challenge each. Tap a game to open its planet.",
   "section.challenges.title": "Live Challenges",
   "section.challenges.subtitle": "Join, play the game you were going to play, watch the board move. One account, as many as you like.",
   "section.games.title": "The Game Galaxy",
