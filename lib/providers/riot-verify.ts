@@ -5,7 +5,7 @@
 // and on a platform paying prize money the difference is the whole game.
 //
 // Riot's own answer is RSO — real OAuth — and RSO needs a PRODUCTION key with
-// an approved product registration. We have a development key. So we use the
+// an approved product registration. We hold a PERSONAL key. So we use the
 // method every third-party League site uses and that Riot's developer policy
 // explicitly contemplates: ask the gamer to set their in-game profile icon to
 // one we name, then read it back from summoner-v4.
@@ -14,11 +14,19 @@
 // icon we pick is random per attempt, and the window is short. Someone watching
 // can't pre-empt it and can't reuse it.
 //
-// Why it works on a dev key: `/lol/summoner/v4/summoners/by-puuid` is not one
-// of the production-gated endpoints. `/riot/account/v1` isn't either — which is
-// what lets VALORANT ride along: one Riot account has ONE puuid across League
-// and VALORANT, so an icon proven in League proves the same human in VALORANT
-// without touching a single VAL-* endpoint.
+// Why it works on the key we have: `/lol/summoner/v4/summoners/by-puuid` and
+// `/riot/account/v1/accounts/by-riot-id` are both on the approved 39 (see
+// `lib/providers/riot-methods.ts`) — which is what lets VALORANT ride along:
+// one Riot account has ONE puuid across League and VALORANT, so an icon proven
+// in League proves the same human in VALORANT. That matters more than it
+// sounds, because the personal key has no `val/*` methods AT ALL. Riot ID
+// identity is not a shortcut here, it is the only route.
+//
+// One thing this file used to get wrong: it said we had a DEVELOPMENT key, and
+// the health note below told an operator whose League had stopped working to
+// regenerate it because dev keys expire after 24 hours. Personal keys do not
+// expire. Sending someone to regenerate a key that has not expired is how a
+// real outage gets misdiagnosed, so the note now says what is true of ours.
 
 const RIOT_TIMEOUT_MS = 8000;
 
@@ -99,20 +107,27 @@ export async function checkIconProof(
 /**
  * Does this Riot key work, and for what?
  *
- * A development key expires every 24 hours, and when it does every Riot link
- * and every Riot sync fails with a 403 that nothing surfaces. This is the probe
- * behind the admin health panel, so "why is League broken" has an answer.
+ * When a key stops answering, every Riot link and every Riot sync fails with a
+ * 403 that nothing else surfaces. This is the probe behind the admin health
+ * panel, so "why is League broken" has an answer.
+ *
+ * `production` is deliberately a probe for something we are NOT approved for.
+ * It calls a `val/*` method, which the personal key cannot reach, so on a
+ * healthy production system it reads FALSE — and that is the correct, expected
+ * answer, not a fault. It flips true only if Riot grants the production key,
+ * which is the one thing an admin panel can't otherwise tell us. It used to be
+ * labelled "VALORANT stats", which made a normal day look like an outage.
  */
 export async function riotKeyHealth(platform = "euw1"): Promise<{
   configured: boolean;
   account: boolean;
   summoner: boolean;
-  valorant: boolean;
+  production: boolean;
   note: string;
 }> {
   const configured = !!process.env.RIOT_API_KEY;
   if (!configured) {
-    return { configured, account: false, summoner: false, valorant: false, note: "RIOT_API_KEY is not set." };
+    return { configured, account: false, summoner: false, production: false, note: "RIOT_API_KEY is not set." };
   }
   const region = platform.startsWith("na") ? "americas" : platform.startsWith("kr") || platform.startsWith("jp") ? "asia" : "europe";
   const probe = async (url: string) => { try { await riot(url); return true; } catch { return false; } };
@@ -122,12 +137,15 @@ export async function riotKeyHealth(platform = "euw1"): Promise<{
   // Status endpoints need the key but no account, so they isolate key validity
   // from "that summoner doesn't exist on this shard".
   const summoner = await probe(`https://${platform}.api.riotgames.com/lol/status/v4/platform-data`);
-  const valorant = await probe(`https://${region}.api.riotgames.com/val/status/v1/platform-data`);
+  // Not on the approved 39, on purpose — see RIOT_PROBE_ONLY_PATHS, which
+  // names this exact path. Written out in full rather than interpolated from
+  // the constant so that a scanner reading this file for Riot URLs sees it.
+  const production = await probe(`https://${region}.api.riotgames.com/val/status/v1/platform-data`);
 
   const note = !account && !summoner
-    ? "The key is rejected everywhere — a development key expires 24 hours after it is generated. Regenerate it at developer.riotgames.com and redeploy."
-    : valorant
-      ? "VALORANT endpoints answer, so this key has production access."
-      : "League works. VALORANT's VAL-* endpoints need a production key, so VALORANT accounts are verified through the shared Riot ID instead — which needs no extra approval.";
-  return { configured, account, summoner, valorant, note };
+    ? "The key is rejected everywhere. A personal key does not expire, so check it was not revoked or overwritten in the environment before regenerating one at developer.riotgames.com — and remember env changes need a redeploy."
+    : production
+      ? "Production access is live: methods beyond the approved 39 now answer. Update lib/providers/riot-methods.ts before calling any of them."
+      : "League works, on the personal key's 39 methods. There are no VAL-* methods on this key at all, so VALORANT accounts are proven through the Riot ID both games share — which needs no further approval.";
+  return { configured, account, summoner, production, note };
 }

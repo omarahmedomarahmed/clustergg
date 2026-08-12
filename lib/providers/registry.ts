@@ -217,9 +217,9 @@ export const PROVIDERS: ProviderDef[] = [
   {
     id: "riot-valorant", name: "VALORANT", game: "VALORANT", glyph: "▲", color: "#fd4556",
     authType: "apikey", envVars: ["RIOT_API_KEY"], identifierLabel: "Riot ID",
-    identifierHint: "GameName#TAG — VALORANT API requires production key approval", phase: 1,
+    identifierHint: "GameName#TAG — same Riot ID as League; VALORANT stats need a production key", phase: 1,
     docsUrl: "https://developer.riotgames.com",
-    legalFlag: "VAL-* endpoints require Riot production API approval (RSO). Identity resolution works with a dev key.",
+    legalFlag: "Our personal key has no VAL-* methods at all. Identity still works: one Riot account has one PUUID across both games, so a League icon proof proves the same human here.",
     capabilities: [
       { key: "account_level", label: "Account level", higherIsBetter: true },
     ],

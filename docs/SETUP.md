@@ -111,6 +111,43 @@ See `lib/bootstrap.ts`.
 `PUBG_API_KEY`, `FORTNITE_API_KEY`, `FACEIT_API_KEY`, `HYPIXEL_API_KEY`,
 `OPENXBL_API_KEY`, `TRN_API_KEY`, `OSU_CLIENT_ID` + `OSU_CLIENT_SECRET`.
 
+### `RIOT_API_KEY` is a personal key, and that constrains the code
+
+Riot approved ClusterGG for a **personal** key. Not production, and not the
+development key the League integration was originally built against. A personal
+key carries **39 methods**; a development key carries 59. The full approved list
+lives in `lib/providers/riot-methods.ts`, and `tests/db/riot-methods.mts`
+asserts nothing in `lib/providers/` calls anything outside it — because an
+unapproved method fails nowhere except in production, for one gamer, in one
+sync, as a 403 nothing surfaces.
+
+Four things follow, and they are the reason the code looks the way it does:
+
+- **`summoner-v4` has only `by-puuid`.** No by-name, no by-account. Every route
+  into League therefore starts at a Riot ID, resolves it through
+  `account-v1/accounts/by-riot-id` to a PUUID, and uses that PUUID for
+  everything after. This is not a stylistic choice and cannot be shortened.
+- **There are no `val/*` methods at all.** VALORANT works because one Riot
+  account has one PUUID across both games, so proving the League profile icon
+  proves the same human in VALORANT. See `lib/providers/riot-verify.ts`.
+- **`spectator-v5` reads `active-games/by-summoner/{...}` but takes a PUUID.**
+  The path name is Riot's, not ours. Passing a PUUID is correct; "fixing" it
+  breaks live-game detection.
+- **A personal key does not expire.** Development keys die after 24 hours, and
+  this file and the admin health panel both used to say so. If Riot stops
+  answering, the cause is a revoked or overwritten key — or a missing redeploy —
+  not expiry.
+
+Rate limits: most methods allow 20,000 / 10s, but **`summoner-v4 by-puuid` is
+capped at 1,600 / minute** and is hit by every stat sync *and* every press of
+Verify during icon proof. It is the binding limit by a wide margin; the number
+is exported as `RIOT_SUMMONER_V4_PER_MINUTE` so a throttle imports it.
+
+Admin → Linked accounts shows key health. **"Personal key (39 methods)" is the
+healthy state** — the fourth pill flips green only if Riot grants production
+access. If it ever does, add the new methods to `riot-methods.ts` in the same
+commit that starts calling them, never in advance.
+
 Env changes need a **redeploy** — they do not apply to an existing build.
 
 ## Discord app, once
