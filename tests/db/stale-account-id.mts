@@ -158,8 +158,8 @@ console.log("== a repair that changes nothing is not written ==");
   // the "fresh" one, so passing the CURRENT id made the very first fetch
   // succeed and the stale path never ran. The suite went green on two
   // assertions that had tested nothing.
-  const calls = { reid: 0 };
-  ADAPTERS["riot-lol"].fetchStats = async () => ({ ok: false, error: STALE });
+  const calls = { reid: 0, fetch: 0 };
+  ADAPTERS["riot-lol"].fetchStats = async () => { calls.fetch++; return { ok: false, error: STALE }; };
   ADAPTERS["riot-lol"].reidentify = async () => { calls.reid++; return "old-encrypted-id"; };
   try {
     const res = await syncAccount(db, acc);
@@ -168,6 +168,15 @@ console.log("== a repair that changes nothing is not written ==");
     const after = await current(acc.id);
     eq("the id is unchanged", after.providerAccountId, "old-encrypted-id");
     ok("…and the real error is kept", /Exception decrypting/.test(after.syncError ?? ""), after.syncError ?? "");
+
+    // ===== WHAT THE `fresh !== current` GUARD IS ACTUALLY WORTH =====
+    //
+    // Breaking it left every assertion above green, because writing the same
+    // value back is a no-op and the retry fails identically. The only
+    // observable difference is a SECOND provider call — spent re-asking a
+    // question already answered, against `summoner-v4`'s 1,600/min, the
+    // tightest budget on the key. That is the thing to assert.
+    eq("and no second call is spent on an id we already know fails", calls.fetch, 1);
   } finally { restore(); }
 }
 
