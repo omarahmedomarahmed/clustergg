@@ -180,7 +180,6 @@ const GROUPS: { title: string; note?: string; keys: { key: string; label: string
       { key: "discord.cta.secondary", label: "Secondary button" },
       { key: "discord.hero.title", label: "/discord-bot hero title" },
       { key: "discord.hero.subtitle", label: "/discord-bot hero subtitle", long: true },
-      { key: "discord.unlock.threshold", label: "Linked gamers required to unlock monetization" },
     ],
   },
   {

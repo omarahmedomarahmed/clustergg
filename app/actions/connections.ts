@@ -143,6 +143,11 @@ export async function updateProfile(_prev: ProfileState, formData: FormData): Pr
   let slug = me.slug;
   if (rawSlug && rawSlug !== me.slug) {
     slug = slugify(rawSlug);
+    // A slug that transliterates to nothing is a REFUSAL, not a silent rename.
+    // This is somebody choosing their own profile URL, so the empty result has
+    // to be said out loud — quietly keeping the old one, or quietly inventing a
+    // new one, both leave them looking at a URL they did not ask for (S1/S2).
+    if (!slug) return { error: "That profile URL has no letters or numbers we can use. Try one with some Latin characters or digits in it." };
     const [taken] = await db.select({ id: schema.users.id }).from(schema.users)
       .where(eq(schema.users.slug, slug)).limit(1);
     if (taken && taken.id !== me.id) return { error: "That profile URL is taken." };

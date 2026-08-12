@@ -207,7 +207,7 @@ export const PRICING_COPY_DEFAULTS: Record<string, string> = {
   "pricing.package.name": "Sponsored challenges",
   "pricing.package.tagline": "Sponsor the gameplay, not the content.",
   "pricing.package.features":
-    "One sponsored challenge a week, per game, carrying your brand\nNaming rights — that game's weekly competition is yours\nCluster funds and pays every prize pool\nEntrants are verified players of that game, read from its official API\nYour creatives in every placement across clustergg.com, included\nPlacements inside every opted-in Discord server, included\nSelf-serve brand portal — swap creatives yourself, any time\nPer-challenge reporting: entrants, completion, reach, standings",
+    "One sponsored challenge a week, per game, carrying your brand\nNaming rights — that game's weekly competition is yours\nCluster funds and pays every prize pool\nEntrants are real players of that game, their stats read from its official API\nYour creatives in every placement across clustergg.com, included\nPlacements inside every opted-in Discord server, included\nSelf-serve brand portal — swap creatives yourself, any time\nPer-challenge reporting: entrants, completion, reach, standings",
 
   "pricing.addon.name": "The Sunday Broadcast",
   "pricing.addon.tagline": "Profile of the Week, decided live.",
@@ -218,7 +218,7 @@ export const PRICING_COPY_DEFAULTS: Record<string, string> = {
   "pricing.faq":
     "What am I actually buying? | Structured gamer attention on Discord: placements across clustergg.com and inside every opted-in server, and sponsored weekly competitions carrying your brand in the games you choose. Not vague awareness, and not a banner next to the audience.\n"
     + "Who pays the prize money? | We do. Every challenge has a guaranteed minimum pool that Cluster funds and pays out. You're buying the competition and the name on it — no setup fee, no administration fee, no payout risk.\n"
-    + "How do you know these are real gamers? | Every account is linked and verified against the game's own official API — rank, matches, wins. Nothing on Cluster is self-reported, which is the whole reason the audience can be described at all.\n"
+    + "How do you know these are real gamers? | Every account is linked to the game's own official API, and every number — rank, matches, wins — is read from it. Nothing on Cluster is self-reported, which is the whole reason the audience can be described at all. Proving the account belongs to the person holding it is a separate step, offered per game where the game allows it.\n"
     + "Can I change my creative myself? | Yes. The package includes the brand portal: upload, swap and pause creatives whenever you want, and watch impressions and clicks per placement and per community. No ticket, no lead time.\n"
     + "Is the impression figure guaranteed? | No, and we won't pretend otherwise. Reach and placement counts are measured; the forward-looking impression number is a projection with its formula printed next to it. What is contractual is the placements and the challenges.\n"
     + "What does naming rights mean? | The weekly challenge for that game runs under your brand — on the card posted to every server, on the leaderboard, on the challenge page, and in the winners announcement.\n"

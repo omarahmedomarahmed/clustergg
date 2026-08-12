@@ -55,8 +55,19 @@ console.log("\n== a throw cannot abandon the rest of the queue ==");
   // the case it cannot — and without it, one throw kills a worker and every
   // account that worker had left.
   const src = code("lib/sync.ts");
+  // Written against the PROPERTY rather than the exact catch body. F1 added a
+  // per-provider tally to the same handler, so the block became
+  // `} catch (e) { failed++; note(...); }` — the guarantee was untouched and an
+  // assertion pinned to the old literal went red anyway. What has to hold is
+  // that the call is inside a try, and that the catch counts the failure rather
+  // than rethrowing it into the pool.
+  const block = src.slice(src.indexOf("await pool(due"));
+  const attempt = block.slice(0, block.indexOf("});"));
   ok("each account is caught individually",
-    /try \{[\s\S]{0,200}syncAccount\(db, account\)[\s\S]{0,120}\} catch \{ failed\+\+; \}/.test(src));
+    /try \{[\s\S]{0,300}syncAccount\(db, account\)/.test(attempt)
+    && /\} catch[\s\S]{0,80}failed\+\+/.test(attempt)
+    && !/throw/.test(attempt),
+    attempt.slice(0, 200));
 }
 
 console.log("\n== the pool actually runs everything, and in parallel ==");

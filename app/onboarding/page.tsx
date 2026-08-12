@@ -15,7 +15,8 @@ import { tryUnlock } from "@/lib/unlock";
 import EmailStep from "@/components/onboarding/EmailStep";
 import ProfileStep from "@/components/onboarding/ProfileStep";
 import { getCountries } from "@/lib/countries-server";
-import { pendingCodeEmail, maskEmail } from "@/lib/email-verify";
+import { pendingCodeEmail, maskEmail, codeShownOnScreen, lastVerificationSendFailed } from "@/lib/email-verify";
+import { emailConfigured } from "@/lib/email";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Set up your account · Cluster" };
@@ -64,9 +65,12 @@ export default async function OnboardingPage() {
   // what they DID — so landing here after the last step both unlocks and
   // produces the congratulations.
   const unlock = await tryUnlock(db, user.id);
-  const [countries, sentTo] = await Promise.all([
+  const [countries, sentTo, sendFailed] = await Promise.all([
     getCountries(),
     pendingCodeEmail(db, user.id),
+    // What HAPPENED to the last one, not whether a key is configured — see
+    // `lastVerificationSendFailed`. Production has a key that 401s.
+    lastVerificationSendFailed(db, user.id),
   ]);
 
   const step = (key: string) => unlock.steps.find((s) => s.key === key);
@@ -183,6 +187,8 @@ export default async function OnboardingPage() {
           masked={maskEmail(sentTo ?? user.email)}
           done={!!step("email")?.done}
           alreadySent={!!sentTo}
+          mailOff={!emailConfigured() || sendFailed}
+          codeOnScreen={codeShownOnScreen(emailConfigured())}
         />
       </Step>
 

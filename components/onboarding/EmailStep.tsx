@@ -14,7 +14,7 @@ import { requestEmailCode, confirmEmailCode, type OnboardState } from "@/app/act
 // already been sent and this opens on "check your inbox", with the address on
 // screen so a typo is visible rather than mysterious.
 
-export default function EmailStep({ email, masked, done, alreadySent }: {
+export default function EmailStep({ email, masked, done, alreadySent, mailOff, codeOnScreen }: {
   /** What we have on file, if anything. Never rendered — see `masked`. */
   email: string | null;
   /**
@@ -29,6 +29,10 @@ export default function EmailStep({ email, masked, done, alreadySent }: {
   done: boolean;
   /** A code went out at sign-in because we already had the address. */
   alreadySent: boolean;
+  /** This deployment cannot send mail at all. */
+  mailOff: boolean;
+  /** …and it is the in-process demo, so the code may be shown on screen. */
+  codeOnScreen: boolean;
 }) {
   const [sendState, send, sending] = useActionState<OnboardState | undefined, FormData>(requestEmailCode, undefined);
   const [checkState, check, checking] = useActionState<OnboardState | undefined, FormData>(confirmEmailCode, undefined);
@@ -85,6 +89,32 @@ export default function EmailStep({ email, masked, done, alreadySent }: {
             <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
               Mail is not switched on here, so the code is{" "}
               <b className="font-mono tracking-widest">{sendState.demoCode}</b>.
+            </p>
+          )}
+
+          {/* THE FIRST-RUN DEAD END. G2.
+              A code is sent the moment the account exists, so this panel is
+              already open on arrival — and the demo code only comes back from
+              the RESEND action, because codes are stored hashed and cannot be
+              recovered on a page load. With mail off, a first-time visitor
+              therefore saw "we sent a six-digit code" and had no way to reach
+              one. docs/SETUP.md promises the code is "printed on the onboarding
+              page", and it was not; the only route forward was guessing that a
+              button labelled "Send it again" reveals it. */}
+          {!sendState?.demoCode && codeOnScreen && (
+            <p className="mt-2 rounded-lg border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+              Mail is not switched on here, so nothing will arrive. Press{" "}
+              <b>Send it again</b> and the code appears on this page.
+            </p>
+          )}
+
+          {/* Mail is off on a REAL deployment. The code is never printed here —
+              saying so is the only honest thing left, and it is what stops
+              somebody waiting on an inbox that will never receive anything. */}
+          {!codeOnScreen && mailOff && (
+            <p className="mt-2 rounded-lg border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
+              We cannot send email at the moment, so this one has not arrived and
+              will not. Write to us and we will confirm your address by hand.
             </p>
           )}
 

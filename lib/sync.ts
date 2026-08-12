@@ -353,7 +353,41 @@ async function pool<T>(items: T[], size: number, work: (item: T) => Promise<void
 }
 
 // Batch sync for cron: pick accounts whose nextSyncAt has passed.
-export async function syncDueAccounts(db: DB, limit = SYNC_TAKE): Promise<{ synced: number; failed: number }> {
+export type ProviderSyncReport = {
+  provider: string;
+  synced: number;
+  failed: number;
+  /** Every account for this provider failed, and there was at least one. */
+  down: boolean;
+  /** The last reason one of them gave, so the report names the cause. */
+  lastError?: string;
+};
+
+/**
+ * PER PROVIDER, AND NEVER A FAILURE-COUNT THRESHOLD. F1.
+ *
+ * The hourly sync answered `{ok: true, synced: 7, failed: 53}` and Vercel saw a
+ * green cron. Fifty-three failures is the difference between a leaderboard that
+ * is the product and a leaderboard that is a lie, and nothing anywhere said so.
+ *
+ * The obvious fix — fail above N failures — is the wrong one, because the
+ * number gets tuned upwards the first time it pages somebody at a weekend and
+ * it never comes back down. It also asks a question nobody cares about. What
+ * matters is not HOW MANY failed but WHETHER A WHOLE PROVIDER IS DOWN: "every
+ * Riot account failed, the key expired" is a thing to act on tonight, and "3%
+ * scattered across six providers" is a normal hour with some dead handles in it.
+ *
+ * So the run reports per provider, and it is unhealthy when any single provider
+ * failed 100% of what it attempted. That signal cannot be tuned away without
+ * deleting it, which is the point.
+ */
+export function providersDown(byProvider: ProviderSyncReport[]): ProviderSyncReport[] {
+  return byProvider.filter((p) => p.down);
+}
+
+export async function syncDueAccounts(db: DB, limit = SYNC_TAKE): Promise<{
+  synced: number; failed: number; byProvider: ProviderSyncReport[]; down: string[];
+}> {
   const due = await db.select().from(schema.linkedGameAccounts)
     .where(or(
       isNull(schema.linkedGameAccounts.nextSyncAt),
@@ -365,18 +399,40 @@ export async function syncDueAccounts(db: DB, limit = SYNC_TAKE): Promise<{ sync
     .limit(limit);
 
   let synced = 0, failed = 0;
+  const per = new Map<string, { synced: number; failed: number; lastError?: string }>();
+  const note = (provider: string, ok: boolean, error?: string) => {
+    const row = per.get(provider) ?? { synced: 0, failed: 0 };
+    if (ok) row.synced++;
+    else { row.failed++; if (error) row.lastError = error.slice(0, 160); }
+    per.set(provider, row);
+  };
+
   await pool(due, SYNC_POOL, async (account) => {
     // `syncAccount` already swallows its own failures and records them on the
     // row. The catch here is for the case it cannot: a throw would abandon
     // every remaining account in this worker.
     try {
       const r = await syncAccount(db, account);
-      if (r.ok) synced++; else failed++;
-    } catch { failed++; }
+      if (r.ok) { synced++; note(account.provider, true); }
+      else { failed++; note(account.provider, false, (r as { error?: string }).error); }
+    } catch (e) { failed++; note(account.provider, false, String(e)); }
   });
 
   await finalizeChallenges(db);
-  return { synced, failed };
+
+  const byProvider: ProviderSyncReport[] = [...per.entries()]
+    .map(([provider, r]) => ({
+      provider, synced: r.synced, failed: r.failed,
+      // Every attempt failed, and there was something to attempt. One account
+      // for a provider that happens to be a dead handle counts here too, and
+      // that is correct: with a sample of one we cannot tell the difference,
+      // and the honest report is "everything we tried for this provider failed".
+      down: r.failed > 0 && r.synced === 0,
+      ...(r.lastError ? { lastError: r.lastError } : {}),
+    }))
+    .sort((a, b) => b.failed - a.failed);
+
+  return { synced, failed, byProvider, down: providersDown(byProvider).map((p) => p.provider) };
 }
 
 // On-demand sync with a cooldown, used when a profile page is viewed.

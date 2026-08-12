@@ -307,8 +307,12 @@ console.log("\n== a read that fails must not lock somebody out ==");
 {
   // Fails OPEN, like the rest of the abuse layer. The thing a closed failure
   // costs is a gamer's access to their own money.
+  // Named `unlockedState()` since G1 — it became a function so that a finished
+  // account reports its three steps as DONE rather than reporting none, which
+  // is what made the onboarding page redraw a finished gamer as 0 of 3. The
+  // fail-open behaviour asserted here is unchanged.
   const src = code("lib/unlock.ts");
-  ok("a failed read returns unlocked", /catch \{[\s\S]{0,120}return UNLOCKED;/.test(src));
+  ok("a failed read returns unlocked", /catch \{[\s\S]{0,120}return unlockedState\(\);/.test(src));
 }
 
 console.log(`\n${pass} passed, ${fails.length} failed`);

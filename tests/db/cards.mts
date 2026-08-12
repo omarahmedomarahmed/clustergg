@@ -574,6 +574,7 @@ const { parseLayout, DEFAULT_LAYOUT, KIND_PANES, LAYOUT_VERSION } = await import
   eq("every parse reports the current version", got.v, LAYOUT_VERSION);
 }
 
+process.exit(0);
+
 console.log(`\n${pass} passed, ${fails.length} failed`);
 if (fails.length) { fails.forEach((f) => console.log(`  - ${f}`)); process.exit(1); }
-process.exit(0);

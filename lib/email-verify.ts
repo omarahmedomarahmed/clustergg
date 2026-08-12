@@ -39,6 +39,27 @@ export const MAX_ATTEMPTS = 5;
 /** How many codes one account may ask for in an hour. */
 export const MAX_SENDS_PER_HOUR = 5;
 
+/**
+ * May a verification code be PRINTED ON THE PAGE? G3.
+ *
+ * It used to be decided by `emailConfigured()` alone: no mail provider, show
+ * the code. That is right for a local copy and wrong for anything else, and the
+ * two are not distinguishable by that question. A production deployment whose
+ * RESEND_API_KEY was never set, or was rotated out, would quietly start
+ * rendering every account's live verification code into the HTML of a page
+ * anybody can reach with a session — turning one missing environment variable
+ * into account takeover.
+ *
+ * So it takes BOTH: mail genuinely unavailable, AND an in-process demo (PGlite,
+ * no DATABASE_URL). On a real database the code is never on screen, however
+ * broken the mail configuration is; what appears instead is an honest failure,
+ * which is the thing an operator can act on.
+ */
+export function codeShownOnScreen(mailConfigured: boolean): boolean {
+  const demo = process.env.DEMO_DB === "1" || !process.env.DATABASE_URL;
+  return !mailConfigured && demo;
+}
+
 const hash = (code: string) => createHash("sha256").update(`cluster:${code}`).digest("hex");
 
 /** Six digits, uniformly random. `randomInt` rather than `Math.random`. */
@@ -238,6 +259,45 @@ export async function isEmailVerified(db: DB, userId: string): Promise<boolean> 
 }
 
 /** Where a code was last sent, for "check your inbox" to be able to say where. */
+/**
+ * Did the last verification email we tried to send actually FAIL? G2 follow-on.
+ *
+ * ===== WHY CONFIGURATION IS THE WRONG QUESTION =====
+ *
+ * The onboarding page warned a gamer that mail was off by asking
+ * `emailConfigured()` — is a key present. Production has a key present and
+ * INVALID: every send comes back `401 validation_error API key is invalid`, and
+ * has since at least 10 August. `emailConfigured()` answers "yes", so no warning
+ * showed, and the page went on saying "we sent a six-digit code" to somebody who
+ * was never going to receive one.
+ *
+ * The result is visible in the data: nine accounts on production, ZERO with a
+ * confirmed address, zero unlocked, zero challenge entrants. Nothing accrues
+ * until the three steps are done, so an invalid API key is not a mail problem —
+ * it is the entire gamer funnel, stopped, silently, for weeks.
+ *
+ * So the page asks what actually happened to the last attempt instead. A key
+ * that is present but rejected, a domain that is not verified, a provider
+ * outage — all of them land here, and none of them are answerable by looking at
+ * an environment variable.
+ *
+ * Failures only. `skipped` is not an error (see the note on `email_log.status`)
+ * and is already covered by the mail-off copy.
+ */
+export async function lastVerificationSendFailed(db: DB, userId: string): Promise<boolean> {
+  try {
+    const [user] = await db.select({ email: schema.users.email })
+      .from(schema.users).where(eq(schema.users.id, userId)).limit(1);
+    const to = (user?.email ?? "").trim().toLowerCase();
+    if (!to) return false;
+    const [row] = await db.select({ status: schema.emailLog.status })
+      .from(schema.emailLog)
+      .where(and(eq(schema.emailLog.toAddress, to), eq(schema.emailLog.template, "verify.code")))
+      .orderBy(desc(schema.emailLog.createdAt)).limit(1);
+    return row?.status === "failed" || row?.status === "bounced";
+  } catch { return false; }
+}
+
 export async function pendingCodeEmail(db: DB, userId: string): Promise<string | null> {
   try {
     const [row] = await db.select({ email: schema.emailCodes.email })

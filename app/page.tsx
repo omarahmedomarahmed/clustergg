@@ -333,7 +333,10 @@ export default async function LandingPage() {
         planets={skinnedPlanets}
         heading={tr("The Cluster galaxy — pick a game")}
         label={c["hero.banner.label"]}
-        note={c["hero.banner.note"]}
+        // `{games}` from the live count the stat strip already reads, so the
+        // sentence is true in production (6), true in the demo (14), and stays
+        // true the day somebody adds a seventh.
+        note={(c["hero.banner.note"] ?? "").replace("{games}", String(counts.games))}
       >
         {!viewer && (
           <BrandHero

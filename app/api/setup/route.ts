@@ -40,13 +40,37 @@ export async function POST(req: NextRequest) {
   }
 
   const db = await getDb();
+
+  // ===== B104: THE FIRST SUPERADMIN IS NAMED HERE, NOT RACED FOR =====
+  //
+  // Signup used to promote whoever arrived first on an empty database. Holding
+  // this token is what proves somebody owns the deployment, so this is where
+  // the operator says which address becomes superadmin. Recorded before the
+  // schema work below so a re-run against an existing database — the common
+  // case, since this refuses once the tables exist — can still set or correct
+  // it. See `lib/bootstrap.ts`.
+  const adminEmail = (req.nextUrl.searchParams.get("admin") ?? "").trim().toLowerCase();
+  let nominated: string | null = null;
+  if (adminEmail) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(adminEmail)) {
+      return NextResponse.json({ error: "bad_admin_email", note: "`admin` must be an email address." }, { status: 400 });
+    }
+    const { nominateSuperadmin } = await import("@/lib/bootstrap");
+    await nominateSuperadmin(db, adminEmail);
+    nominated = adminEmail;
+  }
+
   const existing = await db.execute(
     sql`SELECT to_regclass('public.users') AS t`
   ) as unknown as { rows?: { t: string | null }[] };
   const already = (existing.rows ?? (existing as unknown as { t: string | null }[]))
     .some?.((r) => r.t) ?? false;
   if (already) {
-    return NextResponse.json({ ok: true, note: "Schema already exists — nothing to do." });
+    return NextResponse.json({
+      ok: true,
+      note: "Schema already exists — nothing to do.",
+      ...(nominated ? { superadminNominated: nominated } : {}),
+    });
   }
 
   const { DDL_STATEMENTS } = await import("@/lib/db/ddl");
@@ -60,8 +84,13 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({
     ok: true, migrated: true, seeded: true, demoData: demo,
-    note: demo
-      ? "Schema created + demo universe seeded. First real signup still gets superadmin if you skip demo next time."
-      : "Schema created + platform defaults seeded. The FIRST user to sign up becomes superadmin.",
+    ...(nominated ? { superadminNominated: nominated } : {}),
+    note: nominated
+      ? `Schema created + ${demo ? "demo universe" : "platform defaults"} seeded. `
+        + `${nominated} becomes superadmin when that address signs up — and nobody else does.`
+      : `Schema created + ${demo ? "demo universe" : "platform defaults"} seeded. `
+        + "NO SUPERADMIN WILL BE CREATED: signing up no longer promotes whoever is first, "
+        + "because that was a race anybody who found this URL could enter. Call this again "
+        + "with `&admin=<your email>` and then sign up with that address.",
   });
 }

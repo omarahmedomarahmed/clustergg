@@ -157,6 +157,172 @@ console.log("\n== nothing declares a second ladder ==");
   }
   ok("no other module writes its own list of server sizes", offenders.length === 0,
     offenders.join(" · "));
+
+  // ===== AND NOTHING DECLARES A SINGLE ONE EITHER (B1) =====
+  //
+  // The check above looks for TWO OR MORE `threshold: <number>` literals in one
+  // file, on the reasoning that a size LIST is what went wrong before. That is
+  // exactly why `DEFAULT_UNLOCK_THRESHOLD = 500` in lib/discord/guilds.ts sat
+  // there through the whole consolidation: it is one number, not a list, and it
+  // is not spelled `threshold:`.
+  //
+  // It was not harmless. It is the number the BOT quotes to server owners —
+  // "0 / 500 members have joined Cluster and linked a game account", on the one
+  // screen an owner reads — while /servers, /pool and the ladder all say the
+  // bar is 10. And it is a live gate: `checkUnlock` flips a server to
+  // ad-eligible on it, and `networkReach` counts eligible servers by it.
+  //
+  // So the rule is the strong form: any identifier that NAMES a member
+  // threshold, bound to a number, outside lib/ladder.ts. A single constant is
+  // caught, whatever it is called and however it is spelled.
+  const NAMES = /\b([A-Z][A-Z0-9_]*(?:THRESHOLD|FLOOR|UNLOCK|MIN_MEMBERS)[A-Z0-9_]*)\s*(?::\s*number\s*)?=\s*(\d+)/g;
+
+  // Constants that match the pattern and are NOT a member threshold. Each was
+  // read before it was listed, and each carries the reason.
+  //
+  // An allowlist rather than a narrower regex, deliberately. Narrowing the
+  // pattern until these five stopped matching would also stop it matching the
+  // next `SOMETHING_FLOOR = 500` about linked members, which is the whole thing
+  // being guarded. This fails CLOSED: anything new has to be looked at and
+  // named here, and the existence check below deletes entries that go stale.
+  const NOT_A_MEMBER_BAR: Record<string, string> = {
+    "lib/daily-ceiling.ts:CEILING_FLOOR": "CP per gamer per day, not members",
+    "lib/discord/audience.ts:BATCH_FLOOR": "how many suppressed events are worth one message",
+    "lib/eligibility.ts:US_REPORT_THRESHOLD": "dollars of earnings that trigger tax reporting",
+    "lib/segments.ts:COHORT_FLOOR": "the k-anonymity floor — never describe a group under 25 people",
+    // The one genuinely about linked members, and still not this bar: it decides
+    // what a passer-by may READ off a public page, not who earns. Its own
+    // comment says the two 'happen to agree today' and move for different
+    // reasons, which is exactly the argument for keeping them separate.
+    "lib/server-public.ts:PUBLIC_FLOOR": "privacy floor for printing a server's linked count",
+  };
+
+  // Empty, and it stays empty. `DEFAULT_UNLOCK_THRESHOLD` was the one entry
+  // here; the owner decided the bar is the ladder's, so the constant is gone and
+  // the exception went with it. The mechanism survives because the next lone
+  // threshold somebody adds needs somewhere visible to be argued about, and the
+  // existence check below means an entry cannot outlive its subject.
+  const PENDING: Record<string, string> = {};
+
+  const found = new Map<string, string[]>();
+  for (const file of [...walk("lib"), ...walk("components"), ...walk("app")]) {
+    if (ALLOWED.has(file)) continue;
+    const src = read(file)
+      .replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l)).join("\n");
+    const hits = [...src.matchAll(NAMES)].map((m) => `${m[1]}=${m[2]}`);
+    if (hits.length) found.set(file, hits);
+  }
+
+  const unexpected: string[] = [];
+  const seen = new Set<string>();
+  for (const [file, hits] of found) {
+    for (const hit of hits) {
+      const name = hit.split("=")[0];
+      seen.add(`${file}:${name}`);
+      if (PENDING[file] === name) continue;
+      if (`${file}:${name}` in NOT_A_MEMBER_BAR) continue;
+      unexpected.push(`${file}: ${hit}`);
+    }
+  }
+  ok("no module binds a member threshold to a number of its own", unexpected.length === 0,
+    unexpected.join(" · "));
+
+  // Both lists expire with their subjects. An allowance that outlives the thing
+  // it excused is how `DEFAULT_UNLOCK_THRESHOLD` survived the consolidation
+  // that was supposed to delete it.
+  for (const key of Object.keys(NOT_A_MEMBER_BAR)) {
+    ok(`the allowance for ${key.split(":")[1]} still describes something real`, seen.has(key),
+      `${key} is gone — delete its NOT_A_MEMBER_BAR entry in this file`);
+  }
+  for (const [file, name] of Object.entries(PENDING)) {
+    ok(`the pending exception for ${name} still describes something real`, seen.has(`${file}:${name}`),
+      `${name} is gone from ${file} — delete its PENDING entry in this file`);
+  }
+}
+
+console.log("\n== and NO DOCUMENT carries a retired ladder, anywhere in the repo ==");
+{
+  // ===== WHY THIS EXISTS =====
+  //
+  // `docs/PAYMENTS.md` — the document about how owners are PAID — still said an
+  // owner's earnings were "their cut of what a brand paid, scaled by how many of
+  // their members are linked (5% at 500, 10% at 1,000, 25% at 5,000)". That is
+  // the scheme from TWO pivots ago, contradicted by `MODEL.md`, by
+  // `SOURCE_OF_TRUTH.md`'s "we will never promise a per-challenge rate", and by
+  // the arithmetic in lib/ladder.ts — twenty servers at 5% of a challenge is
+  // 100% of it.
+  //
+  // Three guards were in place and every one of them missed it:
+  //
+  //   the prose sweep below      walked lib, components and app — not docs/. It
+  //                              had been widened from a six-file list precisely
+  //                              because curated lists rot, and the widening was
+  //                              itself a list.
+  //   tests/db/docs-truth.mts    read PAYMENTS.md and checked it for PRICES.
+  //                              Passed. Never looked at thresholds or rates.
+  //   the constant check         wanted two or more `threshold:` literals in one
+  //                              file. A lone `const X = 500` matched neither.
+  //
+  // ===== SO THIS ONE WALKS THE REPOSITORY, AND MATCHES THE CLAIM =====
+  //
+  // Every .md anywhere, including the root, found by walking rather than listed.
+  // And it looks for the ASSERTION — a percentage tied to a member count, or an
+  // owner being given a cut of a challenge — rather than for a bare number:
+  // $350 and "50% prize" are legitimate figures that would bury the signal.
+  const mdFiles = (dir: string): string[] => readdirSync(at(dir), { withFileTypes: true })
+    .flatMap((e) => e.name.startsWith(".") || e.name === "node_modules" || e.name === "coverage"
+      ? []
+      : e.isDirectory() ? mdFiles(`${dir}/${e.name}`)
+        : /\.md$/i.test(e.name) ? [`${dir}/${e.name}`] : []);
+  const docs = mdFiles(".");
+  ok("the sweep found the documents at all", docs.length >= 5, `${docs.length} .md file(s)`);
+  ok("…including ones outside docs/", docs.some((f) => !f.startsWith("./docs/")), docs.join(" "));
+
+  // `exempt` says whether a DENIAL on the same line excuses the match.
+  //
+  // It does for the prose patterns, because MODEL.md legitimately says "Not a
+  // percentage of a challenge" and a guard that fires on a document doing the
+  // right thing gets deleted.
+  //
+  // It does NOT for the hard numeric pair. A concrete rate bound to a concrete
+  // member count has no legitimate framing in a document at all — that is the
+  // whole of "a rate quoted is a rate we are held to", and the denial in front
+  // of it is not what a screenshot carries.
+  const CLAIMS: { re: RegExp; why: string; exempt: boolean }[] = [
+    // A percentage bound to a member count: "5% at 500", "25% at 5,000".
+    { re: /\d+\s*%\s*at\s*[\d,]{2,}/i, why: "a percentage tied to a member count", exempt: false },
+    // An owner being promised a share OF A CHALLENGE, in any wording.
+    { re: /(cut|share|percentage|%)\s+of\s+(what\s+)?(a\s+)?(brand|challenge|sponsor)/i,
+      why: "an owner's cut of a challenge", exempt: true },
+    // The retired bar, stated as a live requirement rather than as history.
+    { re: /(link|reach|hit|cross)\s+[\d,]{3,}\s+(linked\s+)?(gamers|members)/i,
+      why: "a retired member bar quoted as the requirement", exempt: true },
+  ];
+  // A DENIAL IS NOT A CLAIM, and this is the difference between a guard that
+  // survives and one that gets deleted. The first version of this sweep fired on
+  // MODEL.md's "Not a percentage of a challenge. C3 deleted that rate" — the
+  // document doing exactly the right thing. A guard that cries wolf gets
+  // weakened until it stops firing, which is roughly how the original one died.
+  //
+  // Per LINE, and NOT applied to the numeric pattern — because the first version
+  // of this applied it to everything, and my own break test walked straight
+  // through it: "not a flat fee: an owner takes 5% at 500 linked members" was
+  // waved past by the word "not". The comment here claimed that case was caught.
+  // It was not. Exemption is now per pattern, and the hard pair is never exempt.
+  const DENIAL = /\b(not|never|no longer|cannot|can't|must not|will not|won't|deleted|removed|stopped|retired|used to|forbidden)\b/i;
+
+  const bad: string[] = [];
+  for (const f of docs) {
+    for (const [i, line] of read(f.replace(/^\.\//, "")).split("\n").entries()) {
+      for (const { re, why, exempt } of CLAIMS) {
+        if (!re.test(line)) continue;
+        if (exempt && DENIAL.test(line)) continue;
+        bad.push(`${f}:${i + 1} — ${why}: ${line.trim().slice(0, 80)}`);
+      }
+    }
+  }
+  ok("no document promises an owner a rate or quotes a member bar", bad.length === 0,
+    bad.join(" · "));
 }
 
 console.log("\n== the surfaces read it rather than retyping it ==");

@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/password";
 import { uid } from "@/lib/utils";
 import { TROPHY_ART, BANNER_ART } from "@/lib/assets";
 import { CARD_AD_PLACEMENT, HOUSE_CTA } from "@/lib/cards/ads";
+import { demoOnlyKey } from "@/lib/demo-keys";
 
 // Seeds platform defaults (games, spaces, placements, leaderboards,
 // trophies) and the superadmin from env. Demo mode additionally seeds a demo
@@ -544,7 +545,11 @@ export async function seed(db: DB, opts: { demo: boolean }) {
       // DM'd to the owner, and staff are deliberately never shown it. But a
       // demo where the entire server-owner product is behind a secret nobody
       // holds is a demo of the lock, not of the portal.
-      portalKey: `DEMO-${g.guildId.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(-8)}`,
+      // …and it is DEMO-ONLY, enforced rather than intended (BR1). This key is
+      // derived from the guild id, so on a real database it would be a portal
+      // anybody could open by reading a URL. `demoOnlyKey` throws outside the
+      // in-process demo instead of quietly seeding one.
+      portalKey: demoOnlyKey(`DEMO-${g.guildId.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(-8)}`),
       community: { games: ["Chess"], regions: ["mena", "eu"], vibes: ["competitive"], about: "", answeredAt: new Date().toISOString() },
     }).onConflictDoNothing();
   }

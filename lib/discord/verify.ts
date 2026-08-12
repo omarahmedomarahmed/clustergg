@@ -22,12 +22,35 @@ function keyFor(hex: string) {
 
 export type VerifyResult = { ok: true } | { ok: false; reason: string };
 
+/**
+ * How old a signed interaction may be. F6.
+ *
+ * The signature covers `timestamp + body`, and nothing here read the timestamp
+ * — so a captured request stayed valid forever and could be replayed at will.
+ * Discord's own guidance is to reject stale ones, and it matters more here than
+ * usual: an interaction is an ACTION, and some of them move money or hand over
+ * a credential.
+ *
+ * Five minutes each way. Generous, because the cost of being too tight is
+ * rejecting real interactions from a machine whose clock has drifted, and
+ * Discord's own examples use the same order of magnitude. Symmetric, because a
+ * clock ahead of ours is as ordinary as one behind.
+ */
+export const MAX_SIGNATURE_AGE_SECONDS = 300;
+
 // `body` must be the EXACT raw request text — re-serializing the parsed JSON
 // changes the bytes and every signature fails.
 export function verifyInteraction(body: string, signature: string | null, timestamp: string | null): VerifyResult {
   const hex = publicKey();
   if (!hex) return { ok: false, reason: "not_configured" };
   if (!signature || !timestamp) return { ok: false, reason: "missing_signature" };
+  // Freshness BEFORE the cryptography: a replayed request is one whose
+  // signature is perfectly valid, so verifying first and checking after would
+  // spend the expensive operation on the case being rejected.
+  const age = Math.abs(Date.now() / 1000 - Number(timestamp));
+  if (!Number.isFinite(age) || age > MAX_SIGNATURE_AGE_SECONDS) {
+    return { ok: false, reason: "stale_timestamp" };
+  }
   try {
     const sig = Buffer.from(signature, "hex");
     if (sig.length !== 64) return { ok: false, reason: "bad_signature_length" };

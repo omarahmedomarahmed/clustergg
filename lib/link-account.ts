@@ -62,7 +62,9 @@ export async function linkGameAccountFor(
   // "someone else has this" is actionable, a constraint violation is not.
   const conflict = await accountHeldByOther(db, providerId, verified.accountId, userId);
   if (conflict) {
-    return { ok: false, conflict: true, error: conflictMessage(conflict, provider.game) };
+    // The provider id goes with it: which action we can honestly offer depends
+    // on whether this game has a sign-in that proves ownership (G7).
+    return { ok: false, conflict: true, error: conflictMessage(conflict, provider.game, providerId) };
   }
 
   // What we actually know at this moment.

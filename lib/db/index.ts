@@ -1258,6 +1258,13 @@ async function ensureProvisioned(db: DB) {
       await ensureBlogAdPlacements(db);
       await refreshStaleChallengeWindows(db);
       await ensureBrandKeys(db);
+      // BR1. Every boot, and a no-op on every deployment that never ran the
+      // demo seed — which is all of them today. It exists so that "somebody
+      // once pointed the demo seed at this database" is recoverable without
+      // anybody having to notice: a key derived from a public brand slug opens
+      // that brand's portal to whoever reads the URL. Never throws.
+      const { rotateDemoKeys } = await import("@/lib/demo-keys");
+      await rotateDemoKeys(db);
     } catch { /* non-fatal — ads/skins just won't backfill this boot */ }
     return;
   }

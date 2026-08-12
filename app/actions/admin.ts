@@ -7,7 +7,7 @@ import { requireAdmin, requireStaff, hashPassword } from "@/lib/auth";
 import { requireArea, setStaffGrants } from "@/lib/permissions";
 import { checkCoSponsor } from "@/lib/co-sponsor";
 import { requireSystemFor } from "@/lib/departments";
-import { uid, slugify } from "@/lib/utils";
+import { uid, slugify, slugifyOr } from "@/lib/utils";
 import { newAccessKey, getCampaignReadiness } from "@/lib/brands";
 import { syncAccount } from "@/lib/sync";
 import { CADENCE_DAYS, isRepeating, runTitle, stripRunSuffix } from "@/lib/challenge-series";
@@ -249,7 +249,7 @@ export async function saveSpace(formData: FormData) {
     await audit(admin.id, "space.update", "space", spaceId);
   } else {
     await db.insert(schema.spaces).values({
-      id: uid(), slug: slugify(values.name), createdBy: admin.id, ...values,
+      id: uid(), slug: slugifyOr(values.name, `space-${uid().slice(0, 6).toLowerCase()}`), createdBy: admin.id, ...values,
     }).onConflictDoNothing();
     await audit(admin.id, "space.create", "space", values.name);
   }
@@ -282,7 +282,7 @@ export async function ensurePlanetsForGames() {
   for (const g of games) {
     if (have.has(g.name)) continue;
     await db.insert(schema.spaces).values({
-      id: uid(), slug: slugify(g.name), name: g.name, game: g.name,
+      id: uid(), slug: slugifyOr(g.name, `game-${uid().slice(0, 6).toLowerCase()}`), name: g.name, game: g.name,
       description: g.description || `The ${g.name} planet — leaderboards, challenges and community.`,
       createdBy: admin.id,
     }).onConflictDoNothing();
@@ -321,7 +321,7 @@ export async function reviewSpaceRequest(requestId: string, approve: boolean, no
   }).where(eq(schema.spaceRequests.id, requestId));
   if (approve) {
     await db.insert(schema.spaces).values({
-      id: uid(), slug: slugify(request.proposedName), name: request.proposedName,
+      id: uid(), slug: slugifyOr(request.proposedName, `space-${uid().slice(0, 6).toLowerCase()}`), name: request.proposedName,
       description: request.reason.slice(0, 200), createdBy: admin.id,
     }).onConflictDoNothing();
   }
@@ -1016,7 +1016,7 @@ export async function saveGame(formData: FormData) {
     await db.update(schema.games).set(values).where(eq(schema.games.id, gameId));
     await audit(admin.id, "game.update", "game", gameId);
   } else {
-    await db.insert(schema.games).values({ id: uid(), slug: slugify(values.name), ...values }).onConflictDoNothing();
+    await db.insert(schema.games).values({ id: uid(), slug: slugifyOr(values.name, `game-${uid().slice(0, 6).toLowerCase()}`), ...values }).onConflictDoNothing();
     await audit(admin.id, "game.create", "game", values.name);
   }
   revalidatePath("/admin/games");

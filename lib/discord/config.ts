@@ -12,6 +12,26 @@ export const DISCORD_API = "https://discord.com/api/v10";
 // The channel the bot creates on install and pins its how-to guides in.
 export const CLUSTER_CHANNEL = "clustergg";
 
+/**
+ * Do sponsored posts run in a server we have just met? B7.
+ *
+ * It is `true` — sponsored posts are opt-OUT — and the number matters less than
+ * the fact that ONE place says so. It used to be written only as a column
+ * default (`.default(true)` on `discord_guilds.ad_opt_in`), and the admin card
+ * rendered `guild?.adOptIn`, so a server whose row did not exist yet read
+ * `undefined` → falsy → **"Sponsored posts: off"**.
+ *
+ * The row is created by the first `upsertGuild`, at the column default. So an
+ * owner saw "off", pressed something unrelated — turning the daily post off,
+ * say — and the label flipped to "on" in the same breath. Nobody consented to
+ * anything; the card had been describing a server it had no record of, and
+ * `?.` on a boolean silently inverts the meaning of a missing row.
+ *
+ * A leaf module because `lib/db/schema.ts` reads it too, and schema.ts cannot
+ * import from `lib/discord/guilds.ts` without a cycle.
+ */
+export const AD_OPT_IN_DEFAULT = true;
+
 // Env values pasted into a dashboard pick up stray whitespace and quotes
 // astonishingly often, and a public key with a trailing newline fails EVERY
 // signature check while looking perfectly correct in the UI. Normalise once,

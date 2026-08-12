@@ -47,10 +47,22 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
     "A gamer might open TikTok. They might watch a tournament. But before and after both, they're on Discord — it's where the squad is and where the next match gets organised.\n\n"
     + "Every other audience this size has a Business Suite, targeting and a self-serve buy. Discord has none of it. That's not a gap in a media plan; it's the whole gaming audience behind a door with no handle.\n\n"
     + "Cluster is the handle.",
-  "brand.insight.stat": "100%",
-  "brand.insight.statLabel": "of gamers are on Discord",
-  "brand.insight.stat2": "0",
-  "brand.insight.stat2Label": "ads managers to buy it with",
+  // ===== NO FABRICATED MARKET STATISTIC =====
+  //
+  // This said "100% — of gamers are on Discord". That is not true, it is not
+  // sourced, and it is the first number a media buyer or an investor checks. A
+  // claim that cannot survive one question costs more than it buys, and it sat
+  // directly above copy asking somebody to trust our counting.
+  //
+  // Both numbers are now about the thing we can actually stand behind: there is
+  // no way to buy this audience, and half of what a brand pays leaves as prize
+  // money. The second is enforced by `lib/pricing.ts` rather than asserted here
+  // — see `prizeSharePct` — so the words say "half" and the page shows the
+  // computed figure.
+  "brand.insight.stat": "0",
+  "brand.insight.statLabel": "ads managers for Discord",
+  "brand.insight.stat2": "1",
+  "brand.insight.stat2Label": "way in — a competition they already wanted to enter",
 
   "brand.solution.title": "How to advertise on Discord, without asking anyone.",
   "brand.solution.subtitle":
@@ -66,11 +78,13 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
     "Brands spend, gamers play, owners earn. No side works without the other two, which is what makes it run without us.",
   "brand.loop.items":
     "Brands buy | A month of challenges on a published rate card, with the reach stated before you spend.\n"
-    + "Gamers play | One verified account, as many challenges as they like, a trophy that stays on their profile.\n"
+    + "Gamers play | One account, synced from the game's own API, as many challenges as they like, a trophy that stays on their profile.\n"
     + "Owners earn | A weekly pool, shared between the servers that carried a challenge. No sales team, no admin.\n"
     + "Cluster runs it | The bot posts it, scores it, announces it and pays out. Nobody operates anything.",
 
-  "brand.prize.title": "Most of it isn't ad spend. It's prize money.",
+  // Said "Most of it isn't ad spend" directly above a body saying "Half of what
+  // you pay". Half is not most, and the two lines are read together.
+  "brand.prize.title": "Half of it isn't ad spend. It's prize money.",
   "brand.prize.body":
     "Half of what you pay goes to the players as prizes, on trophies carrying your logo. No setup fee, no admin fee, no agency. That's why the rest buys reach instead of overhead.",
 
@@ -93,7 +107,11 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   // never quote a figure the product isn't using.
   "discord.hero.title": "Earn money from your Discord server.",
   "discord.hero.subtitle":
-    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Carry a challenge and you compete for the weekly pool with the servers your size — {threshold} linked gamers moves you up a bracket. Free forever, and it never reads a message.",
+    // `{threshold}` is EARN_FLOOR, and this sentence used to say it "moves you up a
+  // bracket". It does not: it is the bar where a server STARTS earning at all,
+  // and the brackets above it are separate rungs. Told an owner the wrong thing
+  // about the only number on the page they care about.
+    "Weekly challenges with real prize money, run by a bot, funded by brands. Your members get ranked profiles and live stats from the games they already play. Carry a challenge and you share the weekly pool with the servers your size — {threshold} linked gamers is where a server starts earning. Free forever, and it never reads a message.",
 
   // ===== The gamer-facing hero (still the entry point for players) =====
   "hero.badge": "Live stats from the games you already play",
@@ -105,13 +123,34 @@ export const CONTENT_DEFAULTS: Record<string, string> = {
   "hero.cta.secondary": "Explore leaderboards",
   "hero.image": "/assets/hero.png",
   "hero.banner.label": "The Cluster galaxy",
-  "hero.banner.note": "Six worlds, one weekly challenge each. Tap a game to open its planet.",
+  // `{games}` IS SUBSTITUTED WITH THE LIVE COUNT.
+  //
+  // This said "Six worlds, one weekly challenge each", and six was RIGHT —
+  // production runs six games. I changed it to vague prose on the strength of
+  // the demo seed, which carries fourteen, and so replaced a true sentence with
+  // a woollier one. Reading a count off the demo and calling it the product is
+  // the same mistake as reading it off a comment.
+  //
+  // Neither hardcoding is the answer. A literal is right until somebody adds a
+  // game; vague prose is never wrong and never says anything. The page already
+  // knows the number — it renders it in the stat strip — so the copy asks for it.
+  "hero.banner.note": "{games} worlds, one weekly challenge each. Tap a game to open its planet.",
   "section.challenges.title": "Live Challenges",
   "section.challenges.subtitle": "Join, play the game you were going to play, watch the board move. One account, as many as you like.",
   "section.games.title": "The Game Galaxy",
   "section.games.subtitle": "Every world we run — each with its own weekly challenge, leaderboards and community.",
   "section.leaderboards.title": "Leaderboards",
-  "section.leaderboards.subtitle": "Live standings from verified, API-synced accounts.",
+  // "verified" was the wrong word, and it is our own word. `lib/account-ownership.ts`
+  // reserves it for PROVEN OWNERSHIP — linking an account writes
+  // `verified: false, verifiedMethod: "exists"`, and the profile renders that as
+  // "Account exists — ownership not proven". Production holds ten linked accounts
+  // and zero verified ones, so this line claimed something the product's own
+  // profile page contradicts on every account it has.
+  //
+  // What is true is the stronger half of the sentence anyway: the numbers are
+  // read from each game's official API and nothing is self-reported. That is the
+  // actual differentiator, and it does not need a word we cannot back.
+  "section.leaderboards.subtitle": "Live standings read from each game's own API. Nothing self-reported.",
   "section.badges.title": "Badges forged in the void",
   "section.badges.subtitle": "Earned from linked accounts, rank thresholds, community reputation and challenge placements. The criteria are code.",
   "section.partners.title": "Trusted by",

@@ -87,9 +87,26 @@ export default function BrandTierStrip({
       {standing.next && (
         <div className="border-t border-white/10 bg-black/25 px-5 py-3">
           <div className="flex items-center justify-between text-xs">
+            {/* ===== THE ZERO CASE DID NOT PARSE. BR3. =====
+
+                `next.label` is a STANDING — "3 of 6 games" — and this sentence
+                used it as an object, so a brand with nothing running read:
+
+                  One more game and you carry 1 of 6 games.  0/6
+
+                which is the first line a new customer sees on the page we ask
+                them to spend money from. It is also the wrong framing at zero:
+                "one MORE" counts up from something, and they have not started.
+
+                So the sentence branches. Everywhere above zero it reads as it
+                always did, because there it was right. */}
             <span className="flex items-center gap-1.5 text-muted">
               <Icon name="rocket" size={12} className="text-cyan-300" />
-              One more game and you carry <b className="text-ink">{standing.next.label}</b>.
+              {standing.games === 0 ? (
+                <>Your first game puts you on the board — <b className="text-ink">{standing.ofGames}</b> to choose from.</>
+              ) : (
+                <>One more game and you&apos;re on <b className="text-ink">{standing.next.label}</b>.</>
+              )}
             </span>
             <span className="tabular-nums text-muted">{standing.games}/{standing.ofGames}</span>
           </div>

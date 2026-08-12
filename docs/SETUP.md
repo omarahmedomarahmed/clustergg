@@ -58,6 +58,7 @@ Vercel + Neon Postgres + Vercel Blob. Nothing else is required.
 | `NEXT_PUBLIC_APP_URL` | `https://clustergg.com` — used for absolute links and OAuth redirects |
 | `BLOB_READ_WRITE_TOKEN` | Vercel Blob. Uploads and rendered cards live here. |
 | `CRON_SECRET` | Vercel Cron sends it automatically; the routes reject anything else. |
+| `PORTAL_SECRET` | Signs every brand and server portal session. `openssl rand -hex 32`. **The app throws without it** — see below. |
 
 **The bot** — with none of these set, the site behaves normally and the bot
 endpoints report "not configured".
@@ -70,8 +71,18 @@ endpoints report "not configured".
 | `DISCORD_CLIENT_ID` / `DISCORD_CLIENT_SECRET` | OAuth2 → for "Sign in with Discord" |
 | `BOT_API_SECRET` | You generate. Guards command registration. |
 
-**Optional** — `PORTAL_SECRET` (portal sessions survive a redeploy),
-`AD_ANALYTICS_SALT`, `DISCORD_DEFAULT_CHANNEL_ID` (a single test channel before
+**`PORTAL_SECRET` is required, and it may not be shared.** A portal session
+cookie is `HMAC(secret, "<kind>:<id>")` and depends on nothing else — not on the
+key, not on a nonce — so whoever holds this value can mint a session for **any**
+brand and **any** server without ever seeing a key. It used to fall back to
+`CRON_SECRET`, then `BOT_API_SECRET`, then a per-process random value. The first
+two are handed out for scheduling and for command registration, which put three
+trust boundaries on one secret; the third made an unconfigured deployment look
+healthy while signing every portal session out on each cold start. All three
+fallbacks are gone and the app now throws on startup instead. The in-process
+demo (`DEMO_DB=1`) uses a fixed development value, so local work needs nothing.
+
+**Optional** — `AD_ANALYTICS_SALT`, `DISCORD_DEFAULT_CHANNEL_ID` (a single test channel before
 any server has installed), `EXTRA_IMAGE_HOSTS` (comma-separated extra image
 hosts, if you serve art from a CDN of your own — the allowlist in
 `next.config.ts` is deliberately not a wildcard).
@@ -80,12 +91,62 @@ hosts, if you serve art from a CDN of your own — the allowlist in
 unset the endpoint refuses with a 403 and bootstrap is closed — which is the
 right default, because the alternative is an endpoint on the open internet that
 creates the schema and mints the first superadmin. Set it, call
-`POST /api/setup?token=…` once, and you never need it again.
+
+```
+POST /api/setup?token=…&admin=you@yourdomain.com
+```
+
+once, and you never need it again.
+
+**`admin=` is how the first superadmin is chosen, and it is not optional
+either.** Signing up used to promote whoever arrived while the users table was
+empty, so on a fresh deployment the first person to find the URL became
+superadmin. That address now has to be named here, by somebody holding the
+token, and it is promoted only while no superadmin exists yet. Call setup
+without `admin=` and **no superadmin is created at all** — the response says so.
+See `lib/bootstrap.ts`.
 
 **Game providers** — each is optional; a provider with no key reports
 `needs_key` and everything else keeps working: `RIOT_API_KEY`, `STEAM_API_KEY`,
 `PUBG_API_KEY`, `FORTNITE_API_KEY`, `FACEIT_API_KEY`, `HYPIXEL_API_KEY`,
 `OPENXBL_API_KEY`, `TRN_API_KEY`, `OSU_CLIENT_ID` + `OSU_CLIENT_SECRET`.
+
+### `RIOT_API_KEY` is a personal key, and that constrains the code
+
+Riot approved ClusterGG for a **personal** key. Not production, and not the
+development key the League integration was originally built against. A personal
+key carries **39 methods**; a development key carries 59. The full approved list
+lives in `lib/providers/riot-methods.ts`, and `tests/db/riot-methods.mts`
+asserts nothing in `lib/providers/` calls anything outside it — because an
+unapproved method fails nowhere except in production, for one gamer, in one
+sync, as a 403 nothing surfaces.
+
+Four things follow, and they are the reason the code looks the way it does:
+
+- **`summoner-v4` has only `by-puuid`.** No by-name, no by-account. Every route
+  into League therefore starts at a Riot ID, resolves it through
+  `account-v1/accounts/by-riot-id` to a PUUID, and uses that PUUID for
+  everything after. This is not a stylistic choice and cannot be shortened.
+- **There are no `val/*` methods at all.** VALORANT works because one Riot
+  account has one PUUID across both games, so proving the League profile icon
+  proves the same human in VALORANT. See `lib/providers/riot-verify.ts`.
+- **`spectator-v5` reads `active-games/by-summoner/{...}` but takes a PUUID.**
+  The path name is Riot's, not ours. Passing a PUUID is correct; "fixing" it
+  breaks live-game detection.
+- **A personal key does not expire.** Development keys die after 24 hours, and
+  this file and the admin health panel both used to say so. If Riot stops
+  answering, the cause is a revoked or overwritten key — or a missing redeploy —
+  not expiry.
+
+Rate limits: most methods allow 20,000 / 10s, but **`summoner-v4 by-puuid` is
+capped at 1,600 / minute** and is hit by every stat sync *and* every press of
+Verify during icon proof. It is the binding limit by a wide margin; the number
+is exported as `RIOT_SUMMONER_V4_PER_MINUTE` so a throttle imports it.
+
+Admin → Linked accounts shows key health. **"Personal key (39 methods)" is the
+healthy state** — the fourth pill flips green only if Riot grants production
+access. If it ever does, add the new methods to `riot-methods.ts` in the same
+commit that starts calling them, never in advance.
 
 Env changes need a **redeploy** — they do not apply to an existing build.
 

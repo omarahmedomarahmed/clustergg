@@ -81,17 +81,26 @@ export default async function AdminLinkedAccountsPage() {
         </div>
       )}
 
-      {/* Riot key health. A development key dies after 24 hours and takes every
-          League link and sync with it. */}
+      {/* Riot key health. If the key stops answering it takes every League link
+          and sync with it, silently, so it gets a panel of its own.
+
+          Only the first three pills are health: red means something that should
+          work does not. "Production access" is a capability we do not have and
+          have not asked for — it is off on a perfectly healthy day, so it is
+          drawn neutral. It was previously labelled "VALORANT stats" and drawn
+          red, which made every normal day look like an outage. */}
       {riot && (
         <div className="glass mb-6 p-4">
           <h2 className="mb-2 text-sm font-bold">Riot API key</h2>
           <div className="mb-2 flex flex-wrap gap-2 text-xs">
-            {([["Configured", riot.configured], ["Riot accounts", riot.account], ["League", riot.summoner], ["VALORANT stats", riot.valorant]] as [string, boolean][]).map(([label, up]) => (
+            {([["Configured", riot.configured], ["Riot accounts", riot.account], ["League", riot.summoner]] as [string, boolean][]).map(([label, up]) => (
               <span key={label} className={`rounded-full border px-2.5 py-1 ${up ? "border-emerald-400/40 text-emerald-300" : "border-rose-400/40 text-rose-300"}`}>
                 {up ? "●" : "○"} {label}
               </span>
             ))}
+            <span className={`rounded-full border px-2.5 py-1 ${riot.production ? "border-emerald-400/40 text-emerald-300" : "border-white/15 text-muted"}`}>
+              {riot.production ? "● Production access" : "○ Personal key (39 methods)"}
+            </span>
           </div>
           <p className="text-xs text-muted">{riot.note}</p>
         </div>

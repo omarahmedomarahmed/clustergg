@@ -3,7 +3,16 @@ import { runAllJobs } from "@/lib/jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+// 300, like every other cron here. It was 60 — the Vercel default — while
+// /api/cron/sync and /api/cron/announce both declared 300, and this is the
+// route that does the MOST: the weekly close that pays server owners, guild
+// snapshots, challenge reminders, the leaderboard feed and the ad pass.
+//
+// It has actually timed out in production (twice in the last fortnight,
+// "Task timed out after 60 seconds"). A daily job that dies part-way is not a
+// failed job you notice — it is some jobs having run and the rest silently
+// not, and on a Monday the one that does not run is the one that pays people.
+export const maxDuration = 300;
 
 // The daily cron: everything that SPEAKS.
 //

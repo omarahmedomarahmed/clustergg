@@ -38,6 +38,7 @@
 import { eq, sql } from "drizzle-orm";
 import * as schema from "@/lib/db/schema";
 import { uid } from "@/lib/utils";
+import { demoOnlyKey } from "@/lib/demo-keys";
 
 const day = 86400000;
 const ago = (d: number) => new Date(Date.now() - d * day);
@@ -594,8 +595,12 @@ async function seedDemoPortalKeys(db: any) {
   const brands = await db.select().from(schema.brands);
   for (const b of brands) {
     if (!b.slug || /^DEMO-/.test(b.accessKey ?? "")) continue;
+    // Derived from the brand's own public slug, so on a real database
+    // `/brands/<slug>?key=DEMO-<SLUG>` opens their portal to anybody who can
+    // read the URL. `demoOnlyKey` makes writing one outside the in-process demo
+    // a hard failure rather than a silent downgrade (BR1).
     await db.update(schema.brands)
-      .set({ accessKey: `DEMO-${b.slug.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)}` })
+      .set({ accessKey: demoOnlyKey(`DEMO-${b.slug.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)}`) })
       .where(eq(schema.brands.id, b.id));
   }
 }

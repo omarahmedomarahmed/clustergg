@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { sendVerificationCode, checkVerificationCode } from "@/lib/email-verify";
+import { sendVerificationCode, checkVerificationCode, codeShownOnScreen } from "@/lib/email-verify";
 import { sendEmail } from "@/lib/email";
 import { emailConfigured } from "@/lib/email";
 import { parseBand } from "@/lib/age";
@@ -56,12 +56,14 @@ export async function requestEmailCode(
   return {
     ok: true,
     sentTo: res.email,
-    demoCode: emailConfigured() ? undefined : res.code,
+    demoCode: codeShownOnScreen(emailConfigured()) ? res.code : undefined,
     message: sent.ok
       ? `Code sent to ${res.email}. It works for 20 minutes.`
-      : emailConfigured()
-        ? "We could not send that email. Try again, or write to us."
-        : `Mail is not switched on for this deployment, so here is the code instead.`,
+      : codeShownOnScreen(emailConfigured())
+        ? "Mail is not switched on for this deployment, so here is the code instead."
+        // Mail is off (or failing) on a REAL deployment. Said plainly rather
+        // than left as a silent wait, and the code is never printed here.
+        : "We could not send that email. Try again in a moment, or write to us and we will confirm it by hand.",
   };
 }
 

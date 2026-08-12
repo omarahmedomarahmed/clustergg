@@ -264,10 +264,14 @@ recomputed on read, so a header can't disagree with its own body.
 Two earning types on the owner's **Earnings** tab, shown separately and **never
 added together**:
 
-- **Sponsored challenge share** — their cut of what a brand paid, scaled by how
-  many of their members are linked (5% at 500, 10% at 1,000, 25% at 5,000) and
-  apportioned by how many of a challenge's entrants came from their server.
-  **This is theirs**, and it's what a payout draws on.
+- **Weekly pool share** — their share of the server pool for the week. **This is
+  theirs**, and it's what a payout draws on. Not a percentage of any one
+  challenge: an operator releases part of the server vault, a flat share is
+  split evenly between every server that carried a public challenge that week,
+  and the rest is competed for inside a bracket (`lib/week-close.ts`). The
+  rungs, the brackets and the earning floor are one array in `lib/ladder.ts`,
+  and no figure is repeated here — a figure repeated in a document is a figure
+  that goes stale in one.
 - **Their members' winnings** — prize money won by people in their server. **Not
   theirs, never paid to them.** It's on the page because it's the clearest proof
   hosting the bot did something for their community, and because an owner who

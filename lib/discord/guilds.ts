@@ -4,6 +4,7 @@ import { uid } from "@/lib/utils";
 import { getContent } from "@/lib/cms";
 import { dmUser, getGuild, guildIconUrl } from "@/lib/discord/rest";
 import { canAct, siteUrl } from "@/lib/discord/config";
+import { EARN_FLOOR } from "@/lib/ladder";
 import { linkButton, rows } from "@/lib/discord/components";
 import { cardRef, embedColor } from "@/lib/discord/cards";
 
@@ -14,15 +15,28 @@ import { cardRef, embedColor } from "@/lib/discord/cards";
 // is the whole reason a server owner would actively recruit for us rather than
 // passively host a bot, so the counter has to be honest and always available.
 
-export const DEFAULT_UNLOCK_THRESHOLD = 500;
-
-export async function unlockThreshold(): Promise<number> {
-  try {
-    const c = await getContent(["discord.unlock.threshold"]);
-    const n = Number(c["discord.unlock.threshold"]);
-    return Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_UNLOCK_THRESHOLD;
-  } catch { return DEFAULT_UNLOCK_THRESHOLD; }
-}
+// ===== THE BAR IS THE LADDER'S BAR, AND THERE IS NO SECOND OPINION. B1 =====
+//
+// There used to be `DEFAULT_UNLOCK_THRESHOLD = 500` and an `unlockThreshold()`
+// that let a CMS setting override it. Both are gone.
+//
+// The constant survived the consolidation `lib/ladder.ts` was written to
+// perform — that file names the four modules it merged, and this was a fifth,
+// missed because it is a lone constant rather than a list. It was not inert: it
+// decided what the bot told an owner ("0 / 500 members"), while /servers and
+// /pool both said the bar was 10, and it gated the `unlockedServers` count a
+// BRAND is shown.
+//
+// The OVERRIDE went with it, and that is the less obvious half. A setting named
+// "Linked gamers required to unlock monetization" is a second source of truth by
+// construction: an operator who moves it moves this gate away from the ladder
+// without moving the ladder, and every surface that reads `EARN_FLOOR` directly
+// — /servers, /pool, the weekly close, the payout-hold clock — would carry on
+// saying 10. That is precisely the drift that produced five disagreeing lists in
+// the first place, rebuilt as a feature and handed to an operator.
+//
+// So: one array, one number, no override. Changing the bar is a code change to
+// `lib/ladder.ts`, which is the only thing that makes "one ladder" true.
 
 export type GuildRow = typeof schema.discordGuilds.$inferSelect;
 
@@ -177,15 +191,15 @@ export type GuildStats = {
 export async function guildStats(guildId: string): Promise<GuildStats | null> {
   try {
     const db = await getDb();
-    const [row, counts, threshold] = await Promise.all([
+    const [row, counts] = await Promise.all([
       getGuildRow(guildId),
       db.select({
         joined: sql<number>`count(*)`,
         linked: sql<number>`count(${schema.discordGuildMembers.firstLinkedAt})`,
         left: sql<number>`count(${schema.discordGuildMembers.leftAt})`,
       }).from(schema.discordGuildMembers).where(eq(schema.discordGuildMembers.guildId, guildId)),
-      unlockThreshold(),
     ]);
+    const threshold = EARN_FLOOR;
 
     const joined = Number(counts[0]?.joined ?? 0);
     const linked = Number(counts[0]?.linked ?? 0);

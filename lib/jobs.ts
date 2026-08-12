@@ -153,11 +153,20 @@ export async function runJob(key: JobKey): Promise<JobResult> {
         const r = await remindLiveChallenges();
         return {
           key, ok: true,
+          // "Already reminded today" is reported as ITSELF. It used to fall
+          // through to "just launched, or not running", which described a state
+          // the challenge was not in — and on the second run of the day that was
+          // every line of the summary (C1).
           summary: r.sent
-            ? `Reminded ${r.sent} challenge${r.sent === 1 ? "" : "s"}${r.skipped ? ` · ${r.skipped} skipped` : ""}.`
-            : r.skipped
-              ? `Nothing to remind — ${r.skipped} skipped (just launched, or not running).`
-              : "No challenge is running.",
+            ? `Reminded ${r.sent} challenge${r.sent === 1 ? "" : "s"}`
+              + `${r.alreadySent ? ` · ${r.alreadySent} already reminded today` : ""}`
+              + `${r.skipped ? ` · ${r.skipped} skipped` : ""}.`
+            : r.alreadySent
+              ? `Nothing to do — ${r.alreadySent} challenge${r.alreadySent === 1 ? "" : "s"} already reminded today`
+                + `${r.skipped ? `, ${r.skipped} skipped` : ""}.`
+              : r.skipped
+                ? `Nothing to remind — ${r.skipped} skipped (just launched, or not running).`
+                : "No challenge is running.",
         };
       }
       case "discord-ads": {
@@ -201,9 +210,17 @@ export async function runJob(key: JobKey): Promise<JobResult> {
         const r = await postLeaderboardUpdates();
         return {
           key, ok: true,
+          // Each outcome named as itself. "Posted 5 boards" was printed on the
+          // second run of the day when nothing had been posted at all, and
+          // "No active leaderboard had anyone on it yet" was printed when every
+          // board had somebody on it and had already gone out (C1).
           summary: r.posted
-            ? `Posted ${r.posted} board${r.posted === 1 ? "" : "s"} across ${new Set(r.boards.map((b) => b.game)).size} game${new Set(r.boards.map((b) => b.game)).size === 1 ? "" : "s"}.`
-            : "No active leaderboard had anyone on it yet.",
+            ? `Posted ${r.posted} board${r.posted === 1 ? "" : "s"} across ${new Set(r.boards.map((b) => b.game)).size} game${new Set(r.boards.map((b) => b.game)).size === 1 ? "" : "s"}`
+              + `${r.alreadyPosted ? ` · ${r.alreadyPosted} already posted today` : ""}`
+              + `${r.empty ? ` · ${r.empty} with nobody on them` : ""}.`
+            : r.alreadyPosted
+              ? `Nothing to do — ${r.alreadyPosted} board${r.alreadyPosted === 1 ? "" : "s"} already posted today.`
+              : "No active leaderboard had anyone on it yet.",
         };
       }
     }

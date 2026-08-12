@@ -27,7 +27,7 @@ import { cardRef, embedColor } from "@/lib/discord/cards";
 // reports exactly what would be created and what already exists, and nothing
 // happens until someone presses the button.
 
-const HQ_ID_KEY = "discord.hq.guildId";
+export const HQ_ID_KEY = "discord.hq.guildId";
 const HQ_DONE_KEY = "discord.hq.setupFor";   // the guild id we've already built
 const HQ_INVITE_KEY = "discord.hq.invite";   // the public link into HQ
 
