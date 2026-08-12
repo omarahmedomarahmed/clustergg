@@ -20,6 +20,71 @@ export type AccountRef = {
 
 const UA = { "User-Agent": "ClusterGG/1.0 (clustergg.com stat sync)" };
 
+// ===== WE THREW AWAY THE ONLY EXPLANATION WE WERE GIVEN =====
+//
+// This helper recorded `HTTP 400 from na1.api.riotgames.com` and dropped the
+// response body. Riot puts the reason in that body — `{"status":{"message":
+// "Exception decrypting <id>"}}` — and every other provider does something
+// similar. So five League accounts sat failing in production and the only
+// thing anybody could say about it was the number 400.
+//
+// A status code tells you a request failed. It does not tell you why, and
+// "why" is the entire job of an error message. Diagnosing this from outside
+// meant guessing between hypotheses that a single sentence would have settled.
+//
+// Applies to every provider, not just Riot: they all funnel through here.
+
+/**
+ * Anything key-shaped, removed before it can be stored or shown.
+ *
+ * `sync_error` is rendered on the gamer's own profile page
+ * (`app/profile/page.tsx:110`), so whatever comes back from a provider ends up
+ * on a user-facing surface. Providers really do echo credentials into error
+ * text — several take the key as a query parameter — and the previous code was
+ * accidentally safe only because it discarded the body entirely. Capturing it
+ * without scrubbing would turn a diagnostic improvement into a key leak.
+ *
+ * Every environment value of a plausible secret length is matched, rather than
+ * a list of known variable names: the point is to be safe for the provider
+ * nobody has added yet.
+ */
+export function scrubSecrets(s: string): string {
+  let out = s;
+  for (const v of Object.values(process.env)) {
+    if (v && v.length >= 12 && out.includes(v)) out = out.split(v).join("«redacted»");
+  }
+  // Riot keys are recognisable on sight, so they go even if the value in the
+  // environment has drifted from the one that made the request.
+  return out.replace(/RGAPI-[0-9a-f-]{8,}/gi, "«redacted»");
+}
+
+/**
+ * The provider's own explanation, pulled out of whatever shape it arrived in.
+ *
+ * Exported so it can be tested against real payloads rather than through a
+ * network call. Returns "" when there is nothing useful — an empty string
+ * appends nothing, so a provider that says nothing reads exactly as it did
+ * before.
+ */
+export function explainErrorBody(raw: string): string {
+  const text = (raw ?? "").slice(0, 2000);
+  if (!text.trim()) return "";
+  let msg: unknown = text;
+  try {
+    const b = JSON.parse(text);
+    msg = b?.status?.message          // Riot
+      ?? b?.message                    // most REST APIs
+      ?? b?.error_description          // OAuth
+      ?? (typeof b?.error === "string" ? b.error : b?.error?.message)
+      ?? b?.errors?.[0]?.message       // FACEIT, TRN
+      ?? text;
+  } catch { /* not JSON — the raw text is the message */ }
+  // Collapsed and capped: this is concatenated into a column `lib/sync.ts`
+  // truncates at 300, and a wall of HTML from a proxy helps nobody.
+  const clean = scrubSecrets(String(msg)).replace(/\s+/g, " ").trim().slice(0, 160);
+  return clean ? ` — ${clean}` : "";
+}
+
 async function j<T = any>(url: string, init?: RequestInit, timeoutMs = 8000): Promise<T> {
   const res = await fetch(url, {
     ...init,
@@ -27,7 +92,13 @@ async function j<T = any>(url: string, init?: RequestInit, timeoutMs = 8000): Pr
     signal: AbortSignal.timeout(timeoutMs),
     cache: "no-store",
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}`);
+  if (!res.ok) {
+    // The body is read only on the failure path, and reading it is safe here
+    // because we are about to throw rather than parse it as JSON.
+    let why = "";
+    try { why = explainErrorBody(await res.text()); } catch { /* body already gone */ }
+    throw new Error(`HTTP ${res.status} from ${new URL(url).hostname}${why}`);
+  }
   return res.json() as Promise<T>;
 }
 
