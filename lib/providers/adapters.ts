@@ -317,6 +317,18 @@ function riotCluster(platform: string): string {
   return "europe";
 }
 const riotLol = {
+  /**
+   * A fresh PUUID for an account whose stored one no longer decrypts.
+   *
+   * `verify` already does exactly this — Riot ID in, PUUID out, through
+   * `account-v1/accounts/by-riot-id`, which is on the personal key's approved
+   * 39. The Riot ID is kept in `inGameName` at link time, so nothing extra had
+   * to be stored for this to be recoverable.
+   */
+  async reidentify(a: AccountRef): Promise<string | null> {
+    const r = await riotLol.verify(a.inGameName, a.region ?? "euw1");
+    return r.ok ? r.accountId : null;
+  },
   async verify(identifier: string, region = "euw"): Promise<VerifyResult> {
     const key = process.env.RIOT_API_KEY;
     if (!key) return { ok: false, error: "RIOT_API_KEY not configured" };
@@ -387,6 +399,11 @@ const riotLol = {
 const riotValorant = {
   async verify(identifier: string, region = "euw"): Promise<VerifyResult> {
     return riotLol.verify(identifier, region);
+  },
+  // One Riot account has one PUUID across both games, so the League
+  // re-resolution is the VALORANT one.
+  async reidentify(a: AccountRef): Promise<string | null> {
+    return riotLol.reidentify(a);
   },
   async fetchStats(): Promise<StatsResult> {
     return { ok: false, error: "VALORANT stat endpoints require Riot production key approval" };
@@ -702,7 +719,39 @@ const identityOnly = (label: string) => ({
 export type Adapter = {
   verify(identifier: string, region?: string): Promise<VerifyResult>;
   fetchStats(account: AccountRef): Promise<StatsResult>;
+  /**
+   * Fetch a fresh account id for an account whose stored one has gone stale.
+   *
+   * ===== WHY A STORED ID CAN STOP WORKING =====
+   *
+   * Riot encrypts the identifiers it hands out. Rotate the API key — a
+   * development key to the personal key, later the personal key to a production
+   * one — and every id minted under the old key becomes undecryptable. Riot
+   * answers `400 Bad Request - Exception decrypting <id>`, which is what took
+   * every League account on the platform down the day the key changed and left
+   * them down until somebody noticed.
+   *
+   * Nothing is wrong with the account, the key or the code in that state. Only
+   * the stored id is stale, and the Riot ID we already keep in `inGameName` is
+   * enough to mint a new one.
+   *
+   * Optional, because it only means anything for providers with this property.
+   * Chess.com's account id is the username; it cannot go stale.
+   */
+  reidentify?(account: AccountRef): Promise<string | null>;
 };
+
+/**
+ * Does this provider error mean "the id you stored is no longer readable"?
+ *
+ * Deliberately narrow. A broad match on 400 would re-resolve on every
+ * malformed request, and re-resolving is not free — see the ownership note in
+ * `lib/sync.ts`. This matches the sentence Riot actually returns and nothing
+ * else.
+ */
+export function isStaleIdentifier(error: string): boolean {
+  return /exception decrypting/i.test(error);
+}
 
 export const ADAPTERS: Record<string, Adapter> = {
   chesscom, lichess, opendota, speedruncom, roblox, steam,
