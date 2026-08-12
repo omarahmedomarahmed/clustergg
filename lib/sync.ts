@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull, lt, or, sql } from "drizzle-orm";
 import type { DB } from "@/lib/db";
 import { schema } from "@/lib/db";
-import { ADAPTERS } from "@/lib/providers/adapters";
+import { ADAPTERS, isStaleIdentifier } from "@/lib/providers/adapters";
 import { getProvider, isProviderLive } from "@/lib/providers/registry";
 import { meetsRule } from "@/lib/challenge-rules";
 import { awardQuestAction } from "@/lib/quests";
@@ -12,6 +12,9 @@ const ERROR_BACKOFF_MIN = 120;
 
 type Account = typeof schema.linkedGameAccounts.$inferSelect;
 
+// `account` is reassigned in one place — the stale-id repair below — so that
+// everything after it reads the id that actually worked rather than the one
+// that failed.
 export async function syncAccount(db: DB, account: Account): Promise<{ ok: boolean; error?: string }> {
   const provider = getProvider(account.provider);
   const adapter = ADAPTERS[account.provider];
@@ -31,12 +34,68 @@ export async function syncAccount(db: DB, account: Account): Promise<{ ok: boole
     return { ok: false, error: "Provider not configured" };
   }
 
-  const result = await adapter.fetchStats({
+  const ref = {
     providerAccountId: account.providerAccountId,
     inGameName: account.inGameName,
     region: account.region,
     providerData: account.providerData,
-  });
+  };
+  let result = await adapter.fetchStats(ref);
+
+  // ===== A STALE ACCOUNT ID HEALS ITSELF, ONCE =====
+  //
+  // Riot encrypts the ids it issues. Rotating the API key — development to
+  // personal, and personal to production when that lands — makes every id
+  // minted under the old key undecryptable, and Riot says so:
+  // `400 Bad Request - Exception decrypting <id>`. That took every League
+  // account on the platform down the day the key changed, and they stayed down:
+  // nothing retries its way out of it, because the request is wrong, not
+  // unlucky.
+  //
+  // The Riot ID is already stored in `inGameName`, so a new PUUID is one call
+  // away. Doing it here means the next key rotation is a blip rather than an
+  // outage somebody has to notice first.
+  //
+  // ===== AND THE ONE REASON THIS IS NOT UNCONDITIONAL =====
+  //
+  // Re-resolving means asking "who holds GameName#TAG *now*". Riot IDs can be
+  // changed and the old one taken by somebody else, so on a renamed account
+  // this would silently repoint our row — and every trophy, standing and payout
+  // attached to it — at a different human.
+  //
+  // That risk is only acceptable where the row never claimed to be a proven
+  // person. A row carrying real ownership proof is left alone and marked for
+  // reconnection instead: better a gamer re-proves an account than that we
+  // quietly hand one to a stranger. `isProof` is the same predicate the
+  // verification tick uses, so the two can never disagree about what "proven"
+  // means.
+  if (!result.ok && adapter.reidentify && isStaleIdentifier(result.error)) {
+    const { isProof } = await import("@/lib/account-ownership");
+    if (isProof(account.verifiedMethod ?? "")) {
+      await db.update(schema.linkedGameAccounts)
+        .set({
+          syncStatus: "needs_reconnect",
+          syncError: "This account's id is stale after a provider key change. Re-verify it to reconnect — we won't re-point a proven account on our own.",
+          lastSyncedAt: new Date(),
+          nextSyncAt: new Date(Date.now() + 24 * 60 * 60_000),
+        })
+        .where(eq(schema.linkedGameAccounts.id, account.id));
+      return { ok: false, error: "stale id on a proven account" };
+    }
+    const fresh = await adapter.reidentify(ref).catch(() => null);
+    // Only write when it actually changed. An unchanged id means the diagnosis
+    // was wrong, and rewriting the same value would log a repair that did not
+    // happen.
+    if (fresh && fresh !== account.providerAccountId) {
+      await db.update(schema.linkedGameAccounts)
+        .set({ providerAccountId: fresh })
+        .where(eq(schema.linkedGameAccounts.id, account.id));
+      account = { ...account, providerAccountId: fresh };
+      // Retried ONCE, from the new id. A second failure is a real failure and
+      // falls through to the normal error handling below.
+      result = await adapter.fetchStats({ ...ref, providerAccountId: fresh });
+    }
+  }
 
   if (!result.ok) {
     // IMPORTANT: on any failure — including an expired token — we only update the
