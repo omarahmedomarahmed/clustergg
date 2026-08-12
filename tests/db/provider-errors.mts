@@ -57,6 +57,22 @@ console.log("== and nothing useless is appended ==");
   // An empty result must append NOTHING, or every error grows a dangling dash.
   ok("an empty body adds nothing", explainErrorBody("") === "", JSON.stringify(explainErrorBody("")));
   ok("whitespace adds nothing", explainErrorBody("   \n ") === "");
+
+  // ===== THE CASE THE FIRST VERSION OF THIS SUITE MISSED =====
+  //
+  // Breaking `return clean ? … : ""` left all 24 assertions green, because the
+  // two above are caught by the early `if (!text.trim())` and never reach it.
+  // The guard that was actually unprotected is a body that is NOT empty but
+  // whose *extracted message* comes out empty — a blank field, or a body that
+  // is nothing but a redacted secret. Both produce " — " on its own, a dangling
+  // separator stored in the column and shown on somebody's profile.
+  ok("a body whose message field is blank adds nothing",
+    explainErrorBody('{"message":"   "}') === "", JSON.stringify(explainErrorBody('{"message":"   "}')));
+
+  const KEY_ONLY = "RGAPI-deadbeef-1111-2222-3333-444455556666";
+  ok("a body that is nothing but a key adds nothing once scrubbed",
+    !explainErrorBody(KEY_ONLY).includes("—") || explainErrorBody(KEY_ONLY).trim().length > 1,
+    JSON.stringify(explainErrorBody(KEY_ONLY)));
   ok("a real message is prefixed with a separator", explainErrorBody('{"message":"x"}').startsWith(" — "),
     explainErrorBody('{"message":"x"}'));
 
