@@ -2410,8 +2410,23 @@ async function prepareBody(d: CardData): Promise<CardData> {
     case "quest":
     case "planet":
     case "guide": {
-      const [bgUrl, logoUrl] = await Promise.all([bg, toEmbeddable(d.logoUrl, ICON)]);
-      return { ...d, logoUrl, theme: { ...d.theme, bgUrl } };
+      // `globeUrl` TOO. It was omitted, and the planet card renders
+      // `d.globeUrl || d.logoUrl` — so the globe went to Satori as whatever the
+      // upload happened to be. In production that is WebP, which Satori cannot
+      // decode, and an undecodable image does not cost you the image: it throws
+      // inside the render and takes the whole card down.
+      //
+      // Live for at least a fortnight on /api/card/[kind] and
+      // /api/discord/interactions — the bot's own delivery surface — for the
+      // League of Legends, Fortnite and PUBG planets. Every other resolve
+      // branch passes each image through `toEmbeddable`; this one had a field
+      // the branch did not know about.
+      const [bgUrl, logoUrl, globeUrl] = await Promise.all([
+        bg,
+        toEmbeddable(d.logoUrl, ICON),
+        toEmbeddable("globeUrl" in d ? (d as { globeUrl?: string | null }).globeUrl : null, { maxWidth: 720 }),
+      ]);
+      return { ...d, logoUrl, ...("globeUrl" in d ? { globeUrl } : {}), theme: { ...d.theme, bgUrl } };
     }
     case "planets": {
       const [bgUrl, ...logos] = await Promise.all([bg, ...d.games.map((g) => toEmbeddable(g.logoUrl, ICON))]);
