@@ -151,33 +151,38 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
 
 <header class="top">
   <p class="eyebrow">ClusterGG · Complete surface audit · 2026-08-13</p>
-  <h1>Everything the platform does,<br>and what I have actually checked</h1>
-  <p class="standfirst">Enumerated from the code, not recalled from memory. Every row below was extracted by walking the repository — routes from the filesystem, actions from their exports, guards from their source. The verdict column separates <strong>what I verified this session</strong> from <strong>what I have only listed</strong>. That distinction is the point of the document: a claim I have not checked is marked as unchecked, not quietly promoted.</p>
+  <h1>Everything the platform does.<br>Nothing here proves it is right.</h1>
+  <p class="standfirst">Every row was extracted by walking the repository — routes from the filesystem, actions from their exports, constants imported and printed. So the <em>left</em> side of every row is solid: this is what the code does.</p>
+  <p class="standfirst" style="margin-top:14px">What none of it establishes is whether the code is <strong>right</strong>. An earlier version of this page said "verified" against <code>docs/SOURCE_OF_TRUTH.md</code> — a document written by the same lineage that produced the errors. Code agreeing with that document proves the two agree. It does not make either one correct. <strong>Every value below is therefore unratified until you rule on it</strong>, including the ones that look obviously fine.</p>
 
   <div class="tallies">
     <div class="tally"><span class="n mono">131</span><span class="l">Pages</span></div>
     <div class="tally"><span class="n mono">42</span><span class="l">API routes</span></div>
     <div class="tally"><span class="n mono">47</span><span class="l">Action modules</span></div>
     <div class="tally"><span class="n mono">45</span><span class="l">Bot screens</span></div>
-    <div class="tally ok"><span class="n mono">30</span><span class="l">Verified</span></div>
-    <div class="tally bad"><span class="n mono">6</span><span class="l">Broken</span></div>
-    <div class="tally warn"><span class="n mono">5</span><span class="l">Gap</span></div>
-    <div class="tally unk"><span class="n mono">~240</span><span class="l">Unverified</span></div>
+    <div class="tally bad"><span class="n mono">0</span><span class="l">Ratified by you</span></div>
+    <div class="tally"><span class="n mono">41</span><span class="l">Measured, unratified</span></div>
+    <div class="tally warn"><span class="n mono">2</span><span class="l">You have ruled — code disagrees</span></div>
+    <div class="tally unk"><span class="n mono">~240</span><span class="l">Not even measured</span></div>
   </div>
 </header>
 
 <div class="legend">
   <h2>How to read the verdict column</h2>
   <dl>
-    <div><dt><span class="v v-ok">Verified</span></dt><dd>Checked against the running code this session — a constant imported and printed, a guard broken and watched to fail, or a source path read end to end.</dd></div>
-    <div><dt><span class="v v-bad">Broken</span></dt><dd>Confirmed wrong. Either the code contradicts a rule you have stated, or a reference resolves to nothing.</dd></div>
-    <div><dt><span class="v v-warn">Gap</span></dt><dd>The code is internally consistent, but a rule that should exist does not, or a documented fact is materially incomplete.</dd></div>
-    <div><dt><span class="v v-unk">Listed</span></dt><dd>Extracted from the repository and named here, <em>not</em> individually verified. Do not read this as working.</dd></div>
+    <div><dt><span class="v v-ok">Measured</span></dt><dd>I know what the code does here, because I ran it or read it — a constant imported and printed, a guard broken and watched to fail, a source path read end to end. <strong>This says nothing about whether the value is correct.</strong></dd></div>
+    <div><dt><span class="v v-bad">Ruled wrong</span></dt><dd>You have stated the rule and the code contradicts it — or a reference resolves to nothing, which needs no ruling.</dd></div>
+    <div><dt><span class="v v-warn">Open</span></dt><dd>A rule that should exist does not, or a stated fact is materially incomplete. Needs a decision, not a fix.</dd></div>
+    <div><dt><span class="v v-unk">Listed</span></dt><dd>Found in the repository and named here. Not opened, not measured. Do not read this as working.</dd></div>
   </dl>
+  <p style="margin:18px 0 0; color:var(--ink-2); font-size:14.5px; max-width:70ch">There is no <em>Verified</em> chip on this page any more, and its absence is deliberate. Nothing here has been checked against your intent except the two rows you have personally ruled on.</p>
 </div>
 
 <div class="note alarm">
-  <strong>Read this first.</strong> Roughly 240 of the surfaces below are marked <span class="v v-unk">Listed</span>. I enumerated them mechanically; I have not opened most of them. The honest state of this audit is that the <em>rules and money</em> are well verified and the <em>surface area</em> is not. Anyone treating the Listed rows as a certificate of working software would be repeating the mistake this document exists to correct.
+  <strong>Read this first — the correction that produced this version.</strong>
+  <p style="margin:12px 0 0">I previously reported 30 items as <em>verified</em>. That was wrong, and the way it was wrong matters. I measured the code and compared it to <code>docs/SOURCE_OF_TRUTH.md</code>. When they matched I called it verified — but that document was written by an earlier session, from the same understanding that produced the capacity model, the $20 withdrawal floor and the US-only redemption rule. Agreement between two artefacts of one lineage is not evidence.</p>
+  <p style="margin:12px 0 0">Two of the three errors I <em>did</em> find surfaced only because <strong>you</strong> contradicted the code — the per-brand cap and worldwide redemption. Neither came from my checking. That is the measure of how much the rest is worth.</p>
+  <p style="margin:12px 0 0">So the count of rules confirmed correct is <strong>zero</strong>. What follows is a decision sheet, not a certificate.</p>
 </div>
 
 <!-- ═══════════ GAMER ═══════════ -->
@@ -189,9 +194,9 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Step</th><th>Key</th><th>What it captures</th><th>Where</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td>1</td><td><code>link</code></td><td>A game account on any live provider</td><td><code>/onboarding</code>, <code>/settings/connections</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>2</td><td><code>email</code></td><td>Six-digit code, sent at signup</td><td><code>requestEmailCode</code> → <code>confirmEmailCode</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>3</td><td><code>profile</code></td><td>Age band, country, card colours</td><td><code>saveProfileAnswers</code></td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td>1</td><td><code>link</code></td><td>A game account on any live provider</td><td><code>/onboarding</code>, <code>/settings/connections</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>2</td><td><code>email</code></td><td>Six-digit code, sent at signup</td><td><code>requestEmailCode</code> → <code>confirmEmailCode</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>3</td><td><code>profile</code></td><td>Age band, country, card colours</td><td><code>saveProfileAnswers</code></td><td><span class="v v-ok">Measured</span></td></tr>
     </tbody>
   </table></div>
   <p class="intro"><code>UNLOCK_STEPS = 3</code>. Until all three are done nothing accrues — no points, no trophies, no challenge entry. <code>OnboardingBar</code> renders on every page until <code>state.unlocked</code>, so skipping onboarding cannot skip the question.</p>
@@ -200,12 +205,12 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Band</th><th>Play</th><th>Earn CP</th><th>Redeem cash</th><th>Notes</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td><code>under16</code></td><td>no</td><td>no</td><td>no</td><td>Legacy. Readable, no longer writable.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td><code>teen</code> (13–17)</td><td>yes</td><td>yes</td><td><strong>no</strong></td><td>Earns and holds trophies; cannot convert to cash.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td><code>adult</code> (18+)</td><td>yes</td><td>yes</td><td>yes</td><td>—</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>unanswered</td><td>no</td><td>no</td><td>no</td><td>Not a permissive default — <code>rulesFor(null)</code> denies all three.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>under 13</td><td colspan="3">Not an option — a link that deletes the account</td><td>A salted hash of email + Discord ID is kept so they cannot re-sign-up with a different answer.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr class="flag-warn"><td>changing it</td><td colspan="3"><code>MAX_BAND_CHANGES = 0</code></td><td>No self-serve change. Support only. <strong>Not stated in the source of truth.</strong></td><td><span class="v v-warn">Gap</span></td></tr>
+      <tr><td><code>under16</code></td><td>no</td><td>no</td><td>no</td><td>Legacy. Readable, no longer writable.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td><code>teen</code> (13–17)</td><td>yes</td><td>yes</td><td><strong>no</strong></td><td>Earns and holds trophies; cannot convert to cash.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td><code>adult</code> (18+)</td><td>yes</td><td>yes</td><td>yes</td><td>—</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>unanswered</td><td>no</td><td>no</td><td>no</td><td>Not a permissive default — <code>rulesFor(null)</code> denies all three.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>under 13</td><td colspan="3">Not an option — a link that deletes the account</td><td>A salted hash of email + Discord ID is kept so they cannot re-sign-up with a different answer.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr class="flag-warn"><td>changing it</td><td colspan="3"><code>MAX_BAND_CHANGES = 0</code></td><td>No self-serve change. Support only. <strong>Not stated in the source of truth.</strong></td><td><span class="v v-warn">Open</span></td></tr>
     </tbody>
   </table></div>
 
@@ -214,14 +219,14 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>#</th><th>Guard</th><th>Refusal</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td class="num">1</td><td>Challenge exists</td><td><code>not_found</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td class="num">2</td><td>Status is <code>active</code></td><td><code>not_active</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td class="num">3</td><td>Onboarding complete</td><td><code>onboarding</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td class="num">4</td><td>Access key, if the challenge is locked</td><td><code>locked</code> / <code>bad_key</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td class="num">5</td><td>A linked account on the right provider</td><td><code>no_account</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td class="num">6</td><td>Quest-badge gate, if set</td><td><code>gated</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td class="num">7</td><td>Per-challenge requirements</td><td><code>requirements</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr class="flag-bad"><td class="num">—</td><td><strong>Proven ownership of that game account</strong></td><td><strong>does not exist</strong></td><td><span class="v v-bad">Broken</span></td></tr>
+      <tr><td class="num">1</td><td>Challenge exists</td><td><code>not_found</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td class="num">2</td><td>Status is <code>active</code></td><td><code>not_active</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td class="num">3</td><td>Onboarding complete</td><td><code>onboarding</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td class="num">4</td><td>Access key, if the challenge is locked</td><td><code>locked</code> / <code>bad_key</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td class="num">5</td><td>A linked account on the right provider</td><td><code>no_account</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td class="num">6</td><td>Quest-badge gate, if set</td><td><code>gated</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td class="num">7</td><td>Per-challenge requirements</td><td><code>requirements</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr class="flag-bad"><td class="num">—</td><td><strong>Proven ownership of that game account</strong></td><td><strong>does not exist</strong></td><td><span class="v v-bad">Ruled wrong</span></td></tr>
     </tbody>
   </table></div>
   <div class="note alarm">
@@ -232,14 +237,14 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Provider</th><th>Method</th><th>Wired end to end</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td><code>riot-lol</code></td><td>Profile-icon check</td><td>yes</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td><code>opendota</code></td><td>Steam OpenID → Friend ID</td><td>yes</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td><code>steam</code></td><td>Steam OpenID</td><td>yes</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td><code>mobile-legends</code></td><td>In-game mail code</td><td>yes</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr class="flag-warn"><td><code>riot-valorant</code></td><td>Shared Riot PUUID</td><td><strong>no</strong> — no VALORANT row to stamp yet</td><td><span class="v v-warn">Gap</span></td></tr>
-      <tr class="flag-warn"><td><code>fortnite</code></td><td>Epic OAuth</td><td><strong>no</strong> — stats key on display name, not the OAuth id</td><td><span class="v v-warn">Gap</span></td></tr>
-      <tr class="flag-warn"><td><code>pubg</code></td><td>none possible</td><td>—</td><td><span class="v v-warn">Gap</span></td></tr>
-      <tr class="flag-warn"><td><code>apex</code></td><td>none possible</td><td>—</td><td><span class="v v-warn">Gap</span></td></tr>
+      <tr><td><code>riot-lol</code></td><td>Profile-icon check</td><td>yes</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td><code>opendota</code></td><td>Steam OpenID → Friend ID</td><td>yes</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td><code>steam</code></td><td>Steam OpenID</td><td>yes</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td><code>mobile-legends</code></td><td>In-game mail code</td><td>yes</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr class="flag-warn"><td><code>riot-valorant</code></td><td>Shared Riot PUUID</td><td><strong>no</strong> — no VALORANT row to stamp yet</td><td><span class="v v-warn">Open</span></td></tr>
+      <tr class="flag-warn"><td><code>fortnite</code></td><td>Epic OAuth</td><td><strong>no</strong> — stats key on display name, not the OAuth id</td><td><span class="v v-warn">Open</span></td></tr>
+      <tr class="flag-warn"><td><code>pubg</code></td><td>none possible</td><td>—</td><td><span class="v v-warn">Open</span></td></tr>
+      <tr class="flag-warn"><td><code>apex</code></td><td>none possible</td><td>—</td><td><span class="v v-warn">Open</span></td></tr>
     </tbody>
   </table></div>
 
@@ -247,12 +252,12 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Condition</th><th>Code</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td>Minimum age</td><td><code>MIN_REDEEM_AGE = 18</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Sanctioned countries refused</td><td><code>BLOCKED_COUNTRIES</code> — 6 entries</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr class="flag-bad"><td><strong>Everywhere outside the US refused</strong></td><td><code>eligibilityOf(30,"EG") → outside_payout_region</code></td><td><span class="v v-bad">Broken</span></td></tr>
-      <tr><td>US tax reporting line</td><td><code>US_REPORT_THRESHOLD = 2000</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Redeem state machine</td><td><code>request → cancel | approve → send → paid</code>, plus <code>confirm</code>, <code>reject</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>No payment detail stored, ever</td><td>A preference word and an opaque handle. <code>information_schema</code> sweep finds no column that could hold one.</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td>Minimum age</td><td><code>MIN_REDEEM_AGE = 18</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Sanctioned countries refused</td><td><code>BLOCKED_COUNTRIES</code> — 6 entries</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr class="flag-bad"><td><strong>Everywhere outside the US refused</strong></td><td><code>eligibilityOf(30,"EG") → outside_payout_region</code></td><td><span class="v v-bad">Ruled wrong</span></td></tr>
+      <tr><td>US tax reporting line</td><td><code>US_REPORT_THRESHOLD = 2000</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Redeem state machine</td><td><code>request → cancel | approve → send → paid</code>, plus <code>confirm</code>, <code>reject</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>No payment detail stored, ever</td><td>A preference word and an opaque handle. <code>information_schema</code> sweep finds no column that could hold one.</td><td><span class="v v-ok">Measured</span></td></tr>
     </tbody>
   </table></div>
   <div class="note alarm">
@@ -273,7 +278,7 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
       <tr><td><code>/feed</code> <code>/messages</code> <code>/messages/[id]</code> <code>/notifications</code> <code>/search</code></td><td>Social</td><td><span class="v v-unk">Listed</span></td></tr>
       <tr><td><code>/settings/account</code> <code>/connections</code> <code>/earning</code> <code>/notifications</code> <code>/privacy</code></td><td>Settings</td><td><span class="v v-unk">Listed</span></td></tr>
       <tr><td><code>/vote</code> <code>/profile</code> <code>/profile/analytics</code> <code>/goodbye</code></td><td>Profile of the Week, self-view, deletion</td><td><span class="v v-unk">Listed</span></td></tr>
-      <tr><td><code>/rules/[who]</code> <code>/legal/*</code> <code>/answers</code> <code>/blog</code> <code>/games</code></td><td>Published rules and content</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td><code>/rules/[who]</code> <code>/legal/*</code> <code>/answers</code> <code>/blog</code> <code>/games</code></td><td>Published rules and content</td><td><span class="v v-ok">Measured</span></td></tr>
     </tbody>
   </table></div>
 </section>
@@ -286,18 +291,18 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Rule</th><th>Live value</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td>Ladder rungs, by qualified linked members</td><td><code>10 / 50 / 100</code> → shares <code>60% / 25% / 15%</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Floor to earn anything</td><td><code>EARN_FLOOR = 10</code>. Below it, <code>rungOf()</code> returns <code>null</code> — off the ladder, not rung one.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Flat share, split evenly among all who took part</td><td><code>PARTICIPATION_SHARE = 20%</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>The three scoring terms</td><td><code>exclusiveEntrants 40 · newlyQualified 30 · conversion 30</code>, percentile-ranked within a bracket</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>A gamer in two servers</td><td>Worth ½ to each — shares can never exceed the true entrant count</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Private challenges do not pay the pool</td><td><code>week-standing.ts:110</code> filters <code>visibility = "public"</code>. Broken on purpose this session: entrants went 1 → 6.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>A server that never described itself is dropped</td><td>Not scored, not paid — it cannot take percentile positions from servers that did the work</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Payouts open as drafts</td><td>The cron calculates; a human releases. Nothing moves money on its own.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Unreleased money is the reserve</td><td>An operator releases an amount per week; the rest pays owners through a week when nothing sells</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr class="flag-bad"><td><strong>Withdrawal floor</strong></td><td><code>MIN_WITHDRAWAL = 10</code> — the source of truth says <strong>$20</strong></td><td><span class="v v-bad">Broken</span></td></tr>
-      <tr><td>Private challenge they buy themselves</td><td><code>PRIVATE_FEE_PCT = 5%</code>, <code>MIN_PRIZE_POOL = $5</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Payout hold on a first payout</td><td>30 days from tier unlock; unknown unlock date fails <em>closed</em>; a paid track record clears it</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td>Ladder rungs, by qualified linked members</td><td><code>10 / 50 / 100</code> → shares <code>60% / 25% / 15%</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Floor to earn anything</td><td><code>EARN_FLOOR = 10</code>. Below it, <code>rungOf()</code> returns <code>null</code> — off the ladder, not rung one.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Flat share, split evenly among all who took part</td><td><code>PARTICIPATION_SHARE = 20%</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>The three scoring terms</td><td><code>exclusiveEntrants 40 · newlyQualified 30 · conversion 30</code>, percentile-ranked within a bracket</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>A gamer in two servers</td><td>Worth ½ to each — shares can never exceed the true entrant count</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Private challenges do not pay the pool</td><td><code>week-standing.ts:110</code> filters <code>visibility = "public"</code>. Broken on purpose this session: entrants went 1 → 6.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>A server that never described itself is dropped</td><td>Not scored, not paid — it cannot take percentile positions from servers that did the work</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Payouts open as drafts</td><td>The cron calculates; a human releases. Nothing moves money on its own.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Unreleased money is the reserve</td><td>An operator releases an amount per week; the rest pays owners through a week when nothing sells</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr class="flag-bad"><td><strong>Withdrawal floor</strong></td><td><code>MIN_WITHDRAWAL = 10</code> — the source of truth says <strong>$20</strong></td><td><span class="v v-bad">Ruled wrong</span></td></tr>
+      <tr><td>Private challenge they buy themselves</td><td><code>PRIVATE_FEE_PCT = 5%</code>, <code>MIN_PRIZE_POOL = $5</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Payout hold on a first payout</td><td>30 days from tier unlock; unknown unlock date fails <em>closed</em>; a paid track record clears it</td><td><span class="v v-ok">Measured</span></td></tr>
     </tbody>
   </table></div>
 
@@ -305,12 +310,12 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Action</th><th>Module</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td>Open the portal with a key</td><td><code>/login/server</code> → <code>/api/portal/unlock</code></td><td><span class="v v-bad">Broken</span></td></tr>
+      <tr><td>Open the portal with a key</td><td><code>/login/server</code> → <code>/api/portal/unlock</code></td><td><span class="v v-bad">Ruled wrong</span></td></tr>
       <tr><td>Request a challenge for their members</td><td><code>portalRequestChallenge</code></td><td><span class="v v-unk">Listed</span></td></tr>
       <tr><td>Describe the community (required to be scored)</td><td><code>portalSaveCommunity</code></td><td><span class="v v-unk">Listed</span></td></tr>
       <tr><td>Buy a private challenge from the wallet</td><td><code>buyPrivateChallengeAction</code></td><td><span class="v v-unk">Listed</span></td></tr>
       <tr><td>Request a withdrawal</td><td><code>requestWithdrawalAction</code></td><td><span class="v v-unk">Listed</span></td></tr>
-      <tr><td>Set a payout preference</td><td><code>saveServerPayoutPreference</code> — a word and a country, nothing else</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td>Set a payout preference</td><td><code>saveServerPayoutPreference</code> — a word and a country, nothing else</td><td><span class="v v-ok">Measured</span></td></tr>
       <tr><td>Message staff</td><td><code>portalSendMessage</code>, <code>portalMarkRead</code></td><td><span class="v v-unk">Listed</span></td></tr>
     </tbody>
   </table></div>
@@ -324,16 +329,16 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Rule</th><th>Live value</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td>Price of one challenge</td><td><code>$350</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Of which prize money</td><td><code>$175</code> — half</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Where the rest goes</td><td>Cluster 20% · server pool 15% · CP vault 15%</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Self-serve buy</td><td>1–4 consecutive weekly challenges on one game. Past four is a custom deal an operator builds.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Nothing is announced before the bill is paid</td><td><code>announce.ts:437</code> calls <code>canAnnounce</code> <em>and</em> <code>billFor</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Co-sponsored: both must pay</td><td>One brand must never fund the other's logo</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Delivery is counted, never modelled</td><td>One card = one row. A post into a 4,000-member server is <strong>one</strong> row, not 4,000.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>No audience group under 25 described</td><td><code>MIN_COHORT = 25</code>; a slice too small is <code>null</code>, never 0%</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Creative goes live only after review</td><td>Both upload paths write <code>pending_review</code>; <code>serveAds</code> requires <code>approved</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr class="flag-bad"><td><strong>How many brands can pay us at once</strong></td><td><code>payingBrandCapacity = 18</code> — a per-game ceiling that <strong>does not exist</strong> under the per-brand rule</td><td><span class="v v-bad">Broken</span></td></tr>
+      <tr><td>Price of one challenge</td><td><code>$350</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Of which prize money</td><td><code>$175</code> — half</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Where the rest goes</td><td>Cluster 20% · server pool 15% · CP vault 15%</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Self-serve buy</td><td>1–4 consecutive weekly challenges on one game. Past four is a custom deal an operator builds.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Nothing is announced before the bill is paid</td><td><code>announce.ts:437</code> calls <code>canAnnounce</code> <em>and</em> <code>billFor</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Co-sponsored: both must pay</td><td>One brand must never fund the other's logo</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Delivery is counted, never modelled</td><td>One card = one row. A post into a 4,000-member server is <strong>one</strong> row, not 4,000.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>No audience group under 25 described</td><td><code>MIN_COHORT = 25</code>; a slice too small is <code>null</code>, never 0%</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Creative goes live only after review</td><td>Both upload paths write <code>pending_review</code>; <code>serveAds</code> requires <code>approved</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr class="flag-bad"><td><strong>How many brands can pay us at once</strong></td><td><code>payingBrandCapacity = 18</code> — a per-game ceiling that <strong>does not exist</strong> under the per-brand rule</td><td><span class="v v-bad">Ruled wrong</span></td></tr>
     </tbody>
   </table></div>
 
@@ -348,14 +353,14 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Rule</th><th>How it is enforced</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td>Four vaults: prize 50 · Cluster 20 · server 15 · CP 15</td><td><code>DEFAULT_SPLIT</code>, an operator setting rather than a constant</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>No vault has a balance column</td><td><code>vault_ledger</code> is append-only; every balance is <code>sum(amount)</code></td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Money reaches a vault when an invoice is <em>paid</em></td><td>Never on issue</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>An invoice total is its lines</td><td>Recomputed, never stored. Overdue is derived, never a flag.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>The CP ceiling comes out of released money</td><td>Released ÷ eligible gamers ÷ days left. More gamers on the same money = a smaller ceiling.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>A locked week can go up, never down</td><td>People were already shown the number</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Releasing more than the vault holds</td><td>Refused, with the balance named</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Deleting an account mid-payout</td><td>Refused while money is in flight; allowed with a warning while merely requested</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td>Four vaults: prize 50 · Cluster 20 · server 15 · CP 15</td><td><code>DEFAULT_SPLIT</code>, an operator setting rather than a constant</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>No vault has a balance column</td><td><code>vault_ledger</code> is append-only; every balance is <code>sum(amount)</code></td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Money reaches a vault when an invoice is <em>paid</em></td><td>Never on issue</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>An invoice total is its lines</td><td>Recomputed, never stored. Overdue is derived, never a flag.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>The CP ceiling comes out of released money</td><td>Released ÷ eligible gamers ÷ days left. More gamers on the same money = a smaller ceiling.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>A locked week can go up, never down</td><td>People were already shown the number</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Releasing more than the vault holds</td><td>Refused, with the balance named</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Deleting an account mid-payout</td><td>Refused while money is in flight; allowed with a warning while merely requested</td><td><span class="v v-ok">Measured</span></td></tr>
     </tbody>
   </table></div>
 </section>
@@ -366,19 +371,19 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Stage</th><th>Means</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td><code>draft</code></td><td>Being built. Later weeks of a multi-week buy sit here.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr class="flag-warn"><td><code>queued</code></td><td>Built, waiting for its week. <strong>You want this renamed <code>scheduled</code>.</strong></td><td><span class="v v-warn">Gap</span></td></tr>
-      <tr><td><code>announced</code></td><td>Visible and joinable, days before it starts</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td><code>live</code></td><td>Scoring begins, for everybody at once</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td><code>ended</code></td><td>Placements final, trophies awarded</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td><code>draft</code></td><td>Being built. Later weeks of a multi-week buy sit here.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr class="flag-warn"><td><code>queued</code></td><td>Built, waiting for its week. <strong>You want this renamed <code>scheduled</code>.</strong></td><td><span class="v v-warn">Open</span></td></tr>
+      <tr><td><code>announced</code></td><td>Visible and joinable, days before it starts</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td><code>live</code></td><td>Scoring begins, for everybody at once</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td><code>ended</code></td><td>Placements final, trophies awarded</td><td><span class="v v-ok">Measured</span></td></tr>
     </tbody>
   </table></div>
   <ul class="tight">
     <li><strong>Announced and live are separate gates on purpose.</strong> Publishing early gets a field; scoring early gives an early entrant a head start nobody can match.</li>
-    <li><strong>Nothing counts before the gun.</strong> Every entrant is rebaselined at the start, so joining early buys visibility and never points. <span class="v v-ok">Verified</span></li>
-    <li><strong>Pays 1–10 places</strong>, decided by whoever bought it. <span class="v v-ok">Verified</span></li>
-    <li><strong>The board shows 50</strong> and says so when it is a window — a 51st entrant is not silently missing. <span class="v v-ok">Verified</span></li>
-    <li><strong>Scoring:</strong> <code>points = Σ floor(delta[metric]) × pointsEngine[metric]</code>, delta clamped at zero so a decline never subtracts. <span class="v v-ok">Verified</span></li>
+    <li><strong>Nothing counts before the gun.</strong> Every entrant is rebaselined at the start, so joining early buys visibility and never points. <span class="v v-ok">Measured</span></li>
+    <li><strong>Pays 1–10 places</strong>, decided by whoever bought it. <span class="v v-ok">Measured</span></li>
+    <li><strong>The board shows 50</strong> and says so when it is a window — a 51st entrant is not silently missing. <span class="v v-ok">Measured</span></li>
+    <li><strong>Scoring:</strong> <code>points = Σ floor(delta[metric]) × pointsEngine[metric]</code>, delta clamped at zero so a decline never subtracts. <span class="v v-ok">Measured</span></li>
   </ul>
 </section>
 
@@ -395,11 +400,11 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
       <tr><td>Commerce</td><td><code>market</code> <code>marketplace</code> <code>shop</code> <code>store</code> <code>buy</code> <code>spend</code></td><td><span class="v v-unk">Listed</span></td></tr>
       <tr><td>Server &amp; staff</td><td><code>server</code> <code>manage</code> <code>admin</code> <code>req-game</code> <code>discord</code></td><td><span class="v v-unk">Listed</span></td></tr>
       <tr><td>Week &amp; social</td><td><code>week</code> <code>vote</code> <code>votes</code> <code>share</code></td><td><span class="v v-unk">Listed</span></td></tr>
-      <tr><td>Every card carries a sponsor button</td><td>Signed link → <code>/api/ads/go</code> → counted → forwarded</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>An ad can never take a card down</td><td>Fixed this session — the mint is fenced, the card ships without the button</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>Nothing internal reaches Discord</td><td><code>group</code> is ours; <code>rows()</code> strips it. An unknown field is a rejected message.</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>A trail never repeats the screen you are on</td><td>Back cannot return you to where you already are</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td>The picker offers only games whose key is live</td><td>A stale button is refused rather than opening a modal that fails on submit</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td>Every card carries a sponsor button</td><td>Signed link → <code>/api/ads/go</code> → counted → forwarded</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>An ad can never take a card down</td><td>Fixed this session — the mint is fenced, the card ships without the button</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>Nothing internal reaches Discord</td><td><code>group</code> is ours; <code>rows()</code> strips it. An unknown field is a rejected message.</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>A trail never repeats the screen you are on</td><td>Back cannot return you to where you already are</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td>The picker offers only games whose key is live</td><td>A stale button is refused rather than opening a modal that fails on submit</td><td><span class="v v-ok">Measured</span></td></tr>
     </tbody>
   </table></div>
 </section>
@@ -410,18 +415,18 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   <div class="scroll"><table>
     <thead><tr><th>Schedule</th><th>Route</th><th>Does</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td><code>0 * * * *</code></td><td><code>/api/cron/sync</code></td><td>Pulls game stats. Batch 60, 30-min interval, 120-min error backoff.</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td><code>0 * * * *</code></td><td><code>/api/cron/sync</code></td><td>Pulls game stats. Batch 60, 30-min interval, 120-min error backoff.</td><td><span class="v v-ok">Measured</span></td></tr>
       <tr><td><code>0 12 * * *</code></td><td><code>/api/cron/daily</code></td><td>Runs the 10 jobs below</td><td><span class="v v-unk">Listed</span></td></tr>
-      <tr><td><code>*/5 * * * *</code></td><td><code>/api/cron/announce</code></td><td>Drains the post queue. Nothing fans out inline from a server action.</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td><code>*/5 * * * *</code></td><td><code>/api/cron/announce</code></td><td>Drains the post queue. Nothing fans out inline from a server action.</td><td><span class="v v-ok">Measured</span></td></tr>
     </tbody>
   </table></div>
   <div class="scroll" style="margin-top:16px"><table>
     <thead><tr><th>Job</th><th>Note</th><th>Verdict</th></tr></thead>
     <tbody>
-      <tr><td><code>week-close</code></td><td>Monday only, gated on the day. Scores servers, opens draft payouts. Twice on one week is refused.</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td><code>week-close</code></td><td>Monday only, gated on the day. Scores servers, opens draft payouts. Twice on one week is refused.</td><td><span class="v v-ok">Measured</span></td></tr>
       <tr><td><code>guild-snapshots</code></td><td>Weekly member and linked counts</td><td><span class="v v-unk">Listed</span></td></tr>
-      <tr><td><code>challenges</code> · <code>challenge-reminders</code></td><td>Stage transitions and nudges — idempotent</td><td><span class="v v-ok">Verified</span></td></tr>
-      <tr><td><code>discord-ads</code> · <code>week-update</code> · <code>leaderboard-feed</code></td><td>Scheduled posts, deduped by guild</td><td><span class="v v-ok">Verified</span></td></tr>
+      <tr><td><code>challenges</code> · <code>challenge-reminders</code></td><td>Stage transitions and nudges — idempotent</td><td><span class="v v-ok">Measured</span></td></tr>
+      <tr><td><code>discord-ads</code> · <code>week-update</code> · <code>leaderboard-feed</code></td><td>Scheduled posts, deduped by guild</td><td><span class="v v-ok">Measured</span></td></tr>
       <tr><td><code>streak-milestones</code> · <code>purge-observations</code> · <code>botlist-stats</code></td><td>—</td><td><span class="v v-unk">Listed</span></td></tr>
     </tbody>
   </table></div>
@@ -431,7 +436,7 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
 <section id="staff">
   <h2>8 · Staff and admin <span class="count">the only user type that signs in with a password</span></h2>
   <p class="intro">70 admin pages across 47 action modules. This is the least-audited surface on the platform and the one with the most power. One rule is verified and absolute:</p>
-  <div class="note"><strong><code>/admin/users</code> and <code>/admin/linked-accounts</code> are admin-only.</strong> No staff department reaches the gamer directory or the linked-account list, ever. <span class="v v-ok">Verified</span></div>
+  <div class="note"><strong><code>/admin/users</code> and <code>/admin/linked-accounts</code> are admin-only.</strong> No staff department reaches the gamer directory or the linked-account list, ever. <span class="v v-ok">Measured</span></div>
   <div class="scroll"><table>
     <thead><tr><th>Cluster</th><th>Pages</th><th>Verdict</th></tr></thead>
     <tbody>
@@ -449,7 +454,7 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
 
 <!-- ═══════════ REGISTER ═══════════ -->
 <section id="register">
-  <h2>9 · The broken register <span class="count">everything confirmed wrong, in priority order</span></h2>
+  <h2>9 · What needs your ruling <span class="count">nothing below is settled</span></h2>
   <div class="scroll"><table>
     <thead><tr><th>#</th><th>What</th><th>Impact</th><th>Fix</th></tr></thead>
     <tbody>
@@ -465,9 +470,96 @@ footer{border-top:2px solid var(--ink); margin-top:72px; padding-top:20px; color
   </table></div>
 </section>
 
+
+<!-- ═══════════ RATIFICATION ═══════════ -->
+<section id="ratify">
+  <h2>10 · Every number, for ratification <span class="count">41 rows · 0 ruled</span></h2>
+  <p class="intro">This is the sheet that matters. Every value the platform runs on, measured from the code, with nothing asserted about whether it is correct. Strike through what is wrong and I will change the code and the documents together. Silence on a row is not approval — it stays unratified.</p>
+
+  <h3>Money and pricing</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>What</th><th>Code runs</th><th>Your ruling</th></tr></thead>
+    <tbody>
+      <tr><td>Price of one challenge</td><td class="num"><code>$350</code></td><td>—</td></tr>
+      <tr><td>Prize share of it</td><td class="num"><code>$175</code> · 50%</td><td>—</td></tr>
+      <tr><td>Cluster share</td><td class="num">20%</td><td>—</td></tr>
+      <tr><td>Server pool share</td><td class="num">15%</td><td>—</td></tr>
+      <tr><td>CP vault share</td><td class="num">15%</td><td>—</td></tr>
+      <tr><td>Challenges per game a brand may self-serve</td><td class="num">1–4</td><td>—</td></tr>
+      <tr><td>Private challenge margin</td><td class="num">5%</td><td>—</td></tr>
+      <tr><td>Minimum private prize pool</td><td class="num"><code>$5</code></td><td>—</td></tr>
+      <tr class="flag-bad"><td>Owner withdrawal floor</td><td class="num"><code>$10</code> <span style="color:var(--bad)">(docs say $20)</span></td><td>Which?</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The server ladder and the weekly pool</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>What</th><th>Code runs</th><th>Your ruling</th></tr></thead>
+    <tbody>
+      <tr><td>Rung thresholds, in qualified linked members</td><td class="num">10 · 50 · 100</td><td>—</td></tr>
+      <tr><td>Pool share per rung</td><td class="num">60% · 25% · 15%</td><td>—</td></tr>
+      <tr><td>Floor to earn anything</td><td class="num">10</td><td>—</td></tr>
+      <tr><td>Flat share split evenly among all who took part</td><td class="num">20%</td><td>—</td></tr>
+      <tr><td>Scoring weights</td><td class="num">entrants 40 · newly qualified 30 · conversion 30</td><td>—</td></tr>
+      <tr><td>Days before a member counts as qualified</td><td class="num">7</td><td>—</td></tr>
+      <tr><td>First-payout hold</td><td class="num">30 days</td><td>—</td></tr>
+      <tr><td>A gamer in two servers is worth</td><td class="num">½ to each</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The gamer</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>What</th><th>Code runs</th><th>Your ruling</th></tr></thead>
+    <tbody>
+      <tr><td>Onboarding steps before anything accrues</td><td class="num">3 — link, email, profile</td><td>—</td></tr>
+      <tr><td>Selectable age bands</td><td class="num">13–17 · 18+</td><td>—</td></tr>
+      <tr><td>13–17 may earn CP and hold trophies</td><td>yes</td><td>—</td></tr>
+      <tr><td>13–17 may convert to cash</td><td>no</td><td>—</td></tr>
+      <tr><td>Minimum age to redeem</td><td class="num">18</td><td>—</td></tr>
+      <tr><td>Self-serve age-band changes allowed</td><td class="num">0</td><td>—</td></tr>
+      <tr><td>Under-13 route</td><td>Account deleted, salted hash kept</td><td>—</td></tr>
+      <tr class="flag-warn"><td>Countries that may redeem</td><td class="num">US only</td><td><strong>Ruled: worldwide</strong></td></tr>
+      <tr><td>Sanctioned countries blocked</td><td class="num">6</td><td>—</td></tr>
+      <tr><td>US tax reporting line</td><td class="num"><code>$2,000</code></td><td>—</td></tr>
+      <tr class="flag-bad"><td>Proof of account ownership to enter a cash challenge</td><td><strong>not required</strong></td><td>Required?</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>The challenge</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>What</th><th>Code runs</th><th>Your ruling</th></tr></thead>
+    <tbody>
+      <tr><td>Stages</td><td><code>draft → queued → announced → live → ended</code></td><td>rename <code>queued</code></td></tr>
+      <tr><td>Places paid</td><td class="num">1–10</td><td>—</td></tr>
+      <tr><td>Leaderboard window</td><td class="num">50</td><td>—</td></tr>
+      <tr><td>Joining early earns points</td><td>no — rebaselined at the gun</td><td>—</td></tr>
+      <tr><td>Stat pull cadence</td><td class="num">hourly cron · 30-min per account · 120-min error backoff</td><td>—</td></tr>
+      <tr><td>Score formula</td><td><code>Σ floor(Δmetric) × weight</code>, Δ clamped ≥ 0</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Brands, delivery and privacy</h3>
+  <div class="scroll"><table>
+    <thead><tr><th>What</th><th>Code runs</th><th>Your ruling</th></tr></thead>
+    <tbody>
+      <tr class="flag-bad"><td>What limits how many brands can pay at once</td><td class="num">games ÷ 1 = 18</td><td><strong>Ruled: no such cap</strong></td></tr>
+      <tr><td>One card posted = views counted</td><td class="num">1, whatever the server size</td><td>—</td></tr>
+      <tr><td>Frequency cap per gamer per creative</td><td class="num">24h</td><td>—</td></tr>
+      <tr><td>Smallest audience group describable</td><td class="num">25</td><td>—</td></tr>
+      <tr><td>Public server linked-count floor</td><td class="num">5</td><td>—</td></tr>
+      <tr><td>Creative goes live</td><td>only after review</td><td>—</td></tr>
+      <tr><td>Payment details stored</td><td>none — a word and an opaque handle</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note">
+    <strong>How to use this.</strong> Rule on a row and it becomes the source of truth — I change the code, the documents and the tests together, in that order, and the test is the thing that stops it drifting back. Rows you do not rule on stay marked unratified, and I will keep saying so rather than quietly promoting them.
+  </div>
+</section>
+
 <footer>
-  <p>Extracted from the repository on 13 August 2026 at commit <code class="mono">fe6d303</code>. Routes walked from the filesystem, actions from their exports, constants imported and printed, guards read in source. 18 of 99 test suites read in full so far; the remaining 81 are recorded in <code class="mono">docs/TEST_AUDIT.md</code> with a progress marker.</p>
-  <p>Nothing in this document was taken from another document.</p>
+  <p>Extracted from the repository on 13 August 2026. Routes walked from the filesystem, actions from their exports, constants imported and printed, guards read in source. 18 of 99 test suites read in full; the remaining 81 are recorded in <code class="mono">docs/TEST_AUDIT.md</code> with a progress marker.</p>
+  <p><strong>What this document is:</strong> a measurement of the code. <strong>What it is not:</strong> a judgement that the code is right. The second requires you, row by row, and none of it has happened yet.</p>
 </footer>
 
 </div>
