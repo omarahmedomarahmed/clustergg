@@ -110,7 +110,12 @@ guards. The list is in the per-suite table below.
 
 ---
 
-## READ PROGRESS — 16 of 99
+| 17 | `ladder.mts` | keep — exemplary | Self-*expiring* allowlists: every `NOT_A_MEMBER_BAR` exception must still describe something real or the suite fails, so an allowance cannot outlive its subject. Walks the tree rather than listing files, and records that its own break test once walked straight through an earlier version. Its comment corroborates the two-pivot history: the retired 5%/500 ladder is "the scheme from TWO pivots ago". |
+| 18 | `week-close.mts` | **fixed** | See BUG-2. Three dead assertions revived, one wrong expectation corrected, guard proven by breaking `lib/week-standing.ts:110`. |
+
+---
+
+## READ PROGRESS — 18 of 99
 
 Read so far (alphabetical position is not the read order):
 `abuse`, `account-deletion`, `ad-views`, `allocations`, `announce-queue`,
@@ -171,6 +176,64 @@ built for the last failure, not the shape of it.
 or rewrite the reasoning into a live doc and repoint all ten citations. Then add
 a link-integrity check — every `docs/*.md` path named anywhere in the tree must
 resolve — which is one assertion and would have caught this the day it broke.
+
+---
+
+## BUG-2 — three assertions in the weekly close called a SQL builder
+
+**Found by reading. Fixed and proven in this pass.**
+
+`tests/db/week-close.mts` imported drizzle's `eq` at the top for its `.where()`
+clauses. It never defined an `eq` assertion helper — but three lines called one:
+
+```js
+eq("nothing is divided", r.pool, 0);
+eq("…and nobody was paid", r.payouts.length, 0);
+eq("private-challenge entrants are not counted", first?.entrants, 2);
+```
+
+`eq(a, b)` is a SQL comparison builder. Called with three arguments it built an
+object out of them, returned it, and touched neither `pass` nor `fails`. The
+lines printed nothing and could not fail. They had the shape of assertions and
+the behaviour of comments.
+
+The third is the one that matters. It is the guard that stops a server owner
+buying a cheap private challenge, having their own members enter it, and taking
+a share of the weekly pool that other servers' *sponsored* work paid in —
+`SOURCE_OF_TRUTH` §7, *"a private challenge grows you, it does not pay you
+twice."* **It had never once executed.**
+
+### What was actually wrong
+
+Not the product. Revived, the assertion failed `got 1, want 2` — the count was
+*lower* than expected, so private entrants were already being excluded correctly.
+The fixture's expected value was simply wrong: `guilds[0]` carries exactly one
+sponsored entrant, not two. Nobody found out, because nothing ever compared it.
+
+### The fix, and the proof
+
+The drizzle import is `sqlEq` now, so the two cannot be confused; a real `eq`
+assertion helper sits beside `ok` and `near`; the expected value is 1.
+
+Then the guard was broken on purpose — the `visibility = "public"` filter in
+`lib/week-standing.ts:110` commented out — and it bites:
+
+```
+FAIL private-challenge entrants are not counted — got 6, want 1
+FAIL …so the private challenge did not buy a bigger share — exclusiveEntrants: 6
+```
+
+The five private entrants join the one sponsored entrant. Filter restored, tree
+verified clean, suite green at 64 passed / 0 failed.
+
+### The lesson for the rewrite
+
+A swept check across all 99 suites found this pattern in **exactly one file**, so
+it is not endemic. But it is invisible to every tool in use: `tsc` is happy
+(drizzle's `eq` is variadic-tolerant enough), the suite exits 0, and the runner
+counts it as a pass. **The consolidated band must define its assertion helpers in
+one shared module** rather than re-declaring `ok`/`eq`/`near` at the top of 99
+files — which is what let one file quietly not declare one at all.
 
 ---
 

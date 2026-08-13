@@ -22,9 +22,27 @@ const ok = (name: string, cond: boolean, detail = "") => {
 };
 const near = (name: string, got: number, want: number, tol = 0.02) =>
   ok(name, Math.abs(got - want) <= tol, `got ${got}, want ${want}`);
+// ===== THIS HELPER DID NOT EXIST, AND THREE ASSERTIONS CALLED IT ANYWAY. =====
+//
+// `eq` was drizzle's SQL comparison builder, imported at the top of this file
+// for `.where(...)` clauses. Three lines below called it with a NAME and two
+// values, in the shape every other suite in this band uses for an assertion.
+// It happily built a SQL object out of the arguments, returned it, and touched
+// neither `pass` nor `fails`. The lines read as tests, printed nothing, and
+// could not fail.
+//
+// One of the three is `private-challenge entrants are not counted` — the guard
+// that stops a server owner buying a cheap private challenge, having their own
+// members enter it, and taking a share of the pool that other servers'
+// sponsored work paid in. It had never once executed.
+//
+// The drizzle import is `sqlEq` now, so the two can no longer be confused.
+const eq = <T,>(name: string, got: T, want: T) =>
+  ok(name, JSON.stringify(got) === JSON.stringify(want),
+    `got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`);
 
 const { getDb, schema } = await import("../../lib/db/index.ts");
-const { and, eq, inArray } = await import("drizzle-orm");
+const { and, eq: sqlEq, inArray } = await import("drizzle-orm");
 const { uid } = await import("../../lib/utils.ts");
 const { closeWeek, weekKey } = await import("../../lib/week-close.ts");
 const { rungOf, RUNGS, EARN_FLOOR } = await import("../../lib/ladder.ts");
@@ -124,11 +142,11 @@ console.log("\n== a week with money and entrants pays out ==");
   // Clear anything the demo seed left for this period so the run under test is
   // the only one, and its arithmetic can be checked exactly.
   const prior = await db.select({ id: schema.serverPayouts.id }).from(schema.serverPayouts)
-    .where(eq(schema.serverPayouts.periodStart, weekStart));
+    .where(sqlEq(schema.serverPayouts.periodStart, weekStart));
   if (prior.length) {
     await db.delete(schema.serverPayoutLines)
       .where(inArray(schema.serverPayoutLines.payoutId, prior.map((p) => p.id)));
-    await db.delete(schema.serverPayouts).where(eq(schema.serverPayouts.periodStart, weekStart));
+    await db.delete(schema.serverPayouts).where(sqlEq(schema.serverPayouts.periodStart, weekStart));
   }
 
   // Three servers, one entrant each, plus one entrant in two of them — the
@@ -156,7 +174,7 @@ console.log("\n== a week with money and entrants pays out ==");
   // first, which passed by luck and would have kept passing if the
   // public/private filter were deleted.
   const [challenge] = await db.select({ id: schema.challenges.id, spaceId: schema.challenges.spaceId })
-    .from(schema.challenges).where(eq(schema.challenges.visibility, "public")).limit(1);
+    .from(schema.challenges).where(sqlEq(schema.challenges.visibility, "public")).limit(1);
   const [account] = await db.select({ id: schema.linkedGameAccounts.id, userId: schema.linkedGameAccounts.userId })
     .from(schema.linkedGameAccounts).limit(1);
   const joinAt = new Date(weekStart.getTime() + 2 * 86400_000);
@@ -267,9 +285,13 @@ console.log("\n== a week with money and entrants pays out ==");
   // assertion that fails rather than a share quietly moving.
   {
     const first = r.servers.find((x) => x.guildId === guilds[0]);
-    eq("private-challenge entrants are not counted", first?.entrants, 2);
+    // ONE, not two. `guilds[0]` carries exactly one sponsored entrant — U0 —
+    // and the five private-challenge entrants above must not join them. The
+    // expected value said two, and was never checked, because the `eq` this
+    // called was drizzle's SQL builder rather than an assertion.
+    eq("private-challenge entrants are not counted", first?.entrants, 1);
     ok("…so the private challenge did not buy a bigger share",
-      (first?.exclusiveEntrants ?? 0) <= 2, JSON.stringify(first));
+      (first?.exclusiveEntrants ?? 0) <= 1, JSON.stringify(first));
   }
 
   ok("engaged opens are not a term at all",
@@ -304,7 +326,7 @@ console.log("\n== a week with money and entrants pays out ==");
 
   console.log("\n== …as DRAFTS, and only once ==");
   const written = await db.select({ id: schema.serverPayouts.id, status: schema.serverPayouts.status })
-    .from(schema.serverPayouts).where(eq(schema.serverPayouts.periodStart, weekStart));
+    .from(schema.serverPayouts).where(sqlEq(schema.serverPayouts.periodStart, weekStart));
   ok("payout rows were written", written.length > 0, String(written.length));
   // The cron calculates; a human releases. A job that moved money on its own is
   // one nobody could stop on a Sunday.
@@ -313,7 +335,7 @@ console.log("\n== a week with money and entrants pays out ==");
   const again = await closeWeek(now);
   ok("closing the same week twice is refused", again.skipped === true, again.summary);
   const after = await db.select({ id: schema.serverPayouts.id }).from(schema.serverPayouts)
-    .where(eq(schema.serverPayouts.periodStart, weekStart));
+    .where(sqlEq(schema.serverPayouts.periodStart, weekStart));
   ok("…and not one extra payout appeared", after.length === written.length,
     `${after.length} vs ${written.length}`);
 }
