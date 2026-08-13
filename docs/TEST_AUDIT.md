@@ -96,7 +96,81 @@ guards. The list is in the per-suite table below.
 | 7 | `marketing-truth.mts` | keep | The best suite in the band. A drift alarm that was itself caught being too narrow (pinned to one wording, caught one file) and widened to walk every `.ts`/`.tsx` under `app`, `components`, `lib`. Strips comments first so the note explaining a retired promise is not read as the promise. |
 | 8 | `split.mts` | **superseded (§214–256)** | See above. The rest of the suite is sound. |
 
-*(continues as the read proceeds)*
+| 9 | `dataroom-truth.mts` | keep, 1 nit | Excellent. Walks every string in every seeded doc and fails on a hard-coded price. **Nit at :248** — `ok("…and it matches the registry", games === 23)` retypes the number the suite's whole thesis forbids. It is deliberate (a 24th game must force a deck rewrite) but it should read the registry and assert the deck's spelled-out word, not a literal. **Separately: the deck it pins carries the superseded capacity argument** (`defaults.ts:315,327`). The suite is right; its subject is wrong. |
+| 10 | `docs-truth.mts` | keep | The strongest design in the band: a `RETIRED` registry in `lib/retired.ts` whose every entry must name evidence, and the evidence file must still say it. Blanks comments while **keeping newlines** so line numbers stay true. Extends over `app/` and `components/`, not just `docs/`. This is the pattern the consolidated band should be built on. |
+
+| 11 | `honest-copy.mts` | keep, 1 fragility | Ten real defects, each asserted as a property. Its three vacuous negatives are all legitimate guards. **Fragility at :210** — `ok("…on a deployment with no provider keys it is genuinely smaller", live.length < all.length)` asserts a property of the *fixture*, not the product. `RIOT_API_KEY` is set in production; if the band ever runs with keys present this goes red for the right code. This is precisely the trap `public-copy.mts` documents at :75. |
+| 12 | `public-copy.mts` | keep | The most self-aware suite here. Its header records that its own first version asserted a demo-only game count and "enforced a falsehood about production from inside the file meant to prevent exactly that". Asserts properties, never the strings. |
+
+| 13 | `rules.mts` | keep | Every figure imported from the module that enforces it; also checks each journey step's `href` resolves to a real `page.tsx`. Good pattern — steal it. |
+| 14 | `integrity.mts` | keep | Phase-0 defects pinned. Its negatives (`mediaValue`, `roasOf`) guard decisions that still stand. **Surfaced BUG-1 below.** |
+
+| 15 | `money.mts` | keep | The structural "no column could hold a bank account" check reads `information_schema` rather than trusting the schema file. Best assertion in the band. |
+| 16 | `eligibility.mts` | keep | Current through B95. Documents its own B93 inversion (`AgeGate` → `OnboardingBar`) instead of deleting the assertion. Cites `B73 §5 Q4` — **more BUG-1 fallout**. |
+
+---
+
+## READ PROGRESS — 16 of 99
+
+Read so far (alphabetical position is not the read order):
+`abuse`, `account-deletion`, `ad-views`, `allocations`, `announce-queue`,
+`bot-payload`, `dataroom-truth`, `docs-truth`, `eligibility`, `honest-copy`,
+`integrity`, `marketing-truth`, `money`, `public-copy`, `rules`,
+`split` (§214–256 only — **needs a full read**, 593 lines).
+
+**Next:** `attribution`, `audit-batch`, `bootstrap`, `bot-attribution`,
+`bot-dead-ends`, `bot-errors`, `bot-growth`, `bot-unlock`, `brand-signup`,
+`brand-trophies`, `campaign-confirm`, `campaign-console`, `caps`, `card-images`,
+`card-refs`, `cards`, `challenge-billing`, `challenge-stage`,
+`close-to-next-run`, `co-sponsor`, `cold-start`, `concurrency`, `cp-economics`,
+`cp-vault`, `cron-idempotent`, `cron-twice`, `custom-campaign`, `entry-rules`,
+`form-drafts`, `gifting`, `guild-defaults`, `ladder`, `legacy-drop`,
+`live-components`, `marketplace`, `milestones-admin`, `mission-live`,
+`missions`, `money-loop`, `nav`, `no-discord-ads`, `offers`, `onboarding`,
+`ownership`, `payment-webhook`, `planet-explore`, `pool-live`, `portal-key`,
+`portal-keys`, `pre-start-scoring`, `prepay`, `presented-by`,
+`private-challenge`, `prize-places`, `provider-errors`, `public-card-privacy`,
+`publish`, `quest-actions`, `ranks`, `retention`, `riot-methods`,
+`security-b103`, `segments`, `series-plan`, `server-profile`, `server-public`,
+`server-wallet`, `slugs`, `spam-audit`, `stale-account-id`, `storage-budget`,
+`stuck-money`, `sync-throughput`, `taxonomy`, `trophy-admin`, `trophy-stack`,
+`under13`, `unlock-monotonic`, `wallet`, `week-close`, `week-prizes`,
+`welcome-challenge`.
+
+---
+
+# Bugs found by reading (not by running)
+
+## BUG-1 — ten citations to two documents that do not exist
+
+`docs/B73_RESEARCH.md` and `docs/DUE_DILIGENCE_REPORT.md` are both gone. Ten
+places still cite them, and the citations are not decoration:
+
+| File | What it cites them for |
+|---|---|
+| `docs/SOURCE_OF_TRUTH.md:35` | Why brand imagery is on our domain — "that began as a legal read" |
+| `docs/SOURCE_OF_TRUTH.md:326` | Its own index: *"What did the legal research say? → docs/B73_RESEARCH.md"* |
+| `docs/MODEL.md:32` | Same legal read |
+| `lib/db/schema.ts:1949` | **The money-transmission reasoning behind a schema decision** (`B73 Q3`) |
+| `lib/private-challenge.ts:8` | **Why gifting was deleted** (`B73 Q3`) |
+| `lib/brand-report.ts:16,54,112` | Finding #1 — why no brand figure derives from headcount |
+| `lib/ads-beacon.ts:3` | The beacon-minting finding |
+| `tests/db/integrity.mts:4` | Claims *every* assertion in it corresponds to a finding in the missing report |
+
+The last two rows are the ones that bite. `lib/private-challenge.ts` and
+`lib/db/schema.ts` cite a legal analysis as the reason a money-transmission risk
+was closed, and that analysis can no longer be read. The next person to ask "why
+can't a gamer gift a trophy?" gets a dead pointer.
+
+**Why no suite caught it:** `docs-truth.mts` checks that nothing points at the
+deleted `docs/legacy` folder, and that each `RETIRED` entry's evidence file
+exists. It never checks that a document *cited in prose* exists. The guard was
+built for the last failure, not the shape of it.
+
+**Fix:** restore both documents from git history if they were deleted in error,
+or rewrite the reasoning into a live doc and repoint all ten citations. Then add
+a link-integrity check — every `docs/*.md` path named anywhere in the tree must
+resolve — which is one assertion and would have caught this the day it broke.
 
 ---
 
