@@ -217,7 +217,7 @@ console.log("\n== a milestone with no trophy promises nothing ==");
   const noTrophy = DEFAULT_MILESTONES.filter((m) => !m.trophyId);
   ok("the shipped default has none attached", noTrophy.length === DEFAULT_MILESTONES.length,
     "staff attach a trophy when they have one — the ladder still shows and still marks the run");
-  const band = read("components/MissionBand.tsx");
+  const band = read("components/nav/NavChrome.tsx");
   ok("the band says so rather than implying a prize",
     /Trophies for these are being chosen/.test(band));
   ok("…and only draws a trophy icon where there is one", /m\.hasTrophy && <Icon name="trophy"/.test(band));
@@ -227,39 +227,50 @@ console.log("\n== a milestone with no trophy promises nothing ==");
 
 console.log("\n== the band is chrome, and behaves like the one above it ==");
 {
-  const band = read("components/MissionBand.tsx");
-  // B63.2, and the assertion here was WRONG before the browser band caught it.
+  const band = read("components/nav/NavChrome.tsx");
+
+  // ===== THE RULE SURVIVED; THE MECHANISM DID NOT =====
   //
-  // It demanded `backgroundImage` in this component — i.e. it asserted that the
-  // band paints the nav art itself. That is exactly the defect: the header
-  // group paints the image ONCE and everything inside it stays transparent so
-  // that single layer shows through. `tests/ui/week-band.mjs` has guarded
-  // "exactly one element paints the nav art" since B10, and it went red the
-  // first time this component ran in a browser.
+  // These assertions used to pin `bandBg`, `panelBg` and a `bgUrl` flag — three
+  // pieces of machinery that existed only because the header, the week band and
+  // the mission band were separate components that each had to be told whether
+  // the nav had art. The rewrite makes them one component with one background
+  // layer, so there is nothing left to tell: the bands are children of the
+  // element that paints, and they are transparent because they are children.
   //
-  // The db band cannot see a rendered page, so it could not have caught this —
-  // but it could have avoided ASSERTING the wrong thing, which is worse than
-  // not testing it. The rule is now stated the way it actually works.
-  ok("the band does NOT paint the nav art", !/backgroundImage/.test(band),
+  // The RULE is unchanged and still the one that matters, so it is asserted
+  // against the new shape rather than deleted with the old one. `tests/ui`
+  // checks the same thing in a real browser, which is where it was first caught.
+  const bands = band.slice(band.indexOf("function WeekBand"));
+  ok("neither band paints the nav art", !/backgroundImage/.test(bands),
     "a second copy of the image is what makes the header stop reading as one surface");
-  ok("…it stays transparent when the nav has art",
-    /const bandBg = bgUrl \? undefined :/.test(band),
-    "bgUrl is a flag, not a source — exactly what WeekBand does");
-  ok("…and supplies its own ground when the nav has none",
-    /bgUrl \? undefined : \{ background:/.test(band));
-  ok("…while the expanded panel, which drops below the header, gets a scrim",
-    /const panelBg = \{ background: bgUrl \?/.test(band));
-  ok("clicking anywhere in the panel closes it", /onClick=\{toggle\} className="cursor-pointer/.test(band),
+  ok("…and exactly one element in the whole nav does",
+    (band.match(/backgroundImage/g) ?? []).length === 1,
+    "the header's own backdrop layer, and nothing else");
+
+  ok("clicking the panel's own background closes it",
+    /if \(e\.target === e\.currentTarget\) onToggle\(\)/.test(band),
     "B63.1, and it is what people try first");
-  ok("…but a link inside still navigates", /e\.stopPropagation\(\)/.test(band));
-  ok("it remembers the choice", /localStorage\.setItem\(KEY/.test(band));
+  // …and the reason that shape replaced `onClick={toggle}` on the container:
+  // the old one fired for every click INSIDE the panel too, so every link had
+  // to remember to call stopPropagation and any that forgot closed the panel
+  // instead of navigating. Testing the target means a link needs to do nothing.
+  ok("…without every link having to opt out of it",
+    !/stopPropagation/.test(band),
+    "a link that forgets stopPropagation used to close the panel instead of following");
+
+  ok("it remembers the choice", /localStorage\.setItem\(MISSION_KEY/.test(band));
   ok("…starting collapsed, unlike the week band",
-    /localStorage\.getItem\(KEY\) === "open"/.test(band),
+    /getItem\(MISSION_KEY\) === "open"/.test(band),
     "two panels opening over every page on every visit is what makes people collapse both");
-  const nav = code("components/Nav.tsx");
-  ok("both bands are handed the nav's art flag",
-    (nav.match(/optImg\(navBg, 1600\)/g) ?? []).length >= 3,
-    "the header paints it once; the two bands each receive it to decide whether they need their own ground");
+
+  // ===== AND THE NEW RULE, WHICH IS WHY THE REWRITE HAPPENED =====
+  ok("no panel survives a navigation",
+    /useEffect\(\(\) => \{ closeAll\(\); \}, \[pathname/.test(band),
+    "a panel opened on one page used to cover the next one until collapsed by hand");
+  ok("…and only one band is open at a time",
+    (band.match(/if \(!v\) set(Mission|Week)Open\(false\)/g) ?? []).length === 2,
+    "two full-width panels stacked over a phone screen is the whole page");
 }
 
 console.log("\n== the job only walks gamers who could have moved ==");

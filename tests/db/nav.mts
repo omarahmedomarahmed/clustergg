@@ -118,16 +118,22 @@ console.log("\n== the same nav for everybody ==");
   ok("…and no whole menu is", NAV_MENUS.every((m) => m.links.some((l) => !l.auth)),
     "a menu that empties for a guest is an audience switch wearing a menu's clothes");
 
-  const bar = read("components/nav/NavMenuBar.tsx");
+  // ===== ONE FILE NOW, NOT SIX =====
+  //
+  // The bar, its menu bar, its quest card, its alerts and both bands were
+  // separate components that only ever appeared together, sharing a background,
+  // a height variable and a sticky context by convention. `NavChrome` is all of
+  // it; `components/Nav.tsx` is the server half that feeds it. The assertions
+  // below did not change — only where they look.
+  const bar = read("components/nav/NavChrome.tsx");
   // The groups and their order must not depend on who is looking. Only the
   // leaves may, and only by omission.
   ok("the component filters leaves, not groups",
     /menu\.links\.filter\(\(l\) => !l\.auth \|\| signedIn\)/.test(bar));
   ok("…and renders NAV_MENUS in order, unfiltered", /NAV_MENUS\.map\(/.test(bar));
 
-  const nav = read("components/Nav.tsx");
   ok("the bar is rendered once, outside the signed-in branch",
-    (nav.match(/<NavMenuBar/g) ?? []).length === 1,
+    (bar.match(/<MenuBar/g) ?? []).length === 1,
     "two copies is how the two audiences drift apart again");
 }
 
@@ -143,20 +149,26 @@ console.log("\n== the two PLACES stay one click away ==");
   // A menu carries ROUTES. A badge carries a PLACE. The distinction is the
   // reason the row is allowed to hold anything at all.
   const nav = read("components/Nav.tsx");
+  const chrome = read("components/nav/NavChrome.tsx");
   ok("the destination badges are rendered in the row", /navBadges\(\{/.test(nav),
     "the marketplace and planets badges are places, not menu leaves");
   // `lastIndexOf`, not `indexOf`. `navBadges({` is called TWICE — once to build
   // the mobile drawer's link list near the top of the file, and once to render
   // the row. The first version of this check found the drawer call, concluded
   // the badges were above the menu bar, and failed on correct code.
-  ok("…outside any dropdown", nav.lastIndexOf("navBadges({") > nav.indexOf("<NavMenuBar"),
+  // The badges are BUILT server-side and RENDERED in the bar row, so the check
+  // moved with them: the row that paints them must sit outside `MenuBar`, not
+  // inside any panel it opens.
+  ok("…outside any dropdown",
+    chrome.indexOf("badges.map(") > chrome.indexOf("<MenuBar")
+    && chrome.indexOf("badges.map(") < chrome.indexOf("function MenuBar"),
     "a badge inside the menu is the regression this check exists for");
-  ok("…and still admin-gated", /show\("marketplaceBadge"\)|show,/.test(read("lib/site-chrome.ts")) || /show,/.test(nav));
+  ok("…and still admin-gated", /show\[id\]|show:/.test(nav), "navBadges no longer receives the switches");
 }
 
 console.log("\n== the doors are no longer hidden by breakpoint ==");
 {
-  const nav = read("components/Nav.tsx");
+  const nav = read("components/Nav.tsx") + read("components/nav/NavChrome.tsx");
   // The exact defect: the commercial links behind `hidden lg:inline`.
   ok("'For brands' is not a breakpoint-hidden link any more",
     !/hidden lg:inline[^}]*For brands/.test(nav));
