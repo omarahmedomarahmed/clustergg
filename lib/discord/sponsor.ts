@@ -32,7 +32,35 @@ export function withSponsorRow<T extends { components?: unknown }>(
   guildId: string | null,
 ): T {
   if (!ad) return payload;
-  const url = sponsorClickUrl(siteUrl(), ad, guildId);
+
+  // ===== AN AD MAY NEVER TAKE A CARD DOWN. =====
+  //
+  // It did, for a day, and this is how. `sponsorClickUrl` signs the link, the
+  // signature comes from `PORTAL_SECRET`, and PR #115 correctly made a missing
+  // `PORTAL_SECRET` a hard throw instead of a silent fallback to `CRON_SECRET`.
+  // Production had never had one set — the fallback had been hiding that — so
+  // the throw landed the moment a sponsored card was drawn, which is EVERY card
+  // while an ad is live. Every command and every button in every server answered
+  // "Cluster couldn't load that just now."
+  //
+  // The throw is right and stays. What was wrong is that a decoration was
+  // allowed to be load-bearing: the card is the product, the sponsor button is
+  // revenue attached to it, and the ordering between those two is not
+  // negotiable. So the mint is fenced. A card with no ad button loses a click we
+  // could have billed for; a card that never renders loses the product.
+  //
+  // Logged, not swallowed: the only condition that reaches here is a deployment
+  // misconfiguration, and one that is invisible is one nobody fixes.
+  let url: string | null = null;
+  try {
+    url = sponsorClickUrl(siteUrl(), ad, guildId);
+  } catch (e) {
+    console.error("[ads] could not sign the sponsor link — card sent without it", {
+      campaignCreativeId: ad.campaignCreativeId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return payload;
+  }
   // A creative with no destination gets no button. A button that goes nowhere
   // is worse for the brand than no button — it reads as broken, under their
   // name, in somebody else's community.
