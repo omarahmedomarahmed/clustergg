@@ -135,6 +135,47 @@ export const RIOT_PROBE_ONLY_PATHS: readonly string[] = [
  */
 export const RIOT_SUMMONER_V4_PER_MINUTE = 1600;
 
+// ===== VERIFIED AGAINST THE REAL KEY, 2026-08-13 =====
+//
+// Every path in RIOT_APPROVED_PATHS was diffed against the personal key's own
+// method list. 37 of 37 match: nothing missing, nothing invented.
+//
+// The limits that decide how the sync is shaped:
+//
+//   summoner-v4 by-puuid          1,600 / MINUTE      <-- the only tight one
+//   league-v4 entries by-puuid    20,000 / 10 seconds
+//   account-v1 by-riot-id         1,000 / minute
+//   match-v5 by-puuid/ids         2,000 / 10 seconds
+//   match-v5 matches/{id}         2,000 / 10 seconds
+//
+// So the per-account weekly pull is CHEAP. `league-v4 entries by-puuid` returns
+// tier, division, LP, wins and losses for BOTH queues in one call at
+// 20,000/10s — which is the entire scoring and rank-gating requirement for one
+// gamer, in one request, at a limit we cannot realistically reach.
+//
+// Avoid summoner-v4 on any hot path. It is 70x tighter than everything around
+// it and it is not needed for scoring — only for display names.
+export const RIOT_LEAGUE_V4_PER_10S = 20_000;
+export const RIOT_ACCOUNT_V1_PER_MINUTE = 1_000;
+export const RIOT_MATCH_V5_PER_10S = 2_000;
+
+// ===== WHAT THE PERSONAL KEY DOES **NOT** HAVE =====
+//
+// The development key had 59 methods; this one has 39, and the difference is
+// not a smaller League surface — it is three entire games removed.
+//
+//   TFT     tft-match-v1, tft-summoner-v1, tft-league-v1        ALL GONE
+//   LoR     lor-ranked-v1, lor-match-v1, lor-status-v1          ALL GONE
+//   VALORANT val-content-v1, val-ranked-v1, val-status-v1       ALL GONE
+//
+// Also gone: summoner-v4 `/summoners/me`, account-v1 `/active-shards`.
+//
+// VALORANT is the one that costs us a product decision. Not one VAL endpoint
+// survives — not even platform status — so VALORANT cannot be scored, gated,
+// ranked or even health-checked on this key. A VALORANT challenge is
+// unsellable until Riot grants production access.
+export const RIOT_UNAVAILABLE_GAMES = ["TFT", "Legends of Runeterra", "VALORANT"] as const;
+
 /**
  * Reduce a Riot URL — as written in source, template literals and all — to the
  * shape used above: leading host and trailing query removed, every interpolated

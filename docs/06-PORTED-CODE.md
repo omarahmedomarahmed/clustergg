@@ -47,11 +47,51 @@ publisher API access is the real constraint on the business, not code.
    `summoner-v4` is `by-puuid` only. There is no `val/*` beyond platform status.
    `spectator-v5`'s path says `by-summoner` and takes a PUUID.
 
-### What the key does support, confirmed
+### What the key does support — verified against the real list, 2026-08-13
+
+`RIOT_APPROVED_PATHS` was diffed path by path against the personal key's own
+method list. **37 of 37 match.** Nothing missing, nothing invented.
 
 `/lol/league/v4/entries/by-puuid/{}` returns **tier, division, LP, wins and
-losses per queue** in one call. That single endpoint covers ranked wins, matches
-played, and both solo and flex rank gating. No `match-v5` fan-out required.
+losses for both queues** in one call, at **20,000 requests / 10 seconds**. That
+single endpoint is the entire scoring and rank-gating requirement for one gamer,
+in one request, at a limit we cannot realistically reach.
+
+| Endpoint | Limit | Note |
+|---|---|---|
+| `summoner-v4 by-puuid` | **1,600 / minute** | The only tight one — 70× tighter than its neighbours. **Never put it on a hot path.** Display names only |
+| `league-v4 entries by-puuid` | 20,000 / 10s | Scoring + rank gating. Effectively free |
+| `account-v1 by-riot-id` | 1,000 / minute | Linking |
+| `match-v5 by-puuid/ids` | 2,000 / 10s | **Available** |
+| `match-v5 matches/{id}` | 2,000 / 10s | **Available** |
+
+**`match-v5` is available**, which was not assumed. It is not needed for the
+scoring in `docs/00-TRUTH.md` §4.3 — `Δwins` and `Δmatches` both come from
+`league-v4` — but it opens richer challenge types later (per-champion, KDA,
+objectives) without another key application.
+
+### What the personal key does NOT have — and it costs us a game
+
+The development key had 59 methods and this one has 39. The difference is not a
+thinner League surface. **It is three entire games removed.**
+
+| Game | Endpoints | Status |
+|---|---|---|
+| **TFT** | `tft-match-v1`, `tft-summoner-v1`, `tft-league-v1` | **All gone** |
+| **Legends of Runeterra** | `lor-ranked-v1`, `lor-match-v1`, `lor-status-v1` | **All gone** |
+| **VALORANT** | `val-content-v1`, `val-ranked-v1`, `val-status-v1` | **All gone** |
+
+Also removed: `summoner-v4 /summoners/me`, `account-v1 /active-shards`.
+
+**VALORANT is a product decision, not a footnote.** Not one VAL endpoint
+survives — not even platform status — so VALORANT cannot be scored, rank-gated,
+or health-checked on this key. `registry.ts` still declares `riot-valorant` as a
+provider. **It must be marked not live**, and a VALORANT challenge is unsellable
+until Riot grants production access.
+
+The one thing VALORANT can still do is share a proven Riot identity: a PUUID
+proven through League is the same person in VALORANT. That is identity only, and
+it earns nothing until there are stats to read.
 
 ---
 
