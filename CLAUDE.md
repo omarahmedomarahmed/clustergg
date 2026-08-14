@@ -7,7 +7,7 @@ platform described in `docs/00-TRUTH.md`, from nothing.
 
 **Do not open the old branches.** `claude/clustergg-audit-g2ftlm` holds the
 previous platform. Everything worth keeping has already been copied into
-`ported/`, deliberately, with a written reason in `docs/06-PORTED-CODE.md`.
+`ported/`, deliberately, with a written reason in `docs/11-PORTED-CODE.md`.
 
 This is not tidiness. Three prior sessions inherited each other's mistakes by
 reading old code and assuming it encoded a current decision. It did not — it
@@ -27,7 +27,20 @@ If you need something that is not in `ported/`, **ask**. Do not go looking.
 | File | What |
 |---|---|
 | `docs/00-TRUTH.md` | The ratified rules. Every one was decided by the owner on 2026-08-13 |
-| `docs/06-PORTED-CODE.md` | What was carried over and what to change on arrival |
+| `docs/01-CYCLE.md` | **The spine.** Every surface serves one weekly loop — read this second |
+| `docs/02-MONEY.md` | Four vaults, the prize liability ledger, worked numbers |
+| `docs/03-CHALLENGES.md` | Lifecycle, baselining, scoring, rank gates, daily series |
+| `docs/04-SURFACES.md` | Every page, card and route, per audience |
+| `docs/05-ADMIN.md` | The console, and the weekend routine |
+| `docs/06-JOURNEYS.md` | Four journeys as clicks, and a month with real money |
+| `docs/07-DATA-MODEL.md` | Shapes and invariants |
+| `docs/08-BUILD-ORDER.md` | Ten stages, in order |
+| `docs/09-TEST-PLAN.md` | Two bands, the mutation harness, the screenshot record |
+| `docs/10-SETUP.md` | Environment and deployment. No terminal needed |
+| `docs/11-PORTED-CODE.md` | What was carried over and what to change on arrival |
+
+Read `00` and `01` before writing anything. The rest can be read as you reach
+the stage that needs them.
 
 ## House rules
 
