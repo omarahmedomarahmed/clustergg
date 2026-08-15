@@ -180,7 +180,7 @@ Everything in `docs/12-IDENTITY.md`. It replaces the portal key.
 | `/api/auth/discord/callback` | Token exchange, identity, guild roles. **The route that does not exist yet** |
 | Discord sign-in **and** email + password, one `users` row | Linking the second method never creates a second row |
 | Password reset — gamers and brands | |
-| **Staff are gamers** — `staffTitleId` grants the console, super admin grants the title | A staff member cannot place in a challenge they touched |
+| **Staff are gamers** — `staffTitleId` grants the console, super admin grants the title | They **enter and win challenges they run**, on merit. No placement block. Build **T7** instead: a podium trophy unassigned at `ended` is flagged in the prize vault |
 | Brand: key → one-time invite → email + password account | Separate route, separate table from gamers |
 | **Messages** in both portals + **two admin inboxes**, refresh in place | An unanswered thread keeps alerting |
 | **Opt-in server analytics** — `12-IDENTITY.md` §7a | Granted once and permanent · Update on a guild-level cooldown · platform-wide ceiling · dated snapshots · **no weekly-cycle figure may read one** |

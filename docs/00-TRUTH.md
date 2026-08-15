@@ -279,6 +279,7 @@ nothing and it is the only good news most entrants get.
 | G0a | An **email gamer needs no Discord.** They onboard, enter, score, win and redeem exactly like anyone else. They simply have **no parent server**, and no server earns from them until they get one |
 | G0b | A **Discord gamer needs no email** until they redeem |
 | G0c | Gamers get a **password reset**. So does a brand |
+| G0d | **One person may end up with two accounts — an email one and a Discord one — and that is permanent and fine.** They never merge. Each onboards separately and clears every gate on its own, and L1 stops them sharing a game account, so nobody scores twice |
 | G1 | Onboarding is **age band + country + link a game account**. Three things. A server-owner path substitutes the `guilds` scope for the linked account |
 | G2 | **The Discord path never asks for an email.** The email path asks for one because it *is* the credential — and verifies it there, which is what redemption later requires |
 | G3 | A Discord gamer is asked for an email **only at redemption**, and it is **verified** then |

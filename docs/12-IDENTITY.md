@@ -39,7 +39,10 @@ Discord, we see it, and the portal that was already waiting opens.
 | I1a | An **email gamer needs no Discord** — they onboard, enter, score, win and redeem. They have **no parent server**, and no server earns from them until they get one |
 | I1b | A **Discord gamer needs no email** until they redeem |
 | I1c | Linking the second method **never creates a second row, and never merges two accounts** |
-| I1c1 | An identity already on another account is answered with a **route, not a refusal**: *"You already have a Cluster account — sign in with Discord to reach it."* The spare account costs nobody anything and is left alone |
+| I1c1 | An identity already on another account is answered with a **route, not a refusal**: *"You already have a Cluster account — sign in with Discord to reach it."* |
+| I1c2 | **One person may hold two accounts forever, and that is fine.** No merge exists, none is planned, and no support path combines them |
+| I1c3 | **Each account is a separate gamer with its own onboarding and its own gates** — age, country, linked account, redemption email, trophies. Nothing crosses |
+| I1c4 | The two **cannot share a game account**, because L1 makes a game account unique across all gamers. That is what stops one person scoring twice, and it needs no merge to work |
 | I1d | **Password reset** exists for gamers and for brands. It is the only thing an unverified email cannot do |
 | I2 | Brands and gamers use **separate login routes and separate tables**. One email could otherwise be both, and a brand landing in gamer onboarding is a mess |
 | I3 | One brand, one login. Never one user across brands. Shared credentials are acceptable for now — **every spend is logged with timestamp and IP** so a disagreement has an answer |

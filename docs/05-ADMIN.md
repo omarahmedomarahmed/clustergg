@@ -194,7 +194,7 @@ The page opened when an owner asks *"why am I not earning?"* Every section in
 
 | # | Rule |
 |---|---|
-| 1 | **Never list guild members.** One member resolved on demand, never the paged list |
+| 1 | **Never list guild members on any path the product depends on.** One member resolved on demand. The **one exception** is the analytics tab a server owner opted into — `12-IDENTITY.md` §7a — and nothing in the weekly cycle may read what it produces |
 | 2 | Admin may set any gamer's **age band** and **parent server** by hand, from the servers that gamer is in. Logged |
 | 3 | An owner who has never signed in for **4 weeks** may be reassigned — manually, and the claimant must hold ADMINISTRATOR at that moment |
 | 4 | A confirmed ownership transfer **freezes withdrawal for 7 days** |

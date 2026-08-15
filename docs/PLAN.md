@@ -1,6 +1,6 @@
 # The rebuild plan
 
-Written from scratch against `cluster/v3-spec` **3678cba**. The previous plan was
+Written from scratch against `cluster/v3-spec` **0251807**. The previous plan was
 written against an account model that no longer holds and has been deleted, not
 edited.
 
@@ -26,6 +26,7 @@ Everything below depends on getting this table right, so it is first.
 
 | Was in my last plan | Is now |
 |---|---|
+| Two accounts for one person was an open question | **Ruled and closed: permitted, permanently** (G0d, U4b–U4d, I1c2–I1c4). No merge exists, none is planned, **and none is designed for.** Each account onboards separately and clears **every gate on its own**. They cannot share a game account because **L1 already forbids it** — that, not a merge, is what stops one person scoring twice |
 | Gamer email+password was an open question I refused to build | **Built.** `users.passwordHash`, email at signup **for the email path only**, **verified there** because it is the credential |
 | Redemption always asks for an email | The signup verification **is** the one redemption requires. A gamer may never open `/redeem` and still be verified |
 | An already-used identity is refused | It gets a **route**: *"You already have a Cluster account — sign in with Discord to reach it."* The spare account is left alone. **Never a merge** |
@@ -181,8 +182,8 @@ document line permits otherwise.
 | **Builds** | `/api/auth/discord` · `/callback` · `/install` · Discord sign-in · **email + password with the email verified at signup** · password reset for gamers · `brand_users`, the one-time invite, `/api/auth/brand`, brand reset · linking the second method · the shadow account on first bot click |
 | **Deletes** | `guilds.portalKeyHash`, `issueOwnerKey`, `ownerByKey`, `/login/server`, the server half of `portal-auth` |
 | **Governed by** | 12 §1 · 00 §6 G0–G3 · 07 Identity · 04 §1, §5 · 10 §1 |
-| **Guards** | Linking never creates a second row · an already-used identity **routes, never merges** · a brand invite works once · a brand is never a gamer · the email path's verification is the one redemption uses, asked once |
-| **A human can** | Sign up by email, verify, sign out, reset the password, sign back in, link Discord — and be told to sign in with Discord if it is already on another account |
+| **Guards** | Linking never creates a second row · an already-used identity **routes, never merges** · **two accounts for one person each clear every gate alone** · **L1 refuses the second one the same game account** · a brand invite works once · a brand is never a gamer · the email path's verification is the one redemption uses, asked once |
+| **A human can** | Sign up by email, verify, sign out, reset the password, sign back in, link Discord — and be routed to the other account if that Discord is already on one, with both accounts left standing |
 
 ### Sprint 4 · Onboarding, staff, and the console gate
 
@@ -360,6 +361,8 @@ Each names the file I break and the test I expect to go red.
 | 16 | A gamer cannot change their own parent | `lib/identity/attribution.ts` — drop the actor check | *"a gamer can never change their own parent"* |
 | 17 | **Linking never creates a second row** | `lib/identity/accounts.ts` — insert on link | *"linking a second method keeps one row"* |
 | 18 | **An already-used identity routes, never merges** | same — merge the two | *"an already-linked Discord routes to the other account and merges nothing"* |
+| 18a | **Two accounts for one person each clear every gate alone** | `lib/identity/unlock.ts` — inherit the other account's age band | *"a second account onboards from nothing, inheriting neither age nor country"* |
+| 18b | **L1 is what stops one person scoring twice** | `lib/identity/accounts.ts` — drop the uniqueness check | *"two accounts cannot link the same game account"* |
 | 19 | The email path verifies at signup | `app/signup/actions.ts` — skip verification | *"an email gamer is verified at signup and never asked again"* |
 | 20 | A brand invite works once | `lib/portal/brand.ts` — skip `inviteRedeemedAt` | *"a brand invite key is dead after one use"* |
 | 21 | A brand is never a gamer | `lib/auth/context.ts` — resolve a gamer from a brand session | *"a brand account never reaches the gamer nav"* |
@@ -383,90 +386,28 @@ analytics is wired into the money.
 
 ---
 
-## 5 · What I believe is wrong, contradictory or impossible
+## 5 · The four contradictions — all four ruled, all four fixed
 
-Listed, not reconciled.
+Every one was an error in the specification, and every one is corrected at
+`b6ee860`. Recorded here because the next session should know these were found
+by reading rather than by shipping them.
 
-### 5.1 — `08-BUILD-ORDER.md` still forbids what `00-TRUTH` now permits. **The most dangerous one.**
-
-Stage 9.5, the staff row, "Done when":
-
-> **A staff member cannot place in a challenge they touched**
-
-Three documents say the opposite, and give the reasoning:
-
-| Where | Says |
-|---|---|
-| `00-TRUTH.md` A12 | *"A staff member wins like anybody else, **including in challenges they run**. They cannot manipulate one… There is no lever to pull"* |
-| `00-TRUTH.md` A12a | The catch is **T7**, a trophy unassigned at close flagged in the vault — *"That, not a staff rule, is what catches a trophy going nowhere"* |
-| `07-DATA-MODEL.md` U8 | *"A staff member places like anybody else, in any challenge, including ones they run… Manipulation is structurally unavailable, not policed"* |
-| `09-TEST-PLAN.md` §Staff | *"they place in challenges they run, on merit, and there is no lever to pull"* |
-
-The commit that changed this is literally named *"staff win on merit"*. 08's
-done-when was missed.
-
-**I have your instruction** — *"Do not build a staff placement block; build T7
-instead"* — so I am not blocked. **I will build T7 and no placement block.** But
-08-BUILD-ORDER is the file a future session reads to know what to build, and it
-currently instructs the opposite. Worth a one-line edit at your end.
-
-### 5.2 — `05-ADMIN.md` §6 forbids the analytics feature it also describes
-
-Two lines on the same page:
-
-> §6 rule 1 · **Never list guild members.** One member resolved on demand, never the paged list
-> §6 registry · **Analytics** · Granted or not · the last snapshot **and when it was taken** …
-
-A snapshot of "members, roles and who holds them" (07 `guild_snapshots`) is a
-member-list read. 12 §7 was updated to make room for it — *"Never list guild
-members **on any path the product depends on** … There is **one exception, and it
-is opt-in per server**"* — and 05 §6 rule 1 was not.
-
-**How I read it:** 12 §7 is the current form; 05 §6 rule 1 means *never on a path
-the product depends on*. **I will build the opt-in exception.** Same page, §6
-Permissions also still says *"who holds it now"* where 12 G5 now says *"everyone
-we have **seen** holding it"* — the honest version, and the one I will build.
-
-### 5.3 — `04-SURFACES.md` §1 still says onboarding has no email
-
-> ### Onboarding — one page, two paths, **no email**
-> Email is asked **only at redemption**, and verified then.
-
-Against 00 G2 (*"The email path asks for one because it **is** the credential —
-and verifies it there"*) and I7a.
-
-**How I read it, and it is a distinction worth keeping:** *signup* and
-*onboarding* are different screens. The email path collects and verifies at
-`/signup`; the onboarding page that follows never asks either door for an email.
-So 04's heading is true of onboarding and false of signup. I will build it that
-way. Low risk — but if you meant the email path to collect the address without
-verifying it until redemption, say so, because I7a says the opposite and it
-changes the reset flow.
-
-### 5.4 — `02-MONEY.md` KPI 2 is less specific than `00-TRUTH` K2, and only one reading is bounded
-
-| Where | Denominator |
-|---|---|
-| `02-MONEY.md` §4 KPI 2 | *"entrants whose parent is this server **÷ linked members**"* |
-| `00-TRUTH.md` §7 K2 | *"÷ linked members **whose parent is this server**. Both sides are whole gamers, both sides parent-scoped, and the denominator is **live**"* |
-
-Only the parent-scoped denominator makes the ratio bounded at 1.0, which E1 and
-the test plan both require. 12 says 02 and 12 must be read together and neither
-is correct alone; 00 K2 is the one that spells it out.
-
-**I will build both sides parent-scoped, as whole-gamer head counts** — not the
-½ credit, which is KPI 1's unit and would push conversion under 0.5 for every
-split entrant. This is the reading, not a line; correct me if it is wrong,
-because it is the difference between a bounded ratio and an unbounded one.
-
-### 5.5 — Smaller, listed so they are not silently absorbed
-
-| # | Where | What |
+| # | What I found | The ruling |
 |---|---|---|
-| 1 | `09-TEST-PLAN.md` §Two doors | *"an already-taken identity is **refused with the reason**"* — where I1c1 and U4a say **a route, not a refusal**, and your message says the same. Wording only. I build the route |
-| 2 | `12-IDENTITY.md` §7a N8 | *"as the platform approaches **Discord's limit**"*. Discord publishes a global per-bot rate limit, not a member-list quota. The ceiling is therefore **our** number, not one we can read from Discord. I will build it as an operator setting with a named default, so it is visible and tunable rather than a constant nobody can find |
-| 3 | `07-DATA-MODEL.md` | `N1`/`N2` are used twice — once for analytics consent, once for content defaults. Harmless; noting it so a future citation is not ambiguous |
-| 4 | `12-IDENTITY.md` §1 vs §6 | §1's table names **two** capabilities on a gamer row (server manager, staff). §6 splits manager into **guild owner** and **administrator**, and that split is the entire money boundary. I treat it as three capabilities. Not a contradiction — a table that folds where the rules divide |
+| 5.1 | `08-BUILD-ORDER` Stage 9.5 said *"a staff member cannot place in a challenge they touched"*, contradicting 00 A12, 07 U8 and 09 §Staff — in a commit named *"staff win on merit"* | Fixed. It now says they **enter and win on merit, no placement block, build T7 instead**. This was the dangerous one: 08 is the file a future session builds from |
+| 5.2 | `05-ADMIN` §6 rule 1 forbade the member-list read that the analytics section on the same page depends on | Fixed. It now matches 12 §7 — never on a path the product depends on, **with the opted-in analytics tab as the one exception** |
+| 5.3 | `04-SURFACES` §1 headed onboarding *"no email"* against G2 and I7a | Fixed. **Signup and onboarding are different screens**, and it now says so. Confirmed directly: the email is **verified at signup**, because the password reset depends on it |
+| 5.4 | `02-MONEY` KPI 2's denominator was unbounded as written | Fixed. **Both sides parent-scoped, both whole gamers, denominator live** — the only reading bounded at 1.0 |
+
+### The one number the documents leave to me
+
+`12-IDENTITY.md` §7a N8 requires a platform-wide ceiling on member-list pulls but
+gives no figure, and Discord publishes a global per-bot rate limit rather than a
+member-list quota — so the number is ours.
+
+**It is a row in `settings`, never a constant.** Admin must be able to lower it
+the day Discord tightens something, without a deploy. The code ships a named
+default and reads the setting; nothing anywhere hard-codes it.
 
 ---
 
@@ -476,6 +417,8 @@ because it is the difference between a bounded ratio and an unbounded one.
 |---|---|
 | Opening any old branch | The one rule that matters |
 | Migrating `guild_members` into `parentGuildId` | A membership is not a first bot click |
+| Building an account merge, **or designing so one is possible later** | G0d, U4b, I1c2. Two accounts for one person are permanent and fine. L1 is what stops one person scoring twice |
+| One `isGuildManager` check doing both jobs | The owner/manager split is where every money rule lives. Two functions, always |
 | Building a staff placement block | 00 A12, 07 U8, 09 §Staff, and your instruction. T7 instead |
 | Writing copy that says we *cannot* read a member list | The intent is app-wide. The sentence is *"we do not read this unless you ask us to"* |
 | Reconciling anything in §5 silently | Same reason this branch exists |
