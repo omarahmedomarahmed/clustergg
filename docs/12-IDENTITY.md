@@ -8,17 +8,38 @@ attribution rules here, and neither is correct without the other.
 
 ---
 
-## 1 · Three kinds of account
+## 1 · Two kinds of account, and three things a person can be
 
-| | Signs in with | Can be the others? |
+There are exactly **two account tables**. Everything else is a capability on top
+of a gamer row.
+
+| Account | Signs in with | Table |
 |---|---|---|
-| **Gamer** | **Discord only** | Yes — a gamer can manage servers |
-| **Server manager** | The same gamer account | Yes — same person, same login |
-| **Brand** | **Email + password only** | **Never.** A brand user is not a gamer and never sees the gamer nav |
+| **Gamer** | **Discord, or email + password.** Either. Both, if they link the other later | `users` |
+| **Brand** | **Email + password only. Never Discord** | `brand_users` |
+
+| A person can be | Which is | Needs |
+|---|---|---|
+| **A gamer** | A `users` row | Onboarding |
+| **A server manager** | **The same `users` row** | A linked Discord identity that Discord says admins that guild |
+| **Cluster staff** | **The same `users` row** | A staff grant from the super admin |
+| **A brand** | A `brand_users` row | A redeemed one-time invite |
+
+**A staff member is a gamer.** They onboard like everyone, link an account,
+enter challenges and win trophies. The grant opens the console; it does not
+change what they are.
+
+**A server owner is a gamer.** They may sign up by email and never touch
+Discord — we simply will not know they own a guild. The moment they link
+Discord, we see it, and the portal that was already waiting opens.
 
 | # | Rule |
 |---|---|
-| I1 | **A gamer has no password and gives no email at signup.** Discord is the only way a gamer account comes into being — the first bot click, or Sign in with Discord. Email is asked once, at redemption, and verified then |
+| I1 | **Two ways in, one row.** Discord sign-in **or** email + password. Either reaches every gamer surface; neither is second class |
+| I1a | An **email gamer needs no Discord** — they onboard, enter, score, win and redeem. They have **no parent server**, and no server earns from them until they get one |
+| I1b | A **Discord gamer needs no email** until they redeem |
+| I1c | Linking the second method **never creates a second row.** If the identity is already on another account, the link is refused with the reason |
+| I1d | **Password reset** exists for gamers and for brands. It is the only thing an unverified email cannot do |
 | I2 | Brands and gamers use **separate login routes and separate tables**. One email could otherwise be both, and a brand landing in gamer onboarding is a mess |
 | I3 | One brand, one login. Never one user across brands. Shared credentials are acceptable for now — **every spend is logged with timestamp and IP** so a disagreement has an answer |
 | I4 | A gamer is never linked to a brand, never represents one, never sees a brand nav |
@@ -33,6 +54,7 @@ it knows who they are.
 | I5 | That first record holds **nothing but the Discord ID**. No name, no avatar, nothing |
 | I6 | It accrues nothing and counts as nobody until onboarding completes |
 | I7 | **The age question comes before any other data is stored.** We do not hold data on a child we never asked about |
+| I7a | The **email path verifies the email at signup**, because it *is* the credential and a password reset is impossible without it. That verification is the one redemption later requires — it is never asked twice |
 
 ---
 
@@ -80,6 +102,8 @@ Two servers can earn from one gamer. Never more.
 | # | Rule |
 |---|---|
 | A1 | The parent is stamped at the **first click**, and counts once onboarding completes — **wherever** it completed |
+| A1a | **The parent is frozen onto the entry the same moment the baseline is** — at the gun for an early joiner, at Join for a mid-week joiner. `max(challengeStart, joinedAt)`, one rule for both |
+| A1b | So an admin correcting a gamer's parent in week 6 **cannot move week 3's money.** A closed week never moves |
 | A2 | Click in server A, finish onboarding in server B or on the web → **A is the parent**. One account, one parent, no double counting |
 | A3 | **Linked member count → parent server only** |
 | A4 | **Entrant credit → ½ parent + ½ join server** |
@@ -218,13 +242,58 @@ Never on a schedule. Membership is checked only where it decides money.
 | **At the weekly close** | Re-check only servers at or near the gate | ~10–50 per server, weekly |
 | **Admin refresh button** | One guild, on demand, with a cooldown | 2 calls |
 
-**Never list guild members.** `GET /guilds/{id}/members` pages at 1,000 and needs
-the GUILD_MEMBERS privileged intent. Resolve one member on demand instead — same
-answer, no intent, 25× fewer calls.
+**Never list guild members on any path the product depends on.** `GET
+/guilds/{id}/members` pages at 1,000 and needs the GUILD_MEMBERS privileged
+intent. Resolve one member on demand instead — same answer, 25× fewer calls.
+
+There is **one exception, and it is opt-in per server**: the analytics tab in
+§7a. Nothing in the weekly cycle may ever depend on it.
 
 **What we accept:** a member who left still counts until the next checkpoint. One
 week of drift at worst, and the close corrects it. Credit stands for the week
 they entered.
+
+---
+
+## 7a · Server analytics — off by default, opted in per server
+
+A server owner can hand us read access to their member list **in exchange for
+their own analytics.** They choose. If they never do, nothing about their
+earning, their pool position or their portal changes — they simply do not get
+the extra tab.
+
+### What they get
+
+A dashboard of **their own server**, built from the data they allowed: member
+counts over time, roles and who holds them, how many of their members are linked
+to Cluster, entrants and how they convert, activity against challenges. Read
+only. **They cannot manage their server, their members or their roles from
+Cluster, and the page says so.**
+
+Cluster admin sees the same snapshot on the guild registry, stamped with when it
+was taken.
+
+### The consent, and how it behaves
+
+| # | Rule |
+|---|---|
+| N1 | **Off by default, every single session.** Signing out ends it. Signing back in, the tab is off again and must be allowed again |
+| N2 | The **Allow analytics** button is the grant. Before it, the tab exists and is **empty**, showing what they would get |
+| N3 | Allowing shows a plain warning: this page contains **detailed information about your members**, do not open it with somebody looking over your shoulder, and **this permission ends when you sign out** |
+| N4 | It also says, in words: **we do not read your member list by default** — not for scoring, not for the pool, not for anything. Only here, only when you ask |
+| N5 | Every read produces a **snapshot stamped with the date and time it was taken**. Both the owner and admin see that stamp, never an undated number |
+| N6 | They may open the **last snapshot without re-granting** — it is data we already hold. **Update data** is what needs the grant again |
+| N7 | **Cooldown on Allow, and on Update.** Signing out and back in must not be a way around it — the cooldown is on the guild, not the session |
+| N8 | **A hard ceiling across every server.** As the platform approaches it, the cooldown lengthens **everywhere at once**, and a server that cannot refresh is told plainly why and when it can |
+| N9 | Nothing in the weekly cycle — eligibility, KPIs, the pool, a payout — may **ever** read an analytics snapshot. If analytics went away tomorrow the money would be identical |
+
+### The one thing we must not claim
+
+Consent expiring at sign-out is **our rule, not Discord's**. The bot's access to
+that guild is granted at install and persists whether anyone is signed in or
+not. So the honest sentence, and the one that goes on the page, is **"we do not
+read this unless you ask us to"** — never *"we cannot"*. Saying the second would
+be a promise the architecture cannot keep.
 
 ---
 
@@ -241,6 +310,7 @@ owner asks *"why am I not earning?"*
 | **Pool eligibility** | Linked members vs 10 · profile completeness, field by field · in this week's pool, yes or no |
 | **Money** | Balance · this week's share · payout history · pending community-challenge requests |
 | **Refresh** | One button, per guild, cooled down. Re-pulls owner and roles from Discord |
+| **Analytics** | Whether this server has opted in · the **last snapshot and when it was taken** · the cooldown state. Full role holders where they opted in, *seen-only* where they did not |
 | **Audit** | Every admin action on this server, timestamped |
 
 | # | Rule |
@@ -289,5 +359,8 @@ to \<server\>* for servers they admin without the bot. **Never a brand.**
 |---|---|
 | H1 | An **`i` icon on everything** in both portals. Clicking opens an overlay explaining what it is and the rule behind it, visually |
 | H2 | A docs and guides section **inside** each portal — not a link to the marketing site |
+| H5 | A **Messages** page in both portals, and **two matching inboxes** in admin — one for server owners, one for brands. Kept apart, never merged |
+| H6 | **Refresh in place on all four surfaces.** The owner and the brand refresh for admin's replies; admin refreshes for theirs |
+| H7 | An unanswered message **keeps alerting admin** until somebody replies. Support is the point of the page, so silence is the failure mode it exists to prevent |
 | H3 | Progress bars on every gated thing: onboarding, server profile, pool eligibility, challenge lifecycle |
 | H4 | **Never** a progress bar on raw member count — that advertises the wrong number to optimise |

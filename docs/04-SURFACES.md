@@ -30,7 +30,8 @@ owner needs has a **matching card in the Discord bot**. For most gamers the bot
 | `/redeem` | 18+ only: verify email, choose method, request payout | Close |
 | `/profile` | Their own dashboard — challenges entered, trophies, standings | Run |
 | `/settings/*` | Account, connections, privacy, notifications | — |
-| `/signup` · `/login` | **Sign in with Discord.** The only way a gamer account is created | — |
+| `/signup` · `/login` | **Sign in with Discord, or sign up with email + password.** Either. One `users` row either way | — |
+| `/reset` | Password reset — gamers and brands | — |
 | `/login/brand` | Brands only. Email + password, separate table | — |
 | `/rules/[who]` | Published rules for gamer, owner, brand | — |
 | `/legal/*` | Terms, privacy, cookies | — |
@@ -112,6 +113,8 @@ portal key. Full rules in `docs/12-IDENTITY.md` §6.
 | Wallet | Earnings, withdrawals, history |
 | Settings | Contact, payout preference, **admin role mapping** |
 | **Server profile** | Member age range · games played · bio · permanent invite · cover image · announcement channel. **Required to be scored at all** |
+| **Analytics** | **Empty and off by default, every session.** An *Allow analytics* button grants member-list access in exchange for their own dashboard. Read-only, cooled down, snapshot always dated. `12-IDENTITY.md` §7a |
+| **Messages** | Talk to Cluster. **Refresh in place** |
 | Help | An `i` icon on everything, plus docs and guides **inside** the portal |
 
 ### Bot installation and permissions
@@ -153,6 +156,7 @@ Fully self-serve from signup.
 | Page | What it shows |
 |---|---|
 | Overview | Live challenges, entrants, reach |
+| **Messages** | Talk to Cluster. **Refresh in place** |
 | Builder | The purchase flow above |
 | Challenges | Every challenge, per week of a series |
 | **Trophies** | Their branded trophies, **how many gamers hold each**, and who |

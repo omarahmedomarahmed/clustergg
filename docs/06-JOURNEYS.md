@@ -58,7 +58,7 @@ feature list, because a feature list hides the moment where somebody gets stuck.
 | 1 | Discord | Add the bot | Guild registered. **The installer is captured at the redirect.** The guild owner is DM'd, whoever installed it |
 | 2 | Bot settings | Map an **admin role** | Stores the role **ID** |
 | 3 | Bot settings | Pick an announcement channel | — |
-| 4 | `/login` | **Sign in with Discord** | Guild roles read. Their portal was already there, with everything admins did waiting in it |
+| 4 | `/login` | **Sign in with Discord** — or sign up by email and link Discord after | Guild roles read. Their portal was already there, with everything admins did waiting in it. Until Discord is linked we cannot know they own a guild |
 | 5 | Onboarding | Age band → country → pick a server | One answer, used for their gamer profile too |
 | 6 | Portal | Describe the community | **Required to be scored at all** |
 | 7 | Portal | See this week's challenges | The ones feeding this week's pool |
