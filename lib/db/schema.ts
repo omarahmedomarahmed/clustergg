@@ -476,3 +476,190 @@ export const userTrophies = pgTable(
 );
 
 export type UserTrophy = typeof userTrophies.$inferSelect;
+
+// ============================================================================
+// Servers and challenges
+// ============================================================================
+
+/**
+ * A Discord server that has the bot.
+ *
+ * S5 — **`adminRoleId` is the role ID, never the name.** A renamed role must
+ * not silently revoke a portal key, and it would: names are what people
+ * change, ids are what Discord keys on.
+ *
+ * K7 / G-rule — a server that never described itself is **dropped from pool
+ * scoring**, not scored zero. Scored zero it would still occupy a percentile
+ * position and take money from servers that did the work.
+ */
+export const guilds = pgTable(
+  "guilds",
+  {
+    guildId: text("guild_id").primaryKey(),
+    name: text("name").notNull(),
+    slug: text("slug").notNull().unique(),
+    memberCount: integer("member_count").notNull().default(0),
+    adminRoleId: text("admin_role_id"),
+    announceChannelId: text("announce_channel_id"),
+    // The community profile. Null means never described — dropped from scoring.
+    community: text("community"),
+    portalKeyHash: text("portal_key_hash"),
+    installedAt: timestamp("installed_at", { withTimezone: true }).notNull().defaultNow(),
+    // Removal freezes reach; earnings survive (S9).
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+  },
+  (t) => [index("guilds_removed_idx").on(t.removedAt)],
+);
+
+export type Guild = typeof guilds.$inferSelect;
+
+/** Weekly member and linked counts — the denominator for the conversion KPI. */
+export const guildSnapshots = pgTable(
+  "guild_snapshots",
+  {
+    id: text("id").primaryKey(),
+    guildId: text("guild_id").notNull(),
+    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    memberCount: integer("member_count").notNull(),
+    linkedCount: integer("linked_count").notNull(),
+  },
+  (t) => [uniqueIndex("guild_snapshot_week_idx").on(t.guildId, t.weekStart)],
+);
+
+/** A brand. Self-serve from signup; we email the key. */
+export const brands = pgTable("brands", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  contactName: text("contact_name"),
+  contactPhone: text("contact_phone"),
+  contactEmail: text("contact_email"),
+  logoUrl: text("logo_url"),
+  portalKeyHash: text("portal_key_hash"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * A challenge. One game, one week, one sponsor, one prize pool.
+ *
+ * C1 — `announced` requires a **paid** invoice, and there is no path around
+ * it: the transition function reads the invoice, and no other code sets the
+ * state.
+ *
+ * C2 — `startAt` is always a period boundary, enforced in the model rather
+ * than in the UI. There is no date picker anywhere, for anyone (L6), and a
+ * rule enforced only by the absence of a control is a rule until somebody
+ * writes a script.
+ *
+ * C3 — every challenge past `draft` has an invoice (L9). No unbilled
+ * challenges, including the house's own.
+ */
+export const challenges = pgTable(
+  "challenges",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    game: text("game").notNull(),
+    provider: text("provider").notNull(),
+    // draft | pending_payment | scheduled | announced | live | ended
+    state: text("state").notNull().default("draft"),
+    // sponsored | community
+    visibility: text("visibility").notNull().default("sponsored"),
+    sponsorBrandId: text("sponsor_brand_id"),
+    guildId: text("guild_id"),
+    seriesId: text("series_id"),
+    seriesIndex: integer("series_index"),
+    // weekly | daily
+    cadence: text("cadence").notNull().default("weekly"),
+    startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+    endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+    prizePoolCents: integer("prize_pool_cents").notNull().default(0),
+    places: integer("places").notNull().default(1),
+    // Which metrics score, and their weights: { wins: 10, matches: 1 }
+    metrics: jsonb("metrics").$type<Record<string, number>>(),
+    // solo | flex | both
+    queue: text("queue").notNull().default("solo"),
+    rankMin: integer("rank_min"),
+    rankMax: integer("rank_max"),
+    // Community challenges only — you must join the server to get it.
+    accessKey: text("access_key"),
+    invoiceId: text("invoice_id"),
+    announcedAt: timestamp("announced_at", { withTimezone: true }),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("challenges_state_idx").on(t.state),
+    index("challenges_start_idx").on(t.startAt),
+    index("challenges_series_idx").on(t.seriesId),
+  ],
+);
+
+export type Challenge = typeof challenges.$inferSelect;
+
+/**
+ * One gamer in one challenge.
+ *
+ * P1 — **the baseline is stored per participant per challenge.** Two
+ * challenges on one game account never interfere, which is the case that makes
+ * every simpler design wrong.
+ *
+ * P2 — `baselineAt = max(challengeStart, joinedAt)`, no exceptions.
+ * P5 — score is derived from `baseline` and the latest observation. **Never
+ * stored** — except `frozenScore`, which is not a cache: see B6.
+ */
+export const challengeParticipants = pgTable(
+  "challenge_participants",
+  {
+    id: text("id").primaryKey(),
+    challengeId: text("challenge_id").notNull(),
+    userId: text("user_id").notNull(),
+    linkedAccountId: text("linked_account_id").notNull(),
+    // Which server gets the credit for this entrant.
+    guildId: text("guild_id"),
+    joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
+    // max(challengeStart, joinedAt). Null until the gun for an early joiner.
+    baselineAt: timestamp("baseline_at", { withTimezone: true }),
+    // The metric values at baselineAt. Null until stamped.
+    baseline: jsonb("baseline").$type<Record<string, number>>(),
+    // For the gate, and for rank-up recognition at the close.
+    rankAtJoin: integer("rank_at_join"),
+    rankLabelAtJoin: text("rank_label_at_join"),
+    /**
+     * B6 — if a gamer unlinks the account they entered with, their score
+     * freezes at the last sync and they stay in the standings.
+     *
+     * This is NOT a stored score. It is a record of the last derivable value
+     * at the moment the inputs went away, which is a different thing: it is
+     * written once, on unlink, and the derivation prefers it only when there
+     * is nothing left to derive from.
+     */
+    frozenScore: integer("frozen_score"),
+    frozenAt: timestamp("frozen_at", { withTimezone: true }),
+    // Final placement, written at the close. 1 = first.
+    placement: integer("placement"),
+  },
+  (t) => [
+    uniqueIndex("participant_unique_idx").on(t.challengeId, t.userId),
+    index("participant_challenge_idx").on(t.challengeId),
+    index("participant_account_idx").on(t.linkedAccountId),
+  ],
+);
+
+export type ChallengeParticipant = typeof challengeParticipants.$inferSelect;
+
+/** Where a challenge was announced. Reach is counted from these rows. */
+export const challengeAnnouncements = pgTable(
+  "challenge_announcements",
+  {
+    id: text("id").primaryKey(),
+    challengeId: text("challenge_id").notNull(),
+    guildId: text("guild_id").notNull(),
+    // Members at the moment of announcement. Reach is counted, never modelled,
+    // and it is frozen here so a server losing members later cannot rewrite
+    // what a brand was delivered.
+    memberCountAt: integer("member_count_at").notNull().default(0),
+    announcedAt: timestamp("announced_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("announcement_unique_idx").on(t.challengeId, t.guildId)],
+);

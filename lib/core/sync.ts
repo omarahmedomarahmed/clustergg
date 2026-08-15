@@ -56,7 +56,20 @@ export type SyncOutcome = {
 export async function syncAccount(
   db: DB,
   account: Account,
-  opts: { queue?: "solo" | "flex" | "both"; rich?: boolean } = {},
+  opts: {
+    queue?: "solo" | "flex" | "both";
+    rich?: boolean;
+    /**
+     * When this reading was taken.
+     *
+     * Defaults to now, and is only ever passed by a simulation. The four-week
+     * run in docs/09-TEST-PLAN.md compresses a month into a few seconds, so
+     * every observation would otherwise land on the same wall-clock instant
+     * and `observationsAsAt` — which is how a closed week keeps reading the
+     * same on Sunday as it did on Friday — would have nothing to order by.
+     */
+    at?: Date;
+  } = {},
 ): Promise<SyncOutcome> {
   const provider = getProvider(account.provider);
   const adapter = ADAPTERS[account.provider];
@@ -178,7 +191,7 @@ export async function syncAccount(
       .where(eq(schema.linkedGameAccounts.id, account.id));
   }
 
-  const seasonResets = await record(db, account, result.metrics);
+  const seasonResets = await record(db, account, result.metrics, opts.at ?? new Date());
 
   // `verified` is deliberately NOT touched here.
   //
@@ -235,6 +248,7 @@ async function record(
   db: DB,
   account: Account,
   metrics: Record<string, { value: number; rankLabel?: string }>,
+  at: Date,
 ): Promise<string[]> {
   const provider = getProvider(account.provider);
   const laddered = new Set(
@@ -264,6 +278,7 @@ async function record(
         metricKey,
         previousValue: previous.value,
         newValue: value,
+        detectedAt: at,
       });
       resets.push(metricKey);
     }
@@ -278,6 +293,7 @@ async function record(
       metricKey,
       value,
       rankLabel: metric.rankLabel ?? null,
+      observedAt: at,
     });
   }
 
@@ -462,7 +478,7 @@ export async function syncDueAccounts(
 export async function forceSync(
   db: DB,
   linkedAccountId: string,
-  opts: { queue?: "solo" | "flex" | "both" } = {},
+  opts: { queue?: "solo" | "flex" | "both"; at?: Date } = {},
 ): Promise<SyncOutcome> {
   const [account] = await db
     .select()
