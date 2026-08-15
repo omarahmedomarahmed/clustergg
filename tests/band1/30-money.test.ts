@@ -22,8 +22,8 @@ import {
   splitOf,
   formatMoney,
 } from "../../lib/money/amounts.ts";
-import { balanceOf, allBalances, post, ledgerBalances } from "../../lib/money/ledger.ts";
-import { createInvoice, markPaid, invoiceView, isInvoicePaid } from "../../lib/money/invoices.ts";
+import { balanceOf, allBalances, post, ledgerBalances, routePaidInvoice } from "../../lib/money/ledger.ts";
+import { createInvoice, issueInvoice, markPaid, invoiceView, isInvoicePaid } from "../../lib/money/invoices.ts";
 import {
   allocateToPool,
   maxAllocationCents,
@@ -159,6 +159,30 @@ test("a paid invoice routes into the vaults, and an unpaid one does not", async 
   eq(balances.cluster, CHALLENGE_PRICE_CENTS / 4, "a quarter is ours");
   eq(balances.income, 0, "and income is a doorway, not a destination");
   ok(await ledgerBalances(db), "the ledger balances");
+});
+
+test("routing refuses an invoice that has not been paid", async () => {
+  // M6: money enters a vault when the invoice is PAID, never when it is
+  // issued. Allocating on issue fills the vaults with money nobody has sent,
+  // and every payout below then draws on a promise.
+  //
+  // This test exists because breaking the guard was caught by nothing: every
+  // other path reaches routing through markPaid, which sets the date first, so
+  // the guard was only ever called with the answer it wanted. A guard on a
+  // path nothing exercises directly is a guard nobody has checked.
+  const db = await resetDemoDb();
+  const invoiceId = await createInvoice(db, {
+    payerType: "brand",
+    lines: [{ description: "Not paid for", amountCents: CHALLENGE_PRICE_CENTS }],
+  });
+  await issueInvoice(db, invoiceId);
+
+  await throws(
+    () => routePaidInvoice(db, invoiceId),
+    /does not reach a vault/,
+    "an issued, unpaid invoice does not move a cent",
+  );
+  eq(await balanceOf(db, "prize"), 0, "and the vaults are untouched");
 });
 
 test("a webhook that fires twice does not pay twice", async () => {
