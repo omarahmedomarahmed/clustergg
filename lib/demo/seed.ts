@@ -69,12 +69,18 @@ export async function seedDemo(now = new Date()) {
 
   const weekStart = weekStartFor(now);
 
+  // Five servers, and the last one has **removed the bot**.
+  //
+  // S9 is a live state, not an edge case: a portal that survives its bot being
+  // removed is only demonstrably true if the demo contains one. Its earnings,
+  // standings and history all still work; only re-announcing errors, and the
+  // error says to reinstall rather than describing what failed.
   const SERVERS = [
-    { name: "Nightfall", members: 4200 },
-    { name: "Dawnbreak", members: 1800 },
-    { name: "Ironclad", members: 940 },
-    { name: "Zenith", members: 610 },
-    { name: "Lowlands", members: 220 },
+    { name: "Nightfall", members: 4200, removed: false },
+    { name: "Dawnbreak", members: 1800, removed: false },
+    { name: "Ironclad", members: 940, removed: false },
+    { name: "Zenith", members: 610, removed: false },
+    { name: "Lowlands", members: 220, removed: true },
   ];
 
   const guildIds: string[] = [];
@@ -88,6 +94,7 @@ export async function seedDemo(now = new Date()) {
       memberCount: s.members,
       community: `${s.name} is a competitive community that has been running weekly nights since 2023.`,
       announceChannelId: `demo-chan-${i}`,
+      removedAt: s.removed ? new Date(now.getTime() - 2 * 86_400_000) : null,
     });
   }
 

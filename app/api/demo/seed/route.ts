@@ -23,5 +23,13 @@ export async function POST() {
     servers: result.guildIds.length,
     gamers: result.gamers,
     weekStart: result.weekStart.toISOString(),
+    // The portal ids, so the browser band can open both portals without
+    // guessing them. Safe here for the same reason the whole route is: it
+    // refuses outright unless the database is the in-process demo. No key is
+    // returned — the demo fence in `portalOpen` is what lets a screenshot run
+    // walk a portal, and a route that handed out keys would be a route that
+    // could hand out a real one the day somebody removes that fence.
+    guildIds: result.guildIds,
+    brandIds: result.brands,
   });
 }

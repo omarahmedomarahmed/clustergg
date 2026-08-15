@@ -12,6 +12,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
+import { visible } from "./visible.mts";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const OUT = path.join(process.cwd(), "screenshots");
@@ -80,7 +81,7 @@ check(
 await page.goto(`${BASE}/?at=${saturday.toISOString()}`);
 await page.waitForSelector('main[data-phase="grace"]');
 await shot(page, "public-home", 3, "homepage-grace-period");
-const graceBody = (await page.textContent("body")) ?? "";
+const graceBody = await visible(page);
 check(/week has ended/.test(graceBody), "the grace period says the week has ended");
 check(
   /Community challenges/.test(graceBody),
@@ -106,7 +107,7 @@ await page.goto(`${BASE}/pool`);
 await page.waitForSelector("h1");
 await shot(page, "public-pool", 1, "pool-live");
 
-const poolText = (await page.textContent("body")) ?? "";
+const poolText = await visible(page);
 check(/Allocated to this week/.test(poolText), "the allocation is shown");
 check(/Flat/.test(poolText) && /Scored/.test(poolText), "split into the flat and scored shares");
 check(
@@ -137,7 +138,7 @@ const links = await page.locator('a[href^="/challenges/"]').evaluateAll((els) =>
 let withEntrants = "";
 for (const href of [...new Set(links)]) {
   await page.goto(`${BASE}${href}?at=${midWeek.toISOString()}`);
-  const text = (await page.textContent("body")) ?? "";
+  const text = await visible(page);
   if (/Standings/.test(text) && !/Nobody has entered yet/.test(text)) {
     withEntrants = href;
     break;
@@ -148,7 +149,7 @@ await page.goto(`${BASE}${withEntrants}?at=${midWeek.toISOString()}`);
 await page.waitForSelector("h1");
 await shot(page, "public-challenges", 2, "one-challenge-standings");
 
-const challengeText = (await page.textContent("body")) ?? "";
+const challengeText = await visible(page);
 check(/Prize pool/.test(challengeText), "the prize pool is shown");
 check(/Entrants/.test(challengeText), "and the entrant count");
 check(/Reach/.test(challengeText), "and reach, counted from announcements");
@@ -164,7 +165,7 @@ await page.goto(`${BASE}/trophies`);
 await page.waitForSelector("h1");
 await shot(page, "public-trophies", 1, "showcase");
 
-const trophyText = (await page.textContent("body")) ?? "";
+const trophyText = await visible(page);
 check(/holder/.test(trophyText), "trophies show a holder count");
 // The page SAYS "nothing here is for sale", which is correct and which a
 // keyword search would flag. What must be absent is the affordance and the
@@ -194,7 +195,7 @@ console.log("\npublic/community:");
 await page.goto(`${BASE}/community`);
 await page.waitForSelector("h1");
 await shot(page, "public-community", 1, "community-challenges");
-const communityText = (await page.textContent("body")) ?? "";
+const communityText = await visible(page);
 check(
   /A community challenge run by this server/.test(communityText),
   "the wording is M27's, exactly — they paid for it, it is theirs",
@@ -203,7 +204,7 @@ check(
 await page.goto(`${BASE}/servers/nightfall`);
 await page.waitForSelector("h1");
 await shot(page, "public-community", 2, "server-page-with-join-button");
-const serverText = (await page.textContent("body")) ?? "";
+const serverText = await visible(page);
 check(/Join this server/.test(serverText), "with the big Join button that is the point of it");
 
 // ── A gamer profile ─────────────────────────────────────────────────────────
@@ -217,7 +218,7 @@ if (await profileLink.count()) {
   await profileLink.click();
   await page.waitForSelector("h1");
   await shot(page, "public-profile", 1, "gamer-profile-with-trophies");
-  const profileText = (await page.textContent("body")) ?? "";
+  const profileText = await visible(page);
   check(/Trophies/.test(profileText), "their trophies");
   check(/Challenges entered/.test(profileText), "and the challenges they entered");
 }

@@ -78,6 +78,13 @@
       "when": 1786794084706,
       "tag": "0010_safe_captain_britain",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786796371489,
+      "tag": "0011_colorful_doctor_spectrum",
+      "breakpoints": true
     }
   ]
 }

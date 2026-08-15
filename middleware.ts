@@ -11,4 +11,6 @@ export function middleware(request: NextRequest) {
   return NextResponse.next({ request: { headers } });
 }
 
-export const config = { matcher: "/admin/:path*" };
+// The portals need it for the same reason: a refused portal redirects to a
+// login form that sends you back where you were going.
+export const config = { matcher: ["/admin/:path*", "/portal/:path*"] };

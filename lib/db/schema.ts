@@ -504,6 +504,18 @@ export const guilds = pgTable(
     // The community profile. Null means never described — dropped from scoring.
     community: text("community"),
     portalKeyHash: text("portal_key_hash"),
+    // Who we talk to about this server, from the portal's Settings page.
+    contactName: text("contact_name"),
+    contactEmail: text("contact_email"),
+    // ===== HOUSE RULE 5. A WORD AND AN OPAQUE HANDLE. =====
+    //
+    // P2 in docs/02-MONEY.md: what we store is a **preference word**
+    // (`bank`, `giftcard`, …) and an **opaque provider handle**. Nothing
+    // account-shaped, which is why neither of these columns can hold one:
+    // the word is from a fixed list and the handle is whatever the payment
+    // provider hands back, meaningless to us and useless if it leaks.
+    payoutPreference: text("payout_preference"),
+    payoutHandle: text("payout_handle"),
     installedAt: timestamp("installed_at", { withTimezone: true }).notNull().defaultNow(),
     // Removal freezes reach; earnings survive (S9).
     removedAt: timestamp("removed_at", { withTimezone: true }),

@@ -11,6 +11,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
+import { visible } from "./visible.mts";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const OUT = path.join(process.cwd(), "screenshots");
@@ -53,7 +54,7 @@ await page.goto(`${BASE}/admin?${at}`);
 await page.waitForSelector("h1");
 await shot(page, "dashboard-what-is-blocking-this-week");
 
-const dash = (await page.textContent("body")) ?? "";
+const dash = await visible(page);
 check(/What is blocking this week/.test(dash), "the dashboard answers one question");
 check(/Prize vault/.test(dash), "the prize-vault indicator is on the page, not in a report");
 check(/Ceiling — half the vault/.test(dash), "so is the pool ceiling");
@@ -69,7 +70,7 @@ await page.goto(`${BASE}/admin/challenges?${at}`);
 await page.waitForSelector("h1");
 await shot(page, "queue-grouped-by-what-it-needs");
 
-const queue = (await page.textContent("body")) ?? "";
+const queue = await visible(page);
 for (const group of ["Paid, needs setup", "Awaiting payment", "Drafts", "Announced", "Live"]) {
   check(queue.includes(group), `the queue has a "${group}" group`);
 }
@@ -88,7 +89,7 @@ await page.goto(`${BASE}${target}?${at}`);
 await page.waitForSelector("h1");
 await shot(page, "editor-seven-steps");
 
-const editor = (await page.textContent("body")) ?? "";
+const editor = await visible(page);
 for (const step of ["1–5 ·", "6 · Trophies", "7 · Announce"]) {
   check(editor.includes(step), `the editor shows step "${step}" in order`);
 }
@@ -164,7 +165,7 @@ check(
   ["green", "unallocated", "unclaimed", "orphaned"].includes(vaultState ?? ""),
   `the vault reports a real state (${vaultState}) rather than a total`,
 );
-const vaultText = (await page.textContent("body")) ?? "";
+const vaultText = await visible(page);
 check(/Every money-trophy/.test(vaultText), "it lists every money-trophy, not a total");
 check(/Search by gamer name/.test(vaultText), "and can be searched by gamer name — V4");
 check(/reversible/.test(vaultText), "and says a sweep is reversible");
@@ -180,7 +181,7 @@ await page.goto(`${BASE}/admin/vaults/server?${at}`);
 await page.waitForSelector('[data-testid="allocate"]');
 await shot(page, "server-vault-and-the-ceiling");
 
-const poolPage = (await page.textContent("body")) ?? "";
+const poolPage = await visible(page);
 check(/Nothing auto-allocates/.test(poolPage), "the page says nothing auto-allocates");
 check(
   /refunds, disputes and quiet weeks/.test(poolPage),
@@ -202,7 +203,7 @@ console.log("\nadmin/money:");
 await page.goto(`${BASE}/admin/redeems?${at}`);
 await page.waitForSelector("h1");
 await shot(page, "redeem-queue");
-const redeems = (await page.textContent("body")) ?? "";
+const redeems = await visible(page);
 check(
   /falls by exactly the trophy/.test(redeems),
   "the redeem queue states when the vault falls, and it is on paid",
@@ -211,7 +212,7 @@ check(
 await page.goto(`${BASE}/admin/payouts?${at}`);
 await page.waitForSelector("h1");
 await shot(page, "payouts-draft-and-released");
-const payouts = (await page.textContent("body")) ?? "";
+const payouts = await visible(page);
 check(/a human releases/.test(payouts), "payouts say a human releases them");
 
 const releaseButton = page.locator('[data-testid="release"]').first();
@@ -220,7 +221,7 @@ if (await releaseButton.count()) {
   await page.waitForSelector("h1");
   await shot(page, "payout-released");
   check(
-    /released/.test((await page.textContent("body")) ?? ""),
+    /released/.test(await visible(page)),
     "and releasing one moves it out of draft",
   );
 }
@@ -230,14 +231,14 @@ console.log("\nadmin/directories:");
 await page.goto(`${BASE}/admin/users?${at}`);
 await page.waitForSelector('[data-testid="admin-only-note"]');
 await shot(page, "gamer-directory-admin-only");
-const users = (await page.textContent("body")) ?? "";
+const users = await visible(page);
 check(/No staff department reaches this list, ever/.test(users), "the directory says so on its face");
 check(!/@/.test(users.split("Search by name")[1] ?? ""), "and does not show email addresses");
 
 await page.goto(`${BASE}/admin/linked-accounts?${at}`);
 await page.waitForSelector("h1");
 await shot(page, "linked-accounts-and-sync-health");
-const linked = (await page.textContent("body")) ?? "";
+const linked = await visible(page);
 check(/unproven/.test(linked), "an unproven account is labelled unproven, never verified — C5");
 
 console.log("\nadmin/weekend:");

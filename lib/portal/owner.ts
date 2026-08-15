@@ -15,13 +15,14 @@ import { schema } from "../db/index.ts";
 import { uid } from "../core/utils.ts";
 import { newPortalKey, hashPortalKey, keyMatches } from "../core/keys.ts";
 import { weekFor } from "../challenges/week.ts";
-import { poolDivisionFor } from "../pool/score.ts";
+import { poolDivisionFor, percentileRank } from "../pool/score.ts";
 import { createChallenge, attachInvoice, markScheduled } from "../challenges/lifecycle.ts";
 import { createInvoice, markPaid } from "../money/invoices.ts";
 import {
   COMMUNITY_TIERS,
   communityPriceCents,
   formatMoney,
+  KPI_WEIGHTS,
   type CommunityTier,
 } from "../money/amounts.ts";
 
@@ -122,6 +123,194 @@ export async function ownerOverview(
     thisWeekChallenges: challenges,
     notScoredReason: dropped?.reason ?? null,
   };
+}
+
+export type OwnerStanding = {
+  /** 1 is first. Null when this server is not in the run at all. */
+  position: number | null;
+  /** How many servers are in the run. The denominator of the position. */
+  of: number;
+  score: number;
+  /** Each KPI, its percentile rank, and its weight — so the page can say why. */
+  kpis: { key: "entrants" | "conversion" | "activation"; value: number; rank: number; weight: number }[];
+  /**
+   * What would move it: the weakest KPI by rank, named, with what it means.
+   *
+   * ===== ONE SENTENCE, AND IT IS NOT "TRY HARDER" =====
+   *
+   * The standings page exists so an owner can act. A position with no lever is
+   * a scoreboard, and a scoreboard is what the old model had. So the weakest
+   * rank is picked here rather than in the page, because the bot's standings
+   * card renders the same object and the two must not advise differently.
+   */
+  lever: string | null;
+  /** K7 — dropped is not last place, and the page must not draw it as one. */
+  droppedReason: string | null;
+};
+
+const KPI_MEANING: Record<"entrants" | "conversion" | "activation", string> = {
+  entrants:
+    "Entrants is volume — every member who joins a challenge from your server. " +
+    "A gamer who is in two servers is worth half to each.",
+  conversion:
+    "Conversion is entrants ÷ linked members. Getting the members you already " +
+    "have to link an account moves this more than recruiting does.",
+  activation:
+    "Activation is the share of your entrants who actually scored. A member " +
+    "who joins and never plays lowers it.",
+};
+
+/**
+ * Where this server stands this week, and the one thing that would move it.
+ *
+ * Computed from `poolDivisionFor` — the same call the public pool page, the
+ * bot's card and Friday's close make. Ranking here rather than in the page is
+ * house rule 2 applied to a position rather than to money: two surfaces that
+ * each sort the shares themselves are two surfaces that can disagree about who
+ * is third.
+ */
+export async function ownerStanding(
+  db: DB,
+  guildId: string,
+  now = new Date(),
+): Promise<OwnerStanding> {
+  const week = weekFor(now);
+  const division = await poolDivisionFor(db, week.start, now);
+  const dropped = division.dropped.find((d) => d.guildId === guildId) ?? null;
+
+  const ordered = [...division.shares].sort((a, b) => b.score - a.score);
+  const index = ordered.findIndex((s) => s.guildId === guildId);
+  const share = index >= 0 ? ordered[index] : null;
+
+  if (!share) {
+    return {
+      position: null,
+      of: ordered.length,
+      score: 0,
+      kpis: [],
+      lever: null,
+      droppedReason: dropped?.reason ?? null,
+    };
+  }
+
+  // The rank of each KPI across the run, which is what the score is actually
+  // built from — an absolute conversion rate says nothing without the field.
+  const rankOf = (values: number[], value: number) =>
+    percentileRank([...values, value]).at(-1) ?? 0;
+  const kpis = ([
+    ["entrants", share.entrants, KPI_WEIGHTS.entrants],
+    ["conversion", share.conversion, KPI_WEIGHTS.conversion],
+    ["activation", share.activation, KPI_WEIGHTS.activation],
+  ] as const).map(([key, value, weight]) => ({
+    key,
+    value,
+    rank: rankOf(
+      ordered.map((s) => s[key]),
+      value,
+    ),
+    weight,
+  }));
+
+  const weakest = [...kpis].sort((a, b) => a.rank - b.rank)[0];
+
+  return {
+    position: index + 1,
+    of: ordered.length,
+    score: share.score,
+    kpis,
+    lever: weakest ? KPI_MEANING[weakest.key] : null,
+    droppedReason: dropped?.reason ?? null,
+  };
+}
+
+/**
+ * How an owner wants to be paid.
+ *
+ * ===== HOUSE RULE 5 LIVES HERE, NOT IN THE FORM =====
+ *
+ * A word from a fixed list and an opaque handle from the provider. The list is
+ * closed so that "bank" cannot quietly become a free-text field somebody types
+ * an IBAN into, and the handle is length-capped and rejected if it looks like
+ * an account: a rule enforced only by a form's `maxlength` is a rule until
+ * somebody posts to the endpoint directly.
+ */
+export const PAYOUT_PREFERENCES = ["bank", "paypal", "giftcard"] as const;
+export type PayoutPreference = (typeof PAYOUT_PREFERENCES)[number];
+
+/**
+ * Does this look like an account, a card or an IBAN?
+ *
+ * ===== COUNT THE DIGITS, DO NOT MEASURE THE RUN =====
+ *
+ * The first version of this was `/\d[\d\s-]{10,}/` — a run of digits, spaces
+ * and hyphens at least eleven characters long. It let
+ * `"sort 20-00-00 acct 55779911"` straight through, because the word in the
+ * middle breaks the run into two short ones. A UK bank account is a six-digit
+ * sort code and an **eight**-digit number, and people write them with the
+ * words in between, which is the single most likely thing to be typed into a
+ * field labelled "how you want to be paid".
+ *
+ * So: split on anything that is not a digit, space or hyphen, and refuse if
+ * any resulting group carries eight or more digits. Eight because that is the
+ * shortest real account number; an opaque provider reference like
+ * `acct_1QxZr9` has one or two.
+ */
+function accountShaped(handle: string): boolean {
+  return handle
+    .split(/[^\d\s-]+/)
+    .some((group) => (group.match(/\d/g) ?? []).length >= 8);
+}
+
+export async function setPayoutPreference(
+  db: DB,
+  guildId: string,
+  input: { preference: string; handle?: string | null },
+): Promise<void> {
+  if (!(PAYOUT_PREFERENCES as readonly string[]).includes(input.preference)) {
+    throw new CommunityBuilderRefused(
+      `${input.preference} is not one of the ways we pay. Pick one of: ` +
+        `${PAYOUT_PREFERENCES.join(", ")}.`,
+    );
+  }
+  const handle = input.handle?.trim() || null;
+  if (handle && accountShaped(handle)) {
+    throw new CommunityBuilderRefused(
+      "That looks like an account number. We never store one — this field is " +
+        "the reference your payment provider gave you, not your details.",
+    );
+  }
+  await db
+    .update(schema.guilds)
+    .set({ payoutPreference: input.preference, payoutHandle: handle })
+    .where(eq(schema.guilds.guildId, guildId));
+}
+
+export async function setOwnerContact(
+  db: DB,
+  guildId: string,
+  input: { contactName?: string | null; contactEmail?: string | null; adminRoleId?: string | null },
+): Promise<void> {
+  // S5 — the role **ID**, never the name. A renamed role must not silently
+  // revoke access, and it would if we keyed on what people rename.
+  if (input.adminRoleId && !/^\d{5,}$/.test(input.adminRoleId.trim())) {
+    throw new CommunityBuilderRefused(
+      "That is not a role ID. Turn on Developer Mode in Discord, right-click " +
+        "the role and Copy ID — a role name would stop working the moment " +
+        "somebody renames it.",
+    );
+  }
+  await db
+    .update(schema.guilds)
+    .set({
+      ...(input.contactName !== undefined ? { contactName: input.contactName?.trim() || null } : {}),
+      ...(input.contactEmail !== undefined
+        ? { contactEmail: input.contactEmail?.trim() || null }
+        : {}),
+      ...(input.adminRoleId !== undefined
+        ? { adminRoleId: input.adminRoleId?.trim() || null }
+        : {}),
+    })
+    .where(eq(schema.guilds.guildId, guildId));
 }
 
 /** S6 — re-announce one challenge, or all of this week's. */
