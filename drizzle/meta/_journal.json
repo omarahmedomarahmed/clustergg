@@ -43,6 +43,13 @@
       "when": 1786768484073,
       "tag": "0005_blushing_avengers",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786771254157,
+      "tag": "0006_nosy_bulldozer",
+      "breakpoints": true
     }
   ]
 }

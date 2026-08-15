@@ -663,3 +663,60 @@ export const challengeAnnouncements = pgTable(
   },
   (t) => [uniqueIndex("announcement_unique_idx").on(t.challengeId, t.guildId)],
 );
+
+/**
+ * A request to turn a money-trophy into money.
+ *
+ * R5 — **stores a method word and a provider handle. Nothing else.** Not an
+ * IBAN, not a card, not a last four. The structural test walks these column
+ * names, and this table is the one it exists for.
+ *
+ * R1 — requires 18+, a verified email, an allowed country, and a trophy the
+ * vault accounts for. R4 — on `paid`, the prize vault falls by exactly that
+ * trophy's value.
+ */
+export const redemptions = pgTable(
+  "redemptions",
+  {
+    id: text("id").primaryKey(),
+    userTrophyId: text("user_trophy_id").notNull(),
+    userId: text("user_id").notNull(),
+    // pending | approved | sent | paid | cancelled | rejected
+    status: text("status").notNull().default("pending"),
+    // A WORD: `bank` | `giftcard` | `paypal`. Not an instrument.
+    method: text("method").notNull(),
+    // The payment provider's opaque reference for wherever this goes. We
+    // cannot read it, reconstruct it, or leak anything from it.
+    providerHandle: text("provider_handle"),
+    // Short codes. Nothing account-shaped.
+    country: text("country").notNull(),
+    amountCents: integer("amount_cents").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
+    rejectedReason: text("rejected_reason"),
+  },
+  (t) => [
+    uniqueIndex("redemption_trophy_idx").on(t.userTrophyId),
+    index("redemptions_status_idx").on(t.status),
+  ],
+);
+
+export type Redemption = typeof redemptions.$inferSelect;
+
+/** A one-time code, for the email verification that only redemption asks for. */
+export const emailVerifications = pgTable(
+  "email_verifications",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    email: text("email").notNull(),
+    // Hashed. A code sitting in the clear is a code that can be read from a
+    // backup by somebody who should not be able to become this gamer.
+    codeHash: text("code_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  },
+  (t) => [index("email_verifications_user_idx").on(t.userId)],
+);
