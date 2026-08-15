@@ -319,6 +319,58 @@ async function fundServerVault(db: Awaited<ReturnType<typeof resetDemoDb>>, chal
   return balanceOf(db, "server");
 }
 
+test("the ratified constants are the ratified values", () => {
+  // ===== THE ONE PLACE A NUMBER IS WRITTEN TWICE, DELIBERATELY =====
+  //
+  // Everywhere else, importing rather than retyping is the rule. Here it is
+  // inverted, and it has to be: every other test derives its expectation from
+  // these constants, so changing a constant changes the expectation too and
+  // the suite stays green through a rule change nobody agreed to.
+  //
+  // Found by breaking it. Setting POOL_MAX_FRACTION_OF_VAULT to 1 — allocating
+  // the ENTIRE server vault into one week's pool, which is the failure the
+  // rule exists to prevent — was caught by a single incidental assertion in
+  // the worked example, because the half-rule test computed its own ceiling
+  // from the constant it was meant to be checking.
+  //
+  // So this test is the anchor. It pins the values the owner ruled on, and it
+  // is the only file allowed to state them.
+  eq(POOL_MAX_FRACTION_OF_VAULT, 0.5, "the pool ceiling is half the vault — M9");
+  eq(CHALLENGE_PRICE_CENTS, 35_000, "a challenge is $350 — M1");
+  eq(DEFAULT_SPLIT_BPS.prize, 5_000, "half of income backs prizes — M2");
+  eq(DEFAULT_SPLIT_BPS.server, 2_500, "a quarter is owed to server owners — M3");
+  eq(DEFAULT_SPLIT_BPS.cluster, 2_500, "a quarter is Cluster's — M4");
+  eq(POOL_FLAT_BPS, 2_000, "a fifth of every pool is split evenly — turning up is worth something");
+  eq(KPI_WEIGHTS.entrants, 40, "volume weighs 40");
+  eq(KPI_WEIGHTS.conversion, 30, "efficiency weighs 30");
+  eq(KPI_WEIGHTS.activation, 30, "quality weighs 30");
+  eq(COMMUNITY_TIERS[1].prizeCents, 500, "community tier 1 is a $5 pool — M20");
+  eq(COMMUNITY_TIERS[1].winners, 1, "with one winner");
+  eq(COMMUNITY_TIERS[2].prizeCents, 1_000, "tier 2 is a $10 pool — M21");
+  eq(COMMUNITY_TIERS[2].winners, 3, "with three winners");
+  eq(communityPriceCents(2), 1_050, "and the owner pays $10.50 for it");
+  eq(communityPriceCents(1), 500, "while tier 1 costs exactly its prize");
+});
+
+test("half a vault is half a vault, computed independently", async () => {
+  // Arithmetic that does not go through the constant, so a changed constant
+  // cannot take this assertion with it.
+  const db = await resetDemoDb();
+  const vault = await fundServerVault(db, 4);
+  const week = new Date("2026-08-17T00:00:00Z");
+
+  await throws(
+    () => allocateToPool(db, { weekStart: week, amountCents: Math.floor(vault / 2) + 1 }),
+    /never exceed half/,
+    "one cent more than literally half the vault is refused",
+  );
+  const allowed = await allocateToPool(db, {
+    weekStart: week,
+    amountCents: Math.floor(vault / 2),
+  });
+  eq(allowed.allocatedCents, Math.floor(vault / 2), "and literally half is allowed");
+});
+
 test("a pool may never exceed half the vault", async () => {
   const db = await resetDemoDb();
   const vault = await fundServerVault(db, 2);
