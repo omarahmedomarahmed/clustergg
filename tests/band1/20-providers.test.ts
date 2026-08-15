@@ -185,3 +185,55 @@ test("every sellable provider has an adapter", () => {
   const missing = PROVIDERS.filter((p) => !p.notLive && !ADAPTERS[p.id]).map((p) => p.id);
   eq(missing, [], "a sellable provider with no adapter is a game that could never sync");
 });
+
+test("the League adapter itself does not touch the tight endpoint on a routine sync", async () => {
+  // This test exists because breaking the guard was caught by NOTHING. The
+  // sync suite drives a fake adapter, so it proved that `syncAccount` passes
+  // `rich` through — not that the League adapter honours it. The endpoint
+  // choice lives in the adapter, so the assertion has to live at the adapter.
+  //
+  // `summoner-v4 by-puuid` is 1,600 requests a minute. `league-v4 entries` is
+  // 20,000 per ten seconds and carries tier, division, LP, wins and losses for
+  // both queues. One of those belongs on an hourly job across every linked
+  // League account and one does not.
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.RIOT_API_KEY;
+  process.env.RIOT_API_KEY = "test-key-for-url-capture";
+  const called: string[] = [];
+
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    called.push(url);
+    return new Response(url.includes("/entries/") ? "[]" : "{}", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+
+  try {
+    const ref = { providerAccountId: "puuid-1", inGameName: "T#EUW", region: "euw1" };
+
+    called.length = 0;
+    await ADAPTERS["riot-lol"].fetchStats(ref);
+    ok(
+      called.some((u) => u.includes("/lol/league/v4/entries/by-puuid/")),
+      "a routine sync reads league-v4, which is the whole scoring requirement",
+    );
+    eq(
+      called.filter((u) => u.includes("/lol/summoner/v4/")),
+      [],
+      "and never spends the 1,600-a-minute endpoint",
+    );
+
+    called.length = 0;
+    await ADAPTERS["riot-lol"].fetchStats({ ...ref, rich: true });
+    ok(
+      called.some((u) => u.includes("/lol/summoner/v4/")),
+      "while an explicit rich call — linking, reconnecting — still may",
+    );
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) delete process.env.RIOT_API_KEY;
+    else process.env.RIOT_API_KEY = realKey;
+  }
+});
