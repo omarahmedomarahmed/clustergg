@@ -178,8 +178,12 @@ Everything in `docs/12-IDENTITY.md`. It replaces the portal key.
 | Build | Done when |
 |---|---|
 | `/api/auth/discord/callback` | Token exchange, identity, guild roles. **The route that does not exist yet** |
-| Discord sign-in for gamers and owners | Email + password still works for gamers |
+| Discord sign-in **and** email + password, one `users` row | Linking the second method never creates a second row |
+| Password reset — gamers and brands | |
+| **Staff are gamers** — `staffTitleId` grants the console, super admin grants the title | A staff member cannot place in a challenge they touched |
 | Brand: key → one-time invite → email + password account | Separate route, separate table from gamers |
+| **Messages** in both portals + **two admin inboxes**, refresh in place | An unanswered thread keeps alerting |
+| **Opt-in server analytics** — `12-IDENTITY.md` §7a | Granted once and permanent · Update on a guild-level cooldown · platform-wide ceiling · dated snapshots · **no weekly-cycle figure may read one** |
 | **Capture the installer** at the install redirect | Sign them in first if they are not |
 | Parent-server attribution | First bot click, permanent, ½ + ½ entrant credit |
 | Guild owner vs administrator permissions | Only the owner touches money |
@@ -193,7 +197,11 @@ Everything in `docs/12-IDENTITY.md`. It replaces the portal key.
 
 **Guards to prove:** an administrator cannot withdraw. A gamer cannot change
 their own parent. Conversion cannot exceed 1.0. Eligibility does not move
-mid-week. A renamed Discord role does not revoke access.
+mid-week. A renamed Discord role does not revoke access. Parent = join gives 1.0
+and not two halves. A closed week does not move when a parent is corrected.
+The analytics Update cooldown does not reset with a sign-out. **No weekly-cycle
+figure reads an analytics snapshot** — drop the table and every dollar in the
+four-week simulation is identical.
 
 ---
 

@@ -21,12 +21,16 @@ progress, milestone progress, trophy holder counts, reach, entrant counts.
 ## Identity
 
 ### `users`
-A gamer. Created by the bot or the website.
+A gamer. **Also a server manager, also Cluster staff** — those are capabilities
+on this row, never separate accounts. Created by the bot, by Discord sign-in, or
+by email signup.
 
 | Field | Note |
 |---|---|
 | `id`, `slug`, `displayName` | |
-| `email`, `emailVerifiedAt` | **Null until redemption.** Not asked at onboarding |
+| `email`, `emailVerifiedAt` | **Null for a Discord gamer until redemption.** Set **and verified at signup** for an email gamer, because it is their credential |
+| `passwordHash` | Null for a Discord-only gamer |
+| `staffTitleId` | Null for everybody who is not Cluster staff. The **grant**, not the identity |
 | `ageBand` | `teen` \| `adult`. Set once, changed only by support |
 | `country` | Sanctioned countries are never offered |
 | `discordId` | |
@@ -39,6 +43,12 @@ A gamer. Created by the bot or the website.
 | U1 | Nothing accrues until an account is linked **and** age band **and** country are set |
 | U2 | `ageBand` is never self-editable after it is set |
 | U3 | Under-13 is not a value — that path deletes the account and keeps a salted hash of email + Discord ID so the same person cannot re-register with a different answer |
+| U4 | **One row per person, whichever door they came through.** Linking never creates a second row and never merges two |
+| U4a | If that Discord is already on another account, the message is **not a rejection**: *"You already have a Cluster account — that Discord is linked to it. Sign in with Discord to reach it."* The email account they are sitting in stays, harmless and idle. **We never merge two accounts that hold trophies** |
+| U5 | A gamer with **no `discordId` is complete**. No parent server, everything else identical |
+| U6 | A gamer with **no `email` is complete** until they redeem |
+| U7 | `staffTitleId` opens the console. It changes **nothing** about how they play, score or redeem |
+| U8 | **A staff member places like anybody else, in any challenge, including ones they run.** Nothing about a staff grant touches scoring: metrics apply to every entrant equally, trophy values are held to the prize pool by T3, and points derive from provider stats. Manipulation is structurally unavailable, not policed |
 
 ### `brand_users`
 A brand's login. **A separate table from `users`, on purpose.**
@@ -108,7 +118,8 @@ A brand's login. **A separate table from `users`, on purpose.**
 | Field | Note |
 |---|---|
 | `challengeId`, `userId`, `linkedAccountId` | |
-| `guildId` | Which server gets the credit |
+| `joinGuildId` | **Where they pressed Join.** The only server column on this row |
+| `parentGuildIdAtBaseline` | **The parent, frozen at the same instant as the baseline** — the gun for an early joiner, Join for a mid-week joiner. Never read live at scoring time |
 | `joinedAt` | |
 | **`baselineAt`** | `max(challengeStart, joinedAt)` |
 | **`baseline`** | A snapshot of the metric values at `baselineAt` |
@@ -121,6 +132,7 @@ A brand's login. **A separate table from `users`, on purpose.**
 | P3 | A sync is **forced on join** and the baseline stamped from its result |
 | P4 | Unique on `(challengeId, userId)` — one entry per gamer per challenge |
 | P5 | Score is derived from `baseline` and the latest observation. **Never stored** |
+| P6 | **Attribution freezes exactly when the baseline freezes** — `max(challengeStart, joinedAt)`, one rule for both. An admin correcting a gamer's parent in week 6 must not silently move week 3's money. One server column, `joinGuildId`, plus the parent frozen beside it — never a second `guildId` meaning something adjacent |
 
 ### `observations`
 Time-series stat readings per linked account. The raw material for every delta.
@@ -180,6 +192,7 @@ Append-only. Every movement of every dollar.
 | T3 | `Σ(podium values for a challenge) == challenge.prizePool` — guarded at assignment, flagged over **and** under |
 | T4 | Unique on `(challengeId, userId, place)` — duplicates impossible |
 | T5 | Locked at `ended` |
+| T7 | **A podium trophy still unassigned at `ended` is flagged in the prize vault.** The money is accounted for and nobody holds it — the vault must say so, on the dashboard, not in a nightly report |
 | T6 | A holder's `user_trophy` survives the holder's deletion as an **orphan**, so the money stays accounted for |
 
 ### `redemptions`
@@ -221,8 +234,74 @@ Append-only. Every movement of every dollar.
 | `community` | Profile. **A server that never described itself is dropped from scoring** |
 | `installedAt`, `removedAt` | Removal freezes reach; earnings survive |
 
+### `spend_requests`
+An administrator requests, the guild owner approves. There is nowhere else to
+hold a pending request.
+
+| Field | Note |
+|---|---|
+| `guildId`, `requestedBy`, `kind`, `tier`, `payload` | |
+| `state` | `pending` → `approved` → `paid`, or `rejected` |
+| `approvedBy`, `approvedAt` | **Must be the guild owner.** Enforced, not assumed |
+
+### `guild_admins`
+Everyone we have **seen** holding ADMINISTRATOR or the mapped role, accumulated
+from interaction payloads. Never a member list.
+
+| Field | Note |
+|---|---|
+| `guildId`, `discordId` | |
+| `source` | `administrator` \| `mapped_role` |
+| `seenAt` | **Shown on the registry.** The page states that unseen holders do not appear |
+
 ### `guild_snapshots`
-Weekly member and linked counts. The denominator for the conversion KPI.
+A dated reading of a server, taken **only when its owner opts into analytics**
+(`12-IDENTITY.md` §7a). Members, roles and who holds them, linked counts.
+
+| # | Invariant |
+|---|---|
+| S1 | Every row carries **`takenAt` and `takenBy`**, and is never displayed without the date |
+| S2 | **Nothing in the weekly cycle may read this table.** Not eligibility, not a KPI, not the pool, not a payout. If it were dropped tomorrow the money would be identical |
+| S3 | It is **not** the conversion denominator. That is computed live (E1) |
+
+### `guild_analytics_consent`
+
+| Field | Note |
+|---|---|
+| `guildId`, `grantedBy`, `grantedAt` | One row per guild. **No session column — the grant is not a session** |
+| `lastPullAt`, `cooldownUntil` | **On the guild** — signing out and back in is not a way around it |
+
+| # | Invariant |
+|---|---|
+| N1 | The grant is **permanent and survives sign-out.** The bot keeps its access; we keep the snapshot |
+| N2 | A **platform-wide ceiling** on member-list pulls. As it is approached the cooldown lengthens on **every** server at once, and each is told why and when |
+| N3 | The last snapshot is **always readable**. Only **Update** costs a call |
+
+### `messages` and `message_threads`
+One thread per server or per brand. **Two admin inboxes, never merged.**
+
+| Field | Note |
+|---|---|
+| `threadId`, `side` | `server` \| `brand` |
+| `guildId` \| `brandId` | Exactly one of them |
+| `authorKind`, `authorId`, `body`, `sentAt`, `readAt` | |
+
+| # | Invariant |
+|---|---|
+| MS1 | A thread whose **last message is not from Cluster keeps alerting** until somebody replies |
+| MS2 | The two inboxes are **separate surfaces**. A brand thread never appears in the server inbox |
+| MS3 | Refresh in place on all four surfaces — both portals and both inboxes |
+
+### `staff_titles`
+
+| Field | Note |
+|---|---|
+| `id`, `name`, `departments` | The departments this title may reach |
+
+| # | Invariant |
+|---|---|
+| ST1 | **Only the super admin grants a title.** Logged |
+| ST2 | The gamer directory and linked accounts stay **admin-only**, whatever a title says (house rule 7) |
 
 ### Attribution — see `12-IDENTITY.md` §3
 

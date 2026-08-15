@@ -37,10 +37,15 @@ Runs in-process against an in-memory database. Needs nothing running.
 | **Trophy guard** | Values must equal the prize pool — flags over **and** under |
 | **$0 trophies** | Unredeemable at the redeem action, not merely hidden |
 | **Pool** | `allocation ≤ vault ÷ 2`. Flat 20% split evenly. Three KPIs. Community challenges contribute nothing |
-| **Attribution** | Entrant credit is **½ parent + ½ join**. Parent = join → **1.0, not two halves**. Web join with no server → 1.0 to parent. No parent → everything works and no server earns. Linked-member count goes to the **parent only** |
+| **Attribution** | Entrant credit is **½ parent + ½ join**. Parent = join → **1.0, not two halves**. Web join with no server → 1.0 to parent. No parent → everything works and no server earns. Linked-member count goes to the **parent only**. A parent that **loses the bot freezes**: keeps what it earned, gains nothing new |
+| **Retroactive safety** | Attribution is stamped at join. An admin correcting a gamer's parent in week 6 **does not move week 3's money** |
 | **Eligibility** | Frozen at Monday's gun and **never re-checked mid-week**. 8 linked at the gun + 50 on Tuesday earns nothing this week. 10 at the gun, 9 on Wednesday still pays. **The conversion denominator is live**, so the ratio can never exceed 1.0 |
 | **Permissions** | An administrator cannot withdraw or approve a spend. Only the guild owner can. A 13–17 owner may spend and may not withdraw. A **renamed** Discord role does not revoke access — the ID does |
 | **Identity** | A gamer can never change their own parent; admin can, and it is logged. A brand account is never a gamer account and never sees the gamer nav. A brand invite key works **once** |
+| **Two doors, one row** | An email gamer with no Discord onboards, enters, scores, wins and redeems. A Discord gamer needs no email until redemption. **Linking the second method never creates a second row**, and a already-taken identity is refused with the reason |
+| **Staff** | A staff grant changes nothing about how they play — **they place in challenges they run, on merit, and there is no lever to pull**. No title reaches the gamer directory. A podium trophy unassigned at `ended` is flagged in the vault |
+| **Analytics** | The grant is **permanent per server and survives sign-out**. The Update cooldown is on the **guild**, so signing out and back in does not reset it. The platform ceiling lengthens every server's cooldown at once and each is told why. The last snapshot always reads, dated. **No weekly-cycle figure reads a snapshot — drop the table and every dollar in the four-week simulation is identical** |
+| **Messages** | An unanswered thread keeps alerting. The two inboxes never merge |
 | **Ownership transfer** | The old owner must confirm. **14-day timeout** → admin arbitrates. A confirmed transfer **freezes withdrawal for 7 days** |
 | **KPI 3** | An entrant who never plays **lowers** the server's score |
 | **Payouts** | Open as drafts. A job never moves money |
@@ -74,6 +79,12 @@ many suites noticed.
 | Let an administrator withdraw | ≥ 2 |
 | Match a mapped admin role by **name** instead of ID | ≥ 1 |
 | Let a gamer set their own parent server | ≥ 1 |
+| Read the parent live at scoring instead of the frozen stamp | ≥ 1 |
+| Let a KPI read a guild_snapshots row | ≥ 2 |
+| Put the analytics cooldown on the session instead of the guild | ≥ 1 |
+| Ignore the platform ceiling on one server's refresh | ≥ 1 |
+| Merge two accounts when a gamer links an already-used identity | ≥ 1 |
+| Create a second row when a gamer links their second method | ≥ 1 |
 
 **A mutation caught by zero suites is a hole, and the report says so in those
 words.** A mutation caught by one is worth looking at too: one assertion is one

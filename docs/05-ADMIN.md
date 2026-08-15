@@ -173,6 +173,8 @@ anything else.
 | `/admin/servers/[guildId]` | One server — profile, standing, payouts, messages |
 | `/admin/servers/requests` | Community challenge requests |
 | `/admin/payouts` | Owner payouts. **Draft → released** |
+| `/admin/inbox/servers` | **The server-owner inbox.** Refresh in place |
+| `/admin/inbox/brands` | **The brand inbox.** Separate surface, never merged |
 
 ### The guild registry — `/admin/servers/[guildId]`
 
@@ -187,6 +189,7 @@ The page opened when an owner asks *"why am I not earning?"* Every section in
 | **Pool eligibility** | Linked members vs 10 · profile completeness field by field · **in this week's pool, yes or no** |
 | **Money** | Balance · this week's share · payout history · pending community-challenge requests |
 | **Refresh** | One button, per guild, cooled down. Re-pulls **owner and roles only** |
+| **Analytics** | Granted or not · the last snapshot **and when it was taken** · the Update cooldown, and whether the platform-wide ceiling is what is holding it |
 | **Audit** | Every admin action on this server, timestamped |
 
 | # | Rule |
@@ -230,6 +233,7 @@ swept trophy.
 | `/admin/games` | The game catalogue, provider status, whether proof is required |
 | `/admin/cards` | Bot card layouts |
 | `/admin/settings` | Platform settings, vault split, feature switches |
+| `/admin/staff` | Staff titles and their departments. **Super admin only** |
 
 ---
 

@@ -275,9 +275,13 @@ nothing and it is the only good news most entrants get.
 
 | # | Rule |
 |---|---|
-| G1 | Onboarding is **link a game account + age band + country**. Three things |
-| G2 | **No email at onboarding** |
-| G3 | Email is asked **only at redemption**, and must be **verified** then |
+| G0 | **Two ways in, one account.** Sign in with Discord, **or** sign up with email + password. Either reaches every gamer surface. Whichever they used, they may link the other later, and it is the **same `users` row** |
+| G0a | An **email gamer needs no Discord.** They onboard, enter, score, win and redeem exactly like anyone else. They simply have **no parent server**, and no server earns from them until they get one |
+| G0b | A **Discord gamer needs no email** until they redeem |
+| G0c | Gamers get a **password reset**. So does a brand |
+| G1 | Onboarding is **age band + country + link a game account**. Three things. A server-owner path substitutes the `guilds` scope for the linked account |
+| G2 | **The Discord path never asks for an email.** The email path asks for one because it *is* the credential — and verifies it there, which is what redemption later requires |
+| G3 | A Discord gamer is asked for an email **only at redemption**, and it is **verified** then |
 | G4 | Ownership proof is **required** where the game's API supports it |
 | G5 | Where the API cannot support it, entry is allowed with an unproven account — **no badge, no warning, no second class.** It is not the gamer's fault the publisher has no endpoint |
 | G6 | Age bands: **13–17** and **18+** |
@@ -294,7 +298,8 @@ nothing and it is the only good news most entrants get.
 
 | # | Rule |
 |---|---|
-| S1 | **Portal access by Discord sign-in.** The credential is deleted entirely — see `docs/12-IDENTITY.md` |
+| S0 | **A server owner is a gamer.** Same row, same login, same onboarding. What makes them an owner is a **linked Discord identity that Discord says owns that guild** — discovered at sign-in, at link, or on refresh |
+| S1 | **Portal access by a linked Discord identity.** The portal key is deleted entirely. An owner may **sign up by email first and link Discord after** — the portal appears the moment we can see they own the guild. See `docs/12-IDENTITY.md` |
 | S2 | On install, only the **guild owner** has admin |
 | S3 | The guild owner maps an **admin role** in bot settings — the same way they pick a channel |
 | S4 | Anyone with that role signs in with Discord and gets the portal, the bot's admin cards, everything |
@@ -309,8 +314,8 @@ nothing and it is the only good news most entrants get.
 
 | # | KPI | Measures | Weight |
 |---|---|---|---|
-| K1 | **Exclusive entrants** — split across every server a gamer belongs to | Volume | 40 |
-| K2 | **Conversion** — entrants ÷ linked members | Efficiency | 30 |
+| K1 | **Exclusive entrants** — **½ parent server + ½ join server**, and **1.0 when they are the same**. See `docs/12-IDENTITY.md` §3 | Volume | 40 |
+| K2 | **Conversion** — entrants **whose parent is this server** ÷ linked members **whose parent is this server**. Both sides are whole gamers, both sides parent-scoped, and the denominator is **live** | Efficiency | 30 |
 | K3 | **Activation** — entrants who scored above zero ÷ entrants | Quality | 30 |
 
 Plus a **flat share split evenly** among every server that carried an entrant.
@@ -365,6 +370,11 @@ Turning up is worth something.
 | A7 | Vault allocation to the weekly pool is a deliberate admin action, capped at half the vault |
 | A8 | Admin can create a challenge billed to any brand, any server, or the house brand |
 | A9 | `/admin/users` and `/admin/linked-accounts` are **admin-only**. No staff department reaches the gamer directory, ever |
+| A10 | **Cluster staff are gamers.** A staff member is an ordinary `users` row with a staff grant on top. They onboard like everyone, link an account, enter challenges, win trophies and redeem |
+| A11 | The **super admin grants each staff title its departments.** The grant is what opens the console; the gamer account is what plays |
+| A12 | **A staff member wins like anybody else, including in challenges they run.** They cannot manipulate one: the metrics are the same for every entrant, trophy values are capped by the prize-pool guard, and points come from game stats we read from the provider. There is no lever to pull. Placement is earned by playing |
+| A12a | **A trophy still unassigned when a challenge closes is flagged in the prize vault** — a challenge ended with money accounted for and no holder. That, not a staff rule, is what catches a trophy going nowhere |
+| A13 | Two **admin inboxes** — one for server owners, one for brands. A message that nobody has answered **keeps alerting** |
 
 ---
 

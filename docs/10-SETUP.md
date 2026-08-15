@@ -16,10 +16,10 @@ Production and Preview.
 |---|---|---|
 | `DATABASE_URL` | The database connection string | Neon dashboard → your project → Connection string |
 | `AUTH_SECRET` | Signs staff sessions | Any 32+ character random string |
-| `PORTAL_SECRET` | Signs every brand and server portal session | Any 64-character random string. **Must not be the same as any other secret here** |
+| `PORTAL_SECRET` | Signs the **brand** session and the brand invite exchange. Server owners sign in with Discord and have no key to sign | Any 64-character random string. **Must not be the same as any other secret here** |
 | `SETUP_TOKEN` | One-time token that lets the first admin account be created | Any long random string. Remove it after the first admin exists |
 
-**`PORTAL_SECRET` is the one that gets forgotten.** Without it, brand and server
+**`PORTAL_SECRET` is the one that gets forgotten.** Without it, brand
 portals cannot be signed into at all — and because a card signature reaches for
 it, a missing one once took the entire Discord bot down as well. It may not be
 shared with any other secret: whoever holds it could otherwise mint a session for
@@ -260,6 +260,7 @@ A job never releases money. It computes; a human releases.
 
 | # | Check | Where |
 |---|---|---|
+| 0 | **Discord bot verification.** Past roughly 100 servers with the GUILD_MEMBERS intent active, Discord reviews the app and the intent must be justified in writing. Analytics shown to a server's own owner is an approvable use. Start it before server 100, not after | Discord developer portal |
 | 1 | `PORTAL_SECRET` is set and unique | Vercel |
 | 2 | A brand can sign up and receive a key | Try it |
 | 3 | A test payment moves a challenge to `scheduled` | Stripe test mode |
@@ -275,7 +276,7 @@ A job never releases money. It computes; a human releases.
 
 | Cause | Symptom | Prevention |
 |---|---|---|
-| `PORTAL_SECRET` unset | Every portal login fails **and the Discord bot dies**, because a decorative signature threw on a card path | Set it. Fence anything decorative |
+| `PORTAL_SECRET` unset | Brand login fails **and the Discord bot dies**, because a decorative signature threw on a card path | Set it. Fence anything decorative |
 | **WebP artwork on a card** | *"Unsupported image type: image/webp"*. The card renderer cannot decode WebP, so any game art uploaded as WebP fails — silently degrading the card, or killing it | **Convert on upload.** Accept WebP from the uploader and store PNG or JPEG. Never trust the source format |
 | **Sync opening too many connections** | *"Too many database connection attempts are currently ongoing"* from the database on the hourly sync | Bound the batch and reuse one connection across it. A per-account connection will not survive a real account count |
 | Riot key replaced | Every League account breaks at once | Keep the self-heal |
