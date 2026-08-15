@@ -117,7 +117,7 @@ vanishes.
 | # | KPI | Measures | Weight |
 |---|---|---|---|
 | 1 | **Entrants** — ½ to the parent server, ½ to the join server. **Same server = 1.0** | Volume | 40 |
-| 2 | **Conversion** — entrants **whose parent is this server** ÷ linked members | Efficiency | 30 |
+| 2 | **Conversion** — entrants **whose parent is this server** ÷ **linked members whose parent is this server**. Both sides parent-scoped, both whole gamers, denominator **live**. That is the only reading bounded at 1.0 | Efficiency | 30 |
 | 3 | **Activation** — entrants who scored above zero ÷ entrants | Quality | 30 |
 
 Attribution is defined in `docs/12-IDENTITY.md` §3. **Neither document is correct

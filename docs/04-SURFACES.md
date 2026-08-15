@@ -49,7 +49,11 @@ The pool being public is the whole idea. We do not buy entrants with
 advertising — we make what each community earns visible, and the communities
 bring their members.
 
-### Onboarding — one page, two paths, no email
+### Onboarding — one page, two paths
+
+**Signup and onboarding are different screens.** The email door asks for an
+email *at signup*, because it is the credential, and verifies it there.
+Onboarding itself never asks for one, by either door.
 
 The first full screen asks **"Are you a gamer, or a server owner?"** — visual,
 with real screenshots, and skippable. Full rules in `docs/12-IDENTITY.md` §2.
