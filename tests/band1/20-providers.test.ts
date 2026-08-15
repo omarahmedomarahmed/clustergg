@@ -237,3 +237,47 @@ test("the League adapter itself does not touch the tight endpoint on a routine s
     else process.env.RIOT_API_KEY = realKey;
   }
 });
+
+test("the League adapter reads the queue it was asked for", async () => {
+  // Also found by breaking: hard-coding the queue back to solo was caught by
+  // nothing, because the sync suite only proved the setting is *passed*. What
+  // the adapter does with it has to be asserted where it happens.
+  const realFetch = globalThis.fetch;
+  const realKey = process.env.RIOT_API_KEY;
+  process.env.RIOT_API_KEY = "test-key-for-queue-capture";
+
+  const entries = [
+    { queueType: "RANKED_SOLO_5x5", tier: "GOLD", rank: "II", leaguePoints: 40, wins: 30, losses: 20 },
+    { queueType: "RANKED_FLEX_SR", tier: "SILVER", rank: "I", leaguePoints: 10, wins: 7, losses: 3 },
+  ];
+  globalThis.fetch = (async (input: RequestInfo | URL) => {
+    const url = String(input);
+    const body = url.includes("/entries/") ? JSON.stringify(entries) : "{}";
+    return new Response(body, { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+
+  try {
+    const ref = { providerAccountId: "puuid-1", inGameName: "T#EUW", region: "euw1" };
+
+    const solo = await ADAPTERS["riot-lol"].fetchStats({ ...ref, queue: "solo" });
+    ok(solo.ok, "solo resolved");
+    eq(solo.metrics.wins.value, 30, "solo reads the solo queue's wins");
+    eq(solo.metrics.matches.value, 50, "and matches is wins + losses for that queue");
+
+    const flex = await ADAPTERS["riot-lol"].fetchStats({ ...ref, queue: "flex" });
+    ok(flex.ok, "flex resolved");
+    eq(flex.metrics.wins.value, 7, "a flex challenge reads flex — the ported adapter could not");
+    eq(flex.metrics.matches.value, 10, "and counts flex games");
+
+    const both = await ADAPTERS["riot-lol"].fetchStats({ ...ref, queue: "both" });
+    ok(both.ok, "both resolved");
+    eq(both.metrics.wins.value, 37, "both sums the two queues");
+    eq(both.metrics.matches.value, 60, "because a game played in flex is a game played");
+
+    eq(both.metrics.win_rate, undefined, "and no percentage is ever written into the series");
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realKey === undefined) delete process.env.RIOT_API_KEY;
+    else process.env.RIOT_API_KEY = realKey;
+  }
+});
