@@ -89,11 +89,19 @@ back a refund from.
 | 1 | $700 | $175.00 | $175.00 | **$87.50** | $87.50 |
 | 2 | $350 | $87.50 | $175.00 | **$87.50** | $87.50 |
 | 3 | $700 | $175.00 | $262.50 | **$131.25** | $131.25 |
-| 4 | $350 | $87.50 | $218.75 | **$109.38** | $109.37 |
-| | **$2,100** | **$525** | | **$415.63 paid** | **$109.37 held** |
+| 4 | $350 | $87.50 | $218.75 | **$109.37** | $109.38 |
+| | **$2,100** | **$525** | | **$415.62 paid** | **$109.38 held** |
 
-Owners received $415.63 across the month and $109.37 remains available for a
+Owners received $415.62 across the month and $109.38 remains available for a
 quiet week or a refund. The pool never exceeded half the vault at any point.
+
+**Week 4 is why the allocation floors rather than rounds.** Half of $218.75 is
+$109.375, and there is no such coin. Rounding up would put the pool half a cent
+*above* half the vault, which the rule forbids as an absolute and the guard
+refuses outright — a guard cannot both refuse $109.375 and produce $109.38. So
+it floors, and the spare cent stays held. Paid plus held still equals the
+server share exactly; the cent moves between columns and nothing appears or
+vanishes.
 
 ---
 
@@ -287,8 +295,8 @@ A server owner buys a competition for their own members.
 |---|---|
 | Challenges run | 7 — 6 sponsored, 1 community |
 | Prize money committed | $1,060 |
-| Owner payouts released | $415.63 |
-| Held in vault 3 | $109.37 |
+| Owner payouts released | $415.62 |
+| Held in vault 3 | $109.38 |
 | Cluster gross | $525.50 |
 | Trophies awarded | ≈ 350 — 8 podium, the rest $0 participation |
 | Prize vault at month end | $1,060 minus whatever was redeemed |

@@ -181,14 +181,14 @@ The thing a single-surface spec always misses.
 | **1** | Gun Monday. League 62 entrants, Valorant 41. 8 of 10 servers carry an entrant. Friday: winners announced. Saturday: standings | Pool allocated **$87.50** — flat $17.50 split 8 ways, scored $70 |
 | **2** | Acme League #2. Nightfall buys a $10 community challenge | In: $360.50 → prize $185, server $87.50, Cluster $88 |
 | **3** | Acme League #3. Nova Dota | Pool **$131.25** |
-| **4** | Acme League #4. A gamer completes 4 consecutive weeks → **$0 milestone trophy** | Pool **$109.38** |
+| **4** | Acme League #4. A gamer completes 4 consecutive weeks → **$0 milestone trophy** | Pool **$109.37** — floored, see 02-MONEY §3 |
 
 | Month totals | |
 |---|---|
 | Received | $2,110.50 |
 | Prize vault | $1,060 |
-| Owner payouts released | $415.63 |
-| Held in server vault | $109.37 |
+| Owner payouts released | $415.62 |
+| Held in server vault | $109.38 |
 | Cluster gross | $525.50 |
 | Trophies awarded | ≈ 350 — 8 podium, the rest $0 |
 
