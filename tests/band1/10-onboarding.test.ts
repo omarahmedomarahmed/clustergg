@@ -215,6 +215,31 @@ test("the under-13 fingerprint is one-way and salted", () => {
     "the same person under the same salt hashes the same, which is the whole use");
 });
 
+test("the sanctions default is not empty", () => {
+  // This assertion exists because its absence was a hole, found by breaking
+  // the code: emptying `DEFAULT_SANCTIONED` was caught by zero suites. The
+  // test below iterates the list, so an empty list ran its body zero times and
+  // passed vacuously — every assertion green, nothing proven. A loop over a
+  // configurable collection needs a guard that the collection is populated,
+  // or the configuration can switch the test off.
+  ok(
+    DEFAULT_SANCTIONED.length > 0,
+    "there is at least one comprehensively sanctioned jurisdiction in the default",
+  );
+});
+
+test("the filter excludes whatever list it is given", () => {
+  // The mechanism, exercised against a fixture rather than the default, so
+  // this stays true whatever admin edits the list to.
+  const fixture = ["GB", "FR"];
+  const offered = offeredCountries(fixture);
+  no(offered.some((c) => c.code === "GB"), "a listed country is not offered");
+  no(offered.some((c) => c.code === "FR"), "nor is the second one");
+  ok(offered.some((c) => c.code === "DE"), "an unlisted country still is");
+  no(isCountryAllowed("GB", fixture), "and the action refuses what the picker omitted");
+  ok(isCountryAllowed("DE", fixture), "while allowing what it offered");
+});
+
 test("sanctioned countries are not in the picker at all", () => {
   const offered = offeredCountries();
   ok(offered.length > 200, "the picker offers essentially every country");
