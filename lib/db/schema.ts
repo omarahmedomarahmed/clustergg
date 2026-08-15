@@ -15,6 +15,8 @@ import {
   text,
   timestamp,
   boolean,
+  integer,
+  jsonb,
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -84,10 +86,19 @@ export const linkedGameAccounts = pgTable(
     verified: boolean("verified").notNull().default(false),
     // `claimed` | `exists` | `icon` | `oauth` | `openid` | `admin`
     verifiedMethod: text("verified_method").notNull().default("claimed"),
-    // `ok` | `error` | `needs_reconnect`
+    // `ok` | `error` | `needs_reconnect` | `needs_key` | `rate_limited`
     syncStatus: text("sync_status").notNull().default("ok"),
     syncError: text("sync_error"),
     lastSyncAt: timestamp("last_sync_at", { withTimezone: true }),
+    // When this account is next due. Null means "never synced" and sorts
+    // first: a never-synced account belongs to somebody staring at an empty
+    // profile right now.
+    nextSyncAt: timestamp("next_sync_at", { withTimezone: true }),
+    // Provider-specific extras: a profile icon, champion mastery, an
+    // encrypted MLBB session token. Never a payment detail — the structural
+    // test walks column names, and this column exists precisely because
+    // per-provider junk must have one home rather than sprouting columns.
+    providerData: jsonb("provider_data").$type<Record<string, unknown>>(),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -147,4 +158,66 @@ export const sessions = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
   (t) => [index("sessions_user_idx").on(t.userId)],
+);
+
+/**
+ * Every stat reading we have ever taken. The raw material for every delta.
+ *
+ * O1 — **append-only.** There is no "current value" column anywhere, and that
+ * is the same rule as the vault: a current value is `the latest row`, and a
+ * stored one cannot be reconstructed once it disagrees with the series.
+ *
+ * O2 — **a decrease means a season reset, not a bad week.** Riot zeroes `wins`
+ * at a split. Clamping the delta at zero would look correct and would silently
+ * cost every League player their entire week, every split, forever. The
+ * decrease is detected here, in the series, and re-baselines instead — see
+ * `lib/core/sync.ts`.
+ */
+export const observations = pgTable(
+  "observations",
+  {
+    id: text("id").primaryKey(),
+    linkedAccountId: text("linked_account_id").notNull(),
+    provider: text("provider").notNull(),
+    metricKey: text("metric_key").notNull(),
+    value: integer("value").notNull(),
+    // The game's own name for the value, when it has one: "Gold II". Stored
+    // beside the number because a ladder position without its label is a
+    // number nobody can read back.
+    rankLabel: text("rank_label"),
+    observedAt: timestamp("observed_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    index("observations_account_metric_idx").on(
+      t.linkedAccountId,
+      t.metricKey,
+      t.observedAt,
+    ),
+  ],
+);
+
+export type Observation = typeof observations.$inferSelect;
+
+/**
+ * A re-baseline forced by a season reset.
+ *
+ * Kept as rows rather than handled silently because it moves every score in
+ * every live challenge on that account. When a gamer asks why their points
+ * changed on a Tuesday, this table is the answer.
+ */
+export const seasonResets = pgTable(
+  "season_resets",
+  {
+    id: text("id").primaryKey(),
+    linkedAccountId: text("linked_account_id").notNull(),
+    metricKey: text("metric_key").notNull(),
+    previousValue: integer("previous_value").notNull(),
+    newValue: integer("new_value").notNull(),
+    detectedAt: timestamp("detected_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [index("season_resets_account_idx").on(t.linkedAccountId)],
 );

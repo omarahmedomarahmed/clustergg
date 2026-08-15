@@ -15,6 +15,13 @@
       "when": 1786763884632,
       "tag": "0001_huge_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786765493864,
+      "tag": "0002_solid_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }
