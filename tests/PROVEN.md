@@ -375,3 +375,44 @@ version back to prove the difference is load-bearing.
 sprint 1 — 39 assertions, 16 screenshots — was real, passed, and **was not run
 by the documented command**. A test nobody runs is a test that is already
 broken; it just has not been told yet. The script now runs all three passes.
+
+---
+
+# Sprint 3 — two doors, one row
+
+The specification changed underneath the build twice. This is the first sprint
+of the rebuild: Discord OAuth, the email door, the brand's own table, and the
+deletion of the server-owner portal key.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 34 | Linking a second method updates one row | Insert instead of update | *"linking a second method updates one row and never creates another"* | clean, 264/264 |
+| 35 | An already-used identity **routes, never merges** | The `elsewhere` branch made to steal the identity from the other account | *"an identity already on another account is a route, never a merge"* | clean, 264/264 |
+| 36 | Each account clears every gate on its own | `deriveUnlock` made to default age, country and a link | 5 cases across three suites | clean, 264/264 |
+| 37 | **L1 is what stops one person scoring twice** | The collision refusal in `linkAccount` bypassed | 2 cases, in two suites | clean, 264/264 |
+| 38 | The email door's verification is redemption's | `emailVerifiedAt` no longer written | **7 cases**, including the four-week simulation | clean, 264/264 |
+| 39 | A brand invite works exactly once | The `inviteRedeemedAt` check bypassed | *"a brand invite works exactly once"* | clean, 264/264 |
+| 40 | The parent is stamped at the first click | The early return made conditional, so a later click re-stamps | *"the parent is stamped at the first click and never re-stamped"* | clean, 264/264 |
+
+### The break that proved the guard was somewhere else
+
+Attempt one at guard 37 removed `uniqueIndex` from `linked_game_accounts` in
+`lib/db/schema.ts`. **Nothing went red**, and for a moment that read as a hole.
+
+It was not. The in-process database is created from `drizzle/*.sql`, not from
+`schema.ts`, so editing the schema file cannot change the running database's
+constraints — the break never applied. The rule from sprint 1 held again: a
+break that does not go red has two explanations, and *"the test is blind"* is
+only one of them.
+
+The guard L1 actually rests on is the collision refusal in
+`lib/identity/accounts.ts`. Breaking **that** went red in two suites, which is
+the right answer: the unique index is a backstop, and the code is the guard.
+
+### What guard 38's blast radius says
+
+Removing one `emailVerifiedAt` write took down seven cases including the
+four-week simulation — because I7a made one verification serve two purposes.
+That is the intended shape (*"never asked twice"*), and the blast radius is the
+evidence: signup and redemption really are reading the same fact, rather than
+two facts that happen to agree today.
