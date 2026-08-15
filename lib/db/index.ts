@@ -50,7 +50,16 @@ async function createDb() {
     // In-process. `migrateDemo` runs the same generated SQL production runs,
     // so a table that exists here exists there — which is the only reason a
     // test against this database says anything about production.
-    const { PGlite } = await import("@electric-sql/pglite");
+    // `webpackIgnore` leaves this import alone for Node to resolve at runtime.
+    // PGlite loads its WebAssembly through `new URL(...)` and `fs.readFile`;
+    // bundled, webpack rewrites that URL into its own class and Node rejects
+    // it with "must be of type string or Buffer or URL. Received an instance
+    // of URL" — an error that reads as impossible until you know why. It cost
+    // an hour, so it is written down. `serverExternalPackages` alone did not
+    // fix it; the import has to be invisible to the bundler.
+    const { PGlite } = await import(
+      /* webpackIgnore: true */ "@electric-sql/pglite"
+    );
     const { drizzle } = await import("drizzle-orm/pglite");
     const client = new PGlite();
     const db = drizzle(client, { schema });
@@ -99,15 +108,16 @@ export function getDb(): Promise<DB> {
  */
 async function migrateDemo(db: unknown): Promise<void> {
   const { migrate } = await import("drizzle-orm/pglite/migrator");
-  const { fileURLToPath } = await import("node:url");
   const path = await import("node:path");
-  const folder = path.join(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "..",
-    "..",
-    "drizzle",
-  );
-  await migrate(db as never, { migrationsFolder: folder });
+  // From the working directory, not from `import.meta.url`. A bundler rewrites
+  // module URLs — Next's server build turns this file's own URL into something
+  // `fileURLToPath` will not accept — and the demo database is only ever run
+  // from the project root, by the suite or by `next start`. Production never
+  // reaches here: it has a DATABASE_URL and migrates through
+  // `scripts/migrate.mts` at deploy.
+  await migrate(db as never, {
+    migrationsFolder: path.join(process.cwd(), "drizzle"),
+  });
 }
 
 /**
