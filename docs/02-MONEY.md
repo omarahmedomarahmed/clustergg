@@ -116,9 +116,12 @@ vanishes.
 
 | # | KPI | Measures | Weight |
 |---|---|---|---|
-| 1 | **Exclusive entrants** — a gamer in two servers is worth ½ to each | Volume | 40 |
-| 2 | **Conversion** — entrants ÷ linked members | Efficiency | 30 |
+| 1 | **Entrants** — ½ to the parent server, ½ to the join server. **Same server = 1.0** | Volume | 40 |
+| 2 | **Conversion** — entrants **whose parent is this server** ÷ linked members | Efficiency | 30 |
 | 3 | **Activation** — entrants who scored above zero ÷ entrants | Quality | 30 |
+
+Attribution is defined in `docs/12-IDENTITY.md` §3. **Neither document is correct
+without the other.**
 
 | # | Rule |
 |---|---|
@@ -126,7 +129,9 @@ vanishes.
 | K2 | All three measure outcomes on **our** platform |
 | K3 | KPI 3 kills the fake-entrant attack: a member who joins and never plays *lowers* the server's score |
 | K4 | All three are ratios or split volumes, so a large server cannot simply out-mass a small one |
-| K5 | Shares can never sum past the true entrant count — that is what the ½ split enforces |
+| K5 | Shares can never sum past the true entrant count — at most two servers share one gamer, ½ each |
+| K9 | **Conversion counts only entrants whose parent is this server.** Otherwise a server with 10 members converting 20 outsiders scores 2.0 — an unbounded ratio that rewards poaching over recruiting |
+| K10 | **Eligibility is frozen at Monday's gun; all three KPIs are live.** The conversion denominator is live too — frozen at 10 while entrants grow would produce the same unbounded ratio |
 | K6 | **Winning a challenge earns a server nothing directly.** Entrants do |
 | K7 | A server that never described itself is **dropped from the run**, not scored zero — otherwise it takes percentile positions from servers that did the work |
 | K8 | Community challenges do not count toward any pool |

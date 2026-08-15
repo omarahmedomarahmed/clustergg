@@ -32,6 +32,12 @@ any portal without ever seeing a key.
 | `DISCORD_BOT_TOKEN` | Discord Developer Portal → your app → Bot |
 | `DISCORD_PUBLIC_KEY` | Same app → General Information |
 | `DISCORD_APPLICATION_ID` | Same app → General Information |
+| `DISCORD_CLIENT_ID` | Same app → OAuth2. **Sign-in for gamers and server owners** |
+| `DISCORD_CLIENT_SECRET` | Same app → OAuth2 |
+
+**Add `https://clustergg.com/api/auth/discord/callback` as a redirect URI** under
+OAuth2, or every sign-in fails with a mismatch. Scopes: `identify` at sign-in,
+`guilds` only when somebody adds the bot to a server.
 
 ### Payments
 
@@ -48,7 +54,8 @@ Both are load-bearing: brands pay themselves, so a broken key means no sales.
 |---|---|
 | `RESEND_API_KEY` | Resend dashboard → API Keys |
 
-Load-bearing: it delivers brand portal keys and redemption verification codes.
+Load-bearing: it delivers brand invite keys, brand password resets and
+redemption verification codes.
 
 ### Game providers
 

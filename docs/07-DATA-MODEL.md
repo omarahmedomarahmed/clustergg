@@ -30,7 +30,8 @@ A gamer. Created by the bot or the website.
 | `ageBand` | `teen` \| `adult`. Set once, changed only by support |
 | `country` | Sanctioned countries are never offered |
 | `discordId` | |
-| `attributedGuildId` | **The server that brought them.** See attribution below |
+| `parentGuildId` | **Where they first pressed a bot button.** Permanent. See `12-IDENTITY.md` §3 |
+| `parentStampedAt` | When that first click happened |
 | `createdAt`, `status` |
 
 | # | Invariant |
@@ -38,6 +39,23 @@ A gamer. Created by the bot or the website.
 | U1 | Nothing accrues until an account is linked **and** age band **and** country are set |
 | U2 | `ageBand` is never self-editable after it is set |
 | U3 | Under-13 is not a value — that path deletes the account and keeps a salted hash of email + Discord ID so the same person cannot re-register with a different answer |
+
+### `brand_users`
+A brand's login. **A separate table from `users`, on purpose.**
+
+| Field | Note |
+|---|---|
+| `brandId` | |
+| `email`, `passwordHash` | Email + password only. **Never Discord** |
+| `inviteKeyHash`, `inviteRedeemedAt` | The one-time invite that creates the account |
+| `lastLoginAt`, `lastLoginIp` | |
+
+| # | Invariant |
+|---|---|
+| B1 | An invite key is redeemable **once**. After that it is dead |
+| B2 | A brand user is **never** a gamer, never linked to one, never sees the gamer nav |
+| B3 | One brand, one login. Shared credentials are accepted — so **every spend is logged with timestamp, actor and IP** |
+| B4 | Brands and gamers sign in through **different routes**. One email could otherwise be both |
 
 ### `linked_game_accounts`
 
@@ -193,23 +211,35 @@ Append-only. Every movement of every dollar.
 |---|---|
 | `guildId`, `name`, `memberCount` | |
 | `adminRoleId` | **The ID, never the name** — a renamed role must not revoke access |
+| `ownerDiscordId` | The guild owner. **Only they touch money** |
+| `ownerFirstSignInAt` | Null until they appear. Drives the 4-week reassignment clock |
+| `installedByDiscordId` | **Captured at the install redirect or lost forever.** Discord never tells us afterwards |
+| `installerWasOwner` | Whether the installer was the guild owner |
+| `ownershipTransferAt` · `transferConfirmedAt` | The 14-day timeout and the 7-day withdrawal freeze |
+| `eligibilityFrozenAt` · `eligibleThisWeek` | The gun snapshot |
 | `announceChannelId` | |
 | `community` | Profile. **A server that never described itself is dropped from scoring** |
-| `portalKeyHash` | |
 | `installedAt`, `removedAt` | Removal freezes reach; earnings survive |
 
 ### `guild_snapshots`
 Weekly member and linked counts. The denominator for the conversion KPI.
 
-### Attribution
+### Attribution — see `12-IDENTITY.md` §3
 
 | # | Rule |
 |---|---|
-| G1 | An entrant is credited to the server they joined from |
-| G2 | A gamer in **two** servers is worth **½ to each** — shares can never sum past the true entrant count |
-| G3 | Joining from the web: credit the server that **brought them** (`attributedGuildId`) |
-| G4 | No attribution and no server: they count for the brand, for no pool |
-| G5 | **One re-attribution is allowed** — on first Discord link, if they are in a server that has the bot |
+| G1 | **Parent server** = first bot click, permanent. **Join server** = where they pressed Join on that challenge |
+| G2 | Linked member count → **parent only**. Entrant credit → **½ parent + ½ join** |
+| G3 | **Parent = join server → 1.0**, not two halves |
+| G4 | Web join, no server context → **1.0 to parent** |
+| G5 | No parent at all → everything works, no server earns |
+| G6 | A gamer can never change their own parent. **Admin can**, logged |
+| G7 | Parent loses the bot → their credit **freezes** |
+
+### `guild_members` is deleted
+
+The ½-split-across-every-server model is replaced by parent + join server. One
+gamer, at most two servers, no membership table, no per-server dilution.
 
 ---
 
@@ -232,6 +262,7 @@ Weekly member and linked counts. The denominator for the conversion KPI.
 
 | # | Check | If it fails |
 |---|---|---|
+| 0 | Only the guild owner can withdraw or approve a community spend | 🔴 Refuse |
 | 1 | `prizeVault.balance == Σ(unredeemed money-trophies on live accounts)` | 🔴 Alert. The platform's core promise is broken |
 | 2 | `Σ(podium trophy values) == prizePool` for every challenge | 🔴 Block the announce |
 | 3 | `poolAllocation ≤ serverVault ÷ 2` | 🔴 Refuse the allocation |

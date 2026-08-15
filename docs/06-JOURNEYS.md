@@ -55,18 +55,36 @@ feature list, because a feature list hides the moment where somebody gets stuck.
 
 | # | Where | They do | System does |
 |---|---|---|---|
-| 1 | Discord | Add the bot | Guild registered. **Only the guild owner has admin** |
+| 1 | Discord | Add the bot | Guild registered. **The installer is captured at the redirect.** The guild owner is DM'd, whoever installed it |
 | 2 | Bot settings | Map an **admin role** | Stores the role **ID** |
 | 3 | Bot settings | Pick an announcement channel | — |
-| 4 | Bot or email | Receive the portal key | DM'd |
-| 5 | Portal | Sign in with the key | Session |
+| 4 | `/login` | **Sign in with Discord** | Guild roles read. Their portal was already there, with everything admins did waiting in it |
+| 5 | Onboarding | Age band → country → pick a server | One answer, used for their gamer profile too |
 | 6 | Portal | Describe the community | **Required to be scored at all** |
 | 7 | Portal | See this week's challenges | The ones feeding this week's pool |
 | 8 | Portal or bot | **Re-announce** one, or all | Cards reposted to their server |
 | 9 | — | Members join | Their KPIs and **live earnings** climb |
 | 10 | Portal | Watch the pool | Their share in dollars, updating |
 | 11 | Saturday | — | Pool standings announced on every server |
-| 12 | Portal | Request a withdrawal | Admin releases |
+| 12 | Portal | Request a withdrawal | **Only the guild owner may.** Admin releases |
+
+### Who may do what
+
+An **administrator** views everything, re-announces, edits the profile and
+*requests* a community challenge. Only the **guild owner** approves a spend or
+withdraws. A 13–17 owner earns and may spend on community challenges, but
+cannot withdraw until 18. Full table in `docs/12-IDENTITY.md` §6.
+
+### The owner who never appears
+
+| When | What |
+|---|---|
+| Bot installed | **DM the guild owner** — admins can build from your earnings, only you approve |
+| Every week close | DM with that week's earnings |
+| After they sign in once | Also email, weekly |
+| 4 weeks, never signed in | Cluster admin **may** reassign, manually |
+
+**Discord never gives us a guild owner's email.** DM only, until they sign in.
 
 ### Building a community challenge
 
@@ -100,8 +118,8 @@ That public page is the point: their competition advertises their server.
 
 | # | Where | They do | System does | Admin sees |
 |---|---|---|---|---|
-| 1 | `/brands` | Sign up | Portal created, **key emailed** | **Notified: new brand** |
-| 2 | `/login/brand` | Enter the key | Session | — |
+| 1 | `/brands` | Sign up | Portal created, **a one-time invite key emailed** | **Notified: new brand** |
+| 2 | `/login/brand` | Redeem the key, set an email + password | Account created. **Every sign-in after this is email + password** | — |
 | 3 | Portal | Contact name, phone, logo | — | — |
 | 4 | Builder 1 | Pick games from big cards | — | — |
 | 5 | Builder 2 | Per game: how many, single or series, which week | **Draft challenges created** | **Notified: started building.** Shows as *draft — unpaid* |

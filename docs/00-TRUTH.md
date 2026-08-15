@@ -294,10 +294,10 @@ nothing and it is the only good news most entrants get.
 
 | # | Rule |
 |---|---|
-| S1 | Portal access by key. Never a password |
+| S1 | **Portal access by Discord sign-in.** The credential is deleted entirely — see `docs/12-IDENTITY.md` |
 | S2 | On install, only the **guild owner** has admin |
 | S3 | The guild owner maps an **admin role** in bot settings — the same way they pick a channel |
-| S4 | Anyone with that role then gets the portal key, the bot's admin cards, everything |
+| S4 | Anyone with that role signs in with Discord and gets the portal, the bot's admin cards, everything |
 | S5 | **Store the role ID, not the name.** A renamed role must not silently revoke access |
 | S6 | Owners can **re-announce** one challenge or all of this week's, from the portal or the bot |
 | S7 | Every portal page and tab also exists as an **admin bot card** |
@@ -330,7 +330,7 @@ Turning up is worth something.
 
 | # | Rule |
 |---|---|
-| B1 | Fully self-serve from signup. They create their own portal; **we email the key** |
+| B1 | Fully self-serve from signup. **The emailed key is a one-time invite** exchanged for an email-and-password account. A brand user is never a gamer |
 | B2 | Setup: contact name, phone, logo |
 | B3 | Builder: big game cards → pick one or many → challenges per game → single or series → which week |
 | B4 | They see start date, announce date and price **before** paying |

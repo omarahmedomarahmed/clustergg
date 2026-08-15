@@ -171,6 +171,32 @@ than the pool can be assigned.
 
 ---
 
+## Stage 9.5 — Identity, attribution and permissions
+
+Everything in `docs/12-IDENTITY.md`. It replaces the portal key.
+
+| Build | Done when |
+|---|---|
+| `/api/auth/discord/callback` | Token exchange, identity, guild roles. **The route that does not exist yet** |
+| Discord sign-in for gamers and owners | Email + password still works for gamers |
+| Brand: key → one-time invite → email + password account | Separate route, separate table from gamers |
+| **Capture the installer** at the install redirect | Sign them in first if they are not |
+| Parent-server attribution | First bot click, permanent, ½ + ½ entrant credit |
+| Guild owner vs administrator permissions | Only the owner touches money |
+| Eligibility frozen at the gun, KPIs live | Conversion denominator live too |
+| Onboarding fork — gamer or server owner | Both ask age + country |
+| Nav context switcher | Never a brand |
+| The guild registry + refresh button | Everything in §8 |
+| `i`-icon help overlays, docs inside both portals | |
+| Progress bars everywhere | Never on raw member count |
+| Delete `guild_members` and the ½-across-all-servers logic | Replaced by parent + join |
+
+**Guards to prove:** an administrator cannot withdraw. A gamer cannot change
+their own parent. Conversion cannot exceed 1.0. Eligibility does not move
+mid-week. A renamed Discord role does not revoke access.
+
+---
+
 ## Stage 10 — Proof
 
 Everything in `docs/09-TEST-PLAN.md`: the full-cycle simulation and the

@@ -38,6 +38,7 @@ If you need something that is not in `ported/`, **ask**. Do not go looking.
 | `docs/09-TEST-PLAN.md` | Two bands, the mutation harness, the screenshot record |
 | `docs/10-SETUP.md` | Environment and deployment. No terminal needed |
 | `docs/11-PORTED-CODE.md` | What was carried over and what to change on arrival |
+| `docs/12-IDENTITY.md` | **Auth, attribution, permissions.** Read with `02-MONEY` §4 — neither is correct alone |
 
 Read `00` and `01` before writing anything. The rest can be read as you reach
 the stage that needs them.

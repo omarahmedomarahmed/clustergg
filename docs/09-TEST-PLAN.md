@@ -36,7 +36,12 @@ Runs in-process against an in-memory database. Needs nothing running.
 | **Prize vault** | Balance equals unredeemed money-trophies on live accounts. Over-allocation refused. A redeem is impossible for an unaccounted trophy |
 | **Trophy guard** | Values must equal the prize pool — flags over **and** under |
 | **$0 trophies** | Unredeemable at the redeem action, not merely hidden |
-| **Pool** | `allocation ≤ vault ÷ 2`. Flat 20% split evenly. Three KPIs. A gamer in two servers is worth ½ to each. Community challenges contribute nothing |
+| **Pool** | `allocation ≤ vault ÷ 2`. Flat 20% split evenly. Three KPIs. Community challenges contribute nothing |
+| **Attribution** | Entrant credit is **½ parent + ½ join**. Parent = join → **1.0, not two halves**. Web join with no server → 1.0 to parent. No parent → everything works and no server earns. Linked-member count goes to the **parent only** |
+| **Eligibility** | Frozen at Monday's gun and **never re-checked mid-week**. 8 linked at the gun + 50 on Tuesday earns nothing this week. 10 at the gun, 9 on Wednesday still pays. **The conversion denominator is live**, so the ratio can never exceed 1.0 |
+| **Permissions** | An administrator cannot withdraw or approve a spend. Only the guild owner can. A 13–17 owner may spend and may not withdraw. A **renamed** Discord role does not revoke access — the ID does |
+| **Identity** | A gamer can never change their own parent; admin can, and it is logged. A brand account is never a gamer account and never sees the gamer nav. A brand invite key works **once** |
+| **Ownership transfer** | The old owner must confirm. **14-day timeout** → admin arbitrates. A confirmed transfer **freezes withdrawal for 7 days** |
 | **KPI 3** | An entrant who never plays **lowers** the server's score |
 | **Payouts** | Open as drafts. A job never moves money |
 | **Redemption** | 18+, verified email, allowed country. Sanctioned countries never offered |
@@ -62,6 +67,13 @@ many suites noticed.
 | Make a $0 trophy redeemable | ≥ 1 |
 | Stop scrubbing secrets from provider errors | ≥ 1 |
 | Re-point a proven account after a key change | ≥ 1 |
+| Give the join server full credit instead of a half | ≥ 2 |
+| Give two halves when parent and join are the same server | ≥ 1 |
+| Freeze the conversion denominator at the gun snapshot | ≥ 1 |
+| Re-check pool eligibility mid-week | ≥ 1 |
+| Let an administrator withdraw | ≥ 2 |
+| Match a mapped admin role by **name** instead of ID | ≥ 1 |
+| Let a gamer set their own parent server | ≥ 1 |
 
 **A mutation caught by zero suites is a hole, and the report says so in those
 words.** A mutation caught by one is worth looking at too: one assertion is one
@@ -123,8 +135,11 @@ Not one screenshot per page. **Every state of every flow.**
 |---|---|
 | 1 | Bot install |
 | 2 | Admin role mapping · **and access denied before mapping** |
-| 3 | Portal key DM |
-| 4 | Portal login · **wrong key refusal** |
+| 3 | Owner DM on install — *admins can build from your earnings, only you approve* |
+| 4 | **Sign in with Discord** · the consent screen · landing in the portal that was already there |
+| 4a | **Administrator** signed in: withdraw and approve **disabled**, with the reason |
+| 4b | Server profile: 4 of 6 done · *"6 more linked gamers to unlock the pool"* |
+| 4c | **In this week's pool** vs **on track for next week** |
 | 5 | Overview: vault, pool, earnings |
 | 6 | This week's challenges |
 | 7 | **Re-announce one** — confirm, success, the resulting card in Discord |
@@ -145,8 +160,9 @@ Not one screenshot per page. **Every state of every flow.**
 | # | Shot |
 |---|---|
 | 1 | Signup |
-| 2 | Key email |
-| 3 | Login · setup |
+| 2 | Invite-key email |
+| 3 | Redeeming the key once · setting an email + password · **the same key refused a second time** |
+| 3a | Email + password sign-in · password reset |
 | 4 | Builder step 1 — game cards |
 | 5 | Builder step 2 — counts, series, weeks |
 | 6 | Builder step 3 — dates, reach, price |
