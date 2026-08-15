@@ -54,7 +54,8 @@ Both are load-bearing: brands pay themselves, so a broken key means no sales.
 |---|---|
 | `RESEND_API_KEY` | Resend dashboard → API Keys |
 
-Load-bearing: it delivers brand portal keys and redemption verification codes.
+Load-bearing: it delivers brand invite keys, brand password resets and
+redemption verification codes.
 
 ### Game providers
 

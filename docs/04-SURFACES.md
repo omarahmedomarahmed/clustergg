@@ -30,7 +30,8 @@ owner needs has a **matching card in the Discord bot**. For most gamers the bot
 | `/redeem` | 18+ only: verify email, choose method, request payout | Close |
 | `/profile` | Their own dashboard — challenges entered, trophies, standings | Run |
 | `/settings/*` | Account, connections, privacy, notifications | — |
-| `/signup` · `/login` | — | — |
+| `/signup` · `/login` | **Sign in with Discord** or email + password | — |
+| `/login/brand` | Brands only. Email + password, separate table | — |
 | `/rules/[who]` | Published rules for gamer, owner, brand | — |
 | `/legal/*` | Terms, privacy, cookies | — |
 
@@ -47,22 +48,57 @@ The pool being public is the whole idea. We do not buy entrants with
 advertising — we make what each community earns visible, and the communities
 bring their members.
 
-### Onboarding — three things, no email
+### Onboarding — one page, two paths, no email
 
-| Step | Asked | Notes |
+The first full screen asks **"Are you a gamer, or a server owner?"** — visual,
+with real screenshots, and skippable. Full rules in `docs/12-IDENTITY.md` §2.
+
+| Step | Gamer path | Server-owner path |
 |---|---|---|
-| 1 | Link a game account | Ownership proved here if the game supports it |
-| 2 | Age band | 13–17 or 18+. Under-13 is a link that deletes the account, never a third button |
-| 3 | Country | Sanctioned countries are **not offered at all** |
+| 1 | The fork | The fork |
+| 2 | Age band | Age band |
+| 3 | Country | Country |
+| 4 | **Link a game account** | **`guilds` scope** → pick a server they admin → add the bot |
+
+| # | Rule |
+|---|---|
+| 1 | Under-13 is a link that deletes the account, never a third button |
+| 2 | Sanctioned countries are **not offered at all** |
+| 3 | Both paths ask age band and country. **One person, one answer**, used for their gamer profile and every server they own |
+| 4 | Either path always says they can be the other one too, at any time |
+| 5 | **`guilds` is requested here, never at signup** |
+| 6 | A progress bar on every step |
 
 Email is asked **only at redemption**, and verified then. Nothing accrues until
-all three steps are done.
+age band, country and a linked account are done.
+
+### Nav
+
+| Surface | Nav |
+|---|---|
+| Gamer | Site nav + a **context switcher** |
+| Server manager | The same switcher. Selecting a server makes the homepage **that server's portal** |
+| Brand | **No site nav.** A SaaS dashboard with a side nav |
+| Brand on the public site | Guest nav + **Back to dashboard** |
+
+The switcher lists *Playing as \<name\>*, each server they manage, and *Add
+Cluster to \<server\>* for servers they admin without the bot. **Never a
+brand.**
 
 ---
 
 ## 2 · The server owner
 
-Access is by portal key, never a password.
+Access is by **Discord sign-in**, plus admin rights on that guild. There is no
+portal key. Full rules in `docs/12-IDENTITY.md` §6.
+
+| Action | Guild owner | Administrator / mapped role |
+|---|---|---|
+| View standings, analytics, members | ✅ | ✅ |
+| Re-announce · edit the profile · add the bot | ✅ | ✅ |
+| **Request** a community challenge | ✅ | ✅ |
+| **Approve** a community-challenge spend | ✅ | ❌ |
+| **Withdraw** | ✅ | ❌ |
 
 ### Portal pages — and every one has a matching admin bot card
 
@@ -76,17 +112,22 @@ Access is by portal key, never a password.
 | Wallet | Earnings, withdrawals, history |
 | Messages | Talk to staff |
 | Settings | Contact, payout preference, **admin role mapping** |
+| **Server profile** | Member age range · games played · bio · permanent invite · cover image · announcement channel. **Required to be scored at all** |
+| Help | An `i` icon on everything, plus docs and guides **inside** the portal |
 
 ### Bot installation and permissions
 
 | # | Rule |
 |---|---|
-| 1 | On install, **only the guild owner** has admin access |
-| 2 | The guild owner maps an **admin role** in bot settings — the same way they pick a channel |
-| 3 | Anyone holding that role then gets the portal key, the admin bot cards, everything |
-| 4 | **Store the role ID, not the name.** A renamed role must not silently revoke access |
-| 5 | **Admin cards are never public messages.** Ever |
-| 6 | If the bot is removed the portal survives. Errors read *"tell your admin to reinstall Cluster"*. Reinstalling resumes everything |
+| 1 | **Capture the installer at the install redirect** — who they were and whether they were the guild owner. Discord never tells us afterwards |
+| 2 | If they are not signed in at that moment, sign them in first, then redirect back with the guild still selected |
+| 3 | On install, **DM the guild owner** — even if somebody else installed it |
+| 4 | Access is by **ADMINISTRATOR permission** *or* a role the owner maps by hand |
+| 5 | **Store the role ID, not the name.** A renamed role must not silently revoke access |
+| 6 | **Only the guild owner touches money.** Administrators request; the owner approves |
+| 7 | **Admin cards are never public messages.** Ever |
+| 8 | The guild owner's portal **exists before they ever sign up** |
+| 9 | If the bot is removed the portal survives. Errors read *"tell your admin to reinstall Cluster"*. Reinstalling resumes everything |
 
 ---
 
@@ -98,8 +139,8 @@ Fully self-serve from signup.
 
 | Step | Where | What |
 |---|---|---|
-| 1 | `/brands` | Sign up. Portal created, **key emailed** |
-| 2 | `/login/brand` | Enter the key |
+| 1 | `/brands` | Sign up. Portal created, **a one-time invite key emailed** |
+| 2 | `/login/brand` | Redeem the key **once**, then set an email + password. Every sign-in after that is email + password |
 | 3 | Portal setup | Contact name, phone, logo |
 | 4 | **Builder step 1** | Big game cards with logo and cover art. Pick one or several |
 | 5 | **Builder step 2** | Per game: how many challenges · single or series · which week |
@@ -189,7 +230,9 @@ distribution channel.
 | `/api/cron/daily` | Gun stamping, close, milestones |
 | `/api/cron/announce` | Post-queue drain, every 5 minutes |
 | `/api/payments/webhook` | Marks a bill paid → triggers vault routing |
-| `/api/portal/unlock` | Exchanges a portal key for a session |
+| `/api/auth/discord` · `/api/auth/discord/callback` | Discord OAuth — identity, and guild roles when asked |
+| `/api/auth/discord/install` | The bot install redirect. **Captures the installer** |
+| `/api/auth/brand` | Brand email + password, and the one-time invite exchange |
 | `/api/challenges/[id]/leaderboard` | Live standings |
 | `/api/pool` | Live pool standings, for the homepage's in-place refresh |
 | `/api/auth/[provider]` | Ownership proof via OAuth/OpenID |

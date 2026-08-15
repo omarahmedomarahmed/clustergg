@@ -50,7 +50,8 @@ operable by a very small team.
 
 | Surface | What it does |
 |---|---|
-| **The gun** | A job stamps a baseline for every participant who joined early |
+| **The gun** | A job stamps a baseline for every participant who joined early, **and snapshots which servers are eligible for the pool** |
+| **Eligibility** | Frozen here — `linked ≥ 10` and a complete server profile. **Never re-checked mid-week.** All three KPIs stay live |
 | **Sync** | Hourly. Pulls each linked account's stats, computes deltas from that participant's own baseline |
 | **Website** | `/` shows live challenges, a countdown to Friday, and **the pool live** — every server, its KPIs, and the actual dollars it has earned so far |
 | **Bot** | Standings cards, join cards, profile cards. Gamers join right up to the final second |
@@ -85,6 +86,7 @@ second implementation of anything that decides money.
 | Number | Computed once, in | Read by |
 |---|---|---|
 | A server's pool share | The weekly-close function | `/pool`, the owner portal, the bot's standings card, Saturday's announcement, the payout |
+| Who a gamer earns for | The attribution module | Every KPI, the pool, the registry. **½ parent + ½ join, 1.0 when they are the same** |
 | A gamer's challenge score | The scoring function | The board, the bot card, the brand report, the final placement |
 | A challenge's price | The pricing module | Builder, invoice, website, brand portal |
 | The vault split | The split module | Every vault view, every projection, every guide |
@@ -120,6 +122,8 @@ platform — for most gamers it is the entire platform.**
 | Every reply is a card | Consistency is the product's face |
 | A decoration may never take a card down | Fence anything that can throw |
 | Admin cards are **never public messages** | Only the guild owner and mapped roles |
+| The **first bot click** creates an account and stamps the parent server | Permanent. `docs/12-IDENTITY.md` §3 |
+| The interaction payload **contains the member object** | Membership and roles are proven free, on every press. Never poll |
 
 ### The brand portal
 

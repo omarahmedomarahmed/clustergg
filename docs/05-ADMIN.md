@@ -174,6 +174,28 @@ anything else.
 | `/admin/servers/requests` | Community challenge requests |
 | `/admin/payouts` | Owner payouts. **Draft → released** |
 
+### The guild registry — `/admin/servers/[guildId]`
+
+The page opened when an owner asks *"why am I not earning?"* Every section in
+`docs/12-IDENTITY.md` §8.
+
+| Section | Shows |
+|---|---|
+| **Ownership** | Guild owner, ID and name · **has the owner ever signed in** · transfer state · the 14-day confirmation timer · the 4-week reassignment clock |
+| **Who installed it** | The user who added the bot, their role at the time, whether they were the owner |
+| **Permissions** | Every ADMINISTRATOR · the mapped role, ID **and** current name · who holds it now |
+| **Pool eligibility** | Linked members vs 10 · profile completeness field by field · **in this week's pool, yes or no** |
+| **Money** | Balance · this week's share · payout history · pending community-challenge requests |
+| **Refresh** | One button, per guild, cooled down. Re-pulls **owner and roles only** |
+| **Audit** | Every admin action on this server, timestamped |
+
+| # | Rule |
+|---|---|
+| 1 | **Never list guild members.** One member resolved on demand, never the paged list |
+| 2 | Admin may set any gamer's **age band** and **parent server** by hand, from the servers that gamer is in. Logged |
+| 3 | An owner who has never signed in for **4 weeks** may be reassigned — manually, and the claimant must hold ADMINISTRATOR at that moment |
+| 4 | A confirmed ownership transfer **freezes withdrawal for 7 days** |
+
 ---
 
 ## 7 · Gamers

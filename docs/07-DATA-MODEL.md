@@ -40,6 +40,23 @@ A gamer. Created by the bot or the website.
 | U2 | `ageBand` is never self-editable after it is set |
 | U3 | Under-13 is not a value — that path deletes the account and keeps a salted hash of email + Discord ID so the same person cannot re-register with a different answer |
 
+### `brand_users`
+A brand's login. **A separate table from `users`, on purpose.**
+
+| Field | Note |
+|---|---|
+| `brandId` | |
+| `email`, `passwordHash` | Email + password only. **Never Discord** |
+| `inviteKeyHash`, `inviteRedeemedAt` | The one-time invite that creates the account |
+| `lastLoginAt`, `lastLoginIp` | |
+
+| # | Invariant |
+|---|---|
+| B1 | An invite key is redeemable **once**. After that it is dead |
+| B2 | A brand user is **never** a gamer, never linked to one, never sees the gamer nav |
+| B3 | One brand, one login. Shared credentials are accepted — so **every spend is logged with timestamp, actor and IP** |
+| B4 | Brands and gamers sign in through **different routes**. One email could otherwise be both |
+
 ### `linked_game_accounts`
 
 | Field | Note |
@@ -202,7 +219,6 @@ Append-only. Every movement of every dollar.
 | `eligibilityFrozenAt` · `eligibleThisWeek` | The gun snapshot |
 | `announceChannelId` | |
 | `community` | Profile. **A server that never described itself is dropped from scoring** |
-| `portalKeyHash` | |
 | `installedAt`, `removedAt` | Removal freezes reach; earnings survive |
 
 ### `guild_snapshots`
