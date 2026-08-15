@@ -113,7 +113,7 @@ portal key. Full rules in `docs/12-IDENTITY.md` §6.
 | Wallet | Earnings, withdrawals, history |
 | Settings | Contact, payout preference, **admin role mapping** |
 | **Server profile** | Member age range · games played · bio · permanent invite · cover image · announcement channel. **Required to be scored at all** |
-| **Analytics** | **Empty and off by default, every session.** An *Allow analytics* button grants member-list access in exchange for their own dashboard. Read-only, cooled down, snapshot always dated. `12-IDENTITY.md` §7a |
+| **Analytics** | Empty until an *Allow analytics* button grants member-list access, then **permanent**. Their own dashboard, read-only, snapshot always dated, an **Update** button on a guild-level cooldown under a platform-wide ceiling. `12-IDENTITY.md` §7a |
 | **Messages** | Talk to Cluster. **Refresh in place** |
 | Help | An `i` icon on everything, plus docs and guides **inside** the portal |
 

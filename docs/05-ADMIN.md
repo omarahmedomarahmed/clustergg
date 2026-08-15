@@ -189,7 +189,7 @@ The page opened when an owner asks *"why am I not earning?"* Every section in
 | **Pool eligibility** | Linked members vs 10 · profile completeness field by field · **in this week's pool, yes or no** |
 | **Money** | Balance · this week's share · payout history · pending community-challenge requests |
 | **Refresh** | One button, per guild, cooled down. Re-pulls **owner and roles only** |
-| **Analytics** | Opted in or not · the last snapshot **and when it was taken** · the cooldown, and whether the platform-wide ceiling is forcing it |
+| **Analytics** | Granted or not · the last snapshot **and when it was taken** · the Update cooldown, and whether the platform-wide ceiling is what is holding it |
 | **Audit** | Every admin action on this server, timestamped |
 
 | # | Rule |

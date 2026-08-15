@@ -43,11 +43,12 @@ by email signup.
 | U1 | Nothing accrues until an account is linked **and** age band **and** country are set |
 | U2 | `ageBand` is never self-editable after it is set |
 | U3 | Under-13 is not a value — that path deletes the account and keeps a salted hash of email + Discord ID so the same person cannot re-register with a different answer |
-| U4 | **One row per person, whichever door they came through.** Linking Discord to an email account, or an email to a Discord account, never creates a second row. If that identity is already on another account the link is **refused with the reason** |
+| U4 | **One row per person, whichever door they came through.** Linking never creates a second row and never merges two |
+| U4a | If that Discord is already on another account, the message is **not a rejection**: *"You already have a Cluster account — that Discord is linked to it. Sign in with Discord to reach it."* The email account they are sitting in stays, harmless and idle. **We never merge two accounts that hold trophies** |
 | U5 | A gamer with **no `discordId` is complete**. No parent server, everything else identical |
 | U6 | A gamer with **no `email` is complete** until they redeem |
 | U7 | `staffTitleId` opens the console. It changes **nothing** about how they play, score or redeem |
-| U8 | **A staff member cannot place in a challenge they touched** — set its metrics, assigned its trophies or announced it. Blocked at assignment and flagged |
+| U8 | **A staff member places like anybody else, in any challenge, including ones they run.** Nothing about a staff grant touches scoring: metrics apply to every entrant equally, trophy values are held to the prize pool by T3, and points derive from provider stats. Manipulation is structurally unavailable, not policed |
 
 ### `brand_users`
 A brand's login. **A separate table from `users`, on purpose.**
@@ -191,6 +192,7 @@ Append-only. Every movement of every dollar.
 | T3 | `Σ(podium values for a challenge) == challenge.prizePool` — guarded at assignment, flagged over **and** under |
 | T4 | Unique on `(challengeId, userId, place)` — duplicates impossible |
 | T5 | Locked at `ended` |
+| T7 | **A podium trophy still unassigned at `ended` is flagged in the prize vault.** The money is accounted for and nobody holds it — the vault must say so, on the dashboard, not in a nightly report |
 | T6 | A holder's `user_trophy` survives the holder's deletion as an **orphan**, so the money stays accounted for |
 
 ### `redemptions`
@@ -266,14 +268,14 @@ A dated reading of a server, taken **only when its owner opts into analytics**
 
 | Field | Note |
 |---|---|
-| `guildId`, `grantedBy`, `grantedAt`, `sessionId` | |
-| `lastPullAt`, `cooldownUntil` | **On the guild, not the session** — signing out and back in is not a way around it |
+| `guildId`, `grantedBy`, `grantedAt` | One row per guild. **No session column — the grant is not a session** |
+| `lastPullAt`, `cooldownUntil` | **On the guild** — signing out and back in is not a way around it |
 
 | # | Invariant |
 |---|---|
-| N1 | Consent **ends at sign-out**. Every session grants again |
+| N1 | The grant is **permanent and survives sign-out.** The bot keeps its access; we keep the snapshot |
 | N2 | A **platform-wide ceiling** on member-list pulls. As it is approached the cooldown lengthens on **every** server at once, and each is told why and when |
-| N3 | The last snapshot is readable **without** re-granting. Only a fresh pull needs one |
+| N3 | The last snapshot is **always readable**. Only **Update** costs a call |
 
 ### `messages` and `message_threads`
 One thread per server or per brand. **Two admin inboxes, never merged.**

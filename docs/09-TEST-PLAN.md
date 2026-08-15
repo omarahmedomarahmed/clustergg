@@ -43,8 +43,8 @@ Runs in-process against an in-memory database. Needs nothing running.
 | **Permissions** | An administrator cannot withdraw or approve a spend. Only the guild owner can. A 13–17 owner may spend and may not withdraw. A **renamed** Discord role does not revoke access — the ID does |
 | **Identity** | A gamer can never change their own parent; admin can, and it is logged. A brand account is never a gamer account and never sees the gamer nav. A brand invite key works **once** |
 | **Two doors, one row** | An email gamer with no Discord onboards, enters, scores, wins and redeems. A Discord gamer needs no email until redemption. **Linking the second method never creates a second row**, and a already-taken identity is refused with the reason |
-| **Staff** | A staff grant changes nothing about how they play. **A staff member cannot place in a challenge they touched.** No title reaches the gamer directory |
-| **Analytics** | Off by default **every session**. The cooldown is on the **guild**, so signing out and back in does not reset it. The platform-wide ceiling lengthens every server's cooldown at once. The last snapshot reads without re-granting. **No weekly-cycle figure reads a snapshot** — drop the table and every dollar is unchanged |
+| **Staff** | A staff grant changes nothing about how they play — **they place in challenges they run, on merit, and there is no lever to pull**. No title reaches the gamer directory. A podium trophy unassigned at `ended` is flagged in the vault |
+| **Analytics** | The grant is **permanent per server and survives sign-out**. The Update cooldown is on the **guild**, so signing out and back in does not reset it. The platform ceiling lengthens every server's cooldown at once and each is told why. The last snapshot always reads, dated. **No weekly-cycle figure reads a snapshot — drop the table and every dollar in the four-week simulation is identical** |
 | **Messages** | An unanswered thread keeps alerting. The two inboxes never merge |
 | **Ownership transfer** | The old owner must confirm. **14-day timeout** → admin arbitrates. A confirmed transfer **freezes withdrawal for 7 days** |
 | **KPI 3** | An entrant who never plays **lowers** the server's score |
@@ -81,9 +81,9 @@ many suites noticed.
 | Let a gamer set their own parent server | ≥ 1 |
 | Read the parent live at scoring instead of the frozen stamp | ≥ 1 |
 | Let a KPI read a guild_snapshots row | ≥ 2 |
-| Keep analytics consent alive across a sign-out | ≥ 1 |
 | Put the analytics cooldown on the session instead of the guild | ≥ 1 |
-| Let a staff member place in a challenge they set up | ≥ 1 |
+| Ignore the platform ceiling on one server's refresh | ≥ 1 |
+| Merge two accounts when a gamer links an already-used identity | ≥ 1 |
 | Create a second row when a gamer links their second method | ≥ 1 |
 
 **A mutation caught by zero suites is a hole, and the report says so in those

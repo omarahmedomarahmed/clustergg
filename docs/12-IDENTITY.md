@@ -38,7 +38,8 @@ Discord, we see it, and the portal that was already waiting opens.
 | I1 | **Two ways in, one row.** Discord sign-in **or** email + password. Either reaches every gamer surface; neither is second class |
 | I1a | An **email gamer needs no Discord** — they onboard, enter, score, win and redeem. They have **no parent server**, and no server earns from them until they get one |
 | I1b | A **Discord gamer needs no email** until they redeem |
-| I1c | Linking the second method **never creates a second row.** If the identity is already on another account, the link is refused with the reason |
+| I1c | Linking the second method **never creates a second row, and never merges two accounts** |
+| I1c1 | An identity already on another account is answered with a **route, not a refusal**: *"You already have a Cluster account — sign in with Discord to reach it."* The spare account costs nobody anything and is left alone |
 | I1d | **Password reset** exists for gamers and for brands. It is the only thing an unverified email cannot do |
 | I2 | Brands and gamers use **separate login routes and separate tables**. One email could otherwise be both, and a brand landing in gamer onboarding is a mess |
 | I3 | One brand, one login. Never one user across brands. Shared credentials are acceptable for now — **every spend is logged with timestamp and IP** so a disagreement has an answer |
@@ -255,45 +256,57 @@ they entered.
 
 ---
 
-## 7a · Server analytics — off by default, opted in per server
+## 7a · Server analytics — granted once, refreshed on demand
 
-A server owner can hand us read access to their member list **in exchange for
-their own analytics.** They choose. If they never do, nothing about their
-earning, their pool position or their portal changes — they simply do not get
-the extra tab.
+A server owner hands us read access to their member list **in exchange for their
+own analytics.** They choose. If they never do, nothing about their earning,
+their pool position or their portal changes — they simply do not get the tab.
 
 ### What they get
 
-A dashboard of **their own server**, built from the data they allowed: member
-counts over time, roles and who holds them, how many of their members are linked
-to Cluster, entrants and how they convert, activity against challenges. Read
-only. **They cannot manage their server, their members or their roles from
-Cluster, and the page says so.**
+A dashboard of **their own server**: member counts over time, roles and who
+holds them, how many of their members are linked to Cluster, entrants and how
+they convert, activity against challenges. Read only. **They cannot manage their
+server, their members or their roles from Cluster, and the page says so.**
 
 Cluster admin sees the same snapshot on the guild registry, stamped with when it
 was taken.
 
-### The consent, and how it behaves
+### The grant
 
 | # | Rule |
 |---|---|
-| N1 | **Off by default, every single session.** Signing out ends it. Signing back in, the tab is off again and must be allowed again |
-| N2 | The **Allow analytics** button is the grant. Before it, the tab exists and is **empty**, showing what they would get |
-| N3 | Allowing shows a plain warning: this page contains **detailed information about your members**, do not open it with somebody looking over your shoulder, and **this permission ends when you sign out** |
-| N4 | It also says, in words: **we do not read your member list by default** — not for scoring, not for the pool, not for anything. Only here, only when you ask |
-| N5 | Every read produces a **snapshot stamped with the date and time it was taken**. Both the owner and admin see that stamp, never an undated number |
-| N6 | They may open the **last snapshot without re-granting** — it is data we already hold. **Update data** is what needs the grant again |
-| N7 | **Cooldown on Allow, and on Update.** Signing out and back in must not be a way around it — the cooldown is on the guild, not the session |
-| N8 | **A hard ceiling across every server.** As the platform approaches it, the cooldown lengthens **everywhere at once**, and a server that cannot refresh is told plainly why and when it can |
-| N9 | Nothing in the weekly cycle — eligibility, KPIs, the pool, a payout — may **ever** read an analytics snapshot. If analytics went away tomorrow the money would be identical |
+| N1 | **Granted once, per server. It does not expire.** Signing out changes nothing — the bot keeps its access and we keep the snapshot |
+| N2 | Before the grant, the tab exists and is **empty**, showing what they would get behind an **Allow analytics** button |
+| N3 | After the grant, the page shows a plain warning: this contains **detailed information about your members**, do not open it with somebody looking over your shoulder |
+| N4 | It also says, in words: **we do not read your member list for anything else** — not for scoring, not for the pool, not for eligibility. Only here |
+| N5 | Every read is a **snapshot stamped with the date and time it was taken**. Neither the owner nor admin ever sees an undated number |
+| N6 | The last snapshot is **always readable**. It is data we already hold. **Update** is what costs a call |
 
-### The one thing we must not claim
+### The refresh, and the ceiling
 
-Consent expiring at sign-out is **our rule, not Discord's**. The bot's access to
-that guild is granted at install and persists whether anyone is signed in or
-not. So the honest sentence, and the one that goes on the page, is **"we do not
-read this unless you ask us to"** — never *"we cannot"*. Saying the second would
-be a promise the architecture cannot keep.
+The whole point of the Update button is that a stale snapshot is worth less than
+a fresh one, so owners refresh it themselves — and every refresh is a member-list
+pull we have to pay for.
+
+| # | Rule |
+|---|---|
+| N7 | **Cooldown on Update, on the guild.** Never on the session. Signing out and back in is not a way around it |
+| N8 | **A hard ceiling across every server at once.** As the platform approaches Discord's limit, the cooldown lengthens **everywhere**, and a server that cannot refresh right now is told plainly why and when it can. Until then it reads its last snapshot, dated |
+| N9 | Nothing in the weekly cycle — eligibility, a KPI, the pool, a payout — may **ever** read a snapshot. **Delete the table and every dollar is identical.** Otherwise a server changes its own earnings by pressing a button, and the number it competes on depends on how often it refreshed |
+
+### Two things about the permission itself
+
+**The GUILD_MEMBERS intent is app-wide.** One switch, every guild, no per-guild
+control. So per-server consent is **our gate, not Discord's** — a rule we keep in
+code. The page therefore says *"we do not read this unless you ask us to"*, and
+never *"we cannot"*, which would be a promise the architecture cannot keep.
+
+**Past roughly 100 servers with the intent active, Discord reviews the bot.**
+Analytics shown to the server's own owner is a normal, approvable use, and
+nothing here violates their terms — no scraping, no resale, no cross-server
+profiling, and no KPI that measures Discord activity (K4). Expect the review;
+do not be surprised by it.
 
 ---
 

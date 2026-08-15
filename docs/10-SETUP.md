@@ -260,6 +260,7 @@ A job never releases money. It computes; a human releases.
 
 | # | Check | Where |
 |---|---|---|
+| 0 | **Discord bot verification.** Past roughly 100 servers with the GUILD_MEMBERS intent active, Discord reviews the app and the intent must be justified in writing. Analytics shown to a server's own owner is an approvable use. Start it before server 100, not after | Discord developer portal |
 | 1 | `PORTAL_SECRET` is set and unique | Vercel |
 | 2 | A brand can sign up and receive a key | Try it |
 | 3 | A test payment moves a challenge to `scheduled` | Stripe test mode |

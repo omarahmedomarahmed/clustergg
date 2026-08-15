@@ -372,7 +372,8 @@ Turning up is worth something.
 | A9 | `/admin/users` and `/admin/linked-accounts` are **admin-only**. No staff department reaches the gamer directory, ever |
 | A10 | **Cluster staff are gamers.** A staff member is an ordinary `users` row with a staff grant on top. They onboard like everyone, link an account, enter challenges, win trophies and redeem |
 | A11 | The **super admin grants each staff title its departments.** The grant is what opens the console; the gamer account is what plays |
-| A12 | **A staff member may not be a winner in a challenge they touched.** If they set its metrics, assigned its trophies or announced it, their own placement is blocked and flagged. Nobody grades their own paper |
+| A12 | **A staff member wins like anybody else, including in challenges they run.** They cannot manipulate one: the metrics are the same for every entrant, trophy values are capped by the prize-pool guard, and points come from game stats we read from the provider. There is no lever to pull. Placement is earned by playing |
+| A12a | **A trophy still unassigned when a challenge closes is flagged in the prize vault** — a challenge ended with money accounted for and no holder. That, not a staff rule, is what catches a trophy going nowhere |
 | A13 | Two **admin inboxes** — one for server owners, one for brands. A message that nobody has answered **keeps alerting** |
 
 ---
