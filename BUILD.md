@@ -66,18 +66,18 @@ below the surface is missing.
 
 These came out of building it, not out of reading the spec.
 
-### 1. A half-cent where the money document contradicts itself
+### 1. A half-cent where the money document contradicted itself — **resolved**
 
-`docs/02-MONEY.md` §3's worked table allocates **$109.38** of a $218.75 vault in
-week 4. That is half a cent *above* half the vault, and the same document states
-the rule three sections earlier as an absolute — `pool ≤ vault ÷ 2, always` —
-with `docs/07-DATA-MODEL.md` A1 making it a guard that refuses anything above.
+`docs/02-MONEY.md` §3's worked table allocated **$109.38** of a $218.75 vault in
+week 4. That is half a cent *above* half the vault, and the same document stated
+the rule three subsections earlier as an absolute — `pool ≤ vault ÷ 2, always` —
+with `docs/07-DATA-MODEL.md` A1 making it a guard that refuses anything above. A
+guard cannot refuse $109.375 and also produce $109.38.
 
-A guard cannot refuse $109.375 and also produce $109.38. **The code floors, so
-the month pays $415.62 and holds $109.38** rather than the document's $415.63
-and $109.37. Paid plus held still equals the server share exactly; the cent
-moved between columns. Recorded in `tests/band1/30-money.test.ts` rather than
-reconciled silently. **This needs a ruling** — the rule or the table.
+It was raised rather than reconciled silently. **The ruling: the rule stands,
+the table was wrong.** The document now floors too — week 4 allocates $109.37
+and holds $109.38, and the month reads $415.62 paid / $109.38 held. The code did
+not change; it was already right.
 
 ### 2. The ½ split needed a table that did not exist
 

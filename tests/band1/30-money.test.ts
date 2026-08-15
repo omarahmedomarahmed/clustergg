@@ -577,25 +577,21 @@ test("the four-week worked example in docs/02-MONEY.md comes out right", async (
   // §3 of the money document works four weeks of sales, allocating half the
   // vault each week. This recomputes it rather than retyping the answers.
   //
-  // ===== A HALF-CENT WHERE THE DOCUMENT CONTRADICTS ITSELF =====
+  // ===== WEEK 4 IS THE INTERESTING ONE =====
   //
-  // Week 4's vault is $218.75, whose exact half is $109.375. The document's
-  // table allocates **$109.38** and holds $109.37. That rounds the allocation
-  // UP, which puts the pool half a cent *above* half the vault — and three
-  // sections earlier the same document states the rule as an absolute:
+  // Half of $218.75 is $109.375, and there is no such coin. Rounding up would
+  // put the pool half a cent ABOVE half the vault, which the rule forbids as
+  // an absolute — so the allocation floors to $109.37 and $109.38 is held.
   //
-  //     "pool ≤ vault ÷ 2, always"
+  // This was a genuine contradiction in the specification when it was built:
+  // the table said $109.38 allocated while the rule three subsections earlier
+  // said `pool ≤ vault ÷ 2, always`, and A1 in docs/07-DATA-MODEL.md makes
+  // that a guard which refuses anything above. A guard cannot both refuse
+  // $109.375 and produce $109.38. It was raised rather than reconciled
+  // silently, and the ruling was that the rule stands and the table was wrong.
+  // The document now floors too.
   //
-  // with A1 in docs/07-DATA-MODEL.md making it a guard that refuses anything
-  // above, with a reason. A guard cannot refuse $109.375 and also produce
-  // $109.38.
-  //
-  // So the code floors, the rule holds at every step, and the month comes out
-  // one cent the other way: $415.62 paid and $109.38 held rather than $415.63
-  // and $109.37. The totals still reconcile exactly — the cent moved from the
-  // paid column to the held column, and no money appeared or vanished.
-  //
-  // This is recorded rather than reconciled silently, and it has been raised.
+  // The assertions below did not change. They are what the code always did.
   const db = await resetDemoDb();
   const weeks = [
     { sold: 2, week: new Date("2026-09-07T00:00:00Z") },
