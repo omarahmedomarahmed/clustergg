@@ -173,6 +173,30 @@ deleting the readiness check inside `announce` changed nothing — a paid
 challenge whose trophy values did not equal its prize pool could have gone out
 to every server.
 
+## Stage 5 — trophies, milestones, redemption and sweeps
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 38 | A trophy cannot be worth more than the vault holds | `assertHeadroom` deleted from `awardTrophy` | *"an award with no money behind it is refused"* | clean, 154/154 |
+| 39 | A $0 trophy is unredeemable **at the action** | The zero-value check bypassed | *"a $0 trophy is unredeemable at the action, not merely hidden"* | clean, 154/154 |
+| 40 | Only 18+ may redeem | The age check bypassed | *"a teen keeps the trophy and is told when they can have it"* | clean, 154/154 |
+| 41 | A collectable can never carry money | The type/value check bypassed | *"a collectable can never carry money"* | clean, 154/154 |
+| 42 | A sweep is reversible | The sweep deletes the holding instead of parking it | *"a sweep is reversible, and re-funds the trophy"* | clean, 154/154 |
+| 43 | Both sides of the invariant move together on payout | The holding is no longer marked redeemed | *"the full redemption sequence…"* + *"the same trophy cannot be redeemed twice"* | clean, 154/154 |
+| 44 | Consecutive means consecutive | A gap no longer resets the run | *"consecutive weeks means consecutive, and a gap resets"* | clean, 154/154 |
+| 45 | A verified email is required to redeem | The check bypassed | *"email is asked only at redemption, and must be verified"* | clean, 154/154 |
+| 46 | The five-year hold is five years | The expired-sweep window opened to everything | *"an expired sweep takes only what is actually five years old"* | clean, 154/154 |
+| 47 | A duplicate award is a no-op | The already-held check deleted | 3 cases, including settlement and milestones | clean, 154/154 |
+
+### A note on the band's speed, which is a correctness matter
+
+Proving a guard runs the whole band twice. At one PGlite instance per test the
+band took four minutes, so each guard cost eight — and a proof that is
+expensive is a proof that gets skipped. `resetDemoDb` now truncates instead of
+rebuilding: **four minutes to eleven seconds**, same 154 tests, same isolation.
+The table list is read from `pg_tables` rather than kept in the code, for the
+same reason every other guard here walks the tree.
+
 ### One guard that fired before anyone broke it
 
 `02-structural`'s first case asserts that the tree-walk actually reached the
