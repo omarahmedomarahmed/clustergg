@@ -289,3 +289,39 @@ both have passed — over an empty list — and Stage 0 would have shipped two
 guards that guarded nothing. That is the same defect class as the three dead
 assertions in the old weekly close, caught this time because the canary was
 written before the guard was trusted.
+
+---
+
+# Sprint 1 — the admin screens
+
+Fifteen pages over `lib/admin/dashboard.ts`, which was already tested. The only
+new *logic* is the access gate, so that is what was broken.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 70 | The gamer directory is admin-only | `/admin/users` and `/admin/linked-accounts` changed to `departments("admin","support")` | 4 cases, across the kind test, the department matrix and the widening sweep | clean, 238/238 |
+| 71 | An unclassified route fails closed | `accessFor`'s fallback changed from `ADMIN_ONLY` to the dashboard's rule | *"an unclassified route fails closed"* | clean, 238/238 |
+| 72 | `/admin` matches exactly, so the root cannot match as a prefix | The `.filter((r) => r !== "/admin")` line removed **and** the early return removed | *"an unclassified route fails closed"* | clean, 238/238 |
+
+### Guard 72 was caught by zero suites the first time, and the fault was mine
+
+The first attempt at breaking it removed the wrong line — the early return,
+which fails *more* closed, not less — so nothing went red and the guard looked
+unproven. The line that actually carries the property is the `.filter`.
+Removing both is what re-broke it, and the fail-closed case then went red.
+
+The lesson is narrow and worth keeping: **a break that does not go red has two
+explanations, and "the test is blind" is only one of them.** Check that the
+break actually changes behaviour in the direction the guard forbids before
+recording a hole.
+
+### And one assertion that was missing
+
+Failing closed everywhere is not correct either. The fix for the prefix bug
+excludes `/admin` from prefix matching, and a careless edit to that exclusion
+would lock all four departments out of the dashboard — a bug the fail-closed
+test cannot see, because it only checks the tight direction. Added:
+
+> *"the dashboard itself is reachable by every department"*
+
+which is the counterpart, and would have gone red on that edit.

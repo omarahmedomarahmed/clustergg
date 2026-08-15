@@ -61,6 +61,19 @@ test("a sub-route of the directory inherits its access", () => {
   );
 });
 
+test("the dashboard itself is reachable by every department", () => {
+  // The counterpart to fail-closed, and the assertion that was missing: the
+  // fix for the prefix bug excludes `/admin` from prefix matching, and a
+  // careless edit to that exclusion would lock every department out of the
+  // dashboard instead. Failing closed everywhere is not correct either.
+  for (const department of DEPARTMENTS) {
+    ok(
+      mayAccess(accessFor("/admin"), department),
+      `${department} can open the dashboard`,
+    );
+  }
+});
+
 test("an unclassified route fails closed", () => {
   // The direction of the default is the whole safety property. Failing OPEN
   // means the page somebody adds in a hurry is readable by everyone until

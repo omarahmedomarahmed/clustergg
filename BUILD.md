@@ -3,8 +3,9 @@
 `docs/` is the specification and has not been edited. This file is the report
 against it.
 
-Ten stages of `docs/08-BUILD-ORDER.md`, in order. **229 tests, 1,017
-assertions, 18 mutations caught, 68 guards proven by breaking them.**
+Ten stages of `docs/08-BUILD-ORDER.md`, in order, then the sprints that build
+the surfaces over them. **238 tests, 1,072 assertions, 18 mutations caught, 72
+guards proven by breaking them.**
 
 ---
 
@@ -43,6 +44,14 @@ build and test cycle runs against an in-process database.
 
 ---
 
+## The sprints
+
+| Sprint | What | Where |
+|---|---|---|
+| 1 · Admin screens | Fifteen pages over `lib/admin`, the dashboard first. The house-rule-7 gate lives in the layout, so no page can forget it | `app/admin`, `lib/admin/auth.ts` |
+
+---
+
 ## What is not built
 
 Honestly, so nobody has to discover it.
@@ -50,7 +59,6 @@ Honestly, so nobody has to discover it.
 | Not built | Why |
 |---|---|
 | The Discord **card layouts** | The transport, the 3-second rule, the nav grammar, the renderer and its fences are all done and tested. The individual card designs per family are not — they are drawing, and they need the real bot connected to be worth doing |
-| Admin **screens** | `lib/admin/dashboard.ts` computes everything the console shows and is fully tested. The pages that render it are not written |
 | Portal **screens** | Same shape: `lib/portal/*` is complete and tested; the brand and owner pages are not written |
 | `/games`, `/rules`, `/legal`, `/settings/*` | Content pages with no logic behind them |
 | Discord **OAuth** | The route and the config exist. It needs the credentials from `docs/10-SETUP.md` |
