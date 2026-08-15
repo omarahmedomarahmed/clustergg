@@ -130,7 +130,19 @@ arguments and a back-trail into that budget.
 
 ## `ported/cards/fonts.ts`
 
-Font loading for the Satori card renderer. Layouts are entirely new; this is not.
+Font loading for the card renderer. Layouts are entirely new; this is not.
+
+### The renderer cannot decode WebP
+
+This is live in production right now and it is worth knowing before the first
+card is drawn. The renderer answers `Unsupported image type: image/webp` and the
+artwork does not appear — game planet art, brand creatives, anything.
+
+| # | Rule for the rebuild |
+|---|---|
+| 1 | **Convert on upload.** Accept whatever the uploader gives and store PNG or JPEG. Never trust the source format |
+| 2 | **Fence the image.** A card whose artwork will not decode must still render — text, buttons, navigation. Artwork is decoration, and a decoration may never take a card down |
+| 3 | Log the failure with the URL, so a bad asset is findable rather than merely invisible |
 
 ---
 

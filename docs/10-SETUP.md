@@ -20,9 +20,10 @@ Production and Preview.
 | `SETUP_TOKEN` | One-time token that lets the first admin account be created | Any long random string. Remove it after the first admin exists |
 
 **`PORTAL_SECRET` is the one that gets forgotten.** Without it, brand and server
-portals cannot be signed into at all. It may not be shared with any other secret,
-because whoever holds it could otherwise mint a session for any portal without
-ever seeing a key.
+portals cannot be signed into at all — and because a card signature reaches for
+it, a missing one once took the entire Discord bot down as well. It may not be
+shared with any other secret: whoever holds it could otherwise mint a session for
+any portal without ever seeing a key.
 
 ### Discord
 
@@ -198,6 +199,8 @@ A job never releases money. It computes; a human releases.
 | Cause | Symptom | Prevention |
 |---|---|---|
 | `PORTAL_SECRET` unset | Every portal login fails **and the Discord bot dies**, because a decorative signature threw on a card path | Set it. Fence anything decorative |
+| **WebP artwork on a card** | *"Unsupported image type: image/webp"*. The card renderer cannot decode WebP, so any game art uploaded as WebP fails — silently degrading the card, or killing it | **Convert on upload.** Accept WebP from the uploader and store PNG or JPEG. Never trust the source format |
+| **Sync opening too many connections** | *"Too many database connection attempts are currently ongoing"* from the database on the hourly sync | Bound the batch and reuse one connection across it. A per-account connection will not survive a real account count |
 | Riot key replaced | Every League account breaks at once | Keep the self-heal |
 | Node downgraded below 22 | Every money path throws — loudly on a purchase, silently on a background job | Pin it in the project config |
 | A per-guild loop inside a request | Announcements silently half-deliver | Everything fans out through the queue |
