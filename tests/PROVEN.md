@@ -260,6 +260,23 @@ for that one rule.
 | 67 | The dashboard names the specific blocker | Replaced with *"Needs attention"* | *"the dashboard names the specific thing blocking each challenge"* | clean, 228/228 |
 | 68 | The prize-pool check is live, not a report | The continuous check bypassed | *"a prize-pool mismatch on an announced challenge is flagged on the dashboard"* | clean, 228/228 |
 
+## Stage 10 — proof
+
+The mutation harness (`npm run mutate`) is the standing version of this
+document: 18 mutations, each a small plausible silent change, **18 caught**,
+zero holes. It always restores — try/finally, a signal handler, and a byte
+comparison after each one — and it fails loudly when a mutation stops applying,
+because a mutation that cannot apply reports as "caught by zero", which reads
+exactly like a genuine hole.
+
+The four-week simulation asserts the prize-vault invariant and the ledger
+balance **after every state change** across four weeks, which is requirement 4
+of "what done means".
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 69 | The band can tell working code from broken | 18 mutations, one at a time | 18 of 18 caught | every file byte-compared after restore |
+
 ### One guard that fired before anyone broke it
 
 `02-structural`'s first case asserts that the tree-walk actually reached the
