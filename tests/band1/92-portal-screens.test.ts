@@ -28,6 +28,7 @@ import {
   CommunityBuilderRefused,
 } from "../../lib/portal/owner.ts";
 import { portalCookieName, signPayload, verifyPayload } from "../../lib/core/portal-auth.ts";
+import { mayOpenPortal } from "../../lib/portal/session.ts";
 import { KPI_WEIGHTS } from "../../lib/money/amounts.ts";
 import { signUpBrand, confirmAndPay, onInvoicePaid } from "../../lib/portal/brand.ts";
 import { announce } from "../../lib/challenges/lifecycle.ts";
@@ -78,6 +79,26 @@ test("a portal signature does not transfer between portals", () => {
   no(verifyPayload("brand:brand-b", mine), "another brand's does not");
   no(verifyPayload("server:brand-a", mine), "nor the same id as a server");
   no(verifyPayload("brand:brand-a", null), "and nothing verifies as nothing");
+});
+
+test("with a database configured, no session means no portal", () => {
+  // The direction of the default, which is the part of the gate that can be
+  // catastrophically wrong and look completely normal. Everything else in
+  // `lib/portal/session.ts` needs a live request; this does not, which is the
+  // whole reason it was split out.
+  no(
+    mayOpenPortal({ hasSession: false, isDemo: false }),
+    "a real deployment refuses a visitor with no session",
+  );
+  ok(
+    mayOpenPortal({ hasSession: true, isDemo: false }),
+    "and lets in one who has a session for THIS portal",
+  );
+  ok(
+    mayOpenPortal({ hasSession: false, isDemo: true }),
+    "the demo is the one exception, and it is an exception about the database, " +
+      "not about the visitor",
+  );
 });
 
 // ── The standing ────────────────────────────────────────────────────────────

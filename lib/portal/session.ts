@@ -32,8 +32,26 @@ export type PortalKind = "brand" | "server";
  * both portals without a key. A process with a database gets the real check.
  */
 export async function portalOpen(kind: PortalKind, id: string): Promise<boolean> {
-  if (await hasPortalSession(kind, id)) return true;
-  return isDemoMode;
+  return mayOpenPortal({ hasSession: await hasPortalSession(kind, id), isDemo: isDemoMode });
+}
+
+/**
+ * The decision, with the request taken out of it.
+ *
+ * Split out so it can be asserted. Everything else in the gate needs
+ * `next/headers` and therefore a live request, which means the *direction of
+ * the default* — the only part that can be catastrophically wrong — was
+ * reachable by inspection alone. A demo fence that quietly stopped being a
+ * fence would open every portal on a real deployment, and nothing would look
+ * different until somebody read somebody else's numbers.
+ */
+export function mayOpenPortal(facts: { hasSession: boolean; isDemo: boolean }): boolean {
+  if (facts.hasSession) return true;
+  // ===== THE ONLY REASON THIS IS NOT `return false` =====
+  // With no `DATABASE_URL` there is no real customer to leak and the
+  // screenshot record has to walk both portals with no key. The moment a
+  // database is configured, this is `false`.
+  return facts.isDemo;
 }
 
 /**
