@@ -7,7 +7,7 @@
 // `requirePortal`, and it is called once, here.
 
 import Link from "next/link";
-import { requirePortal, brandForPortal } from "../../../../lib/portal/session.ts";
+import { requireBrandPortal, brandForPortal } from "../../../../lib/portal/session.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +29,7 @@ export default async function BrandPortalLayout({
 }) {
   const { brandId } = await params;
   const brand = await brandForPortal(brandId);
-  await requirePortal("brand", brandId);
+  await requireBrandPortal(brandId);
 
   return (
     <div className="min-h-screen">

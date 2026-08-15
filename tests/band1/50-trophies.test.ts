@@ -459,8 +459,8 @@ test("email is asked only at redemption, and must be verified", async () => {
   eq(blocked.ok ? "" : blocked.code, "email_unverified", "and a redeem needs one");
 
   const { code } = await startEmailVerification(db, userId, "Winner@Example.com ");
-  no(await confirmEmailVerification(db, userId, "000000"), "a wrong code does nothing");
-  ok(await confirmEmailVerification(db, userId, code), "the right one verifies");
+  no((await confirmEmailVerification(db, userId, "000000")).ok, "a wrong code does nothing");
+  ok((await confirmEmailVerification(db, userId, code)).ok, "the right one verifies");
 
   const [after] = await db.select().from(schema.users).where(sqlEq(schema.users.id, userId));
   eq(after.email, "winner@example.com", "stored normalised");
@@ -471,12 +471,12 @@ test("email is asked only at redemption, and must be verified", async () => {
 test("an expired verification code does not verify", async () => {
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Slow");
-  const { code, id } = await startEmailVerification(db, userId, "slow@example.com");
+  const { code } = await startEmailVerification(db, userId, "slow@example.com");
   await db
     .update(schema.emailVerifications)
     .set({ expiresAt: new Date(Date.now() - 1000) })
-    .where(sqlEq(schema.emailVerifications.id, id));
-  no(await confirmEmailVerification(db, userId, code), "expired is expired");
+    .where(sqlEq(schema.emailVerifications.userId, userId));
+  no((await confirmEmailVerification(db, userId, code)).ok, "expired is expired");
 });
 
 test("the full redemption sequence, and the vault falls by exactly the value", async () => {

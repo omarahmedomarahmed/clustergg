@@ -13,7 +13,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "../../../../lib/db/index.ts";
-import { portalOpen } from "../../../../lib/portal/session.ts";
+import { serverPortalAccess } from "../../../../lib/portal/session.ts";
+import { mayReAnnounce, mayEditProfile, mayRequestSpend } from "../../../../lib/portal/permissions.ts";
 import {
   reAnnounce,
   describeCommunity,
@@ -26,9 +27,21 @@ import {
 import { weekFor, weekStartPlus } from "../../../../lib/challenges/week.ts";
 import type { CommunityTier } from "../../../../lib/money/amounts.ts";
 
-async function guard(guildId: string): Promise<void> {
-  if (!(await portalOpen("server", guildId))) {
-    throw new Error("That portal is not open to you.");
+/**
+ * Re-check the guild permission, per action, and against the *right* capability.
+ *
+ * The layout gates the pages. A Server Action is an endpoint, and the layout
+ * that rendered the form is not in its call stack — so every action asks
+ * again, and asks the specific question rather than "are they in the portal":
+ * an administrator may re-announce and may not approve a spend.
+ */
+async function guard(
+  guildId: string,
+  may: (access: Awaited<ReturnType<typeof serverPortalAccess>>) => boolean,
+): Promise<void> {
+  const access = await serverPortalAccess(guildId);
+  if (!may(access)) {
+    throw new Error("That is not something your access on this server allows.");
   }
 }
 
@@ -54,7 +67,7 @@ async function attempt(fn: () => Promise<void>): Promise<{ error?: string }> {
  */
 export async function reAnnounceAction(form: FormData): Promise<void> {
   const guildId = String(form.get("guildId"));
-  await guard(guildId);
+  await guard(guildId, mayReAnnounce);
   const ids = form.getAll("challengeId").map(String).filter(Boolean);
   const result = await reAnnounce(await getDb(), guildId, ids);
   revalidatePath(`/portal/server/${guildId}/challenges`);
@@ -67,7 +80,7 @@ export async function reAnnounceAction(form: FormData): Promise<void> {
 
 export async function describeCommunityAction(form: FormData): Promise<void> {
   const guildId = String(form.get("guildId"));
-  await guard(guildId);
+  await guard(guildId, mayEditProfile);
   const result = await attempt(async () =>
     describeCommunity(await getDb(), guildId, String(form.get("community") ?? "")),
   );
@@ -80,7 +93,7 @@ export async function describeCommunityAction(form: FormData): Promise<void> {
 
 export async function saveSettingsAction(form: FormData): Promise<void> {
   const guildId = String(form.get("guildId"));
-  await guard(guildId);
+  await guard(guildId, mayEditProfile);
   const db = await getDb();
 
   const result = await attempt(async () => {
@@ -106,7 +119,9 @@ export async function saveSettingsAction(form: FormData): Promise<void> {
 
 export async function buildCommunityAction(form: FormData): Promise<void> {
   const guildId = String(form.get("guildId"));
-  await guard(guildId);
+  // P6/12 §6 — an administrator may REQUEST. Approving the spend is the
+  // owner's, and that check lives on the approve action, not this one.
+  await guard(guildId, mayRequestSpend);
   const db = await getDb();
   // The tier arrives as a string and is only a tier if `COMMUNITY_TIERS` says
   // so. `buildCommunityChallenge` refuses anything else with a message — the

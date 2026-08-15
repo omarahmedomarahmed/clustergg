@@ -7,7 +7,8 @@
 // different numbers about their own money.
 
 import Link from "next/link";
-import { requirePortal, guildForPortal } from "../../../../lib/portal/session.ts";
+import { requireServerPortal, guildForPortal } from "../../../../lib/portal/session.ts";
+import { accessLabel } from "../../../../lib/portal/permissions.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +31,7 @@ export default async function OwnerPortalLayout({
 }) {
   const { guildId } = await params;
   const guild = await guildForPortal(guildId);
-  await requirePortal("server", guildId);
+  const access = await requireServerPortal(guildId);
 
   return (
     <div className="min-h-screen">
@@ -38,7 +39,7 @@ export default async function OwnerPortalLayout({
         <div className="mx-auto max-w-5xl px-6 py-4">
           <div className="flex items-baseline gap-3">
             <span className="font-semibold tracking-tight">{guild.name}</span>
-            <span className="text-xs text-mute">server portal</span>
+            <span className="text-xs text-mute">server portal · {accessLabel(access)}</span>
           </div>
           <nav className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
             {NAV.map((n) => (

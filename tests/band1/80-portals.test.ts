@@ -11,8 +11,6 @@ import { test } from "../helpers/suite.ts";
 import { resetDemoDb, schema, type DB } from "../../lib/db/index.ts";
 import { newPortalKey, hashPortalKey, keyMatches } from "../../lib/core/keys.ts";
 import {
-  issueOwnerKey,
-  ownerByKey,
   ownerOverview,
   reAnnounce,
   buildCommunityChallenge,
@@ -22,7 +20,6 @@ import {
 } from "../../lib/portal/owner.ts";
 import {
   signUpBrand,
-  brandByKey,
   quote,
   confirmAndPay,
   onInvoicePaid,
@@ -62,6 +59,10 @@ async function aGuild(db: DB, guildId = "g1", over: Record<string, unknown> = {}
 }
 
 // ── Keys ────────────────────────────────────────────────────────────────────
+//
+// The SERVER-OWNER key is gone (S1) — a portal is opened by a linked Discord
+// identity, and the tests for that live in `93-identity.test.ts`. What is left
+// here is the hashing the BRAND invite still uses.
 
 test("a portal key is compared in constant time, and never stored in the clear", () => {
   const key = newPortalKey();
@@ -71,17 +72,7 @@ test("a portal key is compared in constant time, and never stored in the clear",
   ok(keyMatches(hash, key), "the real key matches");
   no(keyMatches(hash, newPortalKey()), "another key does not");
   no(keyMatches(hash, ""), "nor does nothing");
-  no(keyMatches(null, key), "and a server with no key issued yet lets nobody in");
-});
-
-test("a wrong key is refused, and the right one is not", async () => {
-  const db = await resetDemoDb();
-  await aGuild(db);
-  const key = await issueOwnerKey(db, "g1");
-
-  ok((await ownerByKey(db, "g1", key)) !== null, "the issued key works");
-  eq(await ownerByKey(db, "g1", newPortalKey()), null, "another key does not");
-  eq(await ownerByKey(db, "unknown", key), null, "and neither does the right key for the wrong server");
+  no(keyMatches(null, key), "and nothing issued yet lets nobody in");
 });
 
 // ── The owner portal ────────────────────────────────────────────────────────
@@ -477,15 +468,17 @@ test("no group smaller than the floor is ever described", async () => {
   ok(fine.show, "the floor itself is shown");
 });
 
-test("a brand signs up and gets a key, once", async () => {
+test("a brand signs up and gets an invite, once", async () => {
   const db = await resetDemoDb();
   const { brandId, key } = await signUpBrand(db, { name: "Nova", contactEmail: "n@nova.test" });
-  ok(key.length > 20, "a real key");
-  ok((await brandByKey(db, brandId, key)) !== null, "which works");
+  ok(key.length > 20, "a real invite key");
 
   const [brand] = await db.select().from(schema.brands).where(sqlEq(schema.brands.id, brandId));
-  ok(brand.portalKeyHash !== key, "and what we store is not what they hold");
   eq(brand.slug, "nova", "with a readable slug");
+
+  // The credential is no longer on the company row — B1 moved it to a
+  // `brand_users` row, where it is a one-time invite rather than a password.
+  ok(!("portalKeyHash" in brand), "and the brand itself holds no credential at all");
 });
 
 test("the prize vault holds after a full brand purchase", async () => {

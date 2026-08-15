@@ -104,7 +104,7 @@ export async function seedDemo(now = new Date()) {
     const guildId = guildIds[i % guildIds.length];
     const userId = await createGamer(db, {
       displayName: DEMO_NAMES[i % DEMO_NAMES.length] + (i >= DEMO_NAMES.length ? ` ${i}` : ""),
-      attributedGuildId: guildId,
+      parentGuildId: guildId,
     });
     await setAgeBand(db, userId, i % 6 === 0 ? "teen" : "adult");
     await setCountry(db, userId, ["GB", "US", "DE", "BR", "AE"][i % 5]);

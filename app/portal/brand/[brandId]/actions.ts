@@ -9,11 +9,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "../../../../lib/db/index.ts";
-import { portalOpen } from "../../../../lib/portal/session.ts";
+import { brandPortalOpen } from "../../../../lib/portal/session.ts";
 import { confirmAndPay, onInvoicePaid, BuilderRefused } from "../../../../lib/portal/brand.ts";
 
 async function guard(brandId: string): Promise<void> {
-  if (!(await portalOpen("brand", brandId))) {
+  if (!(await brandPortalOpen(brandId))) {
     throw new Error("That portal is not open to you.");
   }
 }

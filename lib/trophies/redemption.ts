@@ -57,72 +57,28 @@ export class RedemptionRefused extends Error {
   }
 }
 
-const VERIFICATION_TTL_MS = 30 * 60_000;
+// ===== EMAIL VERIFICATION MOVED TO `lib/identity/verify.ts` =====
+//
+// It is no longer redemption's alone. I7a — the email signup door verifies at
+// signup, and **that is the same verification**, never asked twice. Two copies
+// would eventually disagree about whether a given gamer had done it.
+//
+// Re-exported so every existing call site is unchanged.
+export {
+  beginEmailVerification,
+  confirmEmailVerification,
+  emailIsVerified,
+  looksLikeEmail,
+} from "../identity/verify.ts";
 
-function hashCode(code: string): string {
-  return createHash("sha256").update(`${authSecret()} ${code}`).digest("hex");
-}
-
-/**
- * Ask for an email and send a code. **The first time an email is ever asked
- * for** (G3) — not at onboarding, only here.
- */
+/** The old name, kept for the redemption flow that already called it. */
 export async function startEmailVerification(
   db: DB,
   userId: string,
   email: string,
-): Promise<{ id: string; code: string }> {
-  const normalised = email.trim().toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalised)) {
-    throw new Error("That does not look like an email address.");
-  }
-  const id = uid();
-  // Six digits, from a cryptographic source. `Math.random` is predictable
-  // enough that a code minted at a known second can be guessed.
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  await db.insert(schema.emailVerifications).values({
-    id,
-    userId,
-    email: normalised,
-    codeHash: hashCode(code),
-    expiresAt: new Date(Date.now() + VERIFICATION_TTL_MS),
-  });
-  return { id, code };
-}
-
-export async function confirmEmailVerification(
-  db: DB,
-  userId: string,
-  code: string,
-  now = new Date(),
-): Promise<boolean> {
-  const rows = await db
-    .select()
-    .from(schema.emailVerifications)
-    .where(
-      and(
-        eq(schema.emailVerifications.userId, userId),
-        isNull(schema.emailVerifications.consumedAt),
-      ),
-    );
-
-  const want = Buffer.from(hashCode(code));
-  for (const row of rows) {
-    if (row.expiresAt.getTime() <= now.getTime()) continue;
-    const have = Buffer.from(row.codeHash);
-    if (have.length !== want.length || !timingSafeEqual(have, want)) continue;
-
-    await db
-      .update(schema.emailVerifications)
-      .set({ consumedAt: now })
-      .where(eq(schema.emailVerifications.id, row.id));
-    await db
-      .update(schema.users)
-      .set({ email: row.email, emailVerifiedAt: now })
-      .where(eq(schema.users.id, userId));
-    return true;
-  }
-  return false;
+): Promise<{ code: string }> {
+  const { beginEmailVerification } = await import("../identity/verify.ts");
+  return { code: await beginEmailVerification(db, userId, email) };
 }
 
 export type Eligibility = { ok: true; amountCents: number } | { ok: false; code: string; reason: string };

@@ -38,14 +38,46 @@ export const users = pgTable(
     id: text("id").primaryKey(),
     slug: text("slug").notNull().unique(),
     displayName: text("display_name").notNull(),
+    // ===== TWO DOORS, AND THE EMAIL MEANS DIFFERENT THINGS BEHIND EACH =====
+    //
+    // G2/I7a. A Discord gamer has no email until they redeem, and it is
+    // verified then. An **email gamer's** address is set and verified **at
+    // signup**, because it *is* the credential and a password reset is
+    // impossible without it — and that verification is the one redemption
+    // later requires. It is never asked twice, so a gamer may be paid without
+    // `/redeem` ever asking for an address.
     email: text("email"),
     emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+    // Null for a Discord-only gamer. U5/U6 — either door alone is complete.
+    passwordHash: text("password_hash"),
+    // ===== THE STAFF GRANT. NOT AN IDENTITY (A10, U7) =====
+    //
+    // Cluster staff are gamers. This column opens the console and changes
+    // **nothing** about how they play, score or redeem — U8: a staff member
+    // places in challenges they run, on merit, because the metrics are the
+    // same for every entrant, trophy values are held to the prize pool by T3,
+    // and points come from provider stats we read. There is no lever.
+    //
+    // It lives on `users` rather than in a side table because a staff member
+    // *is* a gamer; a separate row would be a second account, which is the
+    // thing the whole identity model refuses.
+    staffTitleId: text("staff_title_id"),
     // `teen` | `adult`. Null until onboarding sets it.
     ageBand: text("age_band"),
     country: text("country"),
     discordId: text("discord_id").unique(),
-    // The server that brought them. Attribution rule G3.
-    attributedGuildId: text("attributed_guild_id"),
+    // ===== THE PARENT SERVER. WHERE THEY FIRST PRESSED ANY BOT BUTTON =====
+    //
+    // Permanent (A1). Not "the server they signed up through" and not "a
+    // server they are in" — the first click, wherever onboarding later
+    // finished (A2). Null is a real and complete state: a web gamer has no
+    // parent, does everything, and earns no server anything (A7/U5).
+    //
+    // A gamer can never change this. Cluster admin can, logged (A8) — and
+    // even then it cannot move a closed week, because scoring reads the copy
+    // frozen onto each entry, never this column (P6).
+    parentGuildId: text("parent_guild_id"),
+    parentStampedAt: timestamp("parent_stamped_at", { withTimezone: true }),
     // `active` | `deleted`.
     status: text("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -158,6 +190,65 @@ export const sessions = pgTable(
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   },
   (t) => [index("sessions_user_idx").on(t.userId)],
+);
+
+/**
+ * A brand's login. **A separate table from `users`, on purpose** (I2, B4).
+ *
+ * One email could otherwise be both a brand and a gamer, and a brand landing
+ * in gamer onboarding is a mess. The separation is structural rather than a
+ * flag: there is no column on this row that could make it a gamer, and no
+ * column on `users` that could make one a brand.
+ *
+ * B3 — one brand, one login, and shared credentials are accepted. That is why
+ * `lastLoginAt`/`lastLoginIp` are here and why every spend is logged with an
+ * actor and an IP: when two people share a password, a disagreement still
+ * needs an answer.
+ */
+export const brandUsers = pgTable(
+  "brand_users",
+  {
+    id: text("id").primaryKey(),
+    brandId: text("brand_id").notNull(),
+    email: text("email").notNull().unique(),
+    // Null between the invite being issued and it being redeemed. B1 — the
+    // key is dead the moment `inviteRedeemedAt` is set, and the check is the
+    // timestamp rather than deleting the hash, so "already used" and "never
+    // existed" stay distinguishable in support.
+    passwordHash: text("password_hash"),
+    inviteKeyHash: text("invite_key_hash"),
+    inviteRedeemedAt: timestamp("invite_redeemed_at", { withTimezone: true }),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true }),
+    lastLoginIp: text("last_login_ip"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("brand_users_brand_idx").on(t.brandId)],
+);
+
+/**
+ * A password reset, for a gamer **or** a brand (I1d).
+ *
+ * One mechanism, two subject kinds, because two implementations of "prove you
+ * hold this address" is two places for the token comparison to be wrong.
+ *
+ * The token is stored hashed and single-use: `usedAt` is set on redemption, so
+ * a link in an old email stops working the moment a newer one is used. What we
+ * store is never the token itself — an attacker with the database would
+ * otherwise hold a working reset link for every account.
+ */
+export const passwordResets = pgTable(
+  "password_resets",
+  {
+    id: text("id").primaryKey(),
+    // `gamer` | `brand`
+    subjectKind: text("subject_kind").notNull(),
+    subjectId: text("subject_id").notNull(),
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("password_resets_subject_idx").on(t.subjectKind, t.subjectId)],
 );
 
 /**
@@ -503,7 +594,14 @@ export const guilds = pgTable(
     announceChannelId: text("announce_channel_id"),
     // The community profile. Null means never described — dropped from scoring.
     community: text("community"),
-    portalKeyHash: text("portal_key_hash"),
+    // ===== THERE IS NO PORTAL KEY HERE, AND THAT IS THE POINT =====
+    //
+    // S1 — the server-owner credential is **deleted entirely**. A portal is
+    // opened by a linked Discord identity that Discord says admins this guild,
+    // never by something we issued and they kept. The column is gone rather
+    // than nulled: a credential column that still exists is a credential
+    // somebody re-populates.
+    //
     // Who we talk to about this server, from the portal's Settings page.
     contactName: text("contact_name"),
     contactEmail: text("contact_email"),
@@ -517,6 +615,30 @@ export const guilds = pgTable(
     payoutPreference: text("payout_preference"),
     payoutHandle: text("payout_handle"),
     installedAt: timestamp("installed_at", { withTimezone: true }).notNull().defaultNow(),
+    // ===== OWNERSHIP. THE ONLY PERSON WHO TOUCHES MONEY (P1) =====
+    //
+    // Discovered at sign-in, at link, or on refresh (S0) — never asked for.
+    // `ownerFirstSignInAt` is null until they appear at all, which is what
+    // drives the 4-week reassignment clock and the "portal was already
+    // waiting" state (P4).
+    ownerDiscordId: text("owner_discord_id"),
+    ownerFirstSignInAt: timestamp("owner_first_sign_in_at", { withTimezone: true }),
+    // A DM can fail — an owner who blocks DMs from server members never gets
+    // it, and Discord says so quietly. 12 §6: a recorded state the registry
+    // shows, never an error swallowed on a background path.
+    ownerDmState: text("owner_dm_state"),
+
+    // ===== CAPTURED AT THE INSTALL REDIRECT OR LOST FOREVER (G1) =====
+    //
+    // Discord's API will never tell us who added the bot. If the redirect does
+    // not record it, no later call, job or refresh can recover it.
+    installedByDiscordId: text("installed_by_discord_id"),
+    installerWasOwner: boolean("installer_was_owner"),
+
+    // T1–T4. The 14-day confirmation timeout and the 7-day withdrawal freeze.
+    ownershipTransferAt: timestamp("ownership_transfer_at", { withTimezone: true }),
+    transferConfirmedAt: timestamp("transfer_confirmed_at", { withTimezone: true }),
+
     // Removal freezes reach; earnings survive (S9).
     removedAt: timestamp("removed_at", { withTimezone: true }),
   },
@@ -538,7 +660,13 @@ export const guildSnapshots = pgTable(
   (t) => [uniqueIndex("guild_snapshot_week_idx").on(t.guildId, t.weekStart)],
 );
 
-/** A brand. Self-serve from signup; we email the key. */
+/**
+ * A brand — the company. Its **login** lives in `brand_users`.
+ *
+ * The key that used to live here is gone: B1 makes it a **one-time invite**
+ * that is exchanged for an email-and-password account, so the credential now
+ * belongs to a person's row rather than to the company's.
+ */
 export const brands = pgTable("brands", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -547,7 +675,6 @@ export const brands = pgTable("brands", {
   contactPhone: text("contact_phone"),
   contactEmail: text("contact_email"),
   logoUrl: text("logo_url"),
-  portalKeyHash: text("portal_key_hash"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -815,6 +942,48 @@ export const guildMembers = pgTable(
  * here, and conflating the two would put a `department` column on the gamer
  * directory — which is the table house rule 7 exists to keep people out of.
  */
+/**
+ * Everyone we have **seen** holding ADMINISTRATOR or the mapped role.
+ *
+ * G5 — accumulated from interaction payloads and OAuth grants, **never a
+ * member list**. Who holds a Discord role lives only in the member list, and
+ * we do not read one on any path the product depends on (12 §7).
+ *
+ * So this table is honestly incomplete, and the registry says so in words:
+ * somebody who holds the role and has never pressed a button will not appear.
+ * We do not take the GUILD_MEMBERS intent to close that gap.
+ */
+/**
+ * A staff title, and the departments it reaches.
+ *
+ * ST1 — **only the super admin grants one**, and it is logged. ST2 — whatever
+ * a title says, the gamer directory and the linked-account list stay
+ * admin-only (house rule 7). A title feeds `lib/admin/auth.ts`; it never
+ * overrides it.
+ */
+export const staffTitles = pgTable("staff_titles", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  // The department words this title may reach. An array rather than one
+  // column, because a title like "Finance lead" legitimately reaches two.
+  departments: jsonb("departments").$type<string[]>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: text("created_by"),
+});
+
+export const guildAdmins = pgTable(
+  "guild_admins",
+  {
+    id: text("id").primaryKey(),
+    guildId: text("guild_id").notNull(),
+    discordId: text("discord_id").notNull(),
+    // `administrator` | `mapped_role`
+    source: text("source").notNull(),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("guild_admin_unique_idx").on(t.guildId, t.discordId)],
+);
+
 export const staff = pgTable("staff", {
   userId: text("user_id").primaryKey(),
   name: text("name").notNull(),

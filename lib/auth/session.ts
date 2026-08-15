@@ -69,7 +69,18 @@ export async function createSession(db: DB, userId: string): Promise<string> {
 export async function sessionUser(
   db: DB,
   cookie: string | null | undefined,
-): Promise<{ id: string; slug: string; ageBand: string | null; country: string | null } | null> {
+): Promise<{
+  id: string;
+  slug: string;
+  ageBand: string | null;
+  country: string | null;
+  /** S0 — what makes somebody a server manager. Null for an email-only gamer. */
+  discordId: string | null;
+  /** A7/U5 — null is a complete state, not a missing one. */
+  parentGuildId: string | null;
+  /** A10/U7 — the grant that opens the console. Never what they are. */
+  staffTitleId: string | null;
+} | null> {
   const id = unseal(cookie);
   if (!id) return null;
 
@@ -86,6 +97,9 @@ export async function sessionUser(
     .select({
       id: schema.users.id,
       slug: schema.users.slug,
+      discordId: schema.users.discordId,
+      parentGuildId: schema.users.parentGuildId,
+      staffTitleId: schema.users.staffTitleId,
       ageBand: schema.users.ageBand,
       country: schema.users.country,
       status: schema.users.status,
@@ -97,6 +111,9 @@ export async function sessionUser(
   return {
     id: user.id,
     slug: user.slug,
+    discordId: user.discordId,
+    parentGuildId: user.parentGuildId,
+    staffTitleId: user.staffTitleId,
     ageBand: user.ageBand,
     country: user.country,
   };

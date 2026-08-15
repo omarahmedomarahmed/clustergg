@@ -1,104 +1,114 @@
 // Who may open which portal.
 //
-// ===== A PORTAL SESSION IS FOR ONE PORTAL =====
+// ===== TWO PORTALS, TWO COMPLETELY DIFFERENT ANSWERS =====
 //
-// The rule that matters here is the one docs/04-SURFACES.md §9 states from the
-// brand's side — *"See another brand's numbers · which is exactly why nobody
-// sees theirs"* — and it is the same rule on the owner side. A brand contact
-// holding a valid session for their own portal must be refused at another
-// brand's, and refused the same way a stranger is: no page, no partial page,
-// no "you are not allowed to see the entrants but here is the header".
+// A **server portal** is opened by a linked Discord identity that Discord says
+// admins that guild (12 §2, S1). There is no key, no invite, nothing we
+// issued: the credential was deleted, and what replaced it is a fact about
+// Discord that we look up.
 //
-// `lib/core/portal-auth.ts` already puts the portal's id **inside the cookie
-// name** and signs `"<kind>:<id>"`, so a session for one portal is not a
-// session for another even if the cookie value leaks. This module is the
-// layer that actually asks, and — like the admin console — it is called from
-// the LAYOUT so no page can forget it.
+// A **brand portal** is opened by an email-and-password session against
+// `brand_users` (I2). Separate table, separate route, separate cookie — one
+// email could otherwise be both, and a brand landing in gamer onboarding is a
+// mess.
+//
+// The two are not variations of one mechanism and are deliberately not written
+// as one. The only thing they share is that the gate is called from the layout
+// so no page can forget it.
 
 import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { getDb, isDemoMode } from "../db/index.ts";
-import { schema } from "../db/index.ts";
 import { eq } from "drizzle-orm";
-import { hasPortalSession, verifyPortalKey, type PortalCheck } from "../core/portal-auth.ts";
+import { getDb, isDemoMode, schema } from "../db/index.ts";
+import { currentGamer } from "../auth/current.ts";
+import { hasPortalSession } from "../core/portal-auth.ts";
+import { guildAccessFor, type GuildAccess } from "./permissions.ts";
 
-export type PortalKind = "brand" | "server";
+// ── The brand portal ────────────────────────────────────────────────────────
 
 /**
- * Is this request holding a session for exactly this portal?
+ * Is this request holding a brand session for exactly this brand?
  *
- * Demo mode is fenced, and fenced *narrowly*: with no `DATABASE_URL` there are
- * no real customers to leak, and the screenshot record has to be able to walk
- * both portals without a key. A process with a database gets the real check.
+ * Demo mode is fenced, and fenced narrowly: with no `DATABASE_URL` there are
+ * no real customers to leak, and the screenshot record has to walk the portal
+ * without a password.
  */
-export async function portalOpen(kind: PortalKind, id: string): Promise<boolean> {
-  return mayOpenPortal({ hasSession: await hasPortalSession(kind, id), isDemo: isDemoMode });
+export async function brandPortalOpen(brandId: string): Promise<boolean> {
+  return mayOpenPortal({
+    hasSession: await hasPortalSession("brand", brandId),
+    isDemo: isDemoMode,
+  });
 }
 
 /**
  * The decision, with the request taken out of it.
  *
- * Split out so it can be asserted. Everything else in the gate needs
- * `next/headers` and therefore a live request, which means the *direction of
- * the default* — the only part that can be catastrophically wrong — was
- * reachable by inspection alone. A demo fence that quietly stopped being a
- * fence would open every portal on a real deployment, and nothing would look
- * different until somebody read somebody else's numbers.
+ * Split out so it can be asserted. Everything else here needs `next/headers`
+ * and therefore a live request, which means the **direction of the default** —
+ * the only part that can be catastrophically wrong — would otherwise be
+ * reachable by inspection alone.
  */
 export function mayOpenPortal(facts: { hasSession: boolean; isDemo: boolean }): boolean {
   if (facts.hasSession) return true;
   // ===== THE ONLY REASON THIS IS NOT `return false` =====
   // With no `DATABASE_URL` there is no real customer to leak and the
-  // screenshot record has to walk both portals with no key. The moment a
-  // database is configured, this is `false`.
+  // screenshot record has to walk the portal. With a database, it is `false`.
   return facts.isDemo;
 }
 
+export async function requireBrandPortal(brandId: string): Promise<void> {
+  if (await brandPortalOpen(brandId)) return;
+  const path = (await headers()).get("x-pathname") ?? `/portal/brand/${brandId}`;
+  redirect(`/login/brand?next=${encodeURIComponent(path)}`);
+}
+
+// ── The server portal ───────────────────────────────────────────────────────
+
 /**
- * Check a key without granting anything.
+ * What the signed-in gamer may do on this guild.
  *
- * Granting writes a cookie and a Server Component render may not — that is
- * `/api/portal/unlock`'s job. Splitting it this way is deliberate and is
- * written up in `lib/core/portal-auth.ts`: the version that granted during its
- * own render crashed on a **correct** key and quietly showed the locked view
- * on a wrong one, so the bug only appeared on success.
+ * Returns the **whole** access shape rather than a boolean, because a page
+ * needs to know *which* of owner and administrator they are: an administrator
+ * sees the withdraw button disabled with a reason, not hidden (09 §Band 2,
+ * shot 4a). A boolean here forces every page to ask a second question, and the
+ * second question is the one somebody forgets.
  */
-export async function checkPortalKey(
-  kind: PortalKind,
-  id: string,
-  key: string | null,
-): Promise<PortalCheck> {
+export async function serverPortalAccess(guildId: string): Promise<GuildAccess> {
   const db = await getDb();
-  const hash =
-    kind === "brand"
-      ? (await db.select().from(schema.brands).where(eq(schema.brands.id, id)))[0]?.portalKeyHash
-      : (await db.select().from(schema.guilds).where(eq(schema.guilds.guildId, id)))[0]
-          ?.portalKeyHash;
+  const gamer = await currentGamer();
+  const [guild] = await db.select().from(schema.guilds).where(eq(schema.guilds.guildId, guildId));
+  if (!guild) notFound();
 
-  // An unknown portal is answered exactly like a wrong key. Answering "no such
-  // brand" differently turns the login form into a directory of our customers.
-  if (!hash) return "bad";
-
-  // `verifyPortalKey` compares the *key*; what we hold is its hash. Hash the
-  // given key first so the constant-time comparison is hash against hash.
-  const { hashPortalKey } = await import("../core/keys.ts");
-  return verifyPortalKey(kind, id, hash, key === null ? null : hashPortalKey(key));
+  return guildAccessFor({
+    guild,
+    discordId: gamer?.discordId ?? null,
+    seenAdmin: gamer?.discordId
+      ? Boolean(
+          (
+            await db
+              .select({ id: schema.guildAdmins.id })
+              .from(schema.guildAdmins)
+              .where(eq(schema.guildAdmins.guildId, guildId))
+          ).length,
+        )
+      : false,
+    isDemo: isDemoMode,
+  });
 }
 
-/** Called once, by a portal layout. Every page under it is covered. */
-export async function requirePortal(kind: PortalKind, id: string): Promise<void> {
-  if (await portalOpen(kind, id)) return;
-  const path = (await headers()).get("x-pathname") ?? `/portal/${kind}/${id}`;
-  redirect(`/login/${kind}?id=${encodeURIComponent(id)}&next=${encodeURIComponent(path)}`);
+export async function requireServerPortal(guildId: string): Promise<GuildAccess> {
+  const access = await serverPortalAccess(guildId);
+  if (access.kind === "none") {
+    const path = (await headers()).get("x-pathname") ?? `/portal/server/${guildId}`;
+    // Not "access denied" — a route. They may genuinely admin this guild and
+    // simply not have linked Discord yet (S1: sign up by email, link later).
+    redirect(`/login?next=${encodeURIComponent(path)}&need=discord`);
+  }
+  return access;
 }
 
-/**
- * The portal's own record, or a 404.
- *
- * Separate from the gate on purpose: the gate answers *may you*, this answers
- * *does it exist*, and a portal that does not exist must 404 rather than
- * redirect to a login form for a customer we do not have.
- */
+// ── Existence, which is a different question from permission ────────────────
+
 export async function brandForPortal(id: string) {
   const db = await getDb();
   const [brand] = await db.select().from(schema.brands).where(eq(schema.brands.id, id));

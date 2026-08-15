@@ -13,7 +13,6 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 import { uid } from "../core/utils.ts";
-import { newPortalKey, hashPortalKey, keyMatches } from "../core/keys.ts";
 import { weekFor } from "../challenges/week.ts";
 import { poolDivisionFor, percentileRank } from "../pool/score.ts";
 import { createChallenge, attachInvoice, markScheduled } from "../challenges/lifecycle.ts";
@@ -26,24 +25,13 @@ import {
   type CommunityTier,
 } from "../money/amounts.ts";
 
-/** Issue a key. Returned once, hashed at rest. */
-export async function issueOwnerKey(db: DB, guildId: string): Promise<string> {
-  const key = newPortalKey();
-  await db
-    .update(schema.guilds)
-    .set({ portalKeyHash: hashPortalKey(key) })
-    .where(eq(schema.guilds.guildId, guildId));
-  return key;
-}
-
-export async function ownerByKey(db: DB, guildId: string, key: string) {
-  const [guild] = await db
-    .select()
-    .from(schema.guilds)
-    .where(eq(schema.guilds.guildId, guildId));
-  if (!guild || !keyMatches(guild.portalKeyHash, key)) return null;
-  return guild;
-}
+// ===== THE OWNER PORTAL KEY IS DELETED (S1) =====
+//
+// `issueOwnerKey` and `ownerByKey` used to live here. The credential is gone
+// entirely, not deprecated: a portal is opened by a linked Discord identity
+// that Discord says admins the guild, and by nothing else. Deleting the
+// functions as well as the column matters — a key issuer with no column is one
+// migration away from working again.
 
 export type OwnerOverview = {
   guildId: string;

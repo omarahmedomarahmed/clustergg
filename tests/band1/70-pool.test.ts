@@ -379,7 +379,7 @@ test("the snapshot counts linked members, which is the conversion denominator", 
   for (let i = 0; i < 3; i++) {
     const userId = await createGamer(db, {
       displayName: `linked-${i}`,
-      attributedGuildId: "g1",
+      parentGuildId: "g1",
     });
     await db.insert(schema.linkedGameAccounts).values({
       id: uid(),
@@ -390,7 +390,7 @@ test("the snapshot counts linked members, which is the conversion denominator", 
     });
   }
   // Somebody attributed to g1 who never linked anything.
-  await createGamer(db, { displayName: "unlinked", attributedGuildId: "g1" });
+  await createGamer(db, { displayName: "unlinked", parentGuildId: "g1" });
 
   await snapshotGuilds(db, MONDAY);
   const [snapshot] = await db

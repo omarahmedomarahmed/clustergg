@@ -13,7 +13,6 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 import { uid, slugify } from "../core/utils.ts";
-import { newPortalKey, hashPortalKey, keyMatches } from "../core/keys.ts";
 import { earliestSellableWeek, weekStartPlus, isPeriodBoundary } from "../challenges/week.ts";
 import { createChallenge, attachInvoice, markScheduled } from "../challenges/lifecycle.ts";
 import { createInvoice, markPaid, invoiceView } from "../money/invoices.ts";
@@ -27,26 +26,27 @@ export class BuilderRefused extends Error {
   }
 }
 
+/**
+ * Sign a brand up, and issue the **one-time invite** (B1).
+ *
+ * The key no longer lives on the brand — it lives on a `brand_users` row and
+ * is exchanged, once, for an email and a password. That is the whole of the
+ * change: the company is a company, and the credential belongs to a person.
+ */
 export async function signUpBrand(
   db: DB,
   input: { name: string; contactEmail: string },
-): Promise<{ brandId: string; key: string }> {
+): Promise<{ brandId: string; key: string; brandUserId: string }> {
   const brandId = uid();
-  const key = newPortalKey();
   await db.insert(schema.brands).values({
     id: brandId,
     name: input.name,
     slug: slugify(input.name) || `brand-${brandId.toLowerCase().slice(0, 6)}`,
     contactEmail: input.contactEmail,
-    portalKeyHash: hashPortalKey(key),
   });
-  return { brandId, key };
-}
-
-export async function brandByKey(db: DB, brandId: string, key: string) {
-  const [brand] = await db.select().from(schema.brands).where(eq(schema.brands.id, brandId));
-  if (!brand || !keyMatches(brand.portalKeyHash, key)) return null;
-  return brand;
+  const { issueBrandInvite } = await import("./brand-auth.ts");
+  const invite = await issueBrandInvite(db, { brandId, email: input.contactEmail });
+  return { brandId, key: invite.key, brandUserId: invite.brandUserId };
 }
 
 /** Builder step 1 — the game cards. Only games we can actually score. */

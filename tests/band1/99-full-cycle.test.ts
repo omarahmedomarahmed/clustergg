@@ -112,7 +112,7 @@ async function seed(db: DB): Promise<{ guilds: string[]; gamers: Gamer[]; brandI
     const guildId = guilds[i % guilds.length];
     const userId = await createGamer(db, {
       displayName: `Gamer ${i}`,
-      attributedGuildId: guildId,
+      parentGuildId: guildId,
     });
     // Some are teenagers — they win and hold, and cannot cash out.
     await setAgeBand(db, userId, i % 5 === 0 ? "teen" : "adult");
@@ -374,7 +374,7 @@ test("four weeks, end to end, with the invariant checked at every step", async (
 
   const prizeBefore = await balanceOf(db, "prize");
   const { code } = await startEmailVerification(db, holding.userId, "winner@example.com");
-  ok(await confirmEmailVerification(db, holding.userId, code), "email verified at redemption");
+  ok((await confirmEmailVerification(db, holding.userId, code)).ok, "email verified at redemption");
 
   const redemptionId = await requestRedemption(db, {
     userTrophyId: holding.id,

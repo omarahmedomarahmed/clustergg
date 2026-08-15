@@ -414,7 +414,7 @@ export async function snapshotGuilds(db: DB, weekStart: Date): Promise<number> {
       )
       .where(
         and(
-          eq(schema.users.attributedGuildId, guild.guildId),
+          eq(schema.users.parentGuildId, guild.guildId),
           ne(schema.users.status, "deleted"),
         ),
       );
