@@ -22,6 +22,20 @@
       "when": 1786765493864,
       "tag": "0002_solid_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786766683776,
+      "tag": "0003_naive_bulldozer",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786766796363,
+      "tag": "0004_elite_lizard",
+      "breakpoints": true
     }
   ]
 }
