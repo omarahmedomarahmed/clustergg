@@ -241,6 +241,25 @@ whichever server they happened to click in"*, and two servers carrying the same
 gamer sum to two entrants — precisely what K5 forbids. `guild_members` exists
 for that one rule.
 
+## Stage 8 — the portals
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 60 | Portal keys are hashed and compared in constant time | Compared against the raw value | 3 cases across owner and brand keys | clean, 214/214 |
+| 61 | A removed bot errors with what to do | The removal check bypassed | *"the portal survives the bot being removed, and says what to do"* | clean, 214/214 |
+| 62 | A brand cannot buy a game we cannot score | The liveness check bypassed | *"a brand cannot buy a game we cannot score"* | clean, 214/214 |
+| 63 | A brand cannot buy a week that has started | Both week-floor checks bypassed | *"a brand cannot buy a week that has already started"* | clean, 214/214 |
+| 64 | Owner money never reaches vault 3 | `communitySplitOf` replaced with the standard split | 2 cases, including the end-to-end builder path | clean, 214/214 |
+| 65 | No group under the audience floor is described | The floor lowered to 1 | *"no group smaller than the floor is ever described"* | clean, 214/214 |
+
+## Stage 9 — admin
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 66 | A challenge that missed its week is the loudest row | The started-and-unannounced check bypassed | *"a challenge whose week started and never announced is the loudest row"* | clean, 228/228 |
+| 67 | The dashboard names the specific blocker | Replaced with *"Needs attention"* | *"the dashboard names the specific thing blocking each challenge"* | clean, 228/228 |
+| 68 | The prize-pool check is live, not a report | The continuous check bypassed | *"a prize-pool mismatch on an announced challenge is flagged on the dashboard"* | clean, 228/228 |
+
 ### One guard that fired before anyone broke it
 
 `02-structural`'s first case asserts that the tree-walk actually reached the
