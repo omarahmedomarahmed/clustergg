@@ -128,6 +128,34 @@ async function migrateDemo(db: unknown): Promise<void> {
  */
 export async function resetDemoDb(): Promise<DB> {
   if (!isDemoMode) throw new Error("resetDemoDb is demo-mode only");
-  globalThis.__clusterDb = undefined;
+
+  // Truncate rather than rebuild. Standing up a fresh PGlite instance takes
+  // about a second — which is nothing until a suite calls this a hundred and
+  // fifty times and the band takes four minutes, at which point breaking a
+  // guard to prove it costs eight. The tables are emptied instead, which is
+  // the same isolation for a hundredth of the time.
+  //
+  // The table list comes from the database, not from a list here. A guard with
+  // a hand-maintained list only guards the tables somebody remembered, and the
+  // table somebody forgets is the one that leaks a row into the next test.
+  const existing = globalThis.__clusterDb;
+  if (existing) {
+    const db = (await existing) as DB;
+    const { sql } = await import("drizzle-orm");
+    const rows = await db.execute(
+      sql`select tablename from pg_tables where schemaname = 'public'`,
+    );
+    const list = (Array.isArray(rows) ? rows : ((rows as { rows?: unknown[] }).rows ?? [])) as {
+      tablename: string;
+    }[];
+    const names = list
+      .map((r) => r.tablename)
+      .filter((n) => !n.startsWith("__drizzle"))
+      .map((n) => `"${n}"`)
+      .join(", ");
+    if (names) await db.execute(sql.raw(`truncate table ${names} restart identity cascade`));
+    return db;
+  }
+
   return getDb();
 }
