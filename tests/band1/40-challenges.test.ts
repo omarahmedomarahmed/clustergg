@@ -267,6 +267,19 @@ test("the day-2 joiner does not bank days 1 and 2", async () => {
     .from(schema.challenges)
     .where(sqlEq(schema.challenges.id, challengeId));
 
+  eq(
+    p.baselineAt?.toISOString(),
+    dayTwo.toISOString(),
+    "the baseline is dated at their join, not at the gun",
+  );
+  eq(
+    p.baseline?.wins,
+    40,
+    "and its VALUES are what the account read at that instant, not at the gun — " +
+      "storing the date from the rule and the numbers from 'now' is how a " +
+      "broken rule produces a right-looking score",
+  );
+
   const atJoin = await scoreOf(db, p, challenge, dayTwo);
   eq(atJoin.points, 0, "the 30 wins they made on days 1 and 2 are not theirs to bank");
   ok(entry.notice !== null, "and the card tells them scoring starts now");
@@ -706,7 +719,10 @@ test("placements are written once, on a final sync, and the challenge locks", as
   Object.assign(game, { wins: 5, matches: 12 });
   await forceSync(db, b.accountId, { at: new Date("2026-09-09T00:00:00Z") });
 
-  // A last hour of play that only the final sync can see.
+  // A last hour of play that only the final sync can see. B3: placements are
+  // never computed on stale data — and the reading the close takes must land
+  // INSIDE the scoring window, or the final sync is an expensive no-op and the
+  // placements come from the last hourly reading instead.
   Object.assign(game, { wins: 9, matches: 30 });
   const closed = await closeChallenges(db, new Date("2026-09-11T00:00:01Z"));
   eq(closed.closed, [challengeId], "the challenge closed");
@@ -724,6 +740,13 @@ test("placements are written once, on a final sync, and the challenge locks", as
     .where(sqlEq(schema.challengeParticipants.challengeId, challengeId));
   ok(placed.every((p) => p.placement !== null), "every entrant has a placement");
   eq(new Set(placed.map((p) => p.placement)).size, 2, "and no two share one");
+
+  // Beta was on 5 wins / 12 matches at the last hourly sync and finished on
+  // 9 / 30. If the final sync's reading fell outside the window, the standing
+  // would read 62 rather than 120 — and nothing would have failed.
+  const final = await standingsOf(db, challengeId, FRIDAY);
+  const beta = final.find((s) => s.participant.userId === b.userId);
+  eq(beta?.points, 9 * 10 + 30, "the final sync's reading is inside the window it decides");
 });
 
 test("a closed challenge reads the same on Sunday as it did on Friday", async () => {

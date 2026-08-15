@@ -22,7 +22,7 @@ import { unlockState } from "../identity/unlock.ts";
 import { isProven } from "../identity/accounts.ts";
 import { canProveOwnership, getProvider } from "../providers/registry.ts";
 import { forceSync, latestObservations } from "../core/sync.ts";
-import { baselineAtFor } from "./scoring.ts";
+import { baselineAtFor, observationsAsAt } from "./scoring.ts";
 import { joiningLateNotice } from "./week.ts";
 
 export type RefusalCode =
@@ -191,8 +191,16 @@ export async function enterChallenge(
   // numbers and both are wrong on stale data: a stale reading gates on last
   // week's rank, and it becomes free progress the moment it is stamped as a
   // baseline.
+  //
+  // Stamped at `now` — the same instant the baseline is dated — and not left
+  // to the clock inside the sync. Those differ by a few milliseconds, and the
+  // baseline reads its values with `observedAt <= baselineAt`, so a reading
+  // taken 2ms after the join instant is a reading the baseline cannot see. The
+  // gamer would then baseline on the reading BEFORE their forced sync, which
+  // is the stale reading this forced sync exists to avoid.
   await forceSync(db, account.id, {
     queue: challenge.queue as "solo" | "flex" | "both",
+    at: now,
   });
   const current = await latestObservations(db, account.id);
 
@@ -224,6 +232,16 @@ export async function enterChallenge(
   // count. The start-of-week job stamps them (B2).
   const stampNow = baselineAt.getTime() <= now.getTime();
 
+  // The values are read **as at `baselineAt`**, not "whatever the account
+  // reads right now". For a day-2 joiner those are the same instant, which is
+  // exactly why storing `current` looked correct — and it is why breaking the
+  // baseline rule was caught only by the pure-function test and not by this
+  // path: the date would have been wrong while the numbers stayed right, so
+  // the score came out the same and the stored `baselineAt` was a quiet lie.
+  const baselineValues = stampNow
+    ? await observationsAsAt(db, account.id, baselineAt)
+    : null;
+
   await db.insert(schema.challengeParticipants).values({
     id: participantId,
     challengeId: input.challengeId,
@@ -232,7 +250,7 @@ export async function enterChallenge(
     guildId: input.guildId ?? null,
     joinedAt: now,
     baselineAt: stampNow ? baselineAt : null,
-    baseline: stampNow ? current : null,
+    baseline: baselineValues,
     rankAtJoin: rankMetric ? rank : null,
   });
 

@@ -52,8 +52,14 @@ export async function stampBaselinesAtGun(
 
   let stamped = 0;
   for (const { participant, challenge } of pending) {
+    // Stamped **at the challenge's start**, not at the instant this job runs.
+    // That is the whole difference between "the gun is a real event" and "the
+    // gun is whenever the cron woke up": the reading taken here IS the reading
+    // at Monday 00:00, and dating it later would put it outside the window the
+    // baseline reads from and silently fall back to the joiner's older values.
     await forceSync(db, participant.linkedAccountId, {
       queue: challenge.queue as "solo" | "flex" | "both",
+      at: challenge.startAt,
     });
     // As at the challenge's start, from the series — not "whatever the account
     // reads right now".
@@ -101,9 +107,18 @@ export async function closeChallenges(
     // Placements are never decided on stale data. An hourly sync means the
     // last reading before Friday 00:00 could be 59 minutes old, and an hour of
     // play on the last night of a five-day competition decides places.
+    // Stamped **at the close instant**, for the same reason the gun's reading
+    // is stamped at the gun — and here it is not a subtlety, it is the whole
+    // point of the job. Scoring reads `observedAt <= endAt`. This job
+    // necessarily runs a moment *after* endAt, so a reading dated "now" falls
+    // outside the window and the final sync becomes an expensive no-op:
+    // placements would be decided on the last hourly reading, which is exactly
+    // what B3 forbids. Nothing would have failed. The leaderboard would just
+    // have been slightly wrong, every week, forever.
     for (const p of participants) {
       await forceSync(db, p.linkedAccountId, {
         queue: challenge.queue as "solo" | "flex" | "both",
+        at: challenge.endAt,
       });
     }
 
