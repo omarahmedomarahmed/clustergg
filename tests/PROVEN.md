@@ -125,6 +125,54 @@ because every path into routing goes through `markPaid`, which sets `paidAt`
 first. The guard was real, reachable and completely untested — nothing ever
 called it in the state it existed to refuse.
 
+## Stage 4 — challenges, baselining and scoring
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 29 | `baseline = max(challengeStart, joinedAt)` | Always `challengeStart` | 1 case, first time — see below. After the fix: 3, including the day-2 joiner and the two-challenges case | clean, 127/127 |
+| 30 | The same, the other way | Always `joinedAt` | *"the rule is max(...)"* + *"the early joiner does not score for the week before the gun"* | clean, 127/127 |
+| 31 | Ownership is required where the API supports it | The proof check replaced with `false` | *"ownership is checked before rank"* | clean, 127/127 |
+| 32 | A challenge cannot be announced until it is ready | The readiness check bypassed | **Nothing, first time** — see below. After the fix: *"a paid challenge whose trophies do not match the pool cannot be announced"* | clean, 128/128 |
+| 33 | Start is always a period boundary | The boundary check bypassed | *"there is no date picker, and the model is what enforces it"* | clean, 128/128 |
+| 34 | Nothing announces itself | The `actorId` requirement deleted | *"nothing announces itself"* | clean, 128/128 |
+| 35 | A decline never subtracts | `Math.max(0, …)` removed | *"a decline never subtracts"* | clean, 128/128 |
+| 36 | The rank gate is a range | The floor check bypassed | *"the rank gate is a range, and the refusal shows the numbers"* | clean, 128/128 |
+| 37 | The final sync lands inside the scoring window | The close's `at` removed | *"placements are written once, on a final sync"* | clean, 128/128 |
+
+### Break 29 found two silent production bugs
+
+Forcing the baseline to `challengeStart` was caught by the pure-function test
+and **not** by the day-2-joiner test, which is the case the rule exists for.
+The reason: `enterChallenge` stamped the **date** from the rule and the
+**values** from `now`. For a day-2 joiner those are the same instant, so the
+score came out right while the stored `baselineAt` was a lie.
+
+Reading the baseline values *as at the baseline instant* fixed it — and
+immediately exposed two bugs of the same shape, both of which would have been
+silent in production:
+
+1. **The forced sync on join** stamped its reading a few milliseconds *after*
+   the join instant. Scoring reads `observedAt <= baselineAt`, so the gamer
+   would have baselined on the reading taken **before** their forced sync —
+   precisely the stale reading that forced sync exists to prevent (B1).
+
+2. **The final sync at the close** stamped `now`, which is necessarily *after*
+   `endAt`. Its reading fell outside the scoring window, so the sync was an
+   expensive no-op and placements were decided on the last hourly reading —
+   exactly what B3 forbids. Nothing would have thrown. The leaderboard would
+   simply have been slightly wrong, every week, forever.
+
+Both now stamp at the instant they represent. Guard 37 exists to keep the
+second one fixed.
+
+### Break 32: another guard never called in the state it refuses
+
+Same shape as break 26 in Stage 3. Every test either announced a
+correctly-set-up challenge or was stopped earlier by the unpaid check, so
+deleting the readiness check inside `announce` changed nothing — a paid
+challenge whose trophy values did not equal its prize pool could have gone out
+to every server.
+
 ### One guard that fired before anyone broke it
 
 `02-structural`'s first case asserts that the tree-walk actually reached the
