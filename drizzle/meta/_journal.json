@@ -64,6 +64,13 @@
       "when": 1786772536545,
       "tag": "0008_long_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786773162041,
+      "tag": "0009_complete_killmonger",
+      "breakpoints": true
     }
   ]
 }

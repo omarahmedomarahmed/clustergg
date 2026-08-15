@@ -761,3 +761,37 @@ export const discordPostQueue = pgTable(
     index("post_queue_batch_idx").on(t.batchId),
   ],
 );
+
+/**
+ * Which servers a gamer belongs to.
+ *
+ * ===== WHY THIS TABLE EXISTS =====
+ *
+ * K1 splits an entrant "across every server a gamer belongs to", and G2 says a
+ * gamer in two servers is worth ½ to each. Neither is expressible from
+ * `challenge_participants`, which is unique on (challenge, gamer) — P4, one
+ * entry per gamer per challenge. The participant row records the server they
+ * *joined from*; it cannot record the three servers they are in.
+ *
+ * Without membership the ½ rule silently becomes "whole credit to whichever
+ * server they happened to click in", and two servers carrying the same gamer
+ * would sum to two entrants — which is exactly what K5 forbids.
+ *
+ * Membership is refreshed from Discord when the bot sees a member, and it is
+ * NOT the conversion denominator: that is `guild_snapshots.linkedCount`, which
+ * counts gamers who actually linked an account.
+ */
+export const guildMembers = pgTable(
+  "guild_members",
+  {
+    id: text("id").primaryKey(),
+    guildId: text("guild_id").notNull(),
+    userId: text("user_id").notNull(),
+    seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
+    leftAt: timestamp("left_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("guild_member_unique_idx").on(t.guildId, t.userId),
+    index("guild_member_user_idx").on(t.userId),
+  ],
+);
