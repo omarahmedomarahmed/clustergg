@@ -85,6 +85,46 @@ both each read the queue they name. Re-broken afterwards, both red.
 This is the same lesson as the empty-sanctions hole, from a different angle:
 **a test that mocks the thing it is meant to be checking is checking the mock.**
 
+## Stage 3 — money
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 19 | The pool never exceeds half the vault | The ceiling check deleted | *"a pool may never exceed half the vault"* + *"half, twice, is not a way around the half rule"* | clean, 92/92 |
+| 20 | The half rule is **a half** | `POOL_MAX_FRACTION_OF_VAULT` set to `1` | **One incidental assertion, first time** — see below. After the fix: 3 cases | clean, 94/94 |
+| 21 | The 50/25/25 split | 10% of the prize moved to Cluster | 6 cases across the split, routing and the vault invariant | clean, 92/92 |
+| 22 | Over-allocation is refused at assignment | The headroom comparison replaced with `false` | *"over-allocation is refused at assignment, not discovered at payout"* | clean, 92/92 |
+| 23 | A duplicate webhook does not pay twice | The already-routed check deleted | *"a webhook that fires twice does not pay twice"* | clean, 92/92 |
+| 24 | Community money never reaches vault 3 | `communitySplitOf` replaced with the standard split | *"community money never reaches the server vault"* | clean, 94/94 |
+| 25 | A job never moves money | The `actorId` requirement deleted from `releasePayout` | *"releasing requires a person, and moves the money once"* | clean, 94/94 |
+| 26 | Money enters on **paid**, never on issued | The `paidAt` check deleted from routing | **Nothing, first time** — see below. After the fix: *"routing refuses an invoice that has not been paid"* | clean, 95/95 |
+| 27 | A paid invoice is never overdue | The `!paid` term dropped from the derivation | *"an invoice total is its lines, and overdue is a comparison"* | clean, 95/95 |
+| 28 | An allocation is raised, never lowered | The lowering check deleted | *"an allocation can be raised but never lowered"* | clean, 95/95 |
+
+### Break 20: the tests were derived from the rule they were testing
+
+Setting the pool ceiling from a half to the **whole vault** — allocating every
+cent of vault 3 into one week's pool, which is precisely the failure the rule
+exists to prevent, and which would leave nothing to claw a refund back from —
+was caught by *one* assertion, and only incidentally, in the worked example.
+
+The dedicated half-rule test computed its own ceiling with
+`maxAllocationCents(vault)`, so when the constant changed, the expectation
+changed with it and the test stayed green. Every money test had the same shape:
+import the number, derive the expectation, assert they match. That is the right
+rule for a *page* — no surface may retype a figure — and it is exactly wrong for
+the test that guards the figure.
+
+Two fixes: an **anchor test** that is the one file permitted to state the
+ratified values literally, and a half-rule test whose arithmetic
+(`Math.floor(vault / 2)`) never touches the constant. Re-broken: three red.
+
+### Break 26: a guard only ever called with the answer it wanted
+
+Deleting the "an unpaid invoice does not reach a vault" check changed nothing,
+because every path into routing goes through `markPaid`, which sets `paidAt`
+first. The guard was real, reachable and completely untested — nothing ever
+called it in the state it existed to refuse.
+
 ### One guard that fired before anyone broke it
 
 `02-structural`'s first case asserts that the tree-walk actually reached the
