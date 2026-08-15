@@ -44,7 +44,10 @@ by email signup.
 | U2 | `ageBand` is never self-editable after it is set |
 | U3 | Under-13 is not a value — that path deletes the account and keeps a salted hash of email + Discord ID so the same person cannot re-register with a different answer |
 | U4 | **One row per person, whichever door they came through.** Linking never creates a second row and never merges two |
-| U4a | If that Discord is already on another account, the message is **not a rejection**: *"You already have a Cluster account — that Discord is linked to it. Sign in with Discord to reach it."* The email account they are sitting in stays, harmless and idle. **We never merge two accounts that hold trophies** |
+| U4a | If that identity is already on another account, the message is **not a rejection**: *"You already have a Cluster account — that Discord is linked to it. Sign in with Discord to reach it."* The account they are sitting in stays |
+| U4b | **Two accounts for one person are permitted, permanently.** There is no merge, no reconciliation, no support path to combine them, and none is ever built. They are simply two gamers as far as the platform is concerned |
+| U4c | **Each account onboards separately and passes every gate on its own** — its own age band, its own country, its own linked game account, its own email at redemption, its own trophies. Nothing is inherited from the other |
+| U4d | They therefore **cannot share a linked game account.** L1 already forbids it, and the second one to try is refused by L1/L2 like any other collision. That, not a merge, is what keeps one person from scoring twice |
 | U5 | A gamer with **no `discordId` is complete**. No parent server, everything else identical |
 | U6 | A gamer with **no `email` is complete** until they redeem |
 | U7 | `staffTitleId` opens the console. It changes **nothing** about how they play, score or redeem |
