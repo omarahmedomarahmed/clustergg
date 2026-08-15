@@ -4,7 +4,7 @@
 against it.
 
 Ten stages of `docs/08-BUILD-ORDER.md`, in order, then the sprints that build
-the surfaces over them. **238 tests, 1,072 assertions, 18 mutations caught, 72
+the surfaces over them. **248 tests, 1,104 assertions, 18 mutations caught, 80
 guards proven by breaking them.**
 
 ---
@@ -19,7 +19,7 @@ build and test cycle runs against an in-process database.
 | `npm test` | Band 1 — the logic band. Eleven seconds |
 | `npm run mutate` | The mutation harness. Asks whether the band can tell working code from broken |
 | `npm run build && npm start` | The site, with an in-process database |
-| `npm run test:browser` | Band 2 — seeds the demo and photographs the record |
+| `npm run test:browser` | Band 2 — all three passes: the site, the admin console and the two portals |
 | `npm run seed` | Seed the demo database from a terminal |
 
 `screenshots/` is the record. It is committed.
@@ -49,6 +49,7 @@ build and test cycle runs against an in-process database.
 | Sprint | What | Where |
 |---|---|---|
 | 1 · Admin screens | Fifteen pages over `lib/admin`, the dashboard first. The house-rule-7 gate lives in the layout, so no page can forget it | `app/admin`, `lib/admin/auth.ts` |
+| 2 · Portal screens | The owner's seven pages and the brand's six, the key login and `/api/portal/unlock`. The gate is per-portal and every Server Action re-checks it | `app/portal`, `app/login`, `lib/portal/session.ts` |
 
 ---
 
@@ -59,7 +60,7 @@ Honestly, so nobody has to discover it.
 | Not built | Why |
 |---|---|
 | The Discord **card layouts** | The transport, the 3-second rule, the nav grammar, the renderer and its fences are all done and tested. The individual card designs per family are not — they are drawing, and they need the real bot connected to be worth doing |
-| Portal **screens** | Same shape: `lib/portal/*` is complete and tested; the brand and owner pages are not written |
+| **Messages** — both portals | docs/04-SURFACES.md lists a *Messages · talk to staff* page in each portal. There is no table, no logic and no admin inbox behind it: it is a whole subsystem, not a screen over finished logic, and it was never built in the ten stages. Flagged rather than improvised |
 | `/games`, `/rules`, `/legal`, `/settings/*` | Content pages with no logic behind them |
 | Discord **OAuth** | The route and the config exist. It needs the credentials from `docs/10-SETUP.md` |
 | Stripe | The webhook's job is one function — `onInvoicePaid` — and it is tested. Wiring it to Stripe needs the keys |

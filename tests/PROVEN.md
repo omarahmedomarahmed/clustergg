@@ -325,3 +325,53 @@ test cannot see, because it only checks the tight direction. Added:
 > *"the dashboard itself is reachable by every department"*
 
 which is the counterpart, and would have gone red on that edit.
+
+---
+
+# Sprint 2 — the portal screens
+
+Fifteen pages over `lib/portal`, which was already tested, plus three pieces of
+new logic that the pages could not have been written without. All three fail
+silently when wrong, which is why all three are here.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 73 | With a database configured, no session means no portal | `mayOpenPortal` returns `true` unconditionally | *"with a database configured, no session means no portal"* | clean, 248/248 |
+| 74 | A portal session is for exactly one portal | The portal's id removed from the cookie **name** | *"a portal session is scoped to one portal, by construction"* | clean, 248/248 |
+| 75 | An account number cannot be stored as a payout handle | The check bypassed | *"an account number cannot be typed into the payout handle"* | clean, 248/248 |
+| 76 | …and specifically the digit **count**, not the run length | Reverted to the original `/\d[\d\s-]{10,}/` | same case, on the UK sort-code-and-number string | clean, 248/248 |
+| 77 | The admin role is an ID, never a name | The format check bypassed | *"the admin role is stored as an ID, never a name"* | clean, 248/248 |
+| 78 | The lever is the weakest **rank**, not the heaviest weight | Sorted by weight instead of rank | *"the lever names the weakest KPI, not the loudest one"* | clean, 248/248 |
+| 79 | A dropped server has no position at all | Returned `ordered.length + 1` — last place | *"a dropped server is told it is out of the run, not ranked last"* | clean, 248/248 |
+| 80 | The standings are ordered best-first | Sort direction flipped | *"a standing is a position, a field size, and a lever"* | clean, 248/248 |
+
+### The gate had a part no test could reach, so it was split
+
+`lib/portal/session.ts` needs `next/headers`, so nothing in it was assertable
+from the logic band — including the **direction of its default**, which is the
+one part of an access gate that can be catastrophically wrong while looking
+completely normal. A demo fence that quietly stopped being a fence opens every
+portal on a real deployment and nothing looks different until somebody reads
+somebody else's numbers.
+
+`mayOpenPortal({hasSession, isDemo})` is that decision with the request taken
+out of it. Guard 73 is what the split bought.
+
+### Guard 76 is a regression test for a bug this sprint's own test found
+
+The first `accountShaped` was `/\d[\d\s-]{10,}/` — a long enough *run* of
+digits, spaces and hyphens. It let `"sort 20-00-00 acct 55779911"` straight
+through, because the words break the run into two short ones. That is a UK bank
+account written the way a person writes one, in the field asking how they want
+to be paid.
+
+The test asserted the refusal before the code could do it, and went red. It now
+counts digits per group instead of measuring a run, and guard 76 puts the old
+version back to prove the difference is load-bearing.
+
+### And one guard that was never in the default command
+
+`npm run test:browser` ran `site.mts` only. The admin browser pass written in
+sprint 1 — 39 assertions, 16 screenshots — was real, passed, and **was not run
+by the documented command**. A test nobody runs is a test that is already
+broken; it just has not been told yet. The script now runs all three passes.
