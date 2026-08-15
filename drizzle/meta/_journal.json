@@ -50,6 +50,20 @@
       "when": 1786771254157,
       "tag": "0006_nosy_bulldozer",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786772522856,
+      "tag": "0007_soft_nuke",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786772536545,
+      "tag": "0008_long_chimera",
+      "breakpoints": true
     }
   ]
 }

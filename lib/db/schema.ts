@@ -720,3 +720,44 @@ export const emailVerifications = pgTable(
   },
   (t) => [index("email_verifications_user_idx").on(t.userId)],
 );
+
+/**
+ * The post queue. **Nothing fans out per-guild inline from a request.**
+ *
+ * docs/11-PORTED-CODE.md: "that bug class appeared three times before this
+ * existed". An announcement to two hundred servers is two hundred HTTP calls
+ * to Discord, each rate-limited; doing them inside a server action means the
+ * action times out somewhere in the middle and nobody can say which servers
+ * got the card.
+ *
+ * So: write a row per target and return. A cron drains it every five minutes,
+ * with backoff, and gives up after four attempts — a guild that deleted the
+ * channel fails identically forever, and retrying it for ever means a queue
+ * nobody trusts.
+ */
+export const discordPostQueue = pgTable(
+  "discord_post_queue",
+  {
+    id: text("id").primaryKey(),
+    batchId: text("batch_id").notNull(),
+    channelId: text("channel_id").notNull(),
+    guildId: text("guild_id"),
+    payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
+    // pending | sent | failed
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    lastError: text("last_error"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    // What this post was, so a successful landing can be counted as reach.
+    ledgerChallengeId: text("ledger_challenge_id"),
+    ledgerKind: text("ledger_kind"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("post_queue_due_idx").on(t.status, t.nextAttemptAt),
+    index("post_queue_batch_idx").on(t.batchId),
+  ],
+);

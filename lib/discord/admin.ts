@@ -1,0 +1,123 @@
+// Who may see an owner card.
+//
+// S2 — on install, **only the guild owner** has admin.
+// S3 — the guild owner maps an admin role, the same way they pick a channel.
+// S4 — anyone holding that role then gets the portal key, the admin cards,
+//      everything.
+// S5 — **store the role ID, not the name.** A renamed role must not silently
+//      revoke access, and it would: a name is the thing people change, and an
+//      owner who renames "Staff" to "Team" would lock their whole team out
+//      with no error anybody could connect to what they did.
+// S8 — **admin cards are never public messages. Ever.**
+//
+// That last one is enforced by making it impossible to return an owner card
+// that is not ephemeral, rather than by remembering to set a flag.
+
+import { eq } from "drizzle-orm";
+import type { DB } from "../db/index.ts";
+import { schema } from "../db/index.ts";
+import type { Interaction, ScreenResult } from "./interactions.ts";
+
+export type AdminCheck =
+  | { allowed: true; because: "guild_owner" | "admin_role" }
+  | { allowed: false; reason: string };
+
+/**
+ * Whether this member may act as a server admin here.
+ *
+ * `guildOwnerId` comes from the interaction rather than from our own row,
+ * because Discord is the authority on who owns a guild and ownership can
+ * transfer without telling us.
+ */
+export async function checkAdmin(
+  db: DB,
+  input: { guildId: string | null; memberRoleIds: string[]; userId: string | null; guildOwnerId?: string | null },
+): Promise<AdminCheck> {
+  if (!input.guildId || !input.userId) {
+    return { allowed: false, reason: "That card only works inside a server." };
+  }
+
+  if (input.guildOwnerId && input.userId === input.guildOwnerId) {
+    return { allowed: true, because: "guild_owner" };
+  }
+
+  const [guild] = await db
+    .select()
+    .from(schema.guilds)
+    .where(eq(schema.guilds.guildId, input.guildId));
+
+  if (!guild) {
+    // S9 — if the bot was removed the portal survives, and the error says what
+    // to do rather than what happened.
+    return {
+      allowed: false,
+      reason: "Cluster is not installed here. Tell your admin to reinstall Cluster.",
+    };
+  }
+
+  if (!guild.adminRoleId) {
+    return {
+      allowed: false,
+      reason:
+        "No admin role is mapped yet. The server owner can map one in Cluster's " +
+        "settings — the same way they pick an announcement channel.",
+    };
+  }
+
+  // The comparison is on the ID. Renaming the role changes nothing here, which
+  // is the entire point of storing it this way.
+  if (input.memberRoleIds.includes(guild.adminRoleId)) {
+    return { allowed: true, because: "admin_role" };
+  }
+
+  return {
+    allowed: false,
+    reason: "That is for server admins. Ask whoever runs this server.",
+  };
+}
+
+/**
+ * Wrap an owner-only screen.
+ *
+ * Everything this returns is ephemeral, including the refusal — S8 has no
+ * exceptions, and a refusal posted publicly would announce to a whole server
+ * that somebody tried. The flag is set here rather than by each screen, so a
+ * screen cannot forget it.
+ */
+export function ownerOnly(
+  handler: (ctx: { interaction: Interaction; db: DB }) => Promise<ScreenResult>,
+): (ctx: { interaction: Interaction; db: DB; guildOwnerId?: string | null }) => Promise<ScreenResult> {
+  return async (ctx) => {
+    const check = await checkAdmin(ctx.db, {
+      guildId: ctx.interaction.guild_id ?? null,
+      memberRoleIds: ctx.interaction.member?.roles ?? [],
+      userId: ctx.interaction.member?.user?.id ?? ctx.interaction.user?.id ?? null,
+      guildOwnerId: ctx.guildOwnerId ?? null,
+    });
+    if (!check.allowed) {
+      return { content: check.reason, ephemeral: true };
+    }
+    const result = await handler(ctx);
+    return { ...result, ephemeral: true };
+  };
+}
+
+/** Map an admin role. Stores the ID; the name is never persisted. */
+export async function mapAdminRole(
+  db: DB,
+  guildId: string,
+  roleId: string,
+): Promise<void> {
+  if (!/^\d+$/.test(roleId)) {
+    // A Discord snowflake is digits. Anything else is a name somebody typed,
+    // and storing it would be the exact defect S5 forbids.
+    throw new Error(
+      `An admin role is stored by ID, not by name — "${roleId}" is not an ID. ` +
+        `A renamed role must not silently revoke access.`,
+    );
+  }
+  await db
+    .update(schema.guilds)
+    .set({ adminRoleId: roleId })
+    .where(eq(schema.guilds.guildId, guildId));
+}

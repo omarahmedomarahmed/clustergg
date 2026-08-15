@@ -1,0 +1,207 @@
+// The card renderer.
+//
+// Every reply the bot sends is a card, because consistency is the product's
+// face. Two things about this renderer were learned in production and both are
+// enforced here rather than remembered:
+//
+// ===== 1. IT CANNOT DECODE WebP =====
+//
+// The renderer answers `Unsupported image type: image/webp` and the artwork
+// simply does not appear — game art, brand creatives, anything. Two rules
+// follow (docs/11-PORTED-CODE.md):
+//
+//   * **Convert on upload.** Accept whatever the uploader gives and store PNG
+//     or JPEG. Never trust the source format. That is `lib/cards/upload.ts`.
+//   * **Fence the image.** A card whose artwork will not decode must still
+//     render — text, buttons, navigation. See below.
+//
+// ===== 2. A DECORATION MAY NEVER TAKE A CARD DOWN =====
+//
+// House rule 11, and it is the general form of the WebP problem. A sponsor
+// link signature once threw out of an ad button and took the entire Discord
+// bot down with it. So anything that can throw on a card path is fenced, and
+// the card renders without it.
+
+import type { CardFont } from "./fonts.ts";
+
+/** Formats the renderer can actually decode. Everything else is converted. */
+export const RENDERABLE_IMAGE_TYPES = ["image/png", "image/jpeg"] as const;
+
+/**
+ * WebP is the one that bites: browsers and Discord both serve it happily, so
+ * an image that looks fine everywhere else is invisible on a card.
+ */
+export function isRenderableImageType(contentType: string | null | undefined): boolean {
+  if (!contentType) return false;
+  const type = contentType.split(";")[0].trim().toLowerCase();
+  return (RENDERABLE_IMAGE_TYPES as readonly string[]).includes(type);
+}
+
+export type FenceResult<T> = { ok: true; value: T } | { ok: false; error: string };
+
+/**
+ * Run a decoration, and never let it take the card down.
+ *
+ * Returns a result rather than throwing, and **logs the failure with enough to
+ * find it** — rule 3 of the WebP notes: a bad asset must be findable rather
+ * than merely invisible. An `catch {}` here would satisfy the rule and lose
+ * the only evidence.
+ */
+export async function fence<T>(
+  what: string,
+  fn: () => Promise<T> | T,
+): Promise<FenceResult<T>> {
+  try {
+    return { ok: true, value: await fn() };
+  } catch (e) {
+    const error = e instanceof Error ? e.message : String(e);
+    console.error(`[card] decoration failed and was skipped: ${what} — ${error}`);
+    return { ok: false, error };
+  }
+}
+
+export type CardSpec = {
+  title: string;
+  subtitle?: string;
+  /** Artwork. May be missing, may be undecodable — either way the card renders. */
+  imageUrl?: string | null;
+  rows?: { label: string; value: string }[];
+  footer?: string;
+  accent?: string;
+};
+
+export type RenderedCard = {
+  png: Uint8Array;
+  /** True when artwork was requested and did not make it onto the card. */
+  artworkDropped: boolean;
+  /** Why, so a bad asset is findable. */
+  artworkError?: string;
+};
+
+/**
+ * Render a card to PNG.
+ *
+ * The image is fetched and validated **before** it reaches the renderer,
+ * because the renderer's failure mode is to throw and take the whole card with
+ * it. Checking the content type first turns "the card did not appear" into
+ * "the card appeared without its artwork, and the log says why".
+ */
+export async function renderCard(spec: CardSpec): Promise<RenderedCard> {
+  const { ImageResponse } = await import("@vercel/og");
+  const { loadCardFonts } = await import("./fonts.ts");
+
+  const fonts = await fence("fonts", () => loadCardFonts());
+  const artwork = spec.imageUrl
+    ? await fence("artwork", async () => {
+        const res = await fetch(spec.imageUrl as string);
+        if (!res.ok) throw new Error(`HTTP ${res.status} for ${spec.imageUrl}`);
+        const type = res.headers.get("content-type");
+        if (!isRenderableImageType(type)) {
+          // Named explicitly, because "it did not render" is what everybody
+          // saw for months and it told them nothing.
+          throw new Error(
+            `Unsupported image type: ${type ?? "unknown"} for ${spec.imageUrl}. ` +
+              `The card renderer decodes PNG and JPEG only — convert on upload.`,
+          );
+        }
+        return spec.imageUrl as string;
+      })
+    : null;
+
+  const response = new ImageResponse(cardTree(spec, artwork?.ok ? artwork.value : null), {
+    width: 1200,
+    height: 630,
+    fonts: (fonts.ok ? fonts.value : []) as unknown as ConstructorParameters<
+      typeof ImageResponse
+    >[1] extends { fonts?: infer F }
+      ? F
+      : never,
+  });
+
+  return {
+    png: new Uint8Array(await response.arrayBuffer()),
+    artworkDropped: Boolean(spec.imageUrl) && !(artwork?.ok ?? false),
+    ...(artwork && !artwork.ok ? { artworkError: artwork.error } : {}),
+  };
+}
+
+/** The layout. Kept separate so it can be inspected without rendering. */
+export function cardTree(spec: CardSpec, artworkUrl: string | null): React.ReactElement {
+  const accent = spec.accent ?? "#7c5cff";
+  return {
+    type: "div",
+    key: null,
+    props: {
+      style: {
+        display: "flex",
+        flexDirection: "column",
+        width: "100%",
+        height: "100%",
+        background: "#0a0a0c",
+        color: "#f2f2f5",
+        padding: 56,
+        fontFamily: "Cluster, sans-serif",
+      },
+      children: [
+        artworkUrl
+          ? {
+              type: "img",
+              key: "art",
+              props: {
+                src: artworkUrl,
+                width: 1200,
+                height: 240,
+                style: { objectFit: "cover", borderRadius: 16 },
+              },
+            }
+          : null,
+        {
+          type: "div",
+          key: "title",
+          props: {
+            style: { fontSize: 64, fontWeight: 700, marginTop: 8 },
+            children: spec.title,
+          },
+        },
+        spec.subtitle
+          ? {
+              type: "div",
+              key: "sub",
+              props: {
+                style: { fontSize: 30, color: "#8b8b96", marginTop: 8 },
+                children: spec.subtitle,
+              },
+            }
+          : null,
+        {
+          type: "div",
+          key: "rows",
+          props: {
+            style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 28 },
+            children: (spec.rows ?? []).map((r, i) => ({
+              type: "div",
+              key: `r${i}`,
+              props: {
+                style: { display: "flex", justifyContent: "space-between", fontSize: 28 },
+                children: [
+                  { type: "span", key: "l", props: { style: { color: "#8b8b96" }, children: r.label } },
+                  { type: "span", key: "v", props: { children: r.value } },
+                ],
+              },
+            })),
+          },
+        },
+        {
+          type: "div",
+          key: "footer",
+          props: {
+            style: { marginTop: "auto", fontSize: 24, color: accent },
+            children: spec.footer ?? "ClusterGG",
+          },
+        },
+      ].filter(Boolean),
+    },
+  } as unknown as React.ReactElement;
+}
+
+export type { CardFont };

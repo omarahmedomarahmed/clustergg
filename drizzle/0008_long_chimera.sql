@@ -1,0 +1,1 @@
+ALTER TABLE "discord_post_queue" ADD COLUMN "posted_at" timestamp with time zone;
