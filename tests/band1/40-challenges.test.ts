@@ -528,6 +528,81 @@ test("the prize-pool guard flags over and under", async () => {
   ok((await readinessOf(db, challengeId)).ready, "exactly equal passes");
 });
 
+test("a paid challenge whose trophies do not match the pool cannot be announced", async () => {
+  // L5: the prize-pool guard must pass before an announcement. This test
+  // exists because breaking the readiness check inside `announce` was caught
+  // by nothing — every other test either announces a correctly set-up
+  // challenge or is stopped earlier by the unpaid check. The guard was real,
+  // reachable, and never called in the state it refuses.
+  const db = await resetDemoDb();
+  const challengeId = await createChallenge(db, {
+    title: "Mismatched",
+    game: "Test Game",
+    provider: FAKE,
+    startAt: MONDAY,
+    prizePoolCents: 17_500,
+    metrics: DEFAULT_METRIC_WEIGHTS,
+  });
+  const invoiceId = await createInvoice(db, {
+    payerType: "brand",
+    lines: [{ description: "Challenge", amountCents: CHALLENGE_PRICE_CENTS }],
+  });
+  await attachInvoice(db, challengeId, invoiceId);
+  await markPaid(db, invoiceId);
+  await markScheduled(db, challengeId);
+
+  const trophyId = uid();
+  await db.insert(schema.trophies).values({
+    id: trophyId,
+    type: "podium",
+    name: "First",
+    valueCents: 10_000,
+    challengeId,
+    place: 1,
+  });
+
+  const err = await throws(
+    () => announce(db, challengeId, "admin-1", []),
+    /not ready to announce/,
+    "paid is not the same as ready — the pool guard still has to pass",
+  );
+  ok(err instanceof TransitionRefused, "with the transition error");
+  ok(/under by \$75\.00/.test(err.message), "and it says exactly what is wrong");
+
+  const [still] = await db
+    .select()
+    .from(schema.challenges)
+    .where(sqlEq(schema.challenges.id, challengeId));
+  eq(still.state, "scheduled", "and the challenge did not move");
+
+  // Metrics missing is refused the same way, so the guard is not one check
+  // wearing a general name.
+  await db
+    .update(schema.trophies)
+    .set({ valueCents: 17_500 })
+    .where(sqlEq(schema.trophies.id, trophyId));
+  await db
+    .update(schema.challenges)
+    .set({ metrics: null })
+    .where(sqlEq(schema.challenges.id, challengeId));
+  await throws(
+    () => announce(db, challengeId, "admin-1", []),
+    /Metrics are not set/,
+    "a challenge with nothing to score cannot be announced either",
+  );
+
+  await db
+    .update(schema.challenges)
+    .set({ metrics: DEFAULT_METRIC_WEIGHTS })
+    .where(sqlEq(schema.challenges.id, challengeId));
+  await announce(db, challengeId, "admin-1", []);
+  const [announced] = await db
+    .select()
+    .from(schema.challenges)
+    .where(sqlEq(schema.challenges.id, challengeId));
+  eq(announced.state, "announced", "and once it is right, it announces");
+});
+
 test("the gun moves announced challenges to live", async () => {
   const db = await resetDemoDb();
   const challengeId = await aChallenge(db);
