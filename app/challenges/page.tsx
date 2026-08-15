@@ -1,10 +1,15 @@
 import { liveChallenges, nextWeekChallenges, endedChallenges } from "../../lib/site/queries.ts";
 import { Nav, Card, Money, Empty } from "../components.tsx";
+import { demoNow } from "../../lib/site/clock.ts";
 
 export const dynamic = "force-dynamic";
 
-export default async function ChallengesPage() {
-  const now = new Date();
+export default async function ChallengesPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const now = demoNow(await searchParams);
   const [live, next, past] = await Promise.all([
     liveChallenges(now),
     nextWeekChallenges(now),

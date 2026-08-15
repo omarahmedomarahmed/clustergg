@@ -1,17 +1,20 @@
 import { notFound } from "next/navigation";
 import { challengeDetail } from "../../../lib/site/queries.ts";
 import { Nav, Money, Empty } from "../../components.tsx";
+import { demoNow } from "../../../lib/site/clock.ts";
 import { STATE_LABEL, type ChallengeState } from "../../../lib/challenges/lifecycle.ts";
 
 export const dynamic = "force-dynamic";
 
 export default async function ChallengePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { id } = await params;
-  const detail = await challengeDetail(id);
+  const detail = await challengeDetail(id, demoNow(await searchParams));
   if (!detail) notFound();
   const { challenge, standings, trophies, reachCount } = detail;
 

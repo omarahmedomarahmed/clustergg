@@ -14,7 +14,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.mts",
     "test": "tsx tests/run.mts",
-    "mutate": "tsx tests/mutate.mts"
+    "mutate": "tsx tests/mutate.mts",
+    "demo": "next build && next start",
+    "test:browser": "tsx tests/band2/site.mts",
+    "seed": "tsx scripts/seed-demo.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

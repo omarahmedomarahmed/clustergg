@@ -25,13 +25,20 @@ import {
   phaseAt,
 } from "../lib/site/queries.ts";
 import { COPY, SAYS } from "../lib/content/copy.ts";
+import { demoNow } from "../lib/site/clock.ts";
 import { Nav, Card, Money, Empty } from "./components.tsx";
 import { Countdown, PoolRefresher } from "./countdown.tsx";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
-  const now = new Date();
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  // `?at=` moves the clock in demo mode only, so the screenshot record can
+  // photograph both phases whatever day it runs on. See lib/site/clock.ts.
+  const now = demoNow(await searchParams);
   const phase = phaseAt(now);
   const week = weekFor(now);
 

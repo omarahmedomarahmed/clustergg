@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { livePool, weekFor, phaseAt } from "../../lib/site/queries.ts";
 import { COPY, SAYS } from "../../lib/content/copy.ts";
+import { demoNow } from "../../lib/site/clock.ts";
 import { Nav, Money, Empty } from "../components.tsx";
 import { PoolRefresher } from "../countdown.tsx";
 
@@ -9,8 +10,12 @@ export const dynamic = "force-dynamic";
 // `/pool` shows what each server WOULD be paid if the week ended now —
 // computed by the same function that writes Friday's placements, never by a
 // second implementation that could drift (docs/01-CYCLE.md).
-export default async function PoolPage() {
-  const now = new Date();
+export default async function PoolPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const now = demoNow(await searchParams);
   const pool = await livePool(now);
   const week = weekFor(now);
 

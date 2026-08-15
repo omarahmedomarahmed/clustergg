@@ -167,7 +167,24 @@ export type ProviderDef = {
   linkFlow?: "vc";
 };
 
-export const PROVIDERS: ProviderDef[] = [
+// ===== ONE REGISTRY, HOWEVER THIS MODULE IS LOADED =====
+//
+// The list hangs off `globalThis`, for the same reason the test registry and
+// the assertion counter do (see `tests/helpers/suite.ts`): a `.ts` module in a
+// CommonJS package can be instantiated twice — once for a static import from
+// an ESM parent, once for a dynamic `import()` — and two instances of a
+// registry is two different answers to "is this provider live?".
+//
+// It cost an hour on the demo seeder, which registered a provider, saw it with
+// `getProvider`, and then watched the brand builder refuse to sell it because
+// the builder was reading the other copy. A registry that can be duplicated is
+// a registry that can disagree with itself.
+declare global {
+  // eslint-disable-next-line no-var
+  var __clusterProviders: ProviderDef[] | undefined;
+}
+
+const DECLARED: ProviderDef[] = [
   // ===== Live with zero configuration (public APIs) =====
   {
     id: "chesscom", name: "Chess.com", game: "Chess", glyph: "♞", color: "#7fa650",
@@ -433,6 +450,9 @@ export const PROVIDERS: ProviderDef[] = [
     capabilities: [],
   },
 ];
+
+/** The registry every caller reads and writes. Exactly one, always. */
+export const PROVIDERS: ProviderDef[] = (globalThis.__clusterProviders ??= DECLARED);
 
 export function getProvider(providerId: string): ProviderDef | undefined {
   return PROVIDERS.find((p) => p.id === providerId);
