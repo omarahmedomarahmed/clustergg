@@ -254,6 +254,11 @@ test("a community challenge contributes nothing to the pool", async () => {
   await attachInvoice(db, communityId, invoiceId);
   await markPaid(db, invoiceId, { communityTier: 1 });
   await markScheduled(db, communityId);
+  // ANNOUNCED, deliberately. Leaving it merely scheduled would let the
+  // state filter exclude it and the visibility filter go untested — which is
+  // exactly what happened the first time this was broken: deleting the
+  // "sponsored" condition was caught by nothing.
+  await announce(db, communityId, "admin-1", ["g1"]);
 
   const userId = await createGamer(db, { displayName: "Community Entrant" });
   await db.insert(schema.challengeParticipants).values({
@@ -267,7 +272,11 @@ test("a community challenge contributes nothing to the pool", async () => {
   });
 
   const { kpis, challengeIds } = await kpisForWeek(db, MONDAY);
-  eq(challengeIds.length, 0, "the community challenge is not a contributor");
+  eq(
+    challengeIds.length,
+    0,
+    "an announced, live, paid community challenge is still not a contributor",
+  );
   eq(kpis.length, 0, "so its entrant earns its server nothing from the weekly pool");
 });
 
