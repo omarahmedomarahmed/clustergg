@@ -55,6 +55,36 @@ four breaks accumulated on top of each other. The test output was still red, so
 it looked like it was working. **Commit before breaking**, and read what the
 restore actually printed.
 
+## Stage 2 — providers and sync
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 10 | VALORANT cannot be sold | The `notLive` check removed from `isProviderLive` | *"VALORANT cannot be sold, whatever keys are configured"* | clean, 63/63 |
+| 11 | No percentage can score | Both mechanisms removed from `isScoreable` | *"no ratio, rate or percentage can score a challenge"* + the builder case | clean, 63/63 |
+| 12 | The two scoreable mechanisms agree | One metric's `scoreable: false` deleted | *"the explicit flag and the shape rule never disagree"* | clean, 63/63 |
+| 13 | League counts matches | The metric and its emission removed | *"League counts matches, from the one call that already returns them"* | clean, 63/63 |
+| 14 | A proven account is never re-pointed | `isProven` check replaced with `false` | *"a proven account is never silently re-pointed after a key change"* | clean, 63/63 |
+| 15 | A season reset re-baselines | Rollover detection disabled | *"a season reset re-baselines instead of zeroing a week"* | clean, 63/63 |
+| 16 | A demotion is not a reset | The ladder exclusion removed | *"a rank going down is a bad week, not a season reset"* | clean, 63/63 |
+| 17 | The tight Riot endpoint stays off the hot path | `a.rich` replaced with `true` | **Nothing, first time** — see below. After the fix: the intercept test | clean, 64/64 |
+| 18 | The League queue is honoured | `a.queue ?? "solo"` hard-coded to `"solo"` | **Nothing, first time** — see below. After the fix: *"the League adapter reads the queue it was asked for"* | clean, 65/65 |
+
+### Two holes found in one sitting, both the same shape
+
+Breaks 17 and 18 were each caught by **zero suites**, and for one reason: the
+sync suite drives a *fake adapter*. It proved that `syncAccount` passes `rich`
+and `queue` through to whatever adapter it is given — which is true and worth
+knowing — and proved nothing at all about what the **League adapter** does with
+them. The endpoint choice and the queue arithmetic both live in the adapter.
+
+A guard has to be asserted where the decision is made. Two tests now intercept
+`fetch` and check the adapter's actual HTTP calls and actual arithmetic: that a
+routine sync reads `league-v4` and never `summoner-v4`, and that solo, flex and
+both each read the queue they name. Re-broken afterwards, both red.
+
+This is the same lesson as the empty-sanctions hole, from a different angle:
+**a test that mocks the thing it is meant to be checking is checking the mock.**
+
 ### One guard that fired before anyone broke it
 
 `02-structural`'s first case asserts that the tree-walk actually reached the
