@@ -197,6 +197,17 @@ rebuilding: **four minutes to eleven seconds**, same 154 tests, same isolation.
 The table list is read from `pg_tables` rather than kept in the code, for the
 same reason every other guard here walks the tree.
 
+## Stage 6 — the bot
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 48 | A decoration may never take a card down | `fence` rethrows | *"a decoration that throws does not take the card down"* | clean, 175/175 |
+| 49 | Acknowledge within three seconds | The work awaited before the response | *"the acknowledgement is sent before any work happens"* + *"a slow screen cannot delay the acknowledgement"* | clean, 175/175 |
+| 50 | An owner card is never public | `ownerOnly` stops setting `ephemeral` | *"an owner card is never a public message, including its refusal"* | clean, 175/175 |
+| 51 | The admin role is stored by ID | The snowflake check bypassed | *"the admin role is stored by ID, so renaming it revokes nothing"* | clean, 175/175 |
+| 52 | The renderer cannot decode WebP | Any `image/*` treated as renderable | 3 cases, across the check and both upload paths | clean, 175/175 |
+| 53 | `group` never reaches Discord | The strip in `rows()` removed | *"`group` is ours, not Discord's, and never reaches the wire"* | clean, 175/175 |
+
 ### One guard that fired before anyone broke it
 
 `02-structural`'s first case asserts that the tree-walk actually reached the
