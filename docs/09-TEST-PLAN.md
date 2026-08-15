@@ -37,7 +37,8 @@ Runs in-process against an in-memory database. Needs nothing running.
 | **Trophy guard** | Values must equal the prize pool — flags over **and** under |
 | **$0 trophies** | Unredeemable at the redeem action, not merely hidden |
 | **Pool** | `allocation ≤ vault ÷ 2`. Flat 20% split evenly. Three KPIs. Community challenges contribute nothing |
-| **Attribution** | Entrant credit is **½ parent + ½ join**. Parent = join → **1.0, not two halves**. Web join with no server → 1.0 to parent. No parent → everything works and no server earns. Linked-member count goes to the **parent only** |
+| **Attribution** | Entrant credit is **½ parent + ½ join**. Parent = join → **1.0, not two halves**. Web join with no server → 1.0 to parent. No parent → everything works and no server earns. Linked-member count goes to the **parent only**. A parent that **loses the bot freezes**: keeps what it earned, gains nothing new |
+| **Retroactive safety** | Attribution is stamped at join. An admin correcting a gamer's parent in week 6 **does not move week 3's money** |
 | **Eligibility** | Frozen at Monday's gun and **never re-checked mid-week**. 8 linked at the gun + 50 on Tuesday earns nothing this week. 10 at the gun, 9 on Wednesday still pays. **The conversion denominator is live**, so the ratio can never exceed 1.0 |
 | **Permissions** | An administrator cannot withdraw or approve a spend. Only the guild owner can. A 13–17 owner may spend and may not withdraw. A **renamed** Discord role does not revoke access — the ID does |
 | **Identity** | A gamer can never change their own parent; admin can, and it is logged. A brand account is never a gamer account and never sees the gamer nav. A brand invite key works **once** |

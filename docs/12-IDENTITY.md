@@ -12,13 +12,13 @@ attribution rules here, and neither is correct without the other.
 
 | | Signs in with | Can be the others? |
 |---|---|---|
-| **Gamer** | Discord, **or** email + password | Yes — a gamer can manage servers |
+| **Gamer** | **Discord only** | Yes — a gamer can manage servers |
 | **Server manager** | The same gamer account | Yes — same person, same login |
 | **Brand** | **Email + password only** | **Never.** A brand user is not a gamer and never sees the gamer nav |
 
 | # | Rule |
 |---|---|
-| I1 | Discord sign-in is **optional**. Email + password reaches every gamer surface |
+| I1 | **A gamer has no password and gives no email at signup.** Discord is the only way a gamer account comes into being — the first bot click, or Sign in with Discord. Email is asked once, at redemption, and verified then |
 | I2 | Brands and gamers use **separate login routes and separate tables**. One email could otherwise be both, and a brand landing in gamer onboarding is a mess |
 | I3 | One brand, one login. Never one user across brands. Shared credentials are acceptable for now — **every spend is logged with timestamp and IP** so a disagreement has an answer |
 | I4 | A gamer is never linked to a brand, never represents one, never sees a brand nav |
@@ -191,6 +191,10 @@ pool."*
 **We cannot email a guild owner before they sign in.** Discord never gives us an
 address. DM only until then.
 
+**A DM can fail** — a guild owner who blocks DMs from server members never
+receives it, and Discord says so quietly. A failed DM is a **recorded state the
+guild registry shows**, never an error swallowed on a background path.
+
 ### Ownership transfer
 
 | # | Rule |
@@ -233,7 +237,7 @@ owner asks *"why am I not earning?"*
 |---|---|
 | **Ownership** | Guild owner (ID + name) · **has the owner ever signed in** · transfer state · 14-day timer · 4-week reassignment clock |
 | **Who installed it** | The user who added the bot, their role at the time, whether they were the owner |
-| **Permissions** | Every ADMINISTRATOR · the mapped role (ID **and** current name) · who currently holds it |
+| **Permissions** | Every role carrying ADMINISTRATOR · the mapped role, ID **and** current name · **everyone we have seen holding it**, with when we saw them, labelled as exactly that |
 | **Pool eligibility** | Linked members vs 10 · profile completeness, field by field · in this week's pool, yes or no |
 | **Money** | Balance · this week's share · payout history · pending community-challenge requests |
 | **Refresh** | One button, per guild, cooled down. Re-pulls owner and roles from Discord |
@@ -244,6 +248,7 @@ owner asks *"why am I not earning?"*
 | G1 | **"Who installed the bot" is captured at the install redirect or lost forever.** Discord's API will never tell us afterwards |
 | G2 | If they are not signed in at install, sign them in first, then redirect back with the guild still selected |
 | G3 | Refresh pulls **owner + roles only**. Never the member list |
+| G5 | **Role holders are accumulated from interaction payloads**, never listed. The page says so in words: somebody who holds the role and has never pressed a button will not appear. We do not take the GUILD_MEMBERS intent to close that gap |
 | G4 | Admin can manually set any gamer's **age band** and **parent server**, from the list of servers that gamer is in |
 
 ---

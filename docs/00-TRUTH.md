@@ -275,7 +275,8 @@ nothing and it is the only good news most entrants get.
 
 | # | Rule |
 |---|---|
-| G1 | Onboarding is **link a game account + age band + country**. Three things |
+| G0 | **A gamer account is created by Discord alone** — the first bot click, or Sign in with Discord. There is no gamer password and no gamer email at signup. Losing Discord access is a support matter, not a second credential |
+| G1 | Onboarding is **age band + country + link a game account**. Three things. A server-owner path substitutes the `guilds` scope for the linked account |
 | G2 | **No email at onboarding** |
 | G3 | Email is asked **only at redemption**, and must be **verified** then |
 | G4 | Ownership proof is **required** where the game's API supports it |
@@ -309,8 +310,8 @@ nothing and it is the only good news most entrants get.
 
 | # | KPI | Measures | Weight |
 |---|---|---|---|
-| K1 | **Exclusive entrants** — split across every server a gamer belongs to | Volume | 40 |
-| K2 | **Conversion** — entrants ÷ linked members | Efficiency | 30 |
+| K1 | **Exclusive entrants** — **½ parent server + ½ join server**, and **1.0 when they are the same**. See `docs/12-IDENTITY.md` §3 | Volume | 40 |
+| K2 | **Conversion** — entrants **whose parent is this server** ÷ linked members **whose parent is this server**. Both sides are whole gamers, both sides parent-scoped, and the denominator is **live** | Efficiency | 30 |
 | K3 | **Activation** — entrants who scored above zero ÷ entrants | Quality | 30 |
 
 Plus a **flat share split evenly** among every server that carried an entrant.

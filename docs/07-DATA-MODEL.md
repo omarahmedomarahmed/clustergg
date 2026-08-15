@@ -108,7 +108,8 @@ A brand's login. **A separate table from `users`, on purpose.**
 | Field | Note |
 |---|---|
 | `challengeId`, `userId`, `linkedAccountId` | |
-| `guildId` | Which server gets the credit |
+| `joinGuildId` | **Where they pressed Join.** The only server column on this row |
+| `parentGuildIdAtJoin` | **The parent, stamped here at join.** Never read live at scoring time |
 | `joinedAt` | |
 | **`baselineAt`** | `max(challengeStart, joinedAt)` |
 | **`baseline`** | A snapshot of the metric values at `baselineAt` |
@@ -121,6 +122,7 @@ A brand's login. **A separate table from `users`, on purpose.**
 | P3 | A sync is **forced on join** and the baseline stamped from its result |
 | P4 | Unique on `(challengeId, userId)` — one entry per gamer per challenge |
 | P5 | Score is derived from `baseline` and the latest observation. **Never stored** |
+| P6 | **Attribution is stamped at join, exactly like the baseline.** An admin correcting a gamer's parent in week 6 must not silently move week 3's money. There is one server column, `joinGuildId`, plus the parent frozen beside it — never a second `guildId` meaning something adjacent |
 
 ### `observations`
 Time-series stat readings per linked account. The raw material for every delta.
@@ -221,8 +223,30 @@ Append-only. Every movement of every dollar.
 | `community` | Profile. **A server that never described itself is dropped from scoring** |
 | `installedAt`, `removedAt` | Removal freezes reach; earnings survive |
 
+### `spend_requests`
+An administrator requests, the guild owner approves. There is nowhere else to
+hold a pending request.
+
+| Field | Note |
+|---|---|
+| `guildId`, `requestedBy`, `kind`, `tier`, `payload` | |
+| `state` | `pending` → `approved` → `paid`, or `rejected` |
+| `approvedBy`, `approvedAt` | **Must be the guild owner.** Enforced, not assumed |
+
+### `guild_admins`
+Everyone we have **seen** holding ADMINISTRATOR or the mapped role, accumulated
+from interaction payloads. Never a member list.
+
+| Field | Note |
+|---|---|
+| `guildId`, `discordId` | |
+| `source` | `administrator` \| `mapped_role` |
+| `seenAt` | **Shown on the registry.** The page states that unseen holders do not appear |
+
 ### `guild_snapshots`
-Weekly member and linked counts. The denominator for the conversion KPI.
+Weekly member and linked counts. **History, and the evidence behind the gun's
+eligibility freeze — never the conversion denominator.** That is computed live
+(`12-IDENTITY.md` §4 E1).
 
 ### Attribution — see `12-IDENTITY.md` §3
 
