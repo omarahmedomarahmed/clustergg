@@ -795,3 +795,18 @@ export const guildMembers = pgTable(
     index("guild_member_user_idx").on(t.userId),
   ],
 );
+
+/**
+ * Staff, and which department they are in.
+ *
+ * Separate from `users` on purpose. A staff member is a gamer who also works
+ * here, and conflating the two would put a `department` column on the gamer
+ * directory — which is the table house rule 7 exists to keep people out of.
+ */
+export const staff = pgTable("staff", {
+  userId: text("user_id").primaryKey(),
+  name: text("name").notNull(),
+  // `admin` | `finance` | `support` | `sales`
+  department: text("department").notNull(),
+  addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
+});
