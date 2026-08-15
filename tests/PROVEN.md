@@ -208,6 +208,39 @@ same reason every other guard here walks the tree.
 | 52 | The renderer cannot decode WebP | Any `image/*` treated as renderable | 3 cases, across the check and both upload paths | clean, 175/175 |
 | 53 | `group` never reaches Discord | The strip in `rows()` removed | *"`group` is ours, not Discord's, and never reaches the wire"* | clean, 175/175 |
 
+## Stage 7 — the website, and the pool computation
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 54 | No page retypes a figure | The homepage states the price instead of importing it | *"no page retypes a price, a share or a threshold"* | clean, 192/192 |
+| 55 | A gamer in two servers is worth ½ to each | The split divisor removed | *"a gamer in two servers is worth half to each"* | clean, 192/192 |
+| 56 | A fifth of every pool is split evenly | The flat share zeroed | *"a fifth of every pool is split evenly, because turning up is worth something"* | clean, 192/192 |
+| 57 | An undescribed server is dropped, not scored | The community check bypassed | *"a server that never described itself is dropped, not scored zero"* | clean, 192/192 |
+| 58 | Community challenges feed no weekly pool | The `sponsored` filter deleted | **Nothing, first time** — see below. After the fix: *"a community challenge contributes nothing to the pool"* | clean, 192/192 |
+| 59 | An entrant who never plays lowers the score | Every entrant counted as activated | *"an entrant who never plays lowers the server's score"* | clean, 192/192 |
+
+### Break 58: excluded by the wrong filter
+
+Deleting the `visibility = sponsored` condition changed nothing, because the
+test's community challenge was only `scheduled` — the **state** filter excluded
+it and the visibility filter was never exercised at all. The test looked like
+it proved K8 and proved something else that happened to be true.
+
+Announcing it in the fixture makes the visibility filter the only thing
+standing between that entrant and the pool. Re-broken: red.
+
+### And one rule that needed a table nobody had built
+
+K1 splits an entrant "across every server a gamer belongs to" and G2 makes that
+½ each. Neither is expressible from `challenge_participants`, which is unique
+on (challenge, gamer) — P4 — so it records the one server they clicked Join in
+and cannot record the three they are in.
+
+Without a membership table the ½ rule silently becomes *"whole credit to
+whichever server they happened to click in"*, and two servers carrying the same
+gamer sum to two entrants — precisely what K5 forbids. `guild_members` exists
+for that one rule.
+
 ### One guard that fired before anyone broke it
 
 `02-structural`'s first case asserts that the tree-walk actually reached the
