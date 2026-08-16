@@ -685,18 +685,72 @@ export const guilds = pgTable(
 
 export type Guild = typeof guilds.$inferSelect;
 
-/** Weekly member and linked counts — the denominator for the conversion KPI. */
+/**
+ * A dated reading of one server, taken **only when its owner opts in**.
+ *
+ * ===== THIS IS ANALYTICS, AND NO DOLLAR MAY DEPEND ON IT (S2/N9) =====
+ *
+ * It used to hold the conversion denominator. S3 deleted that: the denominator
+ * is computed live in `lib/pool/eligibility.ts`, and **nothing in the weekly
+ * cycle may read this table** — not eligibility, not a KPI, not the pool, not
+ * a payout. Stated falsifiably: *drop the table and every dollar is
+ * identical*, which is asserted twice — once as a unit and once inside the
+ * four-week simulation.
+ *
+ * The reason is not tidiness. A row here exists because an owner pressed a
+ * button, under a permission they granted and could have declined. A dollar
+ * that depended on it would let a server change its own earnings by
+ * refreshing, and would make a revocable permission load-bearing on the pool.
+ *
+ * S1 — **every row carries `takenAt` and `takenBy`, and is never displayed
+ * without the date.** Neither the owner nor admin ever sees an undated number:
+ * a stale snapshot presented as current is worse than no snapshot, because it
+ * is acted on.
+ */
 export const guildSnapshots = pgTable(
   "guild_snapshots",
   {
     id: text("id").primaryKey(),
     guildId: text("guild_id").notNull(),
-    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    /** S1. The reading's date, and the reason nothing here is ever bare. */
+    takenAt: timestamp("taken_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Who pressed Update — an owner, an administrator, or Cluster admin. */
+    takenBy: text("taken_by"),
     memberCount: integer("member_count").notNull(),
+    /** How many of their members are linked to Cluster. */
     linkedCount: integer("linked_count").notNull(),
+    /** Roles on the server, and who holds them. Read only, and never scored. */
+    rolesJson: jsonb("roles_json").$type<{ id: string; name: string; members: number }[]>(),
+    roleHoldersJson: jsonb("role_holders_json").$type<Record<string, string[]>>(),
   },
-  (t) => [uniqueIndex("guild_snapshot_week_idx").on(t.guildId, t.weekStart)],
+  (t) => [index("guild_snapshots_guild_idx").on(t.guildId, t.takenAt)],
 );
+
+export type GuildSnapshot = typeof guildSnapshots.$inferSelect;
+
+/**
+ * The analytics grant. **One row per guild, and it is not a session.**
+ *
+ * N1 — granted once, per server, and it **does not expire**. Signing out
+ * changes nothing: the bot keeps its access and we keep the snapshot. There is
+ * deliberately no session column, because a grant that expired with a session
+ * would be re-asked on every sign-in and an owner who clicks through it once is
+ * an owner who has not consented to anything.
+ *
+ * N7 — the Update **cooldown is on the guild**, never on the session. Signing
+ * out and back in is not a way around it, and that is why `cooldownUntil`
+ * lives on this row rather than anywhere a login could clear.
+ */
+export const guildAnalyticsConsent = pgTable("guild_analytics_consent", {
+  guildId: text("guild_id").primaryKey(),
+  /** The Discord identity that allowed it. Kept, because consent has an author. */
+  grantedBy: text("granted_by"),
+  grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
+  lastPullAt: timestamp("last_pull_at", { withTimezone: true }),
+  cooldownUntil: timestamp("cooldown_until", { withTimezone: true }),
+});
+
+export type GuildAnalyticsConsent = typeof guildAnalyticsConsent.$inferSelect;
 
 /**
  * A brand — the company. Its **login** lives in `brand_users`.

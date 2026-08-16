@@ -127,6 +127,20 @@
       "when": 1786818543583,
       "tag": "0017_spend-requests",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1786818544583,
+      "tag": "0018_analytics-add",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786818545583,
+      "tag": "0019_analytics-drop",
+      "breakpoints": true
     }
   ]
 }

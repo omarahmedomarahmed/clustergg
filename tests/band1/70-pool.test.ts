@@ -435,7 +435,7 @@ test("no weekly-cycle dollar reads a guild_snapshots row", async () => {
   await db.insert(schema.guildSnapshots).values({
     id: uid(),
     guildId: "g1",
-    weekStart: MONDAY,
+    takenAt: MONDAY,
     memberCount: 999_999,
     linkedCount: 1,
   });

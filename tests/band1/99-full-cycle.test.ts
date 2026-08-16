@@ -358,7 +358,7 @@ test("four weeks, end to end, with the invariant checked at every step", async (
       await db.insert(schema.guildSnapshots).values({
         id: uid(),
         guildId: guilds[0],
-        weekStart,
+        takenAt: weekStart,
         memberCount: 999_999,
         linkedCount: 1,
       });
@@ -370,7 +370,7 @@ test("four weeks, end to end, with the invariant checked at every step", async (
       );
       await db
         .delete(schema.guildSnapshots)
-        .where(sqlEq(schema.guildSnapshots.weekStart, weekStart));
+        .where(sqlEq(schema.guildSnapshots.guildId, guilds[0]));
 
       const { division } = await closeWeek(db, weekStart, close);
 
