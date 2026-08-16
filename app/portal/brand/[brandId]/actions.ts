@@ -11,6 +11,8 @@ import { redirect } from "next/navigation";
 import { getDb } from "../../../../lib/db/index.ts";
 import { brandPortalOpen } from "../../../../lib/portal/session.ts";
 import { confirmAndPay, onInvoicePaid, BuilderRefused } from "../../../../lib/portal/brand.ts";
+import { requireBrandPortal } from "../../../../lib/portal/session.ts";
+import { threadFor, postMessage } from "../../../../lib/messages/threads.ts";
 
 async function guard(brandId: string): Promise<void> {
   if (!(await brandPortalOpen(brandId))) {
@@ -54,4 +56,18 @@ export async function checkoutAction(form: FormData): Promise<void> {
     }
     throw e;
   }
+}
+
+/** H5 — the brand's side of the conversation. */
+export async function sendBrandMessageAction(form: FormData): Promise<void> {
+  const brandId = String(form.get("brandId"));
+  await requireBrandPortal(brandId);
+  const db = await getDb();
+  const threadId = await threadFor(db, { side: "brand", brandId });
+  const body = String(form.get("body") ?? "");
+  if (body.trim()) {
+    await postMessage(db, { threadId, authorKind: "brand", authorId: brandId, body });
+  }
+  revalidatePath(`/portal/brand/${brandId}/messages`);
+  redirect(`/portal/brand/${brandId}/messages`);
 }

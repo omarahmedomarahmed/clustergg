@@ -56,6 +56,12 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   "/admin/payouts": departments("admin", "finance"),
   "/admin/redeems": departments("admin", "finance"),
   "/admin/weekend": departments("admin", "finance", "support", "sales"),
+  // 05 §6 / MS2 — **two inboxes, never merged**, and classified separately for
+  // the same reason they are two pages. Support answers server owners; sales
+  // answers brands. Giving both to both would make the split a layout choice
+  // rather than a rule, and the two conversations are about different money.
+  "/admin/inbox/servers": departments("admin", "support"),
+  "/admin/inbox/brands": departments("admin", "sales"),
   "/admin/settings": ADMIN_ONLY,
   // ST1 — a title is what opens this console, so granting one is the single
   // thing a title must never be able to do. Admin-only by kind, like the

@@ -69,3 +69,32 @@ export function Refusal({ children }: { children: React.ReactNode }) {
     </p>
   );
 }
+
+/**
+ * H1 — an **`i` icon on everything** in both portals.
+ *
+ * Clicking opens an overlay explaining what it is and the rule behind it. Built
+ * as `<details>` rather than a modal on purpose: it needs no JavaScript, it is
+ * in the DOM for the screenshot record whether open or shut, and a help overlay
+ * that depends on a client bundle is a help overlay that is missing on exactly
+ * the page that failed to hydrate.
+ *
+ * House rule 11 — a decoration may never take a card down. This renders text
+ * it was handed and can throw on nothing.
+ */
+export function Help({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <details className="inline-block align-middle" data-help={title}>
+      <summary
+        className="ml-1 inline-flex h-4 w-4 cursor-pointer list-none items-center justify-center rounded-full border border-line text-[10px] text-mute"
+        aria-label={`What is ${title}?`}
+      >
+        i
+      </summary>
+      <div className="mt-2 rounded-lg border border-line bg-ink p-3 text-sm text-mute">
+        <p className="font-medium text-white">{title}</p>
+        <div className="mt-1">{children}</div>
+      </div>
+    </details>
+  );
+}

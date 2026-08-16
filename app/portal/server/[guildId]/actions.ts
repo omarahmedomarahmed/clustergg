@@ -14,7 +14,12 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "../../../../lib/db/index.ts";
 import { serverPortalAccess } from "../../../../lib/portal/session.ts";
-import { mayReAnnounce, mayEditProfile, mayRequestSpend } from "../../../../lib/portal/permissions.ts";
+import {
+  mayReAnnounce,
+  mayEditProfile,
+  mayRequestSpend,
+  mayViewPortal,
+} from "../../../../lib/portal/permissions.ts";
 import {
   reAnnounce,
   describeCommunity,
@@ -25,6 +30,7 @@ import {
   CommunityBuilderRefused,
 } from "../../../../lib/portal/owner.ts";
 import { weekFor, weekStartPlus } from "../../../../lib/challenges/week.ts";
+import { threadFor, postMessage } from "../../../../lib/messages/threads.ts";
 import type { CommunityTier } from "../../../../lib/money/amounts.ts";
 
 /**
@@ -184,4 +190,18 @@ export async function buildCommunityAction(form: FormData): Promise<void> {
     `/portal/server/${guildId}/community` +
       (result.error ? `?error=${encodeURIComponent(result.error)}` : `?built=${challengeId}`),
   );
+}
+
+/** H5 — the owner's side of the conversation. Any manager may write. */
+export async function sendServerMessageAction(form: FormData): Promise<void> {
+  const guildId = String(form.get("guildId"));
+  await guard(guildId, mayViewPortal);
+  const db = await getDb();
+  const threadId = await threadFor(db, { side: "server", guildId });
+  const body = String(form.get("body") ?? "");
+  if (body.trim()) {
+    await postMessage(db, { threadId, authorKind: "server", authorId: guildId, body });
+  }
+  revalidatePath(`/portal/server/${guildId}/messages`);
+  redirect(`/portal/server/${guildId}/messages`);
 }
