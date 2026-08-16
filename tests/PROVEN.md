@@ -416,3 +416,69 @@ four-week simulation — because I7a made one verification serve two purposes.
 That is the intended shape (*"never asked twice"*), and the blast radius is the
 evidence: signup and redemption really are reading the same fact, rather than
 two facts that happen to agree today.
+
+---
+
+# Sprint 3½ — the three things review caught
+
+## The bug: brand login was broken end to end
+
+I deleted `/api/portal/unlock` in sprint 3 and left the page it served behind.
+`app/login/[kind]/page.tsx` still described the deleted portal-key model and
+still posted to the deleted route; three live call sites redirected into it;
+`/login/brand` did not exist. **A brand could not sign in at all.**
+
+Typecheck was clean. The band was green at 264/264. Nothing caught it, because
+a route is a string and no type system has an opinion about one.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 41 | Every form action posts to a handler that exists | The brand login form pointed back at `/api/portal/unlock` | *"every form action posts to a route handler that exists"* | clean, 268/268 |
+| 42 | Every redirect resolves to a page | `lib/portal/session.ts` redirected to `/login/brands` | *"every redirect target in the app resolves to a page or a handler"* | clean, 268/268 |
+| 43 | No rendered copy offers the deleted credential | *"Sign in with your portal key"* put back into the brand login heading | *"no rendered copy offers a credential the platform deleted"* | clean, 268/268 |
+
+### Guards 42 and 43 failed on the first attempt, and both failures were mine
+
+**42 went green** because the walker covered `app/` only — and two of the three
+call sites that caused the original bug live in `lib/`. A guard that covers the
+surface but not the code redirecting into it is guarding the easy half. It now
+walks `lib/` too, with a canary asserting the walk actually reaches
+`lib/portal/session.ts`.
+
+**43 went green** because the check exempted any file mentioning *"one-time
+invite"* — which the brand login page legitimately says, so the page exempted
+itself from the whole rule. It now strips comments and checks what is left: a
+comment may explain that the key was deleted; rendered copy may not offer one.
+
+Both were re-broken against the fixed guard and both went red.
+
+### What the guard found on its first green run
+
+Two more, neither of which I had noticed:
+
+- A dead `/rules` link in the brand builder. `04-SURFACES` specifies
+  `/rules/[who]`, which is sprint 11 — the link was pointing at nothing.
+- Copy on the owner settings page still telling owners that holding the mapped
+  role *"gets the portal key"*.
+
+## The column that shipped ahead of its gate
+
+`users.staffTitleId` and `staff_titles` migrated in sprint 3. `currentStaff`
+read the column. **Nothing enforced who could write it** — a column that opens
+the admin console, with no gate, for one sprint.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 44 | Only the super admin grants a title | `requireSuperAdmin` made to refuse only a null department | 3 cases | clean, 277/277 |
+| 45 | No title reaches the gamer directory (ST2) | `/admin/users` widened from `ADMIN_ONLY` to a department list | **7 cases across two suites** | clean, 277/277 |
+
+Guard 45's blast radius is the sprint-1 design paying off: `ADMIN_ONLY` is its
+own *kind*, not a list, so a title naming every department still cannot reach
+the directory — and widening it breaks seven assertions rather than one.
+
+## And one loaded gun removed
+
+`isGuildManager` in `lib/discord/types.ts` — zero call sites, and the exact
+shape 12 §6 forbids. It was also wrong on its own terms: it accepted
+**MANAGE_GUILD**, which P2 never grants. Deleted, with the reasoning left where
+it was so nobody writes it again.
