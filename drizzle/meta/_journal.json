@@ -141,6 +141,13 @@
       "when": 1786818545583,
       "tag": "0019_analytics-drop",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1786818546583,
+      "tag": "0020_messages",
+      "breakpoints": true
     }
   ]
 }

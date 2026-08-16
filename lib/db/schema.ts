@@ -1059,6 +1059,65 @@ export const discordPostQueue = pgTable(
  * admin-only (house rule 7). A title feeds `lib/admin/auth.ts`; it never
  * overrides it.
  */
+/**
+ * One thread per server, one per brand. **Two inboxes, never merged** (MS2).
+ *
+ * `side` is not decoration and it is not derivable from which id is set — it
+ * is what the admin inbox queries on, and it is the reason a brand thread can
+ * never appear in the server inbox by a query somebody wrote slightly wrong.
+ * Exactly one of `guildId` and `brandId` is set (07).
+ *
+ * MS1 — **a thread whose last message is not from Cluster keeps alerting.**
+ * `lastAuthorKind` is what that reads, and it is deliberately not `unread` or
+ * `needsReply`: a flag can be cleared by opening the page, and H7's whole
+ * point is that **silence is the failure mode the page exists to prevent.**
+ */
+export const messageThreads = pgTable(
+  "message_threads",
+  {
+    id: text("id").primaryKey(),
+    /** `server` | `brand` */
+    side: text("side").notNull(),
+    guildId: text("guild_id"),
+    brandId: text("brand_id"),
+    subject: text("subject"),
+    lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
+    /** `server` | `brand` | `cluster` — who spoke last. MS1 reads this. */
+    lastAuthorKind: text("last_author_kind"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("message_threads_side_idx").on(t.side, t.lastMessageAt),
+    index("message_threads_guild_idx").on(t.guildId),
+    index("message_threads_brand_idx").on(t.brandId),
+  ],
+);
+
+export type MessageThread = typeof messageThreads.$inferSelect;
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: text("id").primaryKey(),
+    threadId: text("thread_id").notNull(),
+    /** `server` | `brand` | `cluster` */
+    authorKind: text("author_kind").notNull(),
+    authorId: text("author_id"),
+    body: text("body").notNull(),
+    sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * When Cluster opened it. **Reading is not answering** — this exists so a
+     * human can see what they have looked at, and MS1 deliberately does not
+     * consult it. A read that cleared the alert is how an unanswered thread
+     * goes quiet, which is the exact failure H7 names.
+     */
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [index("messages_thread_idx").on(t.threadId, t.sentAt)],
+);
+
+export type Message = typeof messages.$inferSelect;
+
 export const staffTitles = pgTable("staff_titles", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
