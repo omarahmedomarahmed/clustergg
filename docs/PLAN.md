@@ -219,9 +219,10 @@ and pushed; everything below is unstarted.
 | 5 · Attribution and eligibility | **Done** |
 | 6 · Permissions and the owner portal | **Done** — including the carried-in bot-install flow |
 | 7 · Opt-in analytics | **Done** |
-| 8 – 14 | Not started |
+| 8 · Messages | **Done** |
+| 9 – 14 | Not started |
 
-**361 tests, 1,553 assertions, 150 guards proven by breaking, 24 mutations
+**370 tests, 1,589 assertions, 155 guards proven by breaking, 24 mutations
 caught by at least their expected number of suites, typecheck gating the band
 inside `npm test`.** Band 1 is entirely green. Band 2 has one red pass, owned
 below.

@@ -929,3 +929,38 @@ control — so per-server consent is *our* gate, kept in code. *"We cannot read
 your member list"* would be a promise the architecture cannot keep, and 12 §7a
 says so explicitly. The guard asserts both halves: that the sentence says *we do
 not*, and that it does not say *we cannot*.
+
+---
+
+# Sprint 8 — messages
+
+The one alert on the platform that fires because **nothing** happened.
+`tests/band1/97-messages.test.ts`.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 151 | **The alert clears on a reply, never on a read** | `markRead` also sets `lastAuthorKind` to `cluster` | *"reading is not answering"* | clean, 369/370 |
+| 152 | An unanswered thread keeps alerting | `isAwaitingReply` returns `false` | **4 cases** | clean, 366/370 |
+| 153 | **The two inboxes never merge** | The `side` filter dropped from `inbox` | *"a brand thread never appears in the server inbox"* | clean, 369/370 |
+| 154 | A brand cannot speak in a server conversation | The author/side check disabled | *"a brand cannot speak in a server conversation"* | clean, 369/370 |
+| 155 | The thread summary is written with the message | The `lastAuthorKind` update dropped from `postMessage` | **4 cases** | clean, 366/370 |
+
+### Guard 151 is the edit somebody will make
+
+Clearing the alert when admin opens the thread reads like an obvious
+improvement — it is what every other inbox on earth does. It turns H7 into its
+exact opposite: the threads that would stop alerting are precisely the ones
+somebody opened, meant to answer, and did not.
+
+So `markRead` exists, does what its name says, and is guarded against doing
+anything else. The alert is derived from **who spoke last**, which is a fact
+about the conversation rather than a fact about a session.
+
+### Guard 155 is why the summary is written in the same call
+
+`lastAuthorKind` is a denormalisation, and normally that would be worth
+avoiding — but the alert has to be answerable from a list query across every
+thread, and deriving it per row from the messages table makes the admin
+dashboard's count a scan. Writing it in the same call as the message is what
+keeps it from being one write behind, and a summary that can lag is an alert
+that can be wrong for as long as nobody notices.
