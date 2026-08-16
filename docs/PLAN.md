@@ -42,6 +42,35 @@ Everything below depends on getting this table right, so it is first.
 
 ---
 
+## 0.1 · The one failure shape this branch keeps producing
+
+Three of the four worst defects found here were the same shape, and none of them
+looked alike from the outside. Read this before writing a guard.
+
+> **Something was proven to EXIST. Nothing was proven to READ it.**
+
+| Where | What existed | What never read it |
+|---|---|---|
+| `/login/brand` | A page, a form, three redirects pointing at it | The route the form posted to had been deleted. Typecheck cannot see it: **a route is a string** |
+| The HTTP surface | Every library, fully tested, 277/277 green | Nothing in front of them. Band 1 calls libraries directly and never goes through HTTP, so a gamer could not press Join |
+| **U3, the under-13 block** | A salted fingerprint, written by the age step, proven to survive account deletion (guard 24) | **Two of the three doors that create a `users` row.** A 12-year-old told *"you cannot come back with a different answer"* could come back through either |
+
+The U3 one is the sharpest, because the guard on it was correct. It proved the
+evidence survives. It never proved anybody consults it, and **those are different
+claims that read identically in a test name.** `docs/TRAPS.md` §18 has the full
+write-up; the fix was to move the check to the point the row is created, so every
+door inherits it, including doors added later.
+
+So: for every rule you guard, ask **what reads it** — not what writes it. Then
+ask whether *every* path that should read it goes through that code. One grep,
+before the fix, not after (trap 21).
+
+And write the negative half. Guard 118 proves `refuseIfBlocked` is **not** a
+blanket refusal; without it, a function that refuses everybody satisfies the two
+guards either side of it.
+
+---
+
 ## 1 · The audit
 
 **KEEP** untouched · **AMEND** right shape, wrong rule inside · **REBUILD** built
@@ -176,6 +205,42 @@ document line permits otherwise.
 
 ## 2 · The sprints
 
+### 2.0 · Where the work has got to
+
+Read this before the sprint tables. Everything above the line is built, guarded
+and pushed; everything below is unstarted.
+
+| Sprint | State |
+|---|---|
+| Stages 1–10 (the ten stages of `08-BUILD-ORDER`) | **Done** |
+| 3 · Two doors, one row | **Done** |
+| 4 · Onboarding, staff, and the console gate | **Done** |
+| 4a · The wiring | **Done** — inserted mid-branch after review; see the table below |
+| 5 · Attribution and eligibility | **Not started.** The highest-risk work left, and deliberately left to a fresh session |
+| 6 – 14 | Not started |
+
+**305 tests, 1,330 assertions, 118 guards proven by breaking, typecheck gating
+the band inside `npm test`.** Band 1 is entirely green. Band 2 has one red pass,
+owned below.
+
+Two things about Sprint 4a, because a fresh session reading straight down will
+otherwise assume the numbering skipped: **it is a real sprint, it is complete,
+and it is where Stripe lives.** Stripe was originally scheduled in Sprint 14 —
+the last one — which put the thing that takes the money after everything that
+spends it. `08`'s own ordering rule is *money before anything that spends it*,
+so it moved. Sprint 14's entry records the move; this is the second place it is
+written down, because one place was not enough to stop the question being asked.
+
+#### Carried forward, with an owner and a sprint
+
+Neither of these is a note in a chat log. Both are deliverables of a named
+sprint, and both are listed again in that sprint's **Builds** row.
+
+| What | Owner | Why it is not now |
+|---|---|---|
+| **`tests/band2/portals.mts` is RED and stays red until Sprint 10** | Sprint 10, with the brand dashboard | It drives the deleted portal-key model — `input[name="id"]` plus a key, and copy asserting *"there is no password anywhere"*. Sprint 3's brand-login rebuild invalidated the whole premise; it was last touched at `6d2724a`. Repairing it means re-authoring the brand portal's screenshot record against email + password and the one-time invite, which is Sprint 10's job. **A permanently-failing suite is how a suite gets deleted** — trap 19 — so it has a date, not a shrug |
+| **The bot-install flow does not exist** | Sprint 6, with the owner portal | `botInstallUrl` is exported from `lib/auth/discord.ts` and **called from nowhere.** `/api/auth/discord/install` handles the callback; nothing starts the round trip. So an owner whose server has never had Cluster in it grants `guilds`, `recordGuildOwnership` finds no known guild to record against, and the step never completes. **Right now the page tells the truth and stops there** — *"A server Cluster has never been added to will not show up — add the bot there first and it appears here"* — which is honest and is not a way through. It belongs in Sprint 6, where the guild-permission gate already lives |
+
 ### Sprint 3 · Two doors, one row
 
 | | |
@@ -230,7 +295,8 @@ Same class as the `/login/brand` bug, one level up: a surface nothing tested.
 
 | | |
 |---|---|
-| **Builds** | The guild-permission gate (ADMINISTRATOR **or** mapped role ID) · owner vs administrator on every action · `spend_requests` — request → approve · withdrawal owner-only · the 13–17 owner who spends and cannot withdraw · all owner pages rebuilt on Discord identity · **an owner who signed up by email and links Discord later** |
+| **Builds** | The guild-permission gate (ADMINISTRATOR **or** mapped role ID) · owner vs administrator on every action · `spend_requests` — request → approve · withdrawal owner-only · the 13–17 owner who spends and cannot withdraw · all owner pages rebuilt on Discord identity · **an owner who signed up by email and links Discord later** · **the bot-install flow** — the route that *starts* the round trip `botInstallUrl` was written for, reached from onboarding's `guilds` step and from the owner portal |
+| **Carried in** | **The bot-install gap** (§2.0). `botInstallUrl` is exported and called from nowhere, so onboarding's owner path dead-ends for anybody whose server has never had Cluster in it. Sprint 4 answered it with honest copy rather than widening its own scope; this sprint answers it with the route. G1 is the constraint on that route: **who installed the bot is captured at the callback or lost forever** — Discord will never tell us afterwards |
 | **Deletes** | The seven key-gated pages, `lib/portal/session.ts` as it stands |
 | **Governed by** | 12 §1, §6 · 04 §2 · 06 §2 · 00 §7 S0–S10 |
 | **Guards** | An administrator cannot withdraw · cannot approve a spend · a **renamed** role does not revoke access · a teen owner spends and does not withdraw · a transfer freezes withdrawal for 7 days |
@@ -267,9 +333,11 @@ Same class as the `/login/brand` bug, one level up: a surface nothing tested.
 
 | | |
 |---|---|
-| **Builds** | The SaaS shell — side nav, no site nav, docs and guides **inside**, `i` on everything · the brand pages rebuilt into it · *Back to dashboard* · the context switcher · four nav states |
+| **Builds** | The SaaS shell — side nav, no site nav, docs and guides **inside**, `i` on everything · the brand pages rebuilt into it · *Back to dashboard* · the context switcher · four nav states · **`tests/band2/portals.mts` re-authored** against email + password and the one-time invite |
+| **Carried in** | **`tests/band2/portals.mts` is red until this sprint** (§2.0). It still drives the portal-key model Sprint 3 deleted, and its assertions describe copy that no longer exists. It is not repaired in place — the brand portal's screenshot record is rewritten here, alongside the pages it photographs, because a record written against a shell that is about to change would be written twice |
 | **Governed by** | 12 §1, §10, §11 · 04 §1, §3 |
 | **Guards** | A brand never appears in the switcher · never sees the gamer nav · the audience floor still suppresses |
+| **Done when** | The nav is right **and band 2 is fully green for the first time since Sprint 3** |
 | **A human can** | Switch between *Playing as …* and each server they manage |
 
 ### Sprint 11 · Help, progress, and the missing pages
