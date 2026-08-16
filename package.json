@@ -13,14 +13,15 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.mts",
-    "test": "tsx tests/run.mts",
+    "test": "tsc --noEmit && tsx tests/run.mts",
     "mutate": "tsx tests/mutate.mts",
     "demo": "next build && next start",
     "test:browser": "tsx tests/band2/site.mts && tsx tests/band2/admin.mts && tsx tests/band2/portals.mts",
     "seed": "tsx scripts/seed-demo.mts",
     "test:browser:site": "tsx tests/band2/site.mts",
     "test:browser:admin": "tsx tests/band2/admin.mts",
-    "test:browser:portals": "tsx tests/band2/portals.mts"
+    "test:browser:portals": "tsx tests/band2/portals.mts",
+    "test:band": "tsx tests/run.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

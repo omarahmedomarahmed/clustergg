@@ -297,6 +297,34 @@ test("every route the spec promises resolves to a handler that exists", async ()
   );
 });
 
+test("the test command typechecks before it runs", async () => {
+  // ===== THE SYSTEMIC HALF OF A DEAD ASSERTION =====
+  //
+  // `96-wiring` shipped `ok(vault.ok || …)` where `PrizeVaultCheck` has no
+  // `ok`. The left side was always `undefined`, the assertion collapsed to one
+  // enum comparison, and it claimed to guard the invariant the platform rests
+  // on. Typecheck names that in a single line.
+  //
+  // It was not being run. `next build` does not typecheck files outside the
+  // app graph, so a whole test suite can be type-broken while a build reports
+  // success — and "build clean" was reported as though it covered tests.
+  //
+  // So `npm test` typechecks first. This asserts that it still does, because
+  // the fix is one careless edit to a script from being undone, and nothing
+  // else would notice.
+  const pkg = JSON.parse(
+    await fs.readFile(path.join(repoRoot, "package.json"), "utf8"),
+  ) as { scripts?: Record<string, string> };
+
+  const test = pkg.scripts?.test ?? "";
+  ok(/tsc\s+--noEmit/.test(test), `npm test runs the typechecker: ${test}`);
+  ok(
+    test.indexOf("tsc") < test.indexOf("tests/run.mts"),
+    "and runs it BEFORE the band — a type error should stop the run, not be " +
+      "buried under three hundred passing assertions",
+  );
+});
+
 test("no rendered copy offers a credential the platform deleted", async () => {
   // The other half of what went wrong: the stale page did not merely 404 on
   // submit, it *described the deleted model* — "access is by portal key, never

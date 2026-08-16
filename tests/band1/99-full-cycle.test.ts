@@ -402,8 +402,22 @@ test("four weeks, end to end, with the invariant checked at every step", async (
   ok(report.every((r) => r.reach > 0), "and reach counted per challenge");
 
   const finalCheck = await checkPrizeVault(db);
+  // ===== M3 ITSELF, NOT A LIST OF ACCEPTABLE STATES =====
+  //
+  // This read `state === "green" || state === "unclaimed"` and called that
+  // "healthy". It was falsifiable, so not dead — but it was weaker than the
+  // code deserves: after four closed weeks nothing should be *unclaimed*, and
+  // permitting it meant the assertion would have stayed green through a month
+  // that ended with trophies promised to a challenge that never closed.
+  //
+  // `holds` is the rule stated once: balance − liability − orphaned is zero
+  // and the vault is not over-allocated. It is true here, so the weaker form
+  // was buying nothing.
   ok(
-    finalCheck.state === "green" || finalCheck.state === "unclaimed",
-    `the month ends with the vault healthy: ${finalCheck.explanation}`,
+    finalCheck.holds,
+    `the month ends with the prize vault holding exactly its liability — ` +
+      `balance ${finalCheck.balanceCents}, liability ${finalCheck.liabilityCents}, ` +
+      `orphaned ${finalCheck.orphanedCents}, state ${finalCheck.state}`,
   );
+  eq(finalCheck.state, "green", "every dollar sits on a gamer's profile");
 });
