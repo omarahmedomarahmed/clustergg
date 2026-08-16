@@ -149,12 +149,85 @@ const MUTATIONS: Mutation[] = [
     replace: "    return { ok: true, value: await fn() };\n  } catch (e) {\n    throw e;",
     expect: 1,
   },
+  // ===== ATTRIBUTION AND ELIGIBILITY =====
+  //
+  // These replace "stop splitting an entrant across the servers they belong
+  // to", which mutated the ½-across-every-server block sprint 5 deleted. The
+  // harness reported it as no longer applying rather than as a hole, which is
+  // the whole reason that distinction exists in the output.
   {
-    name: "Stop splitting an entrant across the servers they belong to",
-    file: "lib/pool/score.ts",
-    find: "    const share = 1 / guildIds.length;",
-    replace: "    const share = 1;",
+    name: "Give the join server full credit instead of a half",
+    file: "lib/identity/attribution.ts",
+    find:
+      "  return [\n" +
+      "    { guildId: parent, share: 0.5 },\n" +
+      "    { guildId: join, share: 0.5 },\n" +
+      "  ];",
+    replace: "  return [{ guildId: join, share: 1 }];",
+    expect: 2,
+  },
+  {
+    name: "Give two halves when parent and join are the same server",
+    file: "lib/identity/attribution.ts",
+    find: "  if (parent === join) return [{ guildId: parent, share: 1 }];",
+    replace: "",
     expect: 1,
+  },
+  {
+    name: "Let a gamer set their own parent server",
+    file: "lib/identity/attribution.ts",
+    find: "  if (input.actorId === input.userId) {",
+    replace: "  if (false) {",
+    expect: 1,
+  },
+  {
+    name: "Read the parent live at scoring instead of the frozen stamp",
+    file: "lib/pool/score.ts",
+    find: "      parentGuildId: p.parentGuildIdAtBaseline,",
+    replace:
+      "      parentGuildId:\n" +
+      "        (\n" +
+      "          await db\n" +
+      "            .select({ parentGuildId: schema.users.parentGuildId })\n" +
+      "            .from(schema.users)\n" +
+      "            .where(eq(schema.users.id, p.userId))\n" +
+      "        )[0]?.parentGuildId ?? null,",
+    expect: 2,
+  },
+  {
+    name: "Freeze the conversion denominator at the gun snapshot",
+    file: "lib/pool/score.ts",
+    find: "    const linkedMembers = Math.max(linkedNow, parented.size);",
+    // The gate's ten, frozen — which is exactly the 3.0 E1 describes. Written
+    // as a literal rather than the imported constant so the mutation needs no
+    // import: production code must not carry a dead one to make a mutation
+    // compile.
+    replace: "    const linkedMembers = 10;",
+    expect: 1,
+  },
+  {
+    name: "Re-check pool eligibility mid-week",
+    file: "lib/pool/score.ts",
+    find: "    if (!isFrozenEligible(guild, week.start)) {",
+    // The profile half of the gate, read live off the row instead of the
+    // freeze. Inlined for the same reason as above.
+    replace:
+      "    if (!guild.coverImageUrl || !guild.inviteUrl || !guild.memberAgeRange) {",
+    expect: 2,
+  },
+  {
+    name: "Let a KPI read a guild_snapshots row",
+    file: "lib/pool/score.ts",
+    find: "    const linkedNow = await linkedMembersOf(db, guild.guildId);",
+    replace:
+      "    const linkedNow =\n" +
+      "      (\n" +
+      "        await db\n" +
+      "          .select()\n" +
+      "          .from(schema.guildSnapshots)\n" +
+      "          .where(eq(schema.guildSnapshots.guildId, guild.guildId))\n" +
+      "      )[0]?.linkedCount ?? (await linkedMembersOf(db, guild.guildId));",
+    expect: 2,
   },
   {
     name: "Announce without checking readiness",

@@ -30,7 +30,7 @@ import { enterChallenge } from "../../lib/challenges/entry.ts";
 import { stampBaselinesAtGun, closeChallenges } from "../../lib/challenges/jobs.ts";
 import { settleChallenge } from "../../lib/trophies/settle.ts";
 import { forceSync } from "../../lib/core/sync.ts";
-import { closeWeek } from "../../lib/pool/score.ts";
+import { closeWeek, poolDivisionFor } from "../../lib/pool/score.ts";
 import { allocateToPool, maxAllocationCents } from "../../lib/money/pool.ts";
 import { releasePayout, markPayoutPaid, payoutTotal } from "../../lib/money/payouts.ts";
 import { checkPrizeVault } from "../../lib/money/prize-vault.ts";
@@ -337,6 +337,41 @@ test("four weeks, end to end, with the invariant checked at every step", async (
     const poolCents = maxAllocationCents(await balanceOf(db, "server"));
     if (poolCents > 0) {
       await allocateToPool(db, { weekStart, amountCents: poolCents });
+
+      // ===== S2 / N9 — DROP THE TABLE AND EVERY DOLLAR IS IDENTICAL =====
+      //
+      // `guild_snapshots` is consent-gated analytics an owner opted into and
+      // could have declined, refreshed by a button they press. Nothing in the
+      // weekly cycle may read it, or a server changes its own earnings by
+      // pressing refresh and a revocable permission becomes load-bearing on
+      // the pool.
+      //
+      // Asserted here as well as in its own unit test because the mutation
+      // "let a KPI read a guild_snapshots row" was caught by exactly one
+      // suite, and one assertion is one edit away from none. This is the
+      // division a real week's money is drafted from.
+      //
+      // One server gets a row and the others do not — the realistic shape,
+      // since the grant is per server (N1), and the only one where a read
+      // moves money *between* servers rather than cancelling out in the rank.
+      const clean = await poolDivisionFor(db, weekStart, close);
+      await db.insert(schema.guildSnapshots).values({
+        id: uid(),
+        guildId: guilds[0],
+        weekStart,
+        memberCount: 999_999,
+        linkedCount: 1,
+      });
+      const withAnalytics = await poolDivisionFor(db, weekStart, close);
+      eq(
+        JSON.stringify(withAnalytics),
+        JSON.stringify(clean),
+        `${where}: the whole division is identical with an analytics snapshot present`,
+      );
+      await db
+        .delete(schema.guildSnapshots)
+        .where(sqlEq(schema.guildSnapshots.weekStart, weekStart));
+
       const { division } = await closeWeek(db, weekStart, close);
 
       const allocated = division.shares.reduce((sum, s) => sum + s.totalCents, 0);
