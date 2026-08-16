@@ -425,23 +425,32 @@ test("no weekly-cycle dollar reads a guild_snapshots row", async () => {
 
   const withoutRows = await poolDivisionFor(db, MONDAY);
 
-  // Now fill the table with numbers that flatly contradict reality. If any
-  // figure below moves, a dollar is reading analytics.
-  for (const guildId of ["g1", "g2"]) {
-    await db.insert(schema.guildSnapshots).values({
-      id: uid(),
-      guildId,
-      weekStart: MONDAY,
-      memberCount: 999_999,
-      linkedCount: guildId === "g1" ? 1 : 500_000,
-    });
-  }
+  // ===== ONE SERVER OPTED IN AND THE OTHER DID NOT =====
+  //
+  // That asymmetry is the realistic shape — the grant is per server (N1) — and
+  // it is the only shape where reading a snapshot moves money *between*
+  // servers. Giving both a row makes any read cancel out in the percentile
+  // ranking, which is how the first version of this guard went green on a
+  // break that really did read the table.
+  await db.insert(schema.guildSnapshots).values({
+    id: uid(),
+    guildId: "g1",
+    weekStart: MONDAY,
+    memberCount: 999_999,
+    linkedCount: 1,
+  });
   const withRows = await poolDivisionFor(db, MONDAY);
 
+  // ===== AND EVERY FIELD, NOT THREE SOMEBODY REMEMBERED =====
+  //
+  // A hand-picked field list guards the fields somebody thought of, which is
+  // the same defect as a hand-maintained file list. The first version compared
+  // `totalCents` and `conversion`, and a break that moved `activation` sailed
+  // through it.
   eq(
-    withRows.shares.map((s) => `${s.guildId}:${s.totalCents}:${s.conversion}`),
-    withoutRows.shares.map((s) => `${s.guildId}:${s.totalCents}:${s.conversion}`),
-    "every share and every KPI is identical whether the analytics table is full or empty",
+    JSON.stringify(withRows),
+    JSON.stringify(withoutRows),
+    "the entire division is identical whether the analytics table is full or empty",
   );
 });
 
