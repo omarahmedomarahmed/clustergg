@@ -19,12 +19,38 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 
-/** The three things onboarding asks for, in the order it asks for them. */
-export const ONBOARDING_STEPS = ["link", "ageBand", "country"] as const;
+/**
+ * The two paths, and the order each asks in.
+ *
+ * ===== I7: THE AGE QUESTION COMES BEFORE ANY OTHER DATA IS STORED =====
+ *
+ * `ageBand` is first in both lists and that ordering is the rule, not a
+ * preference. *"We do not hold data on a child we never asked about."* The
+ * fork itself asks nothing, so it can precede the age question; everything
+ * after it cannot.
+ *
+ * 12 §2 — the **server-owner path substitutes the `guilds` scope for the
+ * linked game account** (G1). An owner who plays none of our games can still
+ * be paid, and a gamer who manages nothing is never asked about servers.
+ */
+export const ONBOARDING_PATHS = ["gamer", "owner"] as const;
+export type OnboardingPath = (typeof ONBOARDING_PATHS)[number];
+
+export const GAMER_STEPS = ["ageBand", "country", "link"] as const;
+export const OWNER_STEPS = ["ageBand", "country", "guilds"] as const;
+
+/** Every step either path can ask for. */
+export const ONBOARDING_STEPS = ["ageBand", "country", "link", "guilds"] as const;
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
+export function stepsFor(path: OnboardingPath): readonly OnboardingStep[] {
+  return path === "owner" ? OWNER_STEPS : GAMER_STEPS;
+}
+
 export type UnlockState = {
-  /** True only when every step is done. Nothing accrues before this is true. */
+  /** Which fork they took. `gamer` unless they said otherwise. */
+  path: OnboardingPath;
+  /** True only when every step *this path asks for* is done. */
   unlocked: boolean;
   /** Which steps are done. */
   done: Record<OnboardingStep, boolean>;
@@ -45,6 +71,14 @@ export type UnlockFacts = {
   ageBand: string | null;
   country: string | null;
   linkedAccountCount: number;
+  /**
+   * Which path they took. Defaults to `gamer`, which is the stricter of the
+   * two: it requires a linked game account, and defaulting to the looser one
+   * would let an unfinished account through by omission.
+   */
+  path?: OnboardingPath;
+  /** Whether they granted the `guilds` scope. The owner path's fourth step. */
+  guildsGranted?: boolean;
 };
 
 /**
@@ -56,13 +90,21 @@ export type UnlockFacts = {
  * endpoint"). Linking is the step; proving is a property of the link.
  */
 export function deriveUnlock(facts: UnlockFacts): UnlockState {
+  const path: OnboardingPath = facts.path ?? "gamer";
   const done: Record<OnboardingStep, boolean> = {
     link: facts.linkedAccountCount > 0,
+    guilds: facts.guildsGranted === true,
     ageBand: facts.ageBand === "teen" || facts.ageBand === "adult",
     country: typeof facts.country === "string" && facts.country.length > 0,
   };
-  const missing = ONBOARDING_STEPS.filter((s) => !done[s]);
+  // Only the steps THIS path asks for. A gamer is never blocked on `guilds`
+  // and an owner is never blocked on a linked game account — 12 §2's capability
+  // gates, not role gates: "an owner who plays none of our games can still be
+  // paid; a gamer who manages nothing is never asked about servers."
+  const steps = stepsFor(path);
+  const missing = steps.filter((s) => !done[s]);
   return {
+    path,
     unlocked: missing.length === 0,
     done,
     missing,

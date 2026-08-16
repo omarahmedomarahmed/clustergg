@@ -18,8 +18,13 @@ import { eq as sqlEq } from "drizzle-orm";
 test("the unlock derivation names which step is missing", () => {
   const none = deriveUnlock({ ageBand: null, country: null, linkedAccountCount: 0 });
   no(none.unlocked, "a gamer who has done nothing is not unlocked");
-  eq(none.missing, ["link", "ageBand", "country"], "all three steps are named");
-  eq(none.next, "link", "and the first one is where they are sent");
+  // ===== AGE FIRST, AND THE ORDER IS THE RULE (I7) =====
+  //
+  // *"The age question comes before any other data is stored. We do not hold
+  // data on a child we never asked about."* So `ageBand` leads both paths, and
+  // `next` sends them there before anything else is asked for or kept.
+  eq(none.missing, ["ageBand", "country", "link"], "all three steps are named, age first");
+  eq(none.next, "ageBand", "and the age question is where they are sent");
 
   const partial = deriveUnlock({ ageBand: "adult", country: null, linkedAccountCount: 1 });
   no(partial.unlocked, "two of three is not unlocked");
@@ -45,8 +50,8 @@ test("a half-onboarded gamer cannot enter, and the refusal says why", async () =
     /link/,
     "a gamer with nothing linked is refused, naming the link step",
   );
-  eq((err as { missing?: string[] }).missing, ["link", "ageBand", "country"],
-    "and the error carries every missing step, not just the first");
+  eq((err as { missing?: string[] }).missing, ["ageBand", "country", "link"],
+    "and the error carries every missing step, not just the first — age first, I7");
 
   await linkAccount(db, {
     userId: id,
