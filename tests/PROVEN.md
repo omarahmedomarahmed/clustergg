@@ -633,3 +633,24 @@ and nothing else would notice.
 **And the reporting rule that goes with it: "typecheck clean" is only said after
 `npm run typecheck` has actually been run. "Build clean" is a different
 statement and does not cover tests.**
+
+---
+
+# Bookkeeping — the numbering
+
+This file briefly carried **two colliding series**: one from the ten stages, one
+restarted at the rebuild. 24 ids meant two different things, and the second
+series skipped a number. Guard 51 had two answers.
+
+Renumbered 1..101 in document order. **Every write-up is unchanged** — only the
+ids moved. The thirteen prose references were re-resolved by position and each
+checked against the row it names; *"Guards 42 and 43"* was plural, slipped the
+first pass, and was corrected by hand to 89 and 90.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 102 | Guard ids are unique and continuous | Row 101 renumbered to 51, recreating a collision | *"every guard id in PROVEN.md is unique, and the series is continuous"* | clean, 294/294 |
+
+The continuity half is the part that keeps this honest: a row cannot be
+inserted without renumbering, so the prose references cannot quietly drift away
+from the rows they cite.
