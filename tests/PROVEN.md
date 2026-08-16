@@ -813,3 +813,63 @@ That is correct and it is now written down in `isFrozenEligible`: a closed
 week's numbers live in `server_payouts`, drafted at that week's own close
 before the next gun fires. Recomputing a closed week from a gate that no longer
 exists is precisely the drift `01-CYCLE`'s one-function rule exists to prevent.
+
+---
+
+# Sprint 6 — permissions, and the install round trip
+
+Two things. The **owner/administrator split**, which is where every money rule
+on a server sits, and the **bot-install flow** carried in from §2.0 — the half
+of a round trip that was missing.
+
+`tests/band1/95-permissions.test.ts` unless the row says otherwise.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 135 | **An administrator cannot withdraw** | `mayWithdraw`'s owner check widened to `kind !== "none"` | 2 cases, including *"an administrator does everything except move money"* | clean, 346/348 |
+| 136 | **An administrator cannot approve a spend** | `mayApproveSpend` widened to `kind !== "none"` | 3 cases, across the capability table and both spend paths | clean, 345/348 |
+| 137 | A teen owner spends and does not withdraw | The age gate collapsed into the owner gate — 09's mutation, written out | *"a teen owner spends and does not withdraw"* | clean, 347/348 |
+| 138 | A confirmed transfer freezes withdrawal for 7 days | The window check disabled | *"a confirmed transfer freezes withdrawal for seven days"* | clean, 347/348 |
+| 139 | The owner is the owner, whatever roles they also hold | The administrator branch moved above the owner branch | *"the owner is the owner, whatever roles they also hold"* | clean, 347/348 |
+| 140 | **Who acted is taken from the access shape** | `identityOf` returns a constant instead of the id | 2 cases | clean, 346/348 |
+| 141 | The install round trip has a starting point | The whole `!code` branch deleted from the install route (`97-onboarding-paths`) | *"the bot install round trip has a starting point, not just a callback"* | clean, 347/348 |
+| 142 | **A request commits nothing until the owner answers** | `requestCommunitySpend` builds and bills the challenge | 3 cases | clean, 345/348 |
+
+### Guard 139 is an ordering bug, not a permission bug
+
+Both branches are individually correct. Swapping them demotes an owner who
+**also** holds the mapped role to an administrator — and every server where the
+owner mapped a role they themselves hold is exactly that case, which is most of
+them. The owner would open their own portal and find withdraw disabled.
+
+It is the same class as guard 72's prefix bug in sprint 1: the predicate is
+right and the order is what carries the property.
+
+### Guard 141, and why it needed a chokepoint rather than a search
+
+`botInstallUrl` shipped in sprint 3 **exported and called from nowhere**. The
+install *callback* was complete and correct — it captures the installer, which
+G1 says is captured there or lost forever — and nothing started the round trip
+that would ever reach it. An owner whose server had never had Cluster in it
+granted `guilds`, saw no rows, and had no way forward.
+
+Typecheck cannot see this: an exported function with no caller is not an error,
+it is a library. Reachability cannot see it either — nothing pointed at a
+missing route, the route existed and was simply never entered from the front.
+
+So the guard is on the **function that builds the consent URL**, the way guard
+112 is for `discordAuthUrl`. Searching for the word "install" would sweep up a
+route name, a state kind, a column and four sentences of prose — trap 16, and a
+guard whose expected list churns on unrelated edits is one somebody deletes.
+
+The second half of the guard is that onboarding actually links to it. A route
+with a caller nobody can reach is the same gap one step along.
+
+### Guard 142 is where the request state earns its existence
+
+Building and billing at *request* time is the plausible shortcut, and it looks
+harmless — the owner still approves before anything is announced. It is not:
+C3 makes every challenge past `draft` carry an invoice, so a built challenge is
+already money committed against the guild, and the owner's approval would be
+approving something already spent. The row exists precisely so there is
+somewhere to hold a request that has cost nothing.
