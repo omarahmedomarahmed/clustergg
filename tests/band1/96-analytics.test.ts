@@ -80,8 +80,17 @@ test("the grant is permanent per server and survives a sign-out", async () => {
     "no session, no token, no expiry — a grant that expired with a login is not a grant",
   );
 
+  // ===== AND THROUGH THE PATH WHERE IT COULD ACTUALLY GO WRONG =====
+  //
+  // `granted` reads the row, so a grant expired **in code** rather than by a
+  // column would leave it true and this test green. Break 144 did exactly
+  // that: it aged the consent out inside `refreshState`, and every assertion
+  // above still passed. The claim is not "a row exists a year later" — it is
+  // that a year-old grant still works.
   const later = new Date(NOW.getTime() + 365 * 24 * 60 * 60 * 1000);
-  ok((await analyticsView(db, "g1", later)).granted, "and a year later it is still granted");
+  const view = await analyticsView(db, "g1", later);
+  ok(view.granted, "a year later it is still granted");
+  ok(view.refresh.allowed, "and Update still works, which is what the grant is for");
 });
 
 test("granting twice does not re-date the consent or clear a cooldown", async () => {
