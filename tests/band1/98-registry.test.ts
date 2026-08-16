@@ -66,6 +66,29 @@ test("refresh pulls owner and roles only, and never the member list", async () =
     calls.some((c) => /member/i.test(c)),
     "12 §7 — never list guild members on any path the product depends on",
   );
+
+  // ===== AND THE HALF THE CALL LIST CANNOT SEE =====
+  //
+  // The recorded list catches anything routed through the injected fetcher,
+  // which is every call this function is *supposed* to make. It cannot see a
+  // direct REST call added beside them — and that is the realistic way this
+  // rule gets broken, because `discordRest` is right there and a member list
+  // is one path away. Break 156 was exactly this: a call added through the
+  // fetcher was a no-op, because the test's fetcher has no such key to hit.
+  //
+  // `/guilds/{id}/members` is an unavoidable literal, so here the vocabulary
+  // *is* the chokepoint: there is no way to page a member list without naming
+  // that path.
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+  const src = await fs.readFile(path.join(repoRoot, "lib", "discord", "guilds.ts"), "utf8");
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  ok(/refreshGuild/.test(code), "the walk read the right file — an empty read would prove nothing");
+  no(
+    /\/members|listMembers|guildMembers|GUILD_MEMBERS/.test(code),
+    "and nothing in it reaches for a member list by any spelling",
+  );
 });
 
 test("role holders are people we have seen, and the page says so", async () => {
