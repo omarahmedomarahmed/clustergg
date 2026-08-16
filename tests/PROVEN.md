@@ -482,3 +482,60 @@ the directory — and widening it breaks seven assertions rather than one.
 shape 12 §6 forbids. It was also wrong on its own terms: it accepted
 **MANAGE_GUILD**, which P2 never grants. Deleted, with the reasoning left where
 it was so nobody writes it again.
+
+---
+
+# Sprint 4a — the wiring
+
+## The gap
+
+Eight routes named in `04-SURFACES.md` §5 did not exist, and no sprint built
+them. The libraries behind every one were written and tested; nothing was in
+front of them.
+
+**Band 1 was green at 277/277 on a platform where a gamer could not press
+Join** — because band 1 calls the libraries directly and never goes through
+HTTP. Discord could not reach us, no sync could run, no payment could land, and
+the week could neither start nor end.
+
+Found by audit against the specification, not by anything failing. Same class
+as `/login/brand`: a surface nothing tested. One level up, because it was the
+whole surface.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 46 | An unset `CRON_SECRET` refuses on a real deployment | The demo fence removed, so unset means allow | *"a cron route with no secret configured refuses on a real deployment"* | clean, 292/292 |
+| 47 | A retried Stripe event moves no money | `alreadyHandled` bypassed | *"a retried event is a no-op, and still answers"* | clean, 292/292 |
+| 48 | A rotation signature still verifies | Only the first `v1` checked | *"a signature from during a secret rotation still verifies"* | clean, 292/292 |
+
+### The guard was written first, and committed red
+
+`94-reachability` was extended before a single route was built, and the failing
+run named all eight:
+
+```
+actual: ["/api/discord/interactions","/api/cron/sync","/api/cron/daily",
+         "/api/cron/announce","/api/payments/webhook",
+         "/api/challenges/x/leaderboard","/api/pool","/api/auth/x"]
+```
+
+It reads the route table **out of `docs/04-SURFACES.md` §5** rather than from a
+list in the test file. A hand-written list would only guard the routes somebody
+remembered, and forgetting is precisely what happened. Add a route to §5 and
+the suite demands it exist; delete one and the demand goes with it. A canary
+asserts the section still parses, so a renamed heading fails loudly rather than
+quietly guarding an empty list.
+
+### Why guard 47 is the expensive one
+
+Stripe retries any non-2xx **for three days**. Without idempotency one payment
+routes into the vaults twice, and `prizeVault.balance == Σ(unredeemed
+money-trophies on live accounts)` — the invariant the whole platform rests on —
+stops holding. The test asserts all four vault balances are unchanged after a
+replay, not merely that the second call returned something different.
+
+### And why Stripe moved sprints
+
+It was in sprint 14, last. `08-BUILD-ORDER`'s own ordering rule is **money
+before anything that spends it**, and sprints 5 through 13 all assume a paid
+invoice works. It is now in 4a with everything else that had no endpoint.

@@ -16,6 +16,7 @@ Everything below depends on getting this table right, so it is first.
 |---|---|
 | **Two account tables** | `users` and `brand_users`. There is no third |
 | **Three capabilities on a gamer row** | Server manager · guild owner · Cluster staff. Each is a fact about a `users` row, never a separate account |
+| **The HTTP surface** | Eight routes in `04-SURFACES` §5 existed only as libraries. Sprint 4a builds them. A library with no endpoint in front of it is a library nothing can call |
 | **Two doors into `users`** | Discord sign-in, or email + password. Either reaches every gamer surface. Linking the second **never creates a second row and never merges two** |
 | **Attribution** | ½ parent + ½ join · 1.0 when they are the same · 1.0 to parent on a web join · nothing when there is no parent. **Frozen onto the entry at `max(challengeStart, joinedAt)`** |
 | **Eligibility** | Frozen at Monday's gun. All three KPIs live, including the conversion denominator |
@@ -195,6 +196,26 @@ document line permits otherwise.
 | **Guards** | Nothing is stored before the age band · no staff title reaches the gamer directory (ST2) · only the super admin grants a title · a staff grant changes nothing about scoring |
 | **A human can** | Walk both onboarding paths, and grant a title as super admin and not as anyone else |
 
+### Sprint 4a · The wiring — **inserted after review**
+
+The gap this closes is the largest found on the branch, and it was found by
+audit rather than by anything failing. **Eight routes named in
+`04-SURFACES.md` §5 did not exist and were in no sprint.** The libraries behind
+them were all written and all tested; nothing was in front of them. Band 1 was
+green at 277/277 on a platform where Discord could not reach us, no sync could
+run, no payment could land, and the week could neither start nor end — because
+band 1 calls the libraries directly and never goes through HTTP.
+
+Same class as the `/login/brand` bug, one level up: a surface nothing tested.
+
+| | |
+|---|---|
+| **Builds** | `/api/discord/interactions` — raw body for Ed25519, 3-second ACK, deferred work in `after()` · `/api/cron/sync`, `/daily`, `/announce` — authorised, bounded, computing only · `/api/payments/webhook` — the only path to `scheduled`, idempotent on the event id · `/api/pool` · `/api/challenges/[id]/leaderboard` · `/api/auth/[provider]` · `lib/money/stripe.ts` · `lib/core/cron-auth.ts` · `/settings/connections` |
+| **Moves** | **Stripe, out of sprint 14.** 08's own ordering rule is *money before anything that spends it*, and sprints 5–13 all assume a paid invoice works |
+| **Governed by** | 04 §5 · 05 §9 · 10 §5, §6 · 01-CYCLE's cron table |
+| **Guards** | An unset `CRON_SECRET` refuses on a real deployment · a retried Stripe event moves no money · a rotation signature still verifies · **every route §5 names resolves to a handler** |
+| **A human can** | Point Discord's interactions endpoint at the deployment and have it verify; fire a Stripe test webhook and watch a challenge reach `scheduled` |
+
 ### Sprint 5 · Attribution and eligibility
 
 | | |
@@ -278,7 +299,7 @@ document line permits otherwise.
 
 | | |
 |---|---|
-| **Builds** | The **13 new mutations** (23 total) · the four-week simulation rebuilt on parent + join, **run twice, once without `guild_snapshots`** · the full screenshot record from 09 §Band 2 · Stripe wiring that needs no live key |
+| **Builds** | The **13 new mutations** (23 total) · the four-week simulation rebuilt on parent + join, **run twice, once without `guild_snapshots`** · the full screenshot record from 09 §Band 2. *(Stripe moved to sprint 4a — money before anything that spends it.)* |
 | **Done when** | Both bands green · every mutation caught · every flow shot including refusals · the invariant holds at every step · a human has clicked all four journeys |
 
 ---
@@ -378,6 +399,10 @@ Each names the file I break and the test I expect to go red.
 | 31 | The installer is captured | `app/api/auth/discord/install/route.ts` — drop the capture | *"who installed the bot is recorded at the redirect"* |
 | 32 | Refresh never lists members | `lib/discord/guilds.ts` — call the member list | *"refresh pulls owner and roles only"* |
 | 33 | Age is asked before anything is stored | `app/onboarding/actions.ts` — store country first | *"nothing is stored before the age band"* |
+| 34 | **Every route the spec promises exists** | Delete any handler under `app/api/` | *"every route the spec promises resolves to a handler that exists"* |
+| 35 | An unset `CRON_SECRET` refuses | `lib/core/cron-auth.ts` — return ok when unset | *"a cron route with no secret configured refuses on a real deployment"* |
+| 36 | A retried Stripe event moves no money | `lib/money/stripe.ts` — drop the `alreadyHandled` check | *"a retried event is a no-op, and still answers"* |
+| 37 | A rotation signature still verifies | same — check only the first `v1` | *"a signature from during a secret rotation still verifies"* |
 
 Guard 28 is the one the whole analytics feature rests on, and it is a **whole-
 simulation** guard, not a unit test: run the four-week money simulation, drop
