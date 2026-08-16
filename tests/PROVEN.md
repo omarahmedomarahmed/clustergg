@@ -654,3 +654,66 @@ first pass, and was corrected by hand to 89 and 90.
 The continuity half is the part that keeps this honest: a row cannot be
 inserted without renumbering, so the prose references cannot quietly drift away
 from the rows they cite.
+
+---
+
+# Sprint 4 — the fork, the two paths, the progress bar
+
+Fifteen breaks, each one applied on its own and reverted before the next.
+`tests/band1/97-onboarding-paths.test.ts` unless the row says otherwise.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 103 | The two paths differ in exactly one step | `OWNER_STEPS` gained `"link"` back | *"the two paths differ in exactly one step"* + 3 more | clean |
+| 104 | Age band is asked before anything is stored (I7) | `GAMER_STEPS` reordered to link-first | *"age band is the first step on every path"* | clean |
+| 105 | A path gets its own list | `stepsFor` returns `GAMER_STEPS` for both | *"an owner is never blocked on a game account"* + 2 more | clean |
+| 106 | The default path is the stricter one | `facts.path ?? "gamer"` → `?? "owner"` | *"the default path is the stricter one"* | clean |
+| 107 | `stepsFor` fails safe on an unknown path | Inverted to `path === "gamer" ? GAMER : OWNER` | *"stepsFor falls back to the gamer list"* | clean |
+| 108 | Switching path costs only the step that differs | `missing` filter drops `ageBand` | *"the progress bar counts the steps of the path"* | clean |
+| 109 | The bar counts this path's steps, not all four | `total` hardcoded to `4` | *"…counts the steps of the path"* + the switch test | clean |
+| 110 | The bar and the gate agree | `Math.round(…)` → `Math.ceil(… + 33)` | *"the bar reads 100% exactly when the account is unlocked"* | clean |
+| 111 | Guild rows come from ownership, not membership | `if (g.owner \|\| hasAdministrator(…))` → `if (true)` | *"the owner's step is answered by rows, not by a flag"* | clean |
+| 112 | One file decides what Discord is asked for | A signup route calls `discordAuthUrl` with `guilds` | *"the guilds scope is asked for at onboarding…"* | clean |
+| 113 | …and only when it was sent there to | `guilds` appended to every scope list | same | clean |
+| 114 | …and it is actually sent when asked | Scope hardcoded to `"identify"` | same | clean |
+| 115 | The guilds round trip has a static route | `app/api/auth/discord/route.ts` moved aside | same — **and nothing else in the band moved: 303/304** | clean |
+
+Guard 115 is the one worth reading twice. `app/api/auth/[provider]/route.ts`
+matches **any** `/api/auth/*`, so the reachability guard correctly reports the
+onboarding redirect as resolving no matter how it is spelled — a moved or
+renamed Discord route would be silently absorbed by the game-provider handler,
+which answers *"we do not run challenges on discord"* and drops the owner back
+on `/settings/connections` having done nothing. Reachability cannot see that
+class of break by construction. This is the assertion that can.
+
+## What the screenshot record found
+
+`tests/band2/stage1-onboarding.mts` walks the fork, both paths, the switch
+between them and the under-13 route. Its last step — *"and they cannot come back
+with a different answer"* — **photographed a successful signup**.
+
+U3 deletes the account and keeps a salted fingerprint precisely so the answer
+cannot be retaken. The fingerprint was written by `blockUnderThirteen` and read
+by exactly one door: the demo sign-in action. The **email signup route** and the
+**Discord callback** both created a `users` row without ever looking. A child
+who answered "under 13" could sign up again with the same address, or sign in
+again with the same Discord account, and be straight back inside.
+
+Guard 24 above proved the fingerprint *survives*. It did not prove anybody
+*consults* it, and those are different claims — the same shape as the dead
+assertion this file already records, one level up: a guard that verifies the
+evidence exists without verifying anything reads it.
+
+The check now lives in `lib/identity/gamers.ts`, at the point the row is made,
+rather than at each door. Every door inherits it, including doors added later —
+and that placement is the actual fix, because *"every door has its own copy"* is
+how two of them came to have none.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 116 | The email door consults the fingerprint | `refuseIfBlocked` stops passing `email` | *"the under-13 answer cannot be retaken at any door…"* (`10-onboarding`) | clean |
+| 117 | The Discord door consults it too | `refuseIfBlocked` removed from `shadowGamerForDiscord` | same | clean |
+| 118 | And it is not a blanket refusal | `refuseIfBlocked` throws unconditionally | 9 tests across `10-onboarding` | clean |
+
+Guard 118 is the negative half, and it is not decoration: without it, 116 and
+117 are both satisfied by a function that refuses everybody.

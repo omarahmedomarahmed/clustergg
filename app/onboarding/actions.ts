@@ -13,6 +13,8 @@
 // went wrong" would satisfy the code and fail the product.
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { ONBOARDING_PATH_COOKIE } from "../../lib/identity/onboarding.ts";
 import { revalidatePath } from "next/cache";
 import { getDb, schema } from "../../lib/db/index.ts";
 import { currentGamer, signOut } from "../../lib/auth/current.ts";
@@ -32,6 +34,43 @@ function refuse(message: string): never {
 
 function reasonFrom(e: unknown): string {
   return e instanceof Error ? e.message : "That did not work.";
+}
+
+/**
+ * The fork. I8 — **both paths ask age band and country.**
+ *
+ * Stored on the session's own cookie rather than on `users`, because the path
+ * is a preference about which screens to show, not a fact about the person.
+ * I9 — either path always says they can be the other one too, at any time, so
+ * a stored path would be a claim that goes stale the moment they change their
+ * mind.
+ */
+export async function choosePathAction(form: FormData): Promise<void> {
+  const path = String(form.get("path") ?? "");
+  if (path !== "gamer" && path !== "owner") refuse("Pick one to carry on.");
+
+  const jar = await cookies();
+  jar.set(ONBOARDING_PATH_COOKIE, path, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 24,
+  });
+  redirect("/onboarding");
+}
+
+/**
+ * I10 — **`guilds` is requested here, never at signup.**
+ *
+ * The owner path's third step. Signup stays frictionless: a screen that asks
+ * to see every server you are in, before you have said you manage any, is a
+ * screen people abandon.
+ */
+export async function requestGuildsScopeAction(): Promise<void> {
+  const gamer = await currentGamer();
+  if (!gamer) redirect("/signup");
+  redirect("/api/auth/discord?kind=guilds&next=/onboarding");
 }
 
 export async function linkAccountAction(form: FormData): Promise<void> {

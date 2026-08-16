@@ -14,7 +14,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getDb, isDemoMode } from "../../../../lib/db/index.ts";
-import { createGamer } from "../../../../lib/identity/gamers.ts";
+import { createGamer, UnderThirteenError } from "../../../../lib/identity/gamers.ts";
 import {
   hashPassword,
   passwordMatches,
@@ -122,6 +122,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return back(request, "/login", { reset: "1" });
     }
   } catch (e) {
+    // ===== U3, ON THE DOOR THAT WAS MISSING IT =====
+    //
+    // `createGamer` refuses an identity that already answered "under 13", and
+    // this turns that refusal into the same quiet page the original answer
+    // led to. It is caught rather than pre-checked because a pre-check here
+    // would be a second implementation of the rule, and the reason the rule
+    // was missing from this route in the first place is that every door had
+    // its own copy.
+    if (e instanceof UnderThirteenError) {
+      return NextResponse.redirect(new URL("/goodbye", request.url), 303);
+    }
     if (e instanceof CredentialRefused) {
       const path =
         action === "signup" ? "/signup" : action.startsWith("reset") ? "/reset" : "/login";

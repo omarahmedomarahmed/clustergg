@@ -9,10 +9,18 @@ import { ok, eq, no, throws } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
 import { resetDemoDb, schema } from "../../lib/db/index.ts";
 import { deriveUnlock, unlockState, requireUnlocked } from "../../lib/identity/unlock.ts";
-import { createGamer, setAgeBand, setCountry, AgeBandLockedError } from "../../lib/identity/gamers.ts";
+import {
+  createGamer,
+  shadowGamerForDiscord,
+  setAgeBand,
+  setCountry,
+  AgeBandLockedError,
+} from "../../lib/identity/gamers.ts";
 import { linkAccount, isProven, AccountTakenError } from "../../lib/identity/accounts.ts";
 import { blockUnderThirteen, isBlocked, registrationFingerprint, mayRedeem } from "../../lib/identity/age.ts";
 import { offeredCountries, isCountryAllowed, DEFAULT_SANCTIONED } from "../../lib/identity/countries.ts";
+import { emailIsFree } from "../../lib/identity/credentials.ts";
+import { authSecret } from "../../lib/core/secret.ts";
 import { eq as sqlEq } from "drizzle-orm";
 
 test("the unlock derivation names which step is missing", () => {
@@ -209,6 +217,48 @@ test("under-13 deletes the account and cannot come back with a different answer"
   const rows = await db.select().from(schema.users).where(sqlEq(schema.users.id, id));
   eq(rows.length, 0, "the account is deleted, not marked");
   ok(await isBlocked(db, hash), "and the fingerprint survives, so the answer cannot be retaken");
+});
+
+test("the under-13 answer cannot be retaken at any door that makes an account", async () => {
+  // ===== THE FINGERPRINT ONLY WORKS IF SOMETHING READS IT =====
+  //
+  // It was written by `blockUnderThirteen` and read by exactly one door — the
+  // demo sign-in action. The email signup route and the Discord callback both
+  // created a `users` row without ever looking, so the child who answered
+  // could sign up again with the same address, or the same Discord account,
+  // and be back inside. The test above proved the fingerprint survives; it did
+  // not prove anybody consults it, and those are different claims.
+  //
+  // The check now lives at the point the row is made, which is why this test
+  // exercises `createGamer` and `shadowGamerForDiscord` rather than a route:
+  // a door that forgets inherits it, and a door added tomorrow does too.
+  const db = await resetDemoDb();
+  const salt = authSecret();
+
+  const email = "child@example.test";
+  const emailUser = await createGamer(db, { displayName: "Child", email });
+  await blockUnderThirteen(db, emailUser, registrationFingerprint({ email, salt }));
+  await throws(
+    () => createGamer(db, { displayName: "Child Again", email }),
+    /under 13/,
+    "the same address cannot open a second account",
+  );
+  // The address itself is free again — the account was deleted — so nothing
+  // but the fingerprint is standing here.
+  ok(await emailIsFree(db, email), "and it is the fingerprint doing it, not the address being taken");
+
+  const discordId = "discord-child-2";
+  const discordUser = await createGamer(db, { displayName: "Child Two", discordId });
+  await blockUnderThirteen(db, discordUser, registrationFingerprint({ discordId, salt }));
+  await throws(
+    () => shadowGamerForDiscord(db, { discordId }),
+    /under 13/,
+    "and neither can the same Discord account, on the door that makes shadow rows",
+  );
+
+  // Nobody else is caught by it.
+  const fine = await createGamer(db, { displayName: "Somebody Else", email: "adult@example.test" });
+  ok(fine.length > 0, "an unrelated signup still works — the block is not a blanket refusal");
 });
 
 test("the under-13 fingerprint is one-way and salted", () => {

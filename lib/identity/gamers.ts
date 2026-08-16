@@ -19,8 +19,42 @@ import { eq } from "drizzle-orm";
 import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 import { uid, slugify } from "../core/utils.ts";
-import { isAgeBand, type AgeBand } from "./age.ts";
+import { isAgeBand, isBlocked, registrationFingerprint, type AgeBand } from "./age.ts";
 import { isCountryAllowed } from "./countries.ts";
+import { authSecret } from "../core/secret.ts";
+
+/**
+ * Thrown when the identity signing up already answered "under 13".
+ *
+ * ===== U3 IS ENFORCED WHERE THE ROW IS MADE, NOT AT EACH DOOR =====
+ *
+ * It was at each door, and that is exactly how it came to be missing from two
+ * of them: the email signup route and the Discord callback both created a
+ * `users` row without ever asking. A child who took the under-13 path — which
+ * deletes the account and keeps a salted fingerprint *precisely* so the answer
+ * cannot be retaken — could sign up again with the same address or the same
+ * Discord account and walk straight back in.
+ *
+ * Found by the screenshot record, whose "cannot come back with a different
+ * answer" step photographed a successful signup.
+ *
+ * A door may still check first, to answer more gracefully than an exception.
+ * What it may not do is be the only thing checking.
+ */
+export class UnderThirteenError extends Error {
+  constructor() {
+    super("That account was closed because its holder is under 13. It cannot be reopened.");
+    this.name = "UnderThirteenError";
+  }
+}
+
+async function refuseIfBlocked(
+  db: DB,
+  parts: { discordId?: string | null; email?: string | null },
+): Promise<void> {
+  const hash = registrationFingerprint({ ...parts, salt: authSecret() });
+  if (await isBlocked(db, hash)) throw new UnderThirteenError();
+}
 
 /**
  * A slug nobody else holds.
@@ -56,6 +90,8 @@ export async function createGamer(
     at?: Date;
   },
 ): Promise<string> {
+  await refuseIfBlocked(db, { discordId: input.discordId, email: input.email });
+
   const id = uid();
   await db.insert(schema.users).values({
     id,
@@ -102,6 +138,11 @@ export async function shadowGamerForDiscord(
     // follows a gamer around.
     return existing.id;
   }
+
+  // Checked after the early return, not before: a gamer who already has a row
+  // is not registering, and the fingerprint only exists for identities whose
+  // row was deleted.
+  await refuseIfBlocked(db, { discordId: input.discordId });
 
   const id = uid();
   await db.insert(schema.users).values({
