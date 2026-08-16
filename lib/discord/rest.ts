@@ -47,6 +47,56 @@ async function call<T>(path: string, init: RequestInit = {}, attempt = 0): Promi
   return { ok: true, data: (await res.json().catch(() => ({}))) as T };
 }
 
+// ===== Interaction responses =====
+//
+// The other half of the 3-second rule. The handler acknowledges immediately
+// with a deferred response; this replaces that placeholder with the finished
+// card once the work in `after()` is done.
+//
+// It uses the **interaction token**, not the bot token — a webhook edit, which
+// is why it does not go through `call()`. The token is valid for 15 minutes
+// and needs no authorization header, which is also why it must never be
+// logged: it is a bearer credential for one interaction.
+
+export async function editOriginalResponse(
+  applicationId: string,
+  interactionToken: string,
+  payload: { content?: string; embeds?: unknown[]; components?: unknown[] },
+  files?: { name: string; data: Uint8Array }[],
+): Promise<boolean> {
+  const url = `${DISCORD_API}/webhooks/${applicationId}/${interactionToken}/messages/@original`;
+
+  try {
+    // A card is an image, so the common path is multipart. `payload_json`
+    // carries the message and each file rides alongside it.
+    if (files && files.length > 0) {
+      const form = new FormData();
+      form.set("payload_json", JSON.stringify(payload));
+      for (const [i, file] of files.entries()) {
+        form.set(
+          `files[${i}]`,
+          new Blob([new Uint8Array(file.data)], { type: "image/png" }),
+          file.name,
+        );
+      }
+      const res = await fetch(url, { method: "PATCH", body: form, cache: "no-store" });
+      return res.ok;
+    }
+
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      cache: "no-store",
+    });
+    return res.ok;
+  } catch {
+    // Never throws. This runs inside `after()`, where an exception is an
+    // unhandled rejection rather than something a person can see.
+    return false;
+  }
+}
+
 // ===== Guilds & channels =====
 
 export type Guild = { id: string; name: string; icon?: string | null; owner_id?: string; approximate_member_count?: number };
