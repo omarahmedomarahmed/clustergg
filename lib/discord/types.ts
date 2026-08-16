@@ -106,11 +106,20 @@ export function actor(i: Interaction): DiscordUser | null {
   return i.member?.user ?? i.user ?? null;
 }
 
-// Guild-level "is this person staff here?" — ADMINISTRATOR (0x8) or MANAGE_GUILD (0x20).
-export function isGuildManager(i: Interaction): boolean {
-  const p = BigInt(i.member?.permissions ?? "0");
-  return (p & 0x8n) !== 0n || (p & 0x20n) !== 0n;
-}
+// ===== `isGuildManager` WAS HERE, AND IT IS NOT COMING BACK =====
+//
+// It answered *"is this person staff here?"* with one boolean, which is the
+// exact shape 12 §6 forbids: the owner/administrator line is where every money
+// rule sits, and one predicate serving both jobs is one call site away from
+// letting an administrator withdraw.
+//
+// It was also wrong on its own terms — it accepted **MANAGE_GUILD** as well as
+// ADMINISTRATOR, and P2 grants neither of those two things: access is
+// ADMINISTRATOR *or a role the owner mapped by hand*, and nothing else.
+//
+// It had zero call sites, which is the only reason it never caused anything.
+// The replacement is `lib/portal/permissions.ts`, where the two questions are
+// two functions and `mayWithdraw` is the only one that can say yes to money.
 
 // Flatten `/cluster show:profile` into { query: "profile" }.
 //

@@ -11,7 +11,14 @@ import { getDb, isDemoMode } from "../db/index.ts";
 import { currentGamer } from "../auth/current.ts";
 import { staffFor, accessFor, mayAccess, type Department } from "./auth.ts";
 
-export type Staff = { userId: string; department: Department; name: string };
+export type Staff = {
+  userId: string;
+  /** The first department. Kept for every call site that asks one question. */
+  department: Department;
+  /** Every department this title reaches. A title may reach more than one. */
+  departments: Department[];
+  name: string;
+};
 
 /**
  * The staff member for this request.
@@ -24,11 +31,33 @@ export type Staff = { userId: string; department: Department; name: string };
 export async function currentStaff(): Promise<Staff | null> {
   const db = await getDb();
   const gamer = await currentGamer();
+
+  // ===== A10/U7 — STAFF ARE GAMERS, AND THE TITLE IS THE GRANT =====
+  //
+  // The grant lives on `users.staffTitleId` and points at a `staff_titles`
+  // row. Read here so a title that reaches two departments works everywhere
+  // the console asks — and read as a LIST, because `accessFor` compares a
+  // route against departments and a title like "Finance lead" has two.
+  if (gamer?.staffTitleId) {
+    const { departmentsForTitle } = await import("./staff.ts");
+    const departments = await departmentsForTitle(db, gamer.staffTitleId);
+    if (departments.length > 0) {
+      return { userId: gamer.id, department: departments[0], departments, name: gamer.slug };
+    }
+  }
+
+  // The legacy `staff` table, kept until every grant has moved to a title.
+  // One department, so the list is that one department.
   const staff = await staffFor(db, gamer?.id ?? null);
-  if (staff) return staff;
+  if (staff) return { ...staff, departments: [staff.department] };
 
   if (isDemoMode) {
-    return { userId: "demo-admin", department: "admin", name: "Demo Admin" };
+    return {
+      userId: "demo-admin",
+      department: "admin",
+      departments: ["admin"],
+      name: "Demo Admin",
+    };
   }
   return null;
 }
@@ -39,7 +68,10 @@ export async function requireAdminAccess(): Promise<Staff> {
   const route = (await headers()).get("x-pathname") ?? "/admin";
 
   if (!staff) redirect("/signup");
-  if (!mayAccess(accessFor(route), staff.department)) {
+  // Any department the title reaches may open the route. ST2 is unaffected:
+  // `ADMIN_ONLY` is its own kind, not a department list, so no title can reach
+  // the gamer directory however many departments it names.
+  if (!staff.departments.some((d) => mayAccess(accessFor(route), d))) {
     redirect(`/admin?denied=${encodeURIComponent(route)}`);
   }
   return staff;

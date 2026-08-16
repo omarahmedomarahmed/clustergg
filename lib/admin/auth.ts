@@ -57,6 +57,11 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   "/admin/redeems": departments("admin", "finance"),
   "/admin/weekend": departments("admin", "finance", "support", "sales"),
   "/admin/settings": ADMIN_ONLY,
+  // ST1 — a title is what opens this console, so granting one is the single
+  // thing a title must never be able to do. Admin-only by kind, like the
+  // directories, and for the same reason: it is not a department list that
+  // could be widened by a well-meaning edit.
+  "/admin/staff": ADMIN_ONLY,
 
   // ===== The two that are never anything else. =====
   "/admin/users": ADMIN_ONLY,

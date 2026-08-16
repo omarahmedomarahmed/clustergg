@@ -3,17 +3,23 @@ import { formatMoney } from "../../lib/money/amounts.ts";
 
 export function Panel({
   title,
+  note,
   action,
   children,
 }: {
   title: string;
+  /** One line under the heading, for the rule this panel is enforcing. */
+  note?: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-line bg-panel">
-      <div className="flex items-center justify-between border-b border-line px-5 py-3">
-        <h2 className="font-medium">{title}</h2>
+      <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
+        <div>
+          <h2 className="font-medium">{title}</h2>
+          {note ? <p className="mt-0.5 text-xs text-mute">{note}</p> : null}
+        </div>
         {action}
       </div>
       <div className="px-5 py-4">{children}</div>
