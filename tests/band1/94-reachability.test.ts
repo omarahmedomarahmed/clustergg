@@ -236,6 +236,67 @@ function withoutComments(src: string): string {
     .join("\n");
 }
 
+/**
+ * Every route `04-SURFACES.md` §5 promises, read out of the document itself.
+ *
+ * ===== WALKED FROM THE SPEC, NEVER LISTED HERE =====
+ *
+ * A hand-written list in this file would only guard the routes I remembered —
+ * and forgetting is exactly what happened: six handlers existed, all under
+ * `/api/auth`, and the other eight were in no sprint at all. Band 1 was green
+ * on a platform where Discord could not reach us, no sync could run, no
+ * payment could land, and the week could neither start nor end, because band 1
+ * calls the libraries directly and never goes through HTTP.
+ *
+ * So the list comes from the specification. Add a route to §5 and this suite
+ * demands it exist; delete one and the demand goes with it.
+ */
+async function specifiedApiRoutes(): Promise<string[]> {
+  const doc = await fs.readFile(path.join(repoRoot, "docs", "04-SURFACES.md"), "utf8");
+  const section = doc.split(/^## 5 · The public API$/m)[1] ?? "";
+  const body = section.split(/^## /m)[0];
+
+  const routes = new Set<string>();
+  // Table cells like `| `/api/cron/sync` | Hourly stat pull |`, including the
+  // rows that name two routes separated by a middle dot.
+  for (const m of body.matchAll(/`(\/api\/[^`]+)`/g)) {
+    routes.add(m[1].trim().replace(/\[[^\]]+\]/g, "x"));
+  }
+  return [...routes];
+}
+
+test("the spec's route list is actually being read", async () => {
+  // The canary. If the section heading is renamed, this suite must fail loudly
+  // rather than quietly guard an empty list — which is how a guard becomes
+  // decoration.
+  const routes = await specifiedApiRoutes();
+  ok(routes.length >= 8, `the §5 table parsed (${routes.length} routes)`);
+  ok(
+    routes.some((r) => r === "/api/discord/interactions"),
+    "including the bot's own endpoint",
+  );
+  ok(
+    routes.some((r) => r.startsWith("/api/cron/")),
+    "and the cron routes",
+  );
+});
+
+test("every route the spec promises resolves to a handler that exists", async () => {
+  // The gap this suite exists for, one level up from the last one: not "does
+  // this link work" but "does the platform have the surface it says it has".
+  const { handlers } = await servedRoutes();
+  const missing = (await specifiedApiRoutes()).filter(
+    (route) => !handlers.some((h) => h.test(route)),
+  );
+
+  eq(
+    missing,
+    [],
+    "04-SURFACES §5 is a promise about what answers an HTTP request. A library " +
+      "with no endpoint in front of it is a library nothing can call",
+  );
+});
+
 test("no rendered copy offers a credential the platform deleted", async () => {
   // The other half of what went wrong: the stale page did not merely 404 on
   // submit, it *described the deleted model* — "access is by portal key, never
