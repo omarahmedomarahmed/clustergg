@@ -964,3 +964,50 @@ thread, and deriving it per row from the messages table makes the admin
 dashboard's count a scan. Writing it in the same call as the message is what
 keeps it from being one write behind, and a summary that can lag is an alert
 that can be wrong for as long as nobody notices.
+
+---
+
+# Sprint 9 — the guild registry, ownership and reassignment
+
+The page opened when an owner asks *"why am I not earning?"* Its two shaping
+rules are both about what we deliberately **do not know**.
+`tests/band1/98-registry.test.ts`.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 156 | **Refresh never lists members** | A direct `discordRest` call to `/guilds/{id}/members` beside the fetcher | **Nothing, first time** — see below. After the fix: *"refresh pulls owner and roles only, and never the member list"* | clean, 380/381 |
+| 157 | Only the outgoing owner confirms a transfer | The owner check disabled | *"only the outgoing owner can confirm a transfer"* | clean, 380/381 |
+| 158 | The claimant must hold ADMINISTRATOR **now** | The claimant check disabled | *"the claimant must hold ADMINISTRATOR at that moment"* | clean, 380/381 |
+| 159 | Arbitration only after the fourteen days | The `timed_out` check disabled | *"arbitration is only available after the timeout"* | clean, 380/381 |
+| 160 | An owner who signed in is never reassignable | `reassignmentState` drops the never-signed-in term | *"an owner who has never signed in may be reassigned after four weeks"* | clean, 380/381 |
+| 161 | A failed owner DM is recorded, not swallowed | The audit write dropped from `recordOwnerDm` | *"a failed owner DM is a recorded state…"* | clean, 380/381 |
+| 162 | A gamer can never set their own age band | The self-edit check deleted | *"admin sets an age band, and it is logged with both sides"* | clean, 380/381 |
+| 163 | Arbitration is never logged as a confirmation | The audit action renamed to `guild.transfer.confirmed` | *"…and is logged as arbitration"* | clean, 380/381 |
+
+### Break 156 was a no-op, and that is a different failure from a blind guard
+
+The first attempt added `await fetcher.members?.(guildId)`. The file changed,
+so the harness let it run — and the test's fetcher has no `members` key, so the
+optional call short-circuited and **nothing executed**. Trap 8's rule again: a
+break that changes nothing proves nothing in either direction, and this one
+changed the source without changing behaviour reachable from the test.
+
+The recorded call list is sound for everything routed through the injected
+fetcher, which is every call `refreshGuild` is *supposed* to make. What it
+cannot see is a direct REST call added beside them — and that is the realistic
+way G3 gets broken, because `discordRest` is right there and a member list is
+one path away.
+
+So the guard has a second half that reads the module and asserts nothing in it
+names a member-list path. That is a vocabulary check, which trap 16 usually
+warns against — but here the vocabulary **is** the chokepoint: there is no way
+to page a member list without naming `/guilds/{id}/members`. A canary asserts
+the read reached the right file first, so an empty read cannot pass.
+
+### Break 163 is about the audit log being answerable, not about behaviour
+
+Renaming the arbitration's audit action changes nothing a user can see. It
+conflates *"nobody answered for fourteen days and Cluster decided"* with *"the
+outgoing owner agreed"* — two different facts about the same server, and the
+difference is the whole content of a dispute six months later. The log is the
+product here, and a log that cannot tell them apart is not one.
