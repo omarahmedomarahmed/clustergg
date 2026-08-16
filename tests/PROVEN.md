@@ -1011,3 +1011,75 @@ conflates *"nobody answered for fourteen days and Cluster decided"* with *"the
 outgoing owner agreed"* — two different facts about the same server, and the
 difference is the whole content of a dispute six months later. The log is the
 product here, and a log that cannot tell them apart is not one.
+
+---
+
+# Sprint 10 — the brand dashboard, the nav, and band 2 green again
+
+`tests/band1/99-nav.test.ts` unless the row says otherwise.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 164 | **A brand never appears in the switcher** | The brand pushed into `switcherFor`'s output | *"a brand never appears in the switcher"* | clean, 388/389 |
+| 165 | A brand is decided first, whatever else is in the browser | The gamer branch moved above the brand branch | *"a brand is decided first…"* | clean, 388/389 |
+| 166 | The brand dashboard has **no site nav** | `showsSiteNav` returns `true` for every state | *"the brand dashboard has no site nav"* | clean, 388/389 |
+| 167 | *Back to dashboard* only away from the dashboard | The `onPublicSite` term dropped | *"a brand browsing the public site gets a way back"* | clean, 388/389 |
+| 168 | The two inboxes are classified apart | `/admin/inbox/brands` widened to `support` | **Nothing, first time** — the anchor table did not cover routes added this sprint. After the fix: *"a department reaches what it should and nothing more"* (`91-admin-access`) | clean, 388/389 |
+
+### Guard 164 is about a source, not a filter
+
+The brand is not removed from the switcher at the end — it is **never an
+input**. A filter is a line somebody deletes while tidying, and its absence
+looks like simplification. An input that was never there cannot be restored by
+accident.
+
+### Break 168 found the anchor table, not a hole
+
+Widening the brand inbox to `support` went green because
+`91-admin-access`'s literal case table — the anchor that exists precisely so
+the tests are not derived from the rule they test — had no rows for pages added
+this sprint. The admin-page census caught them as *unclassified* when they were
+added, which is what put the classification in `ROUTE_ACCESS` at all; nothing
+then asserted **which** classification.
+
+Worth being exact about what this guards: 05 §6 names two inboxes and MS2 keeps
+their data apart, which is guard 153. Which *departments* reach which inbox is
+**our** decision, not a ratified rule — and that is the reason it belongs in
+the table rather than the reason it does not. This file's own standard is that
+silence is not a decision.
+
+## Band 2 is fully green for the first time since Sprint 3
+
+`tests/band2/portals.mts` was RED and carried a date rather than a shrug (§2.0,
+trap 19). It drove the deleted portal-key model — `input[name="id"]` plus a
+key, and copy asserting *"there is no password anywhere"* — and could not be
+repaired in place, because its premise was gone and the shell it photographs
+was about to change. Re-authored here against **B1**: the emailed key is a
+one-time invite, exchanged once for an email-and-password account, and every
+sign-in after that is email and password.
+
+Seven new shots cover this sprint's own surfaces: the SaaS side nav, the guides
+inside the portal, both message pages, and the two admin inboxes photographed
+from the side where merging them would actually happen.
+
+| Pass | Result |
+|---|---|
+| `site.mts` | green |
+| `admin.mts` | green |
+| `portals.mts` | **green — 31 shots, first time since Sprint 3** |
+
+### And one thing that had nothing to do with the model
+
+All four passes launched with
+`executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium"`,
+which worked in the container they were written in. In this one that path is a
+**directory**; the binary is under `chromium-<build>/chrome-linux/chrome`, and
+the build number moves whenever the image or the pinned Playwright version
+does. Playwright's error suggests re-downloading, which is exactly what
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` exists to prevent — so it reads as a broken
+setup rather than a moved file.
+
+`tests/band2/browser.mts` now resolves the binary by looking, preferring a full
+Chromium over a headless shell, and names every path it tried when it cannot
+find one. **A browser pass that cannot start must not read as a product
+failure.**

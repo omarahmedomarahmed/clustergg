@@ -15,6 +15,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
+import { chromiumPath } from "./browser.mts";
 import { visible } from "./visible.mts";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
@@ -40,7 +41,7 @@ async function shot(page: Page, what: string) {
 }
 
 const browser: Browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium",
+  executablePath: chromiumPath(),
 });
 const page = await (
   await browser.newContext({ viewport: { width: 1280, height: 1000 } })
@@ -57,28 +58,48 @@ midWeek.setUTCDate(midWeek.getUTCDate() + 2);
 const at = `at=${midWeek.toISOString()}`;
 console.log(`Seeded, week of ${String(seeded.weekStart).slice(0, 10)}.\n`);
 
-// ── The login, and a wrong key ──────────────────────────────────────────────
+// ── The brand login: one-time invite, then email and password ───────────────
+//
+// ===== THIS SECTION WAS RED FOR SIX SPRINTS, AND ON PURPOSE =====
+//
+// It drove the **portal key** — `input[name="id"]` plus a key, and copy
+// asserting *"there is no password anywhere"*. Sprint 3 deleted that model (S1)
+// and the pass could not be repaired in place: its premise was gone, and the
+// brand portal it photographs was about to become a SaaS shell. A permanently
+// failing suite is how a suite gets deleted (trap 19), so it carried a date
+// rather than a shrug, and this is the date.
+//
+// What it photographs now is B1: **the emailed key is a one-time invite**,
+// exchanged once for an email-and-password account, and every sign-in after
+// that is email and password.
 console.log("portal/login:");
 await page.goto(`${BASE}/login/brand`);
 await page.waitForSelector("h1");
 await shot(page, "brand-login");
 
 const login = await visible(page);
-check(!/password/i.test(login), "there is no password anywhere — access is by key (S1)");
-check(/once/.test(login), "and the key is shown once, which the page says");
+check(/password/i.test(login), "the credential is a password now — the portal key is gone (S1)");
+check(
+  /one-time|once/i.test(login),
+  "and the invite is described as one-time, because it is exchanged rather than kept",
+);
+check(
+  !/portal key/i.test(login),
+  "no rendered copy offers the credential the platform deleted",
+);
 
-await page.fill('input[name="id"]', brandId);
-await page.fill('input[name="key"]', "definitely-not-the-key");
-await page.click('[data-testid="unlock"]');
+// A wrong password, and the refusal that must not be a customer directory.
+await page.fill('[data-testid="brand-email"]', "hi@acme.test");
+await page.fill('[data-testid="brand-password"]', "definitely-not-the-password");
+await page.click('[data-testid="brand-signin"]');
 await page.waitForSelector('[data-testid="login-error"]');
 const refusal = (await page.textContent('[data-testid="login-error"]')) ?? "";
-check(/does not open this portal/.test(refusal), "a wrong key is refused");
-check(/locks it/.test(refusal), "and the refusal says the portal locks — the lockout is not a surprise");
+check(/not right|do not match|incorrect/i.test(refusal), "a wrong password is refused");
 check(
-  !/no such brand/i.test(refusal) && !/unknown/i.test(refusal),
-  "a wrong key and an unknown portal read identically — the form is not a customer directory",
+  !/no such|unknown|not found/i.test(refusal),
+  "and a wrong password reads identically to an unknown email — the form is not a customer directory",
 );
-await shot(page, "brand-login-wrong-key");
+await shot(page, "brand-login-wrong-password");
 
 // ── The owner portal ────────────────────────────────────────────────────────
 console.log("\nportal/server:");
@@ -340,6 +361,86 @@ await shot(page, "brand-billing-and-the-split");
 const billing = await visible(page);
 check(/not announced until its bill is paid/.test(billing), "C1 is stated where a brand reads it");
 check(/Prize pool/.test(billing) && /Server pool/.test(billing), "and the split is published");
+
+// ── The SaaS shell, the guides, and both message surfaces ───────────────────
+//
+// Sprint 10's own additions. 12 §10 — a brand gets **no site nav**: a side nav
+// on their own product, with the docs inside it (H2) rather than a link out to
+// the marketing site.
+console.log("\nportal/brand/shell:");
+await page.goto(`${BASE}/portal/brand/${brandId}?${at}`);
+await page.waitForSelector('[data-nav="brand"]');
+await shot(page, "brand-saas-shell-side-nav");
+check(
+  (await page.locator('aside nav[aria-label="Brand portal"]').count()) === 1,
+  "the brand portal's nav is a side nav on their own dashboard",
+);
+check(
+  (await page.locator('aside nav[aria-label="Guides"]').count()) === 1,
+  "with the guides inside the portal, not a link to the marketing site (H2)",
+);
+
+await page.goto(`${BASE}/portal/brand/${brandId}/guides/reach?${at}`);
+await page.waitForSelector("h1");
+await shot(page, "brand-guide-reach-and-entrants");
+const guide = await visible(page);
+check(
+  /[Dd]ouble counting is deliberate/.test(guide),
+  "the guide says the double counting is deliberate, which is the thing a brand would otherwise read as inflation",
+);
+check(
+  /never sum them|unique audience/i.test(guide),
+  "and that we never sum them into a unique-audience figure",
+);
+check(/25/.test(guide), "and the audience floor, imported rather than retyped (C1)");
+
+console.log("\nportal/messages:");
+await page.goto(`${BASE}/portal/brand/${brandId}/messages?${at}`);
+await page.waitForSelector("h1");
+await shot(page, "brand-messages-empty");
+check(/Nothing yet/.test(await visible(page)), "a brand with nothing to say sees an empty thread");
+
+await page.fill('textarea[name="body"]', "Our week 2 report shows fewer entrants than week 1 — is that right?");
+await page.click('button[type="submit"]');
+await page.waitForSelector("h1");
+await shot(page, "brand-messages-sent-and-waiting");
+const sent = await visible(page);
+check(/Waiting on Cluster/.test(sent), "once sent, it is waiting on us");
+check(
+  /keeps alerting/.test(sent),
+  "and the page says the alert persists — H7, so nobody feels they have to chase it",
+);
+
+await page.goto(`${BASE}/portal/server/${guildId}/messages?${at}`);
+await page.waitForSelector("h1");
+await page.fill('textarea[name="body"]', "Why is my server not in this week's pool?");
+await page.click('button[type="submit"]');
+await page.waitForSelector("h1");
+await shot(page, "owner-messages-sent-and-waiting");
+check(/Waiting on Cluster/.test(await visible(page)), "and an owner's thread waits on us too");
+
+// MS2 — and the two never meet. Photographed from the admin side, because
+// that is the surface where merging them would actually happen.
+console.log("\nadmin/inbox:");
+await page.goto(`${BASE}/admin/inbox/servers`);
+await page.waitForSelector("h1");
+await shot(page, "admin-inbox-servers");
+const serverInbox = await visible(page);
+check(/waiting/i.test(serverInbox), "the server inbox shows what is waiting on a reply");
+check(
+  !/Acme|Nova/.test(serverInbox),
+  "and not one brand appears in it — MS2, two surfaces, never merged",
+);
+
+await page.goto(`${BASE}/admin/inbox/brands`);
+await page.waitForSelector("h1");
+await shot(page, "admin-inbox-brands");
+const brandInbox = await visible(page);
+check(/Acme|Nova/.test(brandInbox), "the brand inbox holds the brand thread");
+check(
+  !/Nightfall|Dawnbreak|Ironclad/.test(brandInbox),
+  "and no server appears in it either",
+);
 
 await browser.close();
 console.log(

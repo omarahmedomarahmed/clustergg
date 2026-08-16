@@ -221,12 +221,13 @@ and pushed; everything below is unstarted.
 | 7 · Opt-in analytics | **Done** |
 | 8 · Messages | **Done** |
 | 9 · The guild registry and ownership | **Done** |
-| 10 – 14 | Not started |
+| 10 · The brand dashboard and the nav | **Done** — band 2 fully green again |
+| 11 – 14 | Not started |
 
-**381 tests, 1,646 assertions, 163 guards proven by breaking, 24 mutations
+**389 tests, 1,680 assertions, 168 guards proven by breaking, 24 mutations
 caught by at least their expected number of suites, typecheck gating the band
-inside `npm test`.** Band 1 is entirely green. Band 2 has one red pass, owned
-below.
+inside `npm test`.** Band 1 is entirely green. **Band 2 is entirely green**, for the first time
+since Sprint 3.
 
 Two things about Sprint 4a, because a fresh session reading straight down will
 otherwise assume the numbering skipped: **it is a real sprint, it is complete,
@@ -243,7 +244,7 @@ sprint, and both are listed again in that sprint's **Builds** row.
 
 | What | Owner | Why it is not now |
 |---|---|---|
-| **`tests/band2/portals.mts` is RED and stays red until Sprint 10** | Sprint 10, with the brand dashboard | It drives the deleted portal-key model — `input[name="id"]` plus a key, and copy asserting *"there is no password anywhere"*. Sprint 3's brand-login rebuild invalidated the whole premise; it was last touched at `6d2724a`. Repairing it means re-authoring the brand portal's screenshot record against email + password and the one-time invite, which is Sprint 10's job. **A permanently-failing suite is how a suite gets deleted** — trap 19 — so it has a date, not a shrug |
+| ~~**`tests/band2/portals.mts` is RED**~~ **— re-authored in Sprint 10, green** | Sprint 10, with the brand dashboard | It drives the deleted portal-key model — `input[name="id"]` plus a key, and copy asserting *"there is no password anywhere"*. Sprint 3's brand-login rebuild invalidated the whole premise; it was last touched at `6d2724a`. Repairing it means re-authoring the brand portal's screenshot record against email + password and the one-time invite, which is Sprint 10's job. **A permanently-failing suite is how a suite gets deleted** — trap 19 — so it has a date, not a shrug |
 | ~~**The bot-install flow does not exist**~~ **— done in Sprint 6** | Sprint 6, with the owner portal | `botInstallUrl` is exported from `lib/auth/discord.ts` and **called from nowhere.** `/api/auth/discord/install` handles the callback; nothing starts the round trip. So an owner whose server has never had Cluster in it grants `guilds`, `recordGuildOwnership` finds no known guild to record against, and the step never completes. **Right now the page tells the truth and stops there** — *"A server Cluster has never been added to will not show up — add the bot there first and it appears here"* — which is honest and is not a way through. It belongs in Sprint 6, where the guild-permission gate already lives |
 
 ### Sprint 3 · Two doors, one row

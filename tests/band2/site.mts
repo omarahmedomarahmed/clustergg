@@ -12,6 +12,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
+import { chromiumPath } from "./browser.mts";
 import { visible } from "./visible.mts";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
@@ -36,7 +37,7 @@ async function shot(page: Page, flow: string, n: number, what: string) {
 }
 
 const browser: Browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium",
+  executablePath: chromiumPath(),
 });
 const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
 const page = await context.newPage();

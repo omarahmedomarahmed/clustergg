@@ -15,6 +15,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, type Browser, type Page } from "playwright";
+import { chromiumPath } from "./browser.mts";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 const OUT = path.join(process.cwd(), "screenshots", "gamer-onboarding");
@@ -106,7 +107,7 @@ await fs.mkdir(OUT, { recursive: true });
 // another, so point at it rather than letting Playwright look for the build
 // its own version expects.
 const browser = await chromium.launch({
-  executablePath: process.env.CHROMIUM_PATH ?? "/opt/pw-browsers/chromium",
+  executablePath: chromiumPath(),
 });
 
 console.log("gamer onboarding:");
