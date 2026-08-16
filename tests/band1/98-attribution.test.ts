@@ -31,7 +31,12 @@ import {
   SERVER_PROFILE_FIELDS,
 } from "../../lib/pool/eligibility.ts";
 import { kpisForWeek } from "../../lib/pool/score.ts";
-import { createGamer } from "../../lib/identity/gamers.ts";
+import { createGamer, setAgeBand, setCountry } from "../../lib/identity/gamers.ts";
+import { linkAccount } from "../../lib/identity/accounts.ts";
+import { enterChallenge } from "../../lib/challenges/entry.ts";
+import { stampBaselinesAtGun } from "../../lib/challenges/jobs.ts";
+import { ADAPTERS, type StatsResult } from "../../lib/providers/adapters.ts";
+import { PROVIDERS } from "../../lib/providers/registry.ts";
 import { createChallenge, attachInvoice, markScheduled, announce } from "../../lib/challenges/lifecycle.ts";
 import { createInvoice, markPaid } from "../../lib/money/invoices.ts";
 import { CHALLENGE_PRICE_CENTS } from "../../lib/money/amounts.ts";
@@ -40,6 +45,35 @@ import { eq as sqlEq } from "drizzle-orm";
 
 const MONDAY = new Date("2026-09-07T00:00:00Z");
 const NEXT_MONDAY = new Date("2026-09-14T00:00:00Z");
+
+// A provider this suite controls, so the two tests that go through the real
+// entry and gun paths can do so without a network.
+const FAKE = "test-attribution-provider";
+if (!PROVIDERS.some((p) => p.id === FAKE)) {
+  PROVIDERS.push({
+    id: FAKE,
+    name: "Test Game",
+    game: "Test Game",
+    glyph: "◆",
+    color: "#888",
+    authType: "public",
+    envVars: [],
+    identifierLabel: "Name",
+    phase: 1,
+    capabilities: [
+      { key: "wins", label: "Wins", higherIsBetter: true },
+      { key: "matches", label: "Matches", higherIsBetter: true },
+    ],
+  });
+}
+ADAPTERS[FAKE] = {
+  async verify() {
+    return { ok: true as const, accountId: "a", name: "n" };
+  },
+  async fetchStats(): Promise<StatsResult> {
+    return { ok: true, metrics: { wins: { value: 0 }, matches: { value: 0 } } };
+  },
+};
 
 // ── The four outcomes, as a pure function ───────────────────────────────────
 //
@@ -227,7 +261,134 @@ test("a parent that lost the bot keeps what it earned and gains nothing new", as
   );
 });
 
+test("an early joiner's parent is stamped by the gun, and the pool reads it", async () => {
+  // ===== THE §0.1 SHAPE, CAUGHT BY A BREAK =====
+  //
+  // Deleting the gun's `parentGuildIdAtBaseline` write was caught by **zero**
+  // suites: every other test in this file stamps participants directly, and
+  // the four-week simulation still allocated every cent because its day-two
+  // joiners froze their parent at Join. The gun was proven to *write* the
+  // stamp by the code being there, and nothing proved anything *read* an entry
+  // the gun had stamped.
+  //
+  // So this one goes through the real path end to end: enter before the gun,
+  // fire the gun, read the pool.
+  const db = await resetDemoDb();
+  await twoEligibleServers(db);
+  const challengeId = await aLiveChallenge(db, MONDAY, FAKE);
+
+  const userId = await createGamer(db, { displayName: "Early bird", parentGuildId: "g1" });
+  await setAgeBand(db, userId, "adult");
+  await setCountry(db, userId, "GB");
+  await linkAccount(db, {
+    userId,
+    provider: FAKE,
+    providerAccountId: "early-1",
+    inGameName: "early",
+    verifiedMethod: "exists",
+  });
+
+  const sunday = new Date(MONDAY.getTime() - 86_400_000);
+  const entry = await enterChallenge(db, { challengeId, userId, guildId: "g1" }, sunday);
+  ok(entry.ok, "they are in");
+  no(entry.ok && entry.baselineStamped, "and wait for the gun — A1a, one rule for both columns");
+
+  const [beforeGun] = await db.select().from(schema.challengeParticipants);
+  eq(
+    beforeGun.parentGuildIdAtBaseline,
+    null,
+    "so the parent is not frozen yet either, because the baseline is not",
+  );
+
+  await stampBaselinesAtGun(db, MONDAY);
+
+  const [afterGun] = await db.select().from(schema.challengeParticipants);
+  eq(afterGun.parentGuildIdAtBaseline, "g1", "the gun stamps both columns together");
+  eq(afterGun.baselineAt?.getTime(), MONDAY.getTime(), "at the gun instant, not when the job ran");
+
+  const { kpis } = await kpisForWeek(db, MONDAY);
+  near(kpis.find((k) => k.guildId === "g1")!.entrants, 1, "and the pool credits g1 for them");
+});
+
+test("a mid-week joiner freezes their parent at Join, and the gun leaves it alone", async () => {
+  // The other half of `max(challengeStart, joinedAt)`. Without it, a test that
+  // only covered the early joiner would be satisfied by a gun that stamped
+  // every participant it could see, including ones already frozen.
+  const db = await resetDemoDb();
+  await twoEligibleServers(db);
+  const challengeId = await aLiveChallenge(db, MONDAY, FAKE);
+
+  const userId = await createGamer(db, { displayName: "Day two", parentGuildId: "g1" });
+  await setAgeBand(db, userId, "adult");
+  await setCountry(db, userId, "GB");
+  await linkAccount(db, {
+    userId,
+    provider: FAKE,
+    providerAccountId: "late-1",
+    inGameName: "late",
+    verifiedMethod: "exists",
+  });
+
+  const dayTwo = new Date(MONDAY.getTime() + 2 * 86_400_000);
+  const entry = await enterChallenge(db, { challengeId, userId, guildId: "g2" }, dayTwo);
+  ok(entry.ok && entry.baselineStamped, "they baseline now, not at the gun");
+
+  const [row] = await db.select().from(schema.challengeParticipants);
+  eq(row.parentGuildIdAtBaseline, "g1", "the parent froze at Join, beside the baseline");
+  eq(row.joinGuildId, "g2", "and the join server is the card they pressed");
+
+  // Their parent is corrected, and then the gun runs again. Neither may move a
+  // stamp that is already frozen.
+  await setParentGuild(db, { userId, guildId: "g2", actorId: "admin-1" });
+  await stampBaselinesAtGun(db, dayTwo);
+
+  const [after] = await db.select().from(schema.challengeParticipants);
+  eq(after.parentGuildIdAtBaseline, "g1", "still g1 — a frozen stamp is frozen");
+
+  const { kpis } = await kpisForWeek(db, MONDAY, dayTwo);
+  near(kpis.find((k) => k.guildId === "g1")!.entrants, 0.5, "half to the parent it was frozen to");
+  near(kpis.find((k) => k.guildId === "g2")!.entrants, 0.5, "and half to the server they joined from");
+});
+
 // ── Conversion ──────────────────────────────────────────────────────────────
+
+test("a parent skipped by the removed-bot rule is not counted as a recruiter", async () => {
+  // The running-total bug, found by break 133. The parented-entrant check has
+  // to be about **this entry**: a check against the accumulated share map is
+  // true as soon as any earlier entry credited that parent, so an entry the
+  // removed-bot rule skipped would still be counted as a conversion.
+  //
+  // It needs two entries on the same parent — one before removal and one
+  // after — which is why no earlier test could see it.
+  const db = await resetDemoDb();
+  await twoEligibleServers(db, { linkedPerGuild: 10 });
+  const challengeId = await aLiveChallenge(db);
+
+  const tuesday = new Date(MONDAY.getTime() + 86_400_000);
+  const wednesday = new Date(MONDAY.getTime() + 2 * 86_400_000);
+
+  const parented = await db
+    .select({ id: schema.users.id })
+    .from(schema.users)
+    .where(sqlEq(schema.users.parentGuildId, "g1"));
+
+  await entrant(db, challengeId, { parent: "g1", join: "g1" }, parented[0].id, MONDAY);
+  await entrant(db, challengeId, { parent: "g1", join: "g1" }, parented[1].id, wednesday);
+
+  await db
+    .update(schema.guilds)
+    .set({ removedAt: tuesday })
+    .where(sqlEq(schema.guilds.guildId, "g1"));
+
+  const { kpis } = await kpisForWeek(db, MONDAY, wednesday);
+  const g1 = kpis.find((k) => k.guildId === "g1")!;
+  near(g1.entrants, 1, "only Monday's entry earns");
+  near(
+    g1.conversion,
+    1 / 10,
+    "and only Monday's entrant is a recruit — Wednesday's is not counted either way",
+  );
+});
 
 test("conversion is bounded at 1.0, because the denominator is live", async () => {
   // ===== E1, THE CASE THAT MOTIVATES THE WHOLE RULE =====
@@ -570,11 +731,15 @@ async function entrant(
   return id;
 }
 
-async function aLiveChallenge(db: DB, startAt: Date = MONDAY): Promise<string> {
+async function aLiveChallenge(
+  db: DB,
+  startAt: Date = MONDAY,
+  provider = "chesscom",
+): Promise<string> {
   const challengeId = await createChallenge(db, {
     title: "Weekly",
     game: "Chess",
-    provider: "chesscom",
+    provider,
     startAt,
     metrics: { wins: 10, matches: 1 },
   });
