@@ -717,3 +717,99 @@ how two of them came to have none.
 
 Guard 118 is the negative half, and it is not decoration: without it, 116 and
 117 are both satisfied by a function that refuses everybody.
+
+---
+
+# Sprint 5 — attribution and eligibility
+
+The highest-risk work on the branch: it rewrites how money is attributed. The
+credit model that `guild_members` existed for is deleted, and **parent + join**
+replaces it — at most two servers per gamer, both recorded on the entry itself.
+
+Sixteen breaks, each applied on its own and reverted before the next, with the
+tree confirmed clean after every one. `tests/band1/98-attribution.test.ts`
+unless the row says otherwise.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 119 | **Parent = join is 1.0, not two halves** | The same-server branch removed from `entrantCredit` | *"parent = join is 1.0, and not two halves"* | clean, 329/330 |
+| 120 | The join server never gets full credit | `entrantCredit` returns 1.0 to the join server | **4 cases across 3 suites**, including *"the four outcomes reach the pool exactly as they are defined"* | clean, 326/330 |
+| 121 | **A web join credits the parent in full** | The `!join` branch returns `[]` | *"a web join credits the parent in full"* + the pool case | clean, 328/330 |
+| 122 | **No parent → no server earns** | The `!parent` branch credits the join server 1.0 | 3 cases | clean, 327/330 |
+| 123 | A parent that lost the bot gains nothing new | The `removedAt` comparison deleted from `lib/pool/score.ts` | *"a parent that lost the bot keeps what it earned and gains nothing new"* | clean, 329/330 |
+| 124 | **Scoring reads the frozen parent, not the live one** | `kpisForWeek` joins `users.parentGuildId` instead of the stamp | **13 cases across 4 suites** | clean, 317/330 |
+| 125 | **A closed week does not move** | `setParentGuild` rewrites every past entry's stamp | 3 cases | clean, 327/330 |
+| 126 | Conversion's denominator is live | The gun's snapshot count swapped in for `linkedMembersOf` | **5 cases across 3 suites** | clean, 325/330 |
+| 127 | Linked members are counted for the parent alone | `linkedMembersOf` also counts gamers who entered from this guild | 1 case, first time — see below. After the fix: 2 | clean, 328/330 |
+| 128 | **Eligibility is frozen at the gun** | `kpisForWeek` recomputes the live gate instead of reading the freeze | **5 cases across 2 suites** | clean, 325/330 |
+| 129 | A gamer can never change their own parent | The actor check deleted from `setParentGuild` | *"a gamer can never change their own parent"* | clean, 329/330 |
+| 130 | Ten linked members is not the whole gate | `eligible` drops the `profile.complete` term | **5 cases across 3 suites** | clean, 325/330 |
+| 131 | **No weekly-cycle dollar reads `guild_snapshots`** | `activation` nudged when a snapshot row exists | **Nothing, first time** — see below. After the fix: *"no weekly-cycle dollar reads a guild_snapshots row"*, and again on the denominator read (5 cases) | clean, 329/330 |
+| 132 | The gun freezes the parent beside the baseline | `stampBaselinesAtGun` stops writing `parentGuildIdAtBaseline` | **Nothing, first time** — see below. After the fix: *"an early joiner's parent is stamped by the gun, and the pool reads it"* | clean, 332/333 |
+| 133 | The parented-entrant check is per entry | Reverted to `entrantShare.has(parent)` — a running total | **Nothing, first time** — see below. After the fix: *"a parent skipped by the removed-bot rule is not counted as a recruiter"* | clean, 332/333 |
+| 134 | An early joiner's parent is **not** frozen at the click | `enterChallenge` freezes the parent unconditionally | *"an early joiner's parent is stamped by the gun, and the pool reads it"* | clean, 332/333 |
+
+### Break 127: the test named for the rule could not fail
+
+Counting join-server gamers in `linkedMembersOf` was caught by one case, and
+**not** by *"linked members are counted live, parent-scoped"* — the test written
+for exactly that rule. Its fixture had no entries at all, so there was nothing
+for a join-scoped count to pick up and the assertion could not vary. Trap 2,
+arriving in the test named after the thing it fails to guard.
+
+Six of g2's members now press Join on g1's card, which is both the realistic
+shape and the number an owner would say out loud. Re-broken: red in two suites.
+
+### Break 131 went green twice over, for two different reasons
+
+Reading `guild_snapshots` and nudging `activation` was caught by **zero**
+suites, and the break had definitely applied.
+
+Two faults, both mine, both in the guard rather than the code:
+
+1. The assertion compared `totalCents` and `conversion` — **three fields
+   somebody remembered.** A break that moved `activation` sailed through. It
+   now compares the whole division.
+2. The fixture gave **both** servers a snapshot row, so any read cancelled out
+   in the percentile ranking. The grant is per server (N1), so one server
+   having a row and the other not is the realistic shape — and the only one
+   where a read moves money *between* servers.
+
+This is the file-list defect one level down: a hand-picked list of fields
+guards the fields somebody thought of, exactly as a hand-kept list of files
+guards the files somebody remembered.
+
+### Breaks 132 and 133 are §0.1, twice, in one sitting
+
+> **Something was proven to EXIST. Nothing was proven to READ it.**
+
+**132.** Deleting the gun's parent stamp changed nothing. Every test in the
+attribution suite inserts participants directly, and the four-week simulation
+still allocated every cent — because half its joiners arrive on day two and
+freeze their parent at Join, so the pool still had shares and the arithmetic
+still balanced. The gun was proven to *write* the stamp by the code being
+there. **Nothing read an entry the gun had stamped.**
+
+The fix is two tests that go through `enterChallenge` and `stampBaselinesAtGun`
+for real — the early joiner and the mid-week joiner, which is both halves of
+`max(challengeStart, joinedAt)`. Guard 134 is the negative half of the first:
+without it, an `enterChallenge` that froze the parent at the click satisfies
+132 while breaking A1a.
+
+**133.** The parented-entrant check needs two entries on the same parent, one
+either side of the bot being removed — the running-total version is true the
+moment *any* earlier entry credited that parent. No fixture had that shape,
+because it takes a removed bot and two entrants to build.
+
+Both re-broken after the fix, both red.
+
+### What the eligibility fixture found on its first run
+
+`twoEligibleServers` froze eligibility for two weeks, and every test that read
+the first week scored against an empty run. The freeze is **one pair of
+columns**, so the next gun overwrites it.
+
+That is correct and it is now written down in `isFrozenEligible`: a closed
+week's numbers live in `server_payouts`, drafted at that week's own close
+before the next gun fires. Recomputing a closed week from a gate that no longer
+exists is precisely the drift `01-CYCLE`'s one-function rule exists to prevent.

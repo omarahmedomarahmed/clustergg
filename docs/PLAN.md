@@ -216,12 +216,13 @@ and pushed; everything below is unstarted.
 | 3 · Two doors, one row | **Done** |
 | 4 · Onboarding, staff, and the console gate | **Done** |
 | 4a · The wiring | **Done** — inserted mid-branch after review; see the table below |
-| 5 · Attribution and eligibility | **Not started.** The highest-risk work left, and deliberately left to a fresh session |
+| 5 · Attribution and eligibility | **Done** |
 | 6 – 14 | Not started |
 
-**305 tests, 1,330 assertions, 118 guards proven by breaking, typecheck gating
-the band inside `npm test`.** Band 1 is entirely green. Band 2 has one red pass,
-owned below.
+**333 tests, 1,439 assertions, 134 guards proven by breaking, 24 mutations
+caught by at least their expected number of suites, typecheck gating the band
+inside `npm test`.** Band 1 is entirely green. Band 2 has one red pass, owned
+below.
 
 Two things about Sprint 4a, because a fresh session reading straight down will
 otherwise assume the numbering skipped: **it is a real sprint, it is complete,
