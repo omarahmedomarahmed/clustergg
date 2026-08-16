@@ -252,6 +252,22 @@ export async function freezeEligibilityAtGun(
  * That is the same answer 12 §4 gives a server that was not ready at the gun,
  * and it is the honest one: the gun is a real event, and a server the gun
  * never saw was not there when the week started.
+ *
+ * ===== THE FREEZE IS ONE WEEK, AND THE NEXT GUN OVERWRITES IT =====
+ *
+ * `eligibilityFrozenAt` carries the week it was taken for, so a stale freeze
+ * can never be mistaken for a current one — without the date, a server
+ * eligible in week 3 would be eligible for ever. The cost is that the freeze
+ * for a **past** week is gone once the next gun fires, so `poolDivisionFor`
+ * cannot recompute a closed week's run.
+ *
+ * That is deliberate and it matches the cycle. A week's division is computed
+ * live all week and written into draft payouts at its own close, before the
+ * next gun — so the closed week's numbers live in `server_payouts`, which is
+ * what every historical surface reads (04 §1: `/pool` is *this* week, and the
+ * grace period shows *final standings, paid*). Recomputing a closed week from
+ * a gate that no longer exists is the drift `01-CYCLE`'s one-function rule
+ * exists to prevent.
  */
 export function isFrozenEligible(
   guild: { eligibilityFrozenAt: Date | null; eligibleThisWeek: boolean | null },
