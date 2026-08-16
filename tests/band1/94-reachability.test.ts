@@ -24,6 +24,20 @@ import { test } from "../helpers/suite.ts";
 
 const repoRoot = path.dirname(path.dirname(path.dirname(fileURLToPath(import.meta.url))));
 const appDir = path.join(repoRoot, "app");
+// ===== `lib/` TOO, AND THAT WAS A HOLE IN THE FIRST VERSION =====
+//
+// The first version of this suite walked `app/` only, and the very break that
+// was supposed to prove it — a redirect in `lib/portal/session.ts` pointing at
+// `/login/brands` — went straight through. Two of the three call sites that
+// caused the original bug live in `lib/`. A guard that covers the surface but
+// not the code that redirects into it is guarding the easy half.
+const sourceDirs = [appDir, path.join(repoRoot, "lib")];
+
+async function walkSources(): Promise<string[]> {
+  const out: string[] = [];
+  for (const dir of sourceDirs) out.push(...(await walk(dir)));
+  return out;
+}
 
 async function walk(dir: string): Promise<string[]> {
   const out: string[] = [];
@@ -147,13 +161,21 @@ test("the walk finds the routes it is meant to guard", async () => {
     handlers.some((h) => h.test("/api/auth/brand")),
     "and /api/auth/brand, the handler its form posts to",
   );
+
+  // The canary. Without this the walk could silently cover nothing outside
+  // `app/`, which is exactly what the first version of this suite did.
+  const files = await walkSources();
+  ok(
+    files.some((f) => f.includes(`${path.sep}lib${path.sep}portal${path.sep}session.ts`)),
+    "and the walk reaches lib/, where two of the three broken redirects lived",
+  );
 });
 
 test("every redirect target in the app resolves to a page or a handler", async () => {
   const { pages, handlers } = await servedRoutes();
   const broken: string[] = [];
 
-  for (const file of await walk(appDir)) {
+  for (const file of await walkSources()) {
     const src = await fs.readFile(file, "utf8");
     for (const target of redirectTargets(src)) {
       if (NOT_ROUTES.includes(target)) continue;
@@ -195,7 +217,26 @@ test("every form action posts to a route handler that exists", async () => {
   eq(broken, [], "every form posts somewhere that can answer it");
 });
 
-test("no page describes a credential the platform deleted", async () => {
+/**
+ * Everything that is not a comment.
+ *
+ * The first version of this check exempted any file mentioning "one-time
+ * invite" anywhere, which meant the brand login page — which legitimately
+ * says that — became exempt from the whole rule, and a break putting *"Sign
+ * in with your portal key"* into its heading sailed through.
+ *
+ * Comments are stripped instead. A comment may explain that the key was
+ * deleted; rendered copy may not offer one.
+ */
+function withoutComments(src: string): string {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .split("\n")
+    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
+    .join("\n");
+}
+
+test("no rendered copy offers a credential the platform deleted", async () => {
   // The other half of what went wrong: the stale page did not merely 404 on
   // submit, it *described the deleted model* — "access is by portal key, never
   // a password" — on a platform where S1 deleted the key and I1 added the
@@ -203,12 +244,8 @@ test("no page describes a credential the platform deleted", async () => {
   // worse, because somebody believes it.
   const offenders: string[] = [];
   for (const file of await walk(appDir)) {
-    const src = await fs.readFile(file, "utf8");
-    // The claim, not one wording of it: any page telling a server owner their
-    // way in is a key.
-    if (/portal key/i.test(src) && !/no portal key|key is deleted|one-time invite/i.test(src)) {
-      offenders.push(path.relative(repoRoot, file));
-    }
+    const src = withoutComments(await fs.readFile(file, "utf8"));
+    if (/portal key/i.test(src)) offenders.push(path.relative(repoRoot, file));
   }
   eq(
     offenders,
