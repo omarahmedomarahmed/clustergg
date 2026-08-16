@@ -3,7 +3,7 @@
 //
 // S5 — **the admin role is stored as an ID, never a name.** The field says so,
 // and `setOwnerContact` refuses anything that is not one: a renamed role must
-// not silently revoke a portal key, and it would if we keyed on the thing
+// not silently revoke somebody's access, and it would if we keyed on the thing
 // people rename.
 //
 // House rule 5 — the payout section takes a *word* and a *reference*, and the
@@ -96,7 +96,7 @@ export default async function OwnerSettings({
             />
             <span className="text-xs text-mute">
               The role <strong>ID</strong>, not its name — Developer Mode on, right-click
-              the role, Copy ID. Anyone holding this role gets the portal key and the
+              the role, Copy ID. Anyone holding this role signs in with Discord and gets the
               bot&apos;s admin cards. We key on the ID so renaming the role does not
               silently lock everybody out.
             </span>

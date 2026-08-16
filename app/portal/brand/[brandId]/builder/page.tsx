@@ -14,7 +14,6 @@
 //
 // Every figure on step 3 comes from `quote`. House rule 2.
 
-import Link from "next/link";
 import { getDb } from "../../../../../lib/db/index.ts";
 import { sellableGames, quote, BuilderRefused } from "../../../../../lib/portal/brand.ts";
 import {
@@ -235,11 +234,9 @@ export default async function Builder({
 
       <p className="text-xs text-mute">
         There is no custom prize pool: {formatMoney(CHALLENGE_PRICE_CENTS)} buys a fixed
-        split, and{" "}
-        <Link href="/rules" className="underline">
-          the split is published
-        </Link>
-        . Daily challenges are not self-serve — talk to us.
+        split — {formatMoney(splitOf(CHALLENGE_PRICE_CENTS).prize)} of it is the prize
+        pool, and your Billing page shows where the rest goes. Daily challenges are not
+        self-serve — talk to us.
       </p>
     </div>
   );
