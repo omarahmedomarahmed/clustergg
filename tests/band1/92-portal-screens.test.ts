@@ -18,10 +18,12 @@
 import { ok, eq, no, throws } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
 import { resetDemoDb, schema, type DB } from "../../lib/db/index.ts";
+import { freezeEligibilityAtGun } from "../../lib/pool/eligibility.ts";
 import { uid } from "../../lib/core/utils.ts";
 import { eq as sqlEq } from "drizzle-orm";
 import {
   ownerStanding,
+  ownerPoolStates,
   setPayoutPreference,
   setOwnerContact,
   PAYOUT_PREFERENCES,
@@ -47,8 +49,14 @@ async function aGuild(db: DB, guildId: string, over: Record<string, unknown> = {
     name: `Server ${guildId}`,
     slug: `server-${guildId}`,
     memberCount: 500,
+    // The six-field profile (12 §5). A fixture guild is complete by default so
+    // that a test about payouts is not silently a test about the pool gate.
     community: "A competitive gaming community.",
     announceChannelId: `chan-${guildId}`,
+    memberAgeRange: "18-24",
+    gamesPlayed: ["Chess"],
+    inviteUrl: `https://discord.gg/${guildId}`,
+    coverImageUrl: `https://cdn.test/${guildId}.png`,
     ...over,
   });
 }
@@ -107,9 +115,15 @@ test("with a database configured, no session means no portal", () => {
  * Two servers, one challenge, one entrant each — but one server has half the
  * linked members, so it wins on conversion.
  */
-async function twoServersOneChallenge(db: DB) {
+async function twoServersOneChallenge(db: DB, opts: { smallReady?: boolean } = {}) {
   await aGuild(db, "big");
-  await aGuild(db, "small", { memberCount: 100 });
+  await aGuild(db, "small", {
+    memberCount: 100,
+    // 12 §5 — a server whose profile was incomplete **at the gun** is dropped
+    // from the run. Set here rather than after the freeze, because clearing it
+    // mid-week is E3's case and does not drop anybody.
+    ...(opts.smallReady === false ? { coverImageUrl: null } : {}),
+  });
 
   const { brandId } = await signUpBrand(db, { name: "Acme", contactEmail: "a@acme.test" });
   const { invoiceId, challengeIds } = await confirmAndPay(
@@ -122,15 +136,22 @@ async function twoServersOneChallenge(db: DB) {
 
   // The linked-member counts are the conversion denominator, and they are the
   // whole point of this fixture: one entrant out of 10 linked members beats one
-  // out of 200.
-  for (const guildId of ["big", "small"]) {
-    await db.insert(schema.guildSnapshots).values({
-      id: uid(),
-      guildId,
-      weekStart: WEEK,
-      memberCount: guildId === "big" ? 500 : 100,
-      linkedCount: guildId === "big" ? 200 : 10,
-    });
+  // out of 200. They are **real gamers parented to each server** now, counted
+  // live (A3/E1) — there is no snapshot left to fake them with.
+  for (const [guildId, linked] of [["big", 40], ["small", 10]] as const) {
+    for (let i = 0; i < linked; i++) {
+      const memberId = await createGamer(db, {
+        displayName: `${guildId}-member-${i}`,
+        parentGuildId: guildId,
+      });
+      await linkAccount(db, {
+        userId: memberId,
+        provider: "chesscom",
+        providerAccountId: `${guildId}-member-${i}`,
+        inGameName: `${guildId}-member-${i}`,
+        verifiedMethod: "exists",
+      });
+    }
   }
 
   // A5 — the builder deliberately leaves metrics unset, because a brand does
@@ -151,7 +172,12 @@ async function twoServersOneChallenge(db: DB) {
   await announce(db, challengeId, "admin-1", ["big", "small"]);
 
   for (const guildId of ["big", "small"]) {
-    const userId = await createGamer(db, { displayName: `Player ${guildId}` });
+    // Parented here — which is what earns this server the credit now (A1/A3).
+    // Membership used to do it; there is no membership table any more.
+    const userId = await createGamer(db, {
+      displayName: `Player ${guildId}`,
+      parentGuildId: guildId,
+    });
     await db
       .update(schema.users)
       .set({ ageBand: "adult", country: "GB" })
@@ -163,9 +189,9 @@ async function twoServersOneChallenge(db: DB) {
       inGameName: `player-${guildId}`,
       verifiedMethod: "oauth",
     });
-    await db.insert(schema.guildMembers).values({ id: uid(), guildId, userId });
     await enterChallenge(db, { challengeId, userId, guildId }, NOW);
   }
+  await freezeEligibilityAtGun(db, WEEK);
   return challengeId;
 }
 
@@ -212,11 +238,8 @@ test("the lever names the weakest KPI, not the loudest one", async () => {
 
 test("a dropped server is told it is out of the run, not ranked last", async () => {
   const db = await resetDemoDb();
-  await twoServersOneChallenge(db);
-  await db
-    .update(schema.guilds)
-    .set({ community: null })
-    .where(sqlEq(schema.guilds.guildId, "small"));
+  // Small never finished its profile, so the gun found it ineligible (12 §4).
+  await twoServersOneChallenge(db, { smallReady: false });
 
   const standing = await ownerStanding(db, "small", NOW);
   eq(standing.position, null, "no position at all — K7, dropped is not last place");
@@ -225,12 +248,37 @@ test("a dropped server is told it is out of the run, not ranked last", async () 
     "and the reason is carried to the page that has to say it",
   );
   ok(
-    /describe/i.test(standing.droppedReason ?? ""),
+    /profile|linked/i.test(standing.droppedReason ?? ""),
     "with the thing to do about it, not just the diagnosis",
   );
 });
 
-// ── House rule 5, at the point of sale ──────────────────────────────────────
+test("eligibility does not move mid-week, in either direction", async () => {
+  // E3 — never re-check eligibility mid-week. **What the pool page shows on
+  // Wednesday is what pays on Friday**, and that promise is broken by the page
+  // itself if it recomputes the gate on every load.
+  const db = await resetDemoDb();
+  await twoServersOneChallenge(db);
+
+  const before = await ownerStanding(db, "small", NOW);
+  ok(before.position !== null, "small was in the pool when the week started");
+
+  // The owner tears their own profile up on Wednesday.
+  await db
+    .update(schema.guilds)
+    .set({ community: null, coverImageUrl: null, inviteUrl: null })
+    .where(sqlEq(schema.guilds.guildId, "small"));
+
+  const after = await ownerStanding(db, "small", NOW);
+  eq(after.position, before.position, "and they are still in it — the gun already fired");
+  eq(after.droppedReason, null, "with nothing to explain, because nothing changed");
+
+  // And the other direction, which is the one that pays money: a server that
+  // was not ready cannot complete its profile on Wednesday and be paid for a
+  // week it was not in.
+  const late = await ownerPoolStates(db, "unknown-guild", NOW);
+  eq(late, null, "a server we have never seen has no states to report");
+});
 
 test("a payout preference is a word from a fixed list", async () => {
   const db = await resetDemoDb();

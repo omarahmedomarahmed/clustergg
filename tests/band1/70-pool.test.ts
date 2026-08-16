@@ -15,7 +15,6 @@ import {
   kpisForWeek,
   poolDivisionFor,
   closeWeek,
-  snapshotGuilds,
   type ServerKpis,
 } from "../../lib/pool/score.ts";
 import { POOL_FLAT_BPS, BPS, CHALLENGE_PRICE_CENTS, formatMoney } from "../../lib/money/amounts.ts";
@@ -24,6 +23,11 @@ import { payoutTotal } from "../../lib/money/payouts.ts";
 import { createInvoice, markPaid } from "../../lib/money/invoices.ts";
 import { createChallenge, attachInvoice, markScheduled, announce } from "../../lib/challenges/lifecycle.ts";
 import { createGamer } from "../../lib/identity/gamers.ts";
+import {
+  freezeEligibilityAtGun,
+  linkedMembersOf,
+  LINKED_MEMBERS_TO_UNLOCK_POOL,
+} from "../../lib/pool/eligibility.ts";
 import { uid } from "../../lib/core/utils.ts";
 import { eq as sqlEq } from "drizzle-orm";
 
@@ -77,35 +81,24 @@ test("the whole pool is paid out, to the cent", () => {
   }
 });
 
-test("a gamer in two servers is worth half to each", async () => {
-  // K5/G2 — shares can never sum past the true entrant count. Without this,
-  // ten overlapping servers turn 100 entrants into 1,000 and the pool pays for
-  // members that do not exist.
+test("entrant credit is half to the parent and half to the join server", async () => {
+  // A4/K5 — at most two servers earn from one gamer, and the shares can never
+  // sum past the true entrant count.
   const db = await resetDemoDb();
   await seedTwoServers(db);
 
   const challengeId = await aLiveChallenge(db, ["g1", "g2"]);
-  const userId = await createGamer(db, { displayName: "In Both" });
+  const userId = await createGamer(db, { displayName: "Parented g1, joined g2" });
 
-  // ONE participant row — P4, one entry per gamer per challenge. The two
-  // servers come from membership, which is the only place they can come from.
-  await db.insert(schema.challengeParticipants).values({
-    id: uid(),
-    challengeId,
-    userId,
-    linkedAccountId: "acct-1",
-    guildId: "g1",
-    baselineAt: MONDAY,
-    baseline: { wins: 0, matches: 0 },
-  });
-  for (const guildId of ["g1", "g2"]) {
-    await db.insert(schema.guildMembers).values({ id: uid(), guildId, userId });
-  }
+  // ONE participant row — P4, one entry per gamer per challenge. Both servers
+  // come off this row: there is no membership table any more, and there is
+  // nothing else the ½ could be read from.
+  await anEntry(db, { challengeId, userId, parent: "g1", join: "g2" });
 
   const { kpis } = await kpisForWeek(db, MONDAY);
-  eq(kpis.length, 2, "both servers carried the entrant");
-  near(kpis[0].entrants, 0.5, "each gets half of the one gamer");
-  near(kpis[1].entrants, 0.5, "and so does the other");
+  eq(kpis.length, 2, "both servers earn from this entrant");
+  near(kpis.find((k) => k.guildId === "g1")!.entrants, 0.5, "the parent gets half");
+  near(kpis.find((k) => k.guildId === "g2")!.entrants, 0.5, "the join server gets the other half");
   near(
     kpis[0].entrants + kpis[1].entrants,
     1,
@@ -135,14 +128,12 @@ test("an entrant who never plays lowers the server's score", async () => {
         providerAccountId: `${guildId}-${i}`,
         verifiedMethod: "exists",
       });
-      await db.insert(schema.challengeParticipants).values({
-        id: uid(),
+      await anEntry(db, {
         challengeId,
         userId,
+        parent: guildId,
+        join: guildId,
         linkedAccountId: accountId,
-        guildId,
-        baselineAt: MONDAY,
-        baseline: { wins: 0, matches: 0 },
       });
       if (i < playedCount) {
         await db.insert(schema.observations).values({
@@ -194,35 +185,33 @@ test("a large server cannot simply out-mass a small one", () => {
   );
 });
 
-test("a server that never described itself is dropped, not scored zero", async () => {
+test("a server that was not ready at the gun is dropped, not scored zero", async () => {
   // K7 — scored zero it would still occupy a percentile position and take
-  // money from servers that did the work.
+  // money from servers that did the work. The test is **frozen eligibility**
+  // now, not a community string: 12 §5 made the profile six fields and 12 §4
+  // put the gate at the gun, so "never described itself" is one of two ways to
+  // miss it and the drop has to cover both.
   const db = await resetDemoDb();
-  await seedTwoServers(db);
+  await seedTwoServers(db, { eligible: false });
+  // g2 never finished its profile, so the gun finds it ineligible.
   await db
     .update(schema.guilds)
-    .set({ community: null })
+    .set({ coverImageUrl: null })
     .where(sqlEq(schema.guilds.guildId, "g2"));
+  await freezeEligibilityAtGun(db, MONDAY);
 
   const challengeId = await aLiveChallenge(db);
   for (const guildId of ["g1", "g2"]) {
     const userId = await createGamer(db, { displayName: `from-${guildId}` });
-    await db.insert(schema.challengeParticipants).values({
-      id: uid(),
-      challengeId,
-      userId,
-      linkedAccountId: uid(),
-      guildId,
-      baselineAt: MONDAY,
-      baseline: {},
-    });
+    await anEntry(db, { challengeId, userId, parent: guildId, join: guildId });
   }
 
   const { kpis, dropped } = await kpisForWeek(db, MONDAY);
-  eq(kpis.length, 1, "only the described server is scored");
+  eq(kpis.length, 1, "only the server that was ready is scored");
   eq(kpis[0].guildId, "g1", "the one that did the work");
   eq(dropped.length, 1, "and the other is reported as dropped");
-  ok(/community profile/.test(dropped[0].reason), "with what to do about it");
+  ok(/not in the pool when the week started/.test(dropped[0].reason), "with the reason");
+  ok(/complete server\s+profile/.test(dropped[0].reason), "and what to do about it");
 
   const division = dividePool(10_000, kpis, MONDAY);
   eq(
@@ -230,6 +219,28 @@ test("a server that never described itself is dropped, not scored zero", async (
     10_000,
     "the whole pool goes to the server that qualified — the dropped one takes no position",
   );
+});
+
+test("an ineligible server's entrants are still recorded — they simply earn it nothing", async () => {
+  // 12 §4: *"Gamer enters from an ineligible server → Recorded. That server
+  // earns nothing this week."* Dropped is not deleted.
+  const db = await resetDemoDb();
+  await seedTwoServers(db, { eligible: false });
+  await db
+    .update(schema.guilds)
+    .set({ inviteUrl: null })
+    .where(sqlEq(schema.guilds.guildId, "g2"));
+  await freezeEligibilityAtGun(db, MONDAY);
+
+  const challengeId = await aLiveChallenge(db);
+  const userId = await createGamer(db, { displayName: "From an unready server" });
+  await anEntry(db, { challengeId, userId, parent: "g2", join: "g2" });
+
+  const rows = await db.select().from(schema.challengeParticipants);
+  eq(rows.length, 1, "the entry exists — the gamer entered, and that is a fact");
+  const { kpis, dropped } = await kpisForWeek(db, MONDAY);
+  eq(kpis.length, 0, "and no server is scored on it this week");
+  eq(dropped.map((d) => d.guildId), ["g2"], "the server is told why, rather than silently absent");
 });
 
 test("a community challenge contributes nothing to the pool", async () => {
@@ -261,15 +272,7 @@ test("a community challenge contributes nothing to the pool", async () => {
   await announce(db, communityId, "admin-1", ["g1"]);
 
   const userId = await createGamer(db, { displayName: "Community Entrant" });
-  await db.insert(schema.challengeParticipants).values({
-    id: uid(),
-    challengeId: communityId,
-    userId,
-    linkedAccountId: uid(),
-    guildId: "g1",
-    baselineAt: MONDAY,
-    baseline: {},
-  });
+  await anEntry(db, { challengeId: communityId, userId, parent: "g1", join: "g1" });
 
   const { kpis, challengeIds } = await kpisForWeek(db, MONDAY);
   eq(
@@ -298,15 +301,7 @@ test("the live pool page and Friday's close are the same function", async () => 
   for (const guildId of ["g1", "g2"]) {
     for (let i = 0; i < 3; i++) {
       const userId = await createGamer(db, { displayName: `${guildId}-p${i}` });
-      await db.insert(schema.challengeParticipants).values({
-        id: uid(),
-        challengeId,
-        userId,
-        linkedAccountId: uid(),
-        guildId,
-        baselineAt: MONDAY,
-        baseline: {},
-      });
+      await anEntry(db, { challengeId, userId, parent: guildId, join: guildId });
     }
   }
 
@@ -348,15 +343,7 @@ test("re-running the close does not double a payout", async () => {
   await seedTwoServers(db);
   const challengeId = await aLiveChallenge(db);
   const userId = await createGamer(db, { displayName: "Only Entrant" });
-  await db.insert(schema.challengeParticipants).values({
-    id: uid(),
-    challengeId,
-    userId,
-    linkedAccountId: uid(),
-    guildId: "g1",
-    baselineAt: MONDAY,
-    baseline: {},
-  });
+  await anEntry(db, { challengeId, userId, parent: "g1", join: "g1" });
   const invoiceId = await createInvoice(db, {
     payerType: "brand",
     lines: [{ description: "c", amountCents: CHALLENGE_PRICE_CENTS }],
@@ -372,32 +359,72 @@ test("re-running the close does not double a payout", async () => {
   eq(await payoutTotal(db, payouts[0].id), 4_000, "at the right amount");
 });
 
-test("the snapshot counts linked members, which is the conversion denominator", async () => {
+test("linked members are counted live, parent-scoped, and never from a snapshot", async () => {
+  // A3 — the linked member count goes to the **parent** server only. E1 — it
+  // is computed live, because a frozen denominator with a growing numerator is
+  // how conversion becomes unbounded.
   const db = await resetDemoDb();
-  await seedTwoServers(db, { snapshots: false });
+  await seedTwoServers(db, { linkedPerGuild: 0, eligible: false });
 
-  for (let i = 0; i < 3; i++) {
-    const userId = await createGamer(db, {
-      displayName: `linked-${i}`,
-      parentGuildId: "g1",
-    });
-    await db.insert(schema.linkedGameAccounts).values({
+  await linkGamers(db, "g1", 3);
+  // Somebody parented to g1 who never linked anything: not a linked member.
+  await createGamer(db, { displayName: "unlinked", parentGuildId: "g1" });
+  // And somebody who linked but is parented **elsewhere** — the case that
+  // makes this parent-scoped rather than a bare count.
+  await linkGamers(db, "g2", 5);
+
+  eq(await linkedMembersOf(db, "g1"), 3, "only gamers parented here, who actually linked");
+  eq(await linkedMembersOf(db, "g2"), 5, "and the other server's are the other server's");
+
+  // The denominator moves during the week — that is the whole of E1.
+  await linkGamers(db, "g1", 4);
+  eq(await linkedMembersOf(db, "g1"), 7, "live: it grows as members link, mid-week");
+});
+
+test("no weekly-cycle dollar reads a guild_snapshots row", async () => {
+  // ===== S2 / N9, STATED FALSIFIABLY =====
+  //
+  // *"Drop the table and every dollar is identical."* `guild_snapshots` is
+  // consent-gated analytics a server owner opted into and could have declined,
+  // refreshed by a button they press. A dollar that depended on it would let a
+  // server change its own earnings by pressing refresh, and would make a
+  // revocable permission load-bearing on the pool.
+  //
+  // This is the sprint-5 half: the pool's numbers with the table full and with
+  // it empty. Sprint 7 owns the full four-week version.
+  const db = await resetDemoDb();
+  await seedTwoServers(db);
+  const challengeId = await aLiveChallenge(db, ["g1", "g2"]);
+  for (const guildId of ["g1", "g2"]) {
+    for (let i = 0; i < 3; i++) {
+      const userId = await createGamer(db, {
+        displayName: `${guildId}-e${i}`,
+        parentGuildId: guildId,
+      });
+      await anEntry(db, { challengeId, userId, parent: guildId, join: guildId });
+    }
+  }
+
+  const withoutRows = await poolDivisionFor(db, MONDAY);
+
+  // Now fill the table with numbers that flatly contradict reality. If any
+  // figure below moves, a dollar is reading analytics.
+  for (const guildId of ["g1", "g2"]) {
+    await db.insert(schema.guildSnapshots).values({
       id: uid(),
-      userId,
-      provider: "chesscom",
-      providerAccountId: `p${i}`,
-      verifiedMethod: "exists",
+      guildId,
+      weekStart: MONDAY,
+      memberCount: 999_999,
+      linkedCount: guildId === "g1" ? 1 : 500_000,
     });
   }
-  // Somebody attributed to g1 who never linked anything.
-  await createGamer(db, { displayName: "unlinked", parentGuildId: "g1" });
+  const withRows = await poolDivisionFor(db, MONDAY);
 
-  await snapshotGuilds(db, MONDAY);
-  const [snapshot] = await db
-    .select()
-    .from(schema.guildSnapshots)
-    .where(sqlEq(schema.guildSnapshots.guildId, "g1"));
-  eq(snapshot.linkedCount, 3, "only members who actually linked an account count");
+  eq(
+    withRows.shares.map((s) => `${s.guildId}:${s.totalCents}:${s.conversion}`),
+    withoutRows.shares.map((s) => `${s.guildId}:${s.totalCents}:${s.conversion}`),
+    "every share and every KPI is identical whether the analytics table is full or empty",
+  );
 });
 
 test("no KPI measures Discord activity", async () => {
@@ -422,7 +449,20 @@ test("no KPI measures Discord activity", async () => {
 
 // ── Fixtures ────────────────────────────────────────────────────────────────
 
-async function seedTwoServers(db: DB, opts: { snapshots?: boolean } = {}) {
+/**
+ * Two servers, both **eligible at the gun**.
+ *
+ * Eligibility is `linked ≥ 10` and a complete six-field profile, frozen on
+ * Monday (12 §4). A fixture that skipped it would put every test in this file
+ * behind the K7 drop and they would all assert on an empty run — which is why
+ * the linked gamers are real rows rather than a snapshot count: the conversion
+ * denominator is live now, and there is nothing left to fake it with.
+ */
+async function seedTwoServers(
+  db: DB,
+  opts: { linkedPerGuild?: number; eligible?: boolean } = {},
+) {
+  const linked = opts.linkedPerGuild ?? LINKED_MEMBERS_TO_UNLOCK_POOL + 2;
   for (const [guildId, name] of [
     ["g1", "Nightfall"],
     ["g2", "Dawnbreak"],
@@ -433,17 +473,63 @@ async function seedTwoServers(db: DB, opts: { snapshots?: boolean } = {}) {
       slug: name.toLowerCase(),
       memberCount: 500,
       community: `${name} is a competitive gaming community.`,
+      memberAgeRange: "18-24",
+      gamesPlayed: ["Chess"],
+      inviteUrl: `https://discord.gg/${guildId}`,
+      coverImageUrl: `https://cdn.test/${guildId}.png`,
+      announceChannelId: `chan-${guildId}`,
     });
-    if (opts.snapshots !== false) {
-      await db.insert(schema.guildSnapshots).values({
-        id: uid(),
-        guildId,
-        weekStart: MONDAY,
-        memberCount: 500,
-        linkedCount: 20,
-      });
-    }
+    await linkGamers(db, guildId, linked);
   }
+  if (opts.eligible !== false) await freezeEligibilityAtGun(db, MONDAY);
+}
+
+/** `n` gamers whose **parent** is this guild, each with a linked account (A3). */
+async function linkGamers(db: DB, guildId: string, n: number): Promise<string[]> {
+  const ids: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const userId = await createGamer(db, {
+      displayName: `${guildId}-member-${i}`,
+      parentGuildId: guildId,
+    });
+    await db.insert(schema.linkedGameAccounts).values({
+      id: uid(),
+      userId,
+      provider: "chesscom",
+      providerAccountId: `${guildId}-acct-${i}-${uid()}`,
+      verifiedMethod: "exists",
+    });
+    ids.push(userId);
+  }
+  return ids;
+}
+
+/**
+ * One entry, with both server columns stamped as the platform would stamp
+ * them — `joinGuildId` where they pressed Join, `parentGuildIdAtBaseline`
+ * frozen beside the baseline (P6).
+ */
+async function anEntry(
+  db: DB,
+  input: {
+    challengeId: string;
+    userId: string;
+    parent: string | null;
+    join: string | null;
+    linkedAccountId?: string;
+    baselineAt?: Date;
+  },
+) {
+  await db.insert(schema.challengeParticipants).values({
+    id: uid(),
+    challengeId: input.challengeId,
+    userId: input.userId,
+    linkedAccountId: input.linkedAccountId ?? uid(),
+    joinGuildId: input.join,
+    parentGuildIdAtBaseline: input.parent,
+    baselineAt: input.baselineAt ?? MONDAY,
+    baseline: { wins: 0, matches: 0 },
+  });
 }
 
 async function aLiveChallenge(db: DB, announceTo: string[] = []): Promise<string> {

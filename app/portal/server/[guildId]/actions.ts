@@ -46,7 +46,7 @@ async function guard(
 }
 
 /** Refusals are shown, not thrown at the user. Anything else is a real bug. */
-async function attempt(fn: () => Promise<void>): Promise<{ error?: string }> {
+async function attempt(fn: () => Promise<unknown>): Promise<{ error?: string }> {
   try {
     await fn();
     return {};
@@ -78,11 +78,41 @@ export async function reAnnounceAction(form: FormData): Promise<void> {
   redirect(`/portal/server/${guildId}/challenges${query}`);
 }
 
+/**
+ * The six-field server profile (12 §5).
+ *
+ * Every field is submitted together and each is optional, so the owner can
+ * answer what they know and come back — the completeness bar is what tells
+ * them how far they have got, and a form that refused a partial save would
+ * make a six-field gate feel like one question with six parts.
+ *
+ * Only fields actually present on the form are passed through, so a page that
+ * renders a subset of them cannot blank the rest.
+ */
 export async function describeCommunityAction(form: FormData): Promise<void> {
   const guildId = String(form.get("guildId"));
   await guard(guildId, mayEditProfile);
+
+  const text = (key: string) =>
+    form.has(key) ? { [key]: String(form.get(key) ?? "") } : {};
+
   const result = await attempt(async () =>
-    describeCommunity(await getDb(), guildId, String(form.get("community") ?? "")),
+    describeCommunity(await getDb(), guildId, {
+      ...text("community"),
+      ...text("memberAgeRange"),
+      ...text("inviteUrl"),
+      ...text("coverImageUrl"),
+      ...text("announceChannelId"),
+      ...(form.has("gamesPlayed")
+        ? {
+            gamesPlayed: form
+              .getAll("gamesPlayed")
+              .map(String)
+              .flatMap((g) => g.split(",").map((s) => s.trim()))
+              .filter(Boolean),
+          }
+        : {}),
+    }),
   );
   revalidatePath(`/portal/server/${guildId}`);
   redirect(

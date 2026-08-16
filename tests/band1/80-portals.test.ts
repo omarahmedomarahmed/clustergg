@@ -110,25 +110,66 @@ test("a server with no community profile is told why it is not scored", async ()
   ok(overview !== null, "and the portal still works, because it reads none of Discord");
 });
 
-test("describing the community is what gets a server into the pool", async () => {
+test("the server profile is six fields, and all six are the pool gate", async () => {
+  // 12 §5 — ten linked members is not enough. A server we cannot describe is
+  // one we cannot sell, and the profile is what a brand is actually buying.
   const db = await resetDemoDb();
   await aGuild(db, "g1", { community: null });
 
   await throws(
-    () => describeCommunity(db, "g1", "hi"),
+    () => describeCommunity(db, "g1", { community: "hi" }),
     /sentence at least/,
-    "a two-character description is not a description",
+    "a two-character bio is not a bio",
   );
   const err = await throws(
-    () => describeCommunity(db, "g1", "ok"),
-    /weekly pool/,
+    () => describeCommunity(db, "g1", { community: "ok" }),
+    /a brand reads/,
     "and the refusal says what it is for",
   );
   ok(err instanceof CommunityBuilderRefused, "by name");
 
-  await describeCommunity(db, "g1", "A long-running competitive Dota community.");
-  const [guild] = await db.select().from(schema.guilds).where(sqlEq(schema.guilds.guildId, "g1"));
-  ok(guild.community !== null, "and a real one is accepted");
+  const afterBio = await describeCommunity(db, "g1", {
+    community: "A long-running competitive Dota community.",
+  });
+  ok(afterBio.done > 0, "a real bio is accepted");
+  no(afterBio.complete, "and one field of six is not a complete profile");
+
+  // H3 — a progress bar on every gated thing, and it has to move.
+  const filled = await describeCommunity(db, "g1", {
+    memberAgeRange: "18-24",
+    gamesPlayed: ["Dota 2"],
+    inviteUrl: "https://discord.gg/g1",
+    coverImageUrl: "https://cdn.test/g1.png",
+    announceChannelId: "chan-1",
+  });
+  eq(filled.done, filled.total, "all six answered");
+  ok(filled.complete, "and the profile is complete");
+  eq(filled.percent, 100, "the bar reads 100% exactly when the gate opens");
+
+  // 12 §5 says this in words, and it is the field most likely to be answered
+  // with the wrong number.
+  const ageField = filled.fields.find((f) => f.key === "memberAgeRange")!;
+  ok(
+    /not your own age band/i.test(ageField.help),
+    "and the member age range says it is their members' ages, not the owner's own band",
+  );
+});
+
+test("a blank answer is an unanswered question, not a ticked box", async () => {
+  // The negative half. Without it, a `describeCommunity` that stored empty
+  // strings would satisfy the test above by filling six columns with nothing
+  // and reporting a complete profile.
+  const db = await resetDemoDb();
+  await aGuild(db, "g1", { community: null });
+  const state = await describeCommunity(db, "g1", {
+    memberAgeRange: "   ",
+    gamesPlayed: ["", "  "],
+    inviteUrl: "",
+    coverImageUrl: "",
+    announceChannelId: "",
+  });
+  eq(state.done, 0, "six blank submissions answer nothing");
+  no(state.complete, "and the gate stays shut");
 });
 
 test("the portal survives the bot being removed, and says what to do", async () => {
@@ -435,7 +476,8 @@ test("the report is per challenge, and never sums into a unique audience", async
       challengeId: id,
       userId,
       linkedAccountId: uid(),
-      guildId: "g1",
+      joinGuildId: "g1",
+      parentGuildIdAtBaseline: "g1",
     });
   }
 

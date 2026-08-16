@@ -15,6 +15,9 @@ import { schema } from "../db/index.ts";
 import { forceSync, latestObservations } from "../core/sync.ts";
 import { observationsAsAt, standingsOf } from "./scoring.ts";
 import { fireTheGun, challengesToClose } from "./lifecycle.ts";
+import { weekFor } from "./week.ts";
+import { parentGuildToFreeze } from "../identity/attribution.ts";
+import { freezeEligibilityAtGun } from "../pool/eligibility.ts";
 
 /**
  * The gun. Monday 00:00 UTC.
@@ -30,7 +33,7 @@ import { fireTheGun, challengesToClose } from "./lifecycle.ts";
 export async function stampBaselinesAtGun(
   db: DB,
   now = new Date(),
-): Promise<{ started: string[]; stamped: number }> {
+): Promise<{ started: string[]; stamped: number; eligibility: number }> {
   const started = await fireTheGun(db, now);
 
   const pending = await db
@@ -68,14 +71,43 @@ export async function stampBaselinesAtGun(
       ? values
       : await latestObservations(db, participant.linkedAccountId);
 
+    // ===== THE PARENT FREEZES HERE TOO. A1a / P6 =====
+    //
+    // Same instant as the baseline, from the same job, because they are the
+    // same event. `max(challengeStart, joinedAt)` is one rule and it governs
+    // both columns — an early joiner's attribution is decided by the gun, not
+    // by what they clicked in the week before it.
+    const frozenParent = await parentGuildToFreeze(db, participant.userId);
+
     await db
       .update(schema.challengeParticipants)
-      .set({ baselineAt: challenge.startAt, baseline: fallback })
+      .set({
+        baselineAt: challenge.startAt,
+        baseline: fallback,
+        parentGuildIdAtBaseline: frozenParent,
+      })
       .where(eq(schema.challengeParticipants.id, participant.id));
     stamped++;
   }
 
-  return { started, stamped };
+  // ===== ELIGIBILITY FREEZES AT THE GUN, ONCE, FOR EVERY SERVER (12 §4) =====
+  //
+  // All sponsored challenges share one gun, so this is **one check per week**
+  // and not one per challenge — which is why it sits outside the loop above
+  // and is keyed on the week rather than on any challenge.
+  //
+  // It runs whenever this job runs, not only when a challenge started: a week
+  // with no sponsored challenge still needs its gate recorded, or the first
+  // week that does have one would read a freeze from some earlier week and
+  // silently score against it.
+  //
+  // This is the **only** caller of `freezeEligibilityAtGun`. E3 — never
+  // re-checked mid-week — is enforced by that fact, and by `kpisForWeek`
+  // reading `isFrozenEligible` rather than the live gate.
+  const week = weekFor(now);
+  const eligibility = await freezeEligibilityAtGun(db, week.start);
+
+  return { started, stamped, eligibility: eligibility.length };
 }
 
 /**

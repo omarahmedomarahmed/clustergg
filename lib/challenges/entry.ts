@@ -20,6 +20,7 @@ import { schema } from "../db/index.ts";
 import { uid } from "../core/utils.ts";
 import { unlockState } from "../identity/unlock.ts";
 import { isProven } from "../identity/accounts.ts";
+import { parentGuildToFreeze } from "../identity/attribution.ts";
 import { canProveOwnership, getProvider } from "../providers/registry.ts";
 import { forceSync, latestObservations } from "../core/sync.ts";
 import { baselineAtFor, observationsAsAt } from "./scoring.ts";
@@ -242,12 +243,29 @@ export async function enterChallenge(
     ? await observationsAsAt(db, account.id, baselineAt)
     : null;
 
+  // ===== THE PARENT FREEZES WITH THE BASELINE. A1a / P6 =====
+  //
+  // "The parent is frozen onto the entry the same moment the baseline is — at
+  // the gun for an early joiner, at Join for a mid-week joiner.
+  // `max(challengeStart, joinedAt)`, one rule for both."
+  //
+  // So an early joiner's parent is left null here and stamped by the gun job
+  // alongside their baseline, rather than being captured now "while we have
+  // it". Those look equivalent and are not: a gamer whose parent is corrected
+  // between joining and Monday should compete under the corrected one, and
+  // only the entry that freezes at the gun does that. One rule, one instant,
+  // both columns.
+  const frozenParent = stampNow ? await parentGuildToFreeze(db, input.userId) : null;
+
   await db.insert(schema.challengeParticipants).values({
     id: participantId,
     challengeId: input.challengeId,
     userId: input.userId,
     linkedAccountId: account.id,
-    guildId: input.guildId ?? null,
+    // P6 — where they pressed Join. Null is a web join, which A6 credits to
+    // the parent in full.
+    joinGuildId: input.guildId ?? null,
+    parentGuildIdAtBaseline: frozenParent,
     joinedAt: now,
     baselineAt: stampNow ? baselineAt : null,
     baseline: baselineValues,

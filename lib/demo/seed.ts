@@ -15,7 +15,6 @@ import { announce } from "../challenges/lifecycle.ts";
 import { enterChallenge } from "../challenges/entry.ts";
 import { stampBaselinesAtGun } from "../challenges/jobs.ts";
 import { forceSync } from "../core/sync.ts";
-import { snapshotGuilds } from "../pool/score.ts";
 import { allocateToPool, maxAllocationCents } from "../money/pool.ts";
 import { balanceOf } from "../money/ledger.ts";
 import { buildCommunityChallenge, payCommunityChallenge } from "../portal/owner.ts";
@@ -92,14 +91,38 @@ export async function seedDemo(now = new Date()) {
       name: s.name,
       slug: s.name.toLowerCase(),
       memberCount: s.members,
+      // ===== THE SIX-FIELD PROFILE (12 §5) =====
+      //
+      // Zenith is deliberately left **incomplete** — no cover image. Ten
+      // linked members is not the whole gate, and a demo where every server
+      // has a full profile cannot show the state an owner actually opens the
+      // portal to fix. K7 drops it from the run with a reason rather than
+      // scoring it zero.
       community: `${s.name} is a competitive community that has been running weekly nights since 2023.`,
       announceChannelId: `demo-chan-${i}`,
-      removedAt: s.removed ? new Date(now.getTime() - 2 * 86_400_000) : null,
+      memberAgeRange: i % 2 === 0 ? "18-24" : "16-21",
+      gamesPlayed: ["League of Legends", "Counter-Strike"],
+      inviteUrl: `https://discord.gg/demo-${i}`,
+      coverImageUrl: s.name === "Zenith" ? null : `https://cdn.test/${guildId}.png`,
+      // Removal is applied **after the gun**, further down. Seeding it here
+      // would make Lowlands ineligible on Monday and it would simply vanish
+      // from the pool — which is not the state S9 and A9 describe. The state
+      // worth demonstrating is a server that was in the pool, earned, and then
+      // lost the bot on Tuesday: it **keeps what it earned and gains nothing
+      // new**, and its portal still works.
     });
   }
 
   // 60 gamers, spread unevenly across the servers so the KPIs differ.
-  const gamers: { userId: string; accountId: string; providerAccountId: string; guildId: string }[] = [];
+  const gamers: {
+    userId: string;
+    accountId: string;
+    providerAccountId: string;
+    /** Their parent server — where they first pressed a bot button (A1). */
+    guildId: string;
+    /** Where they press Join. Null is a web join (A6). */
+    joinGuildId: string | null;
+  }[] = [];
   for (let i = 0; i < 60; i++) {
     const guildId = guildIds[i % guildIds.length];
     const userId = await createGamer(db, {
@@ -118,15 +141,20 @@ export async function seedDemo(now = new Date()) {
       verifiedMethod: i % 4 === 0 ? "icon" : "exists",
     });
     stats.set(providerAccountId, { wins: 0, matches: 0 });
-    await db.insert(schema.guildMembers).values({ id: uid(), guildId, userId });
-    if (i % 4 === 0) {
-      await db.insert(schema.guildMembers).values({
-        id: uid(),
-        guildId: guildIds[(i + 1) % guildIds.length],
-        userId,
-      });
-    }
-    gamers.push({ userId, accountId, providerAccountId, guildId });
+
+    // ===== WHERE THEY WILL PRESS JOIN, WHICH IS NOT ALWAYS HOME =====
+    //
+    // A4 is the ordinary case and a demo in which every gamer joins from their
+    // own parent server never renders it: parent = join is 1.0 (A5), so the
+    // pool page would show whole entrants everywhere and the ½ + ½ split would
+    // be invisible on every surface that photographs it.
+    //
+    // So one gamer in four presses Join on a neighbouring server's card, and
+    // one in nine joins from the web with no server context at all (A6 — 1.0
+    // to the parent).
+    const joinGuildId =
+      i % 9 === 4 ? null : i % 4 === 0 ? guildIds[(i + 1) % guildIds.length] : guildId;
+    gamers.push({ userId, accountId, providerAccountId, guildId, joinGuildId });
   }
 
   // Two brands. One bought a four-week series, one bought a single week.
@@ -227,12 +255,24 @@ export async function seedDemo(now = new Date()) {
       if (i % 3 === 2) continue; // Not everybody enters everything.
       await enterChallenge(
         db,
-        { challengeId, userId: g.userId, guildId: g.guildId },
+        { challengeId, userId: g.userId, guildId: g.joinGuildId },
         new Date(weekStart.getTime() - 86_400_000),
       );
     }
   }
   await stampBaselinesAtGun(db, weekStart);
+
+  // ===== A9 — THE BOT COMES OFF ON TUESDAY, AFTER THE GUN =====
+  //
+  // Lowlands was eligible at the gun and its entrants' attribution froze on
+  // Monday, so it keeps this week's credit. Anything attributed after this
+  // instant earns it nothing. The portal survives (S9): earnings, standings
+  // and history all still read, and only re-announcing errors.
+  const removedGuildId = guildIds[SERVERS.findIndex((s) => s.removed)];
+  await db
+    .update(schema.guilds)
+    .set({ removedAt: new Date(weekStart.getTime() + 86_400_000) })
+    .where(eq(schema.guilds.guildId, removedGuildId));
 
   for (const [i, g] of gamers.entries()) {
     const s = stats.get(g.providerAccountId)!;
@@ -243,9 +283,6 @@ export async function seedDemo(now = new Date()) {
     }
     await forceSync(db, g.accountId, { at: new Date(weekStart.getTime() + 86_400_000) });
   }
-
-  await snapshotGuilds(db, weekStart);
-  await snapshotGuilds(db, lastWeek);
 
   // Allocate this week's pool, within the half rule.
   const ceiling = maxAllocationCents(await balanceOf(db, "server"));

@@ -591,8 +591,28 @@ export const guilds = pgTable(
     slug: text("slug").notNull().unique(),
     memberCount: integer("member_count").notNull().default(0),
     adminRoleId: text("admin_role_id"),
+    // ===== THE SERVER PROFILE — SIX FIELDS, ALL REQUIRED TO BE SCORED =====
+    //
+    // 12 §5: ten linked members is not enough. A server we cannot describe is
+    // one we cannot sell, so the profile is a pool gate and not decoration.
+    // `announceChannelId` is the sixth field and lives here rather than in
+    // settings for that reason: it is part of what makes a server complete.
     announceChannelId: text("announce_channel_id"),
-    // The community profile. Null means never described — dropped from scoring.
+    /**
+     * **Their members' ages**, clearly labelled — and nothing to do with the
+     * owner's own age band (12 §5). Two different questions, asked in two
+     * different places, and neither is ever a substitute for the other: the
+     * owner's is a compliance fact about one person, this is a description of
+     * a community we are selling to a brand.
+     */
+    memberAgeRange: text("member_age_range"),
+    /** Games their members play. */
+    gamesPlayed: jsonb("games_played").$type<string[]>(),
+    /** A permanent invite. Shown publicly and on their community-challenge pages. */
+    inviteUrl: text("invite_url"),
+    /** Their public server page. */
+    coverImageUrl: text("cover_image_url"),
+    // The one-line bio. Null means never described.
     community: text("community"),
     // ===== THERE IS NO PORTAL KEY HERE, AND THAT IS THE POINT =====
     //
@@ -638,6 +658,24 @@ export const guilds = pgTable(
     // T1–T4. The 14-day confirmation timeout and the 7-day withdrawal freeze.
     ownershipTransferAt: timestamp("ownership_transfer_at", { withTimezone: true }),
     transferConfirmedAt: timestamp("transfer_confirmed_at", { withTimezone: true }),
+
+    // ===== ELIGIBILITY: FROZEN AT MONDAY'S GUN (12 §4) =====
+    //
+    // *Is this server in the pool at all?* — `linked ≥ 10` **and** a complete
+    // profile, decided once at the gun and **never re-checked mid-week** (E3).
+    // What the pool page shows on Wednesday is what pays on Friday.
+    //
+    // All three KPIs stay live. This is the only thing that freezes, and the
+    // distinction is what makes the week coherent: a server cannot be dropped
+    // out of a pool it has spent four days visibly earning in, and a server
+    // that was not ready on Monday cannot buy its way in on Tuesday.
+    //
+    // Stored rather than derived, and that is not a violation of "derived,
+    // never stored": a freeze is a *record of an event*, like a baseline. The
+    // inputs it read on Monday are gone by Wednesday, so there is nothing left
+    // to derive it from.
+    eligibilityFrozenAt: timestamp("eligibility_frozen_at", { withTimezone: true }),
+    eligibleThisWeek: boolean("eligible_this_week"),
 
     // Removal freezes reach; earnings survive (S9).
     removedAt: timestamp("removed_at", { withTimezone: true }),
@@ -754,8 +792,27 @@ export const challengeParticipants = pgTable(
     challengeId: text("challenge_id").notNull(),
     userId: text("user_id").notNull(),
     linkedAccountId: text("linked_account_id").notNull(),
-    // Which server gets the credit for this entrant.
-    guildId: text("guild_id"),
+    /**
+     * P6 — **where they pressed Join. The only server column on this row.**
+     *
+     * Named `joinGuildId` and not `guildId` deliberately: the invariant
+     * forbids "a second `guildId` meaning something adjacent", and a bare
+     * `guildId` beside `parentGuildIdAtBaseline` is exactly that. One of these
+     * two decides half the money and the other decides the other half, and a
+     * name that does not say which is a name somebody reads wrong once.
+     */
+    joinGuildId: text("join_guild_id"),
+    /**
+     * P6 / A1a — **the parent, frozen at the same instant as the baseline.**
+     *
+     * The gun for an early joiner, Join for a mid-week joiner —
+     * `max(challengeStart, joinedAt)`, one rule for both. **Never read live at
+     * scoring time.** A1b: an admin correcting a gamer's parent in week 6 must
+     * not silently move week 3's money, and this column is the whole mechanism
+     * — the scoring path reads it and is structurally unable to reach
+     * `users.parentGuildId`.
+     */
+    parentGuildIdAtBaseline: text("parent_guild_id_at_baseline"),
     joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
     // max(challengeStart, joinedAt). Null until the gun for an early joiner.
     baselineAt: timestamp("baseline_at", { withTimezone: true }),
@@ -902,38 +959,25 @@ export const discordPostQueue = pgTable(
 );
 
 /**
- * Which servers a gamer belongs to.
+ * ===== `guild_members` IS DELETED, AND THIS IS WHY =====
  *
- * ===== WHY THIS TABLE EXISTS =====
+ * It existed for one rule: K1 once split an entrant "across every server a
+ * gamer belongs to", ½ each, which `challenge_participants` cannot express —
+ * it is unique on (challenge, gamer) (P4), so it records the one server they
+ * clicked Join in and cannot record the three they are in.
  *
- * K1 splits an entrant "across every server a gamer belongs to", and G2 says a
- * gamer in two servers is worth ½ to each. Neither is expressible from
- * `challenge_participants`, which is unique on (challenge, gamer) — P4, one
- * entry per gamer per challenge. The participant row records the server they
- * *joined from*; it cannot record the three servers they are in.
+ * That rule is gone. 12 §3 replaces it with **parent + join**: at most two
+ * servers earn from one gamer, and both are recorded on the entry itself —
+ * `joinGuildId` and `parentGuildIdAtBaseline`. No membership table, no
+ * per-server dilution, and no read of a Discord member list on any path the
+ * product depends on (12 §7).
  *
- * Without membership the ½ rule silently becomes "whole credit to whichever
- * server they happened to click in", and two servers carrying the same gamer
- * would sum to two entrants — which is exactly what K5 forbids.
- *
- * Membership is refreshed from Discord when the bot sees a member, and it is
- * NOT the conversion denominator: that is `guild_snapshots.linkedCount`, which
- * counts gamers who actually linked an account.
+ * The rows were **not migrated into `parentGuildId`.** A membership is not a
+ * first bot click, and inventing a permanent, unchangeable attribution out of
+ * data that never meant that is the error class this branch exists to end. A
+ * `users` row that predates the parent stamp gets null, which A7 already
+ * defines: they do everything, and no server earns.
  */
-export const guildMembers = pgTable(
-  "guild_members",
-  {
-    id: text("id").primaryKey(),
-    guildId: text("guild_id").notNull(),
-    userId: text("user_id").notNull(),
-    seenAt: timestamp("seen_at", { withTimezone: true }).notNull().defaultNow(),
-    leftAt: timestamp("left_at", { withTimezone: true }),
-  },
-  (t) => [
-    uniqueIndex("guild_member_unique_idx").on(t.guildId, t.userId),
-    index("guild_member_user_idx").on(t.userId),
-  ],
-);
 
 /**
  * Staff, and which department they are in.

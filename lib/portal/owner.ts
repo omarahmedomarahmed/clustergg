@@ -15,6 +15,11 @@ import { schema } from "../db/index.ts";
 import { uid } from "../core/utils.ts";
 import { weekFor } from "../challenges/week.ts";
 import { poolDivisionFor, percentileRank } from "../pool/score.ts";
+import {
+  poolStatesFor,
+  profileCompleteness,
+  type ProfileCompleteness,
+} from "../pool/eligibility.ts";
 import { createChallenge, attachInvoice, markScheduled } from "../challenges/lifecycle.ts";
 import { createInvoice, markPaid } from "../money/invoices.ts";
 import {
@@ -454,34 +459,109 @@ export async function ownerWallet(db: DB, guildId: string) {
   }));
 }
 
-/** K7 — describing the community is what gets a server scored at all. */
+/**
+ * The server profile — **six fields, and all six are a pool gate** (12 §5).
+ *
+ * K7 — a server that never described itself is dropped from the run. Ten
+ * linked members is not enough: a server we cannot describe is one we cannot
+ * sell, and the profile is what a brand is actually buying.
+ *
+ * Every field is optional to *this* call and required for eligibility, so an
+ * owner can fill the form in over a week and watch the bar move. The bar is
+ * `profileCompleteness`, which is the same function the gun and the registry
+ * read — three surfaces agreeing what "complete" means because there is one
+ * definition, not three.
+ */
 export async function describeCommunity(
   db: DB,
   guildId: string,
-  description: string,
-): Promise<void> {
-  const text = description.trim();
-  if (text.length < 20) {
-    throw new CommunityBuilderRefused(
-      "Tell us a little more about the community — a sentence at least. This " +
-        "is what gets your server into the weekly pool.",
-    );
+  profile: {
+    community?: string;
+    memberAgeRange?: string;
+    gamesPlayed?: string[];
+    inviteUrl?: string;
+    coverImageUrl?: string;
+    announceChannelId?: string;
+  },
+): Promise<ProfileCompleteness> {
+  const patch: Record<string, string | string[] | null> = {};
+
+  if (profile.community !== undefined) {
+    const text = profile.community.trim();
+    if (text.length > 0 && text.length < 20) {
+      throw new CommunityBuilderRefused(
+        "Tell us a little more about the community — a sentence at least. " +
+          "This is what a brand reads when they choose where to spend.",
+      );
+    }
+    patch.community = text.length > 0 ? text : null;
   }
-  await db
-    .update(schema.guilds)
-    .set({ community: text })
+  if (profile.memberAgeRange !== undefined) {
+    // 12 §5 — **their members' ages.** Refusing an empty string rather than
+    // storing one keeps `profileCompleteness` honest: a blank answer is an
+    // unanswered question, and storing it would tick the box.
+    patch.memberAgeRange = profile.memberAgeRange.trim() || null;
+  }
+  if (profile.gamesPlayed !== undefined) {
+    patch.gamesPlayed = profile.gamesPlayed.filter((g) => g.trim().length > 0);
+  }
+  if (profile.inviteUrl !== undefined) {
+    patch.inviteUrl = profile.inviteUrl.trim() || null;
+  }
+  if (profile.coverImageUrl !== undefined) {
+    patch.coverImageUrl = profile.coverImageUrl.trim() || null;
+  }
+  if (profile.announceChannelId !== undefined) {
+    patch.announceChannelId = profile.announceChannelId.trim() || null;
+  }
+
+  if (Object.keys(patch).length > 0) {
+    await db.update(schema.guilds).set(patch).where(eq(schema.guilds.guildId, guildId));
+  }
+
+  const [guild] = await db
+    .select()
+    .from(schema.guilds)
     .where(eq(schema.guilds.guildId, guildId));
+  return profileCompleteness(guild ?? {});
 }
 
-/** Members of this server who have entered something. */
+/**
+ * The gamers this server is credited with bringing to Cluster.
+ *
+ * A3 — **linked member count goes to the parent server only.** This used to
+ * read `guild_members`, a Discord membership table that no longer exists: we
+ * do not read a member list on any path the product depends on (12 §7), and a
+ * membership was never what the number meant. The parent is who got them onto
+ * Cluster at all, and that is what an owner is paid for.
+ *
+ * H4 — this feeds a list, never a progress bar. A bar on raw member count
+ * advertises the wrong number to optimise.
+ */
 export async function ownerMembers(db: DB, guildId: string) {
   return db
     .select({
-      userId: schema.guildMembers.userId,
+      userId: schema.users.id,
       displayName: schema.users.displayName,
       slug: schema.users.slug,
     })
-    .from(schema.guildMembers)
-    .innerJoin(schema.users, eq(schema.guildMembers.userId, schema.users.id))
-    .where(and(eq(schema.guildMembers.guildId, guildId), eq(schema.users.status, "active")));
+    .from(schema.users)
+    .where(
+      and(
+        eq(schema.users.parentGuildId, guildId),
+        eq(schema.users.status, "active"),
+      ),
+    );
+}
+
+/**
+ * E2 — the portal always shows **two states**.
+ *
+ * *"In this week's pool"* and *"on track for next week"* answer different
+ * questions, and an owner who only saw the first would have no way to tell
+ * whether the work they did on Wednesday achieved anything. The second is what
+ * makes the gate feel like something they can act on rather than a verdict.
+ */
+export async function ownerPoolStates(db: DB, guildId: string, now = new Date()) {
+  return poolStatesFor(db, guildId, weekFor(now).start);
 }

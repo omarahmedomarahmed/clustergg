@@ -30,7 +30,7 @@ import { enterChallenge } from "../../lib/challenges/entry.ts";
 import { stampBaselinesAtGun, closeChallenges } from "../../lib/challenges/jobs.ts";
 import { settleChallenge } from "../../lib/trophies/settle.ts";
 import { forceSync } from "../../lib/core/sync.ts";
-import { closeWeek, snapshotGuilds } from "../../lib/pool/score.ts";
+import { closeWeek } from "../../lib/pool/score.ts";
 import { allocateToPool, maxAllocationCents } from "../../lib/money/pool.ts";
 import { releasePayout, markPayoutPaid, payoutTotal } from "../../lib/money/payouts.ts";
 import { checkPrizeVault } from "../../lib/money/prize-vault.ts";
@@ -90,7 +90,15 @@ ADAPTERS[SIM] = {
 const WEEK_ONE = new Date("2026-10-05T00:00:00Z"); // A Monday.
 const PRIZE = splitOf(CHALLENGE_PRICE_CENTS).prize;
 
-type Gamer = { userId: string; accountId: string; providerAccountId: string; guildId: string };
+type Gamer = {
+  userId: string;
+  accountId: string;
+  providerAccountId: string;
+  /** Their parent — where they first pressed a bot button (A1). */
+  guildId: string;
+  /** Where they press Join. Null is a web join (A6). */
+  joinGuildId: string | null;
+};
 
 async function seed(db: DB): Promise<{ guilds: string[]; gamers: Gamer[]; brandId: string }> {
   const guilds: string[] = [];
@@ -102,8 +110,15 @@ async function seed(db: DB): Promise<{ guilds: string[]; gamers: Gamer[]; brandI
       name: `Server ${i}`,
       slug: `server-${i}`,
       memberCount: 100 * (i + 1),
+      // The six-field profile (12 §5). Complete on every server, because this
+      // simulation is about money and a server silently dropped by the pool
+      // gate would make four weeks of arithmetic pass over an empty run.
       community: `Server ${i} is a real community with a real description.`,
       announceChannelId: `chan-${i}`,
+      memberAgeRange: "18-24",
+      gamesPlayed: ["Chess"],
+      inviteUrl: `https://discord.gg/server-${i}`,
+      coverImageUrl: `https://cdn.test/server-${i}.png`,
     });
   }
 
@@ -127,14 +142,38 @@ async function seed(db: DB): Promise<{ guilds: string[]; gamers: Gamer[]; brandI
       verifiedMethod: "exists",
     });
     stats.set(providerAccountId, { wins: 0, matches: 0 });
-    await db.insert(schema.guildMembers).values({ id: uid(), guildId, userId });
-    // A third of them are in a second server too, so the ½ split is exercised
-    // by the simulation rather than only by its own unit test.
-    if (i % 3 === 0) {
-      const second = guilds[(i + 1) % guilds.length];
-      await db.insert(schema.guildMembers).values({ id: uid(), guildId: second, userId });
+    // ===== WHERE THEY WILL PRESS JOIN (A4/A5/A6) =====
+    //
+    // A third join from a **neighbouring** server, so the ½ + ½ split is
+    // exercised by the simulation and not only by its own unit test; one in
+    // seven joins from the web with no server context, which A6 credits to the
+    // parent in full. The rest join at home, which A5 makes a whole 1.0.
+    const joinGuildId =
+      i % 7 === 3 ? null : i % 3 === 0 ? guilds[(i + 1) % guilds.length] : guildId;
+    gamers.push({ userId, accountId, providerAccountId, guildId, joinGuildId });
+  }
+
+  // ===== LINKED MEMBERS WHO NEVER ENTER =====
+  //
+  // Two things need them. Eligibility is `linked ≥ 10` per server (12 §4), and
+  // twenty entrants across four servers is five each — every server would be
+  // dropped and four weeks of arithmetic would run over an empty pool. And the
+  // conversion KPI is entrants ÷ linked members: with every linked member also
+  // an entrant it is pinned at 1.0 for everybody and measures nothing.
+  for (const guildId of guilds) {
+    for (let i = 0; i < 8; i++) {
+      const userId = await createGamer(db, {
+        displayName: `${guildId} lurker ${i}`,
+        parentGuildId: guildId,
+      });
+      await linkAccount(db, {
+        userId,
+        provider: SIM,
+        providerAccountId: `sim-lurker-${guildId}-${i}`,
+        inGameName: `Lurker${i}`,
+        verifiedMethod: "exists",
+      });
     }
-    gamers.push({ userId, accountId, providerAccountId, guildId });
   }
 
   const { brandId } = await signUpBrand(db, { name: "Acme", contactEmail: "a@acme.test" });
@@ -214,7 +253,7 @@ test("four weeks, end to end, with the invariant checked at every step", async (
     for (const g of early) {
       const result = await enterChallenge(
         db,
-        { challengeId, userId: g.userId, guildId: g.guildId },
+        { challengeId, userId: g.userId, guildId: g.joinGuildId },
         new Date(weekStart.getTime() - 2 * 86_400_000),
       );
       ok(result.ok, `${where}: an early joiner is in`);
@@ -245,7 +284,7 @@ test("four weeks, end to end, with the invariant checked at every step", async (
     for (const g of late) {
       const result = await enterChallenge(
         db,
-        { challengeId, userId: g.userId, guildId: g.guildId },
+        { challengeId, userId: g.userId, guildId: g.joinGuildId },
         dayTwo,
       );
       ok(result.ok, `${where}: a day-two joiner is in`);
@@ -295,7 +334,6 @@ test("four weeks, end to end, with the invariant checked at every step", async (
     );
 
     // ── Saturday: the pool.
-    await snapshotGuilds(db, weekStart);
     const poolCents = maxAllocationCents(await balanceOf(db, "server"));
     if (poolCents > 0) {
       await allocateToPool(db, { weekStart, amountCents: poolCents });

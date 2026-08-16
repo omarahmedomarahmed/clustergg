@@ -15,9 +15,13 @@
 //
 // ===== THE THREE KPIs, AND WHY THEY ARE THESE THREE =====
 //
-//   1. Exclusive entrants (40) — volume. A gamer in two servers is worth ½ to
-//      each, so shares can never sum past the true entrant count.
-//   2. Conversion (30) — entrants ÷ linked members. Efficiency.
+//   1. Entrants (40) — volume. **½ parent + ½ join, 1.0 when they are the
+//      same.** The split is `lib/identity/attribution.ts`, which is the only
+//      place the rule exists, so shares can never sum past the true entrant
+//      count (K5).
+//   2. Conversion (30) — entrants **whose parent is this server** ÷ linked
+//      members **whose parent is this server**. Both sides parent-scoped, both
+//      whole gamers, denominator **live**. Efficiency.
 //   3. Activation (30) — entrants who scored above zero ÷ entrants. Quality,
 //      and the one that kills the fake-entrant attack: a member who joins and
 //      never plays *lowers* the ratio.
@@ -28,21 +32,37 @@
 // model, and all three of these measure outcomes on our own platform instead.
 //
 // K6 — winning a challenge earns a server nothing directly. Entrants do.
+//
+// ===== AND ONE TABLE THIS FILE MAY NEVER READ =====
+//
+// S2/N9 — **nothing in the weekly cycle may read `guild_snapshots`.** Not
+// eligibility, not a KPI, not the pool, not a payout. It is consent-gated
+// analytics a server owner opted into and could have declined, refreshed by a
+// button they press; a dollar that depended on it would let a server change
+// its own earnings by pressing refresh, and would make a revocable permission
+// load-bearing on the pool. Stated falsifiably: **drop the table and every
+// dollar is identical.**
+//
+// It used to be the conversion denominator. S3 deletes that, and the
+// denominator is now computed live in `lib/pool/eligibility.ts`.
 
-import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 import { KPI_WEIGHTS, POOL_FLAT_BPS, POOL_SCORED_BPS, BPS } from "../money/amounts.ts";
 import { standingsOf } from "../challenges/scoring.ts";
 import { weekFor } from "../challenges/week.ts";
+import { entrantCredit } from "../identity/attribution.ts";
+import { isFrozenEligible, linkedMembersOf } from "./eligibility.ts";
 
 export type ServerKpis = {
   guildId: string;
   name: string;
-  /** Split volume: a gamer in two servers counts ½ to each. */
+  /** Split volume: ½ parent + ½ join, 1.0 when they are the same server. */
   entrants: number;
+  /** Live, parent-scoped. Never a snapshot. */
   linkedMembers: number;
-  /** entrants ÷ linked members. */
+  /** Entrants **parented here** ÷ linked members **parented here**. ≤ 1.0. */
   conversion: number;
   /** entrants who scored above zero ÷ entrants. */
   activation: number;
@@ -104,68 +124,7 @@ export async function kpisForWeek(
   const participants = await db
     .select()
     .from(schema.challengeParticipants)
-    .where(
-      and(
-        inArray(schema.challengeParticipants.challengeId, challengeIds),
-        isNotNull(schema.challengeParticipants.guildId),
-      ),
-    );
-
-  // ===== THE HALF-SPLIT. K1, K5, and G2 in the data model =====
-  //
-  // A gamer who belongs to three servers that all carried the same challenge
-  // is worth a third to each, not one to each. Without it, ten overlapping
-  // servers turn 100 entrants into 1,000 and the pool pays for members who do
-  // not exist.
-  //
-  // The split reads **membership**, not the participant row. A participant row
-  // is unique on (challenge, gamer) — P4 — so it records the one server they
-  // clicked Join in and cannot express the three they are in. Reading it would
-  // quietly turn the ½ rule into "whole credit to wherever they happened to
-  // click".
-  //
-  // Restricted to servers that actually **carried** the challenge. "Every
-  // server a gamer belongs to" cannot mean a server the challenge was never
-  // announced to: that server did nothing for this entrant and would be taking
-  // a share from one that did.
-  //
-  // The denominator is per (gamer, challenge). Entering two challenges is
-  // genuinely two entrants — that double counting is deliberate, §8 — while
-  // being in two servers is one gamer.
-  const announcements = await db
-    .select()
-    .from(schema.challengeAnnouncements)
-    .where(inArray(schema.challengeAnnouncements.challengeId, challengeIds));
-  const carriedBy = new Map<string, Set<string>>();
-  for (const a of announcements) {
-    const set = carriedBy.get(a.challengeId) ?? new Set<string>();
-    set.add(a.guildId);
-    carriedBy.set(a.challengeId, set);
-  }
-
-  const memberships = await db
-    .select()
-    .from(schema.guildMembers)
-    .where(isNull(schema.guildMembers.leftAt));
-  const guildsOf = new Map<string, string[]>();
-  for (const m of memberships) {
-    guildsOf.set(m.userId, [...(guildsOf.get(m.userId) ?? []), m.guildId]);
-  }
-
-  const byGamerChallenge = new Map<string, string[]>();
-  for (const p of participants) {
-    const carried = carriedBy.get(p.challengeId);
-    const member = guildsOf.get(p.userId) ?? [];
-    const eligible = carried ? member.filter((g) => carried.has(g)) : member;
-    // Fall back to the server they joined from. A gamer whose memberships we
-    // have not seen yet still earned their server the credit, and crediting
-    // nobody would quietly shrink the pool's denominator.
-    const guilds = eligible.length > 0 ? eligible : [p.guildId as string];
-    byGamerChallenge.set(`${p.challengeId}:${p.userId}`, guilds);
-  }
-
-  const entrantShare = new Map<string, number>();
-  const activeShare = new Map<string, number>();
+    .where(inArray(schema.challengeParticipants.challengeId, challengeIds));
 
   // Whether each participant scored above zero — the activation numerator.
   const scoredAbove = new Set<string>();
@@ -175,21 +134,66 @@ export async function kpisForWeek(
     }
   }
 
-  for (const [key, guildIds] of byGamerChallenge) {
-    const share = 1 / guildIds.length;
-    const active = scoredAbove.has(key);
-    for (const guildId of guildIds) {
+  const guilds = await db.select().from(schema.guilds);
+  const guildById = new Map(guilds.map((g) => [g.guildId, g]));
+
+  const entrantShare = new Map<string, number>();
+  const activeShare = new Map<string, number>();
+  // The conversion numerator and denominator are **whole gamers**, not shares
+  // (K2), so they are sets of user ids rather than running totals.
+  const parentedEntrants = new Map<string, Set<string>>();
+
+  for (const p of participants) {
+    // ===== THE FROZEN PARENT. P6, AND THE REASON THIS IS NOT A JOIN =====
+    //
+    // Read from the entry, never from `users.parentGuildId`. A1b: an admin
+    // correcting a gamer's parent in week 6 must not silently move week 3's
+    // money, and the mechanism is that this path cannot see the live value at
+    // all. A null stamp is a real answer, not a missing one — the credit rule
+    // (A7) already says a gamer with no parent earns nobody anything.
+    const credits = entrantCredit({
+      parentGuildId: p.parentGuildIdAtBaseline,
+      joinGuildId: p.joinGuildId,
+    });
+
+    const active = scoredAbove.has(`${p.challengeId}:${p.userId}`);
+    // Whether **this entry** actually credited its parent. A running check
+    // against `entrantShare` would be wrong: the map already holds credit from
+    // earlier entries, so a parent skipped by the removed-bot rule below would
+    // still look credited because somebody else's entry put it there.
+    let creditedParent = false;
+
+    for (const { guildId, share } of credits) {
+      // ===== A9 — A PARENT THAT LOST THE BOT FREEZES =====
+      //
+      // "Keeps what it earned, gains nothing new." So the test is not "does
+      // this guild still have the bot" — that would take away credit already
+      // shown to an owner — it is whether this **entry** was frozen before the
+      // bot went. An entry attributed after removal earns the server nothing.
+      const guild = guildById.get(guildId);
+      if (!guild) continue;
+      const frozenAt = p.baselineAt ?? p.joinedAt;
+      if (guild.removedAt && frozenAt.getTime() >= guild.removedAt.getTime()) continue;
+
       entrantShare.set(guildId, (entrantShare.get(guildId) ?? 0) + share);
       if (active) activeShare.set(guildId, (activeShare.get(guildId) ?? 0) + share);
+      if (guildId === p.parentGuildIdAtBaseline) creditedParent = true;
+    }
+
+    // ===== K9 — CONVERSION COUNTS ONLY ENTRANTS PARENTED HERE =====
+    //
+    // Not the ½ + ½ credit. A server with 10 linked members that converted 20
+    // outsiders would otherwise score 2.0 — an unbounded ratio that rewards
+    // poaching over recruiting, which is the opposite of what the KPI is for.
+    // The join server is paid for that conversion through KPI 1; it does not
+    // also get to claim somebody else's member as its own recruit.
+    const parent = p.parentGuildIdAtBaseline;
+    if (parent && creditedParent) {
+      const set = parentedEntrants.get(parent) ?? new Set<string>();
+      set.add(p.userId);
+      parentedEntrants.set(parent, set);
     }
   }
-
-  const guilds = await db.select().from(schema.guilds);
-  const snapshots = await db
-    .select()
-    .from(schema.guildSnapshots)
-    .where(eq(schema.guildSnapshots.weekStart, week.start));
-  const linkedByGuild = new Map(snapshots.map((s) => [s.guildId, s.linkedCount]));
 
   const kpis: ServerKpis[] = [];
   const dropped: { guildId: string; reason: string }[] = [];
@@ -198,29 +202,66 @@ export async function kpisForWeek(
     const entrants = entrantShare.get(guild.guildId) ?? 0;
     if (entrants === 0) continue;
 
-    // K7 — a server that never described itself is **dropped from the run**,
-    // not scored zero. Scored zero it would still occupy a percentile position
-    // and take money from servers that did the work.
-    if (!guild.community) {
+    // ===== K7 — DROPPED FROM THE RUN, NOT SCORED ZERO =====
+    //
+    // Scored zero, an ineligible server would still occupy a percentile
+    // position and take money from servers that did the work. Dropped, its
+    // entrants are still **recorded** (12 §4) — they simply earn it nothing
+    // this week.
+    //
+    // The test is the **frozen** eligibility, not a live re-read. E3: never
+    // re-check mid-week. This is the read that makes that structural, and it
+    // is the one guard 15 breaks.
+    if (!isFrozenEligible(guild, week.start)) {
       dropped.push({
         guildId: guild.guildId,
         reason:
-          "This server has no community profile yet, so it is not scored. " +
-          "Describe the community in the portal to join the pool.",
+          "This server was not in the pool when the week started, so it is " +
+          "not scored this week. Ten linked gamers and a complete server " +
+          "profile by Monday unlocks the next one.",
       });
       continue;
     }
 
-    const linkedMembers = linkedByGuild.get(guild.guildId) ?? 0;
+    // ===== THE CONVERSION DENOMINATOR IS LIVE. E1 =====
+    //
+    // Frozen at the gun's ten while the numerator grew all week, a server that
+    // linked 50 more on Tuesday and got 30 of them to enter would score
+    // 30 ÷ 10 = 3.0 — unbounded, and it rewards exactly the poaching K9 exists
+    // to stop. Live on both sides it is 30 ÷ 60, and 1.0 is the ceiling.
+    const linkedNow = await linkedMembersOf(db, guild.guildId);
+    const parented = parentedEntrants.get(guild.guildId) ?? new Set<string>();
+
+    // ===== WHY THE DENOMINATOR IS A MAXIMUM AND NOT A BARE COUNT =====
+    //
+    // K2 asserts this reading is "the only one bounded at 1.0", and it is —
+    // for every gamer who is *both* an entrant parented here and still a live
+    // linked member parented here, which is all of them on any ordinary week:
+    // entry requires a linked account (entry guard 5) and the parent is the
+    // same fact on both sides.
+    //
+    // Three things the specification permits elsewhere can separate them
+    // mid-week: an admin re-parenting a gamer (A8), a gamer deleting their
+    // account, and a gamer unlinking the account they entered with (B6). In
+    // each case the entry keeps its frozen parent while the live count loses
+    // the gamer, and the bare ratio would climb past 1.0.
+    //
+    // So the denominator is the **complete** live count of gamers parented
+    // here who have linked — and an entry frozen to this parent is itself
+    // evidence of both facts. That is not an adjustment or a clamp: it is the
+    // honest count, and on an ordinary week it is identical to `linkedNow`
+    // because the entrants are already inside it.
+    const linkedMembers = Math.max(linkedNow, parented.size);
     const active = activeShare.get(guild.guildId) ?? 0;
+
     kpis.push({
       guildId: guild.guildId,
       name: guild.name,
       entrants,
       linkedMembers,
-      // A server with no linked members and entrants anyway is a data problem,
+      // A server with entrants and no linked members at all is a data problem,
       // not a perfect conversion rate. Zero is the honest answer.
-      conversion: linkedMembers > 0 ? entrants / linkedMembers : 0,
+      conversion: linkedMembers > 0 ? parented.size / linkedMembers : 0,
       activation: entrants > 0 ? active / entrants : 0,
     });
   }
@@ -396,39 +437,15 @@ export async function closeWeek(
   return { division, drafted };
 }
 
-/** The denominator for conversion, snapshotted weekly. */
-export async function snapshotGuilds(db: DB, weekStart: Date): Promise<number> {
-  const { uid } = await import("../core/utils.ts");
-  const guilds = await db
-    .select()
-    .from(schema.guilds)
-    .where(isNull(schema.guilds.removedAt));
-
-  for (const guild of guilds) {
-    const [row] = await db
-      .select({ n: sql<number>`count(distinct ${schema.users.id})::int` })
-      .from(schema.users)
-      .innerJoin(
-        schema.linkedGameAccounts,
-        eq(schema.linkedGameAccounts.userId, schema.users.id),
-      )
-      .where(
-        and(
-          eq(schema.users.parentGuildId, guild.guildId),
-          ne(schema.users.status, "deleted"),
-        ),
-      );
-
-    await db
-      .insert(schema.guildSnapshots)
-      .values({
-        id: uid(),
-        guildId: guild.guildId,
-        weekStart,
-        memberCount: guild.memberCount,
-        linkedCount: row?.n ?? 0,
-      })
-      .onConflictDoNothing();
-  }
-  return guilds.length;
-}
+// ===== `snapshotGuilds` IS DELETED, AND THAT IS THE POINT OF THIS SPRINT ====
+//
+// It wrote a weekly `linkedCount` and `kpisForWeek` read it as the conversion
+// denominator. S3 deletes that: **the denominator is computed live**
+// (`linkedMembersOf`), and `guild_snapshots` becomes consent-gated analytics
+// that **nothing in the weekly cycle may read** (S2/N9).
+//
+// The job is deleted rather than left writing rows nobody reads, because a
+// table still being filled by the weekly cycle is a table the next person
+// reasonably assumes the weekly cycle depends on. The falsifiable form of the
+// rule is *"drop the table and every dollar is identical"*, and a write is a
+// dependency in the direction that matters least and reads worst.
