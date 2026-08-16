@@ -873,3 +873,59 @@ C3 makes every challenge past `draft` carry an invoice, so a built challenge is
 already money committed against the guild, and the owner's approval would be
 approving something already spent. The row exists precisely so there is
 somewhere to hold a request that has cost nothing.
+
+---
+
+# Sprint 7 — opt-in analytics
+
+The one feature on the platform whose whole design is *"and no dollar may
+depend on it"*. `tests/band1/96-analytics.test.ts` unless the row says
+otherwise.
+
+The rule the feature rests on — S2/N9, **no weekly-cycle figure reads a
+snapshot** — is guard 131 and the four-week simulation's own comparison, both
+proven in sprint 5. Those live where the money is. What is below is the consent.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 143 | **The cooldown is on the guild** | The `cooldownUntil` check disabled | 2 cases | clean, 359/361 |
+| 144 | **The grant survives sign-out** | Consent aged out after 30 minutes inside `refreshState` | 3 cases, first time — **and not the test named for it**, see below. After the fix: 4 | clean, 357/361 |
+| 145 | The platform ceiling holds every server | The `used >= ceiling` check disabled | 2 cases | clean, 359/361 |
+| 146 | A refusal costs no call | The member-list read moved above the gate | 2 cases | clean, 359/361 |
+| 147 | The ceiling is a **setting**, not a constant | `pullCeiling` ignores the row and returns the default | 3 cases | clean, 358/361 |
+| 148 | The ceiling **lengthens every cooldown as load rises** | `cooldownForLoad` flattened to the base wait | *"the ceiling lengthens every server's cooldown at once"* | clean, 360/361 |
+| 149 | The page never says we **cannot** read a member list | The scope sentence rewritten to *"we cannot"* | *"the page says we do not read this, and never that we cannot"* | clean, 360/361 |
+| 150 | A snapshot never reaches a page without its date | `analyticsView` returns `takenAt: null` | 2 cases | clean, 359/361 |
+
+### Break 144: the test named for the rule read the row, not the path
+
+*"The grant is permanent and survives a sign-out"* asserted that the consent row
+exists a year later, and that the row carries no session, token or expiry
+column. Both true, and both still true under a grant expired **in code**: the
+break aged the consent out inside `refreshState`, `granted` stayed true, and the
+test stayed green while three other tests went red.
+
+The structural half is worth keeping — a column that could expire is the failure
+mode most likely to be introduced — but it is not the claim. The claim is that a
+year-old grant still *works*, so the test now asserts Update still runs.
+
+This is the same shape as breaks 132 and 133 in sprint 5, and as trap 18: *the
+evidence is recorded* and *the evidence is honoured* are different claims that
+read identically in a test name.
+
+### Break 148 is why the ceiling is a curve and not a line
+
+Flattening `cooldownForLoad` to a constant leaves a ceiling that is free below
+the limit and a wall above it — which means the first servers to press Update
+each day spend the whole platform budget and every other server hits the wall.
+N8 asks for the opposite: as the platform approaches Discord's limit the
+cooldown lengthens **everywhere**, so it degrades evenly and every server is
+told plainly why and when.
+
+### Break 149 is a sentence, and it is load-bearing
+
+The GUILD_MEMBERS intent is **app-wide** — one switch, every guild, no per-guild
+control — so per-server consent is *our* gate, kept in code. *"We cannot read
+your member list"* would be a promise the architecture cannot keep, and 12 §7a
+says so explicitly. The guard asserts both halves: that the sentence says *we do
+not*, and that it does not say *we cannot*.
