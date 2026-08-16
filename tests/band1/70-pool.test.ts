@@ -379,6 +379,24 @@ test("linked members are counted live, parent-scoped, and never from a snapshot"
   // The denominator moves during the week — that is the whole of E1.
   await linkGamers(db, "g1", 4);
   eq(await linkedMembersOf(db, "g1"), 7, "live: it grows as members link, mid-week");
+
+  // ===== AND THE HALF THAT CAN ACTUALLY GO WRONG =====
+  //
+  // "Parented here" and "entered from here" are different sets, and counting
+  // the second is the plausible mistake — it is the number a server owner
+  // would say out loud. Without an entry that separates them, the assertions
+  // above are true and cannot fail: there is nothing in the fixture for a
+  // join-scoped count to pick up. This is what break 127 found.
+  const challengeId = await aLiveChallenge(db, ["g1", "g2"]);
+  for (const userId of await linkGamers(db, "g2", 6)) {
+    await anEntry(db, { challengeId, userId, parent: "g2", join: "g1" });
+  }
+  eq(
+    await linkedMembersOf(db, "g1"),
+    7,
+    "six of g2's members entering from g1's card are not g1's linked members — A3",
+  );
+  eq(await linkedMembersOf(db, "g2"), 11, "they are g2's, because g2 is who recruited them");
 });
 
 test("no weekly-cycle dollar reads a guild_snapshots row", async () => {
