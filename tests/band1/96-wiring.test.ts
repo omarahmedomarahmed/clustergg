@@ -194,6 +194,7 @@ test("a retried event is a no-op, and still answers", async () => {
   const delivery = event("evt_paid_2", "checkout.session.completed", invoiceId);
 
   await handleStripeEvent(db, delivery);
+  const before = await checkPrizeVault(db);
   const once = {
     income: await balanceOf(db, "income"),
     prize: await balanceOf(db, "prize"),
@@ -204,14 +205,43 @@ test("a retried event is a no-op, and still answers", async () => {
 
   const replay = await handleStripeEvent(db, delivery);
   eq(replay.kind, "replay", "the second is recognised as the same event");
+  const after = await checkPrizeVault(db);
 
   eq(await balanceOf(db, "income"), once.income, "and no vault moved a cent");
   eq(await balanceOf(db, "prize"), once.prize, "not the prize vault");
   eq(await balanceOf(db, "server"), once.server, "not the server vault");
   eq(await balanceOf(db, "cluster"), once.cluster, "not Cluster's");
 
-  const vault = await checkPrizeVault(db);
-  ok(vault.ok || vault.state !== "over_allocated", "and the invariant is intact");
+  // ===== WHAT A REPLAY MUST GUARANTEE, ASSERTED AS ITSELF =====
+  //
+  // The first version of this line read
+  //
+  //     ok(vault.ok || vault.state !== "over_allocated", "…the invariant is intact")
+  //
+  // There is no `ok` on `PrizeVaultCheck` — the field is `holds` — so the left
+  // side was always `undefined`, the expression collapsed to a comparison
+  // against one enum value, and it checked nothing it claimed to. That is the
+  // exact defect this branch exists to end, and typecheck names it in one line.
+  //
+  // Fixing the field exposed the second half of the mistake: `holds` is the
+  // WRONG QUESTION HERE. At this point in the flow $175 has been paid and no
+  // trophy has been assigned, so the vault is legitimately **unallocated** —
+  // the amber rhythm 02-MONEY §5 describes as normal — and `holds` is false by
+  // design. Asserting it would have been a test demanding the platform be in a
+  // state it should not be in.
+  //
+  // What a replay actually promises is that **nothing moved**. So that is what
+  // is asserted, against the whole check rather than one field: a second
+  // delivery of the same event must leave the vault byte-identical.
+  eq(after.balanceCents, before.balanceCents, "the prize vault balance is unchanged");
+  eq(after.liabilityCents, before.liabilityCents, "so is the liability");
+  eq(after.differenceCents, before.differenceCents, "so is the difference between them");
+  eq(after.state, before.state, `and the state is still ${before.state}`);
+  no(
+    after.state === "over_allocated",
+    "and it is certainly not over-allocated — the one state that is a failure " +
+      "rather than a phase, and the one a double-routed payment produces",
+  );
 });
 
 test("every handled event is recorded, including the ones we ignore", async () => {
