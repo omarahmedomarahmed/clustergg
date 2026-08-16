@@ -16,6 +16,7 @@ import { ok, eq, no } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
 import { createHmac } from "node:crypto";
 import { resetDemoDb, schema } from "../../lib/db/index.ts";
+import { eq as sqlEq } from "drizzle-orm";
 import { authoriseCron } from "../../lib/core/cron-auth.ts";
 import {
   verifySignature,
@@ -27,7 +28,6 @@ import {
 } from "../../lib/money/stripe.ts";
 import { signUpBrand, confirmAndPay } from "../../lib/portal/brand.ts";
 import { balanceOf } from "../../lib/money/ledger.ts";
-import { checkPrizeVault } from "../../lib/money/prize-vault.ts";
 
 const WEEK = new Date("2026-09-14T00:00:00Z");
 const BUYING = new Date("2026-09-09T12:00:00Z");
@@ -194,7 +194,6 @@ test("a retried event is a no-op, and still answers", async () => {
   const delivery = event("evt_paid_2", "checkout.session.completed", invoiceId);
 
   await handleStripeEvent(db, delivery);
-  const before = await checkPrizeVault(db);
   const once = {
     income: await balanceOf(db, "income"),
     prize: await balanceOf(db, "prize"),
@@ -205,43 +204,45 @@ test("a retried event is a no-op, and still answers", async () => {
 
   const replay = await handleStripeEvent(db, delivery);
   eq(replay.kind, "replay", "the second is recognised as the same event");
-  const after = await checkPrizeVault(db);
 
   eq(await balanceOf(db, "income"), once.income, "and no vault moved a cent");
   eq(await balanceOf(db, "prize"), once.prize, "not the prize vault");
   eq(await balanceOf(db, "server"), once.server, "not the server vault");
   eq(await balanceOf(db, "cluster"), once.cluster, "not Cluster's");
 
-  // ===== WHAT A REPLAY MUST GUARANTEE, ASSERTED AS ITSELF =====
+  // ===== WHAT THIS SUITE MAY HONESTLY CLAIM, AND WHAT IT MAY NOT =====
   //
-  // The first version of this line read
+  // The first version of this block read
   //
   //     ok(vault.ok || vault.state !== "over_allocated", "…the invariant is intact")
   //
-  // There is no `ok` on `PrizeVaultCheck` — the field is `holds` — so the left
-  // side was always `undefined`, the expression collapsed to a comparison
-  // against one enum value, and it checked nothing it claimed to. That is the
-  // exact defect this branch exists to end, and typecheck names it in one line.
+  // `PrizeVaultCheck` has no `ok` — the field is `holds` — so the left side was
+  // always `undefined` and the expression collapsed to one enum comparison. It
+  // claimed to guard M3 and guarded nothing. Typecheck names it in a line, and
+  // `next build` does not typecheck tests.
   //
-  // Fixing the field exposed the second half of the mistake: `holds` is the
-  // WRONG QUESTION HERE. At this point in the flow $175 has been paid and no
-  // trophy has been assigned, so the vault is legitimately **unallocated** —
-  // the amber rhythm 02-MONEY §5 describes as normal — and `holds` is false by
-  // design. Asserting it would have been a test demanding the platform be in a
-  // state it should not be in.
+  // Fixing the field made it fail, correctly: at this point $175 is paid and
+  // no trophy is assigned, so the vault is legitimately **unallocated** — the
+  // amber rhythm 02-MONEY §5 calls normal — and `holds` is false by design.
   //
-  // What a replay actually promises is that **nothing moved**. So that is what
-  // is asserted, against the whole check rather than one field: a second
-  // delivery of the same event must leave the vault byte-identical.
-  eq(after.balanceCents, before.balanceCents, "the prize vault balance is unchanged");
-  eq(after.liabilityCents, before.liabilityCents, "so is the liability");
-  eq(after.differenceCents, before.differenceCents, "so is the difference between them");
-  eq(after.state, before.state, `and the state is still ${before.state}`);
-  no(
-    after.state === "over_allocated",
-    "and it is certainly not over-allocated — the one state that is a failure " +
-      "rather than a phase, and the one a double-routed payment produces",
-  );
+  // Then asserting the vault was *unchanged* passed, and **still could not
+  // fail**. Money cannot enter the vaults twice for one invoice whatever this
+  // route does, because `routePaidInvoice` refuses when the append-only ledger
+  // already holds a row for that invoice. Breaking this route's idempotency
+  // AND `markPaid`'s together still moved nothing.
+  //
+  // An assertion that cannot fail is decoration however true it is. So the
+  // vault check belongs where it can vary, and it is already there:
+  // `30-money.test.ts` — *"a webhook that fires twice does not pay twice"* —
+  // which goes red the moment that ledger guard is broken. Proven, guard 51.
+  //
+  // What is left here is what **this route** decides, which is falsifiable:
+  // a replay must not write a second record of having handled the event.
+  const records = await db
+    .select()
+    .from(schema.auditLog)
+    .where(sqlEq(schema.auditLog.refId, delivery.id));
+  eq(records.length, 1, "one delivery, one record — a replay adds nothing");
 });
 
 test("every handled event is recorded, including the ones we ignore", async () => {
