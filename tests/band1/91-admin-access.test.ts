@@ -151,6 +151,16 @@ test("a department reaches what it should and nothing more", () => {
     ["sales", "/admin/users", false],
     ["support", "/admin/servers", true],
     ["support", "/admin/users", false],
+    // 05 §6 names two inboxes and MS2 keeps them apart. Which departments
+    // reach which is **our** decision, not a ratified rule — so it is written
+    // down here, where a widening edit goes red, rather than left to whatever
+    // the table happens to say. Support answers server owners; sales answers
+    // brands; both are already how `/admin/servers` and `/admin/brands` are
+    // classified, so the inboxes follow the conversations they are about.
+    ["support", "/admin/inbox/servers", true],
+    ["support", "/admin/inbox/brands", false],
+    ["sales", "/admin/inbox/brands", true],
+    ["sales", "/admin/inbox/servers", false],
     ["admin", "/admin/users", true],
     ["admin", "/admin/settings", true],
   ];
