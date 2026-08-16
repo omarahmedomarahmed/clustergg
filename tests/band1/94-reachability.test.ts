@@ -297,6 +297,38 @@ test("every route the spec promises resolves to a handler that exists", async ()
   );
 });
 
+test("every guard id in PROVEN.md is unique, and the series is continuous", async () => {
+  // ===== THE EVIDENCE RECORD MUST HAVE ONE ANSWER PER QUESTION =====
+  //
+  // `tests/PROVEN.md` answers *"prove this guard was tested"*. It briefly
+  // carried two colliding numbering series — one from the ten stages, one
+  // restarted at the rebuild — so 24 ids meant two different things and guard
+  // 51 had two answers: *"the admin role is stored by ID"* and *"the ledger's
+  // own double-route guard"*.
+  //
+  // Nothing catches that by reading. It is a two-line check, so it is a check.
+  const doc = await fs.readFile(path.join(repoRoot, "tests", "PROVEN.md"), "utf8");
+
+  // Only rows of the guard tables: `| 34 | …`. The attempt tables use
+  // `| 1 · … |` and are deliberately not ids.
+  const ids = [...doc.matchAll(/^\| (\d+) \|/gm)].map((m) => Number(m[1]));
+  ok(ids.length > 50, `the guard tables were found (${ids.length} rows)`);
+
+  const seen = new Set<number>();
+  const duplicates = ids.filter((id) => (seen.has(id) ? true : (seen.add(id), false)));
+  eq(
+    [...new Set(duplicates)],
+    [],
+    "a duplicate id means one guard number has two answers, which is worse " +
+      "than having no number at all",
+  );
+
+  // Continuous and in order, so a row cannot be inserted without renumbering —
+  // which is what keeps the prose references honest.
+  const expected = ids.map((_, i) => i + 1);
+  eq(ids, expected, "the series runs 1..N in document order, with no gaps");
+});
+
 test("the test command typechecks before it runs", async () => {
   // ===== THE SYSTEMIC HALF OF A DEAD ASSERTION =====
   //

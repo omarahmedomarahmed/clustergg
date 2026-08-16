@@ -7,6 +7,12 @@ working tree was clean afterwards.
 
 One row per guard. A guard with no row here has not been proven.
 
+**Guard IDs are unique across this whole file and are never reused.** One
+continuous series in document order, not one per sprint. This file is the
+evidence record — the thing that answers *"prove this guard was tested"* — and
+it briefly carried two colliding series, so guard 51 had two different answers.
+A duplicate id fails the band (`tests/band1/94-reachability.test.ts`).
+
 ---
 
 ## Stage 0 — foundation
@@ -386,17 +392,17 @@ deletion of the server-owner portal key.
 
 | # | Guard | The break | What went red | Restored |
 |---|---|---|---|---|
-| 34 | Linking a second method updates one row | Insert instead of update | *"linking a second method updates one row and never creates another"* | clean, 264/264 |
-| 35 | An already-used identity **routes, never merges** | The `elsewhere` branch made to steal the identity from the other account | *"an identity already on another account is a route, never a merge"* | clean, 264/264 |
-| 36 | Each account clears every gate on its own | `deriveUnlock` made to default age, country and a link | 5 cases across three suites | clean, 264/264 |
-| 37 | **L1 is what stops one person scoring twice** | The collision refusal in `linkAccount` bypassed | 2 cases, in two suites | clean, 264/264 |
-| 38 | The email door's verification is redemption's | `emailVerifiedAt` no longer written | **7 cases**, including the four-week simulation | clean, 264/264 |
-| 39 | A brand invite works exactly once | The `inviteRedeemedAt` check bypassed | *"a brand invite works exactly once"* | clean, 264/264 |
-| 40 | The parent is stamped at the first click | The early return made conditional, so a later click re-stamps | *"the parent is stamped at the first click and never re-stamped"* | clean, 264/264 |
+| 81 | Linking a second method updates one row | Insert instead of update | *"linking a second method updates one row and never creates another"* | clean, 264/264 |
+| 82 | An already-used identity **routes, never merges** | The `elsewhere` branch made to steal the identity from the other account | *"an identity already on another account is a route, never a merge"* | clean, 264/264 |
+| 83 | Each account clears every gate on its own | `deriveUnlock` made to default age, country and a link | 5 cases across three suites | clean, 264/264 |
+| 84 | **L1 is what stops one person scoring twice** | The collision refusal in `linkAccount` bypassed | 2 cases, in two suites | clean, 264/264 |
+| 85 | The email door's verification is redemption's | `emailVerifiedAt` no longer written | **7 cases**, including the four-week simulation | clean, 264/264 |
+| 86 | A brand invite works exactly once | The `inviteRedeemedAt` check bypassed | *"a brand invite works exactly once"* | clean, 264/264 |
+| 87 | The parent is stamped at the first click | The early return made conditional, so a later click re-stamps | *"the parent is stamped at the first click and never re-stamped"* | clean, 264/264 |
 
 ### The break that proved the guard was somewhere else
 
-Attempt one at guard 37 removed `uniqueIndex` from `linked_game_accounts` in
+Attempt one at guard 84 removed `uniqueIndex` from `linked_game_accounts` in
 `lib/db/schema.ts`. **Nothing went red**, and for a moment that read as a hole.
 
 It was not. The in-process database is created from `drizzle/*.sql`, not from
@@ -409,7 +415,7 @@ The guard L1 actually rests on is the collision refusal in
 `lib/identity/accounts.ts`. Breaking **that** went red in two suites, which is
 the right answer: the unique index is a backstop, and the code is the guard.
 
-### What guard 38's blast radius says
+### What guard 85's blast radius says
 
 Removing one `emailVerifiedAt` write took down seven cases including the
 four-week simulation — because I7a made one verification serve two purposes.
@@ -433,19 +439,19 @@ a route is a string and no type system has an opinion about one.
 
 | # | Guard | The break | What went red | Restored |
 |---|---|---|---|---|
-| 41 | Every form action posts to a handler that exists | The brand login form pointed back at `/api/portal/unlock` | *"every form action posts to a route handler that exists"* | clean, 268/268 |
-| 42 | Every redirect resolves to a page | `lib/portal/session.ts` redirected to `/login/brands` | *"every redirect target in the app resolves to a page or a handler"* | clean, 268/268 |
-| 43 | No rendered copy offers the deleted credential | *"Sign in with your portal key"* put back into the brand login heading | *"no rendered copy offers a credential the platform deleted"* | clean, 268/268 |
+| 88 | Every form action posts to a handler that exists | The brand login form pointed back at `/api/portal/unlock` | *"every form action posts to a route handler that exists"* | clean, 268/268 |
+| 89 | Every redirect resolves to a page | `lib/portal/session.ts` redirected to `/login/brands` | *"every redirect target in the app resolves to a page or a handler"* | clean, 268/268 |
+| 90 | No rendered copy offers the deleted credential | *"Sign in with your portal key"* put back into the brand login heading | *"no rendered copy offers a credential the platform deleted"* | clean, 268/268 |
 
-### Guards 42 and 43 failed on the first attempt, and both failures were mine
+### Guards 89 and 90 failed on the first attempt, and both failures were mine
 
-**42 went green** because the walker covered `app/` only — and two of the three
+**89 went green** because the walker covered `app/` only — and two of the three
 call sites that caused the original bug live in `lib/`. A guard that covers the
 surface but not the code redirecting into it is guarding the easy half. It now
 walks `lib/` too, with a canary asserting the walk actually reaches
 `lib/portal/session.ts`.
 
-**43 went green** because the check exempted any file mentioning *"one-time
+**90 went green** because the check exempted any file mentioning *"one-time
 invite"* — which the brand login page legitimately says, so the page exempted
 itself from the whole rule. It now strips comments and checks what is left: a
 comment may explain that the key was deleted; rendered copy may not offer one.
@@ -469,10 +475,10 @@ the admin console, with no gate, for one sprint.
 
 | # | Guard | The break | What went red | Restored |
 |---|---|---|---|---|
-| 44 | Only the super admin grants a title | `requireSuperAdmin` made to refuse only a null department | 3 cases | clean, 277/277 |
-| 45 | No title reaches the gamer directory (ST2) | `/admin/users` widened from `ADMIN_ONLY` to a department list | **7 cases across two suites** | clean, 277/277 |
+| 91 | Only the super admin grants a title | `requireSuperAdmin` made to refuse only a null department | 3 cases | clean, 277/277 |
+| 92 | No title reaches the gamer directory (ST2) | `/admin/users` widened from `ADMIN_ONLY` to a department list | **7 cases across two suites** | clean, 277/277 |
 
-Guard 45's blast radius is the sprint-1 design paying off: `ADMIN_ONLY` is its
+Guard 92's blast radius is the sprint-1 design paying off: `ADMIN_ONLY` is its
 own *kind*, not a list, so a title naming every department still cannot reach
 the directory — and widening it breaks seven assertions rather than one.
 
@@ -504,9 +510,9 @@ whole surface.
 
 | # | Guard | The break | What went red | Restored |
 |---|---|---|---|---|
-| 46 | An unset `CRON_SECRET` refuses on a real deployment | The demo fence removed, so unset means allow | *"a cron route with no secret configured refuses on a real deployment"* | clean, 292/292 |
-| 47 | A retried Stripe event moves no money | `alreadyHandled` bypassed | *"a retried event is a no-op, and still answers"* | clean, 292/292 |
-| 48 | A rotation signature still verifies | Only the first `v1` checked | *"a signature from during a secret rotation still verifies"* | clean, 292/292 |
+| 93 | An unset `CRON_SECRET` refuses on a real deployment | The demo fence removed, so unset means allow | *"a cron route with no secret configured refuses on a real deployment"* | clean, 292/292 |
+| 94 | A retried Stripe event moves no money | `alreadyHandled` bypassed | *"a retried event is a no-op, and still answers"* | clean, 292/292 |
+| 95 | A rotation signature still verifies | Only the first `v1` checked | *"a signature from during a secret rotation still verifies"* | clean, 292/292 |
 
 ### The guard was written first, and committed red
 
@@ -526,7 +532,7 @@ the suite demands it exist; delete one and the demand goes with it. A canary
 asserts the section still parses, so a renamed heading fails loudly rather than
 quietly guarding an empty list.
 
-### Why guard 47 is the expensive one
+### Why guard 94 is the expensive one
 
 Stripe retries any non-2xx **for three days**. Without idempotency one payment
 routes into the vaults twice, and `prizeVault.balance == Σ(unredeemed
@@ -574,7 +580,7 @@ though that covered tests. It does not, and the two are not the same statement.
 |---|---|
 | 1 · `ok(vault.holds, …)` | **Failed, correctly.** $175 is paid and no trophy is assigned, so the vault is legitimately **unallocated** — the amber rhythm 02-MONEY §5 calls normal. `holds` is false by design there. The assertion was demanding a state the platform should not be in |
 | 2 · assert the vault is unchanged | **Passed, and could not fail.** Money cannot enter the vaults twice for one invoice whatever that route does: `routePaidInvoice` refuses when the append-only ledger already holds a row for it. Breaking the webhook's idempotency *and* `markPaid`'s **together** still moved nothing |
-| 3 · assert what the route decides | A replay must write no second record. Falsifiable, and proven — guard 52 |
+| 3 · assert what the route decides | A replay must write no second record. Falsifiable, and proven — guard 99 |
 
 Attempt 2 is the interesting one. It was *true*, and it was still decoration:
 **an assertion that cannot fail is not a test, however correct it is.** The
@@ -582,14 +588,14 @@ vault property belongs where it can vary, and it was already there.
 
 | # | Guard | The break | What went red | Restored |
 |---|---|---|---|---|
-| 49 | A retried Stripe event is a no-op | `alreadyHandled` bypassed | *"a retried event is a no-op"* — on the `kind` assertion, which short-circuits before the vault ones | clean, 292/292 |
-| 50 | (diagnostic) A replay routes money but reports itself a replay | The replay branch made to route | **nothing** — which is how the unfalsifiability was found | clean |
-| 51 | The ledger's own double-route guard | `routePaidInvoice`'s ledger check bypassed | *"a webhook that fires twice does not pay twice"*, in `30-money` — the right place | clean, 292/292 |
-| 52 | A replay writes no second record | The replay branch made to record | *"a retried event is a no-op"* | clean, 292/292 |
-| 53 | `npm test` typechecks first | `tsc --noEmit &&` removed from the script | *"the test command typechecks before it runs"* | clean, 293/293 |
-| 55 | **M3 across the whole money layer** | The prize share routed one cent short | **24 cases across 7 suites** | clean, 293/293 |
+| 96 | A retried Stripe event is a no-op | `alreadyHandled` bypassed | *"a retried event is a no-op"* — on the `kind` assertion, which short-circuits before the vault ones | clean, 292/292 |
+| 97 | (diagnostic) A replay routes money but reports itself a replay | The replay branch made to route | **nothing** — which is how the unfalsifiability was found | clean |
+| 98 | The ledger's own double-route guard | `routePaidInvoice`'s ledger check bypassed | *"a webhook that fires twice does not pay twice"*, in `30-money` — the right place | clean, 292/292 |
+| 99 | A replay writes no second record | The replay branch made to record | *"a retried event is a no-op"* | clean, 292/292 |
+| 100 | `npm test` typechecks first | `tsc --noEmit &&` removed from the script | *"the test command typechecks before it runs"* | clean, 293/293 |
+| 101 | **M3 across the whole money layer** | The prize share routed one cent short | **24 cases across 7 suites** | clean, 293/293 |
 
-Guard 55 is the answer to *"is the invariant actually load-bearing?"* One cent
+Guard 101 is the answer to *"is the invariant actually load-bearing?"* One cent
 of drift takes down twenty-four assertions from the ledger to the four-week
 simulation. It is not guarded in one place; it is guarded everywhere money
 moves.
