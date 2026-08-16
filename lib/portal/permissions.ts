@@ -153,6 +153,26 @@ export function mayWithdraw(facts: WithdrawFacts): WithdrawVerdict {
   return { allowed: true };
 }
 
+/**
+ * The Discord identity behind an access, or null.
+ *
+ * Exists so that anything writing *who did this* — `spend_requests.approvedBy`
+ * above all — takes the id from the **access shape** rather than from an
+ * argument. There is then no parameter an administrator's form could set to
+ * name the owner: the id and the authority arrive together or not at all.
+ */
+export function identityOf(access: GuildAccess): string | null {
+  switch (access.kind) {
+    case "owner":
+    case "administrator":
+      return access.discordId;
+    case "demo":
+      return "demo";
+    default:
+      return null;
+  }
+}
+
 /** A one-line label for the portal header. Owner and administrator read differently. */
 export function accessLabel(access: GuildAccess): string {
   switch (access.kind) {

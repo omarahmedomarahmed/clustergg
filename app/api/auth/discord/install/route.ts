@@ -22,9 +22,10 @@ import {
   fetchIdentity,
   fetchGuilds,
   installCallbackUrl,
+  botInstallUrl,
   DiscordAuthError,
 } from "../../../../../lib/auth/discord.ts";
-import { decodeState } from "../../../../../lib/auth/oauth-state.ts";
+import { decodeState, encodeState } from "../../../../../lib/auth/oauth-state.ts";
 import { shadowGamerForDiscord } from "../../../../../lib/identity/gamers.ts";
 import { signIn, currentGamer } from "../../../../../lib/auth/current.ts";
 import { recordGuildOwnership, seeAdmin } from "../../../../../lib/discord/ownership.ts";
@@ -40,9 +41,55 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const guildId = params.get("guild_id");
   const state = decodeState(params.get("state"));
 
-  if (!code || !guildId) {
+  // ===== ONE ROUTE, BOTH ENDS OF THE ROUND TRIP =====
+  //
+  // `04-SURFACES` §5 names exactly one route for this — *"the bot install
+  // redirect. Captures the installer"* — and `botInstallUrl` sets
+  // `redirect_uri` to this same path. So arriving here **without** a code is
+  // not an error, it is the start: mint a signed state and send them to
+  // Discord's consent screen. Arriving with one is the capture below.
+  //
+  // Sprint 4 shipped only the second half. `botInstallUrl` was exported and
+  // called from nowhere, so an owner whose server had never had Cluster in it
+  // reached the `guilds` step, saw no rows, and had no way forward — the page
+  // said so honestly and stopped there. This is the way forward.
+  if (!code) {
+    // A guild id here is a hint, not a permission: `disable_guild_select`
+    // pre-selects the server, and Discord still refuses anybody who does not
+    // hold ADMINISTRATOR on it. The authority is Discord's, at the consent
+    // screen, which is the only place it can be.
+    const requestedGuildId = params.get("guildId") ?? guildId;
+    const next = params.get("next");
+    const gamer = await currentGamer();
+
     return NextResponse.redirect(
-      new URL("/onboarding?error=" + encodeURIComponent("The install did not complete."), request.url),
+      botInstallUrl({
+        state: encodeState({
+          kind: "install",
+          ...(requestedGuildId ? { guildId: requestedGuildId } : {}),
+          ...(next ? { next } : {}),
+          ...(gamer ? { userId: gamer.id } : {}),
+        }),
+        guildId: requestedGuildId,
+      }),
+      303,
+    );
+  }
+
+  if (!guildId) {
+    // A code with no `guild_id` means they authorised the app but did not
+    // finish adding it to a server. Naming that is worth more than "the
+    // install did not complete", which is what somebody reads three times
+    // before giving up.
+    return NextResponse.redirect(
+      new URL(
+        "/onboarding?error=" +
+          encodeURIComponent(
+            "Cluster was authorised but not added to a server. Pick a server on " +
+              "the Discord screen and press Continue.",
+          ),
+        request.url,
+      ),
       303,
     );
   }

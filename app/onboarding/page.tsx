@@ -50,6 +50,17 @@ const GAMES_PLACEHOLDER = [
   { provider: "mlbb", name: "Mobile Legends: Bang Bang" },
 ];
 
+/**
+ * Where "add the bot" goes, written once.
+ *
+ * The install route is both ends of one round trip: no `code` starts it, a
+ * `code` captures the installer (G1). `next` brings them back to onboarding so
+ * the `guilds` step can find the server that now exists — the alternative,
+ * dropping them on a portal for a guild they have not finished onboarding
+ * against, is how a half-finished owner path gets abandoned.
+ */
+const INSTALL_HREF = "/api/auth/discord/install?next=%2Fonboarding%3Fpath%3Downer";
+
 export default async function OnboardingPage({
   searchParams,
 }: {
@@ -261,13 +272,25 @@ export default async function OnboardingPage({
       {path === "owner" ? (
         <Step n={3} title="Your servers" state={stateOf("guilds")}>
           {unlock.done.guilds ? (
-            <p className="text-sm text-mute">
-              {guildsSeen === 1
-                ? "One server, found. It is on your portal."
-                : `${guildsSeen} servers, found. They are on your portal.`}{" "}
-              We only ever asked Discord what <em>you</em> can do — this is not
-              a member list.
-            </p>
+            <>
+              <p className="text-sm text-mute">
+                {guildsSeen === 1
+                  ? "One server, found. It is on your portal."
+                  : `${guildsSeen} servers, found. They are on your portal.`}{" "}
+                We only ever asked Discord what <em>you</em> can do — this is
+                not a member list.
+              </p>
+              {discordConfigured() ? (
+                <p className="mt-3 text-sm text-mute">
+                  Missing one?{" "}
+                  <a className="underline" href={INSTALL_HREF}>
+                    Add Cluster to it
+                  </a>{" "}
+                  — a server that has never had Cluster in it cannot show up
+                  until the bot is there.
+                </p>
+              ) : null}
+            </>
           ) : discordConfigured() ? (
             <form action={requestGuildsScopeAction} className="flex flex-col gap-3">
               <p className="text-sm text-mute">
@@ -276,13 +299,18 @@ export default async function OnboardingPage({
                 we know which portals are yours. We are not asking for it at
                 signup, and a gamer never sees this screen at all.
               </p>
-              {/* Honest about the one case this cannot cover: ownership is
-                  recorded against servers we already know, so a server that has
-                  never had Cluster in it produces nothing. Saying so beats a
-                  round trip that appears to do nothing. */}
+              {/* Ownership is recorded against servers we already know, so a
+                  server that has never had Cluster in it produces nothing here.
+                  Sprint 4 said so and stopped; the way through is the install
+                  round trip below, which is the only moment G1's "who installed
+                  it" can ever be captured. */}
               <p className="text-sm text-mute">
-                A server Cluster has never been added to will not show up — add
-                the bot there first and it appears here.
+                A server Cluster has never been added to will not show up here
+                yet —{" "}
+                <a className="underline" href={INSTALL_HREF}>
+                  add the bot to it
+                </a>{" "}
+                and it appears.
               </p>
               <Button type="submit">Show me my servers</Button>
             </form>

@@ -223,6 +223,62 @@ test("the owner's step is answered by rows, not by a flag saying they granted it
   );
 });
 
+test("the bot install round trip has a starting point, not just a callback", async () => {
+  // ===== THE GAP THIS GUARD EXISTS BECAUSE OF =====
+  //
+  // `botInstallUrl` shipped in sprint 3 **exported and called from nowhere.**
+  // The install *callback* was complete and correct — it captures the
+  // installer, which G1 says is captured there or lost forever — and nothing
+  // started the round trip that would ever reach it. So an owner whose server
+  // had never had Cluster in it granted `guilds`, saw no rows, and had no way
+  // forward. Typecheck cannot see it: an exported function with no caller is
+  // not an error, it is a library.
+  //
+  // Guarded at the **chokepoint** rather than by searching for the word
+  // "install", which appears in a route name, a state kind, a column and four
+  // sentences of prose (trap 16). One function builds that URL. It must have
+  // a caller, and the caller must be a route.
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+
+  const callers: string[] = [];
+  const walk = async (dir: string): Promise<void> => {
+    for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+      if (entry.name === "node_modules" || entry.name.startsWith(".")) continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+        continue;
+      }
+      if (!/\.tsx?$/.test(entry.name)) continue;
+      const src = await fs.readFile(full, "utf8");
+      const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      const calls = code.replace(/function\s+botInstallUrl\s*\(/g, "function DECL(");
+      if (/\bbotInstallUrl\s*\(/.test(calls)) callers.push(path.relative(repoRoot, full));
+    }
+  };
+  await walk(path.join(repoRoot, "app"));
+  await walk(path.join(repoRoot, "lib"));
+
+  eq(
+    callers.sort(),
+    ["app/api/auth/discord/install/route.ts"],
+    "the install URL is built in exactly one place, and it is the route that also captures the installer",
+  );
+
+  // And the other half: onboarding's owner path must reach it. A route with a
+  // caller nobody can get to is the same gap one level along.
+  const onboarding = await fs.readFile(
+    path.join(repoRoot, "app", "onboarding", "page.tsx"),
+    "utf8",
+  );
+  ok(
+    /\/api\/auth\/discord\/install/.test(onboarding),
+    "and the owner path links to it, so a server that has never had Cluster has a way in",
+  );
+});
+
 test("the guilds scope is asked for at onboarding and nowhere near signup", async () => {
   // I10, checked against the source rather than asserted about a constant,
   // because the failure mode is a *second* call site appearing — a signup page

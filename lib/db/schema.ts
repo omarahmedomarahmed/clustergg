@@ -1015,6 +1015,50 @@ export const staffTitles = pgTable("staff_titles", {
   createdBy: text("created_by"),
 });
 
+/**
+ * An administrator asks; the guild owner answers.
+ *
+ * ===== WHY A TABLE AND NOT A FLAG ON THE CHALLENGE =====
+ *
+ * 12 §6 splits one row off from everything else: an administrator may
+ * **request** a community challenge and only the guild owner may **approve the
+ * spend**. That gap has to be somewhere, and a draft challenge cannot hold it
+ * — a draft with no bill is a thing the owner has not seen, and a bill that
+ * exists is money already committed.
+ *
+ * 07 says it plainly: *"there is nowhere else to hold a pending request."*
+ *
+ * `approvedBy` **must be the guild owner**, and that is enforced in
+ * `lib/portal/spend.ts` rather than assumed — an administrator who could write
+ * this column would have the owner's authority with an extra step.
+ */
+export const spendRequests = pgTable(
+  "spend_requests",
+  {
+    id: text("id").primaryKey(),
+    guildId: text("guild_id").notNull(),
+    /** The Discord identity that asked. An administrator, usually. */
+    requestedBy: text("requested_by").notNull(),
+    /** `community_challenge`. A word, because there is one kind so far. */
+    kind: text("kind").notNull(),
+    tier: integer("tier"),
+    /** What to build if it is approved: title, game, provider, start. */
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    // pending | approved | paid | rejected
+    state: text("state").notNull().default("pending"),
+    /** The guild owner's Discord id. Never an administrator's. */
+    approvedBy: text("approved_by"),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
+    rejectedReason: text("rejected_reason"),
+    /** Written on approval — what the request became. */
+    challengeId: text("challenge_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("spend_requests_guild_idx").on(t.guildId, t.state)],
+);
+
+export type SpendRequest = typeof spendRequests.$inferSelect;
+
 export const guildAdmins = pgTable(
   "guild_admins",
   {
