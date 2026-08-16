@@ -539,3 +539,91 @@ replay, not merely that the second call returned something different.
 It was in sprint 14, last. `08-BUILD-ORDER`'s own ordering rule is **money
 before anything that spends it**, and sprints 5 through 13 all assume a paid
 invoice works. It is now in 4a with everything else that had no endpoint.
+
+---
+
+# The dead assertion, and what the sweep found
+
+## What happened
+
+`96-wiring.test.ts` shipped this, in the suite that tests the payments webhook:
+
+```ts
+ok(vault.ok || vault.state !== "over_allocated", "and the invariant is intact")
+```
+
+`PrizeVaultCheck` has no `ok` — the field is `holds`. The left side was always
+`undefined`, so the whole expression collapsed to one enum comparison. It read
+as a guard on **M3, the invariant the entire platform rests on**, and guarded
+nothing of the kind.
+
+**This is the exact defect this branch exists to end** — the three assertions in
+the old weekly-close suite that called a SQL builder and tested nothing. Same
+shape, same place: the money path.
+
+### Why nothing caught it
+
+`tsc --noEmit` names it in one line. **It was not being run.** `next build`
+does not typecheck files outside the app graph, so an entire test suite can be
+type-broken while the build reports success — and I reported *"build clean"* as
+though that covered tests. It does not, and the two are not the same statement.
+
+## Fixing it took three goes, and each go was a different mistake
+
+| Attempt | What happened |
+|---|---|
+| 1 · `ok(vault.holds, …)` | **Failed, correctly.** $175 is paid and no trophy is assigned, so the vault is legitimately **unallocated** — the amber rhythm 02-MONEY §5 calls normal. `holds` is false by design there. The assertion was demanding a state the platform should not be in |
+| 2 · assert the vault is unchanged | **Passed, and could not fail.** Money cannot enter the vaults twice for one invoice whatever that route does: `routePaidInvoice` refuses when the append-only ledger already holds a row for it. Breaking the webhook's idempotency *and* `markPaid`'s **together** still moved nothing |
+| 3 · assert what the route decides | A replay must write no second record. Falsifiable, and proven — guard 52 |
+
+Attempt 2 is the interesting one. It was *true*, and it was still decoration:
+**an assertion that cannot fail is not a test, however correct it is.** The
+vault property belongs where it can vary, and it was already there.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 49 | A retried Stripe event is a no-op | `alreadyHandled` bypassed | *"a retried event is a no-op"* — on the `kind` assertion, which short-circuits before the vault ones | clean, 292/292 |
+| 50 | (diagnostic) A replay routes money but reports itself a replay | The replay branch made to route | **nothing** — which is how the unfalsifiability was found | clean |
+| 51 | The ledger's own double-route guard | `routePaidInvoice`'s ledger check bypassed | *"a webhook that fires twice does not pay twice"*, in `30-money` — the right place | clean, 292/292 |
+| 52 | A replay writes no second record | The replay branch made to record | *"a retried event is a no-op"* | clean, 292/292 |
+| 53 | `npm test` typechecks first | `tsc --noEmit &&` removed from the script | *"the test command typechecks before it runs"* | clean, 293/293 |
+| 55 | **M3 across the whole money layer** | The prize share routed one cent short | **24 cases across 7 suites** | clean, 293/293 |
+
+Guard 55 is the answer to *"is the invariant actually load-bearing?"* One cent
+of drift takes down twenty-four assertions from the ledger to the four-week
+simulation. It is not guarded in one place; it is guarded everywhere money
+moves.
+
+## The sweep
+
+**Dead property reads: none remain.** That is not an opinion — `tsc --noEmit` is
+exactly the tool that finds them, it is now clean, and `npm test` runs it before
+the band so it cannot silently stop being clean.
+
+**Boolean-combining assertions: 27 found, 26 legitimate.** Most are
+discriminated-union narrowings (`!result.ok && /reason/.test(result.reason)`),
+which typecheck now confirms are reading fields that exist.
+
+The one worth changing was in the four-week simulation:
+
+```ts
+ok(finalCheck.state === "green" || finalCheck.state === "unclaimed", "…healthy")
+```
+
+Falsifiable, so not dead — but weaker than the code deserves. After four closed
+weeks nothing should be *unclaimed*, and permitting it meant the assertion would
+have stayed green through a month that ended with trophies promised to a
+challenge that never closed. `holds` is true there, so the weaker form bought
+nothing. Now `ok(finalCheck.holds, …)` plus `eq(finalCheck.state, "green", …)`.
+
+## The systemic fix
+
+`npm test` is now `tsc --noEmit && tsx tests/run.mts`. Typecheck runs **before**
+the band, so a type error stops the run rather than being buried under three
+hundred passing assertions. `94-reachability` asserts that the script still does
+this, and asserts the ordering — the fix is one careless edit from being undone
+and nothing else would notice.
+
+**And the reporting rule that goes with it: "typecheck clean" is only said after
+`npm run typecheck` has actually been run. "Build clean" is a different
+statement and does not cover tests.**
