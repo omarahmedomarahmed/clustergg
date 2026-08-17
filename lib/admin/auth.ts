@@ -56,12 +56,22 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   "/admin/payouts": departments("admin", "finance"),
   "/admin/redeems": departments("admin", "finance"),
   "/admin/weekend": departments("admin", "finance", "support", "sales"),
-  // 05 §6 / MS2 — **two inboxes, never merged**, and classified separately for
-  // the same reason they are two pages. Support answers server owners; sales
-  // answers brands. Giving both to both would make the split a layout choice
-  // rather than a rule, and the two conversations are about different money.
-  "/admin/inbox/servers": departments("admin", "support"),
-  "/admin/inbox/brands": departments("admin", "sales"),
+  // ===== TWO SURFACES, ONE TEAM. RULED. =====
+  //
+  // 05 §6 / MS2 keep the two inboxes apart as **data**: a brand thread never
+  // appears in the server inbox, and that is guard 153, in the query itself.
+  // Who may *read* each one is a different question, and the answer is that
+  // one small team answers both.
+  //
+  // The first version split them — support for owners, sales for brands, by
+  // analogy with `/admin/servers` and `/admin/brands`. Overturned: **a support
+  // person unable to reply to a brand is a worse failure than a sales person
+  // seeing a server's message.** Silence is the failure mode H7 exists to
+  // prevent, and a departmental wall is a way to produce it.
+  //
+  // The directories are untouched by this and by anything else (ST2).
+  "/admin/inbox/servers": departments("admin", "sales", "support"),
+  "/admin/inbox/brands": departments("admin", "sales", "support"),
   "/admin/settings": ADMIN_ONLY,
   // ST1 — a title is what opens this console, so granting one is the single
   // thing a title must never be able to do. Admin-only by kind, like the

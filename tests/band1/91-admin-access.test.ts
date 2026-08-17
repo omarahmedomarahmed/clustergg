@@ -151,16 +151,18 @@ test("a department reaches what it should and nothing more", () => {
     ["sales", "/admin/users", false],
     ["support", "/admin/servers", true],
     ["support", "/admin/users", false],
-    // 05 §6 names two inboxes and MS2 keeps them apart. Which departments
-    // reach which is **our** decision, not a ratified rule — so it is written
-    // down here, where a widening edit goes red, rather than left to whatever
-    // the table happens to say. Support answers server owners; sales answers
-    // brands; both are already how `/admin/servers` and `/admin/brands` are
-    // classified, so the inboxes follow the conversations they are about.
+    // 05 §6 names two inboxes and MS2 keeps their **data** apart — that is
+    // guard 153, in the query. Who may read each is a different question, and
+    // it is ruled: **one small team answers both.** A support person unable to
+    // reply to a brand is a worse failure than a sales person seeing a
+    // server's message, because silence is what H7 exists to prevent.
     ["support", "/admin/inbox/servers", true],
-    ["support", "/admin/inbox/brands", false],
+    ["support", "/admin/inbox/brands", true],
     ["sales", "/admin/inbox/brands", true],
-    ["sales", "/admin/inbox/servers", false],
+    ["sales", "/admin/inbox/servers", true],
+    // And the wall that does not move, whatever any title says (ST2).
+    ["sales", "/admin/users", false],
+    ["support", "/admin/linked-accounts", false],
     ["admin", "/admin/users", true],
     ["admin", "/admin/settings", true],
   ];
