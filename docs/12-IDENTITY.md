@@ -160,6 +160,7 @@ per challenge.
 | E1 | **The conversion denominator is live, not the gun snapshot.** Frozen at 10 while entrants grow would let a server score 3.0 — an unbounded ratio that rewards poaching |
 | E2 | The portal always shows **two states**: *"In this week's pool"* and *"On track for next week"* |
 | E3 | Never re-check eligibility mid-week. What the pool page shows on Wednesday is what pays on Friday |
+| E4 | **The gun's answer is kept per week, not overwritten.** It is a row in `week_records` carrying the week it was taken for, with `linkedAtGun` and `profileCompleteAtGun` beside it — so a closed week's gate, and the reason behind it, survive the next Monday |
 
 ---
 

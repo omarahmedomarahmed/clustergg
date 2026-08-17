@@ -70,6 +70,7 @@ Build this **before** anything that spends money.
 | **The prize vault as a liability ledger** | Balance equals unredeemed money-trophies |
 | Pool allocation with the **half rule** | Over half is refused with a reason |
 | Payouts open as drafts | Nothing moves money automatically |
+| **The weekly record, written at the close** | `Σ shares == pool` reconciles, and it is never rewritten |
 
 **Guards to prove:** break the half rule and confirm an over-allocation is
 accepted (then restore). Break the prize-vault invariant and confirm the check
@@ -188,6 +189,8 @@ Everything in `docs/12-IDENTITY.md`. It replaces the portal key.
 | Parent-server attribution | First bot click, permanent, ½ + ½ entrant credit |
 | Guild owner vs administrator permissions | Only the owner touches money |
 | Eligibility frozen at the gun, KPIs live | Conversion denominator live too |
+| **`week_records` + `week_credits`, written at the close** | Every server's week, both sides of every ratio, and which challenges credited it |
+| **`/admin/weeks`, `/admin/weeks/[weekStart]`, `/admin/weeks/[weekStart]/[guildId]`** | The history nobody has to recompute |
 | Onboarding fork — gamer or server owner | Both ask age + country |
 | Nav context switcher | Never a brand |
 | The guild registry + refresh button | Everything in §8 |
