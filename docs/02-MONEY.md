@@ -132,6 +132,8 @@ without the other.**
 | K5 | Shares can never sum past the true entrant count — at most two servers share one gamer, ½ each |
 | K9 | **Conversion counts only entrants whose parent is this server.** Otherwise a server with 10 members converting 20 outsiders scores 2.0 — an unbounded ratio that rewards poaching over recruiting |
 | K10 | **Eligibility is frozen at Monday's gun; all three KPIs are live.** The conversion denominator is live too — frozen at 10 while entrants grow would produce the same unbounded ratio |
+| K11 | **The week's whole working is written down at the close** — every server's eligibility and why, both sides of every ratio, its rank, its shares, and which challenges it was credited on. `07-DATA-MODEL.md` `week_records` / `week_credits`. A closed week cannot be re-derived, because its inputs are live and have moved |
+| K12 | **One function, two callers.** `/pool` reads it live for the open week; every historical surface reads the record. Never a second implementation of the same arithmetic |
 | K6 | **Winning a challenge earns a server nothing directly.** Entrants do |
 | K7 | A server that never described itself is **dropped from the run**, not scored zero — otherwise it takes percentile positions from servers that did the work |
 | K8 | Community challenges do not count toward any pool |

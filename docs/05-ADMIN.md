@@ -93,6 +93,25 @@ pay.
 | `/admin/vaults/server` | Vault 3, allocation to the weekly pool |
 | `/admin/vaults/ledger` | Every movement, searchable |
 
+### The weekly history — `/admin/weeks`
+
+Every closed week, and the complete working behind it. Built from
+`week_records` and `week_credits` (`07-DATA-MODEL.md`), never recomputed.
+
+| Page | Shows |
+|---|---|
+| `/admin/weeks` | Every week, newest first — pool allocated, servers paid, total entrants, and whether `Σ shares == pool` still reconciles |
+| `/admin/weeks/[weekStart]` | One week in full: **every server that took part**, eligible or not, its three KPIs **with both sides of each ratio**, its rank, its flat and scored shares, its total, and the payout it became |
+| `/admin/weeks/[weekStart]/[guildId]` | One server's week: **every challenge it contributed to**, whether it was credited as parent, join or both, the whole head count behind the decimal, and how many of them scored above zero |
+| `/admin/servers/[guildId]` | Gains a **week-by-week history strip** — the same rows, filtered to one server |
+
+| # | Rule |
+|---|---|
+| 1 | An **ineligible** server that carried entrants appears with its reason spelled out, field by field. This page exists to answer *"why did I earn nothing?"* without anybody recomputing anything |
+| 2 | **Names are as they were.** A renamed server reads under its old name in old weeks |
+| 3 | Nothing on these pages is recalculated. If a figure disagrees with `server_payouts`, that is a **defect to alert on**, never a number to quietly recompute |
+| 4 | A correction is a **new row**, shown alongside the one it supersedes with its reason. Never an edit |
+
 ### The prize vault page
 
 This page is the platform's balance sheet and must be built with more care than

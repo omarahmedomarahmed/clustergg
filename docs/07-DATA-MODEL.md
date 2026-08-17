@@ -208,6 +208,59 @@ Append-only. Every movement of every dollar.
 | R4 | On `paid`, the prize vault falls by exactly that trophy's value |
 | R5 | Stores a method **word** and a provider handle. Nothing else |
 
+### The weekly record — `week_records` and `week_credits`
+
+**Written once, at the close. Never updated, never recomputed.**
+
+Everything the pool rests on is live during the week and drifts afterwards: a
+member leaves, a profile lapses, an admin re-parents a gamer. So a closed week
+cannot be re-derived — the inputs are gone. The record is the answer, kept the
+same way a ledger row is kept, and for the same reason.
+
+This is **not** an exception to house rule 1. A balance is derived because its
+inputs are permanent. A week's standing is recorded because its inputs are not.
+It is the same shape as `baseline` and `parentGuildIdAtBaseline`: a reading
+frozen at the instant it was true.
+
+#### `week_records`
+One row per server per week. The complete working behind that server's earnings.
+
+| Field | Note |
+|---|---|
+| `weekStart` | The Monday. With `guildId`, the key |
+| `guildId`, `guildName` | **The name as it was**, so a renamed server does not rewrite history |
+| `eligible`, `eligibilityFrozenAt` | The gun's answer, kept per week rather than overwritten |
+| `linkedAtGun`, `profileCompleteAtGun` | **Why** it was eligible or was not, field by field |
+| `entrants` | KPI 1 — the credited total, halves included |
+| `conversionNumerator`, `conversionDenominator`, `conversion` | KPI 2, **with both sides**, so the ratio can be checked and not merely read |
+| `activationNumerator`, `activationDenominator`, `activation` | KPI 3, the same way |
+| `rank`, `scoredShareCents`, `flatShareCents`, `totalCents` | Its position and its money |
+| `poolCents`, `serversInPool` | The week's pool and field size, so a share is legible on its own |
+| `payoutId` | The draft this became. Null if nothing was owed |
+
+#### `week_credits`
+One row per server per challenge per week. **Which servers contributed to which
+challenges**, and how much of each entrant they were credited with.
+
+| Field | Note |
+|---|---|
+| `weekStart`, `guildId`, `challengeId` | The key |
+| `challengeTitle`, `game`, `brandName` | As they were |
+| `role` | `parent` \| `join` \| `both` — which capacity earned the credit |
+| `entrantsCredited` | **A decimal.** Two halves read 1.0; a same-server entrant reads 1.0 as one whole |
+| `entrantsWhole` | The head count behind that credit, so ½ + ½ is visible as two people |
+| `scoredAboveZero` | How many of them actually played |
+
+| # | Invariant |
+|---|---|
+| W1 | **Written once, at the close, by the same function that computes the live pool.** One function, two callers — `/pool` reads it live for the open week, every historical surface reads the record. Never two implementations |
+| W2 | **Never updated and never deleted.** A correction is a new row carrying a `supersedesId` and a reason, exactly like the ledger |
+| W3 | `Σ week_records.totalCents` for a week **equals that week's `pool_allocations`**. Checked at the close and on the admin dashboard |
+| W4 | `Σ week_credits.entrantsCredited` for a server **equals its `week_records.entrants`**. The breakdown reconciles to the total or one of them is wrong |
+| W5 | Names are **copied, not joined**. A server renamed in week 9 must still read as its week-3 name in week 3 |
+| W6 | An **ineligible** server that carried entrants still gets a row, with `eligible: false` and zero money. *"You earned nothing and here is exactly why"* is the question this table exists to answer |
+| W7 | `eligibilityFrozenAt` lives **here**, per week. The guild row carries only the current week's flag, and a closed week's gate is never overwritten |
+
 ### `pool_allocations` and `server_payouts`
 
 | # | Invariant |

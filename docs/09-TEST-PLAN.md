@@ -39,6 +39,7 @@ Runs in-process against an in-memory database. Needs nothing running.
 | **Pool** | `allocation ≤ vault ÷ 2`. Flat 20% split evenly. Three KPIs. Community challenges contribute nothing |
 | **Attribution** | Entrant credit is **½ parent + ½ join**. Parent = join → **1.0, not two halves**. Web join with no server → 1.0 to parent. No parent → everything works and no server earns. Linked-member count goes to the **parent only**. A parent that **loses the bot freezes**: keeps what it earned, gains nothing new |
 | **Retroactive safety** | Attribution is stamped at join. An admin correcting a gamer's parent in week 6 **does not move week 3's money** |
+| **The weekly record** | Written once at the close and **never updated** — a correction is a new row naming what it supersedes. `Σ week_records.totalCents == pool_allocations` for that week (W3), and `Σ week_credits.entrantsCredited == week_records.entrants` per server (W4). A **renamed** server reads under its old name in an old week (W5). An **ineligible** server that carried entrants still has a row, with the reason field by field (W6). Close two weeks and confirm **week 1's row is untouched** by week 2's gun (W7) |
 | **Eligibility** | Frozen at Monday's gun and **never re-checked mid-week**. 8 linked at the gun + 50 on Tuesday earns nothing this week. 10 at the gun, 9 on Wednesday still pays. **The conversion denominator is live**, so the ratio can never exceed 1.0 |
 | **Permissions** | An administrator cannot withdraw or approve a spend. Only the guild owner can. A 13–17 owner may spend and may not withdraw. A **renamed** Discord role does not revoke access — the ID does |
 | **Identity** | A gamer can never change their own parent; admin can, and it is logged. A brand account is never a gamer account and never sees the gamer nav. A brand invite key works **once** |
@@ -80,6 +81,10 @@ many suites noticed.
 | Match a mapped admin role by **name** instead of ID | ≥ 1 |
 | Let a gamer set their own parent server | ≥ 1 |
 | Read the parent live at scoring instead of the frozen stamp | ≥ 1 |
+| Recompute a closed week instead of reading its record | ≥ 2 |
+| Overwrite last week's record at the next gun | ≥ 1 |
+| Join the guild's current name instead of the stored one | ≥ 1 |
+| Drop ineligible servers from the record instead of recording why | ≥ 1 |
 | Let a KPI read a guild_snapshots row | ≥ 2 |
 | Put the analytics cooldown on the session instead of the guild | ≥ 1 |
 | Ignore the platform ceiling on one server's refresh | ≥ 1 |
