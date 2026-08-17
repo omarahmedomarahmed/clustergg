@@ -229,7 +229,15 @@ export async function freezeEligibilityAtGun(
     if (!reading) continue;
     await db
       .update(schema.guilds)
-      .set({ eligibilityFrozenAt: weekStart, eligibleThisWeek: reading.eligible })
+      .set({
+        eligibilityFrozenAt: weekStart,
+        eligibleThisWeek: reading.eligible,
+        // W6 — the **reasons**, not only the answer. By Friday the live
+        // numbers have moved, so "8 linked and a missing cover image" has to
+        // be captured on Monday or the record cannot say why.
+        linkedAtGun: reading.linkedMembers,
+        profileCompleteAtGun: reading.profile.complete,
+      })
       .where(eq(schema.guilds.guildId, guildId));
     out.push({ guildId, eligible: reading.eligible });
   }

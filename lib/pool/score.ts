@@ -53,7 +53,11 @@ import { KPI_WEIGHTS, POOL_FLAT_BPS, POOL_SCORED_BPS, BPS } from "../money/amoun
 import { standingsOf } from "../challenges/scoring.ts";
 import { weekFor } from "../challenges/week.ts";
 import { entrantCredit } from "../identity/attribution.ts";
-import { isFrozenEligible, linkedMembersOf } from "./eligibility.ts";
+import {
+  isFrozenEligible,
+  linkedMembersOf,
+  LINKED_MEMBERS_TO_UNLOCK_POOL,
+} from "./eligibility.ts";
 
 export type ServerKpis = {
   guildId: string;
@@ -66,6 +70,49 @@ export type ServerKpis = {
   conversion: number;
   /** entrants who scored above zero ÷ entrants. */
   activation: number;
+
+  // ===== BOTH SIDES OF EVERY RATIO (07, the weekly record) =====
+  //
+  // A stored ratio nobody can reconstruct is a number an owner has to take on
+  // faith. These carry to `week_records` so a closed week's conversion can be
+  // **checked**, not merely read — and they are produced here, by the same
+  // computation, rather than re-derived by whatever writes the record (W1).
+  conversionNumerator: number;
+  conversionDenominator: number;
+  activationNumerator: number;
+  activationDenominator: number;
+  /** W6/W7 — the gun's reasons, carried through so the record can copy them. */
+  linkedAtGun: number;
+  profileCompleteAtGun: boolean;
+};
+
+/**
+ * One server's credit on one challenge — the breakdown behind KPI 1.
+ *
+ * W4 — these sum to `ServerKpis.entrants` for that server, or one of them is
+ * wrong. Produced beside the total, from the same loop, for exactly that
+ * reason: a breakdown computed separately is a breakdown that can disagree.
+ */
+export type WeekCredit = {
+  guildId: string;
+  challengeId: string;
+  /** Which capacity earned it. `both` is a parent-and-join entrant — A5's 1.0. */
+  role: "parent" | "join" | "both";
+  entrantsCredited: number;
+  /** The head count behind the decimal, so ½ + ½ reads as two people. */
+  entrantsWhole: number;
+  scoredAboveZero: number;
+};
+
+/** A server that carried entrants and was not in the pool. W6 — it still gets a row. */
+export type DroppedServer = {
+  guildId: string;
+  name: string;
+  reason: string;
+  /** What it would have been credited with, so the row is not merely a refusal. */
+  entrants: number;
+  linkedAtGun: number;
+  profileCompleteAtGun: boolean;
 };
 
 export type PoolShare = ServerKpis & {
@@ -82,10 +129,12 @@ export type PoolDivision = {
   flatPoolCents: number;
   scoredPoolCents: number;
   shares: PoolShare[];
-  /** Servers dropped from the run, and why — K7. */
-  dropped: { guildId: string; reason: string }[];
+  /** Servers dropped from the run, and why — K7, with W6's working. */
+  dropped: DroppedServer[];
   /** Which challenges fed this week's pool. M12 — the page names them. */
   contributingChallengeIds: string[];
+  /** W4 — the per-challenge breakdown behind every share. */
+  credits: WeekCredit[];
 };
 
 /**
@@ -99,7 +148,12 @@ export async function kpisForWeek(
   db: DB,
   weekStart: Date,
   now = new Date(),
-): Promise<{ kpis: ServerKpis[]; dropped: { guildId: string; reason: string }[]; challengeIds: string[] }> {
+): Promise<{
+  kpis: ServerKpis[];
+  dropped: DroppedServer[];
+  challengeIds: string[];
+  credits: WeekCredit[];
+}> {
   const week = weekFor(weekStart);
 
   const challenges = await db
@@ -118,7 +172,7 @@ export async function kpisForWeek(
     );
   const challengeIds = challenges.map((c) => c.id);
   if (challengeIds.length === 0) {
-    return { kpis: [], dropped: [], challengeIds: [] };
+    return { kpis: [], dropped: [], challengeIds: [], credits: [] };
   }
 
   const participants = await db
@@ -142,6 +196,7 @@ export async function kpisForWeek(
   // The conversion numerator and denominator are **whole gamers**, not shares
   // (K2), so they are sets of user ids rather than running totals.
   const parentedEntrants = new Map<string, Set<string>>();
+  const creditRows = new Map<string, WeekCredit>();
 
   for (const p of participants) {
     // ===== THE FROZEN PARENT. P6, AND THE REASON THIS IS NOT A JOIN =====
@@ -155,6 +210,11 @@ export async function kpisForWeek(
       parentGuildId: p.parentGuildIdAtBaseline,
       joinGuildId: p.joinGuildId,
     });
+    // W4 — the breakdown is accumulated **in this loop**, from the same
+    // credits the totals come from. Computed separately it could disagree
+    // with the total it is supposed to explain, and the invariant exists
+    // precisely because a breakdown that does not reconcile is worse than none.
+    const creditKey = (guildId: string) => `${guildId}\u0000${p.challengeId}`;
 
     const active = scoredAbove.has(`${p.challengeId}:${p.userId}`);
     // Whether **this entry** actually credited its parent. A running check
@@ -178,6 +238,32 @@ export async function kpisForWeek(
       entrantShare.set(guildId, (entrantShare.get(guildId) ?? 0) + share);
       if (active) activeShare.set(guildId, (activeShare.get(guildId) ?? 0) + share);
       if (guildId === p.parentGuildIdAtBaseline) creditedParent = true;
+
+      const isParent = guildId === p.parentGuildIdAtBaseline;
+      const isJoin = guildId === p.joinGuildId;
+      const row = creditRows.get(creditKey(guildId)) ?? {
+        guildId,
+        challengeId: p.challengeId,
+        // `both` is A5's case — one server did the acquiring and the
+        // converting, and earned a whole entrant rather than two halves.
+        role: (isParent && isJoin ? "both" : isParent ? "parent" : "join") as
+          | "parent"
+          | "join"
+          | "both",
+        entrantsCredited: 0,
+        entrantsWhole: 0,
+        scoredAboveZero: 0,
+      };
+      // A server can be parent on one entrant and join on another within the
+      // same challenge. `both` then describes the challenge honestly; a first
+      // role that stuck would describe only whichever entrant came first.
+      if (row.role !== "both" && ((isParent && row.role === "join") || (isJoin && row.role === "parent"))) {
+        row.role = "both";
+      }
+      row.entrantsCredited += share;
+      row.entrantsWhole += 1;
+      if (active) row.scoredAboveZero += 1;
+      creditRows.set(creditKey(guildId), row);
     }
 
     // ===== K9 — CONVERSION COUNTS ONLY ENTRANTS PARENTED HERE =====
@@ -196,7 +282,7 @@ export async function kpisForWeek(
   }
 
   const kpis: ServerKpis[] = [];
-  const dropped: { guildId: string; reason: string }[] = [];
+  const dropped: DroppedServer[] = [];
 
   for (const guild of guilds) {
     const entrants = entrantShare.get(guild.guildId) ?? 0;
@@ -213,12 +299,34 @@ export async function kpisForWeek(
     // re-check mid-week. This is the read that makes that structural, and it
     // is the one guard 15 breaks.
     if (!isFrozenEligible(guild, week.start)) {
+      // W6 — **and here is exactly why.** Field by field, from what the gun
+      // saw, because by Friday the live numbers have moved and "you were not
+      // eligible" with no reason is the answer this whole table exists to
+      // stop somebody having to give.
+      const linkedAtGun = guild.linkedAtGun ?? 0;
+      const profileCompleteAtGun = guild.profileCompleteAtGun ?? false;
+      const missing: string[] = [];
+      if (linkedAtGun < LINKED_MEMBERS_TO_UNLOCK_POOL) {
+        missing.push(
+          `${LINKED_MEMBERS_TO_UNLOCK_POOL - linkedAtGun} more linked gamers at the gun ` +
+            `(you had ${linkedAtGun} of ${LINKED_MEMBERS_TO_UNLOCK_POOL})`,
+        );
+      }
+      if (!profileCompleteAtGun) missing.push("a complete server profile at the gun");
+      if (guild.eligibilityFrozenAt === null) {
+        missing.push("this server was not registered when the week started");
+      }
+
       dropped.push({
         guildId: guild.guildId,
+        name: guild.name,
+        entrants,
+        linkedAtGun,
+        profileCompleteAtGun,
         reason:
-          "This server was not in the pool when the week started, so it is " +
-          "not scored this week. Ten linked gamers and a complete server " +
-          "profile by Monday unlocks the next one.",
+          "Not in this week's pool, so nothing was scored. Missing at Monday's " +
+          `gun: ${missing.join("; ")}. The next gun re-checks, and this week's ` +
+          "answer is never re-checked (E3).",
       });
       continue;
     }
@@ -263,10 +371,21 @@ export async function kpisForWeek(
       // not a perfect conversion rate. Zero is the honest answer.
       conversion: linkedMembers > 0 ? parented.size / linkedMembers : 0,
       activation: entrants > 0 ? active / entrants : 0,
+      conversionNumerator: parented.size,
+      conversionDenominator: linkedMembers,
+      activationNumerator: active,
+      activationDenominator: entrants,
+      linkedAtGun: guild.linkedAtGun ?? 0,
+      profileCompleteAtGun: guild.profileCompleteAtGun ?? false,
     });
   }
 
-  return { kpis, dropped, challengeIds };
+  // W4 — only the credits of servers that were actually scored. A dropped
+  // server's credits would sum to a total no `week_records` row carries.
+  const scored = new Set(kpis.map((k) => k.guildId));
+  const credits = [...creditRows.values()].filter((c) => scored.has(c.guildId));
+
+  return { kpis, dropped, challengeIds, credits };
 }
 
 /**
@@ -304,7 +423,11 @@ export function dividePool(
   poolCents: number,
   kpis: ServerKpis[],
   weekStart: Date,
-  extras: { dropped?: { guildId: string; reason: string }[]; challengeIds?: string[] } = {},
+  extras: {
+    dropped?: DroppedServer[];
+    challengeIds?: string[];
+    credits?: WeekCredit[];
+  } = {},
 ): PoolDivision {
   const flatPoolCents = Math.floor((poolCents * POOL_FLAT_BPS) / BPS);
   const scoredPoolCents = poolCents - flatPoolCents;
@@ -318,6 +441,7 @@ export function dividePool(
       shares: [],
       dropped: extras.dropped ?? [],
       contributingChallengeIds: extras.challengeIds ?? [],
+      credits: extras.credits ?? [],
     };
   }
 
@@ -375,6 +499,7 @@ export function dividePool(
     shares,
     dropped: extras.dropped ?? [],
     contributingChallengeIds: extras.challengeIds ?? [],
+    credits: extras.credits ?? [],
   };
 }
 
@@ -391,8 +516,8 @@ export async function poolDivisionFor(
 ): Promise<PoolDivision> {
   const { poolForWeek } = await import("../money/pool.ts");
   const poolCents = await poolForWeek(db, weekStart);
-  const { kpis, dropped, challengeIds } = await kpisForWeek(db, weekStart, now);
-  return dividePool(poolCents, kpis, weekStart, { dropped, challengeIds });
+  const { kpis, dropped, challengeIds, credits } = await kpisForWeek(db, weekStart, now);
+  return dividePool(poolCents, kpis, weekStart, { dropped, challengeIds, credits });
 }
 
 /**
@@ -405,14 +530,16 @@ export async function closeWeek(
   db: DB,
   weekStart: Date,
   now = new Date(),
-): Promise<{ division: PoolDivision; drafted: number }> {
+): Promise<{ division: PoolDivision; drafted: number; recorded: number }> {
   const { draftPayout } = await import("../money/payouts.ts");
+  const { writeWeekRecord } = await import("./record.ts");
   const division = await poolDivisionFor(db, weekStart, now);
 
   let drafted = 0;
+  const payoutIds = new Map<string, string>();
   for (const share of division.shares) {
     if (share.totalCents <= 0) continue;
-    await draftPayout(db, {
+    const payoutId = await draftPayout(db, {
       guildId: share.guildId,
       weekStart,
       lines: [
@@ -431,10 +558,38 @@ export async function closeWeek(
         },
       ],
     });
+    if (payoutId) payoutIds.set(share.guildId, payoutId);
     drafted++;
   }
 
-  return { division, drafted };
+  // ===== W1 / K12 — THE RECORD IS WRITTEN FROM THIS DIVISION =====
+  //
+  // Not recomputed. `division` is the object `/pool` has been rendering live
+  // all week; the record is a copy of it, taken at the close. One function,
+  // two callers — and if this line recomputed anything, Thursday's page and
+  // Friday's record could disagree about what an owner was told they had
+  // earned, which is the one failure the public pool cannot survive.
+  //
+  // After the payouts, so each row can name the draft it became.
+  const names = new Map<string, { title: string; game: string; brandName: string | null }>();
+  if (division.contributingChallengeIds.length > 0) {
+    const rows = await db
+      .select({
+        id: schema.challenges.id,
+        title: schema.challenges.title,
+        game: schema.challenges.game,
+        brandName: schema.brands.name,
+      })
+      .from(schema.challenges)
+      .leftJoin(schema.brands, eq(schema.brands.id, schema.challenges.sponsorBrandId))
+      .where(inArray(schema.challenges.id, division.contributingChallengeIds));
+    for (const r of rows) {
+      names.set(r.id, { title: r.title, game: r.game, brandName: r.brandName });
+    }
+  }
+  const record = await writeWeekRecord(db, { division, payoutIds, challengeNames: names }, now);
+
+  return { division, drafted, recorded: record.written };
 }
 
 // ===== `snapshotGuilds` IS DELETED, AND THAT IS THE POINT OF THIS SPRINT ====

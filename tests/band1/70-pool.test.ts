@@ -40,6 +40,15 @@ function kpi(over: Partial<ServerKpis> & { guildId: string }): ServerKpis {
     linkedMembers: 0,
     conversion: 0,
     activation: 0,
+    // Both sides of every ratio, so a record written from these reconciles.
+    // Defaulted rather than omitted: a division test that had to state six
+    // fields to say "one entrant" would stop being readable.
+    conversionNumerator: 0,
+    conversionDenominator: 0,
+    activationNumerator: 0,
+    activationDenominator: 0,
+    linkedAtGun: 0,
+    profileCompleteAtGun: true,
     ...over,
   };
 }
@@ -210,8 +219,15 @@ test("a server that was not ready at the gun is dropped, not scored zero", async
   eq(kpis.length, 1, "only the server that was ready is scored");
   eq(kpis[0].guildId, "g1", "the one that did the work");
   eq(dropped.length, 1, "and the other is reported as dropped");
-  ok(/not in the pool when the week started/.test(dropped[0].reason), "with the reason");
-  ok(/complete server\s+profile/.test(dropped[0].reason), "and what to do about it");
+  // W6 — the reason is **field by field**, from what the gun saw, because by
+  // Friday the live numbers have moved and "you were not eligible" with no
+  // reason is the answer the weekly record exists to stop anybody having to
+  // give.
+  ok(/Not in this week's pool/.test(dropped[0].reason), "with the reason");
+  ok(/complete server profile at the gun/.test(dropped[0].reason), "and which field was missing");
+  eq(dropped[0].name, "Dawnbreak", "named as it was");
+  ok(dropped[0].entrants > 0, "and carrying what it would have been credited with");
+  ok(dropped[0].profileCompleteAtGun === false, "with the gun's own answer beside it");
 
   const division = dividePool(10_000, kpis, MONDAY);
   eq(

@@ -16,6 +16,7 @@ import {
   timestamp,
   boolean,
   integer,
+  doublePrecision,
   jsonb,
   index,
   uniqueIndex,
@@ -415,6 +416,133 @@ export const invoiceLines = pgTable(
  * number. A server owner who saw "$21 so far" on Wednesday and $14 on Friday
  * has been told a lie, whichever number was right.
  */
+/**
+ * A closed week's **complete working**, per server. Written once, at the close.
+ *
+ * ===== THIS IS NOT AN EXCEPTION TO DERIVED-NEVER-STORED =====
+ *
+ * House rule 1 says a balance is `sum(ledger)`, and it is right: a balance is
+ * derived because **its inputs are permanent.** Every ledger row that ever
+ * existed still exists, so the sum can always be taken again.
+ *
+ * A week's standing has the opposite property. Everything it rests on is
+ * **live and moves**: a member leaves, a profile lapses, an admin re-parents a
+ * gamer (A8), a server is renamed, the gun fires again and overwrites the
+ * gate. By Tuesday of week 4, week 3 cannot be re-derived — not "would be
+ * expensive to", *cannot*, because the inputs are gone.
+ *
+ * So it is recorded, the same way and for the same reason a ledger row is:
+ * a reading frozen at the instant it was true. It is the same shape as
+ * `baseline` and `parentGuildIdAtBaseline`, which nobody calls a violation.
+ *
+ * **Do not delete this as a stored derivation.** That is the edit this comment
+ * exists to stop, and the specification (07, "the weekly record") says the
+ * same thing in the same words.
+ *
+ * The number alone was not enough. `server_payouts` keeps what a server was
+ * paid, and a disputed payout is exactly the moment somebody needs to see
+ * **why** — which is the working, not the total.
+ */
+export const weekRecords = pgTable(
+  "week_records",
+  {
+    id: text("id").primaryKey(),
+    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    guildId: text("guild_id").notNull(),
+    /** W5 — **copied, not joined.** A server renamed in week 9 reads as its week-3 name in week 3. */
+    guildName: text("guild_name").notNull(),
+
+    // W7 — the gun's answer, kept **per week**. The guild row carries only the
+    // current week's flag, and a closed week's gate is never overwritten by
+    // the next Monday.
+    eligible: boolean("eligible").notNull(),
+    eligibilityFrozenAt: timestamp("eligibility_frozen_at", { withTimezone: true }),
+    /** W6 — **why**, field by field. "You earned nothing and here is exactly why." */
+    linkedAtGun: integer("linked_at_gun").notNull().default(0),
+    profileCompleteAtGun: boolean("profile_complete_at_gun").notNull().default(false),
+    ineligibleReason: text("ineligible_reason"),
+
+    /** KPI 1 — the credited total, halves included. */
+    entrants: doublePrecision("entrants").notNull().default(0),
+    // KPI 2 and 3, **with both sides**, so a ratio can be checked and not
+    // merely read. A stored ratio nobody can reconstruct is a number an owner
+    // has to take on faith, which is the opposite of what this table is for.
+    conversionNumerator: integer("conversion_numerator").notNull().default(0),
+    conversionDenominator: integer("conversion_denominator").notNull().default(0),
+    conversion: doublePrecision("conversion").notNull().default(0),
+    activationNumerator: doublePrecision("activation_numerator").notNull().default(0),
+    activationDenominator: doublePrecision("activation_denominator").notNull().default(0),
+    activation: doublePrecision("activation").notNull().default(0),
+
+    rank: integer("rank"),
+    scoredShareCents: integer("scored_share_cents").notNull().default(0),
+    flatShareCents: integer("flat_share_cents").notNull().default(0),
+    totalCents: integer("total_cents").notNull().default(0),
+    /** The week's pool and field size, so a share is legible on its own. */
+    poolCents: integer("pool_cents").notNull().default(0),
+    serversInPool: integer("servers_in_pool").notNull().default(0),
+    /** The draft this became. Null when nothing was owed. */
+    payoutId: text("payout_id"),
+
+    /**
+     * W2 — **never updated, never deleted.** A correction is a new row naming
+     * what it supersedes, exactly like the ledger. There is deliberately no
+     * unique index on (week, guild): a superseding row is a second row for
+     * that pair, and a unique index would forbid the only correction mechanism
+     * this table has.
+     */
+    supersedesId: text("supersedes_id"),
+    supersededReason: text("superseded_reason"),
+    writtenAt: timestamp("written_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("week_records_week_idx").on(t.weekStart),
+    index("week_records_guild_idx").on(t.guildId, t.weekStart),
+  ],
+);
+
+export type WeekRecord = typeof weekRecords.$inferSelect;
+
+/**
+ * Which servers contributed to which challenges, and how much of each entrant.
+ *
+ * W4 — `Σ entrantsCredited` for a server **equals its `week_records.entrants`**.
+ * The breakdown reconciles to the total or one of them is wrong, and that is
+ * checked rather than assumed.
+ *
+ * `entrantsCredited` is a decimal and `entrantsWhole` is a head count, and
+ * they are both here because they answer different questions. Two halves read
+ * **1.0 credited over 2 people**; a same-server entrant reads **1.0 over 1**.
+ * Without the head count, an owner cannot tell those apart — and the
+ * difference is the whole of A4 versus A5.
+ */
+export const weekCredits = pgTable(
+  "week_credits",
+  {
+    id: text("id").primaryKey(),
+    weekStart: timestamp("week_start", { withTimezone: true }).notNull(),
+    guildId: text("guild_id").notNull(),
+    challengeId: text("challenge_id").notNull(),
+    // W5 again — as they were, on the day.
+    challengeTitle: text("challenge_title").notNull(),
+    game: text("game").notNull(),
+    brandName: text("brand_name"),
+    /** `parent` | `join` | `both` — which capacity earned the credit. */
+    role: text("role").notNull(),
+    entrantsCredited: doublePrecision("entrants_credited").notNull().default(0),
+    /** The head count behind that decimal, so ½ + ½ is visible as two people. */
+    entrantsWhole: integer("entrants_whole").notNull().default(0),
+    scoredAboveZero: integer("scored_above_zero").notNull().default(0),
+    writtenAt: timestamp("written_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("week_credits_week_idx").on(t.weekStart, t.guildId),
+    index("week_credits_challenge_idx").on(t.challengeId),
+  ],
+);
+
+export type WeekCredit = typeof weekCredits.$inferSelect;
+
 export const poolAllocations = pgTable(
   "pool_allocations",
   {
@@ -674,8 +802,17 @@ export const guilds = pgTable(
     // never stored": a freeze is a *record of an event*, like a baseline. The
     // inputs it read on Monday are gone by Wednesday, so there is nothing left
     // to derive it from.
+    // W7 — **the current week's flag, and nothing older.** The per-week answer
+    // and its reasons live in `week_records`, written at the close, so the next
+    // Monday's gun overwriting these three columns cannot touch a closed week.
+    // These exist so the open week has an answer before its record is written.
     eligibilityFrozenAt: timestamp("eligibility_frozen_at", { withTimezone: true }),
     eligibleThisWeek: boolean("eligible_this_week"),
+    // The **reasons** behind that flag, so the record can copy why and not
+    // only what. W6 — an ineligible server is owed "here is exactly why",
+    // field by field, and by the close the live numbers have moved.
+    linkedAtGun: integer("linked_at_gun"),
+    profileCompleteAtGun: boolean("profile_complete_at_gun"),
 
     // Removal freezes reach; earnings survive (S9).
     removedAt: timestamp("removed_at", { withTimezone: true }),
