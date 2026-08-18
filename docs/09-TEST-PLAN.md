@@ -53,6 +53,8 @@ Runs in-process against an in-memory database. Needs nothing running.
 | **Redemption** | 18+, verified email, allowed country. Sanctioned countries never offered |
 | **Deletion** | Refused while a redemption is in flight. Orphaned trophy money stays in the vault |
 | **Copy** | No page retypes a price, share, threshold or floor. No claim that an account is "verified" unless proof exists. No audience group under 25 |
+| **Copy states the current rule** | **No sentence anywhere describes attribution in words the attribution module does not produce.** Change ½+½ to something else and every page saying otherwise goes red. The banned phrase is the deleted model's: *"in two servers is worth half to each"* — it names no parent, no join server, and not the same-server case |
+| **Deployment** | `build` runs the migrator before `next build`. Every cron route has a schedule and every schedule has a route. Every variable `10-SETUP` §1 requires is named in the preflight, and every variable the preflight names is in `10-SETUP` §1 |
 | **Structural** | No column anywhere could hold a payment detail |
 
 ### The mutation harness

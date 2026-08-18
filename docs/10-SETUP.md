@@ -18,6 +18,15 @@ Production and Preview.
 | `AUTH_SECRET` | Signs staff sessions | Any 32+ character random string |
 | `PORTAL_SECRET` | Signs the **brand** session and the brand invite exchange. Server owners sign in with Discord and have no key to sign | Any 64-character random string. **Must not be the same as any other secret here** |
 | `SETUP_TOKEN` | One-time token that lets the first admin account be created | Any long random string. Remove it after the first admin exists |
+| `CRON_SECRET` | Authorises the three scheduled jobs. **Without it the weekly cycle silently never runs** | Any 32+ character random string. Vercel sends it as `Authorization: Bearer …` |
+
+**`CRON_SECRET` fails closed, and that is the right direction.** An unset secret
+on a real deployment makes `/api/cron/sync`, `/api/cron/daily` and
+`/api/cron/announce` answer **401** rather than leaving the endpoint that closes
+the week open to anybody who can POST to it. The cost is that the symptom is
+**nothing at all**: every page renders, every number is simply stale, and no
+error appears anywhere. `/admin/preflight` names it, because a silence is not
+something anybody goes looking for.
 
 **`PORTAL_SECRET` is the one that gets forgotten.** Without it, brand
 portals cannot be signed into at all — and because a card signature reaches for
@@ -277,6 +286,9 @@ A job never releases money. It computes; a human releases.
 | Cause | Symptom | Prevention |
 |---|---|---|
 | `PORTAL_SECRET` unset | Brand login fails **and the Discord bot dies**, because a decorative signature threw on a card path | Set it. Fence anything decorative |
+| **`CRON_SECRET` unset** | **No symptom.** Every page renders; the gun never fires, nothing syncs, no week ever closes, and the numbers quietly stop moving | Set it. `/admin/preflight` shows it, and each job's last-fired time beside it |
+| **The migrator not called by the build** | Every page 500 on `relation "…" does not exist`. The migration script existed, was correct, and nothing ran it | `build` runs `db:migrate` first, and a guard asserts it — see `09-TEST-PLAN` |
+| **No `vercel.json`** | Same as an unset `CRON_SECRET`, and harder: the routes are authorised and simply never called | A guard asserts every cron route has a schedule and every schedule has a route |
 | **WebP artwork on a card** | *"Unsupported image type: image/webp"*. The card renderer cannot decode WebP, so any game art uploaded as WebP fails — silently degrading the card, or killing it | **Convert on upload.** Accept WebP from the uploader and store PNG or JPEG. Never trust the source format |
 | **Sync opening too many connections** | *"Too many database connection attempts are currently ongoing"* from the database on the hourly sync | Bound the batch and reuse one connection across it. A per-account connection will not survive a real account count |
 | Riot key replaced | Every League account breaks at once | Keep the self-heal |
