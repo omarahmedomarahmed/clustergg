@@ -1490,6 +1490,7 @@ of the table.
 | 220 | **The wallet card asks `mayWithdraw`, and it is four gates not one** (`61-cards`, `95-permissions`) | `mayWithdraw`'s access gate replaced with `if (false)` | *"the wallet card asks mayWithdraw…"* **and** *"an administrator does everything except move money"* + *"an administrator cannot withdraw…"* | clean, 444/444 |
 | 221 | **S2 — the owner reaches their cards before a role is mapped** (`61-cards`) | the `guild.ownerDiscordId` branch in `checkAdmin` disabled | *"on install, before any role is mapped…"* **and** *"the wallet card asks mayWithdraw…"* | clean, 445/445 |
 | 222 | **G5 — a `guild_admins` row is a pair, and staff somewhere is not staff here** (`95-permissions`) | `hasSeenAdmin` matches on the guild alone, as the portal used to | *"being staff somewhere is not being staff here"*, on the third assertion — a different person carried by somebody else's row | clean, 446/446 |
+| 223 | **U4b — an email another gamer holds is a signpost, and the write is refused** (`93-identity`) | `emailLinkOutcome` returns `free` for an address somebody else holds | *"an email already on another account is a route too, and the write is refused"* | clean, 447/447 |
 
 ### Guard 218 and what "≥ 2 suites" was actually asking for
 
@@ -1552,3 +1553,41 @@ test that walked the same path would have agreed with the bug.
 The query now lives in `hasSeenAdmin`, beside the code that writes the rows,
 and the fixture calls it too. A fixture that computes the answer a second way
 is a fixture that can only agree with itself.
+
+
+### Guard 223 — the mutation that was caught by zero, and why it was invisible
+
+09 names one mutation: *"merge two accounts when a gamer links an already-used
+identity"*. It was written as one `find` string against one line — and
+`discordLinkOutcome` and `emailLinkOutcome` end in the same two lines,
+character for character:
+
+```ts
+  if (!holder) return { kind: "free" };
+  if (holder.id === userId) return { kind: "mine" };
+```
+
+`String.replace` takes the first occurrence, so the harness mutated Discord,
+`93-identity` went red, and the report said **caught**. Email was never
+touched, and nothing in the report said so.
+
+Split into two mutations, the email half came back **caught by zero**. The
+hole was real and it was on the money path: `emailLinkOutcome` was exported
+and called by **nothing** — not a page, not an action, not a test. So a
+Discord gamer at `/redeem` could type an address another account already held,
+be sent a code (any address can be), enter it, and `confirmEmailVerification`
+would write it onto a second row.
+
+`users.email` is not unique, so nothing stopped it and nothing said so. What
+breaks next is the reset: `beginReset` selects by address and takes the first
+row, so a password reset would land on whichever of the two the database
+happened to return. That is somebody else's account.
+
+`beginEmailVerification` now asks `emailLinkOutcome` before minting a code, and
+`confirmEmailVerification` asks again before the write — the address can be
+claimed in the thirty minutes between. One function, two callers (K12), and
+`/redeem` renders I1c1's signpost rather than an error page.
+
+The general lesson is trap 35's: **one `find` string can only prove one place.**
+A rule with two implementations needs two mutations, and the harness now
+refuses to start if any `find` matches more or fewer than exactly one.

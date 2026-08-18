@@ -28,6 +28,7 @@ import {
   type RedeemMethod,
 } from "../../lib/trophies/redemption.ts";
 import {
+  EmailTakenError,
   beginEmailVerification,
   confirmEmailVerification,
   looksLikeEmail,
@@ -103,7 +104,16 @@ export async function beginVerificationAction(form: FormData): Promise<void> {
   }
 
   const db = await getDb();
-  const code = await beginEmailVerification(db, gamer.id, email);
+  let code: string;
+  try {
+    code = await beginEmailVerification(db, gamer.id, email);
+  } catch (error) {
+    // U4b — another gamer holds that address. Not an error page: I1c1's
+    // signpost, which tells them how to reach the account they are looking
+    // for. Anything else is somebody staring at a trophy they cannot cash out.
+    if (error instanceof EmailTakenError) backTo({ error: error.message });
+    throw error;
+  }
   // Demo only, and fenced on the absence of a real database: the screenshot
   // record has to walk this flow and there is no inbox to walk it with.
   backTo({ sent: "1", ...(isDemoMode ? { code } : {}) });

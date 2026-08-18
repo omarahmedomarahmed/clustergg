@@ -19,6 +19,21 @@ import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 import { uid } from "../core/utils.ts";
 import { authSecret } from "../core/secret.ts";
+import { emailLinkOutcome } from "./credentials.ts";
+
+/**
+ * Somebody else already holds that address.
+ *
+ * A named error rather than a bare one, so the page that asks for an address
+ * can render I1c1's signpost instead of "something went wrong". `elsewhere` is
+ * not a failure — it is a direction.
+ */
+export class EmailTakenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "EmailTakenError";
+  }
+}
 
 const VERIFICATION_TTL_MS = 30 * 60_000;
 
@@ -46,6 +61,25 @@ export async function beginEmailVerification(
   if (!looksLikeEmail(normalised)) {
     throw new Error("That does not look like an email address.");
   }
+
+  // ===== U4b — AN ADDRESS ANOTHER GAMER HOLDS IS A SIGNPOST, NOT A WRITE ====
+  //
+  // `emailLinkOutcome` has always known this and **nothing called it**. So a
+  // Discord gamer at `/redeem` could type an address another account already
+  // held, receive a code — any address can be sent one — enter it, and
+  // `confirmEmailVerification` would write it onto a second row.
+  //
+  // `users.email` is not unique, so nothing stopped it and nothing said so.
+  // What breaks next is the reset: `beginReset` selects by address and takes
+  // the first row, so a password reset would land on whichever of the two the
+  // database happened to return. That is somebody else's account.
+  //
+  // Refused here so nobody waits for a code they cannot use, and again at the
+  // confirm below, because the write is there and the state can move between
+  // the two. One function, two callers — K12.
+  const outcome = await emailLinkOutcome(db, userId, normalised);
+  if (outcome.kind === "elsewhere") throw new EmailTakenError(outcome.message);
+
   // Six digits from a cryptographic source. `Math.random` is predictable
   // enough that a code minted at a known second can be guessed.
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
@@ -95,6 +129,12 @@ export async function confirmEmailVerification(
       .update(schema.emailVerifications)
       .set({ consumedAt: now })
       .where(eq(schema.emailVerifications.id, row.id));
+    // Asked again at the write. Between the code being minted and it being
+    // typed, somebody else can have verified the same address — thirty minutes
+    // is a long time, and the row that loses is whichever confirms second.
+    const outcome = await emailLinkOutcome(db, userId, row.email);
+    if (outcome.kind === "elsewhere") return { ok: false, reason: outcome.message };
+
     await db
       .update(schema.users)
       .set({ email: row.email, emailVerifiedAt: now })

@@ -19,6 +19,7 @@ import {
   MIN_PASSWORD_LENGTH,
   linkDiscord,
   discordLinkOutcome,
+  emailLinkOutcome,
   emailIsFree,
   gamerByEmail,
   CredentialRefused,
@@ -401,4 +402,71 @@ test("a brand is never a gamer", async () => {
   const after = await db.select({ n: sql<number>`count(*)::int` }).from(schema.users);
   eq(after[0].n, before[0].n, "signing up and redeeming created no gamer at all");
   no(await emailIsFree(db, "a@acme.test") === false, "and the brand's email is not taken as a gamer's");
+});
+
+// ── U4b · the email half of the same ruling ─────────────────────────────────
+
+test("an email already on another account is a route too, and the write is refused", async () => {
+  // ===== CAUGHT BY ZERO SUITES, AND FOR A REASON WORTH KEEPING =====
+  //
+  // 09's mutation is *"merge two accounts when a gamer links an already-used
+  // identity"*. It was written as ONE mutation against ONE line — and
+  // `discordLinkOutcome` and `emailLinkOutcome` end in the same two lines,
+  // character for character, so `String.replace` mutated the Discord one and
+  // the report said "caught". Split in two, the email half came back **caught
+  // by zero**.
+  //
+  // The hole was real and it was on the money path. `emailLinkOutcome` was
+  // exported and called by **nothing** — not a page, not an action, not a
+  // test. So a Discord gamer at `/redeem` could type an address another
+  // account already held, be sent a code (any address can be), enter it, and
+  // `confirmEmailVerification` wrote it onto a second row.
+  //
+  // `users.email` is not unique, so nothing stopped it. What breaks next is
+  // the reset: `beginReset` selects by address and takes the first row, so a
+  // password reset lands on whichever of the two the database returns. That is
+  // somebody else's account.
+  const db = await resetDemoDb();
+  const first = await createGamer(db, { displayName: "First", email: "shared@example.test" });
+  await db
+    .update(schema.users)
+    .set({ emailVerifiedAt: new Date() })
+    .where(sqlEq(schema.users.id, first));
+  const second = await shadowGamerForDiscord(db, { discordId: "444" });
+
+  const outcome = await emailLinkOutcome(db, second, "shared@example.test");
+  eq(outcome.kind, "elsewhere", "we can see it is somewhere else");
+  ok(
+    outcome.kind === "elsewhere" && /never combine/.test(outcome.message),
+    "and it says plainly that nothing will be combined",
+  );
+
+  // Case, and surrounding space, are not a different address. Without this the
+  // whole guard is one `.trim()` away from being bypassed by a leading space.
+  eq(
+    (await emailLinkOutcome(db, second, "  SHARED@Example.TEST  ")).kind,
+    "elsewhere",
+    "and normalising is part of the question, not a formatting nicety",
+  );
+
+  // ── The write, refused. This is the half that was missing.
+  await throws(
+    () => beginEmailVerification(db, second, "shared@example.test"),
+    /already have a Cluster account with that email/,
+    "no code is even minted for an address somebody else holds",
+  );
+
+  const [a] = await db.select().from(schema.users).where(sqlEq(schema.users.id, first));
+  const [b] = await db.select().from(schema.users).where(sqlEq(schema.users.id, second));
+  eq(a.email, "shared@example.test", "the first account keeps its address");
+  eq(b.email, null, "and the second did not quietly acquire it");
+  eq(a.status, "active", "both accounts are still live —");
+  eq(b.status, "active", "two accounts for one person are permanent and fine");
+
+  // ── And the positive half, or the refusal above is a function that says no.
+  const code = await beginEmailVerification(db, second, "mine@example.test");
+  const confirmed = await confirmEmailVerification(db, second, code);
+  ok(confirmed.ok, "an address nobody holds verifies normally");
+  const [after] = await db.select().from(schema.users).where(sqlEq(schema.users.id, second));
+  eq(after.email, "mine@example.test", "and lands on the row that asked for it");
 });
