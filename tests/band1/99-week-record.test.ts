@@ -170,7 +170,23 @@ test("a server's per-challenge credits add up to its recorded entrants", async (
     "on real numbers — a reconciliation of nothing against nothing reconciles too",
   );
 
-  // ===== AND THE HALF THAT CAN FAIL =====
+
+  // The decimal and the head count answer different questions, and both are
+  // needed: two halves read 1.0 over 2 people, a same-server entrant reads 1.0
+  // over 1. Without the head count, A4 and A5 are indistinguishable.
+  const credits = await weekCreditsFor(db, WEEK_1, "g1");
+  ok(credits.length > 0, "g1 was credited on something");
+  const halves = credits.find((c) => c.entrantsCredited < c.entrantsWhole);
+  ok(
+    halves !== undefined,
+    "and at least one credit is a half — so the head count is not just the decimal again",
+  );
+  ok(
+    credits.every((c) => c.role === "parent" || c.role === "join" || c.role === "both"),
+    "each says in which capacity it earned",
+  );
+
+  // ===== AND THE HALF THAT CAN FAIL — LAST, BECAUSE IT CORRUPTS =====\n  //\n  // It mutates a credit on purpose, so everything that reads the honest\n  // numbers has to have read them already. Put earlier, it made the halves\n  // assertion above read data this block had just broken.
   //
   // Break 175 hardcoded `ok: true` and this test stayed green, because every
   // assertion above was satisfied by a checker that always says yes. W4 is a
@@ -188,21 +204,6 @@ test("a server's per-challenge credits add up to its recorded entrants", async (
   ok(
     after.filter((r) => r.guildId !== "g1").every((r) => r.ok),
     "and it says so about that server only, not about every server on the page",
-  );
-
-  // The decimal and the head count answer different questions, and both are
-  // needed: two halves read 1.0 over 2 people, a same-server entrant reads 1.0
-  // over 1. Without the head count, A4 and A5 are indistinguishable.
-  const credits = await weekCreditsFor(db, WEEK_1, "g1");
-  ok(credits.length > 0, "g1 was credited on something");
-  const halves = credits.find((c) => c.entrantsCredited < c.entrantsWhole);
-  ok(
-    halves !== undefined,
-    "and at least one credit is a half — so the head count is not just the decimal again",
-  );
-  ok(
-    credits.every((c) => c.role === "parent" || c.role === "join" || c.role === "both"),
-    "each says in which capacity it earned",
   );
 });
 
