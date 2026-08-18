@@ -47,29 +47,70 @@ test("the bill is computed from the prize, and never the other way round", () =>
   );
 });
 
-test("every prize bills at something whose prize share covers it", () => {
-  // ===== CAN THIS FAIL? YES, AND IT IS THE POINT OF ROUNDING UP =====
-  //
-  // For any prize, `splitOf(billForPrize(prize)).prize >= prize`. Round the
-  // bill *down* instead and this goes red on the odd cents — which is exactly
-  // the state the prize vault must never be in: money promised to trophies
-  // that the vault does not hold.
-  const short: string[] = [];
+test("at the shipped split the arithmetic is exact, and that is worth knowing", () => {
+  // With a 50% prize share, `prize ÷ 0.5` is `prize × 2` — an integer for every
+  // integer prize, so the rounding direction cannot matter and no cent is ever
+  // in play. Stated as its own fact, because it is the reason the next test
+  // exists: **the shipped configuration cannot exercise the rounding rule.**
+  const uneven: number[] = [];
   for (let prize = 1; prize <= 2_000; prize++) {
-    const covered = splitOf(billForPrize(prize)).prize;
+    if (billForPrize(prize) !== prize * 2) uneven.push(prize);
+  }
+  eq(uneven, [], "the shipped split divides exactly, every time");
+});
+
+test("the bill rounds UP, so a prize is never under-covered by it", () => {
+  // ===== THE FIXTURE HAD TO CHANGE BEFORE THIS COULD FAIL =====
+  //
+  // The first version of this swept prizes against the **shipped** split and
+  // asserted `splitOf(billForPrize(p)).prize >= p`. Rounding the bill down
+  // instead went green — because at a 50% share ceil and floor are the same
+  // number, so the property could not vary. Trap 2 through the fixture rather
+  // than the assertion, and trap 27's other face: the break applied, and the
+  // test had no way to receive it.
+  //
+  // 02 §2 is what makes the fix legitimate rather than contrived: *"the shares
+  // are an **operator setting**, not a constant hard-coded in the logic."* A
+  // 70/15/15 split is a configuration somebody may set, and at that split
+  // rounding down under-covers the prize hundreds of times in five thousand.
+  //
+  // Which matters because 02 §5's invariant is absolute: the prize vault holds
+  // exactly the sum of every unredeemed money-trophy. A bill whose prize share
+  // is a cent short of the trophies it funds is that promise broken, by that
+  // cent, permanently.
+  const seventy = { prize: 7_000, server: 1_500, cluster: 1_500 };
+
+  const short: string[] = [];
+  for (let prize = 1; prize <= 5_000; prize++) {
+    const covered = splitOf(billForPrize(prize, seventy), seventy).prize;
     if (covered < prize) short.push(`${prize}¢ → bill covers only ${covered}¢`);
   }
   eq(short, [], "no prize is ever under-covered by the bill computed from it");
+
+  // And the fixture is proven able to discriminate: at this split the two
+  // roundings genuinely differ, so the sweep above is not passing for the same
+  // reason the shipped split does.
+  let differs = 0;
+  for (let prize = 1; prize <= 5_000; prize++) {
+    const up = billForPrize(prize, seventy);
+    const down = Math.floor((prize * 10_000) / seventy.prize);
+    if (up !== down) differs++;
+  }
+  ok(differs > 1_000, `the two roundings differ on ${differs} of 5,000 prizes here`);
 });
 
 test("a prize that cannot be split evenly costs the buyer the cent, not the vault", () => {
-  // The concrete case behind the sweep above. 1¢ of prize cannot come from a
-  // 50% share of any 1¢ bill, so the bill is 2¢ and the extra lands in the
-  // Cluster column — a buyer overpaying by a cent is nothing, and a prize
-  // vault a cent light is the one thing this platform cannot be.
-  const bill = billForPrize(1);
-  ok(bill >= 2, `a 1¢ prize bills at ${bill}¢`);
-  ok(splitOf(bill).prize >= 1, "and the prize share covers the promise");
+  // The smallest concrete case, at a split where it is a real question. A
+  // buyer overpaying by a cent is nothing; a prize vault a cent light is the
+  // one thing this platform cannot be.
+  const seventy = { prize: 7_000, server: 1_500, cluster: 1_500 };
+  const bill = billForPrize(2, seventy);
+  eq(bill, 3, "2¢ of prize bills at 3¢ at a 70% share");
+  ok(splitOf(bill, seventy).prize >= 2, "and the prize share covers the promise");
+  ok(
+    splitOf(Math.floor((2 * 10_000) / seventy.prize), seventy).prize < 2,
+    "where rounding down would not have",
+  );
 });
 
 test("a negative or impossible prize is refused rather than computed", () => {
