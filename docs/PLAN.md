@@ -223,12 +223,37 @@ and pushed; everything below is unstarted.
 | 9 · The guild registry and ownership | **Done** |
 | 10 · The brand dashboard and the nav | **Done** — band 2 fully green again |
 | 10a · The surfaces, and the weekly record | **Done** — inserted after review |
-| 11 – 14 | Not started |
+| 11 · Help, progress, and the missing pages | **Done** |
+| 12 – 14 | Not started |
 
-**401 tests, 1,768 assertions, 178 guards proven by breaking, 24 mutations
+**412 tests, 1,807 assertions, 190 guards proven by breaking, 24 mutations
 caught by at least their expected number of suites, typecheck gating the band
-inside `npm test`.** Band 1 is entirely green. **Band 2 is entirely green**, for the first time
-since Sprint 3.
+inside `npm test`.** Band 1 is entirely green, and so is band 2 — all four
+passes, run into a file rather than read off a terminal (trap 30).
+
+### The mutation count, which the documents disagree about
+
+`09-TEST-PLAN` lists **27** mutations. `tests/mutate.mts` holds **24**, of which
+**18** are 09's — the other six were earned by later stages and are not in the
+document. So **nine of 09's names have no mutation**, and Sprint 14 owes all
+nine:
+
+| 09 mutation | Expected |
+|---|---|
+| Let an administrator withdraw | ≥ 2 |
+| Recompute a closed week instead of reading its record | ≥ 2 |
+| Overwrite last week's record at the next gun | ≥ 1 |
+| Join the guild's current name instead of the stored one | ≥ 1 |
+| Drop ineligible servers from the record instead of recording why | ≥ 1 |
+| Put the analytics cooldown on the session instead of the guild | ≥ 1 |
+| Ignore the platform ceiling on one server's refresh | ≥ 1 |
+| Merge two accounts when a gamer links an already-used identity | ≥ 1 |
+| Create a second row when a gamer links their second method | ≥ 1 |
+
+Sprint 14's own row below says *"the 13 new mutations (23 total)"*, which was
+written before the harness had the six later-stage ones and is wrong in both
+figures. **09 governs and it is nine.** Raised with the owner rather than
+reconciled quietly, because that is what this branch exists for.
 
 Two things about Sprint 4a, because a fresh session reading straight down will
 otherwise assume the numbering skipped: **it is a real sprint, it is complete,
@@ -370,14 +395,23 @@ Same class as the `/login/brand` bug, one level up: a surface nothing tested.
 | **Done when** | The nav is right **and band 2 is fully green for the first time since Sprint 3** |
 | **A human can** | Switch between *Playing as …* and each server they manage |
 
-### Sprint 11 · Help, progress, and the missing pages
+### Sprint 11 · Help, progress, and the missing pages — **done**
 
 | | |
 |---|---|
-| **Builds** | `i` overlays across both portals · progress bars on onboarding, profile, eligibility, lifecycle · `/profile` · `/redeem` · `/games` · `/rules/[who]` · `/legal/*` · `/settings/*` |
-| **Governed by** | 12 §11 · 04 §1 |
-| **Guards** | No progress bar on raw member count (H4) · no page retypes a figure (C1) |
-| **A human can** | Read what every number means without leaving the portal |
+| **Builds** | `i` overlays across both portals · **the owner portal's guides section**, which H2 requires and only the brand portal had · progress bars on onboarding, profile, eligibility, lifecycle, milestones · `/profile` · `/redeem` · `/games` · `/games/[slug]` · `/rules/[who]` · `/legal/*` · `/settings/*` with account, privacy and notifications |
+| **Fixes** | The **six-field server profile form**, which `describeCommunity` has accepted since Sprint 5 behind a page with one box · **E2's two states** on the owner's own standings, read from `poolStatesFor`, which only the admin registry had ever called · **`deleteAccount`**, which R3/V17 requires and nothing implemented |
+| **Governed by** | 12 §11 · 04 §1 · 02 §5 V14–V17 · 07 R3 |
+| **Guards** | 179–190. No progress bar on raw member count (H4), asserted at the chokepoint · one component draws every bar · every portal page carries an `i` · both portals have guides inside them · deletion refused in flight, allowed once landed, and **not** a blanket refusal · a closed account keeps its trophies as orphans · the $0 collectable reaches `/redeem` so its refusal is reachable |
+| **A human can** | Read what every number means without leaving the portal — and close their own account, which nothing on the platform could do before this sprint |
+
+**The rule that had a guard and no code.** `50-trophies` carried a case named
+*"deletion is refused while a redemption is in flight"* whose body asserted only
+that `redemptionsInFlight` counts what it counts. Nothing deleted an account,
+and the three suites that needed a deleted gamer each wrote the `UPDATE` by
+hand. §0.1 with its halves reversed: usually the evidence exists and nothing
+reads it — here the **guard** existed and the **rule** did not, and the test
+name read identically either way.
 
 ### Sprint 12 · The Discord card layouts
 
