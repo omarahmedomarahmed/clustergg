@@ -1191,3 +1191,96 @@ Run twice back to back and green both times, because trap 14: a pass that is
 not idempotent will eventually photograph a refusal and call it a happy path.
 The analytics flow grants, updates and then hits its own cooldown inside one
 run, which is exactly the shape that would have broken on a second.
+
+---
+
+# Sprint 11 — help, progress, and the six pages that never existed
+
+`tests/band1/94-progress.test.ts` unless the row says otherwise.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 179 | **H4 — the pool bar counts profile fields, never the head count** | `poolEligibilityProgress` folded `linkedMembers` into both sides of the bar | *"no profile field answered is no progress"* — expected 0, got 10 | clean, 411/412 |
+| 180 | Exactly one file draws a bar | The KPI rank bar written back inline on the standings page | *"every bar in the app is drawn by app/ui.tsx"*, naming the file | clean, 411/412 |
+| 181 | **H1 — every portal page carries an `i` overlay** | Both `help` props stripped from the owner wallet page | *"H1 — an i icon on everything, in both portals"*, naming the page | clean, 411/412 |
+| 182 | **H2 — the guides live inside each portal** | `app/portal/server/[guildId]/guides` moved aside | *"the server portal has a guides section of its own"* | clean, 411/412 |
+| 183 | **R3/V17 — deletion is refused while a redemption is in flight** | The in-flight check in `deleteAccount` replaced with `if (false)` | *"deletion is refused… and allowed once it lands"* (`50-trophies`) | clean, 411/412 |
+| 184 | …and it is **not** a blanket refusal | The same check replaced with `if (true)` | **2 cases**, including the orphan test that closes an account with no payout at all | clean, 410/412 |
+| 185 | **V14/T6 — a closed account keeps its trophies** | `deleteAccount` deletes `user_trophies` with the holder | *"the holding is still there"* — expected 1, got 0 | clean, 411/412 |
+| 186 | **T2's other half — the collectable reaches `/redeem`** | `myRedeemables` filtered to `valueCents > 0` | *"both holdings reach the page"* — expected 2, got 1 (`50-trophies`) | clean, 411/412 |
+| 187 | A bar never takes a page down | `lifecycleProgress` throws on an unknown state | *"an unknown state is a quiet zero"* | clean, 411/412 |
+| 188 | **E2 — two states, and all four combinations differ** | The in-pool branch collapsed to *"In this week's pool."* | *"it says this week is safe"* | clean, 411/412 |
+| 189 | The unlock note names the **gap**, not the threshold | `unlockNote` states `LINKED_MEMBERS_TO_UNLOCK_POOL` instead of the shortfall | *"it names how many more are needed, not the threshold"* | clean, 411/412 |
+| 190 | A milestone bar caps at its target | `Math.min(done, target)` replaced with `done` | *"an over-run does not read 180%"* — expected 100, got 180 | clean, 411/412 |
+
+### Guard 179 is why `poolEligibilityProgress` takes the whole reading
+
+It is handed `linkedMembers` and deliberately puts none of it in the bar.
+Passing it only the profile would make H4 impossible to break — and therefore
+impossible to prove. **A function that could not have made the mistake cannot
+demonstrate that it does not**, which is trap 2 arriving through the argument
+list rather than through the assertion.
+
+The second half of the same guard is the one 12 §5 actually writes out: with
+six of six fields answered and zero linked gamers the bar reads **100%** and
+the server is **not eligible**. That looks wrong for a second and is right —
+the bar is the half they can finish today, and the gate is the sentence beside
+it. A bar that doubled as the gate would be a bar an owner could only move by
+recruiting, which is H4 again.
+
+### Guard 180 is a chokepoint, not a vocabulary
+
+A bar over a head count can be written a hundred ways and named anything; what
+it cannot do is avoid being a bar. So the property is *where a bar may be
+drawn*, and the answer is one file — the same file that documents H4. Trap 16's
+lesson, applied before the mistake rather than after it.
+
+`Meter` sits beside `Progress` in that file for the case this guard would
+otherwise push people to fake: a percentile rank is **not** progress, and
+drawing one as progress tells an owner they are 40% of the way to finishing
+something that does not finish.
+
+### Guard 182 found a rule that read as one rule and is two
+
+H1 (`i` icons) and H2 (a guides section inside each portal) sit in the same
+four-line table in 12 §11, and the brand portal has had both since Sprint 10.
+The owner portal had the icons and no guides, and nothing noticed for two
+sprints — because "help is done" is a sentence about H1 that sounds like a
+sentence about both.
+
+### Guards 183–185, and the test that was named after a rule that did not exist
+
+`50-trophies` carried a case called *"deletion is refused while a redemption is
+in flight"*. Its body asserted that `redemptionsInFlight` returns one row while
+a redemption is pending, one while it is sent, and none once it is paid. All
+true. Not one word about deletion — because **nothing on the platform deleted
+an account**, and the three suites that needed a deleted gamer each wrote
+`UPDATE users SET status='deleted'` by hand.
+
+This is §0.1 with its halves reversed. The usual shape is evidence that exists
+and nothing that reads it. Here the **guard** existed and the **rule** did not,
+and the test name reads identically either way — which is the same sentence
+trap 18 ends on, one level further out.
+
+Three guards now, because R3 pulls against V14 and one test cannot hold both:
+the first proves it refuses while money is on its way, the second that it does
+not refuse everybody — guard 118's lesson, again — and the third that what it
+actually does is a **status change**, because the trophy money was real.
+
+That third one is the one worth being exact about. The under-13 path *is* a hard delete:
+there is no lawful reason to keep a row we should never have made. Closing your
+own account is not, because a trophy a brand paid for has to stay accounted for
+in the prize vault until admin sweeps it (V15). Two closures, two mechanisms,
+and the difference between them is money that already exists.
+
+### Break 187 went green first, and the reason is trap 8
+
+`lifecycleProgress` was written as `index < 0 ? 0 : index + 1`. Removing the
+ternary changed nothing, because `-1 + 1` is already `0` — the branch that read
+like the fence could never change an answer.
+
+A break that changes nothing proves nothing in either direction. The code was
+simplified to `STATES.indexOf(state) + 1` so the real mechanism is visible, and
+the guard was proven with a break that can vary: making the function **throw**.
+House rule 11 is the point — a bar is decoration, and a decoration may never
+take a page down.
