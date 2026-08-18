@@ -147,6 +147,163 @@ test("every owner card is ephemeral — the card itself, not only the refusal", 
   eq(asStranger, [], "and the refusal is ephemeral too");
 });
 
+// ── P1 / P5 / T4 · the wallet card's Withdraw button ────────────────────────
+
+/** The wallet card as one presser: whether it offers Withdraw, and what it says. */
+async function walletCardFor(
+  db: Awaited<ReturnType<typeof resetDemoDb>>,
+  guildId: string,
+  discordId: string,
+  roles: string[] = [],
+): Promise<{ hasWithdraw: boolean; footer: string }> {
+  const handler = SCREENS.get("serverwallet");
+  ok(handler !== undefined, "the wallet card is registered");
+  const result = await handler!({
+    interaction: anInteraction({
+      guild_id: guildId,
+      member: { user: { id: discordId, username: "Someone" }, roles },
+    }),
+    frame: { screen: "serverwallet", args: [] },
+    trail: [],
+    userId: discordId,
+    guildId,
+    presser: {
+      userId: null,
+      discordId,
+      guildId,
+      roleIds: roles,
+      created: false,
+      blocked: false,
+    },
+  });
+  // The button is in `components`; the footer sentence is in `content`. Kept
+  // apart on purpose — a card that put the word "Withdraw" in its own footer
+  // would otherwise read as an offer of one.
+  return {
+    hasWithdraw: /Withdraw/.test(JSON.stringify(result.components ?? [])),
+    footer: result.content ?? "",
+  };
+}
+
+test("the wallet card asks mayWithdraw, and mayWithdraw is four gates and not one", async () => {
+  // ===== THE §0.1 SHAPE THIS SPRINT FOUND =====
+  //
+  // `mayWithdraw` encodes 12 §2's capability table — *age 18+ · country · be
+  // the guild owner* — plus T4's seven-day freeze. It had a unit suite proving
+  // all four gates, and **nothing in the product called it**. This card
+  // compared the presser's id with `guilds.ownerDiscordId` and called that the
+  // rule, so a 13–17 guild owner was shown a Withdraw button — which is
+  // exactly the case P5 exists to name.
+  //
+  // 09 asks for two suites on "let an administrator withdraw" for this reason:
+  // the unit suite proves the rule, and this proves somebody reads it. One
+  // assertion is one edit away from none, and here there was already only one.
+  const db = await resetDemoDb();
+  const guildId = await aGuild(db, {
+    guildId: "guild-withdraw",
+    ownerDiscordId: "discord-owner",
+    adminRoleId: "42",
+  });
+
+  const anOwner = async (over: Record<string, unknown>) => {
+    const userId = uid();
+    await db.insert(schema.users).values({
+      id: userId,
+      slug: `owner-${userId.toLowerCase()}`,
+      displayName: "Owner",
+      discordId: "discord-owner",
+      ageBand: "adult",
+      country: "GB",
+      ...over,
+    });
+    return userId;
+  };
+
+  // An administrator — seen holding the mapped role, so `checkAdmin` lets them
+  // through to the card. P1 stops them at the button and tells them why.
+  await db.insert(schema.guildAdmins).values({
+    id: uid(),
+    guildId,
+    discordId: "discord-staff",
+    source: "mapped_role",
+    seenAt: new Date(),
+  });
+  const staff = await walletCardFor(db, guildId, "discord-staff", ["42"]);
+  no(staff.hasWithdraw, "P1 — an administrator is offered no Withdraw button");
+  ok(
+    /Only the Discord server owner can withdraw/.test(staff.footer),
+    "and is told why on the card, in the rule's own words",
+  );
+
+  // The adult owner, who may. Without this the assertions above would pass on
+  // a card that offered Withdraw to nobody at all.
+  const ownerId = await anOwner({});
+  const adult = await walletCardFor(db, guildId, "discord-owner");
+  ok(adult.hasWithdraw, "the adult owner in an allowed country is offered it");
+
+  // P5 — the teen owner. Same person, same guild, same access: only the age
+  // band moves. A card gating on ownership alone cannot tell these apart, and
+  // that is the defect this test was written to catch.
+  await db
+    .update(schema.users)
+    .set({ ageBand: "teen" })
+    .where(sqlEq(schema.users.id, ownerId));
+  const teen = await walletCardFor(db, guildId, "discord-owner");
+  no(teen.hasWithdraw, "P5 — a 13–17 owner earns, spends, and is offered no withdrawal");
+  ok(
+    /18\+/.test(teen.footer),
+    "and is told it keeps until they are 18 rather than that they are not allowed",
+  );
+
+  // T4 — the freeze. Adult again, owner again, and still refused for seven
+  // days after a confirmed transfer.
+  await db
+    .update(schema.users)
+    .set({ ageBand: "adult" })
+    .where(sqlEq(schema.users.id, ownerId));
+  await db
+    .update(schema.guilds)
+    .set({ transferConfirmedAt: new Date() })
+    .where(sqlEq(schema.guilds.guildId, guildId));
+  const frozen = await walletCardFor(db, guildId, "discord-owner");
+  no(frozen.hasWithdraw, "T4 — withdrawal is frozen for seven days after a transfer");
+  ok(/frozen/i.test(frozen.footer), "and the card says so");
+});
+
+test("on install, before any role is mapped, the owner still reaches their cards", async () => {
+  // ===== S2, FROM THE CALLER'S END =====
+  //
+  // `checkAdmin` has always known this rule — but only when a caller handed it
+  // `guildOwnerId`, and the screen-registry wrapper has a guild *id* and not a
+  // guild. So every owner card refused the owner with "no admin role is mapped
+  // yet", which is the state every server is in on the day it installs. The
+  // unit test for the rule passed throughout, because it passed the id.
+  //
+  // This is the same shape as the wallet card above and it is why both are
+  // here: a rule proven in isolation, and nothing proven to ask it.
+  const db = await resetDemoDb();
+  const guildId = await aGuild(db, {
+    guildId: "guild-fresh",
+    ownerDiscordId: "discord-owner",
+    // Deliberately no `adminRoleId`. Day one.
+  });
+
+  const owner = await walletCardFor(db, guildId, "discord-owner");
+  ok(/Wallet/.test(owner.footer) || owner.footer.includes("Available"), owner.footer);
+  no(
+    /admin role is mapped/.test(owner.footer),
+    "the owner is not told to map a role before they may look at their own wallet",
+  );
+
+  // The negative half. If the wrapper let everybody through, the assertion
+  // above would pass on a card with no gate at all.
+  const stranger = await walletCardFor(db, guildId, "discord-nobody");
+  ok(
+    /admin role is mapped/.test(stranger.footer),
+    `and somebody who is neither owner nor mapped role is still refused — got: ${stranger.footer}`,
+  );
+});
+
 test("a gamer card is not ephemeral, or the rule above would be vacuous", async () => {
   // ===== THE NEGATIVE HALF (guard 118's lesson) =====
   //

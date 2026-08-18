@@ -815,3 +815,44 @@ about the **command**, not about every process it spawned. `nohup` exists
 precisely to survive that. Before trusting a tree, `ps` for what you started —
 and prefer a foreground run with a long timeout over a detached one you cannot
 see.
+
+---
+
+## 34 · `git checkout <file>` restores HEAD, not "before my break"
+
+Restoring a break with `git checkout lib/discord/admin.ts` threw away the
+**fix** in the same file, because the fix was not committed. The file went back
+to HEAD, which was the state before both.
+
+It looked fine, too: the band came back at 443/445, two red — the same two that
+had been red under the break. I read that as "the break is still applied" for
+long enough to run the whole band again.
+
+The three restores before it were safe by accident: those files were unmodified
+at HEAD, so HEAD *was* the pre-break state.
+
+**Restore the way the harness does — from the bytes read before the break, not
+from git.** `python3` writing the string back, or a copy of the file. Reach for
+`git checkout` only after checking `git status` shows the file clean.
+
+## 35 · A mutation whose `find` never matched, and the hour it cost
+
+`Let an administrator withdraw` was written with four spaces of indentation
+against a line that has two. The harness reported it correctly — *"the line it
+mutates is no longer in lib/portal/permissions.ts"* — but it reported it **when
+the loop reached that mutation**, which on a full run was ninety minutes in.
+
+Worse than the wait: "no longer in" is the wrong diagnosis. It never matched.
+A `find` string is hand-typed and can be wrong from birth, and a mutation that
+cannot apply is reported next to twenty-nine that can, in a report whose whole
+purpose is to say what the band does not notice.
+
+The related shape is quieter. `String.replace` with a string argument replaces
+the **first** occurrence, so a `find` matching two places silently mutates one
+and leaves the other alone — the break appears applied, the band goes green,
+and the report reads as a hole in the suite rather than a defect in the
+harness. That is trap 8 at one remove, and it is undetectable from the output.
+
+**The harness now checks every mutation applies exactly once before writing
+anything.** Nothing is mutated until all thirty-three are known to match one
+place each.

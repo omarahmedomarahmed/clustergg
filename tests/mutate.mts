@@ -284,18 +284,33 @@ const MUTATIONS: Mutation[] = [
   {
     name: "Let an administrator withdraw",
     file: "lib/portal/permissions.ts",
-    find: '    if (facts.access.kind !== "owner" && facts.access.kind !== "demo") {',
-    replace: "    if (false) {",
+    find: '  if (facts.access.kind !== "owner" && facts.access.kind !== "demo") {',
+    replace: "  if (false) {",
     expect: 2,
   },
   {
     name: "Recompute a closed week instead of reading its record",
     file: "lib/pool/record.ts",
-    // W1/K12 — one implementation. The record is a copy of the division the
-    // close already made; recomputing it here is a second one, and the two
-    // agree until an input moves.
-    find: "  const existing = await db",
-    replace: "  const existing: unknown[] = [];\n  const unusedExisting = await db",
+    // 05 §6 rule 3 — *"nothing on these pages is recalculated."* The share a
+    // server was paid is a frozen reading, not a quantity to re-derive: it is
+    // scored + flat with the rounding the close applied, and the pool divided
+    // by the servers in it is the shape somebody writes when they have not
+    // read 02 §5. Both are plausible; only one is what left the vault.
+    //
+    // This is the reader every consumer goes through — the admin week pages,
+    // the per-server history and the Saturday standings card — so a recompute
+    // here is a recompute everywhere, which is exactly why 09 wants two
+    // suites on it rather than one.
+    find:
+      "    .orderBy(asc(schema.weekRecords.rank), asc(schema.weekRecords.guildName));\n" +
+      "  return currentRows(rows);\n}",
+    replace:
+      "    .orderBy(asc(schema.weekRecords.rank), asc(schema.weekRecords.guildName));\n" +
+      "  const current = currentRows(rows);\n" +
+      "  return current.map((r) => ({\n" +
+      "    ...r,\n" +
+      "    totalCents: Math.round(r.poolCents / Math.max(1, r.serversInPool)),\n" +
+      "  }));\n}",
     expect: 2,
   },
   {
@@ -465,6 +480,51 @@ async function refuseDirtyTree(): Promise<void> {
 }
 
 await refuseDirtyTree();
+
+/**
+ * ===== EVERY MUTATION IS CHECKED BEFORE ANY MUTATION IS RUN =====
+ *
+ * The loop below already reports a `find` that does not match — but it reports
+ * it *when it reaches that mutation*, which on a full run is over an hour
+ * after the typo was made. I made that typo (two spaces of indentation, not
+ * four) and found out an hour and a half later.
+ *
+ * Worse, a `find` matching **two** places was silently mutating only the
+ * first, because `String.replace` with a string takes the first occurrence.
+ * That is the trap-8 shape at one remove: the break appears to be applied, the
+ * band goes green, and the report reads as a hole in the suite rather than a
+ * defect in the harness.
+ *
+ * So: exactly one occurrence, every mutation, before anything is written.
+ */
+{
+  const problems: string[] = [];
+  for (const mutation of MUTATIONS) {
+    const source = await fs.readFile(path.join(repoRoot, mutation.file), "utf8");
+    const hits = source.split(mutation.find).length - 1;
+    if (hits === 0) {
+      problems.push(`  ${mutation.name}\n    no longer matches anything in ${mutation.file}`);
+    } else if (hits > 1) {
+      problems.push(
+        `  ${mutation.name}\n    matches ${hits} places in ${mutation.file} — only the ` +
+          `first would be mutated, so the other ${hits - 1} would go untested while the ` +
+          `report claimed otherwise`,
+      );
+    }
+  }
+  if (problems.length > 0) {
+    console.error(
+      `\x1b[31m${problems.length} mutation${problems.length === 1 ? "" : "s"} cannot be ` +
+        `applied as written.\x1b[0m\n`,
+    );
+    for (const p of problems) console.error(p);
+    console.error(
+      "\nNothing has been written. A mutation that cannot apply proves nothing, and " +
+        "an hour of run time is too long to find that out.",
+    );
+    process.exit(1);
+  }
+}
 
 console.log(`Mutation harness — ${MUTATIONS.length} mutations\n`);
 

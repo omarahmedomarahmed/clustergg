@@ -46,6 +46,21 @@ export async function checkAdmin(
     .from(schema.guilds)
     .where(eq(schema.guilds.guildId, input.guildId));
 
+  // ===== S2, ASKED OF THE ROW RATHER THAN OF THE CALLER =====
+  //
+  // *"On install, only the guild owner has admin."* That was true of this
+  // function only when a caller passed `guildOwnerId` — and the screen-registry
+  // wrapper never did, because it has a guild id and not a guild. So every
+  // owner card refused the owner with *"no admin role is mapped yet"*, which
+  // is the state every server is in on the day it installs.
+  //
+  // The fact is in the row this function has already read. Asking a caller to
+  // supply what the query returns is how the two ended up disagreeing, and the
+  // parameter above stays only because `ownerOnly` has the id and not the row.
+  if (guild?.ownerDiscordId && input.userId === guild.ownerDiscordId) {
+    return { allowed: true, because: "guild_owner" };
+  }
+
   if (!guild) {
     // S9 — if the bot was removed the portal survives, and the error says what
     // to do rather than what happened.

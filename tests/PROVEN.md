@@ -1478,3 +1478,49 @@ a missing page, `94-surface-reach` sees a module nothing imports, and this is a
 page nothing links to whose module is imported by itself. Found by clicking,
 which is why *"a human can"* is the definition of done rather than the last row
 of the table.
+
+---
+
+# Sprint 14 — the mutation harness, the month run twice, and three rules nothing read
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 218 | **A closed week is read, never recomputed** (`99-full-cycle`, `99-week-record`) | `weekRecordsFor` derives `totalCents` as `poolCents ÷ serversInPool` on read | *"guild-1's recorded share is the money it was actually paid"* (week 1 of the month) **and** *"an ineligible server that carried entrants has a row"* | clean, 443/443 |
+| 219 | **Four weeks of money are identical with `guild_snapshots` dropped** (`99-full-cycle`) | `poolDivisionFor` selects from `guildSnapshots` | *"the same four weeks with guild_snapshots dropped…"*, as `relation "guild_snapshots" does not exist` | clean, 2/2 |
+| 220 | **The wallet card asks `mayWithdraw`, and it is four gates not one** (`61-cards`, `95-permissions`) | `mayWithdraw`'s access gate replaced with `if (false)` | *"the wallet card asks mayWithdraw…"* **and** *"an administrator does everything except move money"* + *"an administrator cannot withdraw…"* | clean, 444/444 |
+| 221 | **S2 — the owner reaches their cards before a role is mapped** (`61-cards`) | the `guild.ownerDiscordId` branch in `checkAdmin` disabled | *"on install, before any role is mapped…"* **and** *"the wallet card asks mayWithdraw…"* | clean, 445/445 |
+
+### Guard 218 and what "≥ 2 suites" was actually asking for
+
+09 wants two suites on *"recompute a closed week instead of reading its
+record"*, and the first attempt got one — because the mutation was wrong, not
+because the band was thin. It broke `writeWeekRecord`'s idempotency check,
+which is a **different** rule (*"closing twice does not write a second
+record"*) and correctly has exactly one guard.
+
+The mutation 09 names is about a **reader**. Rewritten to make the shared
+reader derive the share instead of returning it, and the second angle put where
+a real month runs: after every close the record is read back through the same
+function the admin week pages and the Saturday standings card use, and compared
+with the payout that was actually drafted against it. A reader that derived a
+share would have to derive the *same* share four weeks running to survive.
+
+### Guards 220 and 221 are the same §0.1 shape, found twice in one afternoon
+
+`mayWithdraw` encodes 12 §2's capability table — *18+ · country · guild owner*
+— plus T4's freeze. It had a suite proving all four gates and **nothing in the
+product called it**: one grep for its name returned the unit tests and a
+comment. The Discord wallet card compared the presser's id with
+`guilds.ownerDiscordId` and called that the rule, so a 13–17 guild owner was
+shown a Withdraw button — precisely the case P5 exists to name. The web wallet
+page carried the rule as a paragraph of help text and consulted nothing.
+
+Wiring the card up exposed the second one immediately: `checkAdmin` only
+recognises the guild owner when a caller hands it `guildOwnerId`, and the
+screen-registry wrapper has a guild *id*, not a guild. So on a freshly
+installed server — before any role is mapped, which is every server on day one
+— the owner was refused every admin card with *"no admin role is mapped yet"*.
+`60-bot`'s test of that rule passed throughout, because it passes the id.
+
+Both were invisible for the same reason: the rule was proven, and the reading
+of it was not.

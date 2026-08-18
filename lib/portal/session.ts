@@ -22,7 +22,12 @@ import { eq } from "drizzle-orm";
 import { getDb, isDemoMode, schema } from "../db/index.ts";
 import { currentGamer } from "../auth/current.ts";
 import { hasPortalSession } from "../core/portal-auth.ts";
-import { guildAccessFor, type GuildAccess } from "./permissions.ts";
+import {
+  guildAccessFor,
+  mayWithdraw,
+  type GuildAccess,
+  type WithdrawVerdict,
+} from "./permissions.ts";
 
 // ── The brand portal ────────────────────────────────────────────────────────
 
@@ -93,6 +98,36 @@ export async function serverPortalAccess(guildId: string): Promise<GuildAccess> 
         )
       : false,
     isDemo: isDemoMode,
+  });
+}
+
+/**
+ * May the signed-in gamer withdraw this guild's money — the same four gates
+ * the Discord wallet card asks, asked the same way.
+ *
+ * ===== 09 BAND 2 SHOT 4a: DISABLED WITH A REASON, NOT HIDDEN =====
+ *
+ * `serverPortalAccess` above already says why it returns the whole access
+ * shape rather than a boolean — *"an administrator sees the withdraw button
+ * disabled with a reason, not hidden."* The wallet page had neither. It
+ * carried the rule as a sentence of help text and consulted nothing, which is
+ * the shape this branch exists to find: a rule proven to exist, read by
+ * nobody.
+ *
+ * The verdict is the whole answer, refusal wording included, so the page
+ * renders the reason rather than composing one.
+ */
+export async function serverWithdrawVerdict(guildId: string): Promise<WithdrawVerdict> {
+  const db = await getDb();
+  const gamer = await currentGamer();
+  const [guild] = await db.select().from(schema.guilds).where(eq(schema.guilds.guildId, guildId));
+  if (!guild) notFound();
+
+  return mayWithdraw({
+    access: await serverPortalAccess(guildId),
+    ageBand: gamer?.ageBand ?? null,
+    country: gamer?.country ?? null,
+    transferConfirmedAt: guild.transferConfirmedAt,
   });
 }
 

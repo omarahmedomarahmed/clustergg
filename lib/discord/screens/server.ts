@@ -32,6 +32,11 @@ import { cardReply } from "./card.ts";
 import { homeTail } from "./home.ts";
 import { serverCard } from "../../cards/specs.ts";
 import { formatMoney } from "../../money/amounts.ts";
+import {
+  guildAccessFor,
+  mayWithdraw,
+  type WithdrawVerdict,
+} from "../../portal/permissions.ts";
 import type { Frame } from "../components.ts";
 
 /**
@@ -78,17 +83,64 @@ function adminCard(
   };
 }
 
-/** Whether this presser is the guild owner — the only one who touches money. */
-async function isGuildOwner(guildId: string, discordId: string | null): Promise<boolean> {
-  if (!discordId) return false;
+/**
+ * May this presser withdraw — asked of the one function that knows.
+ *
+ * ===== THIS CARD USED TO ANSWER IT ITSELF, AND GOT IT WRONG =====
+ *
+ * It compared the presser's id with `guilds.ownerDiscordId` and called that
+ * the rule. That is P1 and only P1. `mayWithdraw` is **four** gates — 12 §2's
+ * capability table is *age 18+ · country · be the guild owner*, plus T4's
+ * seven-day freeze after a confirmed ownership transfer — and this card
+ * consulted none of the other three.
+ *
+ * So a 13–17 guild owner was shown a Withdraw button, which is precisely the
+ * case P5 exists to name: *a 13–17 owner earns and may spend on community
+ * challenges, and may not withdraw.* The rule was written, tested and read by
+ * nothing.
+ *
+ * The refusal wording comes back with the verdict rather than being restated
+ * here, for the same reason: a card that writes its own reason is a second
+ * copy of a rule, and the copy is the one that goes stale.
+ */
+async function withdrawVerdict(
+  guildId: string,
+  discordId: string | null,
+): Promise<WithdrawVerdict> {
   const { getDb, schema } = await import("../../db/index.ts");
   const { eq } = await import("drizzle-orm");
   const db = await getDb();
   const [guild] = await db
-    .select({ ownerDiscordId: schema.guilds.ownerDiscordId })
+    .select()
     .from(schema.guilds)
     .where(eq(schema.guilds.guildId, guildId));
-  return guild?.ownerDiscordId === discordId;
+  if (!guild) return { allowed: false, reason: "Cluster is not installed here." };
+
+  // The presser's own record, if they have one. A stranger has no age band and
+  // no country, and `mayWithdraw` refuses on the access gate before either is
+  // reached — but they are fetched all the same, because a gate that is only
+  // ever asked after another gate has already said no is a gate nobody tests.
+  const [user] = discordId
+    ? await db
+        .select({ ageBand: schema.users.ageBand, country: schema.users.country })
+        .from(schema.users)
+        .where(eq(schema.users.discordId, discordId))
+    : [];
+
+  return mayWithdraw({
+    access: guildAccessFor({
+      guild,
+      discordId,
+      // A wallet card only renders behind `adminCard`, so the presser is
+      // already known to be an administrator or the owner. `guildAccessFor`
+      // decides which.
+      seenAdmin: true,
+      isDemo: false,
+    }),
+    ageBand: user?.ageBand ?? null,
+    country: user?.country ?? null,
+    transferConfirmedAt: guild.transferConfirmedAt,
+  });
 }
 
 screen(
@@ -245,7 +297,7 @@ screen(
     // the two would disagree the first time a payout was superseded.
     const overview = await ownerOverview(db, guildId, new Date());
     const discordId = interaction.member?.user?.id ?? interaction.user?.id ?? null;
-    const owner = await isGuildOwner(guildId, discordId);
+    const verdict = await withdrawVerdict(guildId, discordId);
 
     if (!overview) return { content: "Cluster is not installed here.", ephemeral: true };
 
@@ -256,15 +308,19 @@ screen(
           { label: "Available", value: formatMoney(overview.availableCents) },
           { label: "Earned, ever", value: formatMoney(overview.lifetimeEarnedCents) },
         ],
-        // P1 — said on the card, to whoever is holding it. An administrator
-        // learns why they cannot rather than finding a button missing.
-        footer: owner
+        // Said on the card, to whoever is holding it, **in the words the rule
+        // itself uses**. An administrator, a teen owner and an owner mid
+        // transfer freeze each learn why they cannot, rather than finding a
+        // button missing and opening a support ticket.
+        footer: verdict.allowed
           ? "A payout is drafted at the close and released by a person"
-          : "Only the guild owner can withdraw. You can see everything and move nothing",
+          : verdict.reason,
       },
       {
         buttons: [
-          owner ? linkButton("Withdraw", `${siteUrl()}/portal/server/${guildId}/wallet`, "💸") : null,
+          verdict.allowed
+            ? linkButton("Withdraw", `${siteUrl()}/portal/server/${guildId}/wallet`, "💸")
+            : null,
           navButton("Overview", frame("server"), trail),
           ...homeTail(trail),
         ],

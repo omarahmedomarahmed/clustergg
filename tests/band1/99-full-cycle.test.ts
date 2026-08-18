@@ -48,7 +48,8 @@ import { CHALLENGE_PRICE_CENTS, splitOf, formatMoney } from "../../lib/money/amo
 import { ADAPTERS, type StatsResult } from "../../lib/providers/adapters.ts";
 import { PROVIDERS } from "../../lib/providers/registry.ts";
 import { uid } from "../../lib/core/utils.ts";
-import { eq as sqlEq, and as sqlAnd, gt as sqlGt } from "drizzle-orm";
+import { eq as sqlEq, and as sqlAnd, gt as sqlGt, sql } from "drizzle-orm";
+import { currentRows, weekRecordsFor } from "../../lib/pool/record.ts";
 
 // ── A provider the simulation drives ────────────────────────────────────────
 
@@ -180,8 +181,30 @@ async function seed(db: DB): Promise<{ guilds: string[]; gamers: Gamer[]; brandI
   return { guilds, gamers, brandId };
 }
 
-test("four weeks, end to end, with the invariant checked at every step", async () => {
-  const db = await resetDemoDb();
+/**
+ * The whole month, as a function — so it can be run **twice**.
+ *
+ * ===== WHY THIS IS NOT A TEST BODY ANY MORE =====
+ *
+ * S2/N9 says `guild_snapshots` may not touch the weekly cycle. The per-week
+ * check below compares one division with and without a snapshot row, which
+ * catches a KPI reading the table. It does not catch a *cumulative* drift —
+ * a read that moves a rank in week 2, which moves a payout in week 3, which
+ * moves the pool in week 4. Nothing inside a single week can see that.
+ *
+ * So the month runs twice: once normally, and once with the table **dropped**
+ * out of the database entirely. Dropped rather than emptied, deliberately —
+ * an empty table still answers a query, so an emptied run proves only that
+ * the rows are ignored. A dropped one proves nothing in the weekly cycle so
+ * much as *asks*, because the query would throw.
+ *
+ * Every dollar of the two runs is then compared. See `fingerprint`.
+ */
+async function runTheMonth(
+  db: DB,
+  opts: { analytics: boolean; label: string },
+): Promise<void> {
+  const { label } = opts;
   stats.clear();
   const { guilds, gamers, brandId } = await seed(db);
 
@@ -203,15 +226,15 @@ test("four weeks, end to end, with the invariant checked at every step", async (
     { brandId, games: [SIM], challengesPerGame: 1, startingWeek: WEEK_ONE, weeks: 4 },
     new Date("2026-09-28T12:00:00Z"),
   );
-  eq(challengeIds.length, 4, "four challenges, one a week");
+  eq(challengeIds.length, 4, `${label}: four challenges, one a week`);
   await invariantHolds("after the bill is issued and before it is paid");
-  eq(await balanceOf(db, "prize"), 0, "an unpaid bill has reached no vault");
+  eq(await balanceOf(db, "prize"), 0, `${label}: an unpaid bill has reached no vault`);
 
   await onInvoicePaid(db, invoiceId);
   eq(
     await balanceOf(db, "prize"),
     PRIZE * 4,
-    "and paying it backs all four prize pools at once",
+    `${label}: and paying it backs all four prize pools at once`,
   );
   await invariantHolds("after payment");
 
@@ -222,7 +245,7 @@ test("four weeks, end to end, with the invariant checked at every step", async (
     const weekStart = weekStartPlus(WEEK_ONE, index);
     const gun = weekStart;
     const close = new Date(weekStart.getTime() + 4 * 86_400_000);
-    const where = `week ${index + 1}`;
+    const where = `${label} week ${index + 1}`;
 
     // ── Admin sets it up and announces it. A5: confirm the game and the
     //    metrics, assign trophies, then announce. The builder deliberately
@@ -354,23 +377,25 @@ test("four weeks, end to end, with the invariant checked at every step", async (
       // One server gets a row and the others do not — the realistic shape,
       // since the grant is per server (N1), and the only one where a read
       // moves money *between* servers rather than cancelling out in the rank.
-      const clean = await poolDivisionFor(db, weekStart, close);
-      await db.insert(schema.guildSnapshots).values({
-        id: uid(),
-        guildId: guilds[0],
-        takenAt: weekStart,
-        memberCount: 999_999,
-        linkedCount: 1,
-      });
-      const withAnalytics = await poolDivisionFor(db, weekStart, close);
-      eq(
-        JSON.stringify(withAnalytics),
-        JSON.stringify(clean),
-        `${where}: the whole division is identical with an analytics snapshot present`,
-      );
-      await db
-        .delete(schema.guildSnapshots)
-        .where(sqlEq(schema.guildSnapshots.guildId, guilds[0]));
+      if (opts.analytics) {
+        const clean = await poolDivisionFor(db, weekStart, close);
+        await db.insert(schema.guildSnapshots).values({
+          id: uid(),
+          guildId: guilds[0],
+          takenAt: weekStart,
+          memberCount: 999_999,
+          linkedCount: 1,
+        });
+        const withAnalytics = await poolDivisionFor(db, weekStart, close);
+        eq(
+          JSON.stringify(withAnalytics),
+          JSON.stringify(clean),
+          `${where}: the whole division is identical with an analytics snapshot present`,
+        );
+        await db
+          .delete(schema.guildSnapshots)
+          .where(sqlEq(schema.guildSnapshots.guildId, guilds[0]));
+      }
 
       const { division } = await closeWeek(db, weekStart, close);
 
@@ -401,6 +426,33 @@ test("four weeks, end to end, with the invariant checked at every step", async (
       totalsByWeek.push(
         (await Promise.all(payouts.map((p) => payoutTotal(db, p.id)))).reduce((a, b) => a + b, 0),
       );
+
+      // ===== THE RECORD IS READ BACK, NOT RECOMPUTED (05 §6 RULE 3) =====
+      //
+      // Read through `weekRecordsFor` — the same function the admin week
+      // pages and the Saturday standings card call — and compared with the
+      // payout that was actually drafted against it. These are the same money
+      // twice: the record is a copy of the division the close made, and the
+      // payout is drawn from that division too.
+      //
+      // 09's own reason for wanting a second suite on this. The unit suite
+      // proves the reader returns what was written into a fixture. This
+      // proves that a month's worth of real closes still reads back as the
+      // money that left the vault — and a reader that quietly derived a share
+      // instead of returning it would have to derive the *same* share every
+      // week of four to survive here.
+      const recorded = await weekRecordsFor(db, weekStart);
+      ok(recorded.length > 0, `${where}: the week reads back out of the record`);
+      for (const p of payouts) {
+        const row = recorded.find((r) => r.guildId === p.guildId);
+        ok(row !== undefined, `${where}: ${p.guildId} was paid, so it has a recorded row`);
+        eq(
+          row!.totalCents,
+          await payoutTotal(db, p.id),
+          `${where}: ${p.guildId}'s recorded share is the money it was actually paid`,
+        );
+      }
+
       await invariantHolds(`${where}: after owner payouts`);
     }
 
@@ -423,10 +475,10 @@ test("four weeks, end to end, with the invariant checked at every step", async (
 
   // ── The month, checked. ───────────────────────────────────────────────
 
-  eq(totalsByWeek.length, 4, "owners were paid in all four weeks");
+  eq(totalsByWeek.length, 4, `${label}: owners were paid in all four weeks`);
   ok(
     totalsByWeek.every((t) => t > 0),
-    "and every week paid something — a quiet week must still pay owners",
+    `${label}: and every week paid something — a quiet week must still pay owners`,
   );
 
   const paidOut = totalsByWeek.reduce((a, b) => a + b, 0);
@@ -436,10 +488,10 @@ test("four weeks, end to end, with the invariant checked at every step", async (
     splitOf(CHALLENGE_PRICE_CENTS * 4).server,
     `paid ${formatMoney(paidOut)} plus held ${formatMoney(held)} is exactly the server share`,
   );
-  ok(held > 0, "and something is always held back for a refund or a quiet week");
+  ok(held > 0, `${label}: and something is always held back for a refund or a quiet week`);
 
   // ── A gamer cashes out. ───────────────────────────────────────────────
-  ok(redeemableHolding !== null, "an adult holds a money-trophy");
+  ok(redeemableHolding !== null, `${label}: an adult holds a money-trophy`);
   const [holding] = await db
     .select()
     .from(schema.userTrophies)
@@ -447,7 +499,7 @@ test("four weeks, end to end, with the invariant checked at every step", async (
 
   const prizeBefore = await balanceOf(db, "prize");
   const { code } = await startEmailVerification(db, holding.userId, "winner@example.com");
-  ok((await confirmEmailVerification(db, holding.userId, code)).ok, "email verified at redemption");
+  ok((await confirmEmailVerification(db, holding.userId, code)).ok, `${label}: email verified at redemption`);
 
   const redemptionId = await requestRedemption(db, {
     userTrophyId: holding.id,
@@ -461,18 +513,18 @@ test("four weeks, end to end, with the invariant checked at every step", async (
   eq(
     await balanceOf(db, "prize"),
     prizeBefore - PRIZE,
-    "the prize vault falls by exactly the trophy's value",
+    `${label}: the prize vault falls by exactly the trophy's value`,
   );
   await invariantHolds("after a redemption");
 
   // ── And the brand's report. ───────────────────────────────────────────
   const report = await brandReport(db, brandId);
-  eq(report.length, 4, "a row per week of the series");
+  eq(report.length, 4, `${label}: a row per week of the series`);
   ok(
     report.every((r) => r.entrants === gamers.length),
-    "every week's entrants counted separately — the same gamer four weeks running is four entrants",
+    `${label}: every week's entrants counted separately — the same gamer four weeks running is four entrants`,
   );
-  ok(report.every((r) => r.reach > 0), "and reach counted per challenge");
+  ok(report.every((r) => r.reach > 0), `${label}: and reach counted per challenge`);
 
   const finalCheck = await checkPrizeVault(db);
   // ===== M3 ITSELF, NOT A LIST OF ACCEPTABLE STATES =====
@@ -488,9 +540,129 @@ test("four weeks, end to end, with the invariant checked at every step", async (
   // was buying nothing.
   ok(
     finalCheck.holds,
-    `the month ends with the prize vault holding exactly its liability — ` +
+    `${label}: the month ends with the prize vault holding exactly its liability — ` +
       `balance ${finalCheck.balanceCents}, liability ${finalCheck.liabilityCents}, ` +
       `orphaned ${finalCheck.orphanedCents}, state ${finalCheck.state}`,
   );
-  eq(finalCheck.state, "green", "every dollar sits on a gamer's profile");
+  eq(finalCheck.state, "green", `${label}: every dollar sits on a gamer's profile`);
+}
+
+/**
+ * Every dollar the month produced, in a form two runs can be compared by.
+ *
+ * Ids are random and timestamps are wall-clock, so neither is in here. What is
+ * in here is the money and the working that decided it: each week's record row
+ * per server — rank, entrants, both KPIs, both share halves, the total — the
+ * payout lines those became, the pool allocated, and the four vault balances
+ * at the end.
+ *
+ * Sorted by a stable key rather than by insertion, because two runs insert in
+ * whatever order the loops happen to reach and a diff of row *order* is not a
+ * diff of money.
+ */
+async function fingerprint(db: DB): Promise<string> {
+  const records = currentRows(await db.select().from(schema.weekRecords));
+  const payouts = await db.select().from(schema.serverPayouts);
+  const lines = await db.select().from(schema.payoutLines);
+  const allocations = await db.select().from(schema.poolAllocations);
+
+  const linesByPayout = new Map<string, typeof lines>();
+  for (const line of lines) {
+    linesByPayout.set(line.payoutId, [...(linesByPayout.get(line.payoutId) ?? []), line]);
+  }
+
+  const key = (a: { k: string }, b: { k: string }) => (a.k < b.k ? -1 : a.k > b.k ? 1 : 0);
+
+  return JSON.stringify(
+    {
+      weeks: records
+        .map((r) => ({
+          k: `${r.weekStart.toISOString()}|${r.guildId}`,
+          guildName: r.guildName,
+          eligible: r.eligible,
+          ineligibleReason: r.ineligibleReason,
+          linkedAtGun: r.linkedAtGun,
+          profileCompleteAtGun: r.profileCompleteAtGun,
+          rank: r.rank,
+          entrants: r.entrants,
+          conversion: r.conversion,
+          activation: r.activation,
+          scoredShareCents: r.scoredShareCents,
+          flatShareCents: r.flatShareCents,
+          totalCents: r.totalCents,
+          poolCents: r.poolCents,
+          serversInPool: r.serversInPool,
+        }))
+        .sort(key),
+      payouts: payouts
+        .map((p) => ({
+          k: `${p.weekStart.toISOString()}|${p.guildId}`,
+          status: p.status,
+          lines: (linesByPayout.get(p.id) ?? [])
+            .map((l) => ({ kind: l.kind, amountCents: l.amountCents }))
+            .sort((a, b) => (a.kind < b.kind ? -1 : 1)),
+        }))
+        .sort(key),
+      allocations: allocations
+        .map((a) => ({ k: a.weekStart.toISOString(), amountCents: a.amountCents }))
+        .sort(key),
+      vaults: {
+        income: await balanceOf(db, "income"),
+        prize: await balanceOf(db, "prize"),
+        server: await balanceOf(db, "server"),
+        cluster: await balanceOf(db, "cluster"),
+      },
+    },
+    null,
+    2,
+  );
+}
+
+test("four weeks, end to end, with the invariant checked at every step", async () => {
+  const db = await resetDemoDb();
+  await runTheMonth(db, { analytics: true, label: "the month" });
+});
+
+test("the same four weeks with guild_snapshots dropped come out to the identical dollar", async () => {
+  // ===== S2 / N9, AT THE SCALE THE RULE IS ACTUALLY ABOUT =====
+  //
+  // Analytics is consent-gated and revocable (N1). If a single cent of a
+  // server's earnings depended on it, an owner would change their own money by
+  // pressing a refresh button — and a *different* owner's money too, since the
+  // pool is a division and one server's share is every other server's share.
+  //
+  // The per-week check inside `runTheMonth` compares one division with and
+  // without a snapshot row. This compares two whole months, one of which never
+  // had the table at all, and the table is **dropped** rather than emptied:
+  // an empty table still answers a query, so an emptied month would prove only
+  // that the rows are ignored. Any read at all, anywhere in the cycle, makes
+  // this run throw rather than differ — which is a better failure than a diff.
+  const withAnalytics = await resetDemoDb();
+  await runTheMonth(withAnalytics, { analytics: true, label: "with analytics" });
+  const withPrints = await fingerprint(withAnalytics);
+
+  const without = await resetDemoDb();
+  await without.execute(sql`drop table guild_snapshots`);
+  await runTheMonth(without, { analytics: false, label: "with the table dropped" });
+  const withoutPrints = await fingerprint(without);
+
+  eq(
+    withoutPrints,
+    withPrints,
+    "four weeks of money are identical with the analytics table dropped out of the database",
+  );
+
+  // And the negative half — the comparison must be **capable** of failing, or
+  // it is two empty strings agreeing. A month that produced no money would
+  // pass the check above and prove nothing at all.
+  const parsed = JSON.parse(withPrints) as {
+    weeks: { totalCents: number }[];
+    payouts: unknown[];
+  };
+  ok(parsed.weeks.length > 0, "the fingerprint covers a month that actually ran");
+  ok(
+    parsed.weeks.some((w) => w.totalCents > 0),
+    "and one in which servers were actually paid",
+  );
+  ok(parsed.payouts.length > 0, "with payouts drawn against it");
 });
