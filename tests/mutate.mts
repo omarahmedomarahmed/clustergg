@@ -421,6 +421,51 @@ process.on("uncaughtException", async (e) => {
   process.exit(1);
 });
 
+// ===== REFUSE TO START ON A DIRTY TREE =====
+//
+// The signal handler above restores on SIGINT and SIGTERM. It cannot help
+// against SIGKILL, a power cut, or a process supervisor that does not ask —
+// and a run killed that way leaves a mutation on disk, where the next thing
+// anybody does is run the band and get a result nobody chose.
+//
+// It has happened twice: a ten-minute timeout, and a background job the
+// harness never saw stop. Both left one file broken. So the *second* line of
+// defence is at startup rather than at exit, which is the one place a killed
+// run can still be caught — by the run after it.
+//
+// Reported by name, because "the tree is dirty" is not actionable and
+// "lib/money/amounts.ts is modified" is.
+async function refuseDirtyTree(): Promise<void> {
+  const status = await new Promise<string>((resolve) => {
+    const child = spawn("git", ["status", "--porcelain"], { cwd: repoRoot });
+    let out = "";
+    child.stdout.on("data", (d) => (out += String(d)));
+    child.on("close", () => resolve(out));
+  });
+
+  const dirty = status
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    // Build artefacts are not evidence of anything and change on every run.
+    .filter((l) => !l.endsWith("tsconfig.tsbuildinfo"));
+
+  if (dirty.length === 0) return;
+
+  console.error("The working tree is not clean, so this harness will not start.\n");
+  for (const line of dirty) console.error(`  ${line}`);
+  console.error(
+    "\nEvery mutation is applied to a real file and restored from the bytes read " +
+      "before it. Starting from a tree somebody has already edited means restoring " +
+      "to a state nobody chose — and a previous run killed with SIGKILL is exactly " +
+      "how a mutation ends up sitting here.\n\n" +
+      "Commit or stash, and check nothing above is a mutation left behind.",
+  );
+  process.exit(1);
+}
+
+await refuseDirtyTree();
+
 console.log(`Mutation harness — ${MUTATIONS.length} mutations\n`);
 
 type Result = { mutation: Mutation; caught: string[]; applied: boolean };
