@@ -125,9 +125,24 @@ async function moduleGraph(): Promise<{ modules: Map<string, Module>; roots: str
   const path = await import("node:path");
   const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 
+  // `instrumentation.ts` is a root too. Next calls `register()` on every
+  // runtime boot, so a module it imports is reached on every deploy — more
+  // reliably than one behind a page somebody has to visit.
+  //
+  // It was missed when this guard was written because there was no such file,
+  // and the guard then reported `lib/cards/blob.ts` — the production image
+  // backend — as unreachable while it was in fact installed at every boot.
+  // Adding the root makes this guard MORE accurate, not looser: without it the
+  // only way to go green is to delete a module that is genuinely live.
+  const instrumentation = path.join(repoRoot, "instrumentation.ts");
+  const hasInstrumentation = await fs
+    .stat(instrumentation)
+    .then(() => true, () => false);
+
   const files = [
     ...(await walk(path.join(repoRoot, "app"))),
     ...(await walk(path.join(repoRoot, "lib"))),
+    ...(hasInstrumentation ? [instrumentation] : []),
   ];
 
   const modules = new Map<string, Module>();
@@ -143,7 +158,7 @@ async function moduleGraph(): Promise<{ modules: Map<string, Module>; roots: str
       // it cannot "have no surface" in any way a user would notice.
       hasFunction: /\bexport\s+(?:async\s+)?function\s/.test(src),
     });
-    if (rel.startsWith("app/")) roots.push(abs);
+    if (rel.startsWith("app/") || rel === "instrumentation.ts") roots.push(abs);
   }
   return { modules, roots };
 }

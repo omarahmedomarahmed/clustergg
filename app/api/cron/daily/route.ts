@@ -15,6 +15,7 @@
 import { authoriseCron } from "../../../../lib/core/cron-auth.ts";
 import { getDb } from "../../../../lib/db/index.ts";
 import { runDailyJobs } from "../../../../lib/challenges/jobs.ts";
+import { recordCronRun } from "../../../../lib/site/preflight.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -25,6 +26,8 @@ export async function GET(request: Request): Promise<Response> {
 
   const db = await getDb();
   const result = await runDailyJobs(db);
+  // Stamped after the close. See the sync route for why the order matters.
+  await recordCronRun(db, "daily");
   return Response.json({ ok: true, ...result });
 }
 

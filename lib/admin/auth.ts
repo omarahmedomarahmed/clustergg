@@ -77,6 +77,11 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   // server's record before a call. The gamer directory is not here, and
   // nothing on these pages names a gamer.
   "/admin/weeks": departments("admin", "finance", "support", "sales"),
+  // The wiring, not the data. It names which secrets are SET — never a value —
+  // and which services answer. That is a map of where the platform is soft, so
+  // it is admin-only by kind rather than by department: knowing that
+  // STRIPE_WEBHOOK_SECRET is missing is knowing exactly which door is open.
+  "/admin/preflight": ADMIN_ONLY,
   "/admin/settings": ADMIN_ONLY,
   // ST1 — a title is what opens this console, so granting one is the single
   // thing a title must never be able to do. Admin-only by kind, like the

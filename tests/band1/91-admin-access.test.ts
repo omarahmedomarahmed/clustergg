@@ -189,6 +189,17 @@ test("a department reaches what it should and nothing more", () => {
     ["support", "/admin/games", true],
     ["support", "/admin/cards", true],
     ["finance", "/admin/cards", false],
+    // ===== SPRINT 15'S PAGE — THE WIRING IS ADMIN-ONLY =====
+    //
+    // `/admin/preflight` names which secrets are SET, never a value. That is
+    // still a map of where the platform is soft: knowing STRIPE_WEBHOOK_SECRET
+    // is missing is knowing which door is open. Anchored against all three
+    // departments so widening it to "operators need to see if it is up" fails
+    // here rather than being discovered later.
+    ["admin", "/admin/preflight", true],
+    ["finance", "/admin/preflight", false],
+    ["support", "/admin/preflight", false],
+    ["sales", "/admin/preflight", false],
     // A gamer's own page inherits the directory's rule, which is the whole of
     // house rule 7. It is a dynamic segment, so this is also the assertion
     // that inheritance reaches the right way down.

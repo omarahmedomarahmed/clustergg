@@ -147,3 +147,76 @@ test("the schedules are the cadences 01-CYCLE names, read out of the document", 
     "and vercel.json schedules exactly those cadences",
   );
 });
+
+test("preflight knows every variable 10-SETUP names", async () => {
+  // ===== A RETYPED LIST IS ONLY SAFE IF SOMETHING FAILS WHEN IT DRIFTS =====
+  //
+  // House rule 2 says import numbers, never retype them. `lib/site/preflight.ts`
+  // retypes the variable list anyway, and the reason is in its header: `docs/`
+  // is not deployed, so a page that parsed the document at runtime would work
+  // locally and render blank in production — the exact class of bug the page
+  // exists to catch.
+  //
+  // So the copy is held to the document here instead. Adding a variable to
+  // 10-SETUP without adding it to preflight fails the band, which makes the
+  // document the authority even though the page cannot read it.
+  const doc = await fs.readFile(path.join(repoRoot, "docs", "10-SETUP.md"), "utf8");
+  const setup = new Set(
+    [...doc.slice(0, doc.indexOf("## 2 ·")).matchAll(/`([A-Z][A-Z0-9_]{3,})`/g)].map(
+      (m) => m[1],
+    ),
+  );
+
+  const { ENV_SPEC } = await import("../../lib/site/preflight.ts");
+  const known = new Set(ENV_SPEC.map((v) => v.name));
+
+  const missing = [...setup].filter((n) => !known.has(n)).sort();
+  eq(
+    missing.join(", "),
+    "",
+    "every variable 10-SETUP §1 names appears on /admin/preflight, or the owner " +
+      "has no way to see that it is missing",
+  );
+
+  // ===== AND THE ONE THE DOCUMENT DOES NOT NAME =====
+  //
+  // `CRON_SECRET` is load-bearing and absent from 10-SETUP §1. Without it
+  // `authoriseCron` fails closed, so all three jobs answer 401 and the weekly
+  // cycle silently never runs — verified against the live deployment, which
+  // answered 401 on all three before it was set.
+  //
+  // Asserted as required here **because the code requires it**. If somebody
+  // later adds it to the document, this assertion keeps passing; if somebody
+  // removes it from preflight, the owner loses the only signal that the whole
+  // cycle is dead.
+  const cron = ENV_SPEC.find((v) => v.name === "CRON_SECRET");
+  ok(cron !== undefined && cron.required, "CRON_SECRET is listed, and listed as required");
+});
+
+test("preflight cannot print a secret", async () => {
+  // The page renders `envRows()`, and `envRows()` returns a boolean per
+  // variable. There is no template edit that could leak a value, because the
+  // value never reaches the template — which is a stronger guarantee than
+  // remembering to redact one.
+  const before = process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET = "a-real-looking-secret-value-nobody-should-see";
+  try {
+    const { envRows } = await import("../../lib/site/preflight.ts");
+    const serialised = JSON.stringify(envRows());
+    ok(
+      !serialised.includes("a-real-looking-secret-value"),
+      "no secret value appears anywhere in what the page is handed",
+    );
+    ok(
+      /"name":"AUTH_SECRET","group":"Required","required":true/.test(
+        serialised.replace(/\s+/g, ""),
+      ) || serialised.includes("AUTH_SECRET"),
+      "while the variable itself is still reported by name",
+    );
+    const auth = envRows().find((v) => v.name === "AUTH_SECRET");
+    eq(auth?.present, true, "and its presence is reported truthfully");
+  } finally {
+    if (before === undefined) delete process.env.AUTH_SECRET;
+    else process.env.AUTH_SECRET = before;
+  }
+});
