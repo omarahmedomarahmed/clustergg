@@ -1083,3 +1083,93 @@ setup rather than a moved file.
 Chromium over a headless shell, and names every path it tried when it cannot
 find one. **A browser pass that cannot start must not read as a product
 failure.**
+
+---
+
+# Sprint 10a — the surfaces, and the weekly record
+
+Two things, and the second is why the sprint exists.
+
+**The ruling.** Eligibility as two columns on the guild row, overwritten every
+Monday, was overturned. The reasoning that "a closed week's numbers live in
+`server_payouts`" was wrong in a specific way: **the number survives, the
+working does not** — and a disputed payout is exactly the moment somebody needs
+the working, because the total is the one thing not in dispute.
+
+**The real problem.** Sprints 6, 7 and 9 shipped complete, correct, fully
+guarded libraries and **no pages**. Every guard called the module directly; not
+one asked whether a surface did. §0.1's shape, fourth time.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 169 | **The record is not a second computation** | `record.ts` computes its own division | **Nothing, first time** — see below. After the fix: *"nothing that writes or reads the record computes a pool of its own"* | clean, 400/401 |
+| 170 | Closing twice writes no second record | The already-written check deleted | *"closing twice does not write a second record"* | clean, 399/400 |
+| 171 | **W5 — names are copied at write time** | `guildName` written empty | *"a server renamed in week 2 still reads as its week-1 name"* | clean, 400/401 |
+| 172 | **W6 — an ineligible server still gets a row** | The dropped-server loop deleted | *"…has a row, and it says exactly why"* | clean, 400/401 |
+| 173 | W2 — a superseded row is not current | `currentRows` returns everything | 2 cases | clean, 399/401 |
+| 174 | W7 — a stale freeze is not this week's | The week comparison dropped from `isFrozenEligible` | *"a freeze from last week is not a freeze for this one"* | clean, 400/401 |
+| 175 | **W4 is checked, not asserted** | `reconcileCredits` hardcodes `ok: true` | **Nothing, first time** — no negative half. After the fix: *"a server's per-challenge credits add up…"* | clean, 400/401 |
+| 176 | W3 is checked, not asserted | `weekSummaries` hardcodes `reconciles: true` | *"the shares recorded for a week add up to that week's allocation"* | clean, 400/401 |
+| 177 | The analytics tab exists | The whole page directory deleted | *"every redirect target in the app resolves to a page or a handler"* — see below | clean, 400/401 |
+| 178 | **The guild registry has a page** | The whole page directory deleted | *"every library module is reachable from a page or a route handler"* | clean, 400/401 |
+
+### Break 169: W1 is not a claim about today's numbers
+
+Replacing the division with a **recomputation a day later** went green, because
+on a fixture where nothing moved in between the two agree. Trap 2 in its purest
+form: the assertion was true and could not vary.
+
+W1/K12 does not say *the numbers match today*. It says **there is one
+implementation**. So it is asserted where it can only be true or false — the
+module that writes the record must not compute one, and the three pages that
+read it must not either, which is 05 §6 rule 3 in the same words.
+
+### Break 175, and the one I made worse before I made it better
+
+`reconcileCredits` hardcoded to `ok: true` left the suite green: every
+assertion was satisfied by a checker that always says yes. W3 already had its
+negative half; W4 did not.
+
+The fix then broke the test a second way, and this one is mine to own. The
+negative half **mutates a credit on purpose**, and I put it in the middle of
+the test — so the *"at least one credit is a half"* assertion below it read
+numbers the block had just corrupted. Worse, I committed while the band was
+400/401, because I ran the full band after the break rather than before the
+commit. My own rule, missed. It is fixed, the assertion is last, and the reason
+it is last is written above it.
+
+### Breaks 177 and 178 catch the same defect through different guards
+
+Deleting the analytics page went red via **reachability** — the portal layout
+links to it, and that link now resolves to nothing. Deleting the guild registry
+went red via **surface-reach** — `lib/admin/registry.ts` lost its only app-side
+caller.
+
+Worth being exact, because the two are not interchangeable: reachability sees a
+*link to a missing page*, surface-reach sees a *module nothing points at*. The
+analytics deletion did **not** trip surface-reach, because the portal's actions
+file still imports `grantAnalytics` and actions live under `app/`. Neither
+guard alone covers the class; together they do.
+
+## The guard that ends this class
+
+`tests/band1/94-surface-reach.test.ts`, committed **red**, naming ten modules —
+the three known, and seven that were not known until it said so.
+
+Roots are the files under `app/`; reachability follows imports through `lib/`,
+including dynamic ones (`closeWeek` reaches `record.ts` and `payouts.ts` that
+way, and a guard seeing only static imports would call both dead). A test is
+not a surface: all three modules **were** called, by their own tests, which is
+why "called from anywhere" would have passed.
+
+Six modules remain, all Sprint 12's, on a **self-expiring** allowlist: the band
+fails if an entry gains a surface (its reason is spent) or loses its module (it
+has no subject). 09's fifth rule, and trap 19's other half — a permanently red
+guard gets deleted, so this one carries a date.
+
+### One thing band 1 cannot see, and where it goes instead
+
+Break 179 hid the approve button from an administrator instead of disabling it
+with the reason, and **nothing went red**. That is a rendering property, and
+09's Band 2 shot 4a is where it is specified. It is asserted in the browser
+pass rather than faked with a source check on JSX.
