@@ -77,35 +77,74 @@ test("every card family in 04 §4 is registered, and nothing is a stub", () => {
 
 // ── S8 · an admin card is never a public message ────────────────────────────
 
-test("every owner card is ephemeral, including the refusal", async () => {
-  // S8 has no exceptions. The refusal matters most: posted publicly it would
-  // announce to a whole server that somebody tried to read the wallet.
-  const db = await resetDemoDb();
-  const guildId = await aGuild(db);
-
+/**
+ * Run every owner card as one person, and report which came back public.
+ *
+ * The `who` split is the whole point. The first version of this guard ran them
+ * all as a stranger — so every call took `checkAdmin`'s refusal branch and
+ * returned before the handler, and **the line that sets `ephemeral` on a real
+ * card was never executed.** Deleting that line went green. Trap 27: the break
+ * applied to the file, and the test had no way to receive it.
+ */
+async function ephemeralityOf(
+  db: Awaited<ReturnType<typeof resetDemoDb>>,
+  guildId: string,
+  who: { discordId: string; roles: string[] },
+): Promise<string[]> {
   const leaked: string[] = [];
   for (const name of ADMIN_SCREENS) {
     const handler = SCREENS.get(name);
     ok(handler !== undefined, `${name} is registered`);
     const result = await handler!({
-      interaction: anInteraction({ guild_id: guildId }),
+      interaction: anInteraction({
+        guild_id: guildId,
+        member: { user: { id: who.discordId, username: "Someone" }, roles: who.roles },
+      }),
       frame: { screen: name, args: [] },
       trail: [],
-      userId: "discord-nobody",
+      userId: who.discordId,
       guildId,
       presser: {
         userId: null,
-        discordId: "discord-nobody",
+        discordId: who.discordId,
         guildId,
-        roleIds: [],
+        roleIds: who.roles,
         created: false,
         blocked: false,
       },
     });
     if (!result.ephemeral) leaked.push(name);
   }
+  return leaked;
+}
 
-  eq(leaked, [], "S8 — admin cards are never public messages. Ever");
+test("every owner card is ephemeral — the card itself, not only the refusal", async () => {
+  // ===== BOTH BRANCHES, BECAUSE THEY ARE DIFFERENT LINES =====
+  //
+  // S8 has no exceptions, and it is broken in two different places: the
+  // wrapper's refusal, and the wrapper's return of a real card. A guard that
+  // only ever reaches the first proves nothing about the second — and the
+  // second is the one carrying a wallet balance.
+  const db = await resetDemoDb();
+  const guildId = await aGuild(db, {
+    guildId: "guild-s8",
+    ownerDiscordId: "discord-owner",
+    adminRoleId: "42",
+  });
+
+  // The guild owner. Every card renders for real, so the flag under test is
+  // the one the wrapper puts on a **finished** card.
+  const asOwner = await ephemeralityOf(db, guildId, { discordId: "discord-owner", roles: [] });
+  eq(asOwner, [], "S8 — a rendered admin card is never a public message. Ever");
+
+  // A mapped role reaches the same cards (S4), and they are just as private.
+  const asMapped = await ephemeralityOf(db, guildId, { discordId: "discord-staff", roles: ["42"] });
+  eq(asMapped, [], "and the same for anyone holding the mapped role");
+
+  // And the refusal, which is the case where posting publicly would announce
+  // to a whole server that somebody tried.
+  const asStranger = await ephemeralityOf(db, guildId, { discordId: "discord-nobody", roles: [] });
+  eq(asStranger, [], "and the refusal is ephemeral too");
 });
 
 test("a gamer card is not ephemeral, or the rule above would be vacuous", async () => {
