@@ -19,6 +19,11 @@ const NAV = [
   { path: "/members", label: "Members" },
   { path: "/community", label: "Community challenges" },
   { path: "/wallet", label: "Wallet" },
+  // N2 — the analytics tab exists **before** the grant and is empty, not
+  // hidden. An owner who cannot see what they are being offered cannot
+  // meaningfully consent to it.
+  { path: "/analytics", label: "Analytics" },
+  { path: "/messages", label: "Messages" },
   { path: "/settings", label: "Settings" },
 ];
 

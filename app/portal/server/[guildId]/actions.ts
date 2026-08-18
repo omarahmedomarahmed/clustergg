@@ -19,11 +19,12 @@ import {
   mayEditProfile,
   mayRequestSpend,
   mayViewPortal,
+  mayApproveSpend,
+  identityOf,
 } from "../../../../lib/portal/permissions.ts";
 import {
   reAnnounce,
   describeCommunity,
-  buildCommunityChallenge,
   payCommunityChallenge,
   setPayoutPreference,
   setOwnerContact,
@@ -31,6 +32,20 @@ import {
 } from "../../../../lib/portal/owner.ts";
 import { weekFor, weekStartPlus } from "../../../../lib/challenges/week.ts";
 import { threadFor, postMessage } from "../../../../lib/messages/threads.ts";
+import {
+  requestCommunitySpend,
+  approveCommunitySpend,
+  rejectCommunitySpend,
+  SpendRefused,
+} from "../../../../lib/portal/spend.ts";
+import {
+  grantAnalytics,
+  refreshSnapshot,
+  AnalyticsRefused,
+} from "../../../../lib/analytics/consent.ts";
+import { linkedMembersOf } from "../../../../lib/pool/eligibility.ts";
+import { schema } from "../../../../lib/db/index.ts";
+import { eq as eqSql } from "drizzle-orm";
 import type { CommunityTier } from "../../../../lib/money/amounts.ts";
 
 /**
@@ -153,42 +168,108 @@ export async function saveSettingsAction(form: FormData): Promise<void> {
   );
 }
 
-export async function buildCommunityAction(form: FormData): Promise<void> {
+/**
+ * ===== AN ADMINISTRATOR REQUESTS. THEY DO NOT SPEND. =====
+ *
+ * This action used to build **and pay** the challenge, gated on
+ * `mayRequestSpend` — which an administrator passes. So an administrator could
+ * move the guild's money, which is exactly what P1 forbids, and 12 §6's
+ * central row had no surface enforcing it: `lib/portal/spend.ts` existed and
+ * nothing called it.
+ *
+ * Now it records a request and stops. Nothing is built, nothing is billed, and
+ * the owner sees it waiting. Approving is `approveCommunityAction` below, and
+ * it is a different gate.
+ */
+export async function requestCommunityAction(form: FormData): Promise<void> {
   const guildId = String(form.get("guildId"));
-  // P6/12 §6 — an administrator may REQUEST. Approving the spend is the
-  // owner's, and that check lives on the approve action, not this one.
   await guard(guildId, mayRequestSpend);
-  const db = await getDb();
-  // The tier arrives as a string and is only a tier if `COMMUNITY_TIERS` says
-  // so. `buildCommunityChallenge` refuses anything else with a message — the
-  // cast here would otherwise let "3" through as though it were a real tier.
+  const access = await serverPortalAccess(guildId);
   const tier = Number(form.get("tier")) as CommunityTier;
 
-  let challengeId = "";
-  const result = await attempt(async () => {
-    // C2/L6 — there is no date picker, for anyone. What an owner chooses is a
-    // week, and the earliest one is the next one: this week has started.
-    const startAt = weekStartPlus(weekFor(new Date()).nextStart, 0);
-    const built = await buildCommunityChallenge(db, {
+  let error: string | undefined;
+  try {
+    await requestCommunitySpend(await getDb(), {
       guildId,
-      title: String(form.get("title") ?? "").trim() || "Community challenge",
-      game: String(form.get("game") ?? ""),
-      provider: String(form.get("game") ?? ""),
+      access,
       tier,
-      startAt,
+      payload: {
+        title: String(form.get("title") ?? "").trim() || "Community challenge",
+        game: String(form.get("game") ?? ""),
+        provider: String(form.get("game") ?? ""),
+        // C2/L6 — there is no date picker, for anyone. What is chosen is a
+        // week, and the earliest is the next one: this week has started.
+        startAt: weekStartPlus(weekFor(new Date()).nextStart, 0).toISOString(),
+      },
     });
-    challengeId = built.challengeId;
-    // M22/C1 — owner money routes to the prize vault and Cluster only, and it
-    // is `markPaid`'s `communityTier` that does it. Paying here rather than in
-    // a webhook is the demo's shortcut, not a rule: the routing is the same
-    // call either way.
-    await payCommunityChallenge(db, built.challengeId, tier);
-  });
+  } catch (e) {
+    if (!(e instanceof SpendRefused)) throw e;
+    error = e.message;
+  }
 
   revalidatePath(`/portal/server/${guildId}/community`);
   redirect(
     `/portal/server/${guildId}/community` +
-      (result.error ? `?error=${encodeURIComponent(result.error)}` : `?built=${challengeId}`),
+      (error ? `?error=${encodeURIComponent(error)}` : "?requested=1"),
+  );
+}
+
+/**
+ * The guild owner answers. **Only they can** (P1), and this is where the money
+ * moves — the challenge is built and billed on approval, never before.
+ */
+export async function approveCommunityAction(form: FormData): Promise<void> {
+  const guildId = String(form.get("guildId"));
+  const requestId = String(form.get("requestId"));
+  // Deliberately NOT `guard(..., mayApproveSpend)` and then a second check
+  // inside: `approveCommunitySpend` re-derives it from the access it is
+  // handed, so the authority and the identity written into `approvedBy`
+  // arrive together. This gate is here so the refusal is a page, not a throw.
+  await guard(guildId, mayApproveSpend);
+  const access = await serverPortalAccess(guildId);
+  const db = await getDb();
+
+  let error: string | undefined;
+  try {
+    const built = await approveCommunitySpend(db, { requestId, access });
+    const [request] = await db
+      .select()
+      .from(schema.spendRequests)
+      .where(eqSql(schema.spendRequests.id, requestId));
+    // M22/C1 — owner money routes to the prize vault and Cluster only, and it
+    // is `markPaid`'s `communityTier` that does it.
+    await payCommunityChallenge(db, built.challengeId, (request?.tier ?? 1) as CommunityTier);
+  } catch (e) {
+    if (!(e instanceof SpendRefused)) throw e;
+    error = e.message;
+  }
+
+  revalidatePath(`/portal/server/${guildId}/community`);
+  redirect(
+    `/portal/server/${guildId}/community` +
+      (error ? `?error=${encodeURIComponent(error)}` : "?approved=1"),
+  );
+}
+
+export async function rejectCommunityAction(form: FormData): Promise<void> {
+  const guildId = String(form.get("guildId"));
+  await guard(guildId, mayApproveSpend);
+  const access = await serverPortalAccess(guildId);
+  let error: string | undefined;
+  try {
+    await rejectCommunitySpend(await getDb(), {
+      requestId: String(form.get("requestId")),
+      access,
+      reason: String(form.get("reason") ?? "").trim() || undefined,
+    });
+  } catch (e) {
+    if (!(e instanceof SpendRefused)) throw e;
+    error = e.message;
+  }
+  revalidatePath(`/portal/server/${guildId}/community`);
+  redirect(
+    `/portal/server/${guildId}/community` +
+      (error ? `?error=${encodeURIComponent(error)}` : "?rejected=1"),
   );
 }
 
@@ -204,4 +285,53 @@ export async function sendServerMessageAction(form: FormData): Promise<void> {
   }
   revalidatePath(`/portal/server/${guildId}/messages`);
   redirect(`/portal/server/${guildId}/messages`);
+}
+
+/**
+ * 12 §7a — the grant, and the refresh.
+ *
+ * Both are `mayEditProfile`, not `mayApproveSpend`: analytics is not money.
+ * An administrator who runs the server day to day is exactly who turns this
+ * on, and gating it on the owner would leave the tab dead on most servers.
+ */
+export async function grantAnalyticsAction(form: FormData): Promise<void> {
+  const guildId = String(form.get("guildId"));
+  await guard(guildId, mayEditProfile);
+  const access = await serverPortalAccess(guildId);
+  await grantAnalytics(await getDb(), { guildId, grantedBy: identityOf(access) });
+  revalidatePath(`/portal/server/${guildId}/analytics`);
+  redirect(`/portal/server/${guildId}/analytics`);
+}
+
+export async function refreshAnalyticsAction(form: FormData): Promise<void> {
+  const guildId = String(form.get("guildId"));
+  await guard(guildId, mayEditProfile);
+  const db = await getDb();
+  const access = await serverPortalAccess(guildId);
+
+  try {
+    await refreshSnapshot(db, {
+      guildId,
+      takenBy: identityOf(access),
+      // The reader is injected, so this is the one place the member list is
+      // ever asked for — and on a deployment with no bot token it degrades to
+      // a reading of what we already know rather than throwing on a page.
+      read: async () => {
+        const [guild] = await db
+          .select()
+          .from(schema.guilds)
+          .where(eqSql(schema.guilds.guildId, guildId));
+        return {
+          memberCount: guild?.memberCount ?? 0,
+          linkedCount: await linkedMembersOf(db, guildId),
+        };
+      },
+    });
+  } catch (e) {
+    if (!(e instanceof AnalyticsRefused)) throw e;
+    // A cooldown or the ceiling. The page reads the same state and says so —
+    // rendering the refusal twice would be two wordings of one rule.
+  }
+  revalidatePath(`/portal/server/${guildId}/analytics`);
+  redirect(`/portal/server/${guildId}/analytics`);
 }

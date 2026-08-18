@@ -1,0 +1,101 @@
+// One server's week — every challenge it contributed to, and in what capacity.
+//
+// 05 §6. The decimal and the head count are both here because they answer
+// different questions: two halves read **1.0 credited over 2 people**, and a
+// same-server entrant reads **1.0 over 1**. Without the head count an owner
+// cannot tell A4 from A5.
+
+import { notFound } from "next/navigation";
+import { getDb } from "../../../../../lib/db/index.ts";
+import { weekRecordsFor, weekCreditsFor } from "../../../../../lib/pool/record.ts";
+import { formatMoney } from "../../../../../lib/money/amounts.ts";
+import { Panel, Help } from "../../../../ui.tsx";
+
+export const dynamic = "force-dynamic";
+
+const ROLE_MEANING: Record<string, string> = {
+  parent: "credited as the parent — this server got them onto Cluster",
+  join: "credited as the join server — they pressed Join on this server's card",
+  both: "parent and join — one server did both, so it earned a whole entrant",
+};
+
+export default async function OneServerWeekPage({
+  params,
+}: {
+  params: Promise<{ weekStart: string; guildId: string }>;
+}) {
+  const { weekStart, guildId } = await params;
+  const when = new Date(`${weekStart}T00:00:00.000Z`);
+  if (Number.isNaN(when.getTime())) notFound();
+
+  const db = await getDb();
+  const record = (await weekRecordsFor(db, when)).find((r) => r.guildId === guildId);
+  if (!record) notFound();
+  const credits = await weekCreditsFor(db, when, guildId);
+  const credited = credits.reduce((sum, c) => sum + c.entrantsCredited, 0);
+
+  return (
+    <div className="flex flex-col gap-6" data-testid="server-week">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {record.guildName} · week of {weekStart}
+        </h1>
+        <p className="mt-1 text-sm text-mute">
+          {record.eligible
+            ? `#${record.rank} of ${record.serversInPool} · ${formatMoney(record.totalCents)} of a ${formatMoney(record.poolCents)} pool`
+            : "Not in this week's pool."}
+        </p>
+      </div>
+
+      {!record.eligible ? (
+        <Panel>
+          <p className="text-sm text-mute" data-testid="ineligible-reason">
+            {record.ineligibleReason}
+          </p>
+        </Panel>
+      ) : null}
+
+      <Panel>
+        <h2 className="font-medium">
+          Challenges this server was credited on
+          <Help title="Credited versus people">
+            Half of an entrant is credited when another server was their parent
+            and this one was where they pressed Join. The head count beside it is
+            how many people that half-credit covers.
+          </Help>
+        </h2>
+        {credits.length === 0 ? (
+          <p className="mt-2 text-sm text-mute">None.</p>
+        ) : (
+          <ul className="mt-3 flex flex-col gap-3">
+            {credits.map((c) => (
+              <li key={c.id} className="text-sm">
+                <div className="flex items-baseline justify-between gap-4">
+                  {/* W5 — as it was titled that week. */}
+                  <span>{c.challengeTitle}</span>
+                  <span className="text-mute">
+                    {c.entrantsCredited.toFixed(1)} credited over {c.entrantsWhole}{" "}
+                    {c.entrantsWhole === 1 ? "person" : "people"}
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-mute">
+                  {c.game}
+                  {c.brandName ? ` · ${c.brandName}` : ""} · {ROLE_MEANING[c.role] ?? c.role} ·{" "}
+                  {c.scoredAboveZero} of {c.entrantsWhole} scored above zero
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* W4 — the breakdown reconciles to the total, and the page shows it
+            doing so rather than asking anybody to trust it. */}
+        <p className="mt-4 text-xs text-mute" data-testid="credit-reconciliation">
+          {Math.abs(credited - record.entrants) < 0.0001
+            ? `These add up to ${record.entrants.toFixed(1)} entrants — the figure the share was computed from ✓`
+            : `These add up to ${credited.toFixed(1)}, against a recorded ${record.entrants.toFixed(1)}. That is a defect — raise it, do not recompute it.`}
+        </p>
+      </Panel>
+    </div>
+  );
+}

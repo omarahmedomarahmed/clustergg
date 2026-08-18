@@ -35,6 +35,31 @@ import { test } from "../helpers/suite.ts";
 
 const IGNORE_DIRS = new Set(["node_modules", "screenshots", ".next", "drizzle"]);
 
+/**
+ * Modules whose surface is a **later sprint**, each with the sprint named.
+ *
+ * Not an escape hatch — every entry is checked below, and fails the band the
+ * moment it stops describing something real: if the module gains a surface the
+ * entry is spent, and if the module is deleted the entry has no subject.
+ *
+ * All six are Sprint 12, *The Discord card layouts*, which is where the bot's
+ * screens are built and where the card renderer and the ownership-proof flow
+ * finally get called from a handler. `08-BUILD-ORDER` Stage 6 has them; the
+ * layouts are what has not been written.
+ */
+const NOT_YET_RENDERED = [
+  // The card renderer. Wired at Stage 6, drawn at Sprint 12.
+  "lib/cards/fonts.ts",
+  "lib/cards/render.ts",
+  "lib/cards/upload.ts",
+  // Role mapping from interaction payloads — the bot's admin family (S3/S4).
+  "lib/discord/admin.ts",
+  // Riot's approved-path list, and profile-icon ownership proof. Both are
+  // reached from the bot's *prove ownership* card, which is Sprint 12's.
+  "lib/providers/riot-methods.ts",
+  "lib/providers/riot-verify.ts",
+] as const;
+
 type Module = { rel: string; abs: string; imports: string[]; hasFunction: boolean };
 
 async function walk(dir: string, out: string[] = []): Promise<string[]> {
@@ -143,8 +168,33 @@ test("every library module is reachable from a page or a route handler", async (
   const orphans = libs.filter((m) => !reached.has(m.abs)).map((m) => m.rel).sort();
   eq(
     orphans,
-    [],
+    [...NOT_YET_RENDERED].sort(),
     "a library module no page and no route can reach is a feature with no surface — " +
       "which is how three sprints shipped complete, guarded and invisible",
   );
+
+  // ===== AND THE ALLOWANCE EXPIRES WITH ITS SUBJECT =====
+  //
+  // 09's fifth rule, learned expensively: *"an allowlist entry must still
+  // describe something real or the suite fails. An allowance that outlives
+  // what it excused is how a deleted rule comes back."*
+  //
+  // Two ways an entry stops being real, and both fail here rather than sitting
+  // quietly: the module gets its surface (the reason is spent), or the module
+  // is deleted (there is nothing left to excuse). Trap 19's other half — a
+  // permanently red guard gets deleted, so this one carries a date instead.
+  const known = new Set(libs.map((m) => m.rel));
+  for (const excused of NOT_YET_RENDERED) {
+    ok(
+      known.has(excused),
+      `${excused} is excused from needing a surface and no longer exists — ` +
+        "remove the entry, because an allowance with no subject excuses the next thing that takes its name",
+    );
+    const mod = libs.find((m) => m.rel === excused)!;
+    ok(
+      !reached.has(mod.abs),
+      `${excused} has a surface now — delete its line from NOT_YET_RENDERED, ` +
+        "because an allowance that outlived its reason is a hole with a name",
+    );
+  }
 });

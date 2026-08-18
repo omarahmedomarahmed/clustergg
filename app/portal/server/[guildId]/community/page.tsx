@@ -24,7 +24,14 @@ import { schema } from "../../../../../lib/db/index.ts";
 import { and, eq, desc } from "drizzle-orm";
 import { Panel, Row, Empty, Refusal } from "../../../components.tsx";
 import { Button } from "../../../../ui.tsx";
-import { buildCommunityAction } from "../actions.ts";
+import {
+  requestCommunityAction,
+  approveCommunityAction,
+  rejectCommunityAction,
+} from "../actions.ts";
+import { pendingSpendRequests } from "../../../../../lib/portal/spend.ts";
+import { serverPortalAccess } from "../../../../../lib/portal/session.ts";
+import { mayApproveSpend, accessLabel } from "../../../../../lib/portal/permissions.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +58,14 @@ export default async function CommunityChallenges({
     )
     .orderBy(desc(schema.challenges.startAt));
 
+  // 12 §6 — an administrator requests and the guild **owner** approves. The
+  // page shows both halves to everybody: an administrator who cannot see the
+  // approve button does not know it exists, and "why is nothing happening"
+  // becomes a support ticket instead of a sentence on screen.
+  const access = await serverPortalAccess(guildId);
+  const mayApprove = mayApproveSpend(access);
+  const waiting = await pendingSpendRequests(db, guildId);
+
   const tiers = (Object.keys(COMMUNITY_TIERS) as unknown as CommunityTier[]).map((t) => ({
     tier: t,
     ...COMMUNITY_TIERS[t],
@@ -70,15 +85,86 @@ export default async function CommunityChallenges({
       {typeof query.error === "string" ? (
         <Refusal testId="community-error">{query.error}</Refusal>
       ) : null}
-      {typeof query.built === "string" ? (
-        <p data-testid="community-built" className="text-sm text-green-400">
-          Built and paid. It starts at the start of next week — there is no date
-          picker, for anybody.
+      {typeof query.requested === "string" ? (
+        <p data-testid="community-requested" className="text-sm text-green-400">
+          Requested. Nothing has been built and nothing has been billed — the
+          server owner sees it waiting below and decides.
+        </p>
+      ) : null}
+      {typeof query.approved === "string" ? (
+        <p data-testid="community-approved" className="text-sm text-green-400">
+          Approved, built and paid. It starts at the start of next week — there
+          is no date picker, for anybody.
+        </p>
+      ) : null}
+      {typeof query.rejected === "string" ? (
+        <p data-testid="community-rejected" className="text-sm text-mute">
+          Rejected. Nothing was spent.
         </p>
       ) : null}
 
+      {/* ===== WAITING ON THE OWNER — P1, WITH A SURFACE ===== */}
+      <Panel
+        title="Waiting for the owner"
+        note="Only the guild owner can approve a spend"
+      >
+        {waiting.length === 0 ? (
+          <Empty>Nothing waiting.</Empty>
+        ) : (
+          <ul className="flex flex-col gap-4" data-testid="spend-requests">
+            {waiting.map((r) => {
+              const payload = r.payload as Record<string, string>;
+              return (
+                <li key={r.id} className="text-sm">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span>{payload.title}</span>
+                    <span className="text-mute">
+                      {formatMoney(communityPriceCents((r.tier ?? 1) as CommunityTier))} ·
+                      requested by {r.requestedBy}
+                    </span>
+                  </div>
+                  {mayApprove ? (
+                    <div className="mt-2 flex gap-2">
+                      <form action={approveCommunityAction}>
+                        <input type="hidden" name="guildId" value={guildId} />
+                        <input type="hidden" name="requestId" value={r.id} />
+                        <Button type="submit" data-testid="approve-spend">
+                          Approve and pay
+                        </Button>
+                      </form>
+                      <form action={rejectCommunityAction}>
+                        <input type="hidden" name="guildId" value={guildId} />
+                        <input type="hidden" name="requestId" value={r.id} />
+                        <Button type="submit" data-testid="reject-spend">
+                          Reject
+                        </Button>
+                      </form>
+                    </div>
+                  ) : (
+                    // ===== DISABLED WITH THE REASON, NEVER HIDDEN =====
+                    //
+                    // 09 §Band 2 shot 4a asks for exactly this. A button that
+                    // is simply absent teaches an administrator nothing; one
+                    // that is present and explains itself teaches them who to
+                    // ask.
+                    <p className="mt-2 text-xs text-mute" data-testid="approve-disabled">
+                      <button type="button" disabled className="mr-2 rounded-md border border-line px-2 py-1 opacity-50">
+                        Approve and pay
+                      </button>
+                      You are signed in as {accessLabel(access)}. Only the Discord
+                      server owner can approve a spend — everything else on this
+                      portal is yours to use.
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
+
       <Panel title="Build one" note="Two tiers. That is the whole menu">
-        <form action={buildCommunityAction} className="flex flex-col gap-4">
+        <form action={requestCommunityAction} className="flex flex-col gap-4">
           <input type="hidden" name="guildId" value={guildId} />
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -134,8 +220,13 @@ export default async function CommunityChallenges({
           </label>
 
           <Button type="submit" data-testid="build-community">
-            Build and pay
+            {mayApprove ? "Request it (you can approve it yourself)" : "Request it"}
           </Button>
+          <p className="text-xs text-mute">
+            This records a request. Nothing is built and nothing is billed until
+            the server owner approves — an administrator can ask for a spend and
+            only the owner can make one.
+          </p>
         </form>
       </Panel>
 

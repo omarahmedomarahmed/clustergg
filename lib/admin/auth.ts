@@ -72,6 +72,11 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   // The directories are untouched by this and by anything else (ST2).
   "/admin/inbox/servers": departments("admin", "sales", "support"),
   "/admin/inbox/brands": departments("admin", "sales", "support"),
+  // 05 §6 — the weekly history. Finance answers "why was this payout this
+  // size", support answers "why did I earn nothing", and sales reads a
+  // server's record before a call. The gamer directory is not here, and
+  // nothing on these pages names a gamer.
+  "/admin/weeks": departments("admin", "finance", "support", "sales"),
   "/admin/settings": ADMIN_ONLY,
   // ST1 — a title is what opens this console, so granting one is the single
   // thing a title must never be able to do. Admin-only by kind, like the

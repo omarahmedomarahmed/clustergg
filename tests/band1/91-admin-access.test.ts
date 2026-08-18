@@ -156,6 +156,8 @@ test("a department reaches what it should and nothing more", () => {
     // it is ruled: **one small team answers both.** A support person unable to
     // reply to a brand is a worse failure than a sales person seeing a
     // server's message, because silence is what H7 exists to prevent.
+    ["finance", "/admin/weeks", true],
+    ["support", "/admin/weeks", true],
     ["support", "/admin/inbox/servers", true],
     ["support", "/admin/inbox/brands", true],
     ["sales", "/admin/inbox/brands", true],
