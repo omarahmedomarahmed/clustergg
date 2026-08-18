@@ -238,6 +238,29 @@ spends it. `08`'s own ordering rule is *money before anything that spends it*,
 so it moved. Sprint 14's entry records the move; this is the second place it is
 written down, because one place was not enough to stop the question being asked.
 
+### Sprint 10a · The surfaces, and the weekly record — **inserted after review**
+
+Two things review found, and the second is the larger.
+
+| | |
+|---|---|
+| **Builds** | `week_records` + `week_credits`, written at the close from the division `/pool` already showed (W1/K12) · `/admin/weeks`, `/admin/weeks/[weekStart]`, `/admin/weeks/[weekStart]/[guildId]` · the week strip on `/admin/servers/[guildId]` · `/admin/servers/[guildId]` itself, all eight sections · the owner portal's **Analytics tab**, complete · the community **request** and **approve** screens · `lib/site/nav.ts` wired into the header |
+| **Fixes** | `buildCommunityAction` built **and paid** under `mayRequestSpend` — an administrator moving the guild's money, which P1 forbids, on the sprint whose library existed to prevent it |
+| **Governed by** | 07 `week_records`/`week_credits` W1–W7 · 02 K11/K12 · 12 E4 · 05 §6 *The weekly history* |
+| **Guards** | 169–178, and the structural one: **every library module must be reachable from a page or a route handler** |
+
+**What it was for.** Sprints 6, 7 and 9 shipped complete, correct, fully guarded
+libraries and **no pages**. Every guard called the module directly; not one
+asked whether a surface did — §0.1's shape, fourth time. See trap 24.
+
+**And the ruling that overturned §2.0's eligibility design.** Two columns on the
+guild row, overwritten every Monday, kept the *number* in `server_payouts` and
+lost the *working* — and a disputed payout is exactly when the working is
+needed. `week_records` is not a stored derivation: a balance is derived because
+its inputs are permanent, and a week's standing is recorded because its inputs
+are not. The reasoning is in `07` and in `lib/pool/record.ts`, in both places on
+purpose.
+
 #### Carried forward, with an owner and a sprint
 
 Neither of these is a note in a chat log. Both are deliverables of a named
