@@ -236,3 +236,139 @@ export async function sweepAction(form: FormData): Promise<void> {
 }
 
 export { checkPrizePool };
+
+// ===== SPRINT 13 — THE BUILDER, TEMPLATES, AND THE REST OF THE CONSOLE =====
+
+/**
+ * Build a challenge or a series. 05 §2's builder.
+ *
+ * **Admin enters the prize; the system computes the bill.** Never the reverse.
+ * That is `planSeries`, and this action does not do the arithmetic — it reads
+ * the form, hands it over, and carries the refusal back. A builder that
+ * computed its own preview would be the second implementation the rule exists
+ * to prevent.
+ */
+export async function createSeriesAction(form: FormData): Promise<void> {
+  const who = await actor();
+  const db = await getDb();
+
+  const { planSeries, createSeries, SeriesRefused } = await import(
+    "../../lib/challenges/series.ts"
+  );
+  const { weekStartPlus, dayStartFor } = await import("../../lib/challenges/week.ts");
+
+  const cadence = String(form.get("cadence") ?? "weekly") === "daily" ? "daily" : "weekly";
+  const instances = Number(form.get("instances") ?? 1);
+  const prizeDollars = Number(form.get("prizeDollars") ?? 0);
+  const weeksAhead = Number(form.get("weeksAhead") ?? 1);
+  const now = new Date();
+
+  try {
+    const plan = planSeries({
+      cadence,
+      instances,
+      prizePerInstanceCents: Math.round(prizeDollars * 100),
+      // C5/L6 — there is no date picker. The form offers "which week" or
+      // "which day", and the boundary is computed rather than typed.
+      startAt:
+        cadence === "weekly"
+          ? weekStartPlus(now, Math.max(1, weeksAhead))
+          : dayStartFor(new Date(now.getTime() + Math.max(1, weeksAhead) * 24 * 60 * 60 * 1000)),
+    });
+
+    const brandId = String(form.get("sponsorBrandId") ?? "").trim();
+    const { seriesId } = await createSeries(db, {
+      title: String(form.get("title") ?? "").trim() || "Untitled challenge",
+      game: String(form.get("game") ?? "").trim(),
+      provider: String(form.get("provider") ?? "").trim(),
+      plan,
+      sponsorBrandId: brandId || null,
+      places: Math.max(1, Number(form.get("places") ?? 1)),
+      actorId: who,
+    });
+
+    revalidatePath("/admin/challenges");
+    back(`/admin/challenges/series/${seriesId}`);
+  } catch (e) {
+    if (e instanceof SeriesRefused) back("/admin/challenges/new", e.message);
+    throw e;
+  }
+}
+
+/**
+ * Instantiate trophy templates across a series.
+ *
+ * 03 §7 step 8: three templates become twenty-one trophies, and step 9 is the
+ * guard passing on the total. Without this a seven-day series needs twenty-one
+ * hand-made trophies, and hand-making twenty-one of anything is how one ends
+ * up with the wrong value and the pool guard fails on a Sunday night.
+ */
+export async function instantiateTemplatesAction(form: FormData): Promise<void> {
+  await actor();
+  const db = await getDb();
+  const seriesId = String(form.get("seriesId") ?? "");
+
+  const { seriesInstances, checkTemplates } = await import("../../lib/challenges/series.ts");
+  const { instantiateTemplates } = await import("../../lib/trophies/trophies.ts");
+
+  const instances = await seriesInstances(db, seriesId);
+  if (instances.length === 0) back(`/admin/challenges/series/${seriesId}`, "No such series.");
+
+  const places = form.getAll("place").map(Number);
+  const names = form.getAll("templateName").map(String);
+  const values = form.getAll("templateValue").map((v) => Math.round(Number(v) * 100));
+
+  const templates = places.map((place, i) => ({
+    place,
+    name: names[i] ?? `Place ${place}`,
+    valueCents: values[i] ?? 0,
+  }));
+
+  // The same check the assignment guard will apply, shown before anything is
+  // written. Two implementations of "does this balance" is how a builder tells
+  // you it does and the guard then refuses it.
+  const check = checkTemplates(templates, instances[0].prizePoolCents);
+  if (!check.ok) back(`/admin/challenges/series/${seriesId}`, check.reason ?? "The trophies do not balance.");
+
+  try {
+    await instantiateTemplates(
+      db,
+      instances.map((c) => c.id),
+      templates,
+    );
+  } catch (e) {
+    back(`/admin/challenges/series/${seriesId}`, reason(e));
+  }
+
+  revalidatePath(`/admin/challenges/series/${seriesId}`);
+  back(`/admin/challenges/series/${seriesId}`);
+}
+
+/** Create one trophy from `/admin/trophies/new`. 05 §4. */
+export async function createTrophyStandaloneAction(form: FormData): Promise<void> {
+  await actor();
+  const db = await getDb();
+
+  const type = String(form.get("type") ?? "podium");
+  const dollars = Number(form.get("valueDollars") ?? 0);
+
+  try {
+    await createTrophy(db, {
+      type: type as "podium" | "participation" | "milestone",
+      name: String(form.get("name") ?? "").trim() || "Untitled trophy",
+      // 05 §4 rule 1 — **milestone trophies are always $0.** Enforced in
+      // `createTrophy`, not here; this only reads the form.
+      valueCents: Math.round(dollars * 100),
+      brandId: String(form.get("brandId") ?? "").trim() || null,
+      challengeId: String(form.get("challengeId") ?? "").trim() || null,
+      place: form.get("place") ? Number(form.get("place")) : null,
+      milestoneKind: String(form.get("milestoneKind") ?? "").trim() || null,
+      milestoneGame: String(form.get("milestoneGame") ?? "").trim() || null,
+    });
+  } catch (e) {
+    back("/admin/trophies/new", reason(e));
+  }
+
+  revalidatePath("/admin/trophies");
+  back("/admin/trophies");
+}

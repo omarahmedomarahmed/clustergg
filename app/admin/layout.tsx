@@ -9,15 +9,23 @@ export const dynamic = "force-dynamic";
 const NAV: { href: string; label: string }[] = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/challenges", label: "Challenges" },
+  { href: "/admin/challenges/new", label: "Build" },
   { href: "/admin/vaults", label: "Vaults" },
   { href: "/admin/vaults/prize", label: "Prize vault" },
+  { href: "/admin/vaults/ledger", label: "Ledger" },
   { href: "/admin/trophies", label: "Trophies" },
+  { href: "/admin/trophies/templates", label: "Templates" },
   { href: "/admin/redeems", label: "Redeems" },
   { href: "/admin/payouts", label: "Payouts" },
+  { href: "/admin/invoices", label: "Invoices" },
   { href: "/admin/brands", label: "Brands" },
   { href: "/admin/servers", label: "Servers" },
+  { href: "/admin/servers/requests", label: "Requests" },
   { href: "/admin/users", label: "Gamers" },
   { href: "/admin/linked-accounts", label: "Linked accounts" },
+  { href: "/admin/games", label: "Games" },
+  { href: "/admin/content", label: "Content" },
+  { href: "/admin/cards", label: "Cards" },
   { href: "/admin/weekend", label: "Weekend" },
 ];
 

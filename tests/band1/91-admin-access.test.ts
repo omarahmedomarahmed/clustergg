@@ -162,6 +162,41 @@ test("a department reaches what it should and nothing more", () => {
     ["support", "/admin/inbox/brands", true],
     ["sales", "/admin/inbox/brands", true],
     ["sales", "/admin/inbox/servers", true],
+    // ===== SPRINT 13'S PAGES — THE ANCHOR, NOT THE CENSUS =====
+    //
+    // Trap 29: the page census tells you a route needs a decision; **this
+    // table is where the decision goes.** Widening a rule went green once
+    // because the census had caught the routes as unclassified — which is what
+    // put them in `ROUTE_ACCESS` at all — and nothing then asserted *which*
+    // classification they got.
+    ["sales", "/admin/challenges/new", true],
+    ["finance", "/admin/challenges/new", false],
+    ["finance", "/admin/vaults/ledger", true],
+    ["sales", "/admin/vaults/ledger", false],
+    ["finance", "/admin/trophies/new", true],
+    ["sales", "/admin/trophies/templates", false],
+    ["sales", "/admin/brands/draft", true],
+    ["support", "/admin/brands/draft", false],
+    // Both, and the reasoning is in `auth.ts`: finance owns the money, sales
+    // chases the payment. Neither can mark one paid from the page.
+    ["finance", "/admin/invoices", true],
+    ["sales", "/admin/invoices", true],
+    ["support", "/admin/invoices", false],
+    ["support", "/admin/servers/requests", true],
+    ["finance", "/admin/servers/requests", false],
+    ["sales", "/admin/content", true],
+    ["support", "/admin/content", false],
+    ["support", "/admin/games", true],
+    ["support", "/admin/cards", true],
+    ["finance", "/admin/cards", false],
+    // A gamer's own page inherits the directory's rule, which is the whole of
+    // house rule 7. It is a dynamic segment, so this is also the assertion
+    // that inheritance reaches the right way down.
+    ["admin", "/admin/users/abc123", true],
+    ["support", "/admin/users/abc123", false],
+    ["sales", "/admin/users/abc123", false],
+    ["finance", "/admin/users/abc123", false],
+
     // And the wall that does not move, whatever any title says (ST2).
     ["sales", "/admin/users", false],
     ["support", "/admin/linked-accounts", false],

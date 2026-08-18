@@ -1,29 +1,61 @@
 import Link from "next/link";
 import { formatMoney } from "../../lib/money/amounts.ts";
+import { Help } from "../ui.tsx";
 
 export function Panel({
   title,
   note,
   action,
+  help,
   children,
 }: {
   title: string;
   /** One line under the heading, for the rule this panel is enforcing. */
   note?: string;
   action?: React.ReactNode;
+  /**
+   * The rule behind the panel, at length.
+   *
+   * H1 names the two portals, not the console — but the console is where the
+   * rules are *enforced*, and an operator refusing something at eleven on a
+   * Saturday should be able to read why without leaving the page.
+   */
+  help?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-line bg-panel">
       <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
         <div>
-          <h2 className="font-medium">{title}</h2>
+          <h2 className="font-medium">
+            {title}
+            {help ? <Help title={title}>{help}</Help> : null}
+          </h2>
           {note ? <p className="mt-0.5 text-xs text-mute">{note}</p> : null}
         </div>
         {action}
       </div>
       <div className="px-5 py-4">{children}</div>
     </section>
+  );
+}
+
+/** A refusal, in the words of whatever refused. */
+export function Refusal({
+  children,
+  testId,
+}: {
+  children: React.ReactNode;
+  testId?: string;
+}) {
+  if (!children) return null;
+  return (
+    <p
+      data-testid={testId ?? "refusal"}
+      className="rounded-lg border border-red-900 bg-red-950/40 px-4 py-3 text-sm text-red-300"
+    >
+      {children}
+    </p>
   );
 }
 

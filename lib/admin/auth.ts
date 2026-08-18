@@ -84,6 +84,55 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   // could be widened by a well-meaning edit.
   "/admin/staff": ADMIN_ONLY,
 
+  // ===== SPRINT 13'S PAGES. EACH ONE A DECISION, NOT AN INHERITANCE =====
+  //
+  // Most of these would inherit a sensible rule by prefix — `/admin/vaults/…`
+  // from `/admin/vaults`, `/admin/challenges/…` from `/admin/challenges`. The
+  // census still demands an explicit entry, and trap 29 is why: silence reads
+  // as agreement, and the anchor table in `91-admin-access` is where the
+  // decision is actually recorded. Inheriting is a fine *answer*; it is not a
+  // decision until somebody writes it down.
+
+  // The builder creates an invoice, so it is money-adjacent — but the money it
+  // creates is a **bill**, which is a sales act. Same as `/admin/challenges`.
+  "/admin/challenges/new": departments("admin", "sales"),
+  "/admin/challenges/series": departments("admin", "sales"),
+
+  // The ledger is the balance sheet. Finance, like every other vault page.
+  "/admin/vaults/ledger": departments("admin", "finance"),
+
+  // Trophies are prize-vault liabilities, which is why they sit with finance
+  // rather than with the sales team who sold the challenge.
+  "/admin/trophies/new": departments("admin", "finance"),
+  "/admin/trophies/templates": departments("admin", "finance"),
+
+  // A draft built into a brand's portal is a sales act — 06 §3's last row is
+  // somebody on a call. It bills them for nothing until they confirm.
+  "/admin/brands/draft": departments("admin", "sales"),
+
+  // ===== `/admin/invoices` IS THE ONE THAT NEEDED THINKING ABOUT =====
+  //
+  // Finance owns the money and sales chases the payment: 05 §9 step 8 is
+  // *"chase unpaid drafts — deadline Saturday evening"*, and that is the
+  // salesperson who sold it, not the finance team. Both, therefore.
+  //
+  // There is no **mark paid** control on the page for either of them — the
+  // payment webhook is the only thing that routes money into the vaults — so
+  // widening the readership does not widen what anybody can move.
+  "/admin/invoices": departments("admin", "finance", "sales"),
+
+  // Community requests are a server question, and the page deliberately has no
+  // approve button: only the guild owner approves their own spend (P1).
+  "/admin/servers/requests": departments("admin", "sales", "support"),
+
+  // Copy, the catalogue and the card layouts. Not admin-only: an operator who
+  // cannot see which games are sellable, or which bot screen is registered, is
+  // an operator who has to ask — and `/admin/settings` and `/admin/staff` stay
+  // admin-only, because those change what the platform *does*.
+  "/admin/content": departments("admin", "sales"),
+  "/admin/games": departments("admin", "sales", "support"),
+  "/admin/cards": departments("admin", "support"),
+
   // ===== The two that are never anything else. =====
   "/admin/users": ADMIN_ONLY,
   "/admin/linked-accounts": ADMIN_ONLY,
