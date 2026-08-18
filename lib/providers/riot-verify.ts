@@ -33,6 +33,30 @@ import { isApprovedRiotPath, riotPathShape } from "./riot-methods.ts";
 const RIOT_TIMEOUT_MS = 8000;
 
 /**
+ * Refuse a path this key cannot call, before it goes out.
+ *
+ * ===== EXPORTED SO IT CAN BE EXERCISED, NOT MERELY GREPPED FOR =====
+ *
+ * The first guard on this checked that `riot-verify.ts` **mentions**
+ * `isApprovedRiotPath`. Deleting the call went green, because the import line
+ * still mentioned it — trap 16 exactly: I guarded the vocabulary rather than
+ * the chokepoint, in a guard written to close a §0.1 hole.
+ *
+ * A named function can be called by a test, so the rule is checked by
+ * behaviour and the source assertion only has to prove `riot()` calls **this**.
+ */
+export function assertApprovedRiotPath(url: string): void {
+  const shape = riotPathShape(url);
+  if (!isApprovedRiotPath(shape)) {
+    throw new Error(
+      `${shape} is not one of the paths this Riot key can call. ` +
+        `The approved set is in lib/providers/riot-methods.ts — this is a 403 ` +
+        `waiting to happen, not an expired key.`,
+    );
+  }
+}
+
+/**
  * Icons every account owns.
  *
  * Ids 0–28 are the starter icons granted to every summoner, so the challenge is
@@ -72,14 +96,7 @@ async function riot<T>(url: string): Promise<T> {
   // §0.1's shape: something proven to exist, nothing proven to read it. So the
   // check is here, at the one function every Riot call in this module goes
   // through, rather than at each call site.
-  const shape = riotPathShape(url);
-  if (!isApprovedRiotPath(shape)) {
-    throw new Error(
-      `${shape} is not one of the paths this Riot key can call. ` +
-        `The approved set is in lib/providers/riot-methods.ts — this is a 403 ` +
-        `waiting to happen, not an expired key.`,
-    );
-  }
+  assertApprovedRiotPath(url);
 
   const res = await fetch(url, {
     headers: { "X-Riot-Token": key, "User-Agent": "ClusterGG/1.0 (clustergg.com account verification)" },

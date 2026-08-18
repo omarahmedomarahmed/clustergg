@@ -14,7 +14,7 @@
 // enqueued rather than fanned out inline; and the first press creating the
 // account that A1 stamps a parent onto.
 
-import { ok, eq, no } from "../helpers/assert.ts";
+import { ok, eq, no, throws } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
 import { resetDemoDb, schema } from "../../lib/db/index.ts";
 import { eq as sqlEq } from "drizzle-orm";
@@ -705,8 +705,25 @@ test("a Riot call is checked against the approved path list before it goes out",
   const val = riotPathShape("https://eu.api.riotgames.com/val/ranked/v1/leaderboards/by-act/x");
   no(isApprovedRiotPath(val), `and a VAL path is not: ${val}`);
 
-  // The check has to be **in the fetch helper**, not at each call site, or it
-  // is a rule that holds for the calls somebody remembered.
+  // ===== BEHAVIOUR, THEN THE CHOKEPOINT — AND THE FIRST VERSION WAS NEITHER
+  //
+  // This guard originally asserted that `riot-verify.ts` **mentions**
+  // `isApprovedRiotPath`. Deleting the call went straight through, because the
+  // import line still mentioned it. Trap 16, in a guard written to close a
+  // §0.1 hole: I guarded the vocabulary instead of the thing.
+  const { assertApprovedRiotPath } = await import("../../lib/providers/riot-verify.ts");
+  await throws(
+    async () =>
+      assertApprovedRiotPath("https://eu.api.riotgames.com/val/ranked/v1/leaderboards/by-act/x"),
+    /not one of the paths/,
+    "an unapproved path is refused before the fetch",
+  );
+  // The positive half, or a function that refused everything would pass.
+  assertApprovedRiotPath("https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/abc");
+
+  // And the chokepoint: every Riot call in the module goes through one fetch
+  // helper, and that helper calls it. Asserted with the imports stripped, so
+  // the name surviving at the top of the file cannot satisfy it.
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
   const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
@@ -714,9 +731,18 @@ test("a Riot call is checked against the approved path list before it goes out",
     path.join(repoRoot, "lib", "providers", "riot-verify.ts"),
     "utf8",
   );
-  ok(/async function riot</.test(src), "the read reached the module — an empty read proves nothing");
+  // Imports **and comments** stripped. The comment above the call explains the
+  // rule at length and would satisfy a naive search on its own — which is the
+  // same defect one layer down: a guard matching prose about a thing rather
+  // than the thing.
+  const body = src
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/^import[^;]*;$/gm, "");
+  ok(/async function riot</.test(body), "the read reached the module — an empty read proves nothing");
+  const helper = body.slice(body.indexOf("async function riot<"));
   ok(
-    /isApprovedRiotPath/.test(src),
-    "and the one function every Riot call goes through consults the list",
+    /assertApprovedRiotPath\(/.test(helper.slice(0, 400)),
+    "and the fetch helper calls it, rather than the file merely importing it",
   );
 });
