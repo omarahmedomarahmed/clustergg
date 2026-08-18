@@ -226,12 +226,33 @@ and pushed; everything below is unstarted.
 | 11 · Help, progress, and the missing pages | **Done** |
 | 12 · The Discord card layouts | **Done** — `NOT_YET_RENDERED` is empty |
 | 13 · The series builder, and the rest of admin | **Done** |
-| 14 · Proof | Not started |
+| 14 · Proof | **In progress** — mutations, the month run twice, and the screenshot record are done; the final harness pass is the last thing |
 
-**442 tests, 1,964 assertions, 217 guards proven by breaking, 24 mutations
-caught by at least their expected number of suites, typecheck gating the band
-inside `npm test`.** Band 1 is entirely green, and so is band 2 — all four
-passes, run into a file rather than read off a terminal (trap 30).
+**446 tests, 2,628 assertions, 222 guards proven by breaking, 34 mutations,
+typecheck gating the band inside `npm test`.** Band 1 is entirely green, and so
+is band 2 — now **four** passes, each run twice back to back (trap 14), against
+`next build` + `next start` rather than the dev server.
+
+#### What Sprint 14 has closed so far
+
+| | |
+|---|---|
+| The nine mutations 09 names | Added. Two were wrong when written and both are fixed: *"let an administrator withdraw"* never matched its line, and *"recompute a closed week"* broke the writer's idempotency rather than a reader |
+| The harness itself | Refuses a dirty tree; restores on interrupt (the handler used `require` in ESM and never ran); and **checks every mutation applies exactly once before writing anything**, which immediately found a `find` string that was silently testing one of the two paths it named |
+| The four-week month | Now a function, run **twice** — once normally, once with `guild_snapshots` **dropped out of the database**. Every week record, payout line, allocation and vault balance compared. Dropped rather than emptied: an empty table still answers a query |
+| The screenshot record | `screenshots/gamer-money` (16 shots, 3 of them refusals) and 09's shots 4 and 4a in `screenshots/portals`. Both needed the demo to grow states it had never had |
+| Stripe | Confirmed to need no live key: `stripeConfigured()` gates the checkout call, the webhook takes its secret as an argument, and both bands run green with neither `STRIPE_SECRET_KEY` nor `DATABASE_URL` set |
+
+#### And four rules that existed and were read by nobody
+
+The §0.1 shape again, four more times, all found by asking *what reads this?*
+
+| Rule | Who read it |
+|---|---|
+| `mayWithdraw` — 12 §2's four gates | **Nothing.** The Discord wallet card gated on `ownerDiscordId` alone, so a 13–17 owner was offered a Withdraw button; the web wallet carried the rule as help text |
+| S2 — on install, only the guild owner has admin | `checkAdmin` knew it only when a caller passed `guildOwnerId`, and the screen wrapper has a guild *id*. Every owner card refused the owner on day one |
+| G5 — a `guild_admins` row is a **pair** | `serverPortalAccess` matched on the guild alone. Any gamer who had linked Discord was an administrator of every server that had ever seen staff |
+| R3/V17 — deletion is refused mid-redemption | Sprint 11's find, listed here because it is the same shape and the same cause |
 
 ### The mutation count, which the documents disagree about
 
@@ -256,6 +277,14 @@ Sprint 14's own row below says *"the 13 new mutations (23 total)"*, which was
 written before the harness had the six later-stage ones and is wrong in both
 figures. **09 governs and it is nine.** Raised with the owner rather than
 reconciled quietly, because that is what this branch exists for.
+
+**Closed.** All nine were added, and one of them became two: 09's *"merge two
+accounts when a gamer links an already-used identity"* names one rule with two
+implementations — `discordLinkOutcome` and `emailLinkOutcome` end in the same
+two lines, character for character. Written as one mutation it silently tested
+the Discord path only and reported itself caught, which said nothing at all
+about email. **34 mutations now**, and the harness refuses to start if any of
+them matches zero places or more than one.
 
 Two things about Sprint 4a, because a fresh session reading straight down will
 otherwise assume the numbering skipped: **it is a real sprint, it is complete,
