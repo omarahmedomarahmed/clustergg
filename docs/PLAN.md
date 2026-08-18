@@ -224,9 +224,10 @@ and pushed; everything below is unstarted.
 | 10 · The brand dashboard and the nav | **Done** — band 2 fully green again |
 | 10a · The surfaces, and the weekly record | **Done** — inserted after review |
 | 11 · Help, progress, and the missing pages | **Done** |
-| 12 – 14 | Not started |
+| 12 · The Discord card layouts | **Done** — `NOT_YET_RENDERED` is empty |
+| 13 – 14 | Not started |
 
-**412 tests, 1,807 assertions, 190 guards proven by breaking, 24 mutations
+**429 tests, 1,881 assertions, 211 guards proven by breaking, 24 mutations
 caught by at least their expected number of suites, typecheck gating the band
 inside `npm test`.** Band 1 is entirely green, and so is band 2 — all four
 passes, run into a file rather than read off a terminal (trap 30).
@@ -413,12 +414,27 @@ hand. §0.1 with its halves reversed: usually the evidence exists and nothing
 reads it — here the **guard** existed and the **rule** did not, and the test
 name read identically either way.
 
-### Sprint 12 · The Discord card layouts
+### Sprint 12 · The Discord card layouts — **done**
 
 | | |
 |---|---|
-| **Builds** | Every family in 04 §4, including the owner admin family · the three announcements · WebP converted on upload, artwork fenced |
-| **Guards** | A decoration that throws does not take a card down · an admin card is never public · a first click stamps the parent |
+| **Builds** | Every family in 04 §4 — home, challenges, games, profile, trophies, server and community — registered into `SCREENS` and imported by the interactions route · **the three announcements**, none of which existed · the first bot click creating the account and stamping the parent (I5/A1) · G5's role accumulation from the payload · `/api/uploads`, the door `acceptImage` was written for |
+| **Fixes** | **The close.** `runDailyJobs` ran two of 03 §9's nine steps — no trophies, no draft payout, no week record, no announcement. The four-week simulation ran them by hand, which is why nothing noticed · **`riot-methods.ts`**, the authority on the personal key's 39 paths, was read by nothing · **the card renderer**, which threw on every card because `fonts: []` is not the same as no `fonts` — the fence caught it and the product shipped plain text |
+| **Governed by** | 04 §4 · 12 §1 §3 §7 · 03 §9 · 11-PORTED `cards/fonts.ts` · 10 §8 |
+| **Guards** | 191–211. A rendered admin card is ephemeral **and** so is its refusal · every family registered · the parent never moves on a second press · the first record holds nothing but the Discord ID · role holders are seen, not enumerated · the winners card names the **frozen** server · the close awards, drafts, records and announces — and never releases · nothing undecodable reaches storage · a card renders with no brand fonts installed |
+| **A human can** | Press a button in Discord and get a card back — which, before this sprint, answered *"that screen has gone"* on every screen in the product |
+
+**`NOT_YET_RENDERED` is empty.** All six entries went red as their modules
+gained surfaces, which is 09's fifth rule working: an allowance that outlives
+what it excused is how a deleted rule comes back. Keep it empty — a new entry
+needs a sprint name and a date.
+
+**One thing deliberately not built.** The production image backend. 10 §1 names
+`BLOB_READ_WRITE_TOKEN`, so Vercel Blob is the intended store; nothing in this
+environment can exercise it, and an integration nobody has ever run is the
+shape of code that looks finished and is not. `lib/cards/store.ts` has the seam
+(`setImageBackend`) and says which backend is live. **It belongs with 10-SETUP's
+deployment step and the owner needs to be told it is outstanding.**
 
 ### Sprint 13 · The series builder and the rest of admin
 
