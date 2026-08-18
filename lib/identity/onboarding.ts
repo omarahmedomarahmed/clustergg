@@ -32,6 +32,12 @@ export type Progress = {
   percent: number;
   /** `4 of 6 done` — the shape 12 §5 and H3 ask for. */
   label: string;
+  /**
+   * What this bar counts. Stated in the module rather than at the call site,
+   * because H4 is a rule about the subject and a subject supplied by the page
+   * is a subject the page can change.
+   */
+  subject: string;
 };
 
 /**
@@ -50,5 +56,6 @@ export function progressOf(unlock: UnlockState): Progress {
     total,
     percent: total === 0 ? 100 : Math.round((done / total) * 100),
     label: `${done} of ${total} done`,
+    subject: "onboarding steps",
   };
 }

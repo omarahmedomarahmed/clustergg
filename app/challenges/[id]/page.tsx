@@ -3,6 +3,8 @@ import { challengeDetail } from "../../../lib/site/queries.ts";
 import { Nav, Money, Empty } from "../../components.tsx";
 import { demoNow } from "../../../lib/site/clock.ts";
 import { STATE_LABEL, type ChallengeState } from "../../../lib/challenges/lifecycle.ts";
+import { lifecycleProgress } from "../../../lib/site/progress.ts";
+import { Progress } from "../../ui.tsx";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,15 @@ export default async function ChallengePage({
           {challenge.visibility === "community" ? (
             <p className="mt-2 text-sm">A community challenge run by this server.</p>
           ) : null}
+
+          {/* H3 — a bar on the challenge lifecycle. Derived from the state,
+              which is itself derived; nothing here is stored. */}
+          <div className="mt-4 max-w-sm">
+            <Progress
+              progress={lifecycleProgress(challenge.state as ChallengeState)}
+              testId="lifecycle-progress"
+            />
+          </div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">

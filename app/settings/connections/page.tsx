@@ -25,7 +25,7 @@ export default async function Connections({
   const gamer = await currentGamer();
   if (!gamer) {
     return (
-      <main className="mx-auto max-w-2xl px-6 py-16">
+      <main className="pt-8">
         <h1 className="text-2xl font-semibold tracking-tight">Connections</h1>
         <p className="mt-4 text-sm text-mute">
           <Link href="/login" className="underline">
@@ -41,7 +41,7 @@ export default async function Connections({
   const accounts = await accountsFor(db, gamer.id);
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
+    <main className="pt-8">
       <h1 className="text-2xl font-semibold tracking-tight">Connections</h1>
 
       {typeof params.routed === "string" ? (

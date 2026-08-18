@@ -226,3 +226,83 @@ export async function gamerByDiscordId(db: DB, discordId: string) {
     .where(eq(schema.users.discordId, discordId));
   return row ?? null;
 }
+
+// ===== DELETING AN ACCOUNT. R3 / V17 / V14 / T6 =====
+//
+// ===== WHY THIS FUNCTION DID NOT EXIST UNTIL SPRINT 11 =====
+//
+// It should have. `tests/band1/50-trophies.test.ts` carried a test called
+// *"deletion is refused while a redemption is in flight"* whose body asserted
+// only that `redemptionsInFlight` counts a redemption while it is pending,
+// approved or sent, and stops counting it once paid. All true, and not one
+// word about deletion — because nothing deleted an account, and every other
+// suite that needed a deleted gamer wrote `UPDATE users SET status='deleted'`
+// by hand.
+//
+// That is §0.1's shape with the halves reversed. Usually the evidence exists
+// and nothing reads it; here **the guard existed and the rule did not**, and
+// the test name read identically either way. Trap 2, in the suite most likely
+// to be trusted about money.
+//
+// ===== THREE RULES, AND THEY PULL AGAINST EACH OTHER =====
+//
+//   R3 / V17 — deletion is **refused outright** while a redemption is in
+//              flight. Money already handed to a payment provider cannot be
+//              paid to a record that no longer exists.
+//   V14 / T6 — a holding **survives** the holder, as an orphan, so the money
+//              stays accounted for. The brand really did pay it.
+//   V15      — the balance therefore no longer equals live redeemable
+//              liability, so admin may sweep it to Cluster, logged.
+//
+// So this is a status change and not a delete. The under-13 path above *is* a
+// hard delete, and the difference is the whole point: there is no lawful
+// reason to keep a row we should never have made, and every reason to keep the
+// accounting behind a trophy a brand funded.
+
+export class DeletionRefused extends Error {
+  constructor(readonly code: "redemption_in_flight", message: string) {
+    super(message);
+    this.name = "DeletionRefused";
+  }
+}
+
+/**
+ * Close a gamer's account.
+ *
+ * Refuses while a redemption is in flight, and otherwise marks the row
+ * `deleted` — leaving `user_trophies` untouched, which is what keeps the money
+ * accounted for and turns the prize vault amber until admin sweeps it.
+ */
+export async function deleteAccount(
+  db: DB,
+  userId: string,
+): Promise<{ ok: true } | never> {
+  const { withTx, lockGamer } = await import("../db/tx.ts");
+  const { redemptionsInFlight } = await import("../trophies/redemption.ts");
+
+  return withTx(db, async (tx) => {
+    // The lock before the read the write depends on, for the same reason
+    // `requestRedemption` takes it: a redeem landing between the check and the
+    // update would be a payout aimed at a deleted record.
+    await lockGamer(tx, userId);
+
+    const inFlight = await redemptionsInFlight(tx, userId);
+    if (inFlight.length > 0) {
+      throw new DeletionRefused(
+        "redemption_in_flight",
+        "You have a payout on its way. We cannot close the account until it " +
+          "lands — money already handed to a payment provider cannot be paid " +
+          "to a record that no longer exists. Come back once it says paid.",
+      );
+    }
+
+    // Not a delete. V14 — the trophies stay, as orphans, because the money
+    // behind them was real and the vault has to keep saying so.
+    await tx
+      .update(schema.users)
+      .set({ status: "deleted" })
+      .where(eq(schema.users.id, userId));
+
+    return { ok: true as const };
+  });
+}

@@ -172,3 +172,134 @@ export async function profileBySlug(slug: string) {
 }
 
 export { phaseAt, weekFor };
+
+// ===== THE SIGNED-IN GAMER'S OWN DASHBOARD (04 §1 `/profile`) =====
+//
+// Deliberately separate from `profileBySlug`, which is the **public** page.
+// They show different things to different people — the public one has no
+// standings and no redemption state — and a single query with a `viewer`
+// argument is how a private figure eventually leaks onto a public page.
+
+export type MyEntry = {
+  participant: typeof schema.challengeParticipants.$inferSelect;
+  challenge: typeof schema.challenges.$inferSelect;
+};
+
+/**
+ * Everything `/profile` shows: entries, trophies, and live milestone progress.
+ *
+ * Milestone progress is read from `progressFor`, the same function the bot's
+ * card uses. T7/T13 — *"3 of 5 challenges in League"*, and what they are
+ * missing, in one place so the two surfaces cannot disagree.
+ */
+export async function myDashboard(userId: string) {
+  const db = await getDb();
+  const { progressFor } = await import("../trophies/milestones.ts");
+
+  const [user] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
+  if (!user) return null;
+
+  const holdings = await db
+    .select({ holding: schema.userTrophies, trophy: schema.trophies })
+    .from(schema.userTrophies)
+    .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
+    .where(eq(schema.userTrophies.userId, userId))
+    .orderBy(desc(schema.userTrophies.awardedAt));
+
+  const entries = await db
+    .select({ participant: schema.challengeParticipants, challenge: schema.challenges })
+    .from(schema.challengeParticipants)
+    .innerJoin(
+      schema.challenges,
+      eq(schema.challengeParticipants.challengeId, schema.challenges.id),
+    )
+    .where(eq(schema.challengeParticipants.userId, userId))
+    .orderBy(desc(schema.challengeParticipants.joinedAt));
+
+  const accounts = await db
+    .select()
+    .from(schema.linkedGameAccounts)
+    .where(eq(schema.linkedGameAccounts.userId, userId));
+
+  return {
+    user,
+    holdings,
+    entries,
+    accounts,
+    milestones: await progressFor(db, userId),
+  };
+}
+
+/**
+ * Every trophy this gamer holds, with whether each can be cashed out — asked
+ * of `checkEligibility`, the **same function the redeem action calls.**
+ *
+ * Two implementations of *"may they redeem"* is how a UI ends up kinder than
+ * the rule, or crueller. The button is greyed by the same answer that refuses.
+ */
+export async function myRedeemables(userId: string) {
+  const db = await getDb();
+  const { checkEligibility, redemptionsInFlight } = await import("../trophies/redemption.ts");
+
+  const holdings = await db
+    .select({ holding: schema.userTrophies, trophy: schema.trophies })
+    .from(schema.userTrophies)
+    .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
+    .where(eq(schema.userTrophies.userId, userId))
+    .orderBy(desc(schema.trophies.valueCents));
+
+  const inFlight = await redemptionsInFlight(db, userId);
+
+  return {
+    rows: await Promise.all(
+      holdings.map(async (h) => ({
+        ...h,
+        eligibility: await checkEligibility(db, h.holding.id, userId),
+        pending: inFlight.find((r) => r.userTrophyId === h.holding.id) ?? null,
+      })),
+    ),
+    inFlight,
+  };
+}
+
+/** The game catalogue — `/games`, and one game's challenges on `/games/[slug]`. */
+export async function gamesWithChallenges() {
+  const db = await getDb();
+  const { PROVIDERS, isProviderLive } = await import("../providers/registry.ts");
+
+  const counts = await db
+    .select({ game: schema.challenges.game, n: sql<number>`count(*)::int` })
+    .from(schema.challenges)
+    .where(
+      or(
+        eq(schema.challenges.state, "announced"),
+        eq(schema.challenges.state, "live"),
+        eq(schema.challenges.state, "ended"),
+      ),
+    )
+    .groupBy(schema.challenges.game);
+
+  const byGame = new Map(counts.map((c) => [c.game, c.n]));
+  return PROVIDERS.map((p) => ({
+    provider: p,
+    // O4 — whether a game requires ownership proof is a per-game flag, visible
+    // to admin **and** to brands, so it is on the public page too.
+    live: isProviderLive(p),
+    challenges: byGame.get(p.game) ?? 0,
+  }));
+}
+
+export async function gameBySlug(slug: string) {
+  const db = await getDb();
+  const { PROVIDERS, isProviderLive } = await import("../providers/registry.ts");
+  const provider = PROVIDERS.find((p) => p.id === slug);
+  if (!provider) return null;
+
+  const challenges = await db
+    .select()
+    .from(schema.challenges)
+    .where(eq(schema.challenges.game, provider.game))
+    .orderBy(desc(schema.challenges.startAt));
+
+  return { provider, live: isProviderLive(provider), challenges };
+}

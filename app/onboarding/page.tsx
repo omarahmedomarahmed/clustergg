@@ -27,7 +27,7 @@ import { AGE_BANDS, AGE_BAND_COPY } from "../../lib/identity/age.ts";
 import { offeredCountries } from "../../lib/identity/countries.ts";
 import { getDb, schema } from "../../lib/db/index.ts";
 import { eq } from "drizzle-orm";
-import { Panel, Button, Step, Refusal } from "../ui.tsx";
+import { Panel, Button, Step, Refusal, Progress } from "../ui.tsx";
 import { currentPath } from "../../lib/identity/onboarding.ts";
 import { progressOf } from "../../lib/identity/onboarding.ts";
 import { deriveUnlock } from "../../lib/identity/unlock.ts";
@@ -188,19 +188,10 @@ export default async function OnboardingPage({
       </div>
 
       {/* H3 — a progress bar on every gated thing. H4 — and never on a raw
-          member count, which is why this counts steps somebody controls. */}
-      <div data-testid="progress" data-done={progress.done} data-total={progress.total}>
-        <div className="flex items-baseline justify-between text-xs text-mute">
-          <span>{progress.label}</span>
-          <span>{progress.percent}%</span>
-        </div>
-        <div className="mt-1 h-1.5 rounded-full bg-line">
-          <div
-            className="h-1.5 rounded-full bg-accent transition-all"
-            style={{ width: `${Math.max(2, progress.percent)}%` }}
-          />
-        </div>
-      </div>
+          member count, which is why this counts steps somebody controls.
+          Drawn by the one component in `app/ui.tsx`; a second bar anywhere
+          fails `94-progress`. */}
+      <Progress progress={progress} />
 
       {error ? <Refusal>{error}</Refusal> : null}
 
