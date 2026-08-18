@@ -511,6 +511,141 @@ I write, once, before believing the flow. Cheaper than any guard.
 
 ---
 
+## 24 · A whole sprint can ship with no user interface
+
+**What I did.** Built Sprints 6, 7 and 9. Each one shipped a complete, correct
+library, a full guard suite, and **no page**. `spend.ts` — 12 §6's central money
+rule — had no request screen and no approve screen. `consent.ts` — 330 correct
+lines — had no analytics tab. `registry.ts` — all eight sections — had no
+`/admin/servers/[guildId]`, which is *the page 12 §8 exists for*.
+
+**Why it looked right.** Every sprint closed with the band green, every guard
+proven by breaking, PROVEN.md updated, PLAN §2.0 marked done. The libraries
+really were correct. And the sprint tables in PLAN name **builds**, which reads
+as modules — the "a human can" line is the part that names a surface, and it is
+one line at the bottom of a table I had already convinced myself I had
+satisfied.
+
+**What it cost.** Three sprints marked done that a user could not reach. The
+reviewer found it, not me, and not the band — because every guard called the
+module **directly**. Not one asked whether a surface did.
+
+**What catches it now.** `tests/band1/94-surface-reach.test.ts`. Roots are the
+files under `app/`; reachability follows imports through `lib/`, dynamic ones
+included. A test is not a surface — all three modules *were* called, by their
+own tests, which is why "called from anywhere" would have passed. It was
+committed **red**, naming ten modules: the three known and seven nobody knew
+about.
+
+**The transferable part:** *"a human can"* is not the last line of a sprint
+table, it is the definition of done. Read it first.
+
+---
+
+## 25 · Committing while the band was red, because I ran it in the wrong order
+
+**What I did.** Fixed a hole, committed, then ran the band as part of the next
+break cycle — and the pre-break run said 400/401.
+
+**Why it looked right.** Every one of my commits that stretch had been preceded
+by a green run. This one was preceded by a green run *of the previous change*.
+The habit had degraded from "run, then commit" into "run near committing".
+
+**What it cost.** One red commit in the history, caught two minutes later
+because the break harness prints the baseline. Nothing shipped. But the rule I
+broke is my own, it is written in my instructions, and it is the one that makes
+every other claim in this repository checkable.
+
+**What catches it now.** Nothing automatic, and it should not be automatic —
+the fix is the order, not a tool. `npm test` **before** `git commit`, in the
+same breath, every time. The break harness refusing to start on a dirty tree is
+what surfaced it, which is worth keeping for that reason alone.
+
+---
+
+## 26 · A negative half that corrupts the fixture must run last
+
+**What I did.** Added the missing falsifiable half to a W4 test — mutate a
+credit, assert the reconciliation says no — and put it directly after the
+assertion it was fixing, in the middle of the test.
+
+**Why it looked right.** It reads best there: the positive claim, then
+immediately the proof it can fail.
+
+**What it cost.** Everything below it was now reading numbers the block had
+deliberately broken, and the *"at least one credit is a half"* assertion below
+went red. A minute to find, and it made the test look wrong when the test was
+right.
+
+**What catches it now.** The habit, written where it happened: **an assertion
+that mutates state on purpose goes last, and says why it is last.** A test is
+also a fixture for everything after it in the same test.
+
+---
+
+## 27 · A break that the fake has no way to receive
+
+**What I did.** To prove refresh never lists guild members, added
+`await fetcher.members?.(guildId)` to `refreshGuild`. The band stayed green.
+
+**Why it looked right.** The file changed, the harness confirmed it, so the
+break had "applied". It looked like a blind guard.
+
+**What it cost.** Nothing, because I checked — but it briefly read as a hole in
+a guard that was fine. The test's fetcher object has no `members` key, so `?.`
+short-circuited and **nothing executed**. The source changed; the behaviour did
+not.
+
+**What catches it now.** Trap 8's rule, refined: a break must be reachable *by
+the test*, not merely present in the file. And the guard gained the half a call
+list cannot see — a source assertion that nothing in the module names a
+member-list path, because the realistic break is a direct REST call **beside**
+the injected fetcher, not through it.
+
+---
+
+## 28 · Comparing three fields somebody remembered
+
+**What I did.** Guarded *"no weekly-cycle dollar reads `guild_snapshots`"* by
+comparing `guildId`, `totalCents` and `conversion` between a run with the table
+full and one with it empty.
+
+**Why it looked right.** Those are the money fields. If money does not move,
+nothing that matters moved.
+
+**What it cost.** A break that read the table and nudged **activation** sailed
+straight through. And the fixture gave *both* servers a snapshot row, so any
+read cancelled out in the percentile ranking — two independent reasons the
+guard could not fail, in a guard on the rule an entire feature rests on.
+
+**What catches it now.** The whole division is compared, not a field list, and
+exactly one server has a row — which is the realistic shape, since the grant is
+per server. **A hand-picked list of fields is the file-list defect one level
+down**: it guards what somebody thought of, and forgetting is the failure mode.
+
+---
+
+## 29 · An anchor table that does not cover what was added
+
+**What I did.** Widened an access rule, expecting `91-admin-access`'s literal
+case table to catch it. Green.
+
+**Why it looked right.** That table exists *because* the rest of the suite
+derives its expectations from `ROUTE_ACCESS` itself (break 20's lesson). It is
+the one place values are stated literally.
+
+**What it cost.** Nothing yet. The page census caught the new routes as
+**unclassified** — silence is not a decision — which is what put them in
+`ROUTE_ACCESS` at all. Nothing then asserted *which* classification, so the
+anchor had a gap exactly where new work lands.
+
+**What catches it now.** Rows for every route added, and the habit: **the
+census tells you a route needs a decision; the anchor is where the decision
+goes.** Two guards, two questions, and answering the first does not answer the
+second.
+
+---
+
 # The four questions
 
 If you remember nothing else:
@@ -518,5 +653,8 @@ If you remember nothing else:
 1. **Can this assertion FAIL?** Construct the input where the property varies.
 2. **What reads this rule?** Not what writes it — what reads it, and does every
    path go through that code?
-3. **Did my break actually apply?** A break that changes nothing proves nothing.
+3. **Did my break actually apply?** A break that changes nothing proves nothing
+   — and "applied to the file" is not "reachable by the test".
 4. **Is this the only door?** Grep before you fix.
+5. **Does anything render this?** A library with no surface is a feature that
+   does not exist, however green its guards are.
