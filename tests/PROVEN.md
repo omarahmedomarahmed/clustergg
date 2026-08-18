@@ -1591,3 +1591,43 @@ claimed in the thirty minutes between. One function, two callers (K12), and
 The general lesson is trap 35's: **one `find` string can only prove one place.**
 A rule with two implementations needs two mutations, and the harness now
 refuses to start if any `find` matches more or fewer than exactly one.
+
+
+## Sprint 15 · production readiness
+
+Everything in this sprint was proven against a **real service** — a real
+Postgres, a real object store, a real HTTP request — because a green band says
+nothing about a deployment. Where that was not possible, the row says so.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 224 | **The build command runs the migrator, and runs it first** (`95-deploy`) | `"build": "next build"` | *"the build command runs the migrator"* | clean, 450/450 |
+| 225 | **Every cron route has a schedule, every schedule a route** (`95-deploy`) | dropped `/api/cron/sync` from `vercel.json` | both the route guard and the cadence guard | clean |
+| 226 | **The cadences are 01-CYCLE's, read from the document** (`95-deploy`) | sync's schedule changed to daily, every route still scheduled | *"vercel.json schedules exactly those cadences"* — the set-equality guard alone would have passed | clean |
+| 227 | **`instrumentation.ts` is a reachability root** (`94-surface-reach`) | removed the `blob.ts` import from the boot hook | `lib/cards/blob.ts` reported orphaned again | clean |
+| 228 | **Preflight knows every variable 10-SETUP names** (`95-deploy`) | deleted `RESEND_API_KEY` from `ENV_SPEC` | *"every variable 10-SETUP §1 names appears on /admin/preflight"* | clean |
+| 229 | **Preflight cannot print a secret** (`95-deploy`) | — | asserted directly: a real-looking value in `AUTH_SECRET` never appears in what the page is handed | — |
+| 230 | **Setup refuses once an admin exists, by EITHER grant** (`96-setup`) | `adminExists` stopped checking staff titles | *"a staff TITLE closes it too"* | clean, 461/461 |
+| 231 | **Failed setup attempts are rate-limited durably** (`96-setup`) | the window check made unreachable | *"the correct token is refused once the window is full"* | clean |
+| 232 | **The setup token is compared, not assumed** (`96-setup`) | `tokenMatches` returns `true` | *"row 4 — nothing else, and never whether a token exists"* | clean |
+
+### What was proven against a real service, and how
+
+| Claim | Evidence |
+|---|---|
+| 23 migrations apply to real Postgres 18 | Ran against Neon. `36` tables, `338` columns, `23` rows in `drizzle.__drizzle_migrations`, Postgres 18.4. PGlite hid nothing — no migration needed changing |
+| The build command works on Vercel | Deployment `c836ab8` reached **READY** with `npm run db:migrate && next build` |
+| Production serves | 18 routes fetched and read, not status-checked: every one 200 with its real `<h1>`. `/admin` correctly 307s to sign-in |
+| Vercel Blob stores and returns bytes | A PNG through `acceptImage` → `putImage` → HTTPS GET. 70 bytes in, 70 bytes out, `image/png`, **sha256 identical**. Bytes asserted, not the absence of an exception (trap 31) |
+| Discord's own endpoint verification passes | A **correctly signed** PING (real Ed25519 keypair, Discord's own scheme) → `{"type":1}` 200. One byte of the signature flipped → **401** |
+| The Stripe webhook is safe to replay | Over real HTTP: signed delivery → 200 · **same event id replayed → `replay`, 200, nothing moved** · tampered payload → 400 · genuinely-signed but stale delivery → 400 |
+| `paid → scheduled` | Band 1, `80-portals`, on `onInvoicePaid` — **the same function the webhook calls**, which the webhook's own comment says is deliberate |
+
+### What is not proven, and why
+
+| Item | Why not |
+|---|---|
+| A real Stripe delivery from Stripe's servers | `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` are not set in production — the endpoint answers *"STRIPE_WEBHOOK_SECRET is not set."* The signature path was proven locally against a real HMAC instead |
+| A real Discord button press | Needs the Interactions Endpoint URL set in the Developer Portal, which is a dashboard action. Signature verification and PING/PONG were proven locally with a real keypair |
+| `/admin/preflight` rendering in production | Needs an admin account, and the first admin is created by the owner at `/setup` with their own password |
+| The band against real Postgres | `resetDemoDb` **truncates every table** and refuses outside demo mode. That fence is correct and stays. The band has therefore only ever run on PGlite; the migrations, which are the part PGlite could lie about, were run against Neon directly |

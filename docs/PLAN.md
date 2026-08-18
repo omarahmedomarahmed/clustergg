@@ -227,6 +227,7 @@ and pushed; everything below is unstarted.
 | 12 · The Discord card layouts | **Done** — `NOT_YET_RENDERED` is empty |
 | 13 · The series builder, and the rest of admin | **Done** |
 | 14 · Proof | **Done** — except the one line only a person can sign: a human clicking all four journeys |
+| 15 · Production readiness | **Done** — the platform is up. Four owner actions remain, listed below |
 
 **447 tests, 2,638 assertions, 223 guards proven by breaking, 34 of 34
 mutations caught, typecheck gating the band inside `npm test`.** Band 1 is entirely green, and so
@@ -652,3 +653,54 @@ default and reads the setting; nothing anywhere hard-codes it.
 | Writing copy that says we *cannot* read a member list | The intent is app-wide. The sentence is *"we do not read this unless you ask us to"* |
 | Reconciling anything in §5 silently | Same reason this branch exists |
 | Opening a pull request | Not asked |
+
+
+---
+
+### Sprint 15 · Production readiness
+
+The rule that changed for this sprint: **nothing counts until it has run
+against a real service.** A green band proves the logic and says nothing about
+the deployment — which is exactly how a platform with 447 passing tests served
+500s on every page.
+
+#### What was wrong
+
+| | |
+|---|---|
+| The migrator was never called | `"build": "next build"`. 23 migrations, zero tables, every page 500. §0.1 for the tenth time and the first to cause an outage |
+| Nothing scheduled the crons | No `vercel.json`. The gun never fired, the week never closed, and **the symptom was nothing at all** |
+| `CRON_SECRET` is undocumented | Correct fail-closed code, absent from 10-SETUP. All three routes answered 401 live. Found by calling them, not by reading either the code or the document |
+| `/setup` did not exist | Fully specified in 10-SETUP §2 — five rows, four rules, *"build it exactly like this"*. **The platform had no way to create its first administrator** |
+
+#### What is now true
+
+The database holds 36 tables and 23 applied migrations on Postgres 18.4. The
+build command migrates before it builds, and `95-deploy` fails if that stops
+being true. Three crons are scheduled from `vercel.json`, discovered from disk
+and checked against 01-CYCLE's own cadences. Vercel Blob is installed at boot
+by `instrumentation.ts` and proven by a byte-for-byte round trip. `/setup`
+exists, and `/admin/preflight` answers "is it up?" without a terminal.
+
+**461 tests, 2,694 assertions, 232 guards proven by breaking, 34 of 34
+mutations caught.**
+
+#### The four things only the owner can do
+
+None of these is blocked work — each needs a credential or a dashboard that
+belongs to the owner rather than to this branch.
+
+| # | Action | Until it is done |
+|---|---|---|
+| 1 | Set **`CRON_SECRET`** in Vercel and redeploy | The weekly cycle does not run. Nothing says so |
+| 2 | Create the first admin at **`/setup`**, then delete `SETUP_TOKEN` and redeploy | `/admin` is unreachable. The form is live and waiting; the password should be the owner's, not one this session invented |
+| 3 | Set the **Discord Interactions Endpoint URL** in the Developer Portal | No button press reaches the platform. Signature verification and PING/PONG are proven; the dashboard setting is not something a session can make |
+| 4 | Add the **Stripe** keys and webhook endpoint | No brand can pay. The signature, replay and staleness paths are proven against real HMACs; Stripe's own delivery is not |
+
+#### And one line for the owner in a ratified document
+
+`CRON_SECRET` belongs in 10-SETUP §1's required table. It was not added here,
+because 10-SETUP was ratified on 2026-08-13 and silently editing a ratified
+document is the failure this branch exists to end. `docs/DEPLOYMENT.md` and
+`/admin/preflight` both carry it in the meantime, and `95-deploy` asserts it
+stays carried.

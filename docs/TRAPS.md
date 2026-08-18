@@ -856,3 +856,115 @@ harness. That is trap 8 at one remove, and it is undetectable from the output.
 **The harness now checks every mutation applies exactly once before writing
 anything.** Nothing is mutated until all thirty-three are known to match one
 place each.
+
+
+## 34 · The migrator that nothing called — §0.1, and the one that took production down
+
+**What happened.** Production was deployed, the build was READY, the pooled Neon
+string worked, and every page answered 500 with `relation "challenges" does not
+exist`. The database had **zero tables**. All 23 migrations had never run.
+
+`scripts/migrate.mts` existed, was correct, and said so in its own header: *"On
+Vercel this is the build command's first step."* It was not.
+`package.json` said `"build": "next build"`.
+
+**Why nothing caught it.** Every band was green throughout. The band tested the
+migrator; nothing tested whether anybody **ran** it. This is the tenth instance
+of §0.1 on this branch and the first to cause an outage — the previous nine
+were invisible features, not a dead platform.
+
+**The lesson that is actually new.** A file's own header is not a caller. Nine
+times the missing reader was a page or a card; here it was a **build script**,
+which no test looks at because it is not code the band imports. Any claim of
+the form *"X runs at Y"* is a claim about a caller, and the caller is what to
+assert.
+
+**What now fails.** `95-deploy` asserts the build command calls the migrator
+before the build, exactly as guard 53 asserts `npm test` typechecks first.
+
+---
+
+## 35 · The second gap in the same deploy: three cron routes and no schedule
+
+There was no `vercel.json`. Three cron routes shipped and nothing called any of
+them — the gun never fired, the sync never ran, the week never closed, on a
+platform whose entire product is a weekly loop.
+
+The same shape as 34 and worth listing separately because the **symptom is
+nothing at all**. An unmigrated database screams. An unscheduled cron is
+silent: every page renders, every number is stale, and no error appears
+anywhere.
+
+`95-deploy` now discovers the cron routes **from disk** and requires every one
+to have a schedule and every schedule to have a route, with the cadences read
+out of 01-CYCLE's own table.
+
+---
+
+## 36 · `CRON_SECRET`: correct fail-closed code, undocumented variable
+
+Having added `vercel.json`, the jobs still did not run. `authoriseCron` requires
+`CRON_SECRET` in production and fails closed without it — correct behaviour —
+and **`CRON_SECRET` appears zero times in 10-SETUP**. Verified live: all three
+routes answered 401.
+
+Two things worth carrying:
+
+1. A fail-closed guard plus an undocumented variable is an outage that reads as
+   a code bug. The code was right; the setup document was incomplete.
+2. This was found by **calling the routes**, not by reading either the code or
+   the document. Neither would have shown it.
+
+10-SETUP is ratified, so the line it needs is the owner's call. Meanwhile the
+variable is listed on `/admin/preflight` as required, and `95-deploy` asserts it
+stays listed.
+
+---
+
+## 37 · `/setup` was fully specified and did not exist
+
+10-SETUP §2 specifies `/setup` in a five-row table with four rules under it and
+says *"build it exactly like this"*. There was no `/setup`, and `SETUP_TOKEN`
+appeared in no file. **The platform had no way to create its first
+administrator**, so `/admin` was unreachable by anybody, forever.
+
+`94-reachability` did not catch it because that guard reads **04-SURFACES §5's**
+route list. `/setup` is named in **10-SETUP**. A guard covers the document it
+was pointed at and no other — which is worth remembering before saying "the
+routes are covered".
+
+The generalisation: a route census is only as complete as the set of documents
+it reads. Before trusting one, check which document it parses.
+
+---
+
+## 38 · Two rounds of measuring production wrong
+
+While checking that every page was up, `/challenges` reported **200 with 1
+byte**, and `/rules/gamers` reported **404**. Both were reported as findings and
+both were my error:
+
+* the 1 byte was a bad shell capture — the page consistently returns 9,312
+  bytes on a direct fetch;
+* the audience is `gamer`, not `gamers`, so the 404 was the route guard working
+  exactly as designed.
+
+**The lesson.** When a check against a real service says something surprising,
+suspect the check first. Re-measure a different way *before* writing it down as
+a defect — a false finding costs more than the check does, because somebody
+then goes looking for a bug that is not there.
+
+---
+
+## 39 · Trap 13, again, and it looked fixed
+
+Killing the local server: `pkill -f "next start"` reported success, `ss` showed
+**port 3000 free**, and `curl` still got **200**. The `next-server` process had
+been re-parented and survived both the pattern kill and the port check.
+
+Two checks agreed and both were wrong. The only reliable answer was
+`ps -eo pid,args | grep next-server`, killing the pid directly, and then
+confirming with a curl that actually failed to connect.
+
+**Never conclude a server is dead from the absence of a listener.** Conclude it
+from the absence of a process, and then prove it with a request that is refused.
