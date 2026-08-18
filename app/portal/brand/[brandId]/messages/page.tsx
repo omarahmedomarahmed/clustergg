@@ -42,7 +42,11 @@ export default async function BrandMessages({
             reply appears without you doing anything.
           </Help>
         </h1>
-        <p className="mt-1 text-sm text-mute">
+        <p
+          className="mt-1 text-sm text-mute"
+          data-testid="thread-state"
+          data-awaiting={isAwaitingReply(thread ?? { lastAuthorKind: null }) ? "1" : "0"}
+        >
           {isAwaitingReply(thread ?? { lastAuthorKind: null })
             ? "Waiting on Cluster. Nobody has to chase this — an unanswered message keeps alerting them until somebody replies."
             : "Up to date."}

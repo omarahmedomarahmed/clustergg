@@ -56,6 +56,12 @@ const brandId: string = seeded.brandIds[0];
 const midWeek = new Date(seeded.weekStart);
 midWeek.setUTCDate(midWeek.getUTCDate() + 2);
 const at = `at=${midWeek.toISOString()}`;
+
+// A per-run marker, so a wait can be on **this run's** message rather than on
+// "a message exists" — which is already true the second time this pass runs.
+// Trap 14: a pass that is not idempotent will eventually photograph a refusal
+// and call it a happy path, and the same shape makes a wait return early.
+const RUN = Date.now().toString(36);
 console.log(`Seeded, week of ${String(seeded.weekStart).slice(0, 10)}.\n`);
 
 // ── The brand login: one-time invite, then email and password ───────────────
@@ -400,9 +406,19 @@ await page.waitForSelector("h1");
 await shot(page, "brand-messages-empty");
 check(/Nothing yet/.test(await visible(page)), "a brand with nothing to say sees an empty thread");
 
-await page.fill('textarea[name="body"]', "Our week 2 report shows fewer entrants than week 1 — is that right?");
+// ===== WAIT ON SOMETHING THAT ONLY EXISTS AFTER THE SEND =====
+//
+// `waitForSelector("h1")` was already satisfied before the click — the heading
+// is on the page either way — so it returned instantly and the read below
+// could land on the **pre-send** page. Green most of the time, and red on the
+// run where the navigation was a few milliseconds slower.
+//
+// Trap 19's cousin, and the same lesson as the `waitForURL` that matched the
+// page it was standing on: a wait that is already true is not a wait.
+const brandSaid = `Our week 2 report shows fewer entrants than week 1 — is that right? (${RUN})`;
+await page.fill('textarea[name="body"]', brandSaid);
 await page.click('button[type="submit"]');
-await page.waitForSelector("h1");
+await page.waitForSelector(`li:has-text("${RUN}")`);
 await shot(page, "brand-messages-sent-and-waiting");
 const sent = await visible(page);
 check(/Waiting on Cluster/.test(sent), "once sent, it is waiting on us");
@@ -413,9 +429,10 @@ check(
 
 await page.goto(`${BASE}/portal/server/${guildId}/messages?${at}`);
 await page.waitForSelector("h1");
-await page.fill('textarea[name="body"]', "Why is my server not in this week's pool?");
+const ownerSaid = `Why is my server not in this week's pool? (${RUN})`;
+await page.fill('textarea[name="body"]', ownerSaid);
 await page.click('button[type="submit"]');
-await page.waitForSelector("h1");
+await page.waitForSelector(`li:has-text("${RUN}")`);
 await shot(page, "owner-messages-sent-and-waiting");
 check(/Waiting on Cluster/.test(await visible(page)), "and an owner's thread waits on us too");
 

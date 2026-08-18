@@ -38,7 +38,11 @@ export default async function ServerMessages({
             without you doing anything.
           </Help>
         </h1>
-        <p className="mt-1 text-sm text-mute">
+        <p
+          className="mt-1 text-sm text-mute"
+          data-testid="thread-state"
+          data-awaiting={isAwaitingReply(thread ?? { lastAuthorKind: null }) ? "1" : "0"}
+        >
           {isAwaitingReply(thread ?? { lastAuthorKind: null })
             ? "Waiting on Cluster. An unanswered message keeps alerting them until somebody replies — you do not have to chase it."
             : "Up to date."}

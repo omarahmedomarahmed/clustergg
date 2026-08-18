@@ -733,3 +733,40 @@ with `EADDRINUSE`, and the server answering my signed interactions was the
 **old** one, started without the public key. The symptom was `401 bad
 signature`, which reads as a signing bug and is not one. Kill by finding the
 `next-server` pid, and check the port is free before believing anything.
+
+---
+
+## 32 · A wait that was already true, and the red I could finally name
+
+**What I did.** Ran the four band-2 passes twice back to back. The second
+`portals` run failed one assertion: *"and an owner's thread waits on us too"*.
+
+**Why it looked right.** The step reads: fill the textarea, click Send, wait for
+`h1`, read the page. Waiting for the heading looks like waiting for the page.
+
+**What it cost.** An hour, and it is worth being exact about what was and was
+not established. `h1` is on that page **before** the click as well, so the wait
+was satisfied immediately and the read could land on the pre-send page. That is
+a real defect in the pass, demonstrable by inspection. What I could **not** do
+is reproduce the failure: eight further runs were green, seeded and unseeded.
+
+So the honest statement is: the wait was capable of returning early, it now
+waits on a marker unique to this run, and I cannot prove that is what failed —
+only that it could have. Writing "fixed" here would be a claim one size larger
+than the evidence.
+
+**What catches it now.** A per-run marker in the message body, and a wait on
+`li:has-text(RUN)`, which cannot be true before the send. Both message pages
+also carry `data-testid="thread-state"` with `data-awaiting`, so the state is
+assertable rather than inferred from a sentence.
+
+**The transferable part, and it is trap 30's other half.** This is the same
+failure I could not name last sprint — a `portals` red that went green on the
+retry. The difference this time was one habit: **every band-2 pass ran into a
+file.** The failing assertion was still there to read, in a log from a run that
+had finished twenty minutes earlier. That single change turned "one assertion
+failed and I do not know which" into a line number and a fix.
+
+The rule underneath both: **a wait that is already true is not a wait**, and it
+fails only under load — which means it fails in exactly the run you are least
+able to reproduce.
