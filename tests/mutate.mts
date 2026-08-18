@@ -21,6 +21,21 @@
 // the restore by comparing bytes before it moves on.
 
 import fs from "node:fs/promises";
+// ===== THE SYNCHRONOUS WRITER, IMPORTED RATHER THAN REQUIRED =====
+//
+// The signal handler below has to restore files **synchronously** — an async
+// handler may not finish before the process exits. It used to reach for
+// `require("node:fs")`, which does not exist in an ESM module: every interrupt
+// threw, hit the catch, and printed *"COULD NOT RESTORE … restore it by hand"*.
+//
+// So the one path this harness's own header calls *"the most likely way this
+// harness ever gets stopped"* had never worked. Found by a ten-minute timeout
+// killing a run mid-mutation, which left `lib/identity/attribution.ts` broken
+// on disk — the exact outcome the header promises is impossible.
+//
+// The honest message is why it cost nothing: the handler said what it had
+// failed to do, in those words, instead of exiting quietly.
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -255,6 +270,91 @@ const MUTATIONS: Mutation[] = [
     replace: "  if (false) {",
     expect: 1,
   },
+
+  // ===== THE NINE `09-TEST-PLAN` NAMES THAT HAD NO MUTATION =====
+  //
+  // 09's table lists 27. Eighteen were here; six more were earned by later
+  // stages and are not in the document. That left nine of 09's own names with
+  // nothing behind them — which is the quietest possible kind of gap, because
+  // the harness reported "24 mutations, all caught" and the document said 27.
+  //
+  // Every one of these guards a rule sprints 5 to 10a actually built, so a
+  // hole here would be a hole in the newest and least-exercised half of the
+  // platform.
+  {
+    name: "Let an administrator withdraw",
+    file: "lib/portal/permissions.ts",
+    find: '    if (facts.access.kind !== "owner" && facts.access.kind !== "demo") {',
+    replace: "    if (false) {",
+    expect: 2,
+  },
+  {
+    name: "Recompute a closed week instead of reading its record",
+    file: "lib/pool/record.ts",
+    // W1/K12 — one implementation. The record is a copy of the division the
+    // close already made; recomputing it here is a second one, and the two
+    // agree until an input moves.
+    find: "  const existing = await db",
+    replace: "  const existing: unknown[] = [];\n  const unusedExisting = await db",
+    expect: 2,
+  },
+  {
+    name: "Overwrite last week's record at the next gun",
+    file: "lib/pool/eligibility.ts",
+    find: "  if (guild.eligibilityFrozenAt.getTime() !== weekStart.getTime()) return false;",
+    replace: "",
+    expect: 1,
+  },
+  {
+    name: "Join the guild's current name instead of the stored one",
+    file: "lib/pool/record.ts",
+    find: "      guildName: share.name,",
+    replace: '      guildName: "",',
+    expect: 1,
+  },
+  {
+    name: "Drop ineligible servers from the record instead of recording why",
+    file: "lib/pool/record.ts",
+    find: "  for (const drop of division.dropped) {",
+    replace: "  for (const drop of [] as typeof division.dropped) {",
+    expect: 1,
+  },
+  {
+    name: "Put the analytics cooldown on the session instead of the guild",
+    file: "lib/analytics/consent.ts",
+    find: "  if (consent.cooldownUntil && now.getTime() < consent.cooldownUntil.getTime()) {",
+    replace: "  if (false) {",
+    expect: 1,
+  },
+  {
+    name: "Ignore the platform ceiling on one server's refresh",
+    file: "lib/analytics/consent.ts",
+    find: "  if (used >= ceiling) {",
+    replace: "  if (false) {",
+    expect: 1,
+  },
+  {
+    name: "Merge two accounts when a gamer links an already-used identity",
+    file: "lib/identity/credentials.ts",
+    find: "  if (holder.id === userId) return { kind: \"mine\" };",
+    replace: "  return { kind: \"free\" };",
+    expect: 1,
+  },
+  {
+    name: "Create a second row when a gamer links their second method",
+    file: "lib/identity/credentials.ts",
+    find: "  await db.update(schema.users).set({ discordId }).where(eq(schema.users.id, userId));",
+    replace:
+      "  const { uid } = await import(\"../core/utils.ts\");\n" +
+      "  const fresh = uid();\n" +
+      "  await db.insert(schema.users).values({\n" +
+      "    id: fresh,\n" +
+      "    slug: `gamer-${fresh.toLowerCase()}`,\n" +
+      "    displayName: discordId,\n" +
+      "    discordId,\n" +
+      "  });",
+    expect: 1,
+  },
 ];
 
 /** Which suites noticed. Parsed from the runner's own output. */
@@ -304,9 +404,12 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     // Synchronous, because an async handler may not finish before exit.
     for (const [file, original] of outstanding) {
       try {
-        require("node:fs").writeFileSync(path.join(repoRoot, file), original, "utf8");
-      } catch {
-        console.error(`COULD NOT RESTORE ${file} — restore it by hand before trusting a run.`);
+        writeFileSync(path.join(repoRoot, file), original, "utf8");
+        console.error(`Restored ${file}.`);
+      } catch (e) {
+        console.error(
+          `COULD NOT RESTORE ${file} — restore it by hand before trusting a run. ${String(e)}`,
+        );
       }
     }
     process.exit(130);
