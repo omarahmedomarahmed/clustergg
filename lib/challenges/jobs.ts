@@ -252,11 +252,89 @@ export async function rankMovementFor(
   return out;
 }
 
-/** Everything the hourly and daily crons run, in the order they run it. */
+/**
+ * Everything the daily cron runs, **in 03 §9's order.**
+ *
+ * ===== IT USED TO RUN TWO OF THE NINE STEPS =====
+ *
+ * `stampBaselinesAtGun` and `closeChallenges`, and that was all. Trophies were
+ * never awarded, no payout was ever drafted, no week record was ever written
+ * and nothing was ever announced — on a real deployment the entire close, as a
+ * gamer or an owner experiences it, did not happen.
+ *
+ * Every one of those steps was built, correct and guarded. The four-week
+ * simulation ran them **by hand**, in this order, which is exactly why nothing
+ * noticed: the band orchestrated the close itself, so it never asked whether
+ * anything else did. §0.1, on the largest thing on the platform.
+ *
+ * 03 §9, and what each line is:
+ *
+ *   1. Final sync, then placements          — `closeChallenges`
+ *   2. Podium and participation trophies    — `settleChallenge`
+ *   3. Rank movement for **every** entrant  — `rankMovement`
+ *   4. Winners announced **once**, Friday   — `announceWinners`
+ *   5. The weekly pool, and **draft** payouts — `closeWeek`
+ *   6. Pool standings announced once, Saturday — `announcePoolStandings`
+ *
+ * A1 still holds and is the reason step 5 says *draft*. This computes; a human
+ * releases. Nothing in this path can pay anybody.
+ */
 export async function runDailyJobs(db: DB, now = new Date()) {
+  const { settleChallenge } = await import("../trophies/settle.ts");
+  const { awardEarnedMilestones } = await import("../trophies/milestones.ts");
+  const { closeWeek } = await import("../pool/score.ts");
+  const { announceWinners, announcePoolStandings } = await import("../discord/announce.ts");
+  const { weekFor } = await import("./week.ts");
+
   const gun = await stampBaselinesAtGun(db, now);
   const close = await closeChallenges(db, now);
-  return { gun, close };
+
+  let settled = 0;
+  let announced = 0;
+  const movements: { userId: string; from: number; to: number; improved: boolean }[] = [];
+
+  for (const challengeId of close.closed) {
+    // Steps 3 and 4 — podium trophies to the winners, the $0 branded
+    // collectable to everybody else. Idempotent per challenge, so a cron that
+    // fires twice awards nothing twice.
+    const result = await settleChallenge(db, challengeId, { actorId: null, at: now });
+    settled += result.podium + result.participation;
+
+    // Step 5 — rank movement for **every** entrant, winners and non-winners
+    // alike. It costs nothing and it is the only good news most entrants get.
+    movements.push(...(await rankMovementFor(db, challengeId)));
+
+    // Milestones are per gamer rather than per challenge, and a challenge
+    // closing is when a run of consecutive weeks becomes true.
+    const entrants = await db
+      .select({ userId: schema.challengeParticipants.userId })
+      .from(schema.challengeParticipants)
+      .where(eq(schema.challengeParticipants.challengeId, challengeId));
+    for (const e of entrants) await awardEarnedMilestones(db, e.userId, now);
+
+    // Step 7 — **winners announced once, on Friday, on every server.** The
+    // post queue's ledger is what makes "once" true: a second send is a no-op
+    // rather than a second card, and a bot that repeats itself gets muted.
+    const posted = await announceWinners(db, challengeId);
+    announced += posted.queued;
+  }
+
+  // ===== STEP 8 AND 9 — THE WEEK, ONCE, NOT ONCE PER CHALLENGE =====
+  //
+  // Keyed on the week rather than on the challenges that closed, because a
+  // week with two challenges has one pool. Idempotent: `closeWeek` writes no
+  // second record and `draftPayout` is idempotent per (guild, week), so this
+  // running every day of the grace period is safe and deliberate — Saturday's
+  // standings need Friday's record to exist.
+  const week = weekFor(now);
+  let pool = { drafted: 0, recorded: 0, announced: 0 };
+  if (close.closed.length > 0) {
+    const closed = await closeWeek(db, week.start, now);
+    const standings = await announcePoolStandings(db, week.start);
+    pool = { drafted: closed.drafted, recorded: closed.recorded, announced: standings.queued };
+  }
+
+  return { gun, close, settled, movements: movements.length, announced, pool };
 }
 
 /** Challenges whose window has opened but which were never announced. */

@@ -136,6 +136,19 @@ export async function announceAction(form: FormData): Promise<void> {
 
   try {
     await announce(db, id, who, guildIds);
+    // ===== THE CARD THAT MAKES ANY OF THIS HAPPEN =====
+    //
+    // `announce` records which servers were announced to and flips the state.
+    // It posted **nothing** — so the first step of the gamer's nine, *"a card
+    // appears in their server"*, did not exist, and the entire top of the
+    // funnel was a state change nobody could see.
+    //
+    // A3 — it enqueues and returns. Nothing fans out per-guild inline from a
+    // request; the cron drains it every five minutes. C1/L1 — this is inside
+    // the admin action, and there is no other caller, because nothing
+    // announces itself.
+    const { announceChallenge } = await import("../../lib/discord/announce.ts");
+    await announceChallenge(db, id, guildIds);
   } catch (e) {
     back(`/admin/challenges/${id}`, reason(e));
   }
