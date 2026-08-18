@@ -134,6 +134,7 @@ without the other.**
 | K10 | **Eligibility is frozen at Monday's gun; all three KPIs are live.** The conversion denominator is live too — frozen at 10 while entrants grow would produce the same unbounded ratio |
 | K11 | **The week's whole working is written down at the close** — every server's eligibility and why, both sides of every ratio, its rank, its shares, and which challenges it was credited on. `07-DATA-MODEL.md` `week_records` / `week_credits`. A closed week cannot be re-derived, because its inputs are live and have moved |
 | K12 | **One function, two callers.** `/pool` reads it live for the open week; every historical surface reads the record. Never a second implementation of the same arithmetic |
+| K13 | **The sentence explaining how a server is paid is generated from the attribution module**, not typed into a content default. It must name the parent, the join server, and the case where they are the same — because that third case is the one a retyped sentence always drops |
 | K6 | **Winning a challenge earns a server nothing directly.** Entrants do |
 | K7 | A server that never described itself is **dropped from the run**, not scored zero — otherwise it takes percentile positions from servers that did the work |
 | K8 | Community challenges do not count toward any pool |

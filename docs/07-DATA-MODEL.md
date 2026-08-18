@@ -390,6 +390,8 @@ gamer, at most two servers, no membership table, no per-server dilution.
 |---|---|
 | N1 | A default must **never state a number the product decides**. It asks for it |
 | N2 | Every figure on every page is imported from the module that enforces it |
+| N3 | **A sentence that states a rule is generated from the module that enforces the rule, never typed.** Rule 2 covers numbers; this covers the sentence around them, and the sentence is what a rule change leaves behind |
+| N4 | Attribution copy is the worked example. *"A gamer in two servers is worth half to each"* survived the parent/join rewrite on the public homepage — every figure was still imported and the sentence describing them was from the deleted model. It said nothing false about a number and nothing true about the rule |
 
 ---
 

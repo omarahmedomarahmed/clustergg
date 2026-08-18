@@ -968,3 +968,36 @@ confirming with a curl that actually failed to connect.
 
 **Never conclude a server is dead from the absence of a listener.** Conclude it
 from the absence of a process, and then prove it with a request that is refused.
+
+
+## 40 · A sentence can outlive the rule it describes, and no guard was looking
+
+**What happened.** *"A gamer in two servers is worth half to each"* sat on the
+public homepage for a whole sprint after Sprint 5 replaced that model with
+parent + join. Every **figure** beside it was correctly imported — house rule 2
+held perfectly — so `03-copy` passed, every money guard passed, and the
+sentence said nothing false about a number and nothing true about the rule.
+
+**Why it is not a copy bug.** The copy guard checks that pages do not *retype
+figures*. Nothing checked that pages do not *retype rules*. A rule change
+deletes the code and leaves the prose, and prose is the part nobody greps.
+
+**The fix that generalises.** 07 N3: a sentence stating a rule is **generated
+from the module that enforces the rule**. `attributionSentence()` is produced by
+calling `entrantCredit` — change ½+½ and the homepage sentence changes with it,
+because it is reading the same answer the pool reads.
+
+**Three things worth carrying:**
+
+1. **A banned-phrase guard only bans the phrase somebody already found.** The
+   brief named two files. Walking the tree for *the words the module produces*
+   found a third live instance on the server-owner members page, worded
+   *"counts a half to each"* — a paraphrase the exact-phrase search missed.
+2. **The clause that always goes first is the special case.** K13 requires
+   naming the same-server 1.0 case, and every retyped version dropped it.
+   Dropping it is what made the old wording sound almost right.
+3. **Comments must be stripped before scanning.** Both fixed call sites now
+   carry a comment quoting the dead sentence so the next reader knows why the
+   import is there — and a guard reading raw source would flag the explanation.
+   `withoutComments` moved to `tests/helpers/source.ts` rather than being
+   declared a second time (house rule 4).

@@ -228,6 +228,7 @@ and pushed; everything below is unstarted.
 | 13 · The series builder, and the rest of admin | **Done** |
 | 14 · Proof | **Done** — except the one line only a person can sign: a human clicking all four journeys |
 | 15 · Production readiness | **Done** — the platform is up. Four owner actions remain, listed below |
+| 15b · Copy states the current rule | **Done** — the attribution sentence is generated, and three live pages were saying the deleted model |
 
 **447 tests, 2,638 assertions, 223 guards proven by breaking, 34 of 34
 mutations caught, typecheck gating the band inside `npm test`.** Band 1 is entirely green, and so
@@ -704,3 +705,28 @@ because 10-SETUP was ratified on 2026-08-13 and silently editing a ratified
 document is the failure this branch exists to end. `docs/DEPLOYMENT.md` and
 `/admin/preflight` both carry it in the meantime, and `95-deploy` asserts it
 stays carried.
+
+
+---
+
+### Sprint 15b · Copy states the current rule
+
+`CRON_SECRET` is now in 10-SETUP §1 with its failure mode, and in §8's outage
+table beside the migrator the build never called and the crons nothing
+scheduled. The band asserts **both** directions of the preflight/document
+agreement — the missing direction is how it stayed invisible.
+
+The larger change is 07 **N3**: a sentence that states a rule is generated from
+the module that enforces the rule. `attributionSentence()`, `attributionShort()`
+and `roleMeaning()` live in `lib/identity/attribution.ts` and are produced by
+calling `entrantCredit` — the function that **is** the rule.
+
+**Four live pages, not two.** The brief named `copy.ts` and `owner.ts`. Walking
+the tree found:
+
+| File | What it said |
+|---|---|
+| `app/portal/server/[guildId]/members/page.tsx` | *"counts a half to each"* — the deleted model, live, a **third** time, paraphrased past an exact-phrase search |
+| `app/admin/weeks/[weekStart]/[guildId]/page.tsx` | correct but typed, including K13's same-server case |
+
+**467 tests, 2,718 assertions, 237 guards proven by breaking.**

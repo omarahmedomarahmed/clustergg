@@ -13,6 +13,7 @@ import { getDb } from "../../../../../lib/db/index.ts";
 import { ownerMembers, ownerOverview } from "../../../../../lib/portal/owner.ts";
 import { demoNow } from "../../../../../lib/site/clock.ts";
 import { Panel, Figure, Row, Empty } from "../../../components.tsx";
+import { attributionShort } from "../../../../../lib/identity/attribution.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,10 @@ export default async function OwnerMembers({
         <Figure
           label="Entrants this week"
           value={overview?.kpis ? overview.kpis.entrants.toFixed(1) : "0"}
-          note="A gamer in two servers counts a half to each"
+          // N4, third instance — this said "counts a half to each", the
+          // model Sprint 5 deleted, worded differently enough that a
+          // banned-phrase search for the homepage's version missed it.
+          note={attributionShort()}
         />
         <Figure
           label="Activation"

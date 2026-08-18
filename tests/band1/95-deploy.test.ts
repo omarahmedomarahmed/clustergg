@@ -193,6 +193,34 @@ test("preflight knows every variable 10-SETUP names", async () => {
   ok(cron !== undefined && cron.required, "CRON_SECRET is listed, and listed as required");
 });
 
+test("and 10-SETUP names every variable the preflight requires", async () => {
+  // ===== THE OTHER DIRECTION, WHICH IS THE ONE THAT WAS MISSING =====
+  //
+  // The guard above catches a variable in the document that the page forgot.
+  // It cannot catch the reverse — a variable the page requires that no document
+  // mentions — and that reverse is exactly how `CRON_SECRET` stayed invisible:
+  // `authoriseCron` required it, nothing documented it, all three jobs answered
+  // 401 in production, and the symptom was nothing at all.
+  //
+  // 09-TEST-PLAN now names both directions. This is the second one.
+  const doc = await fs.readFile(path.join(repoRoot, "docs", "10-SETUP.md"), "utf8");
+  const documented = new Set(
+    [...doc.matchAll(/`([A-Z][A-Z0-9_]{3,})`/g)].map((m) => m[1]),
+  );
+
+  const { ENV_SPEC } = await import("../../lib/site/preflight.ts");
+  const undocumented = ENV_SPEC.filter((v) => v.required && !documented.has(v.name))
+    .map((v) => v.name)
+    .sort();
+
+  eq(
+    undocumented.join(", "),
+    "",
+    "every variable the preflight requires is named in 10-SETUP. A preflight " +
+      "checking a variable nobody documented is how CRON_SECRET stayed invisible",
+  );
+});
+
 test("preflight cannot print a secret", async () => {
   // The page renders `envRows()`, and `envRows()` returns a boolean per
   // variable. There is no template edit that could leak a value, because the

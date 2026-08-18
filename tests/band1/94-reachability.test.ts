@@ -19,6 +19,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { withoutComments } from "../helpers/source.ts";
 import { ok, eq } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
 
@@ -228,13 +229,8 @@ test("every form action posts to a route handler that exists", async () => {
  * Comments are stripped instead. A comment may explain that the key was
  * deleted; rendered copy may not offer one.
  */
-function withoutComments(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .split("\n")
-    .filter((line) => !/^\s*(\/\/|\*)/.test(line))
-    .join("\n");
-}
+// Lives in `tests/helpers/source.ts` now — house rule 4. `97-copy-rule`
+// needs it verbatim, and two copies would drift.
 
 /**
  * Every route `04-SURFACES.md` §5 promises, read out of the document itself.

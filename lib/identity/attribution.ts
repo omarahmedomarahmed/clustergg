@@ -92,6 +92,115 @@ export function entrantCredit(entry: EntryAttribution): EntrantCredit[] {
   ];
 }
 
+// ===== N3/K13 — THE SENTENCE IS GENERATED HERE TOO =====
+//
+// House rule 2 says import numbers, never retype them. N3 extends it to the
+// sentence **around** the numbers, and N4 is the worked example: for a whole
+// sprint the public homepage said *"A gamer in two servers is worth half to
+// each"* — the ½-across-all-servers model Sprint 5 deleted. Every figure beside
+// it was correctly imported. The sentence was from the dead rule, so it said
+// nothing false about a number and nothing true about the rule.
+//
+// The fix is not a better sentence; a better sentence goes stale the same way.
+// It is that the sentence is **produced by calling `entrantCredit`** — the
+// function above, which is the whole rule. Change ½+½ to anything else and
+// this text changes with it, because it is reading the same answer the pool
+// reads.
+//
+// K13 requires it to name three things, and the third is the one a retyped
+// sentence always drops: **1.0 when parent and join are the same server, not
+// two halves.** Dropping it is exactly what made the old wording sound almost
+// right.
+
+/** Render a share the way a person says it, whatever the shares become. */
+function shareInWords(share: number): string {
+  if (share === 1) return "a whole entrant";
+  if (share === 0.5) return "half an entrant";
+  // Not a fallback nobody reaches — it is what keeps this honest if the split
+  // ever stops being even. A sentence that could only describe ½ is a sentence
+  // that would quietly lie the day it changed.
+  return `${Number((share * 100).toFixed(2))}% of an entrant`;
+}
+
+function shareFor(credits: EntrantCredit[], guildId: string): number {
+  return credits
+    .filter((c) => c.guildId === guildId)
+    .reduce((sum, c) => sum + c.share, 0);
+}
+
+/**
+ * How a server earns from one gamer, in words the rule itself produced.
+ *
+ * Every number in it comes from `entrantCredit`. Nothing here is typed.
+ */
+export function attributionSentence(): string {
+  const P = "parent", J = "join";
+  const split = entrantCredit({ parentGuildId: P, joinGuildId: J });
+  const together = entrantCredit({ parentGuildId: P, joinGuildId: P });
+
+  return (
+    `A gamer's entry is credited to two servers: the one that first brought ` +
+    `them to Cluster — their parent server, credited for acquisition — earns ` +
+    `${shareInWords(shareFor(split, P))}, and the server they entered from, ` +
+    `credited for conversion, earns ${shareInWords(shareFor(split, J))}. ` +
+    `When both are the same server it earns ` +
+    `${shareInWords(shareFor(together, P))}, not two halves.`
+  );
+}
+
+/**
+ * The same rule, short enough to sit under a KPI heading.
+ *
+ * Still generated, and still naming the same-server case — a "short version"
+ * that drops it is the old sentence with fewer words.
+ */
+export function attributionShort(): string {
+  const P = "parent", J = "join";
+  const split = entrantCredit({ parentGuildId: P, joinGuildId: J });
+  const together = entrantCredit({ parentGuildId: P, joinGuildId: P });
+
+  return (
+    `A gamer's entry is ${shareInWords(shareFor(split, P))} to their parent ` +
+    `server and ${shareInWords(shareFor(split, J))} to the server they ` +
+    `entered from, or ${shareInWords(shareFor(together, P))} when those are ` +
+    `the same server.`
+  );
+}
+
+/** The three ways a server can appear against one entry. */
+export type CreditRole = "parent" | "join" | "both";
+
+/**
+ * What a credit role means, in words the rule produced.
+ *
+ * The week-record page had these typed. Two of the three were right and the
+ * third — `both` — is the same-server case K13 names, which is exactly the one
+ * that goes stale first. Generated here so all three move together.
+ */
+export function roleMeaning(role: CreditRole): string {
+  const P = "parent", J = "join";
+  const split = entrantCredit({ parentGuildId: P, joinGuildId: J });
+  const together = entrantCredit({ parentGuildId: P, joinGuildId: P });
+
+  switch (role) {
+    case "parent":
+      return (
+        `credited as the parent — this server got them onto Cluster, ` +
+        `worth ${shareInWords(shareFor(split, P))}`
+      );
+    case "join":
+      return (
+        `credited as the join server — they pressed Join on this server's ` +
+        `card, worth ${shareInWords(shareFor(split, J))}`
+      );
+    case "both":
+      return (
+        `parent and join — one server did both, so it earned ` +
+        `${shareInWords(shareFor(together, P))}`
+      );
+  }
+}
+
 /**
  * A gamer can **never** change their own parent (A8). Cluster admin can, and
  * it is logged.

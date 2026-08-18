@@ -53,10 +53,13 @@ no.
 | `SETUP_TOKEN` | The first admin cannot be created. Remove it once one exists |
 | `CRON_SECRET` | **All three jobs answer 401 and the weekly cycle silently never runs.** No gun, no sync, no close, and nothing on any page says so |
 
-> **`CRON_SECRET` is not named in 10-SETUP.** It is load-bearing all the same:
-> `authoriseCron` fails closed without it. It is listed here, and on
-> `/admin/preflight` as required, because the code requires it. 10-SETUP is a
-> ratified document, so adding the line to it is the owner's call.
+> **`CRON_SECRET` fails closed, and that is the right direction** — an unset
+> secret makes the three jobs answer 401 rather than leaving the endpoint that
+> closes the week open to anybody who can POST to it. The cost is that the
+> symptom is *nothing at all*. It is now in 10-SETUP §1 and on
+> `/admin/preflight`, and the band asserts **both** directions: every variable
+> the document requires is on the preflight, and every variable the preflight
+> requires is in the document.
 
 > **`PORTAL_SECRET` is the one that gets forgotten**, and its failure does not
 > look like its cause.

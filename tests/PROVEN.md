@@ -1631,3 +1631,47 @@ nothing about a deployment. Where that was not possible, the row says so.
 | A real Discord button press | Needs the Interactions Endpoint URL set in the Developer Portal, which is a dashboard action. Signature verification and PING/PONG were proven locally with a real keypair |
 | `/admin/preflight` rendering in production | Needs an admin account, and the first admin is created by the owner at `/setup` with their own password |
 | The band against real Postgres | `resetDemoDb` **truncates every table** and refuses outside demo mode. That fence is correct and stays. The band has therefore only ever run on PGlite; the migrations, which are the part PGlite could lie about, were run against Neon directly |
+
+
+## Sprint 15b · a sentence that outlived its rule
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 233 | **The deleted model's sentence appears nowhere in the product** (`97-copy-rule`) | put *"a gamer in two servers is worth half to each"* back in `copy.ts` | *"no page describes attribution in the words of the model Sprint 5 deleted"*, naming the file | clean, 467/467 |
+| 234 | **Nothing outside the attribution module types the rule in words** (`97-copy-rule`) | same break | *"attribution is described only by the module that enforces it"*, naming both offending phrases | clean |
+| 235 | **The sentence is produced by the rule** (`97-copy-rule`) | changed the split from ½+½ to 0.7/0.3 and edited no page | the phrase self-check — the guard refuses to keep checking for words the module no longer says | clean |
+| 236 | **10-SETUP names every variable the preflight requires** (`95-deploy`) | added a required `UNDOCUMENTED_SECRET` to `ENV_SPEC` | *"every variable the preflight requires is named in 10-SETUP"* | clean |
+| 237 | **Preflight names every variable 10-SETUP requires** (`95-deploy`, reverse) | deleted `CRON_SECRET` from `ENV_SPEC` | *"every variable 10-SETUP §1 names appears on /admin/preflight"* | clean |
+
+### The break that proves N3 rather than a wording
+
+Guard 235 is the one worth reading. Changing `entrantCredit` from ½+½ to
+0.7/0.3 and touching **no page at all** moved the public homepage sentence to:
+
+> *"A gamer's entry is 70% of an entrant to their parent server and 30% of an
+> entrant to the server they entered from, or a whole entrant when those are
+> the same server."*
+
+That is the whole of N3 demonstrated: the sentence is not a good description of
+the rule, it is an **output of** the rule. The old sentence could not do this,
+which is why it survived the rewrite that made it false.
+
+The guard going red on that break is deliberate and not a defect: its phrase
+list is checked against what the module actually produces, so a rule change
+forces somebody to re-read which words are "the module's words". A guard that
+kept quietly scanning for *"half an entrant"* after halves stopped existing
+would be the same failure one level up.
+
+### Two the guard found that nobody had named
+
+The brief named `lib/content/copy.ts:41` and `lib/portal/owner.ts:147`. Walking
+the tree found two more:
+
+| File | What it said |
+|---|---|
+| `app/portal/server/[guildId]/members/page.tsx` | *"A gamer in two servers counts a **half to each**"* — **the deleted model, live, a third time.** Worded differently enough that a search for the homepage's exact phrase missed it |
+| `app/admin/weeks/[weekStart]/[guildId]/page.tsx` | Correct, but typed: three role meanings, of which `both` is K13's same-server case — the one that goes stale first |
+
+The members page is the argument for the general guard over the banned-phrase
+guard. A banned phrase only bans the phrase somebody already found; walking for
+**the words the module produces** found the paraphrase.
