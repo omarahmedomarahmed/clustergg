@@ -688,3 +688,48 @@ that went red.** The two runs are two facts, not one fact and a correction.
 terminal. It costs nothing, it survives the scrollback, and it turns "somewhere
 above the tail window" into a line number. `tail -30` on a pass that prints
 seventy-eight assertions was never going to show me a failure in the middle.
+
+---
+
+## 31 · A fence that keeps a card standing also keeps you from noticing it fell
+
+**What I did.** Built the card families, ran the band green, and pressed a real
+button on a real build to check a human could reach one. The interaction
+answered `200`. The log said:
+
+```
+[card] decoration failed and was skipped: card — No fonts are loaded.
+```
+
+Every card on the platform was throwing in the renderer and arriving as text.
+
+**Why it looked right.** House rule 11 is *"a decoration may never take a card
+down"*, and the fence was doing precisely that: catching the throw, logging it
+with the reason, and delivering the card without its picture. Band 1 green.
+Band 2 green. Every card delivered. Nothing had failed anywhere, because
+nothing was **allowed** to fail.
+
+**What it cost.** Nothing yet, and only because I looked. `ImageResponse` uses
+its vendored font when `fonts` is *omitted* and throws when handed `fonts: []`
+— and `loadCardFonts()` returns `[]` when no brand fonts are installed, which
+is the documented normal case. One line, and the product had silently lost its
+entire visual identity: 04 §4 asks for *"a rendered image, consistent,
+branded"* and it was shipping plain text.
+
+**What catches it now.** Guard 210, and the shape of it is the transferable
+part: **it asserts bytes returned, not that the fence reported success.** A
+card that degraded to text also succeeds, so a guard phrased as "the card was
+delivered" is green on exactly the failure it exists to catch.
+
+The general rule: **a fence converts a failure into a degraded success, so
+every fence needs a guard on the un-degraded case.** Fencing is not the same as
+handling, and the log is the only place the difference is visible — which is
+why "press it and read the log" earned its place in the routine rather than
+"press it and see a 200".
+
+A footnote from the same investigation, because trap 13 caught me again: I
+killed the `npx` wrapper, `next-server` kept port 3000, my replacement died
+with `EADDRINUSE`, and the server answering my signed interactions was the
+**old** one, started without the public key. The symptom was `401 bad
+signature`, which reads as a signing bug and is not one. Kill by finding the
+`next-server` pid, and check the port is free before believing anything.

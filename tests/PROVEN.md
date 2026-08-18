@@ -1312,6 +1312,8 @@ take a page down.
 | 207 | …and a converter's output is not trusted | The post-conversion check removed | *"nothing undecodable ever reaches storage"* | clean, 426/427 |
 | 208 | **The Riot fetch helper consults the approved list** | The call deleted, the import left | *"a Riot call is checked against the approved path list"* | clean, 426/427 |
 | 209 | …and the list actually refuses something | `isApprovedRiotPath` returns true | same | clean, 426/427 |
+| 210 | **A card renders with no brand fonts installed** | `fonts: []` passed back to `ImageResponse` | *"a card renders with no brand fonts installed"* | clean, 428/429 |
+| 211 | The layout never names a font that is not loaded | `fontFamily` hard-coded to `"Cluster, sans-serif"` | *"the card family string never names a font that is not loaded"* | clean, 428/429 |
 
 ### Guard 191 went green first, and the fixture is why
 
@@ -1370,3 +1372,38 @@ Three things, all the same shape, all found by wiring rather than by reading:
 | `SCREENS`, the registry, and a handler that falls back to *"that screen has gone"* | Any screen at all. Every interaction on the platform answered with a stale-button message |
 | `riot-methods.ts`, the authority on the personal key's 39 paths, diffed against Riot's own list | The fetch helper. An unapproved path would have returned a 403 that reads exactly like an expired key |
 | `acceptImage`, holding *"nothing that is not PNG or JPEG reaches storage"* | Any upload. The rule was enforced by nobody for two sprints |
+
+### Guards 210 and 211: the fence was hiding a renderer that never rendered
+
+Found by pressing a real button on a real build and reading the log, which is
+the only place it was visible:
+
+```
+[card] decoration failed and was skipped: card — No fonts are loaded.
+```
+
+`ImageResponse` ships a vendored Noto Sans and uses it when `fonts` is
+**omitted**. Passing `fonts: []` throws. And `loadCardFonts()` returns `[]`
+when no brand fonts are installed — which is not an error, it is the documented
+normal case, and `fonts.ts` says so in its own header.
+
+So `render.ts` handed the renderer an empty array and **every card on the
+platform threw.** The fence caught it, the text fallback went out, and nothing
+failed anywhere: band 1 green, band 2 green, every card delivered. The product
+had quietly lost its entire visual identity — 04 §4's *"every reply is a card ·
+rendered image, consistent, branded"* — and told nobody.
+
+House rule 11 working exactly as written, and hiding the reason it was working.
+
+**What the guard therefore asserts is bytes returned, not `fence` reporting
+success.** A card that degraded to text also succeeds, and that is the state
+this exists to catch. Verified twice on a real build: the log carried four
+`decoration failed` lines before the fix and none after.
+
+Two smaller things fell out of the same read. `cardFontFamily` was exported and
+called by nothing while the layout named `Cluster` by hand — a family the
+renderer has never heard of unless somebody has dropped the TTFs in. And trap
+13 caught me again on the way: I killed the `npx` wrapper, `next-server` kept
+port 3000, my replacement died with EADDRINUSE, and the server answering my
+signed interactions was the **old** one with no public key. The symptom was
+`401 bad signature`, which reads as a signing bug and is not one.
