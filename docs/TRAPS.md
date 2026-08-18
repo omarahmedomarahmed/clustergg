@@ -770,3 +770,48 @@ failed and I do not know which" into a line number and a fix.
 The rule underneath both: **a wait that is already true is not a wait**, and it
 fails only under load — which means it fails in exactly the run you are least
 able to reproduce.
+
+---
+
+## 33 · I left a mutation harness running for an hour and kept reading the tree it was editing
+
+**What I did.** Started `npm run mutate` with `nohup … &`, from a command whose
+redirect referenced a shell variable the parent had not set. The redirect
+failed, the background *task* was reported as failed within seconds — and
+`nohup npm run mutate` carried on running, detached, for **an hour and
+nineteen minutes**.
+
+**Why it looked right.** The task notification said `status: failed`. I read
+the output, saw `tail: cannot open …`, restored the one file `git status`
+showed as modified, and moved on. Everything about that reads as "the job did
+not run".
+
+**What it cost.** Every `git status`, every `npm run typecheck`, and one whole
+"prove the new guard works" experiment ran against a tree a live process was
+mutating and restoring underneath me. I restored `lib/money/amounts.ts`,
+declared the tree clean — and it was, *at that instant*, because the harness
+had just restored it and not yet mutated the next file. Ninety seconds later
+`lib/pool/score.ts` was carrying *"delete the flat participation share"* and I
+had no idea where it had come from.
+
+Nothing shipped wrong, because the new dirty-tree guard caught it and named the
+file. But I spent twenty minutes reconstructing a history that had a much
+simpler explanation than any of the ones I tried first.
+
+**What catches it now.** Two things, and the second is the one that matters.
+
+The harness **refuses to start on a dirty tree** and names the files, so a
+mutation left behind by a killed run is caught by the next run rather than by
+somebody reading a diff.
+
+And the habit: **house rule 9 is not only about servers.** *"Kill background
+tasks you start"* covers anything that outlives the command — and a process
+that edits source files is far worse to leave running than one that holds a
+port. A stray server serves a stale page; a stray mutation harness makes every
+subsequent observation a race.
+
+**The transferable part:** a background job reported as *failed* is a statement
+about the **command**, not about every process it spawned. `nohup` exists
+precisely to survive that. Before trusting a tree, `ps` for what you started —
+and prefer a foreground run with a long timeout over a detached one you cannot
+see.
