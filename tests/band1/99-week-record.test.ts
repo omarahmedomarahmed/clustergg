@@ -72,6 +72,46 @@ test("the record is written at the close, from the division /pool already showed
   }
 });
 
+test("nothing that writes or reads the record computes a pool of its own", async () => {
+  // ===== WHY THIS IS STRUCTURAL AND NOT A VALUE COMPARISON =====
+  //
+  // Break 169 replaced the division with a **recomputation** a day later, and
+  // went green — because on a fixture where nothing moved in between, the two
+  // agree. That is trap 2 exactly: the assertion was true and could not vary.
+  //
+  // The property W1/K12 actually states is not "the numbers match today", it
+  // is *there is only one implementation*. So it is checked where it can only
+  // be true or false: the module that **writes** the record must not compute
+  // one, and the pages that **read** it must not either. 05 §6 rule 3 says the
+  // same about the pages in the same words — nothing on them is recalculated.
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+  const strip = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+  const writer = strip(await fs.readFile(path.join(repoRoot, "lib", "pool", "record.ts"), "utf8"));
+  ok(/writeWeekRecord/.test(writer), "the read reached the writer — an empty read would prove nothing");
+  no(
+    /poolDivisionFor|kpisForWeek|dividePool/.test(writer),
+    "the module that writes the record does not compute one — it is handed the division the close already made",
+  );
+
+  const pages = [
+    "app/admin/weeks/page.tsx",
+    "app/admin/weeks/[weekStart]/page.tsx",
+    "app/admin/weeks/[weekStart]/[guildId]/page.tsx",
+  ];
+  for (const rel of pages) {
+    const src = strip(await fs.readFile(path.join(repoRoot, rel), "utf8"));
+    ok(/weekRecords|weekSummaries|weekCredits/.test(src), `${rel} reads the record`);
+    no(
+      /poolDivisionFor|kpisForWeek|dividePool|closeWeek/.test(src),
+      `${rel} recalculates nothing — a figure that disagrees is a defect to raise, not a number to recompute`,
+    );
+  }
+});
+
 test("closing twice does not write a second record", async () => {
   // W2 forbids updating a row, so a second write is a **duplicate** — and
   // `Σ totalCents` (W3) would then be double the pool with no edit having
