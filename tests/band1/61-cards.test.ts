@@ -434,3 +434,204 @@ test("the lifecycle bar the bot and the web share reads the same either side", (
   eq(lifecycleProgress("live").done, 5, "live is the fifth of six");
   eq(lifecycleProgress("ended").percent, 100, "and ended is finished");
 });
+
+// ── The close, as a job rather than as a test that orchestrates one ─────────
+
+test("the daily job runs the whole close, not two steps of it", async () => {
+  // ===== THE ONE THIS SUITE EXISTS FOR =====
+  //
+  // `runDailyJobs` ran `stampBaselinesAtGun` and `closeChallenges` and stopped.
+  // No trophies, no draft payout, no week record, no announcement — on a real
+  // deployment the entire close, as a gamer or an owner experiences it, did
+  // not happen.
+  //
+  // Every step was built, correct, and guarded. `99-full-cycle` ran them **by
+  // hand**, in this order, which is exactly why nothing noticed: the band
+  // orchestrated the close itself, so it never asked whether anything else
+  // did. §0.1, on the largest thing on the platform.
+  //
+  // ===== CAN THIS FAIL? =====
+  //
+  // Every assertion below is a separate step of 03 §9, and removing any one
+  // line from `runDailyJobs` turns exactly one of them red. That is the shape
+  // this guard has to have: a single "the close ran" assertion would go green
+  // on a job that did half of it.
+  const db = await resetDemoDb();
+  const { closeWeek: _unused } = await import("../../lib/pool/score.ts");
+  void _unused;
+
+  const weekStart = new Date("2026-09-07T00:00:00Z");
+  const closeAt = new Date("2026-09-11T00:00:01Z");
+  await aClosableWeek(db, weekStart);
+
+  const { runDailyJobs } = await import("../../lib/challenges/jobs.ts");
+  const result = await runDailyJobs(db, closeAt);
+
+  eq(result.close.closed.length, 1, "the challenge closed");
+
+  // 03 §9 step 3 and 4 — podium trophies, and the $0 collectable for everyone
+  // who turned up.
+  const awarded = await db.select().from(schema.userTrophies);
+  ok(awarded.length > 0, `trophies were awarded (${awarded.length})`);
+  ok(result.settled > 0, "and the job says how many");
+
+  // Step 8 — the pool, and payouts opened as **drafts**. A1: it computes, a
+  // human releases, so nothing here may be `released`.
+  const payouts = await db.select().from(schema.serverPayouts);
+  ok(payouts.length > 0, `a payout was drafted (${payouts.length})`);
+  ok(
+    payouts.every((p) => p.status === "draft"),
+    "and every one of them is a draft — a job never releases money",
+  );
+
+  // W1 — the week's working, written once, from the division the close made.
+  const records = await db.select().from(schema.weekRecords);
+  ok(records.length > 0, `the week's record was written (${records.length} rows)`);
+
+  // Steps 7 and 9 — winners on Friday, pool standings on Saturday. Both
+  // through the queue (A3), which is what these rows are.
+  const queued = await db.select().from(schema.discordPostQueue);
+  const kinds = new Set(queued.map((q) => q.ledgerKind));
+  ok(kinds.has("result"), `the close announced something: ${[...kinds].join(", ")}`);
+  ok(result.announced > 0, "and the job says how many cards");
+  ok(result.pool.announced > 0, "including the pool standings");
+});
+
+test("running the close twice awards nothing twice", async () => {
+  // Trap 14's shape, on the job that matters most. A cron fires on a schedule
+  // and a schedule fires twice — a retried invocation, an operator pressing
+  // the button, a deploy that overlaps. Every step in the close is idempotent
+  // and this is where that is checked as one property rather than six.
+  const db = await resetDemoDb();
+  const weekStart = new Date("2026-09-07T00:00:00Z");
+  const closeAt = new Date("2026-09-11T00:00:01Z");
+  await aClosableWeek(db, weekStart);
+
+  const { runDailyJobs } = await import("../../lib/challenges/jobs.ts");
+  await runDailyJobs(db, closeAt);
+
+  const after = {
+    trophies: (await db.select().from(schema.userTrophies)).length,
+    payouts: (await db.select().from(schema.serverPayouts)).length,
+    records: (await db.select().from(schema.weekRecords)).length,
+  };
+
+  await runDailyJobs(db, new Date(closeAt.getTime() + 60_000));
+
+  eq((await db.select().from(schema.userTrophies)).length, after.trophies, "no second trophy");
+  eq((await db.select().from(schema.serverPayouts)).length, after.payouts, "no second payout");
+  eq((await db.select().from(schema.weekRecords)).length, after.records, "no second record");
+});
+
+/** A week with one paid, announced, trophied challenge and two entrants. */
+async function aClosableWeek(
+  db: Awaited<ReturnType<typeof resetDemoDb>>,
+  weekStart: Date,
+): Promise<string> {
+  const { createGamer } = await import("../../lib/identity/gamers.ts");
+  const { createInvoice, markPaid } = await import("../../lib/money/invoices.ts");
+  const { createChallenge, attachInvoice, markScheduled, announce } = await import(
+    "../../lib/challenges/lifecycle.ts"
+  );
+  const { createTrophy } = await import("../../lib/trophies/trophies.ts");
+  const { allocateToPool } = await import("../../lib/money/pool.ts");
+  const { freezeEligibilityAtGun, LINKED_MEMBERS_TO_UNLOCK_POOL } = await import(
+    "../../lib/pool/eligibility.ts"
+  );
+  const { CHALLENGE_PRICE_CENTS } = await import("../../lib/money/amounts.ts");
+
+  const guildId = await aGuild(db, {
+    guildId: "close-guild",
+    name: "Nightfall",
+    community: "A competitive community.",
+    memberAgeRange: "18-24",
+    gamesPlayed: ["Chess"],
+    inviteUrl: "https://discord.gg/close-guild",
+    coverImageUrl: "https://cdn.test/close.png",
+  });
+
+  for (let i = 0; i < LINKED_MEMBERS_TO_UNLOCK_POOL + 1; i++) {
+    const userId = await createGamer(db, { displayName: `m${i}`, parentGuildId: guildId });
+    await db.insert(schema.linkedGameAccounts).values({
+      id: uid(),
+      userId,
+      provider: "chesscom",
+      providerAccountId: `acct-${uid()}`,
+      verified: true,
+      verifiedMethod: "exists",
+    });
+  }
+  await freezeEligibilityAtGun(db, weekStart);
+
+  const challengeId = await createChallenge(db, {
+    title: "Acme Weekly",
+    game: "Chess",
+    provider: "chesscom",
+    startAt: weekStart,
+    metrics: { wins: 10, matches: 1 },
+    prizePoolCents: 17_500,
+    places: 1,
+  });
+  const invoiceId = await createInvoice(db, {
+    payerType: "brand",
+    lines: [{ description: "Challenge", amountCents: CHALLENGE_PRICE_CENTS }],
+  });
+  await attachInvoice(db, challengeId, invoiceId);
+  await markPaid(db, invoiceId);
+  await markScheduled(db, challengeId);
+  // T3 — the podium values must equal the prize pool, or the announce refuses.
+  await createTrophy(db, {
+    name: "Acme Champion",
+    type: "podium",
+    valueCents: 17_500,
+    challengeId,
+    place: 1,
+  });
+  await announce(db, challengeId, "admin-1", [guildId]);
+
+  for (let i = 0; i < 2; i++) {
+    const userId = await createGamer(db, { displayName: `entrant-${i}`, parentGuildId: guildId });
+    const accountId = uid();
+    await db.insert(schema.linkedGameAccounts).values({
+      id: accountId,
+      userId,
+      provider: "chesscom",
+      providerAccountId: `entrant-acct-${uid()}`,
+      verified: true,
+      verifiedMethod: "exists",
+    });
+    await db.insert(schema.challengeParticipants).values({
+      id: uid(),
+      challengeId,
+      userId,
+      linkedAccountId: accountId,
+      joinGuildId: guildId,
+      parentGuildIdAtBaseline: guildId,
+      joinedAt: weekStart,
+      baselineAt: weekStart,
+      baseline: { wins: 0, matches: 0 },
+    });
+    // Somebody has to have played, or activation is zero and the server earns
+    // nothing — which would make the payout assertion pass for the wrong
+    // reason on a week where nothing happened.
+    // One row per metric, which is what the table actually stores. A wide row
+    // per reading would have made `scoreFrom` read a JSON blob, and a metric
+    // added later would then be invisible to every observation before it.
+    for (const [metricKey, value] of [
+      ["wins", i + 1],
+      ["matches", (i + 1) * 3],
+    ] as const) {
+      await db.insert(schema.observations).values({
+        id: uid(),
+        linkedAccountId: accountId,
+        provider: "chesscom",
+        metricKey,
+        value,
+        observedAt: new Date(weekStart.getTime() + 60_000),
+      });
+    }
+  }
+
+  await allocateToPool(db, { weekStart, amountCents: 4_000 });
+  return challengeId;
+}
