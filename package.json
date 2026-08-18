@@ -16,12 +16,13 @@
     "test": "tsc --noEmit && tsx tests/run.mts",
     "mutate": "tsx tests/mutate.mts",
     "demo": "next build && next start",
-    "test:browser": "tsx tests/band2/site.mts && tsx tests/band2/admin.mts && tsx tests/band2/portals.mts",
+    "test:browser": "tsx tests/band2/site.mts && tsx tests/band2/admin.mts && tsx tests/band2/portals.mts && tsx tests/band2/gamer-money.mts",
     "seed": "tsx scripts/seed-demo.mts",
     "test:browser:site": "tsx tests/band2/site.mts",
     "test:browser:admin": "tsx tests/band2/admin.mts",
     "test:browser:portals": "tsx tests/band2/portals.mts",
-    "test:band": "tsx tests/run.mts"
+    "test:band": "tsx tests/run.mts",
+    "test:browser:gamer-money": "tsx tests/band2/gamer-money.mts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",

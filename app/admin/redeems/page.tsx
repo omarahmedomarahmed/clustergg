@@ -76,6 +76,8 @@ export default async function Redeems({
                         <button
                           type="submit"
                           className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white"
+                          data-testid={`redeem-${next.step}`}
+                          data-status={redemption.status}
                         >
                           {next.label}
                         </button>

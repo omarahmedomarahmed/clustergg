@@ -11,11 +11,13 @@ import { createGamer, setAgeBand, setCountry } from "../identity/gamers.ts";
 import { linkAccount } from "../identity/accounts.ts";
 import { signUpBrand, confirmAndPay, onInvoicePaid } from "../portal/brand.ts";
 import { createTrophy } from "../trophies/trophies.ts";
+import { settleChallenge } from "../trophies/settle.ts";
 import { announce } from "../challenges/lifecycle.ts";
 import { enterChallenge } from "../challenges/entry.ts";
-import { stampBaselinesAtGun } from "../challenges/jobs.ts";
+import { stampBaselinesAtGun, closeChallenges } from "../challenges/jobs.ts";
 import { forceSync } from "../core/sync.ts";
 import { allocateToPool, maxAllocationCents } from "../money/pool.ts";
+import { closeWeek } from "../pool/score.ts";
 import { balanceOf } from "../money/ledger.ts";
 import { buildCommunityChallenge, payCommunityChallenge } from "../portal/owner.ts";
 import { weekStartFor } from "../challenges/week.ts";
@@ -194,7 +196,42 @@ export async function seedDemo(now = new Date()) {
     await announce(db, challengeId, "demo-admin", guildIds);
   };
 
-  await setUpAndAnnounce(past[0], acme.brandId, "Acme Energy Weekly — last week");
+  // ===== LAST WEEK HAS A THREE-PLACE PODIUM, ON PURPOSE =====
+  //
+  // With one place there is exactly one money-trophy in the whole demo, and it
+  // lands on whoever scored highest — an adult, as the fixture happens to fall.
+  // 09's gamer flow then has no way to photograph shot 17, *"redeem: blocked
+  // under 18"*, because no 13–17 gamer holds anything worth blocking.
+  //
+  // Three places puts second on a teen and first on an adult, so the same demo
+  // shows the refusal and the payout. T2/T3 still hold: the three values add up
+  // to the prize pool exactly, and they are derived from it here rather than
+  // typed, so a change to the price cannot silently break the guard.
+  const pastPrize = splitOf(CHALLENGE_PRICE_CENTS).prize;
+  const podium = [
+    Math.round(pastPrize * 0.5),
+    Math.round(pastPrize * 0.3),
+    pastPrize - Math.round(pastPrize * 0.5) - Math.round(pastPrize * 0.3),
+  ];
+  await db
+    .update(schema.challenges)
+    .set({
+      metrics: { wins: 10, matches: 1 },
+      title: "Acme Energy Weekly — last week",
+      places: podium.length,
+    })
+    .where(eq(schema.challenges.id, past[0]));
+  for (const [i, valueCents] of podium.entries()) {
+    await createTrophy(db, {
+      type: "podium",
+      name: `Acme Energy Weekly — ${["champion", "runner-up", "third"][i]}`,
+      valueCents,
+      brandId: acme.brandId,
+      challengeId: past[0],
+      place: i + 1,
+    });
+  }
+  await announce(db, past[0], "demo-admin", guildIds);
   await setUpAndAnnounce(current[0], acme.brandId, "Acme Energy Weekly");
   await setUpAndAnnounce(novaCurrent[0], nova.brandId, "Nova Peripherals Showdown");
   await setUpAndAnnounce(nextWeek[0], nova.brandId, "Nova Peripherals — next week");
@@ -247,6 +284,51 @@ export async function seedDemo(now = new Date()) {
     place: 1,
   });
   await announce(db, communityNext.challengeId, "demo-admin", [guildIds[1]]);
+
+  // ===== LAST WEEK IS ACTUALLY PLAYED, CLOSED AND PAID =====
+  //
+  // The seeder bought a challenge for last week, set it up and announced it —
+  // and then nobody entered it and nothing closed it. So the demo had no
+  // placements, no trophies, no week record and no payouts, and the whole
+  // second half of 09's gamer flow (shots 14 and 16-21: *trophy awarded*,
+  // *profile with trophies*, *redeem blocked under 18*, *redeem refused on a
+  // $0 trophy*) could not be photographed, because none of those states
+  // existed in the demo at all.
+  //
+  // This is not decoration. A closed week is the only way the record can show
+  // a **podium trophy beside a $0 collectable on the same profile**, which is
+  // the comparison T1 exists for — and the only way `/redeem` can be
+  // photographed refusing anything, since a refusal needs something to refuse.
+  const lastClose = new Date(lastWeek.getTime() + 5 * 86_400_000);
+  for (const [i, g] of gamers.entries()) {
+    if (i % 3 === 2) continue; // The same "not everybody enters" shape as below.
+    await enterChallenge(
+      db,
+      { challengeId: past[0], userId: g.userId, guildId: g.joinGuildId },
+      new Date(lastWeek.getTime() - 86_400_000),
+    );
+  }
+  await stampBaselinesAtGun(db, lastWeek);
+  for (const [i, g] of gamers.entries()) {
+    const s = stats.get(g.providerAccountId)!;
+    if (i % 4 !== 3) {
+      s.wins += 1 + (i % 7);
+      s.matches += 4 + (i % 9);
+    }
+    await forceSync(db, g.accountId, { at: new Date(lastWeek.getTime() + 86_400_000) });
+  }
+  // Placements first, then trophies. `closeChallenges` runs the final sync
+  // itself — B3, and the reason the close is a job rather than a query.
+  await closeChallenges(db, lastClose);
+  await settleChallenge(db, past[0], { actorId: "demo-admin", at: lastClose });
+
+  // And last week's pool, so there is a week record to read and a payout to
+  // release. W1 — written once, at the close.
+  const lastCeiling = maxAllocationCents(await balanceOf(db, "server"));
+  if (lastCeiling > 0) {
+    await allocateToPool(db, { weekStart: lastWeek, amountCents: lastCeiling, actorId: "demo-admin" });
+    await closeWeek(db, lastWeek, lastClose);
+  }
 
   // ── Play the current week up to Wednesday. ────────────────────────────
   const liveChallenges = [current[0], novaCurrent[0]];
