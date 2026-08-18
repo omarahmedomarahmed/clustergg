@@ -63,6 +63,14 @@ export default async function BrandTrophies({
         detailed.map(({ trophy, detail }) => (
           <Panel
             key={trophy.id}
+            help={
+              <p>
+                A trophy&rsquo;s <strong>value can never be edited</strong> — a $100
+                trophy is a $100 trophy forever, on every profile that holds it. Its
+                name, image and brand can change, and the edit reaches every holder
+                everywhere at once.
+              </p>
+            }
             title={trophy.name}
             note={
               trophy.valueCents > 0

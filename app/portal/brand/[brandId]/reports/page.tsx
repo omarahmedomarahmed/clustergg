@@ -47,7 +47,19 @@ export default async function BrandReports({
     <div className="flex flex-col gap-6">
       <h1 className="text-2xl font-semibold tracking-tight">Reports</h1>
 
-      <Panel title="Filter" note="By game, by week. Never rolled into one number">
+      <Panel
+        title="Filter"
+        note="By game, by week. Never rolled into one number"
+        help={
+          <p>
+            Reach and entrants are <strong>counted per challenge</strong> and
+            deliberately counted again on the next one. The same gamer entering two
+            weeks is two entrants. We will not add them into a &ldquo;unique
+            audience&rdquo; figure, because that figure would be modelled and
+            everything here happened.
+          </p>
+        }
+      >
         <form method="get" className="flex flex-wrap items-end gap-3">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-mute">Game</span>
@@ -88,6 +100,13 @@ export default async function BrandReports({
       </Panel>
 
       <Panel
+        help={
+          <p>
+            <strong>Reach</strong> is every member of every server the challenge was
+            announced to, counted at the moment it was announced.{" "}
+            <strong>Entrants</strong> are the gamers who joined that one.
+          </p>
+        }
         title="Per challenge"
         note="One row per challenge, and deliberately no total — the sum of these would not be a number of people"
       >

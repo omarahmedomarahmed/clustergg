@@ -38,7 +38,13 @@ import { settleChallenge, sweep, reverseSweep } from "../../lib/trophies/settle.
 import { checkPrizeVault } from "../../lib/money/prize-vault.ts";
 import { balanceOf } from "../../lib/money/ledger.ts";
 import { createInvoice, markPaid } from "../../lib/money/invoices.ts";
-import { createGamer, setAgeBand, setCountry } from "../../lib/identity/gamers.ts";
+import {
+  createGamer,
+  setAgeBand,
+  setCountry,
+  deleteAccount,
+  DeletionRefused,
+} from "../../lib/identity/gamers.ts";
 import { CHALLENGE_PRICE_CENTS, TROPHY_HOLD_YEARS, formatMoney } from "../../lib/money/amounts.ts";
 import { createChallenge, attachInvoice, markScheduled } from "../../lib/challenges/lifecycle.ts";
 import { uid } from "../../lib/core/utils.ts";
@@ -423,6 +429,44 @@ test("a $0 trophy is unredeemable at the action, not merely hidden", async () =>
   ok(err instanceof RedemptionRefused, "with the redemption error");
 });
 
+test("/redeem is handed the collectable too, so the refusal is reachable", async () => {
+  // ===== T2's SECOND HALF, WHICH IS THE ONE ABOUT SURFACES =====
+  //
+  // *"Enforced at the redeem action, **not merely hidden in the UI**."* The
+  // test above proves the action refuses. This one proves the button can be
+  // reached: a page whose query never returns the $0 holding would satisfy
+  // the rule and photograph nothing, and 09 Band 2 shot 21 exists to
+  // photograph exactly that refusal.
+  //
+  // Asserted on the query rather than on the JSX, because "does the template
+  // render a button" is a rendering property and belongs in the browser pass
+  // (break 179's lesson). What band 1 can hold is that the page is **given**
+  // the row, with the refusal already attached, from the same function the
+  // action calls.
+  const db = await resetDemoDb();
+  const userId = await anAdult(db, "Holder Of Both");
+  const { code } = await startEmailVerification(db, userId, "both@example.com");
+  await confirmEmailVerification(db, userId, code);
+  await aHolding(db, userId, 0);
+  await aHolding(db, userId, 5_000);
+
+  const { myRedeemables } = await import("../../lib/site/queries.ts");
+  const { rows } = await myRedeemables(userId);
+  eq(rows.length, 2, "both holdings reach the page");
+
+  const collectable = rows.find((r) => r.trophy.valueCents === 0);
+  ok(collectable !== undefined, "including the one worth nothing");
+  eq(
+    collectable!.eligibility.ok ? "" : collectable!.eligibility.code,
+    "zero_value",
+    "carrying the refusal the action would give, from the same function",
+  );
+
+  // The positive half, or a query that refused everything would pass.
+  const money = rows.find((r) => r.trophy.valueCents > 0);
+  ok(money !== undefined && money.eligibility.ok, "and the money one is offered");
+});
+
 test("a teen keeps the trophy and is told when they can have it", async () => {
   const db = await resetDemoDb();
   const userId = await createGamer(db, { displayName: "Young Winner" });
@@ -549,7 +593,22 @@ test("the same trophy cannot be redeemed twice", async () => {
   );
 });
 
-test("deletion is refused while a redemption is in flight", async () => {
+// ===== R3 / V17 — AND THE TEST THAT USED TO BE NAMED AFTER IT =====
+//
+// Until Sprint 11 there was a case here called *"deletion is refused while a
+// redemption is in flight"* whose body did what the first test below does and
+// stopped. Every assertion was true; not one of them was about deletion —
+// because **nothing on the platform deleted an account**, and every suite that
+// needed a deleted gamer wrote `UPDATE users SET status='deleted'` by hand.
+//
+// That is §0.1 with its halves reversed. The usual shape is evidence that
+// exists and nothing that reads it; this was a guard that existed and a rule
+// that did not, and the test name read identically either way. Trap 2, in the
+// suite most likely to be believed about money.
+//
+// So the two claims are now two tests, named for what each actually proves.
+
+test("what counts as in flight is pending, approved or sent — and not paid", async () => {
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Leaving Mid-Payout");
   const holdingId = await aHolding(db, userId, 10_000);
@@ -564,6 +623,72 @@ test("deletion is refused while a redemption is in flight", async () => {
 
   await markRedemptionPaid(db, id, "admin-1");
   eq((await redemptionsInFlight(db, userId)).length, 0, "and settled once paid");
+});
+
+test("deletion is refused while a redemption is in flight, and allowed once it lands", async () => {
+  // ===== CAN THIS FAIL? =====
+  //
+  // Yes, both ways, which is what the old version could not do. Dropping the
+  // check makes the first half green and the refusal disappear; making
+  // `deleteAccount` refuse unconditionally makes the second half red. Guard
+  // 118's lesson: without the positive half, a function that refuses everybody
+  // satisfies the negative one.
+  const db = await resetDemoDb();
+  const userId = await anAdult(db, "Closing Mid-Payout");
+  const holdingId = await aHolding(db, userId, 10_000);
+  const { code } = await startEmailVerification(db, userId, "c@example.com");
+  await confirmEmailVerification(db, userId, code);
+  const id = await requestRedemption(db, { userTrophyId: holdingId, userId, method: "bank" });
+
+  await throws(
+    () => deleteAccount(db, userId),
+    /cannot close the account/i,
+    "money already handed to a provider cannot be paid to a record that is gone",
+  );
+  const [stillHere] = await db
+    .select()
+    .from(schema.users)
+    .where(sqlEq(schema.users.id, userId));
+  eq(stillHere.status, "active", "and the refusal left the account exactly as it was");
+
+  await approveRedemption(db, id, "admin-1");
+  await markSent(db, id, "admin-1");
+  await throws(
+    () => deleteAccount(db, userId),
+    /cannot close the account/i,
+    "still refused once sent — that is the moment the money is furthest out of reach",
+  );
+
+  await markRedemptionPaid(db, id, "admin-1");
+  await deleteAccount(db, userId);
+  const [gone] = await db.select().from(schema.users).where(sqlEq(schema.users.id, userId));
+  eq(gone.status, "deleted", "and it goes through once the payout has landed");
+});
+
+test("a closed account is not a deleted row, because the trophy money was real", async () => {
+  // V14/T6 — the holding **survives** the holder, as an orphan, so the prize
+  // vault keeps accounting for money a brand actually paid. V15 then lets
+  // admin sweep it, which is the only thing that makes the invariant hold
+  // again — and none of that is possible if the row is hard-deleted.
+  //
+  // The contrast worth being exact about: the under-13 path *is* a hard
+  // delete, because there is no lawful reason to keep a row we should never
+  // have made. Two closures, two mechanisms, and the difference is the money.
+  const db = await resetDemoDb();
+  const userId = await anAdult(db, "Closing With A Trophy");
+  await aHolding(db, userId, 10_000);
+
+  await deleteAccount(db, userId);
+
+  const holdings = await db
+    .select()
+    .from(schema.userTrophies)
+    .where(sqlEq(schema.userTrophies.userId, userId));
+  eq(holdings.length, 1, "the holding is still there");
+  eq(holdings[0].redeemedAt, null, "and it was never marked cashed out, because it was not");
+
+  const check = await checkPrizeVault(db);
+  eq(check.state, "orphaned", "the vault says so rather than quietly balancing");
 });
 
 // ── Sweeps ──────────────────────────────────────────────────────────────────

@@ -36,7 +36,19 @@ export default async function OwnerMembers({
       <h1 className="text-2xl font-semibold tracking-tight">Members</h1>
 
       <section className="grid gap-3 sm:grid-cols-3">
-        <Figure label="Linked members" value={String(members.length)} testId="linked-members" />
+        <Figure
+          label="Linked members"
+          value={String(members.length)}
+          help={
+            <p>
+              Gamers whose <strong>first bot click</strong> was in your server, and who
+              have linked a game account. Not your Discord member count — we do not
+              read your member list for this, and a bigger server is not
+              automatically a better one.
+            </p>
+          }
+          testId="linked-members"
+        />
         <Figure
           label="Entrants this week"
           value={overview?.kpis ? overview.kpis.entrants.toFixed(1) : "0"}
@@ -52,6 +64,13 @@ export default async function OwnerMembers({
       <Panel
         title="Who is linked"
         note="Public profiles only. We do not show you anybody's age, country or game handles — not to you, and not to our own staff"
+        help={
+          <p>
+            You are seeing exactly what any visitor sees on a public profile. Age
+            band and country are compliance fields, they decide whether somebody can
+            be paid, and no portal shows them to anybody.
+          </p>
+        }
       >
         {members.length === 0 ? (
           <Empty>Nobody in this server has linked a game account yet.</Empty>

@@ -48,6 +48,13 @@ export default async function OwnerWallet({
           label="Available"
           value={formatMoney(overview.availableCents)}
           note="Released and not yet withdrawn"
+          help={
+            <p>
+              Only the Discord <strong>guild owner</strong> can withdraw. Administrators
+              and mapped roles see everything here and cannot move it — one person
+              touches the money, and that is the whole of the rule.
+            </p>
+          }
           testId="wallet-available"
         />
         <Figure
@@ -59,6 +66,13 @@ export default async function OwnerWallet({
       <Panel
         title="Every week"
         note="A payout is drafted on Friday and released by a person. Nothing pays itself"
+        help={
+          <p>
+            The close <strong>computes</strong>; a human <strong>releases</strong>. A
+            job that moved money on its own is one nobody could stop on a Sunday, so
+            no job on this platform does.
+          </p>
+        }
       >
         {payouts.length === 0 ? (
           <Empty>No payouts yet. The first one is drafted the Friday after your first entrant.</Empty>

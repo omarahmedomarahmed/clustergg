@@ -30,7 +30,18 @@ export default async function BrandOverview({
       <h1 className="text-2xl font-semibold tracking-tight">Overview</h1>
 
       <section className="grid gap-3 sm:grid-cols-2">
-        <Figure label="Challenges bought" value={String(rows.length)} testId="challenge-count" />
+        <Figure
+          label="Challenges bought"
+          value={String(rows.length)}
+          help={
+            <p>
+              Each one is billed on its own — one game, one week, one prize pool.
+              There is no package, no minimum and no capacity cap, so the number
+              here is simply how many you have chosen to run.
+            </p>
+          }
+          testId="challenge-count"
+        />
         <Figure
           label="Best week"
           value={
@@ -43,6 +54,14 @@ export default async function BrandOverview({
       </section>
 
       <Panel
+        help={
+          <p>
+            A challenge that shows as <strong>awaiting setup</strong> is paid and
+            waiting for a Cluster admin to set the metrics and assign the trophies.
+            Nothing announces itself here — a person presses Announce, and there can
+            never be an announced challenge that is unpaid.
+          </p>
+        }
         title="Your challenges"
         note="Per challenge. We never add reach or entrants together across challenges — the sum would not be a number of people"
         action={

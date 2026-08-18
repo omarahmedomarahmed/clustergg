@@ -25,6 +25,10 @@ const NAV = [
   { path: "/analytics", label: "Analytics" },
   { path: "/messages", label: "Messages" },
   { path: "/settings", label: "Settings" },
+  // H2 — the guides live **inside** the portal. Not a link to the marketing
+  // site, which is a different document written for somebody who has not
+  // bought anything yet.
+  { path: "/guides", label: "Guides" },
 ];
 
 export default async function OwnerPortalLayout({

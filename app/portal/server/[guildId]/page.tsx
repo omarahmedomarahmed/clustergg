@@ -38,12 +38,28 @@ export default async function OwnerOverview({
           label="This week, so far"
           value={formatMoney(overview.thisWeekCents)}
           note="What you would be paid if the week ended now"
+          help={
+            <p>
+              Computed by the same function that writes Friday&rsquo;s placements — not
+              a preview of it. If this number and Saturday&rsquo;s payout ever
+              disagreed, the public pool would stop being worth anything, so there
+              is deliberately only one implementation of it.
+            </p>
+          }
           testId="this-week"
         />
         <Figure
           label="Available"
           value={formatMoney(overview.availableCents)}
           note="Released and not yet withdrawn"
+          help={
+            <p>
+              A week&rsquo;s share is computed at the close and opens as a{" "}
+              <strong>draft</strong>. A person releases it — no job on this platform
+              moves money on its own, because a job that did is one nobody could stop
+              on a Sunday. Once released it lands here.
+            </p>
+          }
           testId="available"
         />
         <Figure
@@ -72,6 +88,13 @@ export default async function OwnerOverview({
       <Panel
         title="This week's challenges"
         note="Every challenge feeding this week's pool"
+        help={
+          <p>
+            These are the ones your members can enter this week. Re-announcing puts
+            the card back in your channel — you are our distribution, and a member
+            who never saw the card was never going to enter.
+          </p>
+        }
         action={
           <Link
             href={`/portal/server/${guildId}/challenges`}
@@ -94,7 +117,32 @@ export default async function OwnerOverview({
       </Panel>
 
       {overview.kpis ? (
-        <Panel title="Your three KPIs" note="What the weekly pool is divided by">
+        <Panel
+          title="Your three KPIs"
+          note="What the weekly pool is divided by"
+          help={
+            <>
+              <p>
+                <strong>Entrants</strong> — half to the server where a gamer first
+                pressed a bot button, half to the server where they pressed Join. One
+                whole entrant when that is the same server.
+              </p>
+              <p className="mt-2">
+                <strong>Conversion</strong> — your entrants divided by your linked
+                members. Both sides count only gamers whose first click was here, so
+                it can never go above 1.0.
+              </p>
+              <p className="mt-2">
+                <strong>Activation</strong> — how many of your entrants actually
+                played. A member who joins and never plays lowers this, which is
+                exactly what stops fake entrants being worth anything.
+              </p>
+              <p className="mt-2">
+                None of the three measures anything you do inside Discord.
+              </p>
+            </>
+          }
+        >
           <Row>
             <span>Entrants</span>
             <span className="tabular-nums">{overview.kpis.entrants.toFixed(1)}</span>

@@ -5,23 +5,43 @@
 // into two visual languages for one product.
 
 import { formatMoney } from "../../lib/money/amounts.ts";
+import { Help } from "../ui.tsx";
+
+// ===== H1 — AN `i` ICON ON EVERYTHING, IN BOTH PORTALS =====
+//
+// `help` is a prop on `Panel` and on `Figure` rather than something each page
+// hand-places, for the same reason the progress bar has one component: it puts
+// the icon in one piece of markup, so "on everything" becomes a property a
+// guard can check per page instead of a habit each page has to remember.
+//
+// It stays **optional** on purpose. A required prop would be satisfied by
+// thirteen empty strings the day somebody is in a hurry, and an empty overlay
+// is worse than none — it is an `i` that answers nothing, which teaches people
+// to stop pressing them. `94-progress` asserts every portal page carries at
+// least one, and the content is a judgement no assertion can make.
 
 export function Panel({
   title,
   note,
   action,
+  help,
   children,
 }: {
   title: string;
   note?: string;
   action?: React.ReactNode;
+  /** H1 — what this panel is, and the rule behind it. */
+  help?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="rounded-xl border border-line bg-panel">
       <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-3">
         <div>
-          <h2 className="font-medium">{title}</h2>
+          <h2 className="font-medium">
+            {title}
+            {help ? <Help title={title}>{help}</Help> : null}
+          </h2>
           {note ? <p className="mt-0.5 text-xs text-mute">{note}</p> : null}
         </div>
         {action}
@@ -35,16 +55,22 @@ export function Figure({
   label,
   value,
   note,
+  help,
   testId,
 }: {
   label: string;
   value: string;
   note?: string;
+  /** H1 — what this number is, and the rule behind it. */
+  help?: React.ReactNode;
   testId?: string;
 }) {
   return (
     <div className="rounded-xl border border-line bg-panel px-5 py-4" data-testid={testId}>
-      <p className="text-xs uppercase tracking-wide text-mute">{label}</p>
+      <p className="text-xs uppercase tracking-wide text-mute">
+        {label}
+        {help ? <Help title={label}>{help}</Help> : null}
+      </p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
       {note ? <p className="mt-1 text-xs text-mute">{note}</p> : null}
     </div>

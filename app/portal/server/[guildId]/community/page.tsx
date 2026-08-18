@@ -107,6 +107,14 @@ export default async function CommunityChallenges({
       <Panel
         title="Waiting for the owner"
         note="Only the guild owner can approve a spend"
+        help={
+          <p>
+            An administrator can build and <strong>request</strong> one; only the
+            Discord guild owner can approve the spend. Two separate checks, on
+            purpose — a single one is one careless edit away from letting anybody
+            with a role spend your balance.
+          </p>
+        }
       >
         {waiting.length === 0 ? (
           <Empty>Nothing waiting.</Empty>
@@ -163,7 +171,18 @@ export default async function CommunityChallenges({
         )}
       </Panel>
 
-      <Panel title="Build one" note="Two tiers. That is the whole menu">
+      <Panel
+        title="Build one"
+        note="Two tiers. That is the whole menu"
+        help={
+          <p>
+            Your money buys the prize and our margin, and none of it goes into the
+            weekly pool — paying you out of a pool your own money funded would pay
+            you twice. There is no rate limit and no fee: running these is how a
+            server grows, and that is the point of them.
+          </p>
+        }
+      >
         <form action={requestCommunityAction} className="flex flex-col gap-4">
           <input type="hidden" name="guildId" value={guildId} />
 
@@ -230,7 +249,18 @@ export default async function CommunityChallenges({
         </form>
       </Panel>
 
-      <Panel title="Yours" note="Community challenges never feed a weekly pool — C4/K8">
+      <Panel
+        title="Yours"
+        note="Community challenges never feed a weekly pool — C4/K8"
+        help={
+          <p>
+            Every one of these gets a public page on the web with a{" "}
+            <strong>Join this server</strong> button. That is the whole idea: your
+            competition advertises your server, and somebody has to join it to get
+            the key.
+          </p>
+        }
+      >
         {mine.length === 0 ? (
           <Empty>You have not run one yet.</Empty>
         ) : (

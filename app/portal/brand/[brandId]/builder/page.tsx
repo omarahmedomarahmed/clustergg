@@ -82,6 +82,14 @@ export default async function Builder({
       <Panel
         title="1 · Pick your games"
         note="Only games whose API can referee a match. If we cannot score it, we do not sell it"
+        help={
+          <p>
+            A game missing from this list is one whose publisher API we cannot read
+            today. We would rather not offer it than sell a competition we cannot
+            referee — nobody has ever enjoyed being told their week could not be
+            scored after they paid for it.
+          </p>
+        }
       >
         <form method="get" className="flex flex-col gap-4">
           <div className="grid gap-3 sm:grid-cols-3" data-testid="game-cards">
@@ -113,6 +121,14 @@ export default async function Builder({
         <Panel
           title="2 · How many, and which week"
           note="One challenge is a single. More than one week is a series, billed together"
+          help={
+            <p>
+              You pick a <strong>week</strong>, never a date. Every challenge starts
+              at the start of a week and there is no date picker anywhere on this
+              platform, including for us — it is what makes one gun, one close and
+              one pool possible each week.
+            </p>
+          }
         >
           <form method="get" className="flex flex-col gap-4">
             {picked.map((g) => (
@@ -177,6 +193,14 @@ export default async function Builder({
         <Panel
           title="3 · Before you pay"
           note="Start date, announce date, reach and price — all of it, before the button"
+          help={
+            <p>
+              Paying makes a challenge <strong>eligible to be announced</strong>, not
+              announced. A Cluster admin sets the metrics and the trophies and
+              presses the button — which is also why there can never be an announced
+              challenge that nobody paid for.
+            </p>
+          }
         >
           <Row>
             <span>Challenges</span>

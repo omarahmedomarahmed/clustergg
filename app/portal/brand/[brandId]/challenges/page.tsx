@@ -57,6 +57,14 @@ export default async function BrandChallenges({
         [...byWeek.entries()].map(([week, group]) => (
           <Panel
             key={week}
+            help={
+              <p>
+                A series is billed together and <strong>announced one week at a
+                time</strong>, each after its own payment clears. Every week reads
+                separately here and in your report, because merging them would be a
+                number we modelled rather than counted.
+              </p>
+            }
             title={`Week of ${week}`}
             note={group[0].seriesId ? "Part of a series, billed together" : undefined}
           >

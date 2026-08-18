@@ -38,6 +38,19 @@ export default async function OwnerChallenges({
       <Panel
         title="Challenges feeding this week's pool"
         note="Every one of these earns your server entrants. Re-announcing posts it again — it does not create a new one"
+        help={
+          <>
+            <p>
+              Every challenge is announced to every installed server, so there is
+              nothing here to opt into and nothing to miss.
+            </p>
+            <p className="mt-2">
+              Re-announcing posts the card again. It does not create a second
+              challenge, it does not reset anybody&rsquo;s score, and a member who
+              joins from the reposted card still counts as your entrant.
+            </p>
+          </>
+        }
         action={
           challenges.length > 0 ? (
             <form action={reAnnounceAction}>

@@ -74,6 +74,14 @@ export default async function BrandBilling({
           into a page is a figure that stays at the old value after a ruling,
           and this is the page a brand would quote back at us. */}
       <Panel
+        help={
+          <p>
+            The prize half is set aside as real money before a single trophy is
+            awarded — every trophy worth money is backed by money already received,
+            which is why we can say a trophy is worth something rather than that it
+            entitles somebody to claim something.
+          </p>
+        }
         title={`Where a ${formatMoney(CHALLENGE_PRICE_CENTS)} challenge fee goes`}
         note="The same split on every one"
       >
