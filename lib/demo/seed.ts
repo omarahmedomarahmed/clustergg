@@ -159,6 +159,49 @@ export async function seedDemo(now = new Date()) {
     gamers.push({ userId, accountId, providerAccountId, guildId, joinGuildId });
   }
 
+  // ===== TWO DISCORD IDENTITIES ON THE FIRST SERVER =====
+  //
+  // 09 Band 2 shot 4 is *"sign in with Discord · landing in the portal that was
+  // already there"*, and 4a is *"**administrator** signed in: withdraw and
+  // approve disabled, with the reason"*. Neither was photographable, because
+  // no demo gamer had a Discord id at all — so every portal visit fell through
+  // to demo access, which is the one kind that is allowed everything.
+  //
+  // So: one gamer is the owner of the first server and another is an
+  // administrator of it. An administrator is somebody we have **seen** holding
+  // the mapped role (G5), which is a `guild_admins` row and not a claim, so one
+  // is written the way `identifyPresser` writes them.
+  //
+  // Both are picked from the **adults**. Gamer 0 is a teen (`i % 6 === 0`), and
+  // a teen owner is refused by P5 — which is a state worth having in the demo,
+  // but not the one shot 4 is of: with a teen owner, *every* wallet in the
+  // record shows a refusal and the allowed case is nowhere.
+  //
+  // Deliberately only the first server. A demo where every server has a signed
+  // -in owner cannot show the ordinary case, which is a portal opened by
+  // somebody Discord has told us nothing about.
+  const ownerDiscordId = "demo-discord-owner";
+  const adminDiscordId = "demo-discord-admin";
+  await db
+    .update(schema.guilds)
+    .set({ ownerDiscordId, adminRoleId: "987654321098765432" })
+    .where(eq(schema.guilds.guildId, guildIds[0]));
+  await db
+    .update(schema.users)
+    .set({ discordId: ownerDiscordId })
+    .where(eq(schema.users.id, gamers[1].userId));
+  await db
+    .update(schema.users)
+    .set({ discordId: adminDiscordId })
+    .where(eq(schema.users.id, gamers[2].userId));
+  await db.insert(schema.guildAdmins).values({
+    id: uid(),
+    guildId: guildIds[0],
+    discordId: adminDiscordId,
+    source: "mapped_role",
+    seenAt: new Date(weekStart.getTime() - 3 * 86_400_000),
+  });
+
   // Two brands. One bought a four-week series, one bought a single week.
   const acme = await signUpBrand(db, { name: "Acme Energy", contactEmail: "hi@acme.test" });
   const nova = await signUpBrand(db, { name: "Nova Peripherals", contactEmail: "hi@nova.test" });
@@ -378,6 +421,14 @@ export async function seedDemo(now = new Date()) {
     brands: [acme.brandId, nova.brandId],
     challenges: { past, current: liveChallenges, next: nextWeek, community: community.challengeId },
     weekStart,
+    // Who the browser band signs in as for 09's shots 4 and 4a. Ids rather
+    // than names: `uid()` moves every seed, and a pass that guessed would
+    // fail as "the page did not render".
+    discord: {
+      guildId: guildIds[0],
+      ownerUserId: gamers[1].userId,
+      adminUserId: gamers[2].userId,
+    },
   };
 }
 

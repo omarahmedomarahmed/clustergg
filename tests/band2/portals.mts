@@ -173,6 +173,90 @@ check(
   "and that we hold no account details — house rule 5, where the owner can read it",
 );
 
+// ── Shots 4 and 4a · signed in with Discord, as each of the two people ──────
+//
+// ===== WHY THE PORTAL ABOVE IS NOT EITHER OF THEM =====
+//
+// Everything above this point walks the portal in **demo access** — nobody
+// signed in, and the demo fence opens it so the record can be taken at all.
+// Demo access is the one kind that is allowed everything, so none of it says
+// anything about who may do what.
+//
+// 09's shot 4a is *"**administrator** signed in: withdraw and approve
+// disabled, with the reason"*, and it is the one that matters: a missing
+// button is a support ticket, and a disabled one carrying the rule's own words
+// is an answer. Neither could be photographed until the seeder grew two
+// Discord identities, because no demo gamer had one.
+console.log("\nportal/server signed in:");
+
+/** Sign in as a seeded gamer through the demo route. */
+async function asGamer(userId: string) {
+  const response = await page.request.post(`${BASE}/api/demo/session`, { data: { userId } });
+  if (!response.ok()) throw new Error(`demo sign-in failed: ${response.status()}`);
+}
+
+await asGamer(seeded.discord.ownerUserId);
+await page.goto(`${BASE}/portal/server/${seeded.discord.guildId}/wallet?${at}`);
+await page.waitForSelector('[data-testid="withdraw"]');
+await shot(page, "owner-signed-in-withdraw-allowed");
+const asOwner = await visible(page);
+check(
+  /released by a person/.test(asOwner),
+  "the owner is told how the money moves, not that they cannot move it",
+);
+check(
+  (await page.locator('[data-testid="withdraw"]').getAttribute("data-allowed")) === "1",
+  "and the four gates say yes for an adult owner in an allowed country",
+);
+
+await asGamer(seeded.discord.adminUserId);
+await page.goto(`${BASE}/portal/server/${seeded.discord.guildId}/wallet?${at}`);
+await page.waitForSelector('[data-testid="withdraw-reason"]');
+await shot(page, "administrator-signed-in-withdraw-disabled-with-reason");
+const asAdmin = await visible(page);
+check(
+  /Only the Discord server owner can withdraw/.test(asAdmin),
+  "P1 — the administrator is told which of them may, in the rule's own words",
+);
+check(
+  /Administrators can do everything else here/.test(asAdmin),
+  "and what they CAN do, because a refusal with no next step is a support ticket",
+);
+check(
+  (await page.locator('[data-testid="withdraw"]').getAttribute("data-allowed")) === "0",
+  "the button is disabled rather than absent — 09 shot 4a",
+);
+
+// ===== WHAT THIS RECORD CANNOT SHOW, SAID OUT LOUD =====
+//
+// The obvious next shot is the same administrator on a server they have never
+// been seen on. Until guard 222 that read as `administrator` — the portal
+// asked whether the *guild* had any `guild_admins` row rather than whether
+// *they* did, so anybody who had linked Discord was staff on every server that
+// had ever seen staff.
+//
+// It cannot be photographed here, and the reason is the demo itself.
+// `guildAccessFor` falls through to `{ kind: "demo" }` when nobody matches,
+// which is the fence that lets this whole pass walk a portal without a
+// password. With the fence open, **every** access refusal renders as access.
+//
+// So this asserts the fence rather than pretending to assert the rule, and
+// says which guard actually proves it. A screenshot captioned "administrator
+// refused" that was really the demo fence would be worse than no screenshot:
+// the record is only worth what its captions are.
+const elsewhere: string = seeded.guildIds[1];
+await page.goto(`${BASE}/portal/server/${elsewhere}/wallet?${at}`);
+await page.waitForSelector('[data-testid="withdraw"]');
+check(
+  (await page.locator('[data-testid="withdraw"]').getAttribute("data-allowed")) === "1",
+  "on a guild they do not admin the demo fence opens the portal — which is why " +
+    "access control is proven in band 1 (guard 222) and not in this record",
+);
+
+// Back to demo access for the rest of the pass, which photographs the portal
+// as an unauthenticated record rather than as one person's view.
+await page.context().clearCookies();
+
 await page.goto(`${BASE}/portal/server/${guildId}/community?${at}`);
 await page.waitForSelector('[data-testid="build-community"]');
 await shot(page, "owner-community-builder");

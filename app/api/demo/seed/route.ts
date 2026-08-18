@@ -31,5 +31,8 @@ export async function POST() {
     // could hand out a real one the day somebody removes that fence.
     guildIds: result.guildIds,
     brandIds: result.brands,
+    // The two seeded Discord identities — the first server's owner and one
+    // administrator — so the band can photograph a portal opened by each.
+    discord: result.discord,
   });
 }
