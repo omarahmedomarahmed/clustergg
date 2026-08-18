@@ -28,6 +28,8 @@
 // expire. Sending someone to regenerate a key that has not expired is how a
 // real outage gets misdiagnosed, so the note now says what is true of ours.
 
+import { isApprovedRiotPath, riotPathShape } from "./riot-methods.ts";
+
 const RIOT_TIMEOUT_MS = 8000;
 
 /**
@@ -57,6 +59,28 @@ export function iconImageUrl(iconId: number, version = "14.24.1"): string {
 async function riot<T>(url: string): Promise<T> {
   const key = process.env.RIOT_API_KEY;
   if (!key) throw new Error("RIOT_API_KEY not configured");
+
+  // ===== THE APPROVED LIST IS CONSULTED, NOT MERELY KEPT =====
+  //
+  // `riot-methods.ts` is *"the authority"* on the 39 paths this personal key
+  // can call (11-PORTED). It was written down, diffed path by path against
+  // Riot's own list, and then read by nothing — so a call to an unapproved
+  // path would have gone out and come back 403, which looks exactly like an
+  // expired key and sends whoever is debugging it to regenerate one that has
+  // not expired (10 §4).
+  //
+  // §0.1's shape: something proven to exist, nothing proven to read it. So the
+  // check is here, at the one function every Riot call in this module goes
+  // through, rather than at each call site.
+  const shape = riotPathShape(url);
+  if (!isApprovedRiotPath(shape)) {
+    throw new Error(
+      `${shape} is not one of the paths this Riot key can call. ` +
+        `The approved set is in lib/providers/riot-methods.ts — this is a 403 ` +
+        `waiting to happen, not an expired key.`,
+    );
+  }
+
   const res = await fetch(url, {
     headers: { "X-Riot-Token": key, "User-Agent": "ClusterGG/1.0 (clustergg.com account verification)" },
     signal: AbortSignal.timeout(RIOT_TIMEOUT_MS),

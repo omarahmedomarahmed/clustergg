@@ -28,6 +28,7 @@
 import { verifyInteraction } from "./verify.ts";
 import { InteractionType, InteractionResponseType } from "./types.ts";
 import { parseId, type Frame } from "./components.ts";
+import type { Presser } from "./identify.ts";
 
 export type Interaction = {
   id: string;
@@ -54,8 +55,18 @@ export type ScreenHandler = (ctx: {
   interaction: Interaction;
   frame: Frame;
   trail: Frame[];
+  /** The **Discord** id of the presser. Not ours. */
   userId: string | null;
   guildId: string | null;
+  /**
+   * Who they are on Cluster, resolved before any screen runs.
+   *
+   * I5 — the first press creates the row, so every screen after it knows who
+   * they are without asking. A screen that resolved this itself would be a
+   * screen somebody could add without it, and A1's *"the parent is stamped at
+   * the first click"* would then hold only for the screens somebody remembered.
+   */
+  presser: Presser;
 }) => Promise<ScreenResult>;
 
 /** The screen registry. A card family per key; Stage 6's layouts live here. */
@@ -68,6 +79,15 @@ export function screen(name: string, handler: ScreenHandler): void {
 export type HandlerDeps = {
   /** Runs the callback after the response has been sent. Next's `after()`. */
   defer: (fn: () => Promise<void>) => void;
+  /**
+   * Resolve — and on a first press, **create** — the presser's account.
+   *
+   * Injectable so the band can drive the handler without a database, and
+   * defaulted to the real thing so production cannot accidentally run without
+   * it. The default is exercised by its own guard: a dep with no real default
+   * is a dep that is only ever tested as a stub.
+   */
+  identify?: (interaction: Interaction) => Promise<Presser>;
   /** Edits the original deferred response with the finished card. */
   edit: (applicationId: string, token: string, result: ScreenResult) => Promise<void>;
   /** Overridable so the test band does not need Ed25519 keys. */
@@ -123,6 +143,13 @@ export async function handleInteraction(
   const trail = parsed?.trail ?? [];
 
   const handler = SCREENS.get(frame.screen);
+  const identify =
+    deps.identify ??
+    (async (i: Interaction) => {
+      const { getDb } = await import("../db/index.ts");
+      const { identifyPresser } = await import("./identify.ts");
+      return identifyPresser(await getDb(), i);
+    });
 
   // ===== THE ACKNOWLEDGEMENT. Everything above this line is cheap. =====
   //
@@ -141,8 +168,15 @@ export async function handleInteraction(
     // slow card from a dead one.
     let result: ScreenResult;
     try {
+      // ===== I5 / A1 — BEFORE THE SCREEN, NOT INSIDE IT =====
+      //
+      // The account is created and the parent stamped here, once, so every
+      // screen inherits it — including screens added later. Trap 18's lesson
+      // is the reason it is not in the screens: a rule enforced at each door
+      // is a rule that is missing from the door somebody adds next.
+      const presser = await identify(interaction);
       result = handler
-        ? await handler({ interaction, frame, trail, userId, guildId })
+        ? await handler({ interaction, frame, trail, userId, guildId, presser })
         : {
             content:
               "That screen has gone. Try `/cluster` and start again — nothing " +

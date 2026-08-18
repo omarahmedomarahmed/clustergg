@@ -42,23 +42,31 @@ const IGNORE_DIRS = new Set(["node_modules", "screenshots", ".next", "drizzle"])
  * moment it stops describing something real: if the module gains a surface the
  * entry is spent, and if the module is deleted the entry has no subject.
  *
- * All six are Sprint 12, *The Discord card layouts*, which is where the bot's
- * screens are built and where the card renderer and the ownership-proof flow
- * finally get called from a handler. `08-BUILD-ORDER` Stage 6 has them; the
- * layouts are what has not been written.
+ * ===== EMPTY, AND THAT IS THE ALLOWANCE WORKING =====
+ *
+ * It carried six entries from Sprint 10a to Sprint 12, all of them the bot's:
+ * the card renderer, its fonts, its upload rule, the admin-role mapping, and
+ * Riot's approved-path list and icon proof. Sprint 12 built the card families,
+ * and every one of the six went red here as it gained a surface — which is 09's
+ * fifth rule doing exactly what it is for. *"An allowance that outlives what it
+ * excused is how a deleted rule comes back."*
+ *
+ * Two of them were not simply waiting for a screen, and are worth naming:
+ *
+ *   `riot-methods.ts` was **the authority** on the 39 paths the personal key
+ *   can call, and nothing consulted it. `riot-verify.ts` now checks every URL
+ *   against it before the fetch, because an unapproved path returns a 403 that
+ *   reads exactly like an expired key — and 10 §4 warns that sends whoever is
+ *   debugging it to regenerate a key that has not expired.
+ *
+ *   `upload.ts` held *"nothing that is not PNG or JPEG reaches storage"* with
+ *   no caller, so the rule was enforced by nobody. `/api/uploads` is its door.
+ *
+ * Keep this list empty. A new entry needs a sprint name and a date, and the
+ * next session should read a non-empty one as work somebody deferred rather
+ * than as a category of module that does not need a surface.
  */
-const NOT_YET_RENDERED = [
-  // The card renderer. Wired at Stage 6, drawn at Sprint 12.
-  "lib/cards/fonts.ts",
-  "lib/cards/render.ts",
-  "lib/cards/upload.ts",
-  // Role mapping from interaction payloads — the bot's admin family (S3/S4).
-  "lib/discord/admin.ts",
-  // Riot's approved-path list, and profile-icon ownership proof. Both are
-  // reached from the bot's *prove ownership* card, which is Sprint 12's.
-  "lib/providers/riot-methods.ts",
-  "lib/providers/riot-verify.ts",
-] as const;
+const NOT_YET_RENDERED: readonly string[] = [];
 
 type Module = { rel: string; abs: string; imports: string[]; hasFunction: boolean };
 
@@ -88,6 +96,19 @@ async function importsOf(abs: string, src: string): Promise<string[]> {
   const patterns = [
     /(?:^|\s)(?:import|export)\s[^;]*?from\s*["']([^"']+)["']/g,
     /\bimport\s*\(\s*["']([^"']+)["']\s*\)/g,
+    // ===== `import "./x.ts"` — A SIDE-EFFECT IMPORT IS STILL AN EDGE =====
+    //
+    // Missing this made the guard *stricter* rather than looser, which is why
+    // it surfaced as nine orphans rather than as a hole: the bot's screen
+    // registry is filled by importing each family for its side effects, so
+    // every card family read as unreachable while being perfectly reachable.
+    //
+    // Worth being exact that this does not weaken anything. The question this
+    // suite asks is *can a page reach this module*, and a side-effect import
+    // is one of the ways a page does. What it cannot tell you is whether the
+    // module does anything once imported — which is a different question, and
+    // `61-cards` is where it is asked.
+    /(?:^|\s)import\s*["'](\.[^"']+)["']/g,
   ];
   for (const re of patterns) {
     for (const m of src.matchAll(re)) {

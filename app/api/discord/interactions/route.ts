@@ -17,6 +17,13 @@
 // problem.
 
 import { after } from "next/server";
+// ===== THE IMPORT THAT MAKES THE BOT EXIST =====
+//
+// `SCREENS` is filled as a side effect of importing each family. Without this
+// line every interaction falls through to *"that screen has gone"* — which
+// reads like a stale button rather than a bot with no screens, and would be
+// the quietest possible way to ship nothing.
+import "../../../../lib/discord/screens/index.ts";
 import { handleInteraction } from "../../../../lib/discord/interactions.ts";
 import { editOriginalResponse } from "../../../../lib/discord/rest.ts";
 

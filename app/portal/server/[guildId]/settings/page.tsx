@@ -149,7 +149,9 @@ export default async function OwnerSettings({
               className={FIELD}
               data-testid="cover-image-url"
             />
-            <span className="text-xs text-mute">The top of your public server page.</span>
+            <span className="text-xs text-mute">
+              The top of your public server page, and the artwork on your cards.
+            </span>
           </label>
 
           <label className="flex flex-col gap-1 text-sm">
@@ -169,6 +171,40 @@ export default async function OwnerSettings({
           <div>
             <Button type="submit">Save community profile</Button>
           </div>
+        </form>
+
+        {/* ===== CONVERT ON UPLOAD, WHERE SOMEBODY UPLOADS =====
+
+            The card renderer cannot decode WebP, and WebP is what a browser
+            hands you when you right-click and save an image — so it is the
+            single most likely thing to arrive here. `/api/uploads` runs every
+            file through `acceptImage` and stores PNG or JPEG, whatever came
+            in. A separate form because a file upload is a different request
+            shape, and because the URL field above stays: an owner who already
+            has an image hosted should not have to re-upload it. */}
+        <form
+          action="/api/uploads"
+          method="post"
+          encType="multipart/form-data"
+          className="mt-4 flex flex-wrap items-end gap-3 border-t border-line pt-4"
+        >
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">…or upload one</span>
+            <input
+              type="file"
+              name="file"
+              accept="image/*"
+              className="text-xs"
+              data-testid="cover-image-upload"
+            />
+            <span className="text-xs text-mute">
+              Any format. We convert it to something the card renderer can actually
+              draw, and tell you if we cannot.
+            </span>
+          </label>
+          <Button type="submit" data-testid="upload-cover">
+            Upload
+          </Button>
         </form>
 
         <ul className="mt-4 flex flex-col gap-1 text-xs text-mute">
