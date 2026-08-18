@@ -128,11 +128,16 @@ export function poolStandingHeadline(states: {
  * not waiting for something.
  */
 export function lifecycleProgress(state: ChallengeState): Progress {
-  const index = STATES.indexOf(state);
   // An unknown state reads as nothing done rather than throwing — house rule
   // 11: a bar is decoration and may never take a page down.
-  const done = index < 0 ? 0 : index + 1;
-  return bar(done, STATES.length, "lifecycle stages");
+  //
+  // That is `indexOf`'s own answer, not a branch on top of it. It was written
+  // as `index < 0 ? 0 : index + 1` first, which reads like the fence and is
+  // not one: `-1 + 1` is already 0, so the ternary could never change an
+  // answer. Breaking it went green — and a break that changes nothing proves
+  // nothing in either direction (trap 8). The property is guarded where it can
+  // actually vary, which is this function throwing or not.
+  return bar(STATES.indexOf(state) + 1, STATES.length, "lifecycle stages");
 }
 
 /**
