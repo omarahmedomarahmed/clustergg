@@ -349,10 +349,36 @@ const MUTATIONS: Mutation[] = [
     expect: 1,
   },
   {
-    name: "Merge two accounts when a gamer links an already-used identity",
+    // ===== TWO PATHS, TWO MUTATIONS =====
+    //
+    // `discordLinkOutcome` and `emailLinkOutcome` end in the same two lines,
+    // character for character. Written as one mutation it silently tested the
+    // Discord path only — `String.replace` takes the first occurrence — and
+    // reported itself caught, which said nothing at all about email. The
+    // preflight added this sprint is what surfaced it.
+    name: "Merge two accounts when a gamer links an already-used Discord identity",
     file: "lib/identity/credentials.ts",
-    find: "  if (holder.id === userId) return { kind: \"mine\" };",
-    replace: "  return { kind: \"free\" };",
+    find:
+      "    .where(eq(schema.users.discordId, discordId));\n\n" +
+      '  if (!holder) return { kind: "free" };\n' +
+      '  if (holder.id === userId) return { kind: "mine" };',
+    replace:
+      "    .where(eq(schema.users.discordId, discordId));\n\n" +
+      '  if (!holder) return { kind: "free" };\n' +
+      '  return { kind: "free" };',
+    expect: 1,
+  },
+  {
+    name: "Merge two accounts when a gamer links an already-used email",
+    file: "lib/identity/credentials.ts",
+    find:
+      "    .where(eq(schema.users.email, address));\n\n" +
+      '  if (!holder) return { kind: "free" };\n' +
+      '  if (holder.id === userId) return { kind: "mine" };',
+    replace:
+      "    .where(eq(schema.users.email, address));\n\n" +
+      '  if (!holder) return { kind: "free" };\n' +
+      '  return { kind: "free" };',
     expect: 1,
   },
   {
