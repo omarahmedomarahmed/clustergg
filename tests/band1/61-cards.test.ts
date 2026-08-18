@@ -746,3 +746,67 @@ test("a Riot call is checked against the approved path list before it goes out",
     "and the fetch helper calls it, rather than the file merely importing it",
   );
 });
+
+test("a card renders with no brand fonts installed", async () => {
+  // ===== THE FENCE HID THIS FOR A WHOLE SPRINT =====
+  //
+  // `ImageResponse` ships a vendored font and uses it when `fonts` is
+  // **omitted**. Passing `fonts: []` throws — and `loadCardFonts()` returns
+  // `[]` when no brand fonts are installed, which is the documented normal
+  // case. So every card on the platform threw, `fence` caught it, the text
+  // fallback went out, and nothing ever failed.
+  //
+  // That is house rule 11 working and hiding the reason it was working. The
+  // product silently lost its entire visual identity and told nobody; it was
+  // found by pressing a button on a real build and reading the log.
+  //
+  // ===== CAN THIS FAIL? =====
+  //
+  // Yes: restore `fonts: []` and this throws with the renderer's own message.
+  // Which is why the assertion is on **bytes returned**, not on `fence`
+  // reporting success — a card that renders text-only also "succeeds", and
+  // that is the state this exists to catch.
+  const { renderCard } = await import("../../lib/cards/render.ts");
+  const { loadCardFonts } = await import("../../lib/cards/fonts.ts");
+
+  eq(
+    (await loadCardFonts()).length,
+    0,
+    "no brand fonts are installed here — which is the case that broke",
+  );
+
+  const card = await renderCard({
+    title: "A Challenge",
+    subtitle: "League of Legends",
+    rows: [{ label: "Prize pool", value: "$175.00" }],
+    footer: "3 days left.",
+  });
+
+  ok(card.png.byteLength > 0, `a PNG came back (${card.png.byteLength} bytes)`);
+  no(card.artworkDropped, "and no artwork was asked for, so none was dropped");
+});
+
+test("the card family string never names a font that is not loaded", async () => {
+  // `cardFontFamily` was exported and called by nothing while the layout named
+  // `Cluster` by hand — a family the renderer has never heard of unless
+  // somebody has dropped the TTFs in. Harmless on its own, and exactly the
+  // shape of thing that is true until it is not.
+  const { cardFontFamily } = await import("../../lib/cards/fonts.ts");
+  eq(cardFontFamily([]), "sans-serif", "with none installed, the built-in");
+  eq(
+    cardFontFamily([{ name: "Cluster", data: new ArrayBuffer(0), weight: 400, style: "normal" }]),
+    '"Cluster", sans-serif',
+    "and the brand face when there is one",
+  );
+
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+  const src = await fs.readFile(path.join(repoRoot, "lib", "cards", "render.ts"), "utf8");
+  const body = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  ok(/fontFamily:/.test(body), "the read reached the layout");
+  no(
+    /fontFamily:\s*["'`][^"'`]*Cluster/.test(body),
+    "and the layout asks the module rather than naming a family it hopes exists",
+  );
+});

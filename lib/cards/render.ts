@@ -22,7 +22,7 @@
 // bot down with it. So anything that can throw on a card path is fenced, and
 // the card renders without it.
 
-import type { CardFont } from "./fonts.ts";
+import { cardFontFamily as fontFamilyFor, type CardFont } from "./fonts.ts";
 
 /** Formats the renderer can actually decode. Everything else is converted. */
 export const RENDERABLE_IMAGE_TYPES = ["image/png", "image/jpeg"] as const;
@@ -108,14 +108,34 @@ export async function renderCard(spec: CardSpec): Promise<RenderedCard> {
       })
     : null;
 
-  const response = new ImageResponse(cardTree(spec, artwork?.ok ? artwork.value : null), {
+  // ===== AN EMPTY FONT LIST IS NOT THE SAME AS NO FONT LIST =====
+  //
+  // `ImageResponse` ships a vendored Noto Sans and uses it when `fonts` is
+  // **omitted**. Passing `fonts: []` throws *"No fonts are loaded. At least one
+  // font is required to calculate the layout."*
+  //
+  // `loadCardFonts()` returns `[]` when no brand fonts are installed — which is
+  // a success, and the documented normal case. So the previous line handed the
+  // renderer an empty array and **every card on the platform threw**. The fence
+  // caught it, the text fallback went out, and nothing ever failed: the product
+  // quietly lost its entire visual identity and told nobody. House rule 11 kept
+  // the cards standing and hid the reason they were standing.
+  //
+  // Found by pressing a button on a real build and reading the log, which is
+  // the only place it was visible.
+  const brandFonts = fonts.ok ? fonts.value : [];
+  const response = new ImageResponse(cardTree(spec, artwork?.ok ? artwork.value : null, brandFonts), {
     width: 1200,
     height: 630,
-    fonts: (fonts.ok ? fonts.value : []) as unknown as ConstructorParameters<
-      typeof ImageResponse
-    >[1] extends { fonts?: infer F }
-      ? F
-      : never,
+    ...(brandFonts.length > 0
+      ? {
+          fonts: brandFonts as unknown as ConstructorParameters<
+            typeof ImageResponse
+          >[1] extends { fonts?: infer F }
+            ? F
+            : never,
+        }
+      : {}),
   });
 
   return {
@@ -125,8 +145,19 @@ export async function renderCard(spec: CardSpec): Promise<RenderedCard> {
   };
 }
 
-/** The layout. Kept separate so it can be inspected without rendering. */
-export function cardTree(spec: CardSpec, artworkUrl: string | null): React.ReactElement {
+/**
+ * The layout. Kept separate so it can be inspected without rendering.
+ *
+ * `fonts` decides the family string rather than it being hard-coded: naming
+ * `Cluster` when no Cluster font is loaded is a family the renderer has never
+ * heard of, and `cardFontFamily` exists to answer exactly that question. It was
+ * exported and called by nothing while the tree named the family by hand.
+ */
+export function cardTree(
+  spec: CardSpec,
+  artworkUrl: string | null,
+  fonts: CardFont[] = [],
+): React.ReactElement {
   const accent = spec.accent ?? "#7c5cff";
   return {
     type: "div",
@@ -140,7 +171,7 @@ export function cardTree(spec: CardSpec, artworkUrl: string | null): React.React
         background: "#0a0a0c",
         color: "#f2f2f5",
         padding: 56,
-        fontFamily: "Cluster, sans-serif",
+        fontFamily: fontFamilyFor(fonts),
       },
       children: [
         artworkUrl
