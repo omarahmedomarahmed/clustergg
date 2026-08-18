@@ -80,9 +80,23 @@ export default async function Gamers({
               {rows.map(({ user, accounts, entries }) => (
                 <tr key={user.id} className="border-b border-line last:border-0">
                   <td className="py-2">
-                    <Link href={`/u/${user.slug}`} className="hover:underline">
+                    {/* The gamer's **admin** page, not their public one. The
+                        directory linked out to `/u/[slug]` and nothing linked
+                        in to `/admin/users/[id]` — a page that exists and that
+                        nothing points at, which neither reachability guard
+                        catches: one sees a link to a missing page, the other a
+                        module nothing imports. */}
+                    <Link href={`/admin/users/${user.id}`} className="hover:underline">
                       {user.displayName}
                     </Link>
+                    {user.slug ? (
+                      <Link
+                        href={`/u/${user.slug}`}
+                        className="ml-2 text-xs text-mute hover:underline"
+                      >
+                        public
+                      </Link>
+                    ) : null}
                   </td>
                   <td className="py-2 text-mute">{user.ageBand ?? "—"}</td>
                   <td className="py-2 text-mute">{user.country ?? "—"}</td>

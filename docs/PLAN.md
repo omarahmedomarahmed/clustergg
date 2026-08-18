@@ -225,9 +225,10 @@ and pushed; everything below is unstarted.
 | 10a · The surfaces, and the weekly record | **Done** — inserted after review |
 | 11 · Help, progress, and the missing pages | **Done** |
 | 12 · The Discord card layouts | **Done** — `NOT_YET_RENDERED` is empty |
-| 13 – 14 | Not started |
+| 13 · The series builder, and the rest of admin | **Done** |
+| 14 · Proof | Not started |
 
-**429 tests, 1,881 assertions, 211 guards proven by breaking, 24 mutations
+**442 tests, 1,964 assertions, 217 guards proven by breaking, 24 mutations
 caught by at least their expected number of suites, typecheck gating the band
 inside `npm test`.** Band 1 is entirely green, and so is band 2 — all four
 passes, run into a file rather than read off a terminal (trap 30).
@@ -436,12 +437,22 @@ shape of code that looks finished and is not. `lib/cards/store.ts` has the seam
 (`setImageBackend`) and says which backend is live. **It belongs with 10-SETUP's
 deployment step and the owner needs to be told it is outstanding.**
 
-### Sprint 13 · The series builder and the rest of admin
+### Sprint 13 · The series builder and the rest of admin — **done**
 
 | | |
 |---|---|
-| **Builds** | `/admin/challenges/new`, the series builder (`bill = prize ÷ 0.5`) · trophy templates · the twelve admin pages named in 05 and never built |
-| **Guards** | The bill is computed from the prize, never the reverse · 21 trophies from 3 templates and the guard still passes |
+| **Builds** | `lib/challenges/series.ts` — `planSeries`, `billForPrize`, `checkTemplates`, `createSeries` · `/admin/challenges/new` with a live preview from the same function that builds it · `/admin/challenges/series/[id]` with the template editor and the guard shown while you type · the twelve pages 05 names and never had: `vaults/ledger`, `trophies/new`, `trophies/templates`, `brands/[id]`, `brands/[id]/draft`, `invoices`, `servers/requests`, `content`, `games`, `cards`, `users/[id]` · all of them in the nav, each classified in `ROUTE_ACCESS` **and** anchored in `91-admin-access` |
+| **Governed by** | 05 §2 §3 §4 §5 §6 §8 · 03 §6 §7 · 02 §2 §5 |
+| **Guards** | 212–217. The bill rounds **up** so a prize is never under-covered · the bill is derived from the prize and not the reverse · templates are refused over **and** under · every instance starts on its own boundary, in order · one invoice for the whole series · every admin page classified, and the classification anchored |
+| **A human can** | Type a $10 daily prize over seven days and watch it price at $140 before anything is created, then turn three templates into twenty-one trophies with the guard passing on each instance |
+
+**The decision the rounding forced.** `splitOf` rounds, so bill → prize is not
+injective and something has to absorb the cent. 02 §5 decides it: the prize
+vault holds exactly the sum of every unredeemed money-trophy, so the **buyer**
+covers it and `billForPrize` rounds up. At the shipped 50/25/25 split the
+arithmetic is exact and the question never arises — which is precisely why the
+guard had to be written against a split where it does (02 §2: the shares are an
+operator setting, not a constant).
 
 ### Sprint 14 · Proof
 

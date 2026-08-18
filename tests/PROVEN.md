@@ -1407,3 +1407,74 @@ renderer has never heard of unless somebody has dropped the TTFs in. And trap
 port 3000, my replacement died with EADDRINUSE, and the server answering my
 signed interactions was the **old** one with no public key. The symptom was
 `401 bad signature`, which reads as a signing bug and is not one.
+
+---
+
+# Sprint 13 — the series builder, and the rest of the console
+
+`tests/band1/62-series.test.ts` unless the row says otherwise.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 212 | **The bill rounds UP, so a prize is never under-covered** | `Math.ceil` → `Math.floor` in `billForPrize` | *"the bill rounds UP…"* + *"a prize that cannot be split evenly costs the buyer the cent"* | clean, 440/442 |
+| 213 | **The bill is derived from the prize, not the reverse** | `planSeries` picks a bill and derives the prize | *"a series prize is the instance prize times the count, and the bill follows"* | clean, 440/441 |
+| 214 | **T2 — templates that do not add up are refused, over AND under** | `checkTemplates` accepts anything at or under the pool | *"templates that do not add up are refused — over AND under"* | clean, 441/442 |
+| 215 | Every instance starts on its own boundary, in order | Every instance planned at the same start | 2 cases, including *"a series is ordered, and reads back in order"* | clean, 440/442 |
+| 216 | **C9/B9 — a series is billed together** | One invoice per instance instead of one for the series | *"a series is billed together and starts as drafts"* | clean, 441/442 |
+| 217 | Every admin page is classified, and the classification is anchored | Eleven new pages added with no `ROUTE_ACCESS` entry | *"every admin page on disk is classified"* (`91-admin-access`), naming all eleven | classified, 429/429 |
+
+### Break 212 went green, and the fixture was why
+
+The first version of this guard swept prizes 1–2,000 against the **shipped**
+split and asserted `splitOf(billForPrize(p)).prize >= p`. Rounding the bill
+*down* instead changed nothing — because at a 50% prize share `prize ÷ 0.5` is
+`prize × 2`, an integer for every integer prize, so `ceil` and `floor` are the
+same number and the property could not vary.
+
+Trap 2 arriving through the **fixture** rather than through the assertion, and
+trap 27's other face: the break applied to the file and the test had no way to
+receive it.
+
+02 §2 is what makes the fix legitimate rather than contrived — *"the shares are
+an **operator setting**, not a constant hard-coded in the logic"* — so the sweep
+now runs at a 70/15/15 split, where rounding down under-covers the prize **715
+times in 5,000**, first at 2¢. The test also asserts the two roundings
+genuinely differ there, so it cannot be passing for the same reason the shipped
+split does. And the shipped split's exactness is now its own named assertion
+rather than an invisible reason the other one could not fail.
+
+Worth being exact about why the direction matters at all: `splitOf` rounds, so
+bill → prize is not injective, and whichever direction is authoritative decides
+**who absorbs the cent**. 02 §5 answers it — the prize vault holds exactly the
+sum of every unredeemed money-trophy — so the buyer covers it. A prize a cent
+short of its trophies is the platform's core promise broken, by that cent,
+permanently.
+
+### Guard 217 is the census and the anchor, which are two guards
+
+Every one of Sprint 13's eleven new pages landed as **unclassified**, which is
+what put them in `ROUTE_ACCESS` at all. Most would have inherited a sensible
+rule by prefix — and inheriting is a fine *answer*, not a decision.
+
+Trap 29's lesson is the second half: the census tells you a route needs a
+decision, and `91-admin-access`'s literal case table is where the decision
+**goes**. Twenty-two rows added, including the four that say a gamer's own
+admin page inherits the directory's rule — which is house rule 7 reaching down
+a dynamic segment, and the only assertion that inheritance goes the right way.
+
+`/admin/invoices` is the one that needed thinking about, and the reasoning is
+in `auth.ts` rather than here: finance owns the money, sales chases the payment
+(05 §9 step 8), neither can mark one paid from the page because the payment
+webhook is the only thing that routes money.
+
+### One page that existed and nothing pointed at
+
+`/admin/users/[id]` rendered, was classified, and was reachable by typing a
+URL. The directory linked out to `/u/[slug]` — the **public** profile — and
+nothing linked in.
+
+Neither reachability guard catches that shape: `94-reachability` sees a link to
+a missing page, `94-surface-reach` sees a module nothing imports, and this is a
+page nothing links to whose module is imported by itself. Found by clicking,
+which is why *"a human can"* is the definition of done rather than the last row
+of the table.
