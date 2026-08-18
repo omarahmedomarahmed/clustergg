@@ -165,6 +165,30 @@ test("a server's per-challenge credits add up to its recorded entrants", async (
   const reconciliation = await reconcileCredits(db, WEEK_1);
   ok(reconciliation.length > 0, "there are scored servers to reconcile");
   ok(reconciliation.every((r) => r.ok), "and every one of them adds up");
+  ok(
+    reconciliation.every((r) => r.credited > 0),
+    "on real numbers — a reconciliation of nothing against nothing reconciles too",
+  );
+
+  // ===== AND THE HALF THAT CAN FAIL =====
+  //
+  // Break 175 hardcoded `ok: true` and this test stayed green, because every
+  // assertion above was satisfied by a checker that always says yes. W4 is a
+  // check, and a check that cannot say no is a sentence.
+  const [credit] = await weekCreditsFor(db, WEEK_1, "g1");
+  await db
+    .update(schema.weekCredits)
+    .set({ entrantsCredited: credit.entrantsCredited + 1 })
+    .where(sqlEq(schema.weekCredits.id, credit.id));
+  const after = await reconcileCredits(db, WEEK_1);
+  no(
+    after.find((r) => r.guildId === "g1")!.ok,
+    "one credit out of place and it says so — which is the whole of W4",
+  );
+  ok(
+    after.filter((r) => r.guildId !== "g1").every((r) => r.ok),
+    "and it says so about that server only, not about every server on the page",
+  );
 
   // The decimal and the head count answer different questions, and both are
   // needed: two halves read 1.0 over 2 people, a same-server entrant reads 1.0
