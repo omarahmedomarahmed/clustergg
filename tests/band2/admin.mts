@@ -79,14 +79,40 @@ for (const group of ["Paid, needs setup", "Awaiting payment", "Drafts", "Announc
 // ── The editor, and the prize-pool guard in all three states ────────────────
 console.log("\nadmin/editor:");
 
-// Find a challenge that is still editable.
-const editable = await page
+// ===== FIND A CHALLENGE THAT IS STILL EDITABLE, BY OPENING ONE =====
+//
+// This took the first `/admin/challenges/*` link on the page, which was the
+// only one for ten sprints. Sprint 13 added a **Build a challenge** button
+// pointing at `/admin/challenges/new`, and it sits above the queue — so the
+// pass opened the builder, waited for a trophy form that a builder does not
+// have, and reported the prize-pool guard as broken.
+//
+// A closed challenge is the same trap from the other side: its editor is a
+// record, not a form. So the candidates are probed rather than guessed, and
+// the one that carries the trophy form is the one the guard is exercised on.
+const links = await page
   .locator('a[href^="/admin/challenges/"]')
   .evaluateAll((els) => els.map((e) => (e as HTMLAnchorElement).getAttribute("href") ?? ""));
-const target = [...new Set(editable)].find((h) => h !== "/admin/challenges");
-check(Boolean(target), "there is a challenge to open");
+const candidates = [...new Set(links)].filter(
+  (h) => h !== "/admin/challenges" && h !== "/admin/challenges/new" && !h.includes("/series/"),
+);
+check(candidates.length > 0, "the queue has challenges in it");
 
-await page.goto(`${BASE}${target}?${at}`);
+let target: string | undefined;
+for (const href of candidates) {
+  await page.goto(`${BASE}${href}?${at}`);
+  await page.waitForSelector("h1");
+  if ((await page.locator('input[name="valueDollars"]').count()) > 0) {
+    target = href;
+    break;
+  }
+}
+check(
+  Boolean(target),
+  `none of the ${candidates.length} challenges in the queue is still open for setup, so ` +
+    `the prize-pool guard cannot be photographed failing`,
+);
+
 await page.waitForSelector("h1");
 await shot(page, "editor-seven-steps");
 

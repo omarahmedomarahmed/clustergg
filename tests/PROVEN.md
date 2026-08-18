@@ -1489,6 +1489,7 @@ of the table.
 | 219 | **Four weeks of money are identical with `guild_snapshots` dropped** (`99-full-cycle`) | `poolDivisionFor` selects from `guildSnapshots` | *"the same four weeks with guild_snapshots dropped…"*, as `relation "guild_snapshots" does not exist` | clean, 2/2 |
 | 220 | **The wallet card asks `mayWithdraw`, and it is four gates not one** (`61-cards`, `95-permissions`) | `mayWithdraw`'s access gate replaced with `if (false)` | *"the wallet card asks mayWithdraw…"* **and** *"an administrator does everything except move money"* + *"an administrator cannot withdraw…"* | clean, 444/444 |
 | 221 | **S2 — the owner reaches their cards before a role is mapped** (`61-cards`) | the `guild.ownerDiscordId` branch in `checkAdmin` disabled | *"on install, before any role is mapped…"* **and** *"the wallet card asks mayWithdraw…"* | clean, 445/445 |
+| 222 | **G5 — a `guild_admins` row is a pair, and staff somewhere is not staff here** (`95-permissions`) | `hasSeenAdmin` matches on the guild alone, as the portal used to | *"being staff somewhere is not being staff here"*, on the third assertion — a different person carried by somebody else's row | clean, 446/446 |
 
 ### Guard 218 and what "≥ 2 suites" was actually asking for
 
@@ -1524,3 +1525,30 @@ installed server — before any role is mapped, which is every server on day one
 
 Both were invisible for the same reason: the rule was proven, and the reading
 of it was not.
+
+### Guard 222 is the one that was actually dangerous
+
+Wiring the wallet up meant asking how a page decides somebody is an
+administrator, and `serverPortalAccess` decided it like this:
+
+```ts
+seenAdmin: gamer?.discordId
+  ? Boolean((await db.select().from(guildAdmins)
+      .where(eq(guildAdmins.guildId, guildId))).length)
+  : false,
+```
+
+Filtered on the guild. Not on the person. Every guild with one staff member
+has a `guild_admins` row, so **any gamer who had ever linked Discord was an
+administrator of every such server** — the members list, the analytics, the
+community-challenge request, the whole portal.
+
+Two things hid it, and both are worth naming. The **rule** was right:
+`guildAccessFor` is correct and has its own tests, so the suite was asking the
+right question of the wrong layer. And this suite's own fixture ran the
+mirror-image query — filtered on the discord id alone, with no guild — so a
+test that walked the same path would have agreed with the bug.
+
+The query now lives in `hasSeenAdmin`, beside the code that writes the rows,
+and the fixture calls it too. A fixture that computes the answer a second way
+is a fixture that can only agree with itself.

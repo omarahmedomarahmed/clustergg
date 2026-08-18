@@ -16,6 +16,7 @@
 
 import { ok, eq, no, throws } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
+import { hasSeenAdmin } from "../../lib/discord/admin.ts";
 import { resetDemoDb, schema, type DB } from "../../lib/db/index.ts";
 import {
   guildAccessFor,
@@ -351,16 +352,21 @@ async function aGuild(db: DB) {
   });
 }
 
-async function accessOf(db: DB, discordId: string): Promise<GuildAccess> {
-  const [guild] = await db.select().from(schema.guilds).where(sqlEq(schema.guilds.guildId, "g1"));
-  const seen = await db
-    .select()
-    .from(schema.guildAdmins)
-    .where(sqlEq(schema.guildAdmins.discordId, discordId));
+async function accessOf(db: DB, discordId: string, guildId = "g1"): Promise<GuildAccess> {
+  const [guild] = await db.select().from(schema.guilds).where(sqlEq(schema.guilds.guildId, guildId));
   return guildAccessFor({
     guild,
     discordId,
-    seenAdmin: seen.length > 0,
+    // ===== THE FIXTURE ASKED THE WRONG QUESTION TOO =====
+    //
+    // This ran its own `guild_admins` query filtered on the **discord id
+    // alone**, exactly as the server portal ran one filtered on the **guild
+    // alone**. Two different wrong halves of the same pair, and between them
+    // the suite could not have noticed either.
+    //
+    // It goes through `hasSeenAdmin` now, so the fixture and the product are
+    // asking the same question of the same table.
+    seenAdmin: await hasSeenAdmin(db, guildId, discordId),
     isDemo: false,
   });
 }
@@ -373,3 +379,65 @@ function aPayload() {
     startAt: MONDAY.toISOString(),
   };
 }
+
+// ── G5 · a `guild_admins` row is a pair ─────────────────────────────────────
+
+test("being staff somewhere is not being staff here", async () => {
+  // ===== THE DEFECT THIS EXISTS FOR =====
+  //
+  // `serverPortalAccess` asked whether the guild had **any** `guild_admins`
+  // row, not whether *this* gamer had one. Every guild with a single staff
+  // member has one — so any gamer who had ever linked Discord was an
+  // administrator of every such server: the members list, the analytics, the
+  // community-challenge request, the whole portal.
+  //
+  // It went unnoticed for two reasons and both are here. The rule
+  // (`guildAccessFor`) was correct and well tested, so the suite was asking
+  // the right question of the wrong layer. And this suite's own fixture ran
+  // the mirror-image query — filtered on the discord id alone — so even a test
+  // that walked the same path would have agreed with the bug.
+  const db = await resetDemoDb();
+  await aGuild(db);
+  await db.insert(schema.guilds).values({
+    guildId: "g2",
+    name: "Dawnbreak",
+    slug: "dawnbreak",
+    memberCount: 300,
+    adminRoleId: "444444444444444444",
+    ownerDiscordId: "someone-else",
+    community: "Dawnbreak is a competitive gaming community.",
+    announceChannelId: "chan-2",
+    memberAgeRange: "18-24",
+    gamesPlayed: ["Chess"],
+    inviteUrl: "https://discord.gg/g2",
+    coverImageUrl: "https://cdn.test/g2.png",
+  });
+
+  // Somebody is staff on g1. That is the only row in the table.
+  await db.insert(schema.guildAdmins).values({
+    id: uid(),
+    guildId: "g1",
+    discordId: ADMIN_ID,
+    source: "mapped_role",
+    seenAt: new Date(),
+  });
+
+  ok(await hasSeenAdmin(db, "g1", ADMIN_ID), "the pair we have seen reads as seen");
+  no(
+    await hasSeenAdmin(db, "g2", ADMIN_ID),
+    "the same person on a different guild has not been seen there",
+  );
+  no(
+    await hasSeenAdmin(db, "g1", "a-stranger"),
+    "and a different person on the same guild is not carried by somebody else's row",
+  );
+  no(await hasSeenAdmin(db, "g1", null), "nobody signed in is nobody seen");
+
+  // And through the access shape, which is what a page actually asks.
+  eq((await accessOf(db, ADMIN_ID, "g1")).kind, "administrator", "staff on their own guild");
+  eq(
+    (await accessOf(db, ADMIN_ID, "g2")).kind,
+    "none",
+    "and nothing at all on a server they have never been seen on",
+  );
+});

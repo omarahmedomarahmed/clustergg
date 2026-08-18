@@ -13,7 +13,7 @@
 // That last one is enforced by making it impossible to return an owner card
 // that is not ephemeral, rather than by remembering to set a flag.
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 import type { Interaction, ScreenResult } from "./interactions.ts";
@@ -115,6 +115,42 @@ export function ownerOnly(
     const result = await handler(ctx);
     return { ...result, ephemeral: true };
   };
+}
+
+/**
+ * Have we **seen this person** holding admin on **this guild**?
+ *
+ * ===== THE PAIR, NOT THE GUILD =====
+ *
+ * `guild_admins` is G5's honest, incomplete record: a row exists because we
+ * watched somebody press a button while holding ADMINISTRATOR or the mapped
+ * role. The row is a **pair**, and so is the question.
+ *
+ * The server portal asked it with only the guild in the `where`, so any gamer
+ * who had ever linked Discord was an administrator of every server that had
+ * ever seen one — the whole portal, the members list, the analytics, the
+ * community-challenge request. One missing `and()` between "somebody here is
+ * staff" and "you are".
+ *
+ * It lives here, beside the code that writes the rows, so there is one place
+ * that knows what a `guild_admins` row means.
+ */
+export async function hasSeenAdmin(
+  db: DB,
+  guildId: string,
+  discordId: string | null | undefined,
+): Promise<boolean> {
+  if (!discordId) return false;
+  const rows = await db
+    .select({ id: schema.guildAdmins.id })
+    .from(schema.guildAdmins)
+    .where(
+      and(
+        eq(schema.guildAdmins.guildId, guildId),
+        eq(schema.guildAdmins.discordId, discordId),
+      ),
+    );
+  return rows.length > 0;
 }
 
 /** Map an admin role. Stores the ID; the name is never persisted. */

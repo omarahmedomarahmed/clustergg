@@ -21,6 +21,7 @@ import { notFound, redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { getDb, isDemoMode, schema } from "../db/index.ts";
 import { currentGamer } from "../auth/current.ts";
+import { hasSeenAdmin } from "../discord/admin.ts";
 import { hasPortalSession } from "../core/portal-auth.ts";
 import {
   guildAccessFor,
@@ -87,16 +88,11 @@ export async function serverPortalAccess(guildId: string): Promise<GuildAccess> 
   return guildAccessFor({
     guild,
     discordId: gamer?.discordId ?? null,
-    seenAdmin: gamer?.discordId
-      ? Boolean(
-          (
-            await db
-              .select({ id: schema.guildAdmins.id })
-              .from(schema.guildAdmins)
-              .where(eq(schema.guildAdmins.guildId, guildId))
-          ).length,
-        )
-      : false,
+    // Asked of `hasSeenAdmin`, which knows that a `guild_admins` row is a
+    // **pair**. This used to run its own query with only the guild in the
+    // `where`, and every gamer who had linked Discord was an administrator of
+    // every server that had ever seen one.
+    seenAdmin: await hasSeenAdmin(db, guildId, gamer?.discordId),
     isDemo: isDemoMode,
   });
 }
