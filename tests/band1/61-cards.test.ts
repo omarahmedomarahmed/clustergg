@@ -635,3 +635,88 @@ async function aClosableWeek(
   await allocateToPool(db, { weekStart, amountCents: 4_000 });
   return challengeId;
 }
+
+// ── Convert on upload, and the path list that is finally consulted ──────────
+
+test("nothing that is not PNG or JPEG reaches the store", async () => {
+  // ===== THE RULE HAD NO CALLER FOR TWO SPRINTS =====
+  //
+  // `acceptImage` has said *"nothing that is not PNG or JPEG reaches storage"*
+  // since Stage 6 and nothing called it, so the rule was enforced by nobody.
+  // `/api/uploads` is its door, and `putImage` takes a `StoredImage` — which
+  // only `acceptImage` produces — so the type is the gate rather than a check
+  // somebody could route around.
+  const { acceptImage, UploadRefused } = await import("../../lib/cards/upload.ts");
+  const { putImage, readImage } = await import("../../lib/cards/store.ts");
+
+  const png = await acceptImage({
+    bytes: new Uint8Array([1, 2, 3]),
+    contentType: "image/png",
+  });
+  const stored = await putImage(png, "img-png");
+  eq(readImage("img-png")?.contentType, "image/png", "a PNG goes through untouched");
+  no(stored.converted, "and needed no converting");
+
+  // WebP is the one that bites: the renderer answers `Unsupported image type`
+  // and the artwork simply does not appear. With no converter configured the
+  // refusal is the honest failure — the alternative is storing it and finding
+  // out months later that every card carrying it renders blank.
+  const refused = await (async () => {
+    try {
+      await acceptImage({ bytes: new Uint8Array([1]), contentType: "image/webp" });
+      return null;
+    } catch (e) {
+      return e;
+    }
+  })();
+  ok(refused instanceof UploadRefused, "a WebP with no converter is refused, in words");
+  ok(/PNG and JPEG/.test((refused as Error).message), "naming what the renderer can read");
+
+  // And with one, it is **converted rather than rejected** — 11-PORTED is
+  // explicit that the rule is not "reject WebP": a brand told their logo is
+  // the wrong format will send it anyway, in an email, on a Friday.
+  const converted = await acceptImage(
+    { bytes: new Uint8Array([1]), contentType: "image/webp" },
+    async () => ({ bytes: new Uint8Array([9, 9]), contentType: "image/png" as const }),
+  );
+  ok(converted.converted, "a converter turns it into something drawable");
+  eq(converted.contentType, "image/png", "and what reaches the store is PNG");
+
+  await putImage(converted, "img-webp");
+  eq(readImage("img-webp")?.contentType, "image/png", "so the store never holds a WebP");
+});
+
+test("a Riot call is checked against the approved path list before it goes out", async () => {
+  // `riot-methods.ts` is *"the authority"* on the 39 paths the personal key can
+  // call. It was written down, diffed path by path against Riot's own list —
+  // and read by nothing. An unapproved path returns a 403 that looks exactly
+  // like an expired key, and 10 §4 warns that sends whoever is debugging it to
+  // regenerate a key that has not expired.
+  const { isApprovedRiotPath, riotPathShape } = await import(
+    "../../lib/providers/riot-methods.ts"
+  );
+
+  const approved = riotPathShape(
+    "https://euw1.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/abc",
+  );
+  ok(isApprovedRiotPath(approved), `the icon proof's own path is approved: ${approved}`);
+
+  // VALORANT: not one endpoint survives on this key, not even platform status.
+  const val = riotPathShape("https://eu.api.riotgames.com/val/ranked/v1/leaderboards/by-act/x");
+  no(isApprovedRiotPath(val), `and a VAL path is not: ${val}`);
+
+  // The check has to be **in the fetch helper**, not at each call site, or it
+  // is a rule that holds for the calls somebody remembered.
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+  const src = await fs.readFile(
+    path.join(repoRoot, "lib", "providers", "riot-verify.ts"),
+    "utf8",
+  );
+  ok(/async function riot</.test(src), "the read reached the module — an empty read proves nothing");
+  ok(
+    /isApprovedRiotPath/.test(src),
+    "and the one function every Riot call goes through consults the list",
+  );
+});
