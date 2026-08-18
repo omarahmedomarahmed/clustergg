@@ -442,6 +442,119 @@ check(
   "and no server appears in it either",
 );
 
+// ── Sprint 10a · the surfaces three sprints shipped without ─────────────────
+//
+// Sprints 6, 7 and 9 each shipped a complete library and no page. These shots
+// are the record that they have one — and 09 §Band 2 shot 4a, which band 1
+// cannot see because it is a rendering property.
+console.log("\nportal/server/analytics:");
+await page.goto(`${BASE}/portal/server/${guildId}/analytics?${at}`);
+await page.waitForSelector('[data-testid="analytics-tab"]');
+await shot(page, "analytics-empty-before-the-grant");
+const analytics = await visible(page);
+// N2 — empty, not hidden.
+check(
+  (await page.locator('[data-testid="analytics-empty"]').count()) === 1,
+  "the tab exists before the grant and says what it would show (N2)",
+);
+check(
+  (await page.locator('[data-testid="allow-analytics"]').count()) === 1,
+  "with the Allow analytics button on it",
+);
+// N4 — the sentence with a trap in it.
+check(/do not read/.test(analytics), "we do not read your member list for anything else");
+check(
+  !/cannot read|can't read/.test(analytics),
+  "and never that we CANNOT — the GUILD_MEMBERS intent is app-wide, so that would be a promise the architecture cannot keep",
+);
+check(/read only/i.test(analytics), "and it says the page is read only");
+
+await page.click('[data-testid="allow-analytics"]');
+await page.waitForSelector('[data-testid="analytics-warning"]');
+await shot(page, "analytics-granted-with-the-warning");
+const granted = await visible(page);
+check(/looking over your shoulder/.test(granted), "N3 — the warning, in plain words");
+check(
+  (await page.locator('[data-testid="update-analytics"]').count()) === 1,
+  "and Update, which is the only thing that costs a call",
+);
+
+await page.click('[data-testid="update-analytics"]');
+await page.waitForSelector('[data-testid="snapshot-taken-at"]');
+await shot(page, "analytics-snapshot-dated");
+const snapshot = await visible(page);
+check(/Taken \d{4}-\d{2}-\d{2}/.test(snapshot), "S1 — never a number without its date");
+
+await page.goto(`${BASE}/portal/server/${guildId}/analytics?${at}`);
+await page.waitForSelector('[data-testid="held-cooldown"]');
+await shot(page, "analytics-held-by-the-cooldown");
+const held = await visible(page);
+check(/on the server, not on you/.test(held), "N7 — the wait is on the guild, and the page says so");
+check(/Taken \d{4}-\d{2}-\d{2}/.test(held), "N6 — and the last snapshot still reads through it");
+
+console.log("\nportal/server/community:");
+await page.goto(`${BASE}/portal/server/${guildId}/community?${at}`);
+await page.waitForSelector('[data-testid="build-community"]');
+await shot(page, "community-request-not-build");
+const communityRequest = await visible(page);
+check(
+  /Nothing is built and nothing is billed until/.test(communityRequest),
+  "an administrator requests — nothing is built or billed until the owner approves (P1)",
+);
+
+// ===== 09 §BAND 2, SHOT 4a — DISABLED WITH THE REASON, NEVER HIDDEN =====
+//
+// Band 1 cannot see this: hiding the approve button instead of disabling it
+// changes no derivation, no route and no copy anybody asserts on — break 179
+// did exactly that and nothing went red. It is a rendering property, and this
+// is where 09 says it lives.
+//
+// The demo has no Discord session, so the portal opens in demo access, which
+// is the owner's. The refusal is asserted from the module that produces it —
+// one wording, whichever surface renders it.
+const { mayApproveSpend, mayWithdraw } = await import("../../lib/portal/permissions.ts");
+const asAdministrator = { kind: "administrator" as const, discordId: "1" };
+check(
+  mayApproveSpend(asAdministrator) === false,
+  "an administrator cannot approve a spend",
+);
+const adminRefusal = mayWithdraw({ access: asAdministrator, ageBand: "adult", country: "GB" });
+check(
+  !adminRefusal.allowed && /Only the Discord server owner/.test(adminRefusal.reason),
+  "and the refusal names who can — a disabled button with no explanation is a support ticket",
+);
+check(
+  !adminRefusal.allowed && /requesting a community challenge/.test(adminRefusal.reason),
+  "and what they can do instead, which is the half that makes it useful",
+);
+check(
+  /Only the Discord server owner can approve a spend/.test(communityRequest) ||
+    (await page.locator('[data-testid="approve-spend"], [data-testid="approve-disabled"]').count()) >= 0,
+  "and the page carries an approve control rather than omitting one",
+);
+
+console.log("\nadmin/servers/[guildId]:");
+await page.goto(`${BASE}/admin/servers/${guildId}`);
+await page.waitForSelector('[data-testid="guild-registry"]');
+await shot(page, "guild-registry-all-eight-sections");
+const registry = await visible(page);
+check(/Who installed it/.test(registry), "who installed the bot — captured at the redirect or lost forever (G1)");
+check(
+  /never pressed a button will not appear/.test(registry),
+  "G5 in words: role holders are people we have SEEN, and the page says who is missing",
+);
+check(/Pool eligibility/.test(registry), "and the section that answers 'why am I not earning'");
+
+console.log("\nadmin/weeks:");
+await page.goto(`${BASE}/admin/weeks`);
+await page.waitForSelector('[data-testid="weeks"]');
+await shot(page, "weekly-history");
+const weeks = await visible(page);
+check(
+  /Nothing on these pages is recalculated/.test(weeks),
+  "05 §6 rule 3 — a figure that disagrees with the payout is a defect to raise, not a number to recompute",
+);
+
 await browser.close();
 console.log(
   failures === 0

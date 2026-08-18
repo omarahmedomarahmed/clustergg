@@ -222,9 +222,10 @@ and pushed; everything below is unstarted.
 | 8 · Messages | **Done** |
 | 9 · The guild registry and ownership | **Done** |
 | 10 · The brand dashboard and the nav | **Done** — band 2 fully green again |
+| 10a · The surfaces, and the weekly record | **Done** — inserted after review |
 | 11 – 14 | Not started |
 
-**389 tests, 1,680 assertions, 168 guards proven by breaking, 24 mutations
+**401 tests, 1,768 assertions, 178 guards proven by breaking, 24 mutations
 caught by at least their expected number of suites, typecheck gating the band
 inside `npm test`.** Band 1 is entirely green. **Band 2 is entirely green**, for the first time
 since Sprint 3.

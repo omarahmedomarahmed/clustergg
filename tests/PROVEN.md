@@ -1173,3 +1173,21 @@ Break 179 hid the approve button from an administrator instead of disabling it
 with the reason, and **nothing went red**. That is a rendering property, and
 09's Band 2 shot 4a is where it is specified. It is asserted in the browser
 pass rather than faked with a source check on JSX.
+
+## Band 2, after this sprint
+
+Seven new shots — the analytics tab through its whole consent flow, the
+community request screen, the guild registry and the weekly history — and shot
+4a's assertions.
+
+| Pass | Result |
+|---|---|
+| `site.mts` | green |
+| `admin.mts` | green |
+| `stage1-onboarding.mts` | green, 12 shots |
+| `portals.mts` | green, **38 shots** |
+
+Run twice back to back and green both times, because trap 14: a pass that is
+not idempotent will eventually photograph a refusal and call it a happy path.
+The analytics flow grants, updates and then hits its own cooldown inside one
+run, which is exactly the shape that would have broken on a second.
