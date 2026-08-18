@@ -1284,3 +1284,89 @@ simplified to `STATES.indexOf(state) + 1` so the real mechanism is visible, and
 the guard was proven with a break that can vary: making the function **throw**.
 House rule 11 is the point — a bar is decoration, and a decoration may never
 take a page down.
+
+---
+
+# Sprint 12 — the card families, the three announcements, and the close
+
+`tests/band1/61-cards.test.ts` unless the row says otherwise.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 191 | **S8 — a rendered owner card is ephemeral** | The wrapper returns the handler's result unchanged | *"every owner card is ephemeral — the card itself, not only the refusal"* | clean, 422/423 |
+| 192 | …and so is the refusal | The refusal branch drops the flag | same | clean, 422/423 |
+| 193 | **Every family in 04 §4 is registered** | `import "./games.ts"` deleted from the screen index | *"every card family in 04 §4 is registered"* — **and** `94-surface-reach`, from the other side | clean, 421/423 |
+| 194 | **A1 — the parent never moves** | `shadowGamerForDiscord` re-stamps an existing row | *"a second press in another server does not move the parent"* + `98-attribution` | clean, 421/423 |
+| 195 | **I5 — the first record holds nothing but the Discord ID** | The username taken from the payload | *"the first press creates the account and stamps the parent"* | clean, 422/423 |
+| 196 | **G5 — role holders are seen, not enumerated** | Every presser recorded, role or not | *"role holders are accumulated from the payload, never listed"* | clean, 422/423 |
+| 197 | **The winners card names the FROZEN server** | `users.parentGuildId` read instead of the stamp | *"the winners card names the server each winner came from"* | clean, 422/423 |
+| 198 | A community challenge is announced to its own server only | The community branch removed | *"…announced to its own server only"* | clean, 422/423 |
+| 199 | A server that removed the bot is not posted to | The `removedAt` filter dropped | *"announcing a challenge queues a card for every installed server"* | clean, 422/423 |
+| 200 | The announcement carries a **Join** button | The button removed from the card | same | clean, 422/423 |
+| 201 | A card says everything without its picture | `cardText` drops the values | *"a card says everything without its picture"* | clean, 422/423 |
+| 202 | **The close awards trophies** | `settleChallenge` removed from `runDailyJobs` | *"the daily job runs the whole close, not two steps of it"* | clean, 424/425 |
+| 203 | …drafts payouts and writes the record | `closeWeek` skipped | same | clean, 424/425 |
+| 204 | …and announces the winners | `announceWinners` removed | same | clean, 424/425 |
+| 205 | **A job never releases money** | The job releases the payouts it drafted | same | clean, 424/425 |
+| 206 | **Nothing undecodable reaches storage** | `acceptImage` accepts every type | **3 cases across 2 suites** | clean, 424/427 |
+| 207 | …and a converter's output is not trusted | The post-conversion check removed | *"nothing undecodable ever reaches storage"* | clean, 426/427 |
+| 208 | **The Riot fetch helper consults the approved list** | The call deleted, the import left | *"a Riot call is checked against the approved path list"* | clean, 426/427 |
+| 209 | …and the list actually refuses something | `isApprovedRiotPath` returns true | same | clean, 426/427 |
+
+### Guard 191 went green first, and the fixture is why
+
+Deleting the line that makes a rendered owner card ephemeral changed nothing,
+because every call in the fixture was a stranger — so every one took
+`checkAdmin`'s early return and **the line under test never executed.** Trap 27
+exactly: the break applied to the file, and the test had no way to receive it.
+
+S8 is broken in two different places — the wrapper's refusal, and the wrapper's
+return of a real card — and they are different lines. The guard now runs every
+admin screen three times: as the guild owner, as a holder of the mapped role
+(S4 reaches the same cards), and as a stranger. Guards 191 and 192 are the two
+halves that were one.
+
+### Guard 208 matched a name, not a call — inside a guard written to close a §0.1 hole
+
+The first version asserted that `riot-verify.ts` **mentions**
+`isApprovedRiotPath`. Deleting the call went straight through: the import line
+still mentions it. That is trap 16 — guard the chokepoint, not the vocabulary —
+and it is worth recording that it happened *while fixing* an instance of §0.1,
+which is the frame of mind least likely to notice it.
+
+Two changes. The check became an exported function so the rule can be exercised
+by behaviour rather than inferred from source, with both halves — an unapproved
+path throws, an approved one does not. And the chokepoint assertion strips
+imports **and comments** before searching, because the paragraph above the call
+explains the rule at length and would satisfy a naive match on its own. A guard
+matching prose about a thing rather than the thing is the same defect one layer
+down.
+
+### Guards 202–205: the close ran two of nine steps
+
+`runDailyJobs` was `stampBaselinesAtGun` and `closeChallenges`, and stopped. No
+trophies were awarded, no payout was drafted, no week record was written and
+nothing was announced. On a real deployment **the entire close, as a gamer or
+an owner experiences it, did not happen.**
+
+Every step was built, correct and guarded. `99-full-cycle` ran them **by hand**,
+in this order — which is exactly why nothing noticed: the band orchestrated the
+close itself, so it never asked whether anything else did. §0.1 on the largest
+thing on the platform, and the fifth time this shape has been found here.
+
+Four guards rather than one, because a single *"the close ran"* assertion goes
+green on a job that does half of it. Each of the four kills exactly one line.
+205 is the one that is not about completeness: it breaks the close by making it
+do **more** — releasing the payouts it drafted — because A1 is the rule that a
+job computes and a human releases, and a close that helpfully released would
+pass every other assertion here.
+
+### What Sprint 12 found that was not on its list
+
+Three things, all the same shape, all found by wiring rather than by reading:
+
+| Existed | Nothing read it |
+|---|---|
+| `SCREENS`, the registry, and a handler that falls back to *"that screen has gone"* | Any screen at all. Every interaction on the platform answered with a stale-button message |
+| `riot-methods.ts`, the authority on the personal key's 39 paths, diffed against Riot's own list | The fetch helper. An unapproved path would have returned a 403 that reads exactly like an expired key |
+| `acceptImage`, holding *"nothing that is not PNG or JPEG reaches storage"* | Any upload. The rule was enforced by nobody for two sprints |
