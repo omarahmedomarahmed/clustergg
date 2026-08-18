@@ -658,3 +658,33 @@ If you remember nothing else:
 4. **Is this the only door?** Grep before you fix.
 5. **Does anything render this?** A library with no surface is a feature that
    does not exist, however green its guards are.
+
+---
+
+## 30 · A red I cannot name, because I did not capture the output
+
+**What I did.** Ran `tests/band2/portals.mts` and read the result off the
+terminal with `| tail -30`. It printed *"1 portal browser assertion failed."*
+The `✗` line was somewhere above the tail window, so I re-ran the pass to see
+which one — and the second run was green.
+
+**Why it looked right.** Re-running is the obvious next move, and a browser
+pass that goes green on the retry reads as a flake in something incidental.
+Five further runs — three with a fresh seed, one back to back — were all green,
+which makes the "it was nothing" story more comfortable each time.
+
+**What it cost.** Nothing yet, and that is the problem. A red I cannot name is
+not a red I have ruled out. The failing run's output no longer exists, so the
+only honest statement about it is *one assertion failed and I do not know which
+one*, which is exactly the sentence somebody stops reading after the words
+"went green on the retry".
+
+Trap 8's rule says a break that changes nothing proves nothing. This is the
+mirror of it: **a pass that goes green on a re-run does not retract the run
+that went red.** The two runs are two facts, not one fact and a correction.
+
+**What catches it now.** Every band-2 pass is run into a file —
+`npx tsx tests/band2/x.mts > out.log 2>&1` — and the file is grepped, never the
+terminal. It costs nothing, it survives the scrollback, and it turns "somewhere
+above the tail window" into a line number. `tail -30` on a pass that prints
+seventy-eight assertions was never going to show me a failure in the middle.
