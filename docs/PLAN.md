@@ -226,10 +226,10 @@ and pushed; everything below is unstarted.
 | 11 · Help, progress, and the missing pages | **Done** |
 | 12 · The Discord card layouts | **Done** — `NOT_YET_RENDERED` is empty |
 | 13 · The series builder, and the rest of admin | **Done** |
-| 14 · Proof | **In progress** — mutations, the month run twice, and the screenshot record are done; the final harness pass is the last thing |
+| 14 · Proof | **Done** — except the one line only a person can sign: a human clicking all four journeys |
 
-**446 tests, 2,628 assertions, 222 guards proven by breaking, 34 mutations,
-typecheck gating the band inside `npm test`.** Band 1 is entirely green, and so
+**447 tests, 2,638 assertions, 223 guards proven by breaking, 34 of 34
+mutations caught, typecheck gating the band inside `npm test`.** Band 1 is entirely green, and so
 is band 2 — now **four** passes, each run twice back to back (trap 14), against
 `next build` + `next start` rather than the dev server.
 
@@ -242,16 +242,32 @@ is band 2 — now **four** passes, each run twice back to back (trap 14), agains
 | The four-week month | Now a function, run **twice** — once normally, once with `guild_snapshots` **dropped out of the database**. Every week record, payout line, allocation and vault balance compared. Dropped rather than emptied: an empty table still answers a query |
 | The screenshot record | `screenshots/gamer-money` (16 shots, 3 of them refusals) and 09's shots 4 and 4a in `screenshots/portals`. Both needed the demo to grow states it had never had |
 | Stripe | Confirmed to need no live key: `stripeConfigured()` gates the checkout call, the webhook takes its secret as an argument, and both bands run green with neither `STRIPE_SECRET_KEY` nor `DATABASE_URL` set |
+| The harness, run to completion | **34 of 34 caught** on the final tree. The run before it was 33 — the hole is guard 223 below, and it was on the money path |
 
-#### And four rules that existed and were read by nobody
+#### What "done" still does not include
 
-The §0.1 shape again, four more times, all found by asking *what reads this?*
+09's list ends with *"a human has clicked all four journeys end to end"*, and
+that is not something this branch can mark for itself. The demo is seeded, the
+record is in `screenshots/`, and `npm run test:browser` walks all four passes.
+
+Two things are also deliberately unbuilt and belong to deployment rather than
+to a sprint:
+
+| | |
+|---|---|
+| The production image backend | `lib/cards/store.ts` has a `setImageBackend` seam and **no Vercel Blob implementation**. Cards render and store in the demo; a deployment needs `BLOB_READ_WRITE_TOKEN` and the backend wired to it. Belongs with 10-SETUP's deployment step |
+| 23 mutations caught by exactly **one** suite | Not a failure — every one is at or above its expected number. But the harness prints them under *"one assertion is one edit away from none"*, and that list is the honest next place to add a second angle |
+
+#### And five rules that existed and were read by nobody
+
+The §0.1 shape again, five more times, all found by asking *what reads this?*
 
 | Rule | Who read it |
 |---|---|
 | `mayWithdraw` — 12 §2's four gates | **Nothing.** The Discord wallet card gated on `ownerDiscordId` alone, so a 13–17 owner was offered a Withdraw button; the web wallet carried the rule as help text |
 | S2 — on install, only the guild owner has admin | `checkAdmin` knew it only when a caller passed `guildOwnerId`, and the screen wrapper has a guild *id*. Every owner card refused the owner on day one |
 | G5 — a `guild_admins` row is a **pair** | `serverPortalAccess` matched on the guild alone. Any gamer who had linked Discord was an administrator of every server that had ever seen staff |
+| U4b — an email another gamer holds is a signpost, not a write | **Nothing.** `emailLinkOutcome` was exported and called by no page, no action and no test, so a Discord gamer could write an address another account held onto a second row — and `users.email` is not unique |
 | R3/V17 — deletion is refused mid-redemption | Sprint 11's find, listed here because it is the same shape and the same cause |
 
 ### The mutation count, which the documents disagree about
