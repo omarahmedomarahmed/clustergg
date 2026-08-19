@@ -159,10 +159,22 @@ move money.
 | Job | Cadence | Serves |
 |---|---|---|
 | Sync | Hourly | Phase 2 |
-| Post-queue drain | Every 5 minutes | Phase 1 and 3 |
+| Post-queue drain | Hourly | Phase 1 and 3 |
 | Daily jobs | Daily | Gun stamping, close, milestones |
 
 **A job never moves money on its own.** It computes; a human releases.
+
+**The drain was every five minutes and is now hourly.** Five minutes is the
+right cadence once cards are going out — an announcement should not sit in a
+queue while the servers it is for are awake. It is not the right cadence for a
+platform with nothing announced: 288 firings a day that each drain an empty
+queue, and the only thing they reliably do is keep the database from ever
+suspending.
+
+**Raise it back to five minutes before the first paid week is announced.**
+The cost of an hour's delay on a Sunday-night announcement is a Monday gun that
+some servers see late, and that is a real cost the moment there is a real
+challenge.
 
 ---
 
