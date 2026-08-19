@@ -2,5 +2,18 @@
   "framework": "nextjs",
   "installCommand": "npm install --no-audit --no-fund",
   "buildCommand": "next build",
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/cron/sync",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/cron/daily",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/announce",
+      "schedule": "0 * * * *"
+    }
+  ]
 }
