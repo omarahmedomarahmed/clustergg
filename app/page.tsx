@@ -24,7 +24,8 @@ import {
   weekFor,
   phaseAt,
 } from "../lib/site/queries.ts";
-import { COPY, SAYS } from "../lib/content/copy.ts";
+import { liveCopy } from "../lib/content/store.ts";
+import { SAYS } from "../lib/content/copy.ts";
 import { demoNow } from "../lib/site/clock.ts";
 import { Nav, Card, Money, Empty } from "./components.tsx";
 import { Countdown, PoolRefresher } from "./countdown.tsx";
@@ -41,6 +42,11 @@ export default async function Home({
   const now = demoNow(await searchParams);
   const phase = phaseAt(now);
   const week = weekFor(now);
+  // E7 — live on save. The words come from the store, which falls back to the
+  // code-side defaults when it is unreachable: the failure mode of a content
+  // store is a site with the wrong words, and the failure mode of an unfenced
+  // one is no site.
+  const copy = await liveCopy();
 
   const [live, next, ended, community, pool] = await Promise.all([
     liveChallenges(now),
@@ -56,8 +62,8 @@ export default async function Home({
       <main className="mx-auto flex max-w-5xl flex-col gap-12 px-6 py-12" data-phase={phase}>
         {/* ── Hero ─────────────────────────────────────────────────────── */}
         <section className="flex flex-col gap-4">
-          <h1 className="text-4xl font-semibold tracking-tight">{COPY.tagline}</h1>
-          <p className="max-w-2xl text-mute">{COPY.noMachinery}</p>
+          <h1 className="text-4xl font-semibold tracking-tight">{copy.tagline}</h1>
+          <p className="max-w-2xl text-mute">{copy.noMachinery}</p>
 
           {phase === "run" ? (
             <div className="rounded-xl border border-line bg-panel px-5 py-4">
@@ -68,7 +74,7 @@ export default async function Home({
             </div>
           ) : (
             <p className="rounded-xl border border-line bg-panel px-5 py-4">
-              {COPY.gracePeriod}
+              {copy.gracePeriod}
             </p>
           )}
         </section>
@@ -104,7 +110,7 @@ export default async function Home({
               This week&rsquo;s pool
               {phase === "grace" ? " — final" : ", live"}
             </h2>
-            <p className="mt-1 max-w-2xl text-sm text-mute">{COPY.poolIsPublic}</p>
+            <p className="mt-1 max-w-2xl text-sm text-mute">{copy.poolIsPublic}</p>
           </div>
 
           <div className="rounded-xl border border-line bg-panel">
@@ -199,7 +205,7 @@ export default async function Home({
 
         {/* ── Always ───────────────────────────────────────────────────── */}
         <section className="flex flex-col gap-3 border-t border-line pt-8">
-          <p className="max-w-2xl font-medium">{COPY.discordTerms}</p>
+          <p className="max-w-2xl font-medium">{copy.discordTerms}</p>
           <p className="max-w-2xl text-sm text-mute">{SAYS.kpis()}</p>
           <p className="max-w-2xl text-sm text-mute">{SAYS.unitPrice()}</p>
         </section>

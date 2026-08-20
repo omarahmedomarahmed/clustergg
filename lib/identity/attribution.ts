@@ -149,6 +149,38 @@ export function attributionSentence(): string {
 }
 
 /**
+ * The words that describe this rule — **live and deleted** — in the module that
+ * owns it.
+ *
+ * ===== WHY THE LIST LIVES HERE AND NOT IN THE GUARD =====
+ *
+ * `97-copy-rule` used to type these, and that was fine while the only thing
+ * checking them was a test: *"a guard may quote what it bans."*
+ *
+ * It stopped being fine when `lib/content/validate.ts` needed the same list to
+ * refuse an **operator** typing the rule into the content store (E3). A copy
+ * of the list in `lib/` is a rendered surface stating the deleted model, and
+ * `97-copy-rule` said so immediately — which is the guard working, not a
+ * nuisance to exempt around.
+ *
+ * So the rule's words belong to the rule, like its numbers do. N3, applied to
+ * the list of what N3 bans.
+ *
+ * The first two are phrases `attributionSentence` and `attributionShort`
+ * actually produce, and `97-copy-rule` asserts that they still do — a list
+ * checking for words nobody says any more is decoration. The rest are the
+ * **deleted** model's, which no module produces and which is exactly why they
+ * have to be written down somewhere: they are what a rule change leaves behind.
+ */
+export const RULE_PHRASES = [
+  "half an entrant",
+  "a whole entrant",
+  "worth half",
+  "half to each",
+  "½ to each",
+] as const;
+
+/**
  * The same rule, short enough to sit under a KPI heading.
  *
  * Still generated, and still naming the same-server case — a "short version"

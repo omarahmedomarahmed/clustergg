@@ -25,6 +25,7 @@ import { and, desc, eq } from "drizzle-orm";
 import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 import { uid } from "../core/utils.ts";
+import { COPY } from "./copy.ts";
 import { checkCopy, refusalText } from "./validate.ts";
 
 export const SCOPES = ["copy", "page_art", "card"] as const;
@@ -135,19 +136,20 @@ export async function historyOf(db: DB, scope: Scope, key: string): Promise<Over
  * a content store is a site with the wrong words; the failure mode of an
  * unfenced one is no site.
  */
-export async function liveCopy(
-  db: DB,
-  defaults: Record<string, string>,
-): Promise<Record<string, string>> {
+export async function liveCopy(): Promise<typeof COPY> {
   try {
-    const live = await currentOverrides(db, "copy");
-    const out: Record<string, string> = { ...defaults };
+    const { getDb } = await import("../db/index.ts");
+    const live = await currentOverrides(await getDb(), "copy");
+    const out: Record<string, string> = { ...COPY };
     for (const [key, row] of live) {
-      if (row.value !== null && key in defaults) out[key] = row.value;
+      // `key in COPY` and not merely "is a key": an override for a key that no
+      // longer exists is history, not copy, and rendering it would resurrect a
+      // string the deploy deliberately removed.
+      if (row.value !== null && key in COPY) out[key] = row.value;
     }
-    return out;
+    return out as typeof COPY;
   } catch (e) {
     console.error("[content] the override store was unreachable; serving defaults", e);
-    return { ...defaults };
+    return COPY;
   }
 }

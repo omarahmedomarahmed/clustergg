@@ -35,6 +35,7 @@ import {
   entrantCredit,
   attributionSentence,
   attributionShort,
+  RULE_PHRASES,
 } from "../../lib/identity/attribution.ts";
 
 const repoRoot = path.join(import.meta.dirname, "..", "..");
@@ -89,14 +90,16 @@ test("nothing outside the attribution module types the rule in words", async () 
   // The phrases are taken from `attributionSentence` and `attributionShort`
   // rather than typed here, so a change to how the rule is worded cannot leave
   // this guard checking for something nobody says any more.
+  // ===== THE LIST MOVED INTO THE MODULE THAT OWNS THE RULE =====
+  //
+  // It used to be typed here, which was fine while a test was the only thing
+  // checking it. `lib/content/validate.ts` now needs the same list to refuse an
+  // **operator** typing the rule into the content store (E3), and a second copy
+  // in `lib/` is a rendered surface stating the deleted model — which this very
+  // guard reported the moment it existed. So the rule's words belong to the
+  // rule, like its numbers do.
   const generated = `${attributionSentence()} ${attributionShort()}`;
-  const PHRASES = [
-    "half an entrant",
-    "a whole entrant",
-    "worth half",
-    "half to each",
-    "½ to each",
-  ];
+  const PHRASES = RULE_PHRASES;
   for (const phrase of PHRASES.slice(0, 2)) {
     ok(
       generated.includes(phrase),

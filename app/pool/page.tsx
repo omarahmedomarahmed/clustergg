@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { livePool, weekFor, phaseAt } from "../../lib/site/queries.ts";
-import { COPY, SAYS } from "../../lib/content/copy.ts";
+import { liveCopy } from "../../lib/content/store.ts";
+import { SAYS } from "../../lib/content/copy.ts";
 import { demoNow } from "../../lib/site/clock.ts";
 import { Nav, Money, Empty } from "../components.tsx";
 import { PoolRefresher } from "../countdown.tsx";
@@ -18,6 +19,8 @@ export default async function PoolPage({
   const now = demoNow(await searchParams);
   const pool = await livePool(now);
   const week = weekFor(now);
+  // E7 — live on save, fenced onto the defaults. See `lib/content/store.ts`.
+  const copy = await liveCopy();
 
   return (
     <>
@@ -25,7 +28,7 @@ export default async function PoolPage({
       <main className="mx-auto flex max-w-4xl flex-col gap-8 px-6 py-12">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">The weekly pool</h1>
-          <p className="mt-2 max-w-2xl text-mute">{COPY.poolIsPublic}</p>
+          <p className="mt-2 max-w-2xl text-mute">{copy.poolIsPublic}</p>
           <p className="mt-2 text-sm text-mute">
             Week of {week.start.toISOString().slice(0, 10)} ·{" "}
             {phaseAt(now) === "run" ? "live, updating as members join" : "final"}
@@ -84,7 +87,7 @@ export default async function PoolPage({
         ) : null}
 
         <section className="border-t border-line pt-6">
-          <p className="font-medium">{COPY.discordTerms}</p>
+          <p className="font-medium">{copy.discordTerms}</p>
           <p className="mt-2 text-sm text-mute">{SAYS.kpis()}</p>
           <p className="mt-4 text-sm text-mute">
             Fed by {pool.contributingChallengeIds.length} sponsored challenge

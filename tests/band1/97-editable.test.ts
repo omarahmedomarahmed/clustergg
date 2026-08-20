@@ -197,14 +197,13 @@ test("deleting an override is a row, and the key reads as its default again", as
   // blank."* A store that could not tell the two apart would make the default
   // unreachable the moment anybody typed into the key.
   const db = await resetDemoDb();
-  const defaults = { tagline: COPY.tagline };
 
   await saveOverride(db, { scope: "copy", key: "tagline", value: "An override.", editedBy: "u1" });
-  eq((await liveCopy(db, defaults)).tagline, "An override.", "the override reads");
+  eq((await liveCopy()).tagline, "An override.", "the override reads");
 
   await saveOverride(db, { scope: "copy", key: "tagline", value: null, editedBy: "u1" });
   eq(
-    (await liveCopy(db, defaults)).tagline,
+    (await liveCopy()).tagline,
     COPY.tagline,
     "removing it reads as the code-side default again",
   );
@@ -216,7 +215,7 @@ test("deleting an override is a row, and the key reads as its default again", as
 
   // A blank string is a different thing and stays one.
   await saveOverride(db, { scope: "copy", key: "tagline", value: "", editedBy: "u1" });
-  eq((await liveCopy(db, defaults)).tagline, "", "an override to blank is an override to blank");
+  eq((await liveCopy()).tagline, "", "an override to blank is an override to blank");
 });
 
 // ── The refusal is at the store, not at the form ────────────────────────────
@@ -270,4 +269,33 @@ test("SAYS keys still produce their figures, so the refusal has an answer to poi
       false,
     "and the placeholder form of the same sentence is savable",
   );
+});
+
+test("an edit is live on the page that renders it, without a deploy", async () => {
+  // ===== E7 — AND THE HALF AN EDITOR ALONE DOES NOT GIVE YOU =====
+  //
+  // An editor that writes rows nobody reads is a diagnostic with a text box.
+  // The property is that the **page** changes, so this asserts through
+  // `liveCopy` — the function `app/page.tsx` and `app/pool/page.tsx` call —
+  // rather than through the store it happens to read.
+  const db = await resetDemoDb();
+  eq((await liveCopy()).poolIsPublic, COPY.poolIsPublic, "it starts as the default");
+
+  await saveOverride(db, {
+    scope: "copy",
+    key: "poolIsPublic",
+    value: "Every server's earnings are public, on purpose.",
+    editedBy: "u1",
+  });
+  eq(
+    (await liveCopy()).poolIsPublic,
+    "Every server's earnings are public, on purpose.",
+    "and the next render says the new thing — no deploy in this loop",
+  );
+
+  // An override for a key the deploy has since removed is history, not copy.
+  // Rendering it would resurrect a string somebody deliberately deleted.
+  await saveOverride(db, { scope: "copy", key: "keyThatWasDeleted", value: "Gone.", editedBy: "u1" });
+  const rendered = await liveCopy();
+  no("keyThatWasDeleted" in rendered, "an override with no key behind it renders nothing");
 });
