@@ -19,6 +19,7 @@ import {
   CredentialRefused,
 } from "../../../../lib/portal/brand-auth.ts";
 import { beginReset, completeReset } from "../../../../lib/identity/reset.ts";
+import { sendPasswordReset } from "../../../../lib/delivery/emails.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -68,7 +69,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (action === "reset-begin") {
-      const token = await beginReset(db, { kind: "brand", email: String(form.get("email") ?? "") });
+      const address = String(form.get("email") ?? "");
+      const token = await beginReset(db, { kind: "brand", email: address });
+      // The send sits inside the null check for the same reason the demo token
+      // does: the page must answer identically whether or not that brand
+      // exists, and only one of the two branches has anywhere to send to.
+      if (token) await sendPasswordReset({ to: address, token, kind: "brand" });
       // ===== THE SAME ANSWER EITHER WAY =====
       //
       // `token` is null when there is nobody to reset, and the page must not

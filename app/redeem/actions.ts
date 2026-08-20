@@ -33,6 +33,18 @@ import {
   confirmEmailVerification,
   looksLikeEmail,
 } from "../../lib/identity/verify.ts";
+import { sendVerificationCode } from "../../lib/delivery/emails.ts";
+
+/**
+ * What the page says when the code was minted and could not be delivered.
+ *
+ * L4 — a failed send is a state a human can see. The gamer is the human here,
+ * and telling them "sent" when it was not is how somebody sits waiting on an
+ * inbox for a code that is never coming.
+ */
+const NOT_SENT =
+  "We could not send the code just now. Nothing is wrong with your account — " +
+  "ask for another in a minute, or contact support if it keeps happening.";
 
 function backTo(params: Record<string, string>): never {
   const qs = new URLSearchParams(params).toString();
@@ -114,9 +126,27 @@ export async function beginVerificationAction(form: FormData): Promise<void> {
     if (error instanceof EmailTakenError) backTo({ error: error.message });
     throw error;
   }
+  // ===== AND HERE IT IS ACTUALLY SENT =====
+  //
+  // This line is the launch blocker. `beginEmailVerification` mints the code
+  // and returns it; for a whole sprint both of its call sites handed it
+  // straight to `isDemoMode ? { code } : {}`, so in production the code existed
+  // for one function call and reached nobody. The page said "sent". Redemption
+  // needs a verified email, verification needs a code, and no gamer on the
+  // platform could ever be paid.
+  //
+  // `sendEmail` never throws (L2/L5), so a missing key or a refusing provider
+  // records a row and returns — the gamer is told what happened rather than
+  // shown an error page for something that half-worked.
+  const sent = await sendVerificationCode({ to: email, code, userId: gamer.id });
+
   // Demo only, and fenced on the absence of a real database: the screenshot
   // record has to walk this flow and there is no inbox to walk it with.
-  backTo({ sent: "1", ...(isDemoMode ? { code } : {}) });
+  backTo({
+    sent: "1",
+    ...(isDemoMode ? { code } : {}),
+    ...(sent.status === "sent" ? {} : { warn: NOT_SENT }),
+  });
 }
 
 export async function confirmVerificationAction(form: FormData): Promise<void> {

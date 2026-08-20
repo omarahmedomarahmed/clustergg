@@ -46,6 +46,25 @@ export async function signUpBrand(
   });
   const { issueBrandInvite } = await import("./brand-auth.ts");
   const invite = await issueBrandInvite(db, { brandId, email: input.contactEmail });
+
+  // ===== AND HERE IT IS ACTUALLY SENT =====
+  //
+  // B1's one-time key was minted, hashed at rest, and returned to a caller
+  // that was the demo seeder. **There was no way for a brand to ever sign in**
+  // — the whole commercial funnel ended at a key nobody received. It is the
+  // same defect as the verification code, one audience along.
+  //
+  // The key is still returned as well: it exists in readable form exactly once,
+  // here, and the demo has to be able to show it because there is no inbox to
+  // walk the screenshot record with. `sendBrandInvite` records the attempt and
+  // never throws, so a signup does not fail because Resend is having a day.
+  const { sendBrandInvite } = await import("../delivery/emails.ts");
+  await sendBrandInvite({
+    to: input.contactEmail,
+    brandName: input.name,
+    key: invite.key,
+  });
+
   return { brandId, key: invite.key, brandUserId: invite.brandUserId };
 }
 

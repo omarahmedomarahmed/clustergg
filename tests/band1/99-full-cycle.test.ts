@@ -36,7 +36,7 @@ import { releasePayout, markPayoutPaid, payoutTotal } from "../../lib/money/payo
 import { checkPrizeVault } from "../../lib/money/prize-vault.ts";
 import { balanceOf, ledgerBalances } from "../../lib/money/ledger.ts";
 import {
-  startEmailVerification,
+  beginEmailVerification,
   confirmEmailVerification,
   requestRedemption,
   approveRedemption,
@@ -498,7 +498,7 @@ async function runTheMonth(
     .where(sqlEq(schema.userTrophies.id, redeemableHolding as string));
 
   const prizeBefore = await balanceOf(db, "prize");
-  const { code } = await startEmailVerification(db, holding.userId, "winner@example.com");
+  const code = await beginEmailVerification(db, holding.userId, "winner@example.com");
   ok((await confirmEmailVerification(db, holding.userId, code)).ok, `${label}: email verified at redemption`);
 
   const redemptionId = await requestRedemption(db, {

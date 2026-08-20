@@ -30,6 +30,7 @@ import { shadowGamerForDiscord } from "../../../../../lib/identity/gamers.ts";
 import { signIn, currentGamer } from "../../../../../lib/auth/current.ts";
 import { recordGuildOwnership, seeAdmin } from "../../../../../lib/discord/ownership.ts";
 import { registerGuild } from "../../../../../lib/discord/guilds.ts";
+import { dmGuildInstalled } from "../../../../../lib/delivery/dm.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -129,6 +130,19 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   });
   await seeAdmin(db, { guildId, discordId: identity.id, source: "administrator" });
   if (guilds.length > 0) await recordGuildOwnership(db, identity.id, guilds);
+
+  // ===== L6 — THE FIRST THING ANYBODY IS EVER TOLD =====
+  //
+  // *"On install, DM the guild owner — whoever installed it. Cluster is on your
+  // server, admins can create challenges from your earnings, only you can
+  // approve them."* `dmUser` had been written and correct for a sprint and was
+  // called by nothing, so a server owner installed a bot that then said
+  // nothing at all to them.
+  //
+  // Queued, not sent (L11): this is an OAuth redirect, and a Discord round trip
+  // inside it is a redirect that can time out. The cron delivers it and records
+  // whether it landed.
+  await dmGuildInstalled(db, { guildId, discordId: identity.id });
 
   // ── G2 · sign them in if they are not, and come back here ───────────────
   //

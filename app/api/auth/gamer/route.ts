@@ -27,6 +27,7 @@ import {
 import { beginReset, completeReset } from "../../../../lib/identity/reset.ts";
 import { signIn, currentGamer } from "../../../../lib/auth/current.ts";
 import { beginEmailVerification, confirmEmailVerification } from "../../../../lib/identity/verify.ts";
+import { sendVerificationCode, sendPasswordReset } from "../../../../lib/delivery/emails.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         passwordHash: await hashPassword(password),
       });
       const code = await beginEmailVerification(db, userId, email);
+      // Sent, not returned. Both call sites of `beginEmailVerification` used to
+      // drop the code unless the platform was in demo mode, which left an email
+      // signup permanently stuck on `/signup/verify`.
+      await sendVerificationCode({ to: email, code, userId });
       await signIn(userId);
       return back(request, "/signup/verify", isDemoMode ? { code } : {});
     }
@@ -107,7 +112,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     if (action === "reset-begin") {
-      const token = await beginReset(db, { kind: "gamer", email: String(form.get("email") ?? "") });
+      const address = String(form.get("email") ?? "");
+      const token = await beginReset(db, { kind: "gamer", email: address });
+      // `token` is null when there is nobody to reset, and the answer is the
+      // same either way — a form that distinguishes is a form that confirms
+      // which of our gamers exist to anybody who asks. So the send is inside
+      // the null check and the response is outside it.
+      if (token) await sendPasswordReset({ to: address, token, kind: "gamer" });
       const demo: Record<string, string> = isDemoMode && token ? { token } : {};
       return back(request, "/reset", { kind: "gamer", sent: "1", ...demo });
     }

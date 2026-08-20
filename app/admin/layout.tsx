@@ -27,6 +27,15 @@ const NAV: { href: string; label: string }[] = [
   { href: "/admin/content", label: "Content" },
   { href: "/admin/cards", label: "Cards" },
   { href: "/admin/weekend", label: "Weekend" },
+  // ===== TWO DOORS THAT HAD NO LINK =====
+  //
+  // `/admin/preflight` and `/admin/queue` were reachable only by typing the
+  // URL. Preflight now carries the button that registers the bot's slash
+  // commands — a deploy step — and the queue is where `10-SETUP` §8's outage
+  // table sends an operator. D14's rule one console along: a door nothing
+  // points at is a door nobody finds.
+  { href: "/admin/queue", label: "Queue" },
+  { href: "/admin/preflight", label: "Preflight" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

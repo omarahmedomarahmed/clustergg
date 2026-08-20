@@ -24,8 +24,22 @@
 
 import { and, asc, eq, lte, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.ts";
-import { postMessage } from "./rest.ts";
+import { dmUser, postMessage } from "./rest.ts";
 import { uid } from "../core/utils.ts";
+
+/**
+ * The DM transport slot. A record rather than a setter, for the reason
+ * `lib/delivery/send.ts` sets out at its own: an exported setter nothing in
+ * `app/` calls is what L12 is about, and excusing one is the softening the rule
+ * exists to prevent.
+ *
+ * Its default is the real call, so production cannot end up running on a stub.
+ * The band assigns to it because L10's whole subject is what happens when
+ * Discord **refuses** a DM — 50007, an owner with DMs from server members
+ * turned off — and a rule about a failure that cannot be made to fail is a rule
+ * nobody has checked.
+ */
+export const DM_TRANSPORT: { send: typeof dmUser } = { send: dmUser };
 
 /** How many rows one drain run will attempt. Bounded by the cron's maxDuration. */
 export const DRAIN_BATCH = 120;
@@ -55,7 +69,15 @@ export type QueueLedger = { challengeId: string; kind: "launch" | "ending" | "re
  * attribute a click to the wrong server.
  */
 export async function enqueuePosts(
-  targets: { channelId: string; guildId: string | null; payload: Record<string, unknown> }[],
+  targets: {
+    channelId?: string | null;
+    /** Set instead of `channelId` for a DM. L11 — never inline, always here. */
+    dmUserId?: string | null;
+    guildId: string | null;
+    payload: Record<string, unknown>;
+    /** What this message is, for the delivery record a DM writes at drain. */
+    kind?: string | null;
+  }[],
   ledger?: QueueLedger,
 ): Promise<Enqueued> {
   const batchId = uid();
@@ -63,10 +85,16 @@ export async function enqueuePosts(
   try {
     const db = await getDb();
     const rows = targets.map((t) => ({
-      id: uid(), batchId, channelId: t.channelId, guildId: t.guildId,
+      id: uid(), batchId,
+      channelId: t.channelId ?? null,
+      dmUserId: t.dmUserId ?? null,
+      guildId: t.guildId,
       payload: t.payload,
       ledgerChallengeId: ledger?.challengeId ?? null,
-      ledgerKind: ledger?.kind ?? null,
+      // A DM carries what it is here so the drain can write the delivery
+      // record without guessing. Channel posts keep using this for the
+      // announcement ledger, which is what it was built for.
+      ledgerKind: t.kind ?? ledger?.kind ?? null,
     }));
     // Chunked: one insert of a thousand rows is a statement some drivers refuse,
     // and this path must not fail for a server that has grown.
@@ -110,7 +138,20 @@ export async function drainPostQueue(limit = DRAIN_BATCH): Promise<DrainResult> 
 
     for (const row of due) {
       out.attempted++;
-      const res = await postMessage(row.channelId, row.payload as never);
+      // ===== L11 — THE DM GOES THROUGH HERE, NOT THROUGH A REQUEST =====
+      //
+      // Same batching, same backoff, same give-up budget as an announcement.
+      // The only difference is the call, and `dmUser` opens the channel first
+      // — which is the call that fails when an owner has blocked DMs from
+      // server members, and the reason `dmUser` reports a status rather than a
+      // boolean.
+      const res = row.dmUserId
+        ? await DM_TRANSPORT.send(row.dmUserId, row.payload as never)
+        : await postMessage(row.channelId ?? "", row.payload as never);
+
+      if (row.dmUserId) {
+        await recordDmOutcome(db, row, res.ok ? null : `${res.status}: ${res.error}`);
+      }
       if (res.ok) {
         await db.update(schema.discordPostQueue)
           .set({ status: "done", postedAt: new Date(), lastError: null })
@@ -176,7 +217,13 @@ export async function drainPostQueue(limit = DRAIN_BATCH): Promise<DrainResult> 
 export type QueueStatus = {
   pending: number; failed: number; done: number;
   /** The servers we have given up on, with why — this is the actionable list. */
-  failures: { guildId: string | null; channelId: string; error: string | null; attempts: number }[];
+  failures: {
+    guildId: string | null;
+    channelId: string | null;
+    dmUserId: string | null;
+    error: string | null;
+    attempts: number;
+  }[];
 };
 
 /** What the admin console shows: what is waiting, and what we gave up on. */
@@ -192,6 +239,7 @@ export async function queueStatus(limit = 50): Promise<QueueStatus> {
     const failures = await db.select({
       guildId: schema.discordPostQueue.guildId,
       channelId: schema.discordPostQueue.channelId,
+      dmUserId: schema.discordPostQueue.dmUserId,
       error: schema.discordPostQueue.lastError,
       attempts: schema.discordPostQueue.attempts,
     }).from(schema.discordPostQueue)
@@ -252,5 +300,51 @@ async function recordLandings(
         memberCountAt: guild?.memberCount ?? 0,
       })
       .onConflictDoNothing();
+  }
+}
+
+/**
+ * L10 — a DM's outcome is a state a human can see, with when it was tried.
+ *
+ * Two writes, deliberately, because they answer two different questions. The
+ * `deliveries` row is the **history**: every attempt, with its reason and its
+ * timestamp, which is what an operator asked *"did we ever tell them?"* needs.
+ * `guilds.ownerDmState` is the **current** answer, which is what the registry
+ * shows at a glance and what the reassignment refusal reads — a query that had
+ * to scan a history table to decide whether somebody may be replaced would be
+ * a rule nobody could see the working of.
+ *
+ * Fenced whole. An owner who blocks DMs is a normal state of the world, and
+ * recording it must never be able to take the drain down.
+ */
+async function recordDmOutcome(
+  db: Awaited<ReturnType<typeof getDb>>,
+  row: { dmUserId: string | null; guildId: string | null; ledgerKind: string | null },
+  error: string | null,
+): Promise<void> {
+  try {
+    const { record } = await import("../delivery/send.ts");
+    await record({
+      channel: "dm",
+      kind: row.ledgerKind ?? "dm",
+      recipient: row.dmUserId ?? "(unknown)",
+      guildId: row.guildId,
+      status: error ? "failed" : "sent",
+      error,
+    });
+    if (row.guildId) {
+      // ===== ONE WRITER FOR THE FLAG, AND IT IS NOT THIS FILE =====
+      //
+      // The obvious line here is an `update` on `guilds.owner_dm_state`, and it
+      // was one until `94-export-reach` pointed out that `recordOwnerDm` — the
+      // function 12 §6 was written around, which also writes the audit entry
+      // for a failure — had no caller. Two writers for one column is K12's
+      // shape, and the one that drifts is always the one that also does
+      // something else.
+      const { recordOwnerDm } = await import("../admin/registry.ts");
+      await recordOwnerDm(db, { guildId: row.guildId, state: error ? "failed" : "sent" });
+    }
+  } catch (e) {
+    console.error("[post-queue] could not record a DM outcome", e);
   }
 }

@@ -30,6 +30,7 @@ import {
   migrationHealth,
   cronHealth,
   commandHealth,
+  undeliveredMessages,
   type Health,
 } from "../../../lib/site/preflight.ts";
 import { Panel, Row, Light } from "../components.tsx";
@@ -66,11 +67,12 @@ export default async function Preflight() {
 
   // Settled independently. One slow external service must not stop the
   // database row from rendering — that row is the one somebody came for.
-  const [services, migrations, crons, commands] = await Promise.all([
+  const [services, migrations, crons, commands, undelivered] = await Promise.all([
     serviceHealth(db),
     migrationHealth(db, expected),
     cronHealth(db),
     commandHealth(),
+    undeliveredMessages(db),
   ]);
 
   const env = envRows();
@@ -178,6 +180,54 @@ export default async function Preflight() {
             </button>
           </form>
         </Row>
+      </Panel>
+
+      {/*
+        L2/L4 — the env row says the key is missing; this says who was waiting
+        while it was. A verification code that never left is a gamer who cannot
+        be paid, and until this list existed there was no way to know their
+        name.
+      */}
+      <Panel
+        title={
+          undelivered.length === 0
+            ? "Every message left"
+            : `${undelivered.length} message${undelivered.length === 1 ? "" : "s"} did not arrive`
+        }
+        note="Undelivered means we never tried — a missing key. Failed means the provider refused"
+        help={
+          <p>
+            A failed send is never retried automatically, because the people on this
+            list are usually waiting on something they asked for and a silent retry
+            an hour later is not the same as an answer. Fix the cause, then ask them
+            to try again.
+          </p>
+        }
+      >
+        {undelivered.length === 0 ? (
+          <Row>
+            <p className="text-sm text-mute" data-testid="deliveries-clear">
+              Nothing recorded as undelivered or failed.
+            </p>
+          </Row>
+        ) : (
+          undelivered.map((m, i) => (
+            <Row key={`${m.recipient}-${i}`}>
+              <div className="flex items-start gap-3">
+                <Light ok={false} level={m.status === "undelivered" ? "amber" : "red"} />
+                <div>
+                  <p className="text-sm" data-testid="delivery-failure">
+                    {m.kind.replace(/_/g, " ")} · {m.channel} · {m.recipient}
+                  </p>
+                  <p className="mt-0.5 text-xs text-mute">
+                    {m.status} · {m.attemptedAt.toISOString().slice(0, 16).replace("T", " ")} UTC
+                    {m.error ? ` · ${m.error}` : ""}
+                  </p>
+                </div>
+              </div>
+            </Row>
+          ))
+        )}
       </Panel>
 
       {groups.map((group) => (

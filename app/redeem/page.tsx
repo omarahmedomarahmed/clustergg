@@ -125,6 +125,20 @@ export default async function Redeem({
 
             {str("sent") ? (
               <>
+                {/*
+                  L4 — a failed send is a state a human can see. Telling
+                  somebody "sent" when it was not is how they sit waiting on an
+                  inbox for a code that is never coming, which is exactly what
+                  the platform did for a whole sprint.
+                */}
+                {str("warn") ? (
+                  <p
+                    data-testid="verify-not-sent"
+                    className="mt-4 rounded-lg border border-line bg-ink px-4 py-3 text-sm text-mute"
+                  >
+                    {str("warn")}
+                  </p>
+                ) : null}
                 {isDemoMode && str("code") ? (
                   <p
                     data-testid="demo-code"

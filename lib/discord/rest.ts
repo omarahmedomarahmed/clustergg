@@ -245,11 +245,31 @@ export async function addGuildMember(
   return { ok: true, added: res.data !== undefined, status: res.data === undefined ? 204 : 201 };
 }
 
-export async function dmUser(userId: string, payload: Json): Promise<boolean> {
-  const chan = await call<Channel>("/users/@me/channels", { method: "POST", body: JSON.stringify({ recipient_id: userId }) });
-  if (!chan.ok) return false;
+/**
+ * Open a DM channel with one person and post into it.
+ *
+ * ===== IT RETURNS A REASON NOW, AND L10 IS WHY =====
+ *
+ * This used to answer `boolean`. *"A DM can fail. An owner who blocks DMs from
+ * server members never receives it and Discord says so quietly. A failed DM is
+ * a recorded state the guild registry shows, with when it was tried — never a
+ * swallowed error."* A bare false cannot be shown to anybody: **50007 Cannot
+ * send messages to this user** is a setting the owner chose and can undo, and
+ * a 429 is us being busy. Telling an operator "the DM failed" without which of
+ * those it was is telling them nothing they can act on.
+ *
+ * The two calls are reported separately for the same reason: failing to open
+ * the channel is the blocked case, and failing to post into an open channel is
+ * not.
+ */
+export async function dmUser(userId: string, payload: Json): Promise<RestResult<void>> {
+  const chan = await call<Channel>("/users/@me/channels", {
+    method: "POST",
+    body: JSON.stringify({ recipient_id: userId }),
+  });
+  if (!chan.ok) return chan as RestResult<void>;
   const sent = await postMessage(chan.data.id, payload);
-  return sent.ok;
+  return sent.ok ? { ok: true, data: undefined } : (sent as RestResult<void>);
 }
 
 // ===== Slash-command registration =====

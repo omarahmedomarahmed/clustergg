@@ -332,6 +332,35 @@ export async function runDailyJobs(db: DB, now = new Date()) {
     const closed = await closeWeek(db, week.start, now);
     const standings = await announcePoolStandings(db, week.start);
     pool = { drafted: closed.drafted, recorded: closed.recorded, announced: standings.queued };
+
+    // ===== STEP 10 — TELLING THE OWNER, AFTER THE MONEY, NEVER BEFORE =====
+    //
+    // L7 — *at every week close, DM the owner their earnings. Once they have
+    // signed in, email as well.* Both, and both strictly downstream of
+    // `closeWeek`: L5 is that nothing which moves money waits on a message, so
+    // the payouts are drafted and the record written before a single notice is
+    // attempted, and neither `notifyOwnerEarnings` nor `dmOwnerEarnings` can
+    // throw back into this loop.
+    //
+    // The DM is the one that always fires. Discord never gives us an owner's
+    // address, so before they sign in it is the only channel there is — which
+    // is why the email is conditional inside its own function and this loop is
+    // not conditional at all.
+    const { notifyOwnerEarnings } = await import("../delivery/notify.ts");
+    const { dmOwnerEarnings } = await import("../delivery/dm.ts");
+    for (const share of closed.division.shares) {
+      if (share.totalCents <= 0) continue;
+      await notifyOwnerEarnings(db, {
+        guildId: share.guildId,
+        weekStart: week.start,
+        amountCents: share.totalCents,
+      });
+      await dmOwnerEarnings(db, {
+        guildId: share.guildId,
+        weekStart: week.start,
+        amountCents: share.totalCents,
+      });
+    }
   }
 
   return { gun, close, settled, movements: movements.length, announced, pool };

@@ -134,6 +134,13 @@ export const ROUTE_ACCESS: Record<string, Access> = {
   // cannot see which games are sellable, or which bot screen is registered, is
   // an operator who has to ask — and `/admin/settings` and `/admin/staff` stay
   // admin-only, because those change what the platform *does*.
+  // The bot's outbox. It names servers and the Discord ids of their owners —
+  // never a gamer, and nothing about money — and the question it answers is
+  // *"why did our server not get the card"*, which is support's question and
+  // sales's. Finance is out because there is nothing here they could act on,
+  // and 10-SETUP §8's outage table is written for the same two.
+  "/admin/queue": departments("admin", "sales", "support"),
+
   "/admin/content": departments("admin", "sales"),
   "/admin/games": departments("admin", "sales", "support"),
   "/admin/cards": departments("admin", "support"),

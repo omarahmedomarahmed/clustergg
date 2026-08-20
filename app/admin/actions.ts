@@ -23,6 +23,8 @@ import {
   rejectRedemption,
 } from "../../lib/trophies/redemption.ts";
 import { sweep } from "../../lib/trophies/settle.ts";
+import { notifyRedemptionProgress } from "../../lib/delivery/notify.ts";
+import type { RedemptionStage } from "../../lib/delivery/emails.ts";
 import { isQueue } from "../../lib/providers/registry.ts";
 
 async function actor(): Promise<string> {
@@ -205,16 +207,35 @@ export async function redemptionAction(form: FormData): Promise<void> {
   const id = String(form.get("redemptionId"));
   const step = String(form.get("step"));
 
+  // ===== L5 — THE MONEY FIRST, AND THE NOTICE STRICTLY AFTER =====
+  //
+  // *"Nothing that moves money waits on an email."* So the state change is
+  // done and committed inside the try, and the notice is outside it, on a
+  // module `lib/trophies/redemption.ts` does not import. A Resend outage
+  // cannot roll back an approval, and a send that fails cannot make a
+  // succeeded step render as a refusal.
+  //
+  // `stage` is set only when the step actually succeeded — an exception above
+  // leaves it null and `back()` has already redirected, so there is no path
+  // where somebody is told their payout is approved and it is not.
+  let stage: RedemptionStage | null = null;
   try {
-    if (step === "approve") await approveRedemption(db, id, who);
-    else if (step === "send") await markSent(db, id, who);
-    else if (step === "paid") await markRedemptionPaid(db, id, who);
-    else if (step === "reject") {
+    if (step === "approve") {
+      await approveRedemption(db, id, who);
+      stage = "approved";
+    } else if (step === "send") {
+      await markSent(db, id, who);
+      stage = "sent";
+    } else if (step === "paid") {
+      await markRedemptionPaid(db, id, who);
+      stage = "paid";
+    } else if (step === "reject") {
       await rejectRedemption(db, id, who, String(form.get("reason") || "No reason given"));
     }
   } catch (e) {
     back("/admin/redeems", reason(e));
   }
+  if (stage) await notifyRedemptionProgress(db, id, stage);
   revalidatePath("/admin/redeems");
   back("/admin/redeems");
 }
@@ -400,4 +421,84 @@ export async function registerCommandsAction(): Promise<void> {
   }
   revalidatePath("/admin/preflight");
   redirect("/admin/preflight?registered=1");
+}
+
+/**
+ * Sign a brand up, and send them the one-time key (B1).
+ *
+ * ===== THERE WAS NO WAY TO CREATE A BRAND AT ALL =====
+ *
+ * `signUpBrand` had exactly one caller on this branch and it was the demo
+ * seeder. So the entire commercial funnel — `04-SURFACES` §3, `06-JOURNEYS`
+ * §3 — began at a door that existed only in a fixture, and the one-time key it
+ * mints reached nobody even when it was called.
+ *
+ * The key is shown once, here, and never again: it is hashed at rest, and this
+ * is the only moment it exists in readable form. `signUpBrand` emails it as
+ * well — showing it is for the case where the email did not leave, which is a
+ * state the operator can now see on `/admin/preflight`.
+ */
+export async function createBrandAction(form: FormData): Promise<void> {
+  await actor();
+  const name = String(form.get("name") ?? "").trim();
+  const contactEmail = String(form.get("contactEmail") ?? "").trim();
+  if (!name || !contactEmail) {
+    back("/admin/brands", "A brand needs a name and a contact email.");
+  }
+
+  const { looksLikeEmail } = await import("../../lib/identity/verify.ts");
+  if (!looksLikeEmail(contactEmail)) {
+    back("/admin/brands", "That does not look like an email address.");
+  }
+
+  const db = await getDb();
+  const { signUpBrand } = await import("../../lib/portal/brand.ts");
+  let key: string;
+  try {
+    ({ key } = await signUpBrand(db, { name, contactEmail }));
+  } catch (e) {
+    back("/admin/brands", reason(e));
+  }
+  revalidatePath("/admin/brands");
+  redirect(`/admin/brands?invited=${encodeURIComponent(name)}&key=${encodeURIComponent(key)}`);
+}
+
+/**
+ * Drain the queue now, rather than waiting for the cron.
+ *
+ * `10-SETUP` §8's outage table tells an operator to do this and there was no
+ * button. Bounded by `DRAIN_BATCH`, so pressing it during a backlog is safe:
+ * it takes a batch, reports what happened, and says whether more is waiting.
+ */
+export async function drainQueueAction(): Promise<void> {
+  await actor();
+  const { drainPostQueue } = await import("../../lib/discord/post-queue.ts");
+  const result = await drainPostQueue();
+  revalidatePath("/admin/queue");
+  redirect(
+    `/admin/queue?notice=${encodeURIComponent(
+      `${result.posted} delivered, ${result.rescheduled} rescheduled, ${result.failed} given up on.` +
+        (result.more ? " More is still waiting — press it again." : ""),
+    )}`,
+  );
+}
+
+/**
+ * Put the given-up-on rows back in the queue.
+ *
+ * Not a retry loop. A row reaches `failed` after four attempts over ninety
+ * minutes, by which point the cause is a deleted channel, a removed permission
+ * or an owner who does not take DMs — and none of those is fixed by a fifth
+ * attempt. This is the button somebody presses *after* fixing the cause.
+ */
+export async function retryFailedPostsAction(): Promise<void> {
+  await actor();
+  const { retryFailed } = await import("../../lib/discord/post-queue.ts");
+  const n = await retryFailed();
+  revalidatePath("/admin/queue");
+  redirect(
+    `/admin/queue?notice=${encodeURIComponent(
+      n === 0 ? "There was nothing to put back." : `${n} put back in the queue.`,
+    )}`,
+  );
 }

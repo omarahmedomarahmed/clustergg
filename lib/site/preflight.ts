@@ -462,3 +462,51 @@ export async function commandHealth(): Promise<Health> {
     return { ok: false, label, detail: `Could not ask Discord: ${(e as Error).message}` };
   }
 }
+
+export type UndeliveredMessage = {
+  channel: string;
+  kind: string;
+  recipient: string;
+  status: string;
+  error: string | null;
+  attemptedAt: Date;
+};
+
+/**
+ * Who is owed a message that never arrived.
+ *
+ * ===== L2/L4 — THE HALF THE ENV ROW COULD NOT SHOW =====
+ *
+ * `/admin/preflight` already had a row saying `RESEND_API_KEY` is missing.
+ * What it could not say is **who was waiting while it was** — the gamers whose
+ * verification codes were never sent, the brand whose one-time key never
+ * arrived, the owner whose DM Discord refused. A missing key is a
+ * misconfiguration somebody fixes in a minute; the people it stranded are the
+ * part that needs acting on afterwards.
+ *
+ * Both channels, because L3 and L10 are the same question. Recent first, and
+ * bounded: this is a list to act on, not an archive.
+ */
+export async function undeliveredMessages(db: DB, limit = 25): Promise<UndeliveredMessage[]> {
+  try {
+    const { desc, inArray } = await import("drizzle-orm");
+    const { schema } = await import("../db/index.ts");
+    return await db
+      .select({
+        channel: schema.deliveries.channel,
+        kind: schema.deliveries.kind,
+        recipient: schema.deliveries.recipient,
+        status: schema.deliveries.status,
+        error: schema.deliveries.error,
+        attemptedAt: schema.deliveries.attemptedAt,
+      })
+      .from(schema.deliveries)
+      .where(inArray(schema.deliveries.status, ["failed", "undelivered"]))
+      .orderBy(desc(schema.deliveries.attemptedAt))
+      .limit(limit);
+  } catch {
+    // House rule 11 on the page whose job is to stay readable while things are
+    // broken: a table that does not exist yet must not blank the schema row.
+    return [];
+  }
+}

@@ -1127,7 +1127,18 @@ export const discordPostQueue = pgTable(
   {
     id: text("id").primaryKey(),
     batchId: text("batch_id").notNull(),
-    channelId: text("channel_id").notNull(),
+    // ===== WHERE IT GOES: A CHANNEL, OR ONE PERSON =====
+    //
+    // L11 — *DMs are sent through the post queue, never inline.* A per-guild
+    // loop inside a request is already in `10-SETUP` §8's outage table, and a
+    // DM is exactly that shape: one Discord round trip per owner, on a path
+    // that must not take a request down.
+    //
+    // Exactly one of these is set. `channelId` lost its NOT NULL for this
+    // rather than being made to carry a user id under a flag — a column whose
+    // meaning depends on another column is a column somebody reads wrongly.
+    channelId: text("channel_id"),
+    dmUserId: text("dm_user_id"),
     guildId: text("guild_id"),
     payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
     // pending | sent | failed
@@ -1329,3 +1340,58 @@ export const staff = pgTable("staff", {
   department: text("department").notNull(),
   addedAt: timestamp("added_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Every message the platform owed somebody, and whether it left.
+ *
+ * ===== ONE TABLE, BECAUSE L3 AND L10 ASK THE SAME QUESTION =====
+ *
+ * `15-DELIVERY` L3 wants an operator asked *"did they get the code?"* to have
+ * an answer that is not a guess. L10 wants the same answer about a DM an owner
+ * may have blocked. Two tables would be two half-answers, and the operator
+ * question is *"did we tell them"* rather than *"which transport did we use"*.
+ *
+ * `channel` is `email` or `dm`. `kind` is which of the messages this is —
+ * `verification`, `brand_invite`, `password_reset`, `owner_earnings`,
+ * `redemption_progress`, `guild_installed`, `ownership_transfer`,
+ * `reassignment_warning`.
+ *
+ * ===== WHAT IS NOT HERE =====
+ *
+ * **The body.** A verification code, a reset token and a one-time brand key
+ * all travel through this and none of them may be stored: a table of every
+ * secret we ever sent is worth more to somebody than the accounts it opens.
+ * `subject` is a line an operator can recognise, never the payload.
+ *
+ * `status` is `sent` | `failed` | `undelivered`, and the third is not a
+ * synonym for the second. **Undelivered means we never tried** — L2's missing
+ * `RESEND_API_KEY`, which is a misconfiguration somebody can fix, not an
+ * outage. A row that says `failed` means Resend or Discord refused it, and
+ * `error` says what they said.
+ */
+export const deliveries = pgTable(
+  "deliveries",
+  {
+    id: text("id").primaryKey(),
+    // `email` | `dm`
+    channel: text("channel").notNull(),
+    kind: text("kind").notNull(),
+    /** The address or the Discord id. Who we were talking to, never what we said. */
+    recipient: text("recipient").notNull(),
+    /** Our own id for them, when there is one. Null for a brand invite to a stranger. */
+    userId: text("user_id"),
+    guildId: text("guild_id"),
+    subject: text("subject"),
+    // `sent` | `failed` | `undelivered`
+    status: text("status").notNull(),
+    error: text("error"),
+    attemptedAt: timestamp("attempted_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("deliveries_status_idx").on(t.status, t.attemptedAt),
+    index("deliveries_recipient_idx").on(t.recipient),
+    index("deliveries_guild_idx").on(t.guildId),
+  ],
+);
+
+export type Delivery = typeof deliveries.$inferSelect;

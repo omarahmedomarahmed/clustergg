@@ -19,6 +19,14 @@ import { weekRecordsForGuild } from "../../../../lib/pool/record.ts";
 import { refreshAllowedAt, REFRESH_COOLDOWN_MS } from "../../../../lib/discord/guilds.ts";
 import { formatMoney } from "../../../../lib/money/amounts.ts";
 import { Panel, Help } from "../../../ui.tsx";
+import {
+  arbitrateTransferAction,
+  confirmTransferAction,
+  reassignOwnerAction,
+  setAgeBandAction,
+  setParentGuildAction,
+  warnBeforeReassignmentAction,
+} from "./actions.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +39,20 @@ function Row({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+const FIELD =
+  "rounded-md border border-line bg-ink px-3 py-1.5 text-sm outline-none focus:border-white/30";
+const BTN = "rounded-md border border-line px-3 py-1.5 text-sm hover:bg-white/5";
+
 export default async function GuildRegistryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ guildId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { guildId } = await params;
+  const query = await searchParams;
+  const str = (k: string) => (typeof query[k] === "string" ? (query[k] as string) : null);
   const db = await getDb();
   const registry = await guildRegistry(db, guildId);
   if (!registry) notFound();
@@ -53,6 +69,17 @@ export default async function GuildRegistryPage({
         </p>
       </div>
 
+      {str("error") ? (
+        <p className="rounded-lg border border-line bg-ink px-4 py-3 text-sm" data-testid="registry-error">
+          {str("error")}
+        </p>
+      ) : null}
+      {str("notice") ? (
+        <p className="rounded-lg border border-line bg-ink px-4 py-3 text-sm text-mute" data-testid="registry-notice">
+          {str("notice")}
+        </p>
+      ) : null}
+
       {/* 1 · Ownership */}
       <Panel>
         <h2 className="font-medium">Ownership</h2>
@@ -65,16 +92,168 @@ export default async function GuildRegistryPage({
               : "never"
           }
         />
+        {/*
+          L10 — *"a failed DM is a recorded state the guild registry shows,
+          with when it was tried."* The word alone answers what; the date
+          answers whether it is a thing to chase or history. A `failed` here
+          also refuses reassignment, which is why it is spelled out rather than
+          shown as a colour.
+        */}
         <Row
           label="Owner DM"
           value={
-            registry.ownership.dmState === "sent"
+            (registry.ownership.dmState === "sent"
               ? "delivered"
               : registry.ownership.dmState
                 ? `${registry.ownership.dmState} — recorded, not swallowed`
-                : "not sent yet"
+                : "never tried") +
+            (registry.ownership.lastDmAt
+              ? ` · last tried ${registry.ownership.lastDmAt.toISOString().slice(0, 16).replace("T", " ")} UTC`
+              : "")
           }
         />
+        {registry.ownership.dms.length > 0 ? (
+          <Row
+            label="DMs attempted"
+            value={registry.ownership.dms
+              .slice(0, 4)
+              .map(
+                (d) =>
+                  `${d.kind.replace(/_/g, " ")}: ${d.status}${d.error ? ` (${d.error})` : ""}`,
+              )
+              .join(" · ")}
+          />
+        ) : null}
+      </Panel>
+
+      {/*
+        ===== THE PAGE WAS READ-ONLY AND THE RULES WERE NOT =====
+
+        Every control below calls a function that was written, guarded, and had
+        no caller anywhere — `94-export-reach` found all five. The 14-day
+        confirmation, the arbitration, the four-week reassignment, the age-band
+        correction and A8's parent correction were rules with no way to perform
+        them.
+
+        The order is deliberate: warn, then reassign. `reassignOwner` refuses
+        until the warning has actually been delivered, so the button above the
+        one that takes somebody's earnings is the one that tells them first.
+      */}
+      <Panel>
+        <h2 className="font-medium">Ownership actions</h2>
+        <Help title="Why the warning comes first">
+          <p>
+            Reassigning somebody who was never told is indistinguishable from taking
+            their money, so a reassignment is refused until Discord has accepted the
+            warning DM. Queued is not delivered — the Owner DM row above says which.
+          </p>
+        </Help>
+
+        <form action={warnBeforeReassignmentAction} className="mt-3">
+          <input type="hidden" name="guildId" value={guildId} />
+          <button type="submit" className={BTN} data-testid="warn-owner">
+            Send the reassignment warning
+          </button>
+        </form>
+
+        <form action={reassignOwnerAction} className="mt-4 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="guildId" value={guildId} />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">New owner Discord ID</span>
+            <input name="newOwnerDiscordId" required className={FIELD} data-testid="reassign-to" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Why</span>
+            <input name="reason" className={FIELD} />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="holdsAdmin" data-testid="holds-admin" />
+            <span className="text-mute">I have checked they hold ADMINISTRATOR right now</span>
+          </label>
+          <button type="submit" className={BTN} data-testid="reassign-owner">
+            Reassign
+          </button>
+        </form>
+
+        <form action={confirmTransferAction} className="mt-4 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="guildId" value={guildId} />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Confirmed by (outgoing owner&apos;s Discord ID)</span>
+            <input name="byDiscordId" required className={FIELD} data-testid="confirm-by" />
+          </label>
+          <button type="submit" className={BTN} data-testid="confirm-transfer">
+            Confirm the transfer
+          </button>
+        </form>
+
+        <form action={arbitrateTransferAction} className="mt-4 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="guildId" value={guildId} />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Award ownership to (Discord ID)</span>
+            <input name="newOwnerDiscordId" required className={FIELD} data-testid="arbitrate-to" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Why</span>
+            <input name="reason" className={FIELD} />
+          </label>
+          <button type="submit" className={BTN} data-testid="arbitrate-transfer">
+            Arbitrate a timed-out transfer
+          </button>
+        </form>
+      </Panel>
+
+      {/* A gamer-level correction, run from the server that raised it */}
+      <Panel>
+        <h2 className="font-medium">Corrections</h2>
+        <Help title="Both of these are logged with both sides">
+          <p>
+            An age band is set once and only support can move it (G9). A parent
+            server is stamped at a gamer&apos;s first bot click and a gamer can never
+            change their own (A8) — this is the only thing that moves one, and it
+            cannot move a closed week&apos;s money.
+          </p>
+        </Help>
+
+        <form action={setAgeBandAction} className="mt-3 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="guildId" value={guildId} />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Gamer ID</span>
+            <input name="userId" required className={FIELD} data-testid="ageband-user" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Band</span>
+            <select name="ageBand" className={FIELD} data-testid="ageband-value">
+              <option value="adult">adult</option>
+              <option value="teen">teen</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Why</span>
+            <input name="reason" className={FIELD} />
+          </label>
+          <button type="submit" className={BTN} data-testid="set-ageband">
+            Set the age band
+          </button>
+        </form>
+
+        <form action={setParentGuildAction} className="mt-4 flex flex-wrap items-end gap-3">
+          <input type="hidden" name="guildId" value={guildId} />
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Gamer ID</span>
+            <input name="userId" required className={FIELD} data-testid="parent-user" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Parent guild ID (blank for none)</span>
+            <input name="parentGuildId" className={FIELD} data-testid="parent-guild" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-mute">Why</span>
+            <input name="reason" className={FIELD} />
+          </label>
+          <button type="submit" className={BTN} data-testid="set-parent">
+            Correct the parent server
+          </button>
+        </form>
         <Row label="Transfer" value={registry.ownership.transfer.state.replace(/_/g, " ")} />
         <Row
           label="Reassignment"

@@ -58,6 +58,24 @@ export async function recordGuildOwnership(
           .update(schema.guilds)
           .set({ ownershipTransferAt: now })
           .where(eq(schema.guilds.guildId, g.id));
+
+        // ===== L8 — THE CLOCK STARTS FROM A MESSAGE SOMEBODY SENT =====
+        //
+        // T3's fourteen days are a window for the outgoing owner to say this
+        // is wrong. A window that opens against somebody who was never told is
+        // not a window, it is a countdown — and until now nothing told them,
+        // because `dmUser` had no callers.
+        //
+        // After the write and fenced, so a queue failure cannot leave the
+        // clock unstarted: an unstarted clock means the transfer is never
+        // resolved at all, which is worse than an un-DMed one that the
+        // registry will show as un-DMed.
+        const { dmOwnershipTransfer } = await import("../delivery/dm.ts");
+        await dmOwnershipTransfer(db, {
+          guildId: g.id,
+          outgoingDiscordId: row.ownerDiscordId,
+          incomingDiscordId: discordId,
+        });
       } else if (!row.ownerDiscordId) {
         await db
           .update(schema.guilds)

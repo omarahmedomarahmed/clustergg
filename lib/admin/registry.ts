@@ -231,6 +231,37 @@ export async function reassignOwner(
     );
   }
 
+  // ===== L9 — SOMEBODY WHO WAS NEVER TOLD MAY NOT BE REPLACED =====
+  //
+  // *"Reassigning somebody who was never notified is indistinguishable from
+  // taking their money."* So this is a refusal, not a reminder: the warning DM
+  // must have been **delivered**, and `owner_dm_state` is written by the post
+  // queue at the moment Discord accepted it — not when we queued it, because
+  // queued is not sent and this is the one place that distinction is worth
+  // money.
+  //
+  // Two consequences worth stating plainly rather than discovering:
+  //
+  //   * A `failed` state blocks reassignment for as long as it stands. An owner
+  //     who blocks DMs from server members is therefore un-reassignable, and
+  //     that is the intended answer — we cannot hand their earnings to somebody
+  //     else on the strength of a message Discord told us it refused to deliver.
+  //   * It does **not** touch the four-week clock, which `reassignmentState`
+  //     deliberately runs from install regardless of any DM. The window still
+  //     opens on time; what is gated is the act.
+  if (guild.ownerDmState !== "sent") {
+    throw new RegistryRefused(
+      guild.ownerDmState === "failed"
+        ? "We tried to warn this owner and Discord refused to deliver it — they " +
+          "have DMs from server members turned off. Reach them another way before " +
+          "reassigning; handing their earnings to somebody else on the strength of " +
+          "a message that never arrived is not something this console will do."
+        : "This owner has not been warned yet. Send the reassignment warning, wait " +
+          "for it to be delivered, and try again — reassigning somebody who was " +
+          "never told is indistinguishable from taking their money.",
+    );
+  }
+
   await db
     .update(schema.guilds)
     .set({ ownerDiscordId: input.newOwnerDiscordId, ownerFirstSignInAt: null })
@@ -341,6 +372,29 @@ export async function guildRegistry(db: DB, guildId: string, now = new Date()) {
     .where(eq(schema.serverPayouts.guildId, guildId))
     .orderBy(desc(schema.serverPayouts.weekStart));
 
+  // ===== L10 — "WITH WHEN IT WAS TRIED" =====
+  //
+  // `owner_dm_state` is one word and answers *what*. It cannot answer *when*,
+  // and 12 §6 and L10 both ask for both — an operator looking at "failed" needs
+  // to know whether that was this morning or in March, because one of those is
+  // a thing to chase and the other is history.
+  //
+  // Read from `deliveries` rather than adding a timestamp column beside the
+  // flag: every attempt is already recorded there with its reason, so the
+  // registry gets the full history for free and the flag stays the fast answer
+  // that the reassignment refusal reads.
+  const dms = await db
+    .select({
+      kind: schema.deliveries.kind,
+      status: schema.deliveries.status,
+      error: schema.deliveries.error,
+      attemptedAt: schema.deliveries.attemptedAt,
+    })
+    .from(schema.deliveries)
+    .where(and(eq(schema.deliveries.guildId, guildId), eq(schema.deliveries.channel, "dm")))
+    .orderBy(desc(schema.deliveries.attemptedAt))
+    .limit(20);
+
   return {
     // 1 · Ownership
     ownership: {
@@ -349,6 +403,9 @@ export async function guildRegistry(db: DB, guildId: string, now = new Date()) {
       hasEverSignedIn: guild.ownerFirstSignInAt !== null,
       firstSignInAt: guild.ownerFirstSignInAt,
       dmState: guild.ownerDmState,
+      /** Every DM we have tried to send this owner, newest first. L10. */
+      dms,
+      lastDmAt: dms[0]?.attemptedAt ?? null,
       transfer: transferStateOf(guild, now),
       reassignment: reassignmentState(guild, now),
     },

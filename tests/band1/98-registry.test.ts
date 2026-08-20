@@ -290,6 +290,48 @@ test("the claimant must hold ADMINISTRATOR at that moment", async () => {
     "and four weeks is four weeks, whoever is asking",
   );
 
+  // ===== L9 — AND THE THIRD CONDITION, WHICH IS THE EXPENSIVE ONE =====
+  //
+  // *"Reassigning somebody who was never notified is indistinguishable from
+  // taking their money."* Both conditions above are met here and it is still
+  // refused, because nobody has told this owner anything.
+  await throws(
+    () =>
+      reassignOwner(
+        db,
+        {
+          guildId: "g1",
+          actorId: "admin-1",
+          newOwnerDiscordId: NEW_OWNER,
+          claimantHoldsAdministrator: true,
+          reason: "owner never appeared",
+        },
+        days(30),
+      ),
+    /has not been warned yet/,
+    "a warning that was never sent is not a warning",
+  );
+
+  // A DM that Discord refused is not a warning either, and it says which.
+  await recordOwnerDm(db, { guildId: "g1", state: "failed" });
+  await throws(
+    () =>
+      reassignOwner(
+        db,
+        {
+          guildId: "g1",
+          actorId: "admin-1",
+          newOwnerDiscordId: NEW_OWNER,
+          claimantHoldsAdministrator: true,
+          reason: "owner never appeared",
+        },
+        days(30),
+      ),
+    /Discord refused to deliver it/,
+    "and an owner who blocks DMs is un-reassignable, which is the intended answer",
+  );
+
+  await recordOwnerDm(db, { guildId: "g1", state: "sent" });
   await reassignOwner(
     db,
     {
@@ -302,7 +344,7 @@ test("the claimant must hold ADMINISTRATOR at that moment", async () => {
     days(30),
   );
   const [guild] = await db.select().from(schema.guilds).where(sqlEq(schema.guilds.guildId, "g1"));
-  eq(guild.ownerDiscordId, NEW_OWNER, "with both conditions met, it happens");
+  eq(guild.ownerDiscordId, NEW_OWNER, "with all three conditions met, it happens");
   const [entry] = await db
     .select()
     .from(schema.auditLog)

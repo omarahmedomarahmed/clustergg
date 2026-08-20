@@ -28,7 +28,7 @@ import {
   approveRedemption,
   markSent,
   markRedemptionPaid,
-  startEmailVerification,
+  beginEmailVerification,
   confirmEmailVerification,
   redemptionsInFlight,
   RedemptionRefused,
@@ -445,7 +445,7 @@ test("/redeem is handed the collectable too, so the refusal is reachable", async
   // action calls.
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Holder Of Both");
-  const { code } = await startEmailVerification(db, userId, "both@example.com");
+  const code = await beginEmailVerification(db, userId, "both@example.com");
   await confirmEmailVerification(db, userId, code);
   await aHolding(db, userId, 0);
   await aHolding(db, userId, 5_000);
@@ -502,7 +502,7 @@ test("email is asked only at redemption, and must be verified", async () => {
   const blocked = await checkEligibility(db, holdingId, userId);
   eq(blocked.ok ? "" : blocked.code, "email_unverified", "and a redeem needs one");
 
-  const { code } = await startEmailVerification(db, userId, "Winner@Example.com ");
+  const code = await beginEmailVerification(db, userId, "Winner@Example.com ");
   no((await confirmEmailVerification(db, userId, "000000")).ok, "a wrong code does nothing");
   ok((await confirmEmailVerification(db, userId, code)).ok, "the right one verifies");
 
@@ -515,7 +515,7 @@ test("email is asked only at redemption, and must be verified", async () => {
 test("an expired verification code does not verify", async () => {
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Slow");
-  const { code } = await startEmailVerification(db, userId, "slow@example.com");
+  const code = await beginEmailVerification(db, userId, "slow@example.com");
   await db
     .update(schema.emailVerifications)
     .set({ expiresAt: new Date(Date.now() - 1000) })
@@ -527,7 +527,7 @@ test("the full redemption sequence, and the vault falls by exactly the value", a
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Paid Out");
   const holdingId = await aHolding(db, userId, 10_000);
-  const { code } = await startEmailVerification(db, userId, "paid@example.com");
+  const code = await beginEmailVerification(db, userId, "paid@example.com");
   await confirmEmailVerification(db, userId, code);
 
   const before = await balanceOf(db, "prize");
@@ -555,7 +555,7 @@ test("a redemption cannot skip a step, and cannot be paid twice", async () => {
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Impatient");
   const holdingId = await aHolding(db, userId, 10_000);
-  const { code } = await startEmailVerification(db, userId, "i@example.com");
+  const code = await beginEmailVerification(db, userId, "i@example.com");
   await confirmEmailVerification(db, userId, code);
   const id = await requestRedemption(db, { userTrophyId: holdingId, userId, method: "bank" });
 
@@ -578,7 +578,7 @@ test("the same trophy cannot be redeemed twice", async () => {
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Twice");
   const holdingId = await aHolding(db, userId, 10_000);
-  const { code } = await startEmailVerification(db, userId, "t@example.com");
+  const code = await beginEmailVerification(db, userId, "t@example.com");
   await confirmEmailVerification(db, userId, code);
 
   const id = await requestRedemption(db, { userTrophyId: holdingId, userId, method: "bank" });
@@ -612,7 +612,7 @@ test("what counts as in flight is pending, approved or sent — and not paid", a
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Leaving Mid-Payout");
   const holdingId = await aHolding(db, userId, 10_000);
-  const { code } = await startEmailVerification(db, userId, "l@example.com");
+  const code = await beginEmailVerification(db, userId, "l@example.com");
   await confirmEmailVerification(db, userId, code);
   const id = await requestRedemption(db, { userTrophyId: holdingId, userId, method: "bank" });
 
@@ -636,7 +636,7 @@ test("deletion is refused while a redemption is in flight, and allowed once it l
   const db = await resetDemoDb();
   const userId = await anAdult(db, "Closing Mid-Payout");
   const holdingId = await aHolding(db, userId, 10_000);
-  const { code } = await startEmailVerification(db, userId, "c@example.com");
+  const code = await beginEmailVerification(db, userId, "c@example.com");
   await confirmEmailVerification(db, userId, code);
   const id = await requestRedemption(db, { userTrophyId: holdingId, userId, method: "bank" });
 

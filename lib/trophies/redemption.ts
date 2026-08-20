@@ -71,15 +71,14 @@ export {
   looksLikeEmail,
 } from "../identity/verify.ts";
 
-/** The old name, kept for the redemption flow that already called it. */
-export async function startEmailVerification(
-  db: DB,
-  userId: string,
-  email: string,
-): Promise<{ code: string }> {
-  const { beginEmailVerification } = await import("../identity/verify.ts");
-  return { code: await beginEmailVerification(db, userId, email) };
-}
+// ===== `startEmailVerification` WAS DELETED HERE =====
+//
+// *"The old name, kept for the redemption flow that already called it."* The
+// redemption flow did not call it. Nothing did, outside its own tests — it was
+// on `94-export-reach`'s list of 144, and it was actively harmful: it wrapped
+// `beginEmailVerification` and **consumed the returned code**, which made the
+// L14 assertion read green over the exact defect it was written for. A caller
+// that nothing calls is not a caller.
 
 export type Eligibility = { ok: true; amountCents: number } | { ok: false; code: string; reason: string };
 

@@ -1742,3 +1742,56 @@ has no terminal, ever"* makes a script the wrong shape — and the row above it
 asks **Discord** which commands exist rather than comparing our list to our
 list, which is a check that passes on the only day it matters. Recorded as a
 deploy step in `docs/DEPLOYMENT.md` §5.
+
+## Sprint 16 · delivery — the launch blocker
+
+`beginEmailVerification` minted a six-digit code, hashed it into a row, and
+**returned it**. Both call sites handed it to `isDemoMode ? { code } : {}`, so
+in production the code existed for one function call and reached nobody. The
+page said *"sent"*. Downstream: `users.emailVerifiedAt` could never be written,
+so `checkEligibility` refused **every money trophy on the platform** with
+`email_unverified`. `beginReset` had the identical shape, and B1's one-time
+brand key had nowhere to go at all.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 247 | **The code that arrives is the code that verifies** (`97-delivery`) | — | asserted end to end: the six digits are read back out of the email body and typed into `confirmEmailVerification`. A sender wired to a second freshly-minted code passes every other assertion and leaves the money path exactly as broken | — |
+| 248 | **An absent `RESEND_API_KEY` records and does not throw** (`97-delivery`, L2) | made `sendEmail` throw when the key is missing | *"the answer says it never left"*, expected `undelivered`, actual `failed` — and the distinction is the point: undelivered means we never tried | clean, 10/10 |
+| 249 | **No message body is ever stored** (`97-delivery`) | — | asserted directly: the code `123456` appears nowhere in the recorded row. A table of every secret we sent is worth more than the accounts it opens | — |
+| 250 | **Break the sender and the money still moves** (`97-delivery`, L5) | the break IS the test — a transport that throws on every call | the trophy is still redeemable, the redemption is still requested, the approval still stands and is still stamped | permanent |
+| 251 | **A money module cannot even reach the sender** (`97-delivery`, L5) | — | source-level: no `lib/trophies/*`, `lib/money/*` or `lib/pool/score.ts` imports `lib/delivery/*`. An edge that exists but is not currently taken is the shape that gets taken later | — |
+| 252 | **Every door that mints a secret also sends it** (`97-delivery`) | deleted the `sendVerificationCode` call from `app/redeem/actions.ts` | this guard, naming the file. **`94-export-reach`'s L14 stayed green** — see below | clean |
+| 253 | **A DM goes through the post queue, never inline** (`97-delivery`, L11) | made `dmGuildInstalled` call `dmUser` directly and queue a channel row | *"addressed to a person rather than a channel"* | clean |
+| 254 | **A refused DM is a recorded state the registry shows, with when** (`97-delivery`, L10) | removed the `recordDmOutcome` call from the drain | *"the registry shows the state"*, expected `failed`, actual `null` | clean |
+| 255 | **A guild whose owner was never successfully told cannot be reassigned** (`97-delivery` + `98-registry`, L9) | — | asserted in three states: never warned, warned-and-refused-by-Discord, delivered. Only the third goes through | — |
+
+### Guard 252 exists because guard 240 could not see this
+
+L14 fires when a return value is unused at **every** call site. That caught the
+original defect, when both doors dropped the code. It cannot catch the
+regression: deleting the send from `/redeem` alone leaves the signup door
+consuming the value, so **L14 stayed green while every Discord gamer was
+un-payable again.** Proven by doing exactly that and watching it not move.
+
+So a second guard, at a different altitude: a file that mints a secret must
+also send it. Source-level, because a server action needs a request, a session
+and a cookie jar and cannot be driven from band 1 — band 2 walks the flow with
+a real browser, and this stops the wire being cut between those runs.
+
+### What the new guard found while it was being written
+
+`97-delivery`'s own door check went red on two files nobody had named:
+
+| File | What it said |
+|---|---|
+| `lib/trophies/redemption.ts` | `startEmailVerification` — *"the old name, kept for the redemption flow that already called it."* The redemption flow did not call it. It wrapped `beginEmailVerification` and **consumed the code**, which is what made L14 read green over the defect it was written for. Deleted |
+| `lib/portal/brand.ts` | `signUpBrand` minted B1's one-time key and returned it to a caller that was the demo seeder. **No brand could ever sign in.** Now emailed, and `/admin/brands` grew the door that creates one — it had none |
+
+### And two seams that had to not be functions
+
+`setEmailTransport` and `setDmSender` were the obvious way to let the band break
+delivery, and `94-export-reach` immediately listed both: an exported setter
+nothing in `app/` calls is exactly L12's shape, and excusing them would be the
+softening the rule exists to prevent. They are records now — `TRANSPORT.email`
+and `DM_TRANSPORT.send` — whose defaults are the production path, so every real
+send exercises the slot.

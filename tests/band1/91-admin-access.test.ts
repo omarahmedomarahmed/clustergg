@@ -183,6 +183,10 @@ test("a department reaches what it should and nothing more", () => {
     ["sales", "/admin/invoices", true],
     ["support", "/admin/invoices", false],
     ["support", "/admin/servers/requests", true],
+    // The bot's outbox. Support answers "why did our server not get the card",
+    // and the page names servers and owner Discord ids — never a gamer.
+    ["support", "/admin/queue", true],
+    ["finance", "/admin/queue", false],
     ["finance", "/admin/servers/requests", false],
     ["sales", "/admin/content", true],
     ["support", "/admin/content", false],
