@@ -1127,3 +1127,54 @@ value was wanted two lines later and `export` was already typed.
 `next build` runs a compiler with rules of its own, over files the band reads
 only as text. Before believing a sprint is deployable, **run the build** — and
 when it finds something, ask why no test could have.
+
+---
+
+## 36 · An empty result and no result look the same, and the harness could not tell them apart
+
+**What happened.** The Sprint 16 mutation run reported a hole:
+
+```
+A mutation caught by zero suites is a hole.
+  Join the guild's current name instead of the stored one
+```
+
+That is W5 — names in the weekly record are copied, not joined — so the report
+says three sprints of history could be silently rewritten by a server rename
+and no test would notice.
+
+Nothing was wrong with the band. Re-running that one mutation through the
+harness's own `spawn` caught it on the first try, in `99-week-record`, which
+has asserted W5 since Sprint 13:
+
+```
+✗ a server renamed in week 2 still reads as its week-1 name in week 1
+    expected: "Nightfall"   actual: ""
+517/518 · [exit 1]
+```
+
+**Why the harness got it wrong.** `failingSuites` scans the runner's output for
+`✗` marks and returns the suites that had one. For that mutation it found none
+and returned `[]` — because the band process had died without printing a single
+suite, with `npx next build` running on the same machine at the time.
+
+`[]` is also what it returns when the band ran perfectly and noticed nothing. A
+spawn that failed, a process the OS killed, a crash before the first suite, and
+a genuine hole all arrived as the same empty list, and the harness printed the
+most alarming reading of it.
+
+**Why this one stings.** This harness is what certifies every guard in
+`tests/PROVEN.md` — and it had the exact defect it exists to find: *a result
+consumed without anything checking one was produced.* It is `SCREENS` being
+empty, `mayWithdraw` read by no card, and the migrator nothing ran, in the tool
+that was built to catch them.
+
+**The fix.** A band run counts as a result only if it printed its own summary
+line, and its total must match the run before it. Either condition failing
+stops the harness with *"the band did not complete"*, the tail of the output,
+and the reason it is **not** a hole — because reporting it as one sends the
+next person looking for an assertion that is already there.
+
+**Carry this:** when a check reports "nothing", ask whether it could tell
+*nothing* from *nothing ran*. If the same value means both, the report is not
+evidence — and the day it matters, it will read as the alarming one.

@@ -1974,3 +1974,110 @@ they are exactly what `refreshGuild` needs, and building the Refresh button
 revived them. **They were not dead code — they were the other half of an
 unwired feature**, which is the distinction the guard's list exists to force
 somebody to make, and it is only visible once you try to build the surface.
+
+---
+
+## Sprint 16, after the fact — two holes the sprint's own verification found
+
+Everything above was written with the band green and the typecheck clean. Both
+of the following were found **after** that, by running things the band does not
+run, and each is the shape this branch exists to end: **a result nobody checked
+was produced**.
+
+### Guard 292 — a route file cannot export something `next build` will refuse
+
+`npx next build`, run at the end of the sprint for the first time, refused the
+tree:
+
+```
+app/settings/layout.tsx
+Type error: Layout "app/settings/layout.tsx" does not match the required types
+of a Next.js Layout.
+  "SETTINGS_TABS" is not a valid Layout export field.
+```
+
+Next type-checks a route file's exports against a fixed set of its own.
+`SETTINGS_TABS` had been exported since Sprint 11 (`f3d94dd`) and **nothing had
+ever imported it** — the deploy had been failing for five sprints on a keyword
+that did nothing. `tsc --noEmit` passes the file happily, so `npm test` could
+not have seen it: two compilers, two rule sets, and the band runs one of them.
+
+`95-deploy` §0.1 has asserted since Sprint 9 that the build command runs the
+migrator **first** — and could not assert that the build then succeeds.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 292 | **No route file exports something `next build` will refuse** (`95-deploy`) | `export const SETTINGS_TABS` put back, exactly as Sprint 11 had it | *"app/settings/layout.tsx exports SETTINGS_TABS"* — the defect's own name, from the file the build named | clean, 518/518 |
+
+The guard reads each route file's exports and checks them against what that
+kind of file may export — segment config everywhere, `metadata` and friends on
+a page or layout, the HTTP verbs on a route handler. It is not a build and does
+not pretend to be. It catches the one failure that has actually happened: a
+named export added to a route file because the value was wanted two lines later
+and `export` was already typed.
+
+It also asserts it found route files at all (`> 50`), because a guard over a
+set it never walked is a guard that passes for the wrong reason — trap 8, in
+the place trap 8 is easiest to miss.
+
+### The harness accused the band of a hole the band did not have
+
+The Sprint 16 mutation run reported:
+
+```
+A mutation caught by zero suites is a hole.
+  Join the guild's current name instead of the stored one
+```
+
+That is W5 — *names are copied, not joined* — and the reading it invites is
+that nothing asserts it. **Nothing was wrong with the band.** Re-running that
+one mutation through the harness's own `spawn` caught it immediately:
+
+```
+✗ a server renamed in week 2 still reads as its week-1 name in week 1
+    AssertionError: recorded under the name it had
+      expected: "Nightfall"
+      actual:   ""
+517/518 · [exit 1]
+```
+
+`99-week-record` has asserted W5 since Sprint 13, in three assertions, one of
+them the one above.
+
+**What had actually happened.** `npx next build` was running on the same
+machine while the harness was mid-run, and the band process for that one
+mutation died without printing a suite. `failingSuites` scans the runner's
+output for `✗` marks; it found none, returned `[]` — and `[]` is also exactly
+what it returns for a band that genuinely noticed nothing. The harness reported
+the second reading of an answer that meant the first.
+
+So the harness that certifies every other guard in this document had the defect
+it exists to find: it consumed a result without ever checking one had been
+produced. Four different events — a spawn that failed, a process the OS killed,
+a crash before the first suite, and a real hole — all arrived as the same empty
+list.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 293 | **A band run that did not finish stops the harness, and is never reported as a hole** (`tests/mutate.mts`) | `runBand` pointed at `tests/run-does-not-exist.mts`, so the band produces output and no summary — the observed failure, made deterministic | *"The band did not complete under 'Move 10% of the prize to Cluster'. the band printed no summary line, so it did not finish."*, the last twelve lines of the run, and the reason it is not a hole. The harness stopped at mutation 1 rather than reporting 34 | clean; the temporary commit carrying the break was reset away, and the mutated file was restored by the same `finally` |
+
+A run now counts as a result only if it printed its own summary line, and its
+total has to match the run before it — a band that lost eleven suites is a
+broken run, not a mutation nobody caught. Both conditions stop the harness
+outright: a number that was never measured is worse than no number, because the
+report around it looks exactly as confident.
+
+**Carry this:** the harness's report is evidence about a band run *that
+happened*. Nothing in the old output distinguished the run from its absence,
+and the first time that mattered it pointed a reader at three healthy
+assertions and told them they were missing.
+
+**The rerun.** With the fix in and nothing else on the machine: **34 of 34
+caught, zero holes, exit 0** — and the mutation reported as a hole reads
+
+```
+✓ Join the guild's current name instead of the stored one — caught by 1 (expected ≥ 1)
+   band1/99-week-record.test.ts
+```
+
+which is the suite that was catching it the whole time.

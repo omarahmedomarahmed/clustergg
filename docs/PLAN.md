@@ -229,14 +229,21 @@ and pushed; everything below is unstarted.
 | 14 · Proof | **Done** — except the one line only a person can sign: a human clicking all four journeys |
 | 15 · Production readiness | **Done** — the platform is up. Four owner actions remain, listed below |
 | 15b · Copy states the current rule | **Done** — the attribution sentence is generated, and three live pages were saying the deleted model |
-| 16 · Delivery, and the editable surface | **Done** — the launch blocker is closed, and `94-export-reach` found 146 |
+| 16 · Delivery, and the editable surface | **Done** — the launch blocker is closed, `94-export-reach` found 146, and running `next build` afterwards found a deploy that had been failing since Sprint 11 |
 | **17 · The design pass** | Not started. `13-DESIGN` in full: palette, typography, `/pool` first, the logo, the OG image, game art, trophy art |
 | **18 · The unexport pass** | Not started. See below — 64 exports that should never have been exports |
 
-**517 tests, 3,115 assertions, 285 guards proven by breaking, 34 of 34
+**518 tests, 3,117 assertions, 293 guards proven by breaking, 34 of 34
 mutations caught, typecheck gating the band inside `npm test`.** Band 1 is entirely green, and so
 is band 2 — now **four** passes, each run twice back to back (trap 14), against
 `next build` + `next start` rather than the dev server.
+
+**And `next build` is now something somebody runs.** It was refusing the tree
+for five sprints — `app/settings/layout.tsx` exported `SETTINGS_TABS`, which
+Next does not allow a layout to export and `tsc --noEmit` does not mind. Nothing
+imported it. `95-deploy` now checks every route file's exports against what its
+kind may export (guard 292), which is not a build and does not replace running
+one: **run `npx next build` before believing a sprint is deployable.**
 
 #### Sprint 18 · the unexport pass, and why it is its own sprint
 
