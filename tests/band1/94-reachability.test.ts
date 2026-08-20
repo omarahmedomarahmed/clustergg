@@ -293,6 +293,81 @@ test("every route the spec promises resolves to a handler that exists", async ()
   );
 });
 
+/**
+ * Every **page** route `04-SURFACES.md` promises, read out of the document.
+ *
+ * ===== E21 — THE API LIST HAD THIS TREATMENT AND THE PAGE LIST NEVER DID ====
+ *
+ * `14-EDITABLE` §7 found `/brands` and `/servers` missing by *comparing the
+ * built routes against the document by hand*, and says why nothing else could:
+ * **the reachability guards cannot see a page nothing links to, because
+ * nothing links to it.** `redirectTargets` and `formActions` walk what the code
+ * points at; a page in the specification and in no code at all is pointed at by
+ * nobody, so both are silent.
+ *
+ * `/brands` is the entire brand acquisition funnel's front door — `04` §3 step
+ * 1 and `06-JOURNEYS` §3 step 1 both begin there — and it did not exist.
+ *
+ * Read from the document rather than listed here, for the same reason §5's API
+ * list is: a hand-written list only guards the routes somebody remembered, and
+ * forgetting is the defect.
+ */
+async function specifiedPageRoutes(): Promise<string[]> {
+  const doc = await fs.readFile(path.join(repoRoot, "docs", "04-SURFACES.md"), "utf8");
+
+  const routes = new Set<string>();
+  for (const line of doc.split("\n")) {
+    // Only table rows whose FIRST cell is a route. A route named in prose, or
+    // in the "what it is" column of another row, is a mention rather than a
+    // promise — and `04` is full of both.
+    const cells = line.split("|");
+    if (cells.length < 3 || !line.trim().startsWith("|")) continue;
+    const first = cells[1].trim();
+    // A cell may name two routes with a middle dot: `/servers` · `/servers/[slug]`
+    const found = [...first.matchAll(/`(\/[^`]*)`/g)].map((m) => m[1].trim());
+    if (found.length === 0) continue;
+    for (const route of found) {
+      if (route.startsWith("/api/")) continue;
+      // `/settings/*` and `/legal/*` are families, not routes. A star is the
+      // document saying "and its children", which is not a promise this guard
+      // can check without inventing the children.
+      if (route.includes("*")) continue;
+      routes.add(route.replace(/\[[^\]]+\]/g, "x"));
+    }
+  }
+  return [...routes].sort();
+}
+
+test("the spec's PAGE list is actually being read", async () => {
+  // The canary. If `04`'s tables are reformatted this must fail loudly rather
+  // than quietly guard an empty list — which is how a guard becomes decoration.
+  const routes = await specifiedPageRoutes();
+  ok(routes.length >= 15, `the page tables parsed (${routes.length} routes)`);
+  ok(routes.includes("/pool"), "including /pool, the page the platform is about");
+  ok(routes.includes("/redeem"), "and /redeem, the one the money ends at");
+  ok(
+    routes.some((r) => r.includes("x")),
+    "and the dynamic ones, with their parameter flattened",
+  );
+});
+
+test("every page route the spec promises resolves to a page that exists", async () => {
+  // E21. The API half of this has existed since Sprint 10 and found eight
+  // missing handlers; the page half was never written, and `/brands` — the
+  // whole commercial funnel's front door — has been missing ever since.
+  const { pages } = await servedRoutes();
+  const missing = (await specifiedPageRoutes()).filter(
+    (route) => !pages.some((p) => p.test(route)),
+  );
+
+  eq(
+    missing,
+    [],
+    "04-SURFACES names these pages. A page in the document and not in the code is " +
+      "either a page nobody built or a page we deleted and forgot to unwrite",
+  );
+});
+
 test("every guard id in PROVEN.md is unique, and the series is continuous", async () => {
   // ===== THE EVIDENCE RECORD MUST HAVE ONE ANSWER PER QUESTION =====
   //
