@@ -22,6 +22,8 @@ owner needs has a **matching card in the Discord bot**. For most gamers the bot
 | `/games` · `/games/[slug]` | A game, and every challenge on it | Prepare |
 | `/trophies` | The showcase — every trophy, its value, its holders | All |
 | `/trophies/[id]` | One trophy — brand, challenge, series, holders, past holders | All |
+| `/brands` | **Where a brand signs up.** The whole commercial funnel starts here — what Cluster sells, what a week costs, and a form. `06-JOURNEYS` §3 step 1 | All |
+| `/servers` | **The server index.** Every server with the bot and a complete profile — games, member range, bio, and a Join button. How a gamer finds one | All |
 | `/community` | Community challenges run by servers | Grace |
 | `/servers` · `/servers/[slug]` | A server's public page — **big Join button**, their community challenges | All |
 | `/pool` | This week's pool, live, every server and its earnings | Run |

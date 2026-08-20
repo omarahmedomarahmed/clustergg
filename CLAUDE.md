@@ -47,6 +47,7 @@ quests, Cluster Points and a marketplace that v3 deleted.
 | `docs/12-IDENTITY.md` | **Auth, attribution, permissions.** Read with `02-MONEY` §4 — neither is correct alone |
 | `docs/13-DESIGN.md` | **The visual system.** Colour that carries information, motion, the profile engine, the assets that must exist |
 | `docs/14-EDITABLE.md` | **What a human can change without a deploy.** Content, card layouts, page art, the gamer profile |
+| `docs/15-DELIVERY.md` | **Email and DM.** Every message the platform owes somebody, and the guard that proves it is sent |
 
 Read `00` and `01` before writing anything. The rest can be read as you reach
 the stage that needs them.

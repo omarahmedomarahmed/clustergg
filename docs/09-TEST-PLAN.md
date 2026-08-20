@@ -56,6 +56,9 @@ Runs in-process against an in-memory database. Needs nothing running.
 | **Copy states the current rule** | **No sentence anywhere describes attribution in words the attribution module does not produce.** Change ½+½ to something else and every page saying otherwise goes red. The banned phrase is the deleted model's: *"in two servers is worth half to each"* — it names no parent, no join server, and not the same-server case |
 | **Deployment** | `build` runs the migrator before `next build`. Every cron route has a schedule and every schedule has a route. Every variable `10-SETUP` §1 requires is named in the preflight, and every variable the preflight names is in `10-SETUP` §1 |
 | **Structural** | No column anywhere could hold a payment detail |
+| **Delivery** | Every message `15-DELIVERY` names is **actually sent**. A verification code reaches the send function, a brand invite reaches it, a reset reaches it. An absent `RESEND_API_KEY` records the message undelivered and **does not throw** (L2). **Nothing that moves money waits on a send** — break the sender and the payout, the trophy and the placement all still happen (L5) |
+| **Reachability, function-level** | **An exported function with no caller outside its own module fails the band** (L12). Module-level was not enough: `rest.ts` was reached, so `dmUser` was never questioned. And a function whose **return value is discarded at every call site** is the same defect wearing a caller (L14) |
+| **Every page the document promises** | Every route `04-SURFACES` names resolves to a page that exists. The API-route list is already read out of the document; page routes were never given the same treatment, which is how `/brands` and `/servers` stayed missing |
 
 ### The mutation harness
 
@@ -92,6 +95,10 @@ many suites noticed.
 | Ignore the platform ceiling on one server's refresh | ≥ 1 |
 | Merge two accounts when a gamer links an already-used identity | ≥ 1 |
 | Create a second row when a gamer links their second method | ≥ 1 |
+| Return a verification code without sending it | ≥ 2 |
+| Throw instead of recording when the mail key is absent | ≥ 1 |
+| Block a payout on a failed send | ≥ 2 |
+| Swallow a failed DM instead of recording it | ≥ 1 |
 
 **A mutation caught by zero suites is a hole, and the report says so in those
 words.** A mutation caught by one is worth looking at too: one assertion is one
