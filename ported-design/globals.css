@@ -1,0 +1,376 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #04051a;
+  --color-panel: #0b0d26;
+  --color-ink: #e8eaf6;
+  --color-muted: #9aa0c3;
+  --color-violet: #8b5cf6;
+  --color-cyan: #22d3ee;
+  --color-magenta: #e879f9;
+  --color-gold: #fbbf24;
+  --font-display: var(--font-grotesk), system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html, body {
+  background: #04051a;
+  color: #e8eaf6;
+  font-family: var(--font-grotesk), system-ui, sans-serif;
+  min-height: 100%;
+}
+
+/* ---------- Everything at 90% ----------
+ *
+ * `zoom` rather than a root font-size. Half of this UI is sized in px — game
+ * logos, the globe, card art, the Discord card previews — so shrinking the root
+ * font would shrink the words and leave the pictures where they were, which is
+ * a different design rather than a smaller one.
+ *
+ * Modern browsers treat `zoom` as part of the used-value computation, so fixed
+ * positioning, 100vw and 100dvh all scale with it and the sticky nav still spans
+ * the window. Print is excluded: a deck printed at 90% is just small.
+ */
+html { zoom: 0.9; }
+@media print { html { zoom: 1; } }
+
+::selection { background: rgba(139, 92, 246, 0.45); }
+
+* { scrollbar-width: thin; scrollbar-color: rgba(139,92,246,.35) transparent; }
+
+/* ---------- Cosmic surfaces ---------- */
+.glass {
+  background: linear-gradient(160deg, rgba(139,92,246,0.07), rgba(34,211,238,0.04) 55%, rgba(255,255,255,0.02));
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  backdrop-filter: blur(14px);
+  border-radius: 1rem;
+}
+.glass-hover { transition: border-color .25s, transform .25s, box-shadow .25s; }
+.glass-hover:hover {
+  border-color: rgba(139,92,246,.5);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 40px -12px rgba(139,92,246,.35);
+}
+
+/* ===== The two-colour system =====
+ *
+ * There used to be one gradient — violet to cyan to fuchsia — on every headline,
+ * every button and every big number, which meant nothing on the site could mean
+ * anything by being coloured. Now colour carries information:
+ *
+ *   BLUE   Discord, the bot, gamers. The product.
+ *   PURPLE brands, ads, pricing. The business.
+ *
+ * `.grad-text` keeps its name because thirty-nine files call it, but it is a
+ * flat blue now. `.brand-text` is its purple twin for commercial surfaces.
+ */
+.grad-text { color: #38bdf8; }
+.brand-text { color: #a78bfa; }
+
+/* The primary button. Blue by default — it is mostly a gamer or bot action. */
+.glow-btn {
+  background: #2563eb;
+  box-shadow: 0 0 24px -6px rgba(56,189,248,.55), inset 0 1px 0 rgba(255,255,255,.2);
+  transition: box-shadow .25s, transform .15s, filter .2s, background .2s;
+}
+.glow-btn:hover { background: #1d4ed8; box-shadow: 0 0 42px -6px rgba(56,189,248,.8); filter: brightness(1.06); transform: translateY(-1px); }
+.glow-btn:active { transform: translateY(0); }
+
+/* Its purple twin, for anything a brand clicks: pricing, enquiry, the portal. */
+.brand-btn {
+  background: #7c3aed;
+  box-shadow: 0 0 24px -6px rgba(167,139,250,.6), inset 0 1px 0 rgba(255,255,255,.2);
+  transition: box-shadow .25s, transform .15s, filter .2s, background .2s;
+}
+.brand-btn:hover { background: #6d28d9; box-shadow: 0 0 42px -6px rgba(167,139,250,.85); filter: brightness(1.06); transform: translateY(-1px); }
+.brand-btn:active { transform: translateY(0); }
+
+/* The money button.
+ *
+ * Deep cyan, not the neon `--color-cyan`. That bright cyan is a highlight
+ * colour — it is the tone links, chips and live numbers are picked out in — and
+ * a large filled surface in it reads as a glowing sticker rather than as
+ * something you press. It also fails contrast against white text, which is
+ * exactly the wrong property for the one button in the product that moves
+ * money.
+ *
+ * Used for: paying an invoice, releasing a payout, marking one paid, collecting
+ * a trophy redemption. Anywhere a click has a number attached. */
+.money-btn {
+  background: #0e7490;
+  color: #fff;
+  box-shadow: 0 0 24px -8px rgba(14,116,144,.7), inset 0 1px 0 rgba(255,255,255,.14);
+  transition: box-shadow .25s, transform .15s, filter .2s, background .2s;
+}
+.money-btn:hover { background: #155e75; box-shadow: 0 0 40px -8px rgba(34,211,238,.5); filter: brightness(1.06); transform: translateY(-1px); }
+.money-btn:active { transform: translateY(0); }
+
+.ghost-btn {
+  border: 1px solid rgba(139,92,246,.4);
+  background: rgba(139,92,246,.08);
+  transition: background .2s, border-color .2s;
+}
+.ghost-btn:hover { background: rgba(139,92,246,.18); border-color: rgba(139,92,246,.7); }
+
+.nebula-bg {
+  background:
+    radial-gradient(60% 45% at 15% 0%, rgba(124,58,237,.16), transparent 60%),
+    radial-gradient(45% 40% at 85% 10%, rgba(8,145,178,.13), transparent 60%),
+    radial-gradient(50% 60% at 50% 110%, rgba(232,121,249,.07), transparent 60%);
+}
+
+.ring-orbit {
+  border: 1px dashed rgba(139,92,246,.25);
+  border-radius: 9999px;
+  animation: spin-slow 40s linear infinite;
+}
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+
+@keyframes float-y { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.float-y { animation: float-y 6s ease-in-out infinite; }
+
+@keyframes pulse-glow {
+  0%,100% { box-shadow: 0 0 18px -6px rgba(139,92,246,.6); }
+  50% { box-shadow: 0 0 34px -6px rgba(34,211,238,.7); }
+}
+.pulse-glow { animation: pulse-glow 4s ease-in-out infinite; }
+
+@keyframes ticker-x { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.ticker-track { animation: ticker-x 36s linear infinite; }
+.ticker-track:hover { animation-play-state: paused; }
+
+@keyframes shimmer { from { background-position: -200% 0; } to { background-position: 200% 0; } }
+.shimmer {
+  background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.14) 50%, transparent 70%);
+  background-size: 200% 100%;
+  animation: shimmer 2.8s linear infinite;
+}
+
+@keyframes rise-in { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+.rise-in { animation: rise-in .7s cubic-bezier(.2,.7,.3,1) both; }
+.rise-in-1 { animation-delay: .08s; } .rise-in-2 { animation-delay: .16s; }
+.rise-in-3 { animation-delay: .24s; } .rise-in-4 { animation-delay: .32s; }
+
+/* Loading-screen phrase: gentle fade-in each time it swaps (every second) */
+@keyframes loadingPhraseIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.loading-phrase { animation: loadingPhraseIn 0.4s ease-out; }
+
+/* ---------- Themed gamer profile (scoped to .profile-root) ---------- */
+.profile-root {
+  background-color: var(--p-bg);
+  color: var(--p-text);
+  font-family: var(--p-font);
+  min-height: 100vh;
+}
+/* Background image is rendered on a separate position:fixed layer (see the
+   public profile page) — not via background-attachment:fixed here, which caused
+   slow/janky scrolling on long, heavily-customized profiles. */
+.profile-root.has-bg-image { background-color: transparent; }
+.profile-root .p-muted { color: var(--p-muted); }
+.profile-root .p-accent { color: var(--p-accent); }
+
+.p-card {
+  border-radius: var(--p-radius);
+  padding: 1.25rem;
+  transition: transform .25s, box-shadow .25s, border-color .25s;
+}
+.p-card-glass { background: color-mix(in srgb, var(--p-panel) 70%, transparent); border: 1px solid color-mix(in srgb, var(--p-accent) 25%, transparent); backdrop-filter: blur(14px); }
+.p-card-solid { background: var(--p-panel); border: 1px solid color-mix(in srgb, var(--p-accent) 18%, transparent); }
+.p-card-outline { background: transparent; border: 1.5px solid color-mix(in srgb, var(--p-accent) 45%, transparent); }
+.p-card-flat { background: color-mix(in srgb, var(--p-panel) 50%, transparent); border: none; }
+.p-card:hover { transform: translateY(-3px); box-shadow: 0 14px 40px -16px color-mix(in srgb, var(--p-accent) 55%, transparent); border-color: color-mix(in srgb, var(--p-accent) 55%, transparent); }
+
+.p-grad { background: linear-gradient(92deg, var(--p-accent), var(--p-accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+.p-btn { border-radius: 9999px; padding: .55rem 1.4rem; font-weight: 600; font-size: .9rem; transition: all .2s; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem; }
+.p-btn-neon { background: linear-gradient(92deg, var(--p-accent), var(--p-accent2)); color: #fff; box-shadow: 0 0 22px -4px var(--p-accent); }
+.p-btn-neon:hover { box-shadow: 0 0 38px -4px var(--p-accent); filter: brightness(1.1); }
+.p-btn-solid { background: var(--p-accent); color: #fff; }
+.p-btn-solid:hover { filter: brightness(1.12); }
+.p-btn-outline { background: transparent; border: 1.5px solid var(--p-accent); color: var(--p-accent); }
+.p-btn-outline:hover { background: color-mix(in srgb, var(--p-accent) 15%, transparent); }
+.p-btn-glass { background: color-mix(in srgb, var(--p-accent) 15%, transparent); border: 1px solid color-mix(in srgb, var(--p-accent) 40%, transparent); color: var(--p-text); backdrop-filter: blur(8px); }
+.p-btn-glass:hover { background: color-mix(in srgb, var(--p-accent) 28%, transparent); }
+.p-btn-pill { background: color-mix(in srgb, var(--p-accent) 90%, #000); color: #fff; border-radius: 9999px; box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--p-accent) 60%, #000); }
+.p-btn-pill:hover { transform: translateY(-1px); }
+
+.p-avatar-circle { border-radius: 9999px; }
+.p-avatar-rounded { border-radius: 1.25rem; }
+.p-avatar-square { border-radius: .25rem; }
+
+/* ---------- Guest-selectable site cursor (set via data attr on <html>) ---------- */
+:root[data-cursor="spark"] * { cursor: inherit; }
+
+/* ---------- Interaction layer ---------- */
+a, button, [role="button"], select, summary { cursor: pointer; }
+
+.pressable { transition: transform .12s ease, filter .15s ease; }
+.pressable:hover { filter: brightness(1.08); }
+.pressable:active { transform: scale(.96); }
+
+/* ===== TOUCH TARGETS. M2 =====
+ *
+ * The audit counted 58 controls under 32px on a phone. Most of this product is
+ * used from a phone, next to Discord, and a control you have to aim at is one
+ * people mis-tap — which on a page with "Release payout" and "Redeem" on it is
+ * not a cosmetic problem.
+ *
+ * Fixed here rather than in 58 components on purpose. Editing each call site
+ * would mean 58 chances to change a layout, and the ones that matter are all
+ * built from the same handful of classes.
+ *
+ * `pointer: coarse` scopes it to touch input, so the desktop density — which is
+ * fine, because a mouse is precise — is untouched. Two rules:
+ *
+ *   1. Named controls get a real 44px minimum box. `min-height` and not
+ *      `height`, so anything already taller keeps its size.
+ *   2. `.tap` expands the HIT AREA without changing the visual size, for the
+ *      small icon buttons where a 44px box would wreck the layout. The overlay
+ *      is inset-negative and unstyled, so nothing moves and nothing is drawn.
+ *      Opt-in, because it needs a positioned parent.
+ *
+ * 44px is Apple's and Google's shared floor, and the WCAG 2.2 AA target is
+ * 24px — so this clears both rather than sitting between them. */
+@media (pointer: coarse) {
+  .glow-btn, .brand-btn, .money-btn, .ghost-btn, .pressable,
+  button.pressable, a.pressable {
+    min-height: 44px;
+  }
+  /* Inputs too: a field you cannot hit is a form you cannot fill. */
+  .input-cosmic { min-height: 44px; }
+
+  .tap { position: relative; }
+  .tap::after {
+    content: "";
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 44px; min-height: 44px;
+    width: 100%; height: 100%;
+  }
+}
+
+.nav-link { position: relative; transition: color .2s; }
+.nav-link:hover { color: #e8eaf6; }
+.nav-link::after {
+  content: ""; position: absolute; left: 0; right: 100%; bottom: -4px; height: 2px;
+  background: #38bdf8;
+  transition: right .25s ease; border-radius: 2px;
+}
+.nav-link:hover::after { right: 0; }
+
+.card-lift {
+  transition: transform .3s cubic-bezier(.2,.7,.3,1), box-shadow .3s, border-color .3s;
+}
+.card-lift:hover {
+  transform: translateY(-4px) scale(1.012);
+  border-color: rgba(139,92,246,.55);
+  box-shadow: 0 16px 48px -16px rgba(139,92,246,.45);
+}
+.card-lift:active { transform: translateY(-1px) scale(.995); }
+
+/* Event/challenge hero card: hidden standings panel reveals on hover */
+.event-card .event-reveal {
+  opacity: 0; transform: translateY(10px);
+  transition: opacity .3s ease, transform .3s ease;
+}
+.event-card:hover .event-reveal { opacity: 1; transform: translateY(0); }
+.event-card .event-cover { transition: transform .5s cubic-bezier(.2,.7,.3,1), opacity .3s; }
+.event-card:hover .event-cover { transform: scale(1.05); }
+
+/* Partners marquee */
+@keyframes marquee-x { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.marquee-track { animation: marquee-x 28s linear infinite; }
+.marquee-track:hover { animation-play-state: paused; }
+
+/* Leaderboard podium */
+.podium-step {
+  position: relative;
+  background: linear-gradient(180deg, rgba(139,92,246,.14), rgba(139,92,246,.03));
+  border: 1px solid rgba(139,92,246,.3);
+  border-radius: 1rem 1rem .4rem .4rem;
+  transition: transform .25s, box-shadow .25s;
+}
+.podium-step:hover { transform: translateY(-4px); box-shadow: 0 12px 36px -12px rgba(139,92,246,.5); }
+.podium-1 { border-color: rgba(251,191,36,.55); background: linear-gradient(180deg, rgba(251,191,36,.16), rgba(251,191,36,.03)); }
+.podium-2 { border-color: rgba(203,213,225,.45); background: linear-gradient(180deg, rgba(203,213,225,.13), rgba(203,213,225,.03)); }
+.podium-3 { border-color: rgba(217,119,6,.5); background: linear-gradient(180deg, rgba(217,119,6,.14), rgba(217,119,6,.03)); }
+
+.rank-chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 2rem; height: 2rem; padding: 0 .4rem;
+  border-radius: .6rem; font-weight: 800; font-size: .85rem;
+  border: 1px solid rgba(139,92,246,.25); color: #9aa0c3;
+}
+.rank-chip-1 { border-color: rgba(251,191,36,.7); color: #fbbf24; background: rgba(251,191,36,.1); box-shadow: 0 0 14px -4px rgba(251,191,36,.6); }
+.rank-chip-2 { border-color: rgba(203,213,225,.6); color: #e2e8f0; background: rgba(203,213,225,.08); }
+.rank-chip-3 { border-color: rgba(217,119,6,.65); color: #f59e0b; background: rgba(217,119,6,.1); }
+
+/* Stat tab pills */
+.stat-tab {
+  border: 1px solid rgba(139,92,246,.22); color: #9aa0c3;
+  border-radius: 9999px; padding: .35rem .9rem; font-size: .8rem;
+  transition: all .2s; white-space: nowrap;
+}
+.stat-tab:hover { border-color: rgba(139,92,246,.6); color: #e8eaf6; }
+.stat-tab-active {
+  border-color: rgba(34,211,238,.7); color: #a5f3fc;
+  background: rgba(34,211,238,.1); box-shadow: 0 0 16px -6px rgba(34,211,238,.6);
+}
+
+@keyframes glow-sweep {
+  0% { transform: translateX(-100%) skewX(-12deg); }
+  100% { transform: translateX(250%) skewX(-12deg); }
+}
+.glow-sweep { position: relative; overflow: hidden; }
+.glow-sweep::before {
+  content: ""; position: absolute; top: 0; bottom: 0; width: 35%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
+  animation: glow-sweep 4.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.input-cosmic {
+  background: rgba(6, 8, 30, 0.7);
+  border: 1px solid rgba(139,92,246,.25);
+  border-radius: .65rem;
+  padding: .6rem .9rem;
+  width: 100%;
+  color: #e8eaf6;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.input-cosmic:focus { border-color: rgba(139,92,246,.7); box-shadow: 0 0 0 3px rgba(139,92,246,.15); }
+.input-cosmic::placeholder { color: #6a6f92; }
+
+.table-cosmic th {
+  text-align: left; font-size: .72rem; letter-spacing: .1em; text-transform: uppercase;
+  color: #9aa0c3; padding: .6rem .9rem; border-bottom: 1px solid rgba(139,92,246,.2);
+}
+.table-cosmic td { padding: .65rem .9rem; border-bottom: 1px solid rgba(139,92,246,.08); }
+.table-cosmic tr:hover td { background: rgba(139,92,246,.05); }
+
+.prose-cosmic h2 { font-size: 1.3rem; font-weight: 700; margin: 1.6em 0 .5em; color: #e8eaf6; }
+.prose-cosmic p, .prose-cosmic li { color: #9aa0c3; line-height: 1.7; margin: .5em 0; }
+.prose-cosmic ul { list-style: disc; padding-left: 1.4em; }
+
+/* Hide scrollbar for the game-logo nav row while keeping it scrollable. */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Arabic / RTL mode: swap in the Arabic-capable webfont site-wide. */
+.font-arabic { font-family: var(--font-cairo), var(--font-grotesk), system-ui, sans-serif; }
+
+/* Embed mode (`?embed=1`) — the page, with none of the site around it.
+   Used by the Profile of the Week snapshot, which frames a gamer's real
+   profile so voters see exactly what they're judging. Without this the frame
+   shows the whole site inside itself, competition band and all. */
+html[data-embed="1"] header,
+html[data-embed="1"] footer,
+html[data-embed="1"] [data-site-chrome] {
+  display: none !important;
+}
+html[data-embed="1"] main { padding-bottom: 0 !important; }
