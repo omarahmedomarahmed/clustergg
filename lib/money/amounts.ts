@@ -67,7 +67,15 @@ export const POOL_SCORED_BPS = BPS - POOL_FLAT_BPS;
  * three measure outcomes on our own platform.
  */
 export const KPI_WEIGHTS = {
-  /** Exclusive entrants — a gamer in two servers is worth ½ to each. Volume. */
+  /**
+   * Exclusive entrants. Volume.
+   *
+   * This comment used to end *"a gamer in two servers is worth ½ to each"* —
+   * **the model Sprint 5 deleted**, sitting in the module that owns the
+   * weights. `97-copy-rule` could not see it because it strips comments before
+   * scanning, which is correct for rendered copy and blind here. What credits
+   * an entrant is `lib/identity/attribution.ts`, and it is parent + join.
+   */
   entrants: 40,
   /** Entrants ÷ linked members. Efficiency. */
   conversion: 30,

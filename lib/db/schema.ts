@@ -1395,3 +1395,45 @@ export const deliveries = pgTable(
 );
 
 export type Delivery = typeof deliveries.$inferSelect;
+
+/**
+ * Editable copy, page art, and card layouts — **one row per edit, forever.**
+ *
+ * ===== E4 — A NEW ROW, NEVER AN OVERWRITE =====
+ *
+ * *"The previous value is one click away, because the fastest fix for bad copy
+ * is the copy from before it."* An `UPDATE` here would make a revert a retype,
+ * and a retype is how the wrong number comes back.
+ *
+ * So the current value of a key is the newest row for it, and everything older
+ * is the history. Derived, never stored — house rule 1, one surface along.
+ *
+ * `scope` is what kind of thing is being overridden: `copy` for a content key,
+ * `page_art` for a page background, `card` for a bot card family. One table
+ * because the question *"who changed this and when"* is the same for all
+ * three, and three tables would be three places to forget the answer.
+ */
+export const contentOverrides = pgTable(
+  "content_overrides",
+  {
+    id: text("id").primaryKey(),
+    // `copy` | `page_art` | `card`
+    scope: text("scope").notNull(),
+    /** The content key, the page key, or the card family. */
+    key: text("key").notNull(),
+    /**
+     * The value. Null **means deleted** — E6's first-class action, which is
+     * how a key goes back to reading as its code-side default. A blank string
+     * is a different thing and stays a blank string.
+     */
+    value: text("value"),
+    /** Structured settings, for the scopes a string cannot express. */
+    settings: jsonb("settings").$type<Record<string, unknown>>(),
+    /** Who. Never null — an unattributed edit is one nobody can ask about. */
+    editedBy: text("edited_by").notNull(),
+    editedAt: timestamp("edited_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("content_overrides_key_idx").on(t.scope, t.key, t.editedAt)],
+);
+
+export type ContentOverride = typeof contentOverrides.$inferSelect;

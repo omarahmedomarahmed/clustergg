@@ -1795,3 +1795,40 @@ nothing in `app/` calls is exactly L12's shape, and excusing them would be the
 softening the rule exists to prevent. They are records now — `TRANSPORT.email`
 and `DM_TRANSPORT.send` — whose defaults are the production path, so every real
 send exercises the slot.
+
+## Sprint 16 · the refusal, before any editor
+
+`14-EDITABLE` §1. Both existing copy guards — `03-copy` and `97-copy-rule` —
+walk **source files**, so they can only see strings a deploy put there. The
+moment an operator can type copy into a database, both stop covering the
+strings that actually render: somebody types *"$700 a challenge"* into a
+content key, it is live, it is wrong, and the whole band stays green because no
+test file changed.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 256 | **A legitimate sentence is accepted, placeholder and all** (`97-editable`) | `checkCopy` made to refuse unconditionally | this guard, naming all eight — **every default the platform already ships**, including the `{price}` form the refusal tells operators to use | clean, 10/10 |
+| 257 | **A currency amount, a percentage and a threshold are each refused** (`97-editable`, E1) | the same break, from the other side | the refusal cases stop distinguishing which rule fired | clean |
+| 258 | **The refusal names the exact key that already carries the figure** (`97-editable`, E1) | dropped the alternative from the named-figure branch | *"names the module constant that holds it"* — `CHALLENGE_PRICE_CENTS` | clean |
+| 259 | **Every refusal names an alternative** (`97-editable`, E2) | the same break | four rules checked, and the one with no alternative is named | clean |
+| 260 | **A rule stated in words is refused, including the current one** (`97-editable`, E3) | — | asserted on the deleted model's sentence, a paraphrase of it, and `attributionShort()` typed out by hand | — |
+| 261 | **Every edit is a new row; nothing is overwritten** (`97-editable`, E4) | made `saveOverride` delete the key's rows before inserting | *"two edits, two rows"*, expected 2, actual 1 — and the removal-is-a-row case with it | clean |
+| 262 | **The store refuses, not the form** (`97-editable`) | — | asserted at `saveOverride`, with the row count checked afterwards: a refusal that saves first is not a refusal | — |
+
+### Guard 256 is the one that makes the other six mean anything
+
+A validator whose body is `return refuse()` satisfies E1, names an alternative
+for E2, catches every rule for E3 and never writes a bad row for E4. It is also
+useless — and an editor nobody can use is an editor that gets bypassed, with
+the figure written into a page instead, which is where it was to begin with.
+Breaking `checkCopy` to refuse everything turns guard 256 red and leaves the
+E1 refusals green, which is exactly the asymmetry it exists to close.
+
+### And one the validator found in the module it guards
+
+`lib/money/amounts.ts` carried, as the doc comment on `KPI_WEIGHTS.entrants`:
+*"a gamer in two servers is worth ½ to each"* — **the model Sprint 5 deleted**,
+in the module that owns the weights. `97-copy-rule` could not see it because it
+strips comments before scanning, which is right for rendered copy and blind
+here. Replaced with what actually credits an entrant, and with a note saying
+which guard could not see it.
