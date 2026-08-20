@@ -123,16 +123,31 @@ export function actor(i: Interaction): DiscordUser | null {
 
 // Flatten `/cluster show:profile` into { query: "profile" }.
 //
-// Options are read from the top level AND from a subcommand, because a bot that
-// was live under the old subcommand shape can still receive one: Discord serves
-// whatever command definition a client last synced, and a client that hasn't
-// refreshed will keep sending `/cluster show what:…` for a while after the flat
-// command is registered. Reading both means those users keep working instead of
-// getting silence until their client catches up.
-export function readCommand(i: Interaction): { query: string; focused?: string } {
+// ===== BOTH SHAPES, BECAUSE DISCORD SERVES WHATEVER WAS LAST SYNCED =====
+//
+// Options are read from the top level AND from a subcommand. A client that has
+// not refreshed keeps sending the command definition it last saw, so a bot that
+// changes shape has to understand the old one for a while or those gamers get
+// silence until their client catches up.
+//
+// ===== WHAT WAS REMOVED, AND WHY IT MATTERED =====
+//
+// This used to end in a translation table mapping v1's subcommands onto v1's
+// vocabulary: `quest`, `planet`, `share`, a leaderboard `board`. **Every one of
+// those names a surface v3 deleted.** It was harmless only because nothing
+// called this function; the moment the slash command was wired it would have
+// been the deleted product's vocabulary, live, in the parser at the front door.
+//
+// There is no legacy client to serve either: no command was ever registered, so
+// no Discord client anywhere is holding an older definition of ours. A
+// subcommand's own name is now simply the token, which is the shape a future
+// `/cluster challenges` would take anyway.
+export function readCommand(i: {
+  data?: { options?: CommandOption[] };
+}): { query: string; focused?: string } {
   const top = i.data?.options ?? [];
   const subOpt = top.find((o) => o.type === OptionType.SubCommand);
-  const flat = subOpt ? subOpt.options ?? [] : top;
+  const flat = subOpt ? (subOpt.options ?? []) : top;
 
   const opts: Record<string, string> = {};
   let focused: string | undefined;
@@ -141,25 +156,7 @@ export function readCommand(i: Interaction): { query: string; focused?: string }
     if (o.focused) focused = o.name;
   }
 
-  // The flat shape: one option, whatever it was called.
-  if (!subOpt) return { query: (opts.show ?? Object.values(opts)[0] ?? "").trim(), focused };
-
-  // A legacy `/cluster <sub> …` invocation, translated into the same token
-  // vocabulary the flat command speaks.
-  const a = (k: string) => (opts[k] ?? "").trim();
-  const legacy: Record<string, string> = {
-    home: "",
-    show: a("gamer") ? `gamer:${a("gamer")}` : a("what") || "profile",
-    planet: `planet:${a("game")}`,
-    leaderboard: `board:${a("game")}`,
-    challenge: `challenges:${a("game")}`,
-    quest: `quest:${a("name")}`,
-    link: `link:${a("game")}`,
-    guide: `guide:${a("topic") || "getting-started"}`,
-    share: "share",
-    server: "admin:growth",
-    admin: "admin",
-    help: "help",
-  };
-  return { query: legacy[subOpt.name] ?? "", focused };
+  // A subcommand names the screen; a flat invocation carries it in `show`.
+  if (subOpt) return { query: subOpt.name.trim(), focused };
+  return { query: (opts.show ?? Object.values(opts)[0] ?? "").trim(), focused };
 }

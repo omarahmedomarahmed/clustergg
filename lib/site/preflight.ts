@@ -407,3 +407,58 @@ export async function serviceHealth(db: DB): Promise<Health[]> {
       : { ok: false, label: `Check ${i + 1}`, detail: `The check itself failed: ${r.reason}` },
   );
 }
+
+/**
+ * Which slash commands Discord actually has registered for this app.
+ *
+ * ===== A DEPLOY STEP NOBODY COULD SEE =====
+ *
+ * The bot handled `Ping` and `MessageComponent` and nothing else. No command
+ * was ever registered, `registerGlobalCommands` had no caller, and there was
+ * nowhere on the platform that would have said so. Buttons only exist on an
+ * announced challenge card, so a gamer in a server with no live challenge
+ * could not reach the bot at all — and every surface reported healthy.
+ *
+ * This asks Discord rather than asking ourselves. A local list compared
+ * against a local list is a check that passes on the day the PUT fails, which
+ * is the only day it matters: `COMMANDS` is what we *intend*, and the only
+ * authority on what a gamer can type is Discord's own answer.
+ */
+export async function commandHealth(): Promise<Health> {
+  const label = "Discord slash commands";
+  const { appId } = await import("../discord/config.ts");
+  if (!process.env.DISCORD_BOT_TOKEN || !appId()) {
+    return NOT_SET(
+      label,
+      "DISCORD_BOT_TOKEN or DISCORD_APP_ID is missing. Nothing can be registered.",
+    );
+  }
+  try {
+    const { listGlobalCommands } = await import("../discord/rest.ts");
+    const { COMMANDS } = await import("../discord/commands.ts");
+    const res = await listGlobalCommands();
+    if (!res.ok) {
+      return { ok: false, label, detail: `Discord answered ${res.status}: ${res.error}` };
+    }
+    const live = new Set(
+      (res.data as { name?: string }[]).map((c) => c.name).filter((n): n is string => !!n),
+    );
+    const missing = COMMANDS.map((c) => c.name).filter((n) => !live.has(n));
+    if (missing.length > 0) {
+      return {
+        ok: false,
+        label,
+        detail:
+          `${missing.length} of ${COMMANDS.length} not registered: /${missing.join(", /")}. ` +
+          "Until they are, the only way into the bot is a button on an announced challenge.",
+      };
+    }
+    return {
+      ok: true,
+      label,
+      detail: `All ${COMMANDS.length} registered with Discord: /${COMMANDS.map((c) => c.name).join(", /")}.`,
+    };
+  } catch (e) {
+    return { ok: false, label, detail: `Could not ask Discord: ${(e as Error).message}` };
+  }
+}

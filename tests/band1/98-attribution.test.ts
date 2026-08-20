@@ -753,3 +753,116 @@ async function aLiveChallenge(
   await announce(db, challengeId, "admin-1", []);
   return challengeId;
 }
+
+// ── A2 · the gamer with no parent, and the door they were told to use ────────
+
+test("a gamer with no parent, in a server with no live challenge, reaches the bot and gets one", async () => {
+  // ===== THE SIXTEENTH OMISSION, FROM THE GAMER'S SIDE =====
+  //
+  // `12-IDENTITY` §3 tells a gamer who signed up on the web: *open Discord, go
+  // to a server that has Cluster and use `/cluster` — that becomes your
+  // parent.* Three things had to be true for that sentence to work and none of
+  // them were:
+  //
+  //   1. `/cluster` had to exist. `ApplicationCommand` was not handled at all.
+  //   2. It had to reach the bot without a challenge card to press, because
+  //      buttons only exist on an announced challenge and this server has none.
+  //   3. It had to actually stamp the parent. `shadowGamerForDiscord` returned
+  //      early for any row that existed, and a web signup has a row.
+  //
+  // So this drives the real handler, with no challenge anywhere, and asserts
+  // the money-side fact rather than the card: A7's "no server earns anything"
+  // is the state being left, and `users.parentGuildId` is what leaves it.
+  const db = await resetDemoDb();
+  await import("../../lib/discord/screens/index.ts");
+  const { handleInteraction } = await import("../../lib/discord/interactions.ts");
+  const { InteractionType } = await import("../../lib/discord/types.ts");
+  const { identifyPresser } = await import("../../lib/discord/identify.ts");
+
+  const guildId = "g-no-challenge";
+  await db.insert(schema.guilds).values({
+    guildId,
+    name: "Quiet Server",
+    slug: "quiet-server",
+    memberCount: 40,
+    announceChannelId: `chan-${guildId}`,
+  });
+
+  // A web signup: an account, a linked Discord identity, and no parent — the
+  // exact person §3's sentence is addressed to.
+  const discordId = "d-web-signup";
+  const userId = await createGamer(db, {
+    displayName: "Web Gamer",
+    email: "web@example.test",
+    passwordHash: "x",
+    discordId,
+  });
+  const [before] = await db
+    .select({ parent: schema.users.parentGuildId })
+    .from(schema.users)
+    .where(sqlEq(schema.users.id, userId));
+  eq(before.parent, null, "they start with no parent — A7, and no server earning from them");
+
+  eq(
+    (await db.select().from(schema.challengeAnnouncements)).length,
+    0,
+    "and there is no announced challenge anywhere, so there is no button to press",
+  );
+
+  const body = JSON.stringify({
+    id: "i1",
+    token: "t1",
+    application_id: "app1",
+    type: InteractionType.ApplicationCommand,
+    data: { name: "cluster" },
+    member: { user: { id: discordId, username: "Web Gamer" }, roles: [] },
+    guild_id: guildId,
+  });
+
+  const deferred: (() => Promise<void>)[] = [];
+  let card: { content?: string; embeds?: unknown[] } | null = null;
+  const response = await handleInteraction(
+    { body, signature: "s", timestamp: "t" },
+    {
+      verify: async () => true,
+      identify: (i) => identifyPresser(db, i as never),
+      defer: (fn) => deferred.push(fn),
+      edit: async (_a, _t, result) => {
+        card = result;
+      },
+    },
+  );
+  eq(response.status, 200, "the command is acknowledged");
+  for (const fn of deferred) await fn();
+
+  ok(card !== null, "and a card arrives — the bot is reachable with no challenge in the server");
+  ok(
+    !/screen has gone/.test((card as { content?: string }).content ?? ""),
+    "not the stale-button card, which is what `/cluster` used to produce",
+  );
+
+  const [after] = await db
+    .select({ parent: schema.users.parentGuildId, at: schema.users.parentStampedAt })
+    .from(schema.users)
+    .where(sqlEq(schema.users.id, userId));
+  eq(after.parent, guildId, "and the server they used it in is now their parent — §3's sentence, true");
+  ok(after.at !== null, "stamped, so A1's never-moves has something to protect");
+
+  // A1 unchanged: a second command, in a different server, moves nothing.
+  const elsewhere = "g-somewhere-else";
+  await db.insert(schema.guilds).values({
+    guildId: elsewhere,
+    name: "Other Server",
+    slug: "other-server",
+    memberCount: 10,
+  });
+  await identifyPresser(
+    db,
+    { member: { user: { id: discordId, username: "Web Gamer" } }, guild_id: elsewhere } as never,
+  );
+  const [still] = await db
+    .select({ parent: schema.users.parentGuildId })
+    .from(schema.users)
+    .where(sqlEq(schema.users.id, userId));
+  eq(still.parent, guildId, "a later click in another server does not move it — A1, and A8 keeps admin the only mover");
+});

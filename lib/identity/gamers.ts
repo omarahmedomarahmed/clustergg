@@ -15,7 +15,7 @@
 // The slug is derived through the ported slugifier, which is the reason a
 // gamer called 日本語ゲーマー does not end up at `/u/gamer`.
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { DB } from "../db/index.ts";
 import { schema } from "../db/index.ts";
 import { uid, slugify } from "../core/utils.ts";
@@ -128,14 +128,50 @@ export async function shadowGamerForDiscord(
   input: { discordId: string; parentGuildId?: string | null; at?: Date },
 ): Promise<string> {
   const [existing] = await db
-    .select({ id: schema.users.id })
+    .select({
+      id: schema.users.id,
+      parentGuildId: schema.users.parentGuildId,
+      parentStampedAt: schema.users.parentStampedAt,
+    })
     .from(schema.users)
     .where(eq(schema.users.discordId, input.discordId));
   if (existing) {
+    // ===== "HAS A ROW" IS NOT "HAS ALREADY CLICKED" =====
+    //
     // A1/A2 — the parent is stamped at the FIRST click and never moves. A
-    // second click in another server must not re-stamp it, and this early
-    // return is the only thing standing between that rule and a parent that
-    // follows a gamer around.
+    // second click in another server must not re-stamp it, and the early
+    // return here is the only thing standing between that rule and a parent
+    // that follows a gamer around.
+    //
+    // But it was also the only thing standing between `12-IDENTITY` §3's *"No
+    // parent yet"* and being unreachable. A gamer who signed up on the web and
+    // linked Discord has a row, no parent, and **has never clicked**. The
+    // document tells exactly that person: *open Discord, go to a server that
+    // has Cluster and use `/cluster` — that becomes your parent.* The early
+    // return made that sentence false, and nobody noticed because until this
+    // sprint there was no `/cluster` for them to use.
+    //
+    // So the condition is "was a parent ever stamped", not "does a row exist".
+    // Three things make this safe to do here rather than nowhere:
+    //
+    //   * It can only ever fill a null. A stamped parent is never moved, which
+    //     is A1 unchanged — and A8 keeps the admin correction the only thing
+    //     that can move one.
+    //   * It cannot move money that has already moved. A1b — a closed week
+    //     reads `week_records`, and a parent stamped in week 6 has no bearing
+    //     on week 3.
+    //   * A7 is the state it replaces: no parent at all, and **no server
+    //     earning anything**. Filling it takes nothing from anybody.
+    //
+    // `isNull` in the WHERE, not just in the `if`: two presses landing together
+    // would otherwise both read null and both write, and the loser would be
+    // whichever guild the database happened to commit second.
+    if (input.parentGuildId && !existing.parentGuildId && !existing.parentStampedAt) {
+      await db
+        .update(schema.users)
+        .set({ parentGuildId: input.parentGuildId, parentStampedAt: input.at ?? new Date() })
+        .where(and(eq(schema.users.id, existing.id), isNull(schema.users.parentStampedAt)));
+    }
     return existing.id;
   }
 

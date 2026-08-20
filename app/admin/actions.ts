@@ -372,3 +372,32 @@ export async function createTrophyStandaloneAction(form: FormData): Promise<void
   revalidatePath("/admin/trophies");
   back("/admin/trophies");
 }
+
+/**
+ * Register the slash commands with Discord.
+ *
+ * ===== A DEPLOY STEP, NOT A TERMINAL COMMAND (10-SETUP) =====
+ *
+ * `registerGlobalCommands` was written, correct, and called by nothing, so
+ * `/cluster` did not exist and the only way into the bot was a button on an
+ * announced challenge. The obvious home for the fix is a script; `10-SETUP`'s
+ * whole premise is that the owner needs no terminal, so it is a button, on the
+ * page whose job is telling them what is not wired yet. `docs/DEPLOYMENT.md`
+ * names it as a step.
+ *
+ * `PUT` replaces the whole set, which is why this sends `COMMANDS` entire
+ * rather than the difference: a partial send is how a command that was removed
+ * from the array stays live in Discord forever.
+ */
+export async function registerCommandsAction(): Promise<void> {
+  await actor();
+  const { registerGlobalCommands } = await import("../../lib/discord/rest.ts");
+  const { COMMANDS } = await import("../../lib/discord/commands.ts");
+
+  const res = await registerGlobalCommands(COMMANDS as unknown as Record<string, unknown>[]);
+  if (!res.ok) {
+    back("/admin/preflight", `Discord refused the registration: ${res.status} ${res.error}`);
+  }
+  revalidatePath("/admin/preflight");
+  redirect("/admin/preflight?registered=1");
+}

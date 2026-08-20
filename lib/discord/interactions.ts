@@ -26,7 +26,8 @@
 // that never resolves.
 
 import { verifyInteraction } from "./verify.ts";
-import { InteractionType, InteractionResponseType } from "./types.ts";
+import { InteractionType, InteractionResponseType, type CommandOption } from "./types.ts";
+import { commandFrame } from "./commands.ts";
 import { parseId, type Frame } from "./components.ts";
 import type { Presser } from "./identify.ts";
 
@@ -35,7 +36,10 @@ export type Interaction = {
   token: string;
   type: number;
   application_id: string;
-  data?: { name?: string; custom_id?: string; values?: string[] };
+  // `options` is what a slash command carries, and its absence here is part of
+  // why the command path read as implemented: the type could not express an
+  // invocation, so nothing that read this shape could have handled one.
+  data?: { name?: string; custom_id?: string; values?: string[]; options?: CommandOption[] };
   guild_id?: string;
   channel_id?: string;
   member?: { user?: { id: string; username: string }; roles?: string[] };
@@ -134,12 +138,24 @@ export async function handleInteraction(
   const userId = interaction.member?.user?.id ?? interaction.user?.id ?? null;
   const guildId = interaction.guild_id ?? null;
 
+  // ===== TWO WAYS IN, AND ONLY ONE OF THEM EXISTED =====
+  //
+  // A component press carries the frame in its `custom_id`. A slash command
+  // carries a name and its options, and until this branch existed the fallback
+  // read `data.name` straight into a screen key — so `/cluster` looked up a
+  // screen called "cluster", found nothing, and rendered *"that screen has
+  // gone"*. Nothing registered a command, so nobody ever saw it.
+  //
+  // `commandFrame` is the translation, and it is a real one: the command's own
+  // vocabulary is not the screen registry's, and pretending they are the same
+  // namespace is what made this look implemented.
   const parsed =
     interaction.data?.custom_id != null ? parseId(interaction.data.custom_id) : null;
-  const frame: Frame = parsed?.target ?? {
-    screen: interaction.data?.name ?? "home",
-    args: [],
-  };
+  const frame: Frame =
+    parsed?.target ??
+    (interaction.type === InteractionType.ApplicationCommand
+      ? commandFrame(interaction)
+      : { screen: "home", args: [] });
   const trail = parsed?.trail ?? [];
 
   const handler = SCREENS.get(frame.screen);

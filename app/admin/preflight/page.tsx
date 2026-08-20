@@ -29,9 +29,11 @@ import {
   serviceHealth,
   migrationHealth,
   cronHealth,
+  commandHealth,
   type Health,
 } from "../../../lib/site/preflight.ts";
 import { Panel, Row, Light } from "../components.tsx";
+import { registerCommandsAction } from "../actions.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -64,10 +66,11 @@ export default async function Preflight() {
 
   // Settled independently. One slow external service must not stop the
   // database row from rendering — that row is the one somebody came for.
-  const [services, migrations, crons] = await Promise.all([
+  const [services, migrations, crons, commands] = await Promise.all([
     serviceHealth(db),
     migrationHealth(db, expected),
     cronHealth(db),
+    commandHealth(),
   ]);
 
   const env = envRows();
@@ -143,6 +146,38 @@ export default async function Preflight() {
         {services.map((h) => (
           <HealthRow key={h.label} h={h} />
         ))}
+      </Panel>
+
+      {/*
+        The bot's front door. Registering the commands is a deploy step, and it
+        lives here rather than in a script because 10-SETUP's premise is that
+        the owner never opens a terminal. The row above the button is Discord's
+        own answer, not ours: a local list compared against a local list passes
+        on the one day the PUT failed.
+      */}
+      <Panel
+        title="The bot's front door"
+        note="Without the commands, the only way into the bot is a button on an announced challenge"
+        help={
+          <p>
+            Slash commands are registered globally with Discord and replaced whole
+            each time. Re-register after any deploy that changes them; Discord can
+            take up to an hour to propagate a change to every client.
+          </p>
+        }
+      >
+        <HealthRow h={commands} />
+        <Row>
+          <form action={registerCommandsAction}>
+            <button
+              type="submit"
+              data-testid="register-commands"
+              className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-white/5"
+            >
+              Register the slash commands
+            </button>
+          </form>
+        </Row>
       </Panel>
 
       {groups.map((group) => (

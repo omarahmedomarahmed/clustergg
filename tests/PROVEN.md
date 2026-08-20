@@ -1707,3 +1707,38 @@ three verdicts must be reachable before the list is believed.
 call site made L14 read green over the exact defect it was written for. It is
 itself an export nothing calls, so the rule that fixed it is the same sentence
 as L13 one level along: *a caller that nothing calls is not a caller.*
+
+### The sixteenth omission — the bot had no front door
+
+Found while ruling on `94-export-reach`'s list, and it outranked everything on
+it. The bot handled `Ping` and `MessageComponent`. There was no
+`ApplicationCommand` handling anywhere, no command was ever registered, and
+`readCommand` — the parser written for exactly this — was sitting in the
+dead-code list. Buttons only exist on an announced challenge card, so **a gamer
+in a server with no live challenge could not reach the bot at all**, while
+`12-IDENTITY` §3 told a gamer with no parent server to go and use `/cluster`.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 243 | **A slash command is dispatched through the command router** (`60-bot`) | removed the `ApplicationCommand` branch, restoring the old `data.name` fallback | *"the handler routed the command through commandFrame"*, actual: **"That screen has gone. Try `/cluster` and start again"** — the defect's own symptom | clean, 22/22 |
+| 244 | **Every screen a slash command can open is registered** (`60-bot`) | — | asserted directly against the real `SCREENS` registry, with `screens/index.ts` imported. A vocabulary asserted against itself would have passed on `/cluster` from day one | — |
+| 245 | **`/cluster` in a server stamps the parent of a gamer who has never clicked** (`98-attribution`) | restored the unconditional early return in `shadowGamerForDiscord` | *"the server they used it in is now their parent"*, expected `g-no-challenge`, actual `null` | clean, 25/25 |
+| 246 | **A stamped parent still never moves** (`98-attribution`, the other half) | dropped the `parentStampedAt IS NULL` condition so any click re-stamps | *"a later click in another server does not move it — A1"*, actual `g-somewhere-else` | clean |
+
+### The break that was green, and what it cost to notice
+
+Guard 243 was written first as six assertions on `commandFrame`, the pure
+router. Removing the entire `ApplicationCommand` branch from the handler left
+every one of them green: they proved a function and nothing about whether
+anything calls it — **trap 8, in the suite for a defect whose whole shape is
+"written, correct, called by nothing."** The fix is the probe screen: one
+command driven through the real handler, and the screen it lands on observed.
+
+### And the registration nobody could see
+
+`registerGlobalCommands` and `listGlobalCommands` were both orphans. The
+registration is now a button on `/admin/preflight` — `10-SETUP`'s *"the owner
+has no terminal, ever"* makes a script the wrong shape — and the row above it
+asks **Discord** which commands exist rather than comparing our list to our
+list, which is a check that passes on the only day it matters. Recorded as a
+deploy step in `docs/DEPLOYMENT.md` §5.

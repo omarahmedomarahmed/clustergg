@@ -143,6 +143,24 @@ Discord verifies the endpoint by sending a signed **PING** and refuses to save
 the URL if the signature check fails. If it will not save, `DISCORD_PUBLIC_KEY`
 is wrong or missing — that is almost always the cause.
 
+### The slash commands, and why this is a step rather than a note
+
+**Press "Register the slash commands" on `/admin/preflight` after any deploy
+that changes them.** The row above the button is Discord's own answer to *which
+commands are registered*, not ours — a local list compared against a local list
+passes on the one day the registration failed.
+
+This is a real deploy step because for a whole sprint it was nobody's. The bot
+handled `Ping` and `MessageComponent`, no command was ever registered, and
+`registerGlobalCommands` was written and called by nothing. Buttons only exist
+on an announced challenge card, so **a gamer in a server with no live challenge
+could not reach the bot at all** — while `12-IDENTITY` §3 was telling a gamer
+with no parent server to go and use `/cluster`.
+
+Global commands can take up to an hour to reach every client. The `PUT`
+replaces the set whole, so a command deleted from `lib/discord/commands.ts` is
+gone from Discord at the next registration and not before.
+
 ---
 
 ## 6 · Payments
@@ -185,9 +203,11 @@ In order, and none of it needs a terminal.
    schema row on preflight is red, the answer is here.
 4. **Vercel → Settings → Cron Jobs** lists three jobs. Preflight says when each
    last fired — a job that has never fired is usually `CRON_SECRET`.
-5. Press a real button in Discord. Nothing else exercises signature
-   verification, the 3-second acknowledgement and the deferred work together,
-   and neither test band covers any of it.
+5. Press a real button in Discord, **and type `/cluster`**. Nothing else
+   exercises signature verification, the 3-second acknowledgement and the
+   deferred work together, and neither test band covers any of it. The command
+   is the half that has no button to fall back on: if the commands row on
+   preflight is red, press its button and wait — Discord propagates globally.
 6. If money moved: `/admin/vaults` reconciles, and the prize vault equals the
    sum of unredeemed money-trophies.
 

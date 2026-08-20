@@ -11,6 +11,7 @@
 // two surfaces, one derivation, no chance of the bot saying they are ready and
 // the site disagreeing.
 
+import type { DB } from "../../db/index.ts";
 import { ButtonStyle } from "../types.ts";
 import { frame, navButton, backButton, linkButton, type Button } from "../components.ts";
 import { siteUrl } from "../config.ts";
@@ -47,13 +48,36 @@ screen("home", async ({ trail, presser }) => {
   const db = await getDb();
   const unlock = presser.userId ? await unlockState(db, presser.userId) : null;
 
+  // ===== A2/A7 — "NO PARENT SERVER YET", AND THE ONLY PLACE IT CAN BE SAID ===
+  //
+  // `12-IDENTITY` §3 owes a gamer with no parent a sentence, and names this
+  // exact route for it: *open Discord, go to a server that has Cluster and use
+  // `/cluster` — that becomes your parent.* Before the slash command existed
+  // there was no way for that person to reach the bot at all, so the sentence
+  // had nowhere to appear and the state was invisible.
+  //
+  // Read after `identify` has already run, which is what makes the row honest:
+  // by the time this card is drawn, a `/cluster` in a server **has** stamped
+  // the parent, so the gamer who needed telling sees the server that just
+  // became theirs rather than an instruction to do what they have just done.
+  const parent = presser.userId ? await parentServerOf(db, presser.userId) : null;
+  const parentRow = parent
+    ? { label: "Your server", value: `${parent} earns when you play` }
+    : {
+        label: "No parent server yet",
+        value: "Use /cluster in a server that has Cluster and it becomes yours",
+      };
+
   if (unlock && !unlock.unlocked) {
     const progress = progressOf(unlock);
     return cardReply(
       {
         title: "Nearly there",
         subtitle: progress.label,
-        rows: unlock.missing.map((m) => ({ label: STEP_LABEL[m] ?? m, value: "needed" })),
+        rows: [
+          ...unlock.missing.map((m) => ({ label: STEP_LABEL[m] ?? m, value: "needed" })),
+          parentRow,
+        ],
         footer: "Nothing counts until these are done — that is deliberate, not a delay",
       },
       {
@@ -75,6 +99,7 @@ screen("home", async ({ trail, presser }) => {
         { label: "This week", value: "Live challenges and the countdown to Friday" },
         { label: "The pool", value: "What every server has earned so far, publicly" },
         { label: "Your trophies", value: "Worth money if you place, a collectable if you turn up" },
+        parentRow,
       ],
       footer: "We reward outcomes, never Discord activity",
     },
@@ -91,6 +116,25 @@ screen("home", async ({ trail, presser }) => {
     },
   );
 });
+
+/**
+ * The name of the server that gets acquisition credit for this gamer, if any.
+ *
+ * A name, never an id: an id on a card is a number nobody can act on. Null
+ * when there is no parent, and null when the parent's guild row has gone —
+ * both are "no server to name", and A9 already says a departed parent keeps
+ * what it earned and gains nothing new.
+ */
+async function parentServerOf(db: DB, userId: string): Promise<string | null> {
+  const { schema } = await import("../../db/index.ts");
+  const { eq } = await import("drizzle-orm");
+  const [row] = await db
+    .select({ name: schema.guilds.name })
+    .from(schema.users)
+    .innerJoin(schema.guilds, eq(schema.users.parentGuildId, schema.guilds.guildId))
+    .where(eq(schema.users.id, userId));
+  return row?.name ?? null;
+}
 
 const STEP_LABEL: Record<string, string> = {
   ageBand: "Your age band",

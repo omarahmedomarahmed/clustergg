@@ -27,7 +27,8 @@ import {
   button,
   MAX_CUSTOM_ID,
 } from "../../lib/discord/components.ts";
-import { InteractionType, InteractionResponseType } from "../../lib/discord/types.ts";
+import { InteractionType, InteractionResponseType, OptionType } from "../../lib/discord/types.ts";
+import { COMMANDS, commandFrame } from "../../lib/discord/commands.ts";
 import { fence, isRenderableImageType } from "../../lib/cards/render.ts";
 import { acceptImage, UploadRefused } from "../../lib/cards/upload.ts";
 import { enqueuePosts } from "../../lib/discord/post-queue.ts";
@@ -82,7 +83,18 @@ test("the acknowledgement is sent before any work happens", async () => {
 
   const deferred: (() => Promise<void>)[] = [];
   const response = await handleInteraction(
-    { body: anInteraction({ data: { name: "slow-work" } }), signature: "s", timestamp: "t" },
+    {
+      // A press, not a command name. `data.name` used to be read straight into
+      // a screen key, which is exactly the accident that made the slash command
+      // look implemented — see `lib/discord/commands.ts`. A test that routes
+      // through the accident cannot notice when it is fixed.
+      body: anInteraction({
+        type: InteractionType.MessageComponent,
+        data: { custom_id: navId(frame("slow-work")) },
+      }),
+      signature: "s",
+      timestamp: "t",
+    },
     { verify: alwaysVerified, defer: (fn) => deferred.push(fn), edit: async () => {} },
   );
 
@@ -103,16 +115,94 @@ test("a slow screen cannot delay the acknowledgement", async () => {
     return { content: "eventually" };
   });
 
-  const { response, ackMs, delivered } = await run(
-    anInteraction({ data: { name: "very-slow" } }),
+  const { ackMs, delivered } = await run(
+    anInteraction({
+      type: InteractionType.MessageComponent,
+      data: { custom_id: navId(frame("very-slow")) },
+    }),
   );
   ok(ackMs < 100, `the acknowledgement took ${ackMs.toFixed(0)}ms, not the screen's 300`);
+  eq(delivered?.content, "eventually", "and the card does arrive");
+});
+
+test("a slash command is acknowledged as a NEW message, and routed by its own vocabulary", async () => {
+  // ===== THE SIXTEENTH OMISSION =====
+  //
+  // `ApplicationCommand` was never handled. The fallback read `data.name`
+  // straight into a screen key, so `/cluster` looked for a screen called
+  // "cluster", found none, and rendered *"that screen has gone"*. Nothing
+  // registered a command, so nobody ever saw it — and buttons only exist on an
+  // announced challenge card, so a gamer in a server with no live challenge
+  // could not reach the bot at all.
+  const { response } = await run(anInteraction({ data: { name: "cluster" } }));
   eq(
     (response.body as { type: number }).type,
     InteractionResponseType.DeferredChannelMessageWithSource,
-    "and it is a deferred response, so the card can arrive later",
+    "a command posts a new card rather than replacing one nobody pressed",
   );
-  eq(delivered?.content, "eventually", "and the card does arrive");
+
+  // ===== THE DISPATCH ITSELF, NOT ONLY THE ROUTER =====
+  //
+  // Asserting `commandFrame` alone proves a pure function and nothing about
+  // whether the handler calls it. Removing the whole `ApplicationCommand`
+  // branch left every mapping assertion below green — trap 8 exactly, in the
+  // suite for the defect. So one command is driven end to end, through the real
+  // handler, and the screen it lands on is observed.
+  await import("../../lib/discord/screens/index.ts");
+  const realSearch = SCREENS.get("search")!;
+  let landedWith: string[] = [];
+  screen("search", async ({ frame: f }) => {
+    landedWith = f.args;
+    return { content: "probe" };
+  });
+  const routed = await run(
+    anInteraction({
+      data: { name: "cluster", options: [{ name: "show", type: OptionType.String, value: "wednesday" }] },
+    }),
+  );
+  SCREENS.set("search", realSearch);
+  eq(routed.delivered?.content, "probe", "the handler routed the command through commandFrame");
+  eq(landedWith, ["wednesday"], "carrying the words they typed, so search has something to search");
+
+  // The router is a pure function, so the vocabulary is asserted without a
+  // registry — which is what lets this check the mapping rather than whichever
+  // screens some earlier suite happened to leave behind.
+  const cmd = (name: string, show?: string) => ({
+    data: {
+      name,
+      options: show === undefined ? [] : [{ name: "show", type: OptionType.String, value: show }],
+    },
+  });
+  eq(commandFrame(cmd("cluster")).screen, "home", "/cluster opens home");
+  eq(commandFrame(cmd("cluster", "challenges")).screen, "challenges", "/cluster show:challenges");
+  eq(commandFrame(cmd("challenges")).screen, "challenges", "/challenges is its own door");
+  eq(commandFrame(cmd("profile")).screen, "profile", "and so is /profile");
+  eq(commandFrame(cmd("server")).screen, "server", "and /server");
+  eq(
+    commandFrame(cmd("cluster", "wednesday")),
+    { screen: "search", args: ["wednesday"] },
+    "a word we do not know is a search, never a dead end",
+  );
+
+  // ===== AND NOTHING IT PRODUCES MAY BE A SCREEN THAT DOES NOT EXIST =====
+  //
+  // The whole defect was a frame naming a screen nobody registered. Every
+  // destination the router can reach is checked against the real registry — a
+  // vocabulary asserted against itself would have passed on `/cluster` from
+  // day one.
+  const destinations = [
+    ...COMMANDS.map((c) => commandFrame(cmd(c.name))),
+    ...["challenges", "games", "trophies", "profile", "help", "commands", "entries", "community"].map(
+      (t) => commandFrame(cmd("cluster", t)),
+    ),
+    commandFrame(cmd("cluster", "wednesday")),
+    commandFrame(cmd("cluster", "gamer:someone")),
+  ];
+  eq(
+    destinations.filter((f) => !SCREENS.has(f.screen)).map((f) => f.screen),
+    [],
+    "every screen a slash command can open is registered",
+  );
 });
 
 test("a button press replaces its card rather than posting a new one", async () => {
@@ -179,7 +269,12 @@ test("a screen that throws still produces a card", async () => {
     throw new Error("the standings query fell over");
   });
 
-  const { delivered } = await run(anInteraction({ data: { name: "explodes" } }));
+  const { delivered } = await run(
+    anInteraction({
+      type: InteractionType.MessageComponent,
+      data: { custom_id: navId(frame("explodes")) },
+    }),
+  );
   ok(delivered !== null, "the gamer gets a card rather than a spinner that never resolves");
   ok(
     /went wrong/.test(delivered?.content ?? ""),
@@ -193,7 +288,12 @@ test("a screen that throws still produces a card", async () => {
 });
 
 test("an unknown screen is a card, not a crash", async () => {
-  const { delivered, response } = await run(anInteraction({ data: { name: "no-such-screen" } }));
+  const { delivered, response } = await run(
+    anInteraction({
+      type: InteractionType.MessageComponent,
+      data: { custom_id: navId(frame("no-such-screen")) },
+    }),
+  );
   eq(response.status, 200, "the interaction is still acknowledged");
   ok(/start again/.test(delivered?.content ?? ""), "and the card tells them what to do");
 });
