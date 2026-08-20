@@ -243,15 +243,10 @@ export default async function NewChallenge({
               </label>
             </div>
 
-            {/* The game name is carried alongside the provider id because
-                `challenges.game` is what every catalogue page groups by, and
-                deriving it here rather than asking twice is what stops the two
-                disagreeing. */}
-            <input
-              type="hidden"
-              name="game"
-              value={providers[0]?.game ?? ""}
-            />
+            {/* The game name is NOT submitted. It is derived from the provider
+                id on the server, because a hidden input cannot follow the
+                select above it — this field used to be pinned to
+                `providers[0].game` and stamped every challenge "Chess". */}
 
             <div>
               <Button type="submit" data-testid="create-series">

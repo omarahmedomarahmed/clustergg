@@ -10,6 +10,7 @@
 // above it is an action that a brand or an owner can call for somebody else's
 // portal by changing one string.
 
+import { getProvider } from "../../../../lib/providers/registry.ts";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb } from "../../../../lib/db/index.ts";
@@ -195,7 +196,10 @@ export async function requestCommunityAction(form: FormData): Promise<void> {
       tier,
       payload: {
         title: String(form.get("title") ?? "").trim() || "Community challenge",
-        game: String(form.get("game") ?? ""),
+        // The picker posts a PROVIDER ID. The game name is looked up from it
+        // rather than stored as a second copy — writing the id into both
+        // columns is what made a League challenge read "riot-lol".
+        game: getProvider(String(form.get("game") ?? ""))?.game ?? "",
         provider: String(form.get("game") ?? ""),
         // C2/L6 — there is no date picker, for anyone. What is chosen is a
         // week, and the earliest is the next one: this week has started.

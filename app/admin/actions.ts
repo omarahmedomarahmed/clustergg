@@ -25,7 +25,7 @@ import {
 import { sweep } from "../../lib/trophies/settle.ts";
 import { notifyRedemptionProgress } from "../../lib/delivery/notify.ts";
 import type { RedemptionStage } from "../../lib/delivery/emails.ts";
-import { isQueue } from "../../lib/providers/registry.ts";
+import { getProvider, isQueue } from "../../lib/providers/registry.ts";
 
 async function actor(): Promise<string> {
   const staff = await currentStaff();
@@ -298,10 +298,29 @@ export async function createSeriesAction(form: FormData): Promise<void> {
     });
 
     const brandId = String(form.get("sponsorBrandId") ?? "").trim();
+
+    // ===== THE GAME NAME IS DERIVED, NEVER SUBMITTED =====
+    //
+    // It used to arrive as a hidden field the form set to `providers[0].game`
+    // — the FIRST entry in the registry, whatever the operator picked. That is
+    // `chesscom`, so every challenge built here was stored as "Chess" with a
+    // correct provider beside it, and every catalogue page groups by `game`.
+    //
+    // A hidden input cannot follow a `<select>` without client JavaScript, so
+    // the shape was wrong rather than the value: the server already holds the
+    // provider id, and the registry already maps it to a game. Asking the
+    // browser for a second, redundant copy is what let the two disagree.
+    const providerId = String(form.get("provider") ?? "").trim();
+    const picked = getProvider(providerId);
+    if (!picked) {
+      back("/admin/challenges/new", `"${providerId}" is not a provider we can score.`);
+      return;
+    }
+
     const { seriesId } = await createSeries(db, {
       title: String(form.get("title") ?? "").trim() || "Untitled challenge",
-      game: String(form.get("game") ?? "").trim(),
-      provider: String(form.get("provider") ?? "").trim(),
+      game: picked.game,
+      provider: providerId,
       plan,
       sponsorBrandId: brandId || null,
       places: Math.max(1, Number(form.get("places") ?? 1)),

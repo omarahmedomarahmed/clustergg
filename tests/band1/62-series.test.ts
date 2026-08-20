@@ -21,6 +21,12 @@ import { ok, eq, no, throws } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
 import { resetDemoDb, schema } from "../../lib/db/index.ts";
 import { eq as sqlEq } from "drizzle-orm";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { liveProviders } from "../../lib/providers/registry.ts";
+import { withoutComments, walkSource } from "../helpers/source.ts";
+
+const repoRoot = path.join(import.meta.dirname, "..", "..");
 import {
   billForPrize,
   planSeries,
@@ -327,5 +333,115 @@ test("a series needs a person, and the log can name them", async () => {
       }),
     /built by a person/,
     "a series with no actor is a series nobody can be asked about",
+  );
+});
+
+// ===== THE GAME NAME IS DERIVED FROM THE PROVIDER, NEVER SUBMITTED =====
+//
+// Found by clicking, in production, on the first challenge anybody built:
+// title "LOL CHallenegeee", provider `riot-lol`, and `game: "Chess"`.
+//
+// `/admin/challenges/new` carried the game name in a hidden input pinned to
+// `providers[0].game`. The registry's first entry is `chesscom`, so the field
+// read "Chess" whatever the operator selected, and every catalogue page groups
+// by `challenges.game`.
+//
+// ===== AND WHY THIS GUARD READS SOURCE RATHER THAN CALLING ANYTHING =====
+//
+// The first version of it built a series through `createSeries` for every live
+// provider and asserted the two columns agreed. It passed — and it passed with
+// the production bug restored, because the test passed the game name in
+// itself. `createSeries` stores what it is given and that was never in doubt.
+// The defect was one level up, in the CALLER, and a test that supplies the
+// argument can never see a caller supplying the wrong one. Trap 27, inside the
+// guard for a defect found in production.
+//
+// The property is "the server derives this, and no form submits it", and a
+// server action cannot be invoked from band 1. So it is asserted where it can
+// be true or false: in the source of the action that writes the row, and in
+// every form that posts to it — the same shape as the copy-rule guard.
+test("the admin action derives a challenge's game from the provider it was given", async () => {
+  const src = withoutComments(
+    await fs.readFile(path.join(repoRoot, "app", "admin", "actions.ts"), "utf8"),
+  );
+
+  ok(
+    /createSeries\(/.test(src),
+    "the canary: this file still creates a series, so the assertions below read something real",
+  );
+  ok(
+    /getProvider\(/.test(src),
+    "it looks the provider up rather than trusting a name it was handed",
+  );
+  no(
+    /game:\s*String\(\s*form\.get\(\s*["']game["']/.test(src),
+    "the game name is never read off the form — the browser cannot be the source " +
+      "of a fact the registry already holds, and that redundancy is what let the " +
+      "two columns disagree",
+  );
+});
+
+test("every place that writes a challenge's game derives it from the provider", async () => {
+  const offenders: string[] = [];
+  let sites = 0;
+
+  for (const dir of ["app", "lib"]) {
+    for (const file of await walkSource(path.join(repoRoot, dir))) {
+      const src = withoutComments(await fs.readFile(file, "utf8"));
+      // Every `game:` that is part of building a challenge. The value has to
+      // come from the registry — `getProvider(...)`— and not from a form field,
+      // a variable somebody hopes holds the right thing, or `providers[0]`,
+      // which is `chesscom` and is how this defect happened three times.
+      for (const m of src.matchAll(/\bgame:\s*([^,\n}]+)/g)) {
+        const value = m[1].trim();
+        sites++;
+
+        // ===== NO SKIP LIST =====
+        //
+        // The first version of this opened with
+        // `if (/^(string|input\.game|…)/i.test(value)) continue;` to quieten
+        // noise — and `String(form.get("game"))` starts with "string", so the
+        // exclusion swallowed the exact defect. The break went green inside the
+        // guard written for it, which is trap 27 for the third time on this
+        // branch.
+        //
+        // So there is no skip list. Two things are wrong and everything else is
+        // somebody else's problem: a value that reaches for the form, or one
+        // pinned to the registry's first entry, without deriving from the
+        // registry.
+        const derived = /getProvider\(/.test(value) || /\bpicked\.game\b/.test(value);
+        const pinned = /providers\s*\[\s*0\s*\]/.test(value);
+        const fromForm = /form\.get\(/.test(value);
+        if ((pinned || fromForm) && !derived) {
+          offenders.push(`${path.relative(repoRoot, file)}: game: ${value}`);
+        }
+      }
+    }
+  }
+
+  ok(sites > 0, "the canary: there are challenge-building sites to have read");
+  eq(
+    offenders,
+    [],
+    "a game name pinned to the registry's first entry, or read straight off a " +
+      "form, is not derived — `providers[0]` is chesscom, which is why a League " +
+      "challenge read \"Chess\" in production",
+  );
+});
+
+// The negative half. Without it, a registry whose providers all shared one game
+// name would make the whole class of defect invisible — and an empty `app/`
+// walk would make the sweep above pass by never running.
+test("the registry can actually disagree, and the sweep above reads real files", async () => {
+  const live = liveProviders();
+  ok(live.length > 3, "there are several live providers to disagree about");
+  ok(
+    new Set(live.map((p) => p.game)).size > 1,
+    "they do not all share one game name — if they did, the guards above would " +
+      "pass against the very bug they exist to catch",
+  );
+  ok(
+    (await walkSource(path.join(repoRoot, "app"))).length > 20,
+    "and there are real files under app/ to have swept",
   );
 });

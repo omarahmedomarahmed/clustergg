@@ -2105,3 +2105,50 @@ Break (b) is the half worth having. Nothing about a build inside `npm test`
 looks wrong in a diff — it looks like more rigour. What it actually does is make
 the command that runs forty times a sprint take four minutes, and the fix
 somebody reaches for at that point is to stop running it.
+
+---
+
+# Found by clicking — the game name
+
+`tests/band1/62-series.test.ts`.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 295 | **Every place that writes a challenge's game derives it from the provider** | `game: providers[0].game` restored in `app/admin/actions.ts` — the production defect, exactly | *"a game name pinned to the registry's first entry, or read straight off a form, is not derived"*, naming `app/admin/actions.ts: game: providers[0].game` | clean, 522/522 |
+| 296 | The same, at the owner's community challenge | `game: String(form.get("game"))` restored — the provider id written into the game column | same assertion, naming `app/portal/server/[guildId]/actions.ts` | clean, 522/522 |
+| 297 | The registry can disagree, and the sweep read real files | — | negative half: several live providers, more than one game name among them, and challenge-building sites found to have swept | clean |
+
+### The first version of this guard passed with the bug restored
+
+It built a series through `createSeries` for every live provider and asserted
+the two columns agreed. Green — **and green with the production defect back in
+place**, because the test passed the game name in itself. `createSeries` stores
+what it is given, which was never in doubt. The defect was one level up, in the
+**caller**, and a test that supplies the argument can never see a caller
+supplying the wrong one.
+
+### And the second version had a skip list that swallowed the defect
+
+Rewritten to read source, it opened with
+
+    if (/^(string|input\.game|p\.game|guild|null)/i.test(value)) continue;
+
+to quieten noise. `String(form.get("game"))` starts with `"string"`. The
+exclusion skipped the exact expression the guard existed to catch, and break 2
+went green inside it.
+
+**There is no skip list now.** Two things are wrong — a value that reaches for
+the form, or one pinned to `providers[0]` — and everything else is somebody
+else's problem. Trap 27 arriving twice inside one guard, in the same sitting.
+
+### What it found beyond the reported defect
+
+The report was one challenge reading "Chess". Walking every write site found
+**three**, of which two were live defects and one was fine:
+
+| Where | |
+|---|---|
+| `app/admin/actions.ts` | `providers[0].game` — reported |
+| `app/admin/brands/[id]/draft/page.tsx` | the **same hidden field**, so every admin-built brand draft was "Chess" too |
+| `app/portal/server/[guildId]/actions.ts` | the provider id written into **both** columns — a community challenge would read `riot-lol` as its game |
+| `lib/portal/brand.ts` | **correct.** `getProvider(game)?.game` — a badly named variable, not a bug |

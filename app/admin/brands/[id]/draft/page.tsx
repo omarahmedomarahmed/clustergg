@@ -142,7 +142,6 @@ export default async function BrandDraft({
             <input type="hidden" name="prizeDollars" value={prizeDollars} />
             <input type="hidden" name="weeksAhead" value={ahead} />
             <input type="hidden" name="sponsorBrandId" value={id} />
-            <input type="hidden" name="game" value={providers[0]?.game ?? ""} />
 
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-mute">Title</span>
