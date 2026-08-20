@@ -8,7 +8,18 @@
 import Link from "next/link";
 import { Nav } from "../components.tsx";
 
-export const SETTINGS_TABS = [
+// ===== NOT EXPORTED, AND `npm test` COULD NOT SEE WHY =====
+//
+// Next type-checks a layout's exports against a fixed set and refuses anything
+// else: *"SETTINGS_TABS is not a valid Layout export field."* Nothing imported
+// it — it has been an unnecessary `export` since Sprint 11 — so `next build`
+// failed on a keyword that did nothing.
+//
+// `tsc --noEmit` passes it happily, which is why the band never noticed: the
+// rule is Next's, not TypeScript's, and the only thing that runs it is the
+// build. `95-deploy` guards that the build command runs the migrator first; it
+// cannot guard that the build succeeds.
+const SETTINGS_TABS = [
   { href: "/settings", label: "Account" },
   // D14's rule, one surface along: a door nothing points at is a door nobody
   // finds. The builder is the largest thing a gamer can edit and it would
