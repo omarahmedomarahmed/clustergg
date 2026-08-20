@@ -264,9 +264,20 @@ const MUTATIONS: Mutation[] = [
     expect: 1,
   },
   {
+    // ===== REPOINTED AT THE RULE THAT ACTUALLY RUNS =====
+    //
+    // This used to mutate `mapAdminRole` in `lib/discord/admin.ts`, which was a
+    // **second** implementation of S5 with no caller anywhere — and a looser
+    // one: `^\d+$` against the live `^\d{5,}$`, so the two disagreed about
+    // whether "1" is a role ID. It was deleted in Sprint 16, and the harness
+    // refused to run rather than reporting a mutation it could not apply as
+    // caught by zero. That refusal is the harness working.
+    //
+    // `setOwnerContact` is where the rule is enforced: the portal's Settings
+    // page is the only surface that sets an admin role.
     name: "Store an admin role by name",
-    file: "lib/discord/admin.ts",
-    find: "  if (!/^\\d+$/.test(roleId)) {",
+    file: "lib/portal/owner.ts",
+    find: "  if (input.adminRoleId && !/^\\d{5,}$/.test(input.adminRoleId.trim())) {",
     replace: "  if (false) {",
     expect: 1,
   },
