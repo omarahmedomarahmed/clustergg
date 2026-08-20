@@ -20,7 +20,13 @@ encoded a *previous* decision, and nothing in the file said which. That cost:
   tested nothing, one of them the guard protecting the server pool from being
   drained by private challenges
 
-If you need something that is not in `ported/`, **ask**. Do not go looking.
+If you need something that is not in `ported/` or `ported-design/`, **ask**.
+Do not go looking.
+
+`ported-design/` is the second deliberate carry: the v1 platform's token system
+and its gamer-profile engine, with the reason written in its README. Two files.
+None of `main`'s 227 components came with them, and none should — most render
+quests, Cluster Points and a marketplace that v3 deleted.
 
 ## Reading order
 
@@ -39,6 +45,9 @@ If you need something that is not in `ported/`, **ask**. Do not go looking.
 | `docs/10-SETUP.md` | Environment and deployment. No terminal needed |
 | `docs/11-PORTED-CODE.md` | What was carried over and what to change on arrival |
 | `docs/12-IDENTITY.md` | **Auth, attribution, permissions.** Read with `02-MONEY` §4 — neither is correct alone |
+| `docs/13-DESIGN.md` | **The visual system.** Colour that carries information, motion, the profile engine, the assets that must exist |
+| `docs/14-EDITABLE.md` | **What a human can change without a deploy.** Content, card layouts, page art, the gamer profile |
+| `docs/15-DELIVERY.md` | **Email and DM.** Every message the platform owes somebody, and the guard that proves it is sent |
 
 Read `00` and `01` before writing anything. The rest can be read as you reach
 the stage that needs them.

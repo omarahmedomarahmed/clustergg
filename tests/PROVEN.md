@@ -1675,3 +1675,35 @@ the tree found two more:
 The members page is the argument for the general guard over the banned-phrase
 guard. A banned phrase only bans the phrase somebody already found; walking for
 **the words the module produces** found the paraphrase.
+
+
+## Sprint 16 · delivery, and the guard that found the rest
+
+`94-export-reach` is committed **red**, on purpose, before anything it names is
+fixed. The two guards that could not see either defect are named in its header,
+and the rows below are the proof that the new one can.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 238 | **An exported function with no caller outside its own module fails the band** (`94-export-reach`, L12) | none needed — committed red. It names 144 exports in `lib/`, `dmUser` among them | *"an exported function with no caller outside its own module is an unfinished feature… A test is not a caller"* | — |
+| 239 | **The allowance expires when its entry gains a caller** (`94-export-reach`, L13) | put `lib/pool/score.ts:529 closeWeek` — a function with real callers — into `NOT_YET_CALLED` | *"closeWeek has a caller now — delete its line from NOT_YET_CALLED, because an allowance that outlived its reason is a hole with a name"* | clean |
+| 240 | **A value used only behind a demo fence was never delivered** (`94-export-reach`, L14) | none needed — committed red on `beginEmailVerification` and `beginReset` | *"a value whose every use in production sits behind a demo fence was never delivered. This is how a gamer is told a code was sent that nobody sent"* | — |
+| 241 | **The return-value reader can tell its three verdicts apart** (`94-export-reach`) | `verdictFor` made to return `"consumed"` unconditionally | the reader check — **and guard 240 went GREEN**, which is the entire reason the reader check exists | clean |
+| 242 | **The symbol graph follows dynamic imports** (`94-export-reach`) | dropped the `await import("…")` edge reader | the canary — *"reached from the weekly tick, which imports it dynamically"* | clean |
+
+### Guard 241 is the one worth reading
+
+Blinding the reader made the L14 assertion **pass**. Its list is compared
+against an empty one, so a reader that answers `"consumed"` for everything
+produces an empty list and a green tick over every defect the guard exists to
+find — trap 27 exactly, in the assertion whose whole subject is a launch
+blocker. So the reader is exercised on source written inside the suite, and all
+three verdicts must be reachable before the list is believed.
+
+### And one the guard found while being written
+
+`startEmailVerification` in `lib/trophies/redemption.ts` wraps
+`beginEmailVerification` and **consumes** its return value. Counting it as a
+call site made L14 read green over the exact defect it was written for. It is
+itself an export nothing calls, so the rule that fixed it is the same sentence
+as L13 one level along: *a caller that nothing calls is not a caller.*
