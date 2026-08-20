@@ -299,3 +299,278 @@ test("an edit is live on the page that renders it, without a deploy", async () =
   const rendered = await liveCopy();
   no("keyThatWasDeleted" in rendered, "an override with no key behind it renders nothing");
 });
+
+// ── E8–E12 · the card editor ────────────────────────────────────────────────
+
+test("the preview and the card are drawn by the same function", async () => {
+  // ===== E8, AND WHY IT IS ASSERTED STRUCTURALLY =====
+  //
+  // *"The preview is rendered by the same code that renders the card — a real
+  // image, never an HTML mock. Two renderers is how a preview starts lying."*
+  //
+  // This platform has paid for the alternative already: `loadCardFonts()`
+  // returned `[]`, `ImageResponse` throws on an empty font list, **every card
+  // on the platform threw**, the fence turned them all into text, and both
+  // bands stayed green. An HTML preview would have looked perfect throughout.
+  //
+  // So the property is "there is exactly one renderer", and it is read from
+  // source: a second one that agreed with the first today is still a second
+  // one tomorrow.
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const repoRoot = path.join(import.meta.dirname, "..", "..");
+
+  const preview = await fs.readFile(
+    path.join(repoRoot, "app/api/admin/card-preview/route.ts"),
+    "utf8",
+  );
+  ok(
+    /from\s+["'][^"']*lib\/cards\/render\.ts["']/.test(preview),
+    "the preview route imports the real renderer",
+  );
+  ok(/renderCard\(/.test(preview), "and calls it");
+  ok(
+    /from\s+["'][^"']*lib\/cards\/sample\.ts["']/.test(preview),
+    "with the same sample the save check renders",
+  );
+
+  // And nothing anywhere builds a card out of markup instead.
+  const { walkSource, withoutComments } = await import("../helpers/source.ts");
+  const drawnInHtml: string[] = [];
+  for (const abs of await walkSource(path.join(repoRoot, "app"))) {
+    // Comments stripped, for the reason `94-reachability` learned: a file
+    // explaining that a card is 1200×630 is explaining, not drawing.
+    // `/api/uploads` says exactly that, and reading raw source flagged it.
+    const src = withoutComments(await fs.readFile(abs, "utf8"));
+    const rel = path.relative(repoRoot, abs);
+    if (/card-?preview/i.test(rel)) continue;
+    // A page that both mentions a card and draws its own 1200×630 box is a
+    // page drawing a card by hand.
+    if (/1200/.test(src) && /630/.test(src) && /card/i.test(src)) drawnInHtml.push(rel);
+  }
+  eq(drawnInHtml, [], "and no page draws a card-shaped thing of its own");
+});
+
+test("a layout the renderer cannot draw degrades rather than throwing", async () => {
+  // D20's rule applied to card settings: *read forgivingly, never discard on a
+  // version mismatch.* A settings blob written by a deploy that had a layout
+  // this one does not must not throw the family back to nothing — the
+  // operator's accent survives a layout that did not.
+  const { readSettings, CARD_DEFAULTS } = await import("../../lib/cards/settings.ts");
+
+  const stale = readSettings({ layout: "carousel", accent: "#22d3ee", backgroundUrl: "/a.png" });
+  eq(stale.layout, CARD_DEFAULTS.layout, "an unknown layout falls back to the default");
+  eq(stale.accent, "#22d3ee", "and everything else survives — field by field, not all or nothing");
+
+  eq(readSettings(null).layout, CARD_DEFAULTS.layout, "and no settings at all is the default");
+  eq(readSettings({ accent: "red" }).accent, null, "a colour that is not a colour is dropped");
+});
+
+test("a family's settings reach the card without the spec knowing they exist", async () => {
+  const { withSettings } = await import("../../lib/cards/settings.ts");
+  const { sampleSpec } = await import("../../lib/cards/sample.ts");
+
+  const applied = withSettings(sampleSpec("home"), {
+    backgroundUrl: "/art.png",
+    accent: "#0e7490",
+    layout: "banner",
+  });
+  eq(applied.layout, "banner", "the layout reaches the renderer");
+  eq(applied.accent, "#0e7490", "and the accent");
+  eq(applied.imageUrl, "/art.png", "and the art");
+
+  // ===== A MEANING IS NOT A THEME =====
+  //
+  // 13-DESIGN §1: gold, silver and bronze mean the podium and nothing else. A
+  // spec that set its own accent said something; an operator recolouring the
+  // family must not repaint it.
+  const podium = withSettings({ title: "First", accent: "#fbbf24" }, {
+    backgroundUrl: null,
+    accent: "#0e7490",
+    layout: "standard",
+  });
+  eq(podium.accent, "#fbbf24", "a spec that named its own accent keeps it");
+});
+
+test("S8 is not a layout property — nothing here can make an admin card public", async () => {
+  // E12. The settings a human can edit are art, colour and arrangement. A
+  // per-family "public" toggle would be a way to publish a server's earnings to
+  // its whole membership by ticking a box on an admin page, so there is no such
+  // field and this is what stops one being added quietly.
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const repoRoot = path.join(import.meta.dirname, "..", "..");
+  const { withoutComments } = await import("../helpers/source.ts");
+
+  const settings = withoutComments(
+    await fs.readFile(path.join(repoRoot, "lib/cards/settings.ts"), "utf8"),
+  );
+  const action = withoutComments(
+    await fs.readFile(path.join(repoRoot, "app/admin/cards/actions.ts"), "utf8"),
+  );
+
+  for (const [name, src] of [["settings", settings], ["the editor's action", action]] as const) {
+    no(
+      /\bephemeral\b/i.test(src),
+      `${name} has no ephemeral field — S8 is decided by ADMIN_SCREENS, not by an editor`,
+    );
+    no(/\bpublic\b\s*[:?]/i.test(src), `${name} has no public flag either`);
+  }
+
+  // The canary: the read found the real files, so an empty answer is "no such
+  // field" rather than "no such file".
+  ok(/CARD_LAYOUTS/.test(settings), "the settings module was actually read");
+  ok(/saveCardAction/.test(action), "and so was the action");
+});
+
+// ── E13–E16 · page background art ───────────────────────────────────────────
+
+test("a page with no art renders nothing extra, and one with art carries its overlay", async () => {
+  // E13 — *"always optional. Every page must look finished with none."* So
+  // "none" is the absence of an element rather than an empty one: a page with
+  // no art must not be a page with a transparent layer over it, or every
+  // future z-index question starts with a thing nobody meant to be there.
+  const db = await resetDemoDb();
+  const { pageArtFor, NO_ART, MIN_OVERLAY, MAX_OVERLAY, readArt } = await import(
+    "../../lib/site/page-art.ts"
+  );
+
+  const none = await pageArtFor(db, "home");
+  eq(none.imageUrl, null, "with nothing saved, there is no image");
+
+  await saveOverride(db, {
+    scope: "page_art",
+    key: "home",
+    settings: { imageUrl: "/art.png", overlay: 60, focal: "top" },
+    editedBy: "u1",
+  });
+  const set = await pageArtFor(db, "home");
+  eq(set.imageUrl, "/art.png", "the art reads");
+  eq(set.overlay, 60, "and its overlay, which travels with it");
+  eq(set.focal, "top", "and its focal point");
+
+  // E14 — the overlay is part of the setting and it has a floor. An operator
+  // picking art on a calibrated monitor is the one person who cannot see the
+  // phone in daylight that makes the words unreadable.
+  eq(readArt({ imageUrl: "/a.png", overlay: 0 }).overlay, MIN_OVERLAY, "zero is clamped to the floor");
+  eq(readArt({ imageUrl: "/a.png", overlay: 200 }).overlay, MAX_OVERLAY, "and 200 to the ceiling");
+  eq(
+    readArt({ imageUrl: "/a.png" }).overlay,
+    NO_ART.overlay,
+    "and art saved with no overlay at all still gets one",
+  );
+
+  // A page key that no page renders is not a page key.
+  const { isPageKey } = await import("../../lib/site/page-art.ts");
+  no(isPageKey("not-a-page"), "an unknown page key is refused");
+  ok(isPageKey("pool"), "and a real one is not");
+});
+
+test("page art and card art go through the same upload door", async () => {
+  // E16/E11 — *"the same upload door as everything else: acceptImage,
+  // converted, stored in Blob."* A second upload path is a second place for
+  // the WebP rule to be missing, and `10-SETUP` §8 is explicit that the
+  // renderer cannot decode WebP: a WebP background is a silently broken card.
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const repoRoot = path.join(import.meta.dirname, "..", "..");
+
+  for (const rel of [
+    "app/admin/content/actions.ts",
+    "app/admin/cards/actions.ts",
+    "app/api/uploads/route.ts",
+  ]) {
+    const src = await fs.readFile(path.join(repoRoot, rel), "utf8");
+    ok(/acceptImage\(/.test(src), `${rel} runs its upload through acceptImage`);
+    ok(/putImage\(/.test(src), `${rel} stores it through putImage`);
+  }
+
+  // And the door still refuses what the renderer cannot draw.
+  const { acceptImage, UploadRefused } = await import("../../lib/cards/upload.ts");
+  let refusal: unknown;
+  try {
+    await acceptImage({ bytes: new Uint8Array([1, 2, 3]), contentType: "image/webp" });
+  } catch (e) {
+    refusal = e;
+  }
+  ok(refusal instanceof UploadRefused, "a WebP with no converter configured is refused");
+  ok(
+    /PNG and JPEG/.test((refusal as Error).message),
+    "and the refusal says what the renderer can actually decode",
+  );
+});
+
+test("a layout that cannot render is refused at save, not discovered by a gamer", async () => {
+  // ===== E10, AND WHY THE FENCE MAKES IT NECESSARY =====
+  //
+  // `cardReply` fences `renderCard`: a family that throws produces a text card
+  // with all its buttons and nothing anywhere complains. That fence is correct
+  // and it stays — house rule 11 — but it means a broken layout is invisible
+  // downstream, which is exactly what happened when `loadCardFonts()` returned
+  // an empty list and **every card on the platform** turned into text for a
+  // sprint with both bands green.
+  //
+  // So the save is the only place it can be caught, and the check there is
+  // deliberately unfenced.
+  const { assertLayoutRenders, LayoutRefused, CARD_DEFAULTS } = await import(
+    "../../lib/cards/settings.ts"
+  );
+
+  let refusal: unknown;
+  try {
+    await assertLayoutRenders("home", CARD_DEFAULTS, async () => {
+      throw new Error("No fonts are loaded. At least one font is required");
+    });
+  } catch (e) {
+    refusal = e;
+  }
+  ok(refusal instanceof LayoutRefused, "a layout the renderer refuses is refused at save");
+  ok(
+    /No fonts are loaded/.test((refusal as Error).message),
+    "carrying what the renderer actually said, which is the part somebody can fix",
+  );
+  ok(
+    /not saved/.test((refusal as Error).message),
+    "and saying it did not go live, because the fence downstream would hide that",
+  );
+
+  // The other half: a layout that renders is not refused. Without this, a
+  // check that threw unconditionally would pass the case above.
+  let secondThought: unknown;
+  const drawn: unknown[] = [];
+  try {
+    await assertLayoutRenders("home", CARD_DEFAULTS, async (spec) => {
+      drawn.push(spec);
+      return { png: new Uint8Array() };
+    });
+  } catch (e) {
+    secondThought = e;
+  }
+  eq(secondThought, undefined, "a layout that renders saves");
+  eq(drawn.length, 1, "and the check rendered exactly one card to find that out");
+  eq(
+    (drawn[0] as { title?: string }).title,
+    "ClusterGG",
+    "a real sample spec, not an empty object — a layout that draws nothing renders fine",
+  );
+});
+
+test("the card editor refuses through the rule, not through a copy of it", async () => {
+  // The action must not decide this for itself. An action that re-implemented
+  // the check is an action that can be kinder than the rule, and the next
+  // surface that saves a layout would have to remember to decide the same way.
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const { withoutComments } = await import("../helpers/source.ts");
+  const repoRoot = path.join(import.meta.dirname, "..", "..");
+
+  const action = withoutComments(
+    await fs.readFile(path.join(repoRoot, "app/admin/cards/actions.ts"), "utf8"),
+  );
+  ok(/assertLayoutRenders\(/.test(action), "the save calls the rule");
+  ok(/LayoutRefused/.test(action), "and carries its refusal back to the operator");
+  ok(
+    action.indexOf("assertLayoutRenders(") < action.indexOf("saveOverride("),
+    "before the write, which is the whole of E10 — refused at save, not discovered by a gamer",
+  );
+});

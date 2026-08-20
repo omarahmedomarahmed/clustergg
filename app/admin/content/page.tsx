@@ -28,7 +28,13 @@ import { CHALLENGE_PRICE_CENTS, splitOf } from "../../../lib/money/amounts.ts";
 import { getDb } from "../../../lib/db/index.ts";
 import { currentOverrides, historyOf } from "../../../lib/content/store.ts";
 import { Panel, Row } from "../components.tsx";
-import { saveCopyAction, clearCopyAction, revertCopyAction } from "./actions.ts";
+import { allPageArt, PAGE_KEYS, NO_ART, MIN_OVERLAY, MAX_OVERLAY } from "../../../lib/site/page-art.ts";
+import {
+  saveCopyAction,
+  clearCopyAction,
+  revertCopyAction,
+  savePageArtAction,
+} from "./actions.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +49,7 @@ export default async function Content({
 
   const db = await getDb();
   const live = await currentOverrides(db, "copy");
+  const art = await allPageArt(db);
 
   // Search is a filter over the keys and their words, not a query: there are
   // tens of keys, and a round trip to filter tens of rows is a round trip an
@@ -82,6 +89,11 @@ export default async function Content({
       {str("saved") ? (
         <p className="rounded-lg border border-line bg-ink px-4 py-3 text-sm text-mute" data-testid="copy-saved">
           “{str("saved")}” is live.
+        </p>
+      ) : null}
+      {str("artSaved") ? (
+        <p className="rounded-lg border border-line bg-ink px-4 py-3 text-sm text-mute" data-testid="art-saved">
+          The background on “{str("artSaved")}” is live.
         </p>
       ) : null}
       {str("cleared") ? (
@@ -262,6 +274,95 @@ export default async function Content({
           )}
         </Panel>
       ) : null}
+
+      {/*
+        ===== E13–E16 · PAGE BACKGROUND ART =====
+
+        New in v3, and additive only: every page must look finished with none,
+        so the setting adds a layer and nothing depends on it. The overlay
+        travels with the image and has a floor — art without a readability
+        overlay is how text becomes unreadable on somebody else's screen, and
+        the operator choosing the art is the one person who cannot see that
+        happen.
+      */}
+      <Panel
+        title="Page backgrounds"
+        note="Always optional. Every page is designed to look finished with none"
+        help={
+          <p>
+            The image sits on its own fixed layer behind the page — never{" "}
+            <code>background-attachment: fixed</code>, which v1 found makes long
+            pages scroll badly. If it fails to load the page is intact and the
+            overlay is what you see. Uploads go through the same door as
+            everything else: PNG and JPEG, WebP converted.
+          </p>
+        }
+      >
+        {PAGE_KEYS.map((key) => {
+          const a = art.get(key) ?? NO_ART;
+          return (
+            <div key={key} className="border-b border-line py-4 last:border-0">
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="text-sm">/{key === "home" ? "" : key}</p>
+                <span className="text-xs text-mute" data-testid={`art-state-${key}`}>
+                  {a.imageUrl ? `art set · overlay ${a.overlay}%` : "no background"}
+                </span>
+              </div>
+              <form
+                action={savePageArtAction}
+                encType="multipart/form-data"
+                className="mt-2 flex flex-wrap items-end gap-3"
+              >
+                <input type="hidden" name="pageKey" value={key} />
+                <input type="hidden" name="imageUrl" value={a.imageUrl ?? ""} />
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-mute">Image</span>
+                  <input
+                    type="file"
+                    name="art"
+                    accept="image/*"
+                    className="text-xs text-mute"
+                    data-testid={`art-file-${key}`}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-mute">Overlay ({MIN_OVERLAY}–{MAX_OVERLAY}%)</span>
+                  <input
+                    name="overlay"
+                    type="number"
+                    min={MIN_OVERLAY}
+                    max={MAX_OVERLAY}
+                    defaultValue={a.overlay}
+                    className="rounded-md border border-line bg-ink px-3 py-1.5 text-sm outline-none focus:border-white/30"
+                    data-testid={`art-overlay-${key}`}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-mute">Focal point</span>
+                  <select name="focal" defaultValue={a.focal} className="rounded-md border border-line bg-ink px-3 py-1.5 text-sm outline-none focus:border-white/30">
+                    <option value="top">top</option>
+                    <option value="center">center</option>
+                    <option value="bottom">bottom</option>
+                  </select>
+                </label>
+                {a.imageUrl ? (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="clearArt" data-testid={`art-clear-${key}`} />
+                    <span className="text-mute">Clear it</span>
+                  </label>
+                ) : null}
+                <button
+                  type="submit"
+                  className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-white/5"
+                  data-testid={`art-save-${key}`}
+                >
+                  Save
+                </button>
+              </form>
+            </div>
+          );
+        })}
+      </Panel>
 
       <Panel
         title="SAYS — sentences that need a figure"

@@ -25,9 +25,11 @@ import {
   phaseAt,
 } from "../lib/site/queries.ts";
 import { liveCopy } from "../lib/content/store.ts";
+import { pageArtFor } from "../lib/site/page-art.ts";
+import { getDb } from "../lib/db/index.ts";
 import { SAYS } from "../lib/content/copy.ts";
 import { demoNow } from "../lib/site/clock.ts";
-import { Nav, Card, Money, Empty } from "./components.tsx";
+import { Nav, Card, Money, Empty, PageArtLayer } from "./components.tsx";
 import { Countdown, PoolRefresher } from "./countdown.tsx";
 
 export const dynamic = "force-dynamic";
@@ -47,6 +49,10 @@ export default async function Home({
   // store is a site with the wrong words, and the failure mode of an unfenced
   // one is no site.
   const copy = await liveCopy();
+  // E13 — always optional. With none set this renders nothing at all, which is
+  // what makes "every page must look finished with none" a property rather
+  // than an aspiration.
+  const art = await pageArtFor(await getDb(), "home");
 
   const [live, next, ended, community, pool] = await Promise.all([
     liveChallenges(now),
@@ -58,6 +64,7 @@ export default async function Home({
 
   return (
     <>
+      <PageArtLayer art={art} />
       <Nav />
       <main className="mx-auto flex max-w-5xl flex-col gap-12 px-6 py-12" data-phase={phase}>
         {/* ── Hero ─────────────────────────────────────────────────────── */}

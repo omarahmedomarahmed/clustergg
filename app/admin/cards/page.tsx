@@ -24,12 +24,25 @@ import { imageBackendName } from "../../../lib/cards/store.ts";
 import { RENDERABLE_IMAGE_TYPES } from "../../../lib/cards/render.ts";
 import { MAX_CUSTOM_ID } from "../../../lib/discord/components.ts";
 import { Panel, Row, Light } from "../components.tsx";
+import { getDb } from "../../../lib/db/index.ts";
+import { cardSettings, CARD_DEFAULTS, CARD_LAYOUTS } from "../../../lib/cards/settings.ts";
+import { saveCardAction, clearCardAction } from "./actions.ts";
 
 export const dynamic = "force-dynamic";
 
-export default async function Cards() {
+const FIELD =
+  "rounded-md border border-line bg-ink px-3 py-1.5 text-sm outline-none focus:border-white/30";
+
+export default async function Cards({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = await searchParams;
+  const str = (k: string) => (typeof query[k] === "string" ? (query[k] as string) : null);
   const fonts = await loadCardFonts();
   const admin = new Set(ADMIN_SCREENS);
+  const settings = await cardSettings(await getDb());
 
   return (
     <div className="flex flex-col gap-6">
@@ -40,6 +53,143 @@ export default async function Cards() {
           families.
         </p>
       </div>
+
+      {str("error") ? (
+        <p className="rounded-lg border border-line bg-ink px-4 py-3 text-sm" data-testid="card-refusal">
+          {str("error")}
+        </p>
+      ) : null}
+      {str("saved") ? (
+        <p className="rounded-lg border border-line bg-ink px-4 py-3 text-sm text-mute" data-testid="card-saved">
+          “{str("saved")}” is live. Every card in that family draws it from now on.
+        </p>
+      ) : null}
+      {str("cleared") ? (
+        <p className="rounded-lg border border-line bg-ink px-4 py-3 text-sm text-mute" data-testid="card-cleared">
+          “{str("cleared")}” is back to what the code ships.
+        </p>
+      ) : null}
+
+      {/*
+        ===== THE EDITOR, BESIDE THE DIAGNOSTIC =====
+
+        14-EDITABLE §3: the diagnostic above is genuinely useful and it stays —
+        it is the page somebody opens when they are told the bot is broken.
+        What it gains is this.
+
+        The preview is a real PNG from `renderCard`, the same function the bot
+        calls. Two renderers is how a preview starts lying, and this platform
+        already knows what that costs: the renderer threw on every card for a
+        sprint, the fence turned them into text, and both bands stayed green.
+      */}
+      <Panel
+        title="Per family — art, accent and layout"
+        note="The preview is a real render. If the bot cannot draw it, neither can this"
+        help={
+          <p>
+            A save renders the sample card first and is refused if it fails — a
+            family that cannot render would otherwise become a text card for every
+            gamer who presses the button, quietly, because the fence that keeps
+            cards standing also hides the reason. Artwork is a decoration: bad art
+            degrades a card and never takes it down.
+          </p>
+        }
+      >
+        {Object.keys(CARD_FAMILIES).map((family) => {
+          const s = settings.get(family) ?? CARD_DEFAULTS;
+          const overridden = settings.has(family);
+          return (
+            <div key={family} className="border-b border-line py-4 last:border-0">
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="text-sm">{family}</p>
+                <span className="text-xs text-mute" data-testid={`card-state-${family}`}>
+                  {overridden ? "edited" : "no override — the defaults the code ships"}
+                </span>
+              </div>
+
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/admin/card-preview?family=${encodeURIComponent(family)}`}
+                alt={`A real render of the ${family} card`}
+                width={600}
+                height={315}
+                data-testid={`card-preview-${family}`}
+                className="mt-3 w-full max-w-xl rounded-lg border border-line"
+              />
+
+              <form
+                action={saveCardAction}
+                encType="multipart/form-data"
+                className="mt-3 flex flex-wrap items-end gap-3"
+              >
+                <input type="hidden" name="family" value={family} />
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-mute">Layout</span>
+                  <select
+                    name="layout"
+                    defaultValue={s.layout}
+                    className={FIELD}
+                    data-testid={`card-layout-${family}`}
+                  >
+                    {CARD_LAYOUTS.map((l) => (
+                      <option key={l} value={l}>
+                        {l}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-mute">Accent</span>
+                  <input
+                    name="accent"
+                    defaultValue={s.accent ?? ""}
+                    placeholder="#22d3ee"
+                    className={FIELD}
+                    data-testid={`card-accent-${family}`}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-mute">Background art</span>
+                  <input
+                    type="file"
+                    name="art"
+                    accept="image/*"
+                    className="text-xs text-mute"
+                    data-testid={`card-art-${family}`}
+                  />
+                </label>
+                <input type="hidden" name="backgroundUrl" value={s.backgroundUrl ?? ""} />
+                {s.backgroundUrl ? (
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="clearArt" />
+                    <span className="text-mute">Remove the art</span>
+                  </label>
+                ) : null}
+                <button
+                  type="submit"
+                  className="rounded-md border border-line px-3 py-1.5 text-sm hover:bg-white/5"
+                  data-testid={`card-save-${family}`}
+                >
+                  Save
+                </button>
+              </form>
+
+              {overridden ? (
+                <form action={clearCardAction} className="mt-2">
+                  <input type="hidden" name="family" value={family} />
+                  <button
+                    type="submit"
+                    className="text-xs text-mute underline hover:text-white"
+                    data-testid={`card-clear-${family}`}
+                  >
+                    Back to what the code ships
+                  </button>
+                </form>
+              ) : null}
+            </div>
+          );
+        })}
+      </Panel>
 
       <Panel
         title="The families"

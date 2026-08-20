@@ -100,3 +100,70 @@ export async function revertCopyAction(form: FormData): Promise<void> {
   revalidatePath("/", "layout");
   back({ saved: key, focus: key });
 }
+
+// ── Page background art. `14-EDITABLE` §4 ───────────────────────────────────
+
+/**
+ * E16 — *"it goes through the same upload door as everything else:
+ * `acceptImage`, converted, stored in Blob."*
+ *
+ * The same two functions `/api/uploads` and the card editor call. A page
+ * background is not a special case, and a second upload path is a second place
+ * for the WebP rule to be missing — which is the rule whose absence turns a
+ * card into a silently blank one.
+ */
+export async function savePageArtAction(form: FormData): Promise<void> {
+  const who = await editor();
+  const key = String(form.get("pageKey") ?? "");
+
+  const { isPageKey, MIN_OVERLAY, MAX_OVERLAY, readArt } = await import(
+    "../../../lib/site/page-art.ts"
+  );
+  if (!isPageKey(key)) back({ error: `There is no page called “${key}”.` });
+
+  const overlay = Number(form.get("overlay") ?? MIN_OVERLAY);
+  if (!Number.isFinite(overlay) || overlay < MIN_OVERLAY || overlay > MAX_OVERLAY) {
+    // E14 — the overlay is part of the setting, not a guess, and it has a
+    // floor. An operator picking art on a calibrated monitor cannot see the
+    // phone in daylight that makes the words unreadable.
+    back({
+      error: `The readability overlay runs from ${MIN_OVERLAY} to ${MAX_OVERLAY}. It is not optional — art with no overlay is text on whatever happens to be behind it.`,
+      art: key,
+    });
+  }
+
+  let imageUrl = String(form.get("imageUrl") ?? "").trim() || null;
+  const file = form.get("art");
+  if (file instanceof File && file.size > 0) {
+    const { acceptImage, UploadRefused } = await import("../../../lib/cards/upload.ts");
+    const { putImage } = await import("../../../lib/cards/store.ts");
+    const { uid } = await import("../../../lib/core/utils.ts");
+    if (file.size > 8 * 1024 * 1024) back({ error: "That file is larger than 8 MB.", art: key });
+    try {
+      const accepted = await acceptImage({
+        bytes: new Uint8Array(await file.arrayBuffer()),
+        contentType: file.type,
+        filename: file.name,
+      });
+      imageUrl = (await putImage(accepted, uid())).url;
+    } catch (e) {
+      if (e instanceof UploadRefused) back({ error: e.message, art: key });
+      throw e;
+    }
+  }
+  if (String(form.get("clearArt") ?? "") === "on") imageUrl = null;
+
+  const db = await getDb();
+  const { saveOverride: save } = await import("../../../lib/content/store.ts");
+  await save(db, {
+    scope: "page_art",
+    key,
+    settings: readArt({ imageUrl, overlay, focal: form.get("focal") }) as unknown as Record<
+      string,
+      unknown
+    >,
+    editedBy: who,
+  });
+  revalidatePath("/", "layout");
+  back({ artSaved: key, art: key });
+}

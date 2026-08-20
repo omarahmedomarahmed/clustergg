@@ -86,3 +86,54 @@ export function Card({ children, href }: { children: React.ReactNode; href?: str
 export function Empty({ children }: { children: React.ReactNode }) {
   return <p className="rounded-xl border border-dashed border-line px-5 py-8 text-center text-sm text-mute">{children}</p>;
 }
+
+/**
+ * The page's background art, on its own fixed layer.
+ *
+ * ===== D18 — A SEPARATE LAYER, NEVER `background-attachment: fixed` =====
+ *
+ * v1 found that `background-attachment: fixed` makes long customized pages
+ * scroll badly — the compositor re-rasterises the whole background on every
+ * frame. A fixed-position element behind the content gets the same effect and
+ * scrolls at sixty frames.
+ *
+ * ===== E14/E15 — THE OVERLAY IS PART OF THE SETTING, AND THE WHOLE THING IS
+ * A DECORATION =====
+ *
+ * `aria-hidden` and `pointer-events: none`: this can never take a click, never
+ * reach a screen reader, and — because it sits behind everything with its own
+ * stacking context — can never cover the page if the image 404s. A background
+ * that fails to load leaves a dark panel and a readable page, which is house
+ * rule 11 applied to visuals.
+ *
+ * Renders nothing at all when there is no art, which is E13: every page must
+ * look finished with none, so "none" is the absence of an element rather than
+ * an empty one.
+ */
+export function PageArtLayer({
+  art,
+}: {
+  art: { imageUrl: string | null; overlay: number; focal: "top" | "center" | "bottom" };
+}) {
+  if (!art.imageUrl) return null;
+  return (
+    <div
+      aria-hidden
+      data-testid="page-art"
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={art.imageUrl}
+        alt=""
+        className="h-full w-full object-cover"
+        style={{ objectPosition: art.focal }}
+      />
+      <div
+        data-testid="page-art-overlay"
+        className="absolute inset-0"
+        style={{ background: `rgba(4, 5, 26, ${art.overlay / 100})` }}
+      />
+    </div>
+  );
+}

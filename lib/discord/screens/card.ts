@@ -39,7 +39,27 @@ export type ReplyOptions = {
    * on something nobody looks at.
    */
   textOnly?: boolean;
+  /** Which card family this screen belongs to, for the operator's settings. */
+  family?: string;
 };
+
+/**
+ * Merge a family's saved settings into a spec.
+ *
+ * Fenced onto the spec itself: a settings lookup that fails must produce the
+ * card the code ships, not no card. The database read is inside the try for
+ * exactly that reason — this runs on every card the bot draws.
+ */
+async function applySettings(spec: CardSpec, family: string | undefined): Promise<CardSpec> {
+  if (!family) return spec;
+  try {
+    const { getDb } = await import("../../db/index.ts");
+    const { settingsFor, withSettings } = await import("../../cards/settings.ts");
+    return withSettings(spec, await settingsFor(await getDb(), family));
+  } catch {
+    return spec;
+  }
+}
 
 /**
  * Render a card, or say the same thing without one.
@@ -63,7 +83,17 @@ export async function cardReply(
 
   const rendered = await fence("card", async () => {
     const { renderCard } = await import("../../cards/render.ts");
-    return renderCard(spec);
+    // ===== THE OPERATOR'S SETTINGS, APPLIED HERE AND NOWHERE ELSE =====
+    //
+    // `14-EDITABLE` E8/E9. Every card goes through this function, so this is
+    // the one place a family's background, accent and layout can be applied —
+    // and it sits **inside** the fence, which is what makes E9 true: bad art
+    // degrades the card and never takes it down.
+    //
+    // `options.family` is optional: a screen that does not name one draws the
+    // defaults, which is exactly what every screen did before the editor
+    // existed.
+    return renderCard(await applySettings(spec, options.family));
   });
 
   if (!rendered.ok) {

@@ -68,6 +68,15 @@ export type CardSpec = {
   rows?: { label: string; value: string }[];
   footer?: string;
   accent?: string;
+  /**
+   * Which arrangement to draw. `14-EDITABLE` E8/E10.
+   *
+   * Optional and defaulted, so every existing caller keeps drawing exactly what
+   * it drew before — and so a family whose saved layout name no longer exists
+   * degrades to `standard` rather than throwing, which the fence would turn
+   * into a text card nobody was told about.
+   */
+  layout?: "standard" | "banner" | "minimal";
 };
 
 export type RenderedCard = {
@@ -159,6 +168,25 @@ export function cardTree(
   fonts: CardFont[] = [],
 ): React.ReactElement {
   const accent = spec.accent ?? "#7c5cff";
+
+  // ===== THREE LAYOUTS, ONE TREE =====
+  //
+  // E8 — the preview is rendered by the same code that renders the card, so a
+  // layout is a branch **here** rather than a second component somewhere the
+  // bot never runs. Two renderers is how a preview starts lying, and this
+  // platform has already paid for that once: the renderer threw on every card
+  // for a sprint, the fence turned them into text, and both bands stayed green.
+  //
+  // `banner` gives the artwork the whole top and drops the rows to make room —
+  // the shape a challenge announcement wants. `minimal` drops the artwork
+  // entirely, which is what an owner-only card should look like when a server
+  // has set a background that is fine for a public card and wrong for a
+  // private one.
+  const layout = spec.layout ?? "standard";
+  const showArt = layout !== "minimal" && artworkUrl;
+  const artHeight = layout === "banner" ? 380 : 240;
+  const titleSize = layout === "minimal" ? 72 : 64;
+
   return {
     type: "div",
     key: null,
@@ -174,14 +202,14 @@ export function cardTree(
         fontFamily: fontFamilyFor(fonts),
       },
       children: [
-        artworkUrl
+        showArt
           ? {
               type: "img",
               key: "art",
               props: {
                 src: artworkUrl,
                 width: 1200,
-                height: 240,
+                height: artHeight,
                 style: { objectFit: "cover", borderRadius: 16 },
               },
             }
@@ -190,7 +218,7 @@ export function cardTree(
           type: "div",
           key: "title",
           props: {
-            style: { fontSize: 64, fontWeight: 700, marginTop: 8 },
+            style: { fontSize: titleSize, fontWeight: 700, marginTop: 8 },
             children: spec.title,
           },
         },
@@ -209,7 +237,7 @@ export function cardTree(
           key: "rows",
           props: {
             style: { display: "flex", flexDirection: "column", gap: 10, marginTop: 28 },
-            children: (spec.rows ?? []).map((r, i) => ({
+            children: (layout === "banner" ? (spec.rows ?? []).slice(0, 2) : (spec.rows ?? [])).map((r, i) => ({
               type: "div",
               key: `r${i}`,
               props: {

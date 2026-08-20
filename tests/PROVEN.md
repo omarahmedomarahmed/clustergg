@@ -1832,3 +1832,36 @@ in the module that owns the weights. `97-copy-rule` could not see it because it
 strips comments before scanning, which is right for rendered copy and blind
 here. Replaced with what actually credits an entrant, and with a note saying
 which guard could not see it.
+
+## Sprint 16 · the editors
+
+`/admin/content` told you about copy. `/admin/cards` told you about card
+layouts. `14-EDITABLE`'s opening paragraph is about exactly that: *"a session
+read 'Bot card layouts' and built a page that tells you about bot card layouts.
+That was a fair reading of what was written."*
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 263 | **An edit is live on the page that renders it** (`97-editable`, E7) | made `liveCopy` read an empty override map | *"the next render says the new thing — no deploy in this loop"* | clean, 19/19 |
+| 264 | **The preview and the card are drawn by the same function** (`97-editable`, E8) | removed the `renderCard` import from the preview route | *"the preview route imports the real renderer"* | clean |
+| 265 | **A layout that cannot render is refused at save** (`97-editable`, E10) | — | asserted both ways: a renderer that throws is refused with what it said, and one that works is not. The check renders a **real sample spec**, because a layout that draws nothing renders fine | — |
+| 266 | **And the editor refuses through the rule, not a copy of it** (`97-editable`) | deleted the `assertLayoutRenders` call from the save | *"the save calls the rule"* | clean |
+| 267 | **Card settings degrade field by field** (`97-editable`) | — | a layout name a later deploy removed falls back; the accent beside it survives. D20's rule, applied to a second store | — |
+| 268 | **S8 is not a layout property** (`97-editable`, E12) | — | source-level: no `ephemeral` and no `public` field in the settings or the action. A per-family toggle would publish a server's earnings to its whole membership | — |
+| 269 | **The readability overlay has a floor** (`97-editable`, E14) | removed the clamp from `readArt` | *"zero is clamped to the floor"*, expected 20, actual 0 | clean |
+| 270 | **Page art and card art go through the same upload door** (`97-editable`, E11/E16) | — | all three call sites run `acceptImage` → `putImage`, and a WebP with no converter is still refused naming PNG and JPEG | — |
+
+### Guard 266 exists because guard 265 could not see the wiring
+
+The first version of E10's check lived inline in the action, and 265 tested it
+by rendering. Deleting the whole check from the action left every assertion
+green — the same shape as the slash-command dispatch, one sprint's-worth of
+lesson later. The rule moved into `lib/cards/settings.ts` where it can be
+driven directly, and 266 asserts the action calls it **before** the write.
+
+### And what the E8 guard found in the middle of being written
+
+Its second half — *no page draws a card-shaped thing of its own* — went red on
+`app/api/uploads/route.ts`, which says in a **comment** that a card is
+1200×630. That is explaining, not drawing. Comments stripped, the same way
+`94-reachability` learned to.
