@@ -27,6 +27,7 @@
 
 import { ok, eq } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
+import { withoutComments, walkSource } from "../helpers/source.ts";
 import fs from "node:fs/promises";
 import path from "node:path";
 
@@ -247,4 +248,119 @@ test("preflight cannot print a secret", async () => {
     if (before === undefined) delete process.env.AUTH_SECRET;
     else process.env.AUTH_SECRET = before;
   }
+});
+
+// ===== §0.2 `npm test` CANNOT SEE A `next build` FAILURE =====
+//
+// `next build` refused the tree at the end of Sprint 16:
+//
+//     Type error: Layout "app/settings/layout.tsx" does not match the required
+//     types of a Next.js Layout. "SETTINGS_TABS" is not a valid Layout export
+//     field.
+//
+// Next type-checks a route file's exports against a fixed set and refuses
+// anything outside it. `SETTINGS_TABS` had been exported since Sprint 11
+// (`f3d94dd`) and **nothing ever imported it** — so the deploy had been failing
+// for five sprints on a keyword that did nothing.
+//
+// The band could not see it, and neither band could have. `npm test` runs
+// `tsc --noEmit`, which passes the file happily: the rule is Next's, not
+// TypeScript's, and the only thing that runs it is the build. §0.1 above
+// guards that the build command runs the migrator first; nothing guards that
+// the build then succeeds — that is a minutes-long compile, not a band test.
+//
+// So the rule is restated here, cheaply, from the same source of truth Next
+// reads: the exports of the file. This does not make the band a build. It
+// catches the one failure mode that has actually happened, which is a named
+// export added to a route file because the value was needed two lines later
+// and `export` was already typed.
+
+/** Route segment config, valid on every route file. */
+const SEGMENT_CONFIG = [
+  "dynamic",
+  "dynamicParams",
+  "revalidate",
+  "fetchCache",
+  "runtime",
+  "preferredRegion",
+  "maxDuration",
+  "experimental_ppr",
+];
+
+/** What Next accepts, per kind of route file, on top of `SEGMENT_CONFIG`. */
+const ALLOWED: Record<string, string[]> = {
+  "layout.tsx": ["metadata", "generateMetadata", "viewport", "generateViewport", "generateStaticParams"],
+  "page.tsx": ["metadata", "generateMetadata", "viewport", "generateViewport", "generateStaticParams"],
+  "template.tsx": [],
+  "default.tsx": [],
+  "loading.tsx": [],
+  "error.tsx": [],
+  "global-error.tsx": [],
+  "not-found.tsx": [],
+  "route.ts": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+  "opengraph-image.tsx": ["alt", "size", "contentType", "generateImageMetadata"],
+  "twitter-image.tsx": ["alt", "size", "contentType", "generateImageMetadata"],
+};
+
+/**
+ * The names a module exports as **values**.
+ *
+ * `export default` is not a name and is always allowed. `export type` and
+ * `export interface` are not values, so they never reach Next's check — a
+ * guard that flagged them would be stricter than the build and would send
+ * somebody deleting a type to satisfy a rule that does not apply to it.
+ */
+function namedExports(src: string): string[] {
+  const code = withoutComments(src);
+  const out: string[] = [];
+
+  for (const m of code.matchAll(/^export\s+(?:async\s+)?function\s+(\w+)/gm)) out.push(m[1]);
+  for (const m of code.matchAll(/^export\s+(?:const|let|var|class)\s+(\w+)/gm)) out.push(m[1]);
+
+  // `export { a, b as c }` — the exported name is what lands on the module.
+  for (const m of code.matchAll(/^export\s*\{([^}]*)\}/gm)) {
+    for (const part of m[1].split(",")) {
+      const piece = part.trim();
+      if (!piece || /^type\s/.test(piece)) continue;
+      const as = piece.match(/\bas\s+(\w+)$/);
+      out.push(as ? as[1] : piece.split(/\s/)[0]);
+    }
+  }
+
+  // `export * from` puts names on the module that this file does not state, so
+  // there is no reading of it that is safe to allow in a route file.
+  if (/^export\s+\*/m.test(code)) out.push("* (re-export)");
+
+  return out.filter((n) => n !== "default");
+}
+
+test("no route file exports something `next build` will refuse", async () => {
+  const files = (await walkSource(path.join(repoRoot, "app"))).filter((f) =>
+    Object.hasOwn(ALLOWED, path.basename(f)),
+  );
+
+  // A guard over a set it never found is a guard that passes for the wrong
+  // reason. `app/` has had a layout since Sprint 1 and route handlers since
+  // Sprint 2; zero files here means the walk broke, not that the tree is clean.
+  ok(files.length > 50, `the walk found route files to check: ${files.length}`);
+
+  const refused: string[] = [];
+  for (const file of files) {
+    const kind = path.basename(file);
+    const allowed = new Set([...SEGMENT_CONFIG, ...ALLOWED[kind]]);
+    const src = await fs.readFile(file, "utf8");
+    for (const name of namedExports(src)) {
+      if (allowed.has(name)) continue;
+      refused.push(`${path.relative(repoRoot, file)} exports ${name}`);
+    }
+  }
+
+  eq(
+    refused.sort().join("\n"),
+    "",
+    "every export of every route file is one Next accepts. Anything else fails " +
+      "`next build` with \"is not a valid export field\" — a deploy-time failure " +
+      "`tsc --noEmit` passes and no test run can reach. Move the value into a " +
+      "module beside the route and import it",
+  );
 });

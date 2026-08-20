@@ -422,7 +422,29 @@ function failingSuites(output: string): string[] {
   return [...suites];
 }
 
-function runBand(): Promise<string> {
+// ===== A BAND THAT NEVER RAN LOOKS EXACTLY LIKE A BAND THAT CAUGHT NOTHING ==
+//
+// Sprint 16's run reported *"Join the guild's current name instead of the
+// stored one — caught by 0"*, and the hole was not in the band. Re-running that
+// one mutation through this same `spawn` caught it immediately, in the suite
+// that has asserted W5 since Sprint 13: `99-week-record`, 517/518, exit 1.
+//
+// What had happened is that `next build` was running on the same machine at the
+// time, and the band process died without printing a suite. `failingSuites` saw
+// no `✗`, returned `[]`, and `[]` is the same answer it gives for a band that
+// genuinely noticed nothing — so the harness accused the band of a hole it did
+// not have, and it would have accused it just as confidently if the spawn had
+// failed outright.
+//
+// That is the harness's version of the defect it exists to find: **a result
+// nobody checked was produced**. A run is now only a result if it printed its
+// own summary line, and the totals have to match the run before it — a band
+// that lost eleven suites is a broken run, not a mutation nobody caught.
+type BandRun = { output: string; total: number | null };
+
+const SUMMARY = /^(\d+)\/(\d+) passed · \d+ assertions · (\d+) suites$/m;
+
+function runBand(): Promise<BandRun> {
   return new Promise((resolve) => {
     const child = spawn("npx", ["tsx", "tests/run.mts"], {
       cwd: repoRoot,
@@ -431,8 +453,38 @@ function runBand(): Promise<string> {
     let out = "";
     child.stdout.on("data", (d) => (out += String(d)));
     child.stderr.on("data", (d) => (out += String(d)));
-    child.on("close", () => resolve(out));
+    child.on("close", () => {
+      const clean = out.replace(/\x1b\[[0-9;]*m/g, "");
+      const summary = SUMMARY.exec(clean);
+      resolve({ output: out, total: summary ? Number(summary[2]) : null });
+    });
   });
+}
+
+/**
+ * Stop, rather than report a number that was never measured.
+ *
+ * Loudly and with the tail of the output, because *"the band did not run"* is
+ * only actionable if you can see what it said instead — and the most likely
+ * cause is something else on the machine, which is invisible by the time
+ * anybody reads the report.
+ */
+function refuseIncompleteRun(mutation: Mutation, run: BandRun, expected: number | null): void {
+  const reason =
+    run.total === null
+      ? "the band printed no summary line, so it did not finish"
+      : `the band reported ${run.total} tests, and the run before it reported ${expected}`;
+
+  console.error(`\n\x1b[31mThe band did not complete under "${mutation.name}".\x1b[0m`);
+  console.error(`  ${reason}.\n`);
+  console.error("  Last lines of its output:\n");
+  for (const line of run.output.trimEnd().split("\n").slice(-12)) console.error(`    ${line}`);
+  console.error(
+    "\n  This is NOT a mutation caught by zero suites — it is a run that produced " +
+      "no answer. Reporting it as a hole would send somebody looking for a missing " +
+      "assertion that is already there. Re-run with nothing else heavy on the " +
+      "machine; `next build` alongside this harness is how it happened the first time.",
+  );
 }
 
 // ===== The restore guarantee =====
@@ -568,6 +620,11 @@ console.log(`Mutation harness — ${MUTATIONS.length} mutations\n`);
 type Result = { mutation: Mutation; caught: string[]; applied: boolean };
 const results: Result[] = [];
 
+// How many tests the band collected last time it finished. The first completed
+// run sets it; every run after has to agree. A mutation that changes the number
+// of tests the runner can even collect has broken the run, not the band.
+let bandTotal: number | null = null;
+
 for (const mutation of MUTATIONS) {
   const full = path.join(repoRoot, mutation.file);
   const original = await fs.readFile(full, "utf8");
@@ -585,7 +642,16 @@ for (const mutation of MUTATIONS) {
   try {
     outstanding.set(mutation.file, original);
     await fs.writeFile(full, original.replace(mutation.find, mutation.replace), "utf8");
-    const caught = failingSuites(await runBand());
+
+    const run = await runBand();
+    if (run.total === null || (bandTotal !== null && run.total !== bandTotal)) {
+      refuseIncompleteRun(mutation, run, bandTotal);
+      await restoreAll();
+      process.exit(1);
+    }
+    bandTotal = run.total;
+
+    const caught = failingSuites(run.output);
     results.push({ mutation, caught, applied: true });
 
     const mark = caught.length >= mutation.expect ? "\x1b[32m✓\x1b[0m" : "\x1b[31m✗\x1b[0m";

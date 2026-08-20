@@ -1083,3 +1083,47 @@ three sprints before `94-surface-reach` was written.
 **Carry this:** a page that describes a control it does not have is the same
 defect as a function with no caller, seen from the other side. Four of the five
 above were found by reading the page's own words back to it.
+
+---
+
+## 35 · `npm test` is not `next build`, and the rule that broke was Next's
+
+**What happened.** At the end of Sprint 16, with the band at 517/517 and the
+typecheck clean, `npx next build` refused the tree:
+
+```
+app/settings/layout.tsx
+Type error: Layout "app/settings/layout.tsx" does not match the required types
+of a Next.js Layout.
+  "SETTINGS_TABS" is not a valid Layout export field.
+```
+
+`SETTINGS_TABS` had been exported since Sprint 11 (`f3d94dd`). **Nothing ever
+imported it** — the `export` was reflex, and it had been failing the deploy for
+five sprints.
+
+**Why no band could see it.** `npm test` typechecks with `tsc --noEmit`, which
+passes the file happily. Next type-checks a route file's exports against a
+fixed set of its own, and the only thing that runs that check is the build. Two
+compilers, two rule sets, and the band only ever ran one of them.
+
+`95-deploy` §0.1 has asserted since Sprint 9 that the build command runs the
+migrator **first**. It could not assert that the build then **succeeds** — a
+minutes-long compile is not a band test — so the strongest guard in the file
+was standing next to a hole the same size as the one it was built to close.
+
+**What it cost, and what it didn't.** Nothing, yet: this branch has not
+deployed. That is luck. The Sprint 9 version of exactly this shape — a migrator
+that was correct and that nothing ran — served 500s to everybody who visited.
+
+**The fix, and the guard.** The export is gone (nothing wanted it) and
+`95-deploy` now restates Next's rule from the same place Next reads it: the
+exports of each route file, checked against what that kind of file may export.
+It is not a build and does not pretend to be. It catches the one failure mode
+that has actually happened — a named export added to a route file because the
+value was wanted two lines later and `export` was already typed.
+
+**Carry this:** *a green band is evidence about the code the band runs.*
+`next build` runs a compiler with rules of its own, over files the band reads
+only as text. Before believing a sprint is deployable, **run the build** — and
+when it finds something, ask why no test could have.
