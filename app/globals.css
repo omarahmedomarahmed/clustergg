@@ -13,3 +13,87 @@ body {
   background: var(--color-ink);
   color: #f2f2f5;
 }
+
+/*
+ * ===== THE GAMER PROFILE THEME LAYER. D17. =====
+ *
+ * Every rule below is under `.profile-root`, and every variable it reads is
+ * prefixed `--p-`. That is the whole safety property: a gamer choosing a
+ * background is choosing it for their own page, and a variable set on `:root`
+ * would let them repaint Cluster's own chrome — the nav, the money colour, the
+ * podium — on every page a visitor saw next.
+ *
+ * `13-DESIGN` §1's rule holds inside the scope too: gold, silver and bronze
+ * mean the podium and nothing else, so they are NOT gamer-settable and are not
+ * `--p-` variables. They are the platform's, and they are the same on every
+ * profile.
+ *
+ * Nothing here is Sprint 17's design pass. These are the mechanics the builder
+ * needs: a scope, four card styles, five button styles, and an off switch for
+ * anybody who asked not to be moved (D6).
+ */
+.profile-root {
+  background: var(--p-bg, #04051a);
+  color: var(--p-text, #e8eaf6);
+  font-family: var(--p-font, system-ui, sans-serif);
+}
+
+.profile-root .p-muted { color: var(--p-muted, #9aa0c3); }
+.profile-root .p-accent { color: var(--p-accent, #8b5cf6); }
+
+/* The podium. Cluster's, on every profile, whatever the gamer chose. */
+.profile-root .p-gold { color: #fbbf24; }
+.profile-root .p-silver { color: #cbd5e1; }
+.profile-root .p-bronze { color: #b45309; }
+
+.profile-root .p-card {
+  border-radius: var(--p-radius, 16px);
+  padding: 1.25rem;
+  background: var(--p-panel, #0b0d26);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.profile-root .p-card[data-style="glass"] {
+  background: color-mix(in srgb, var(--p-panel, #0b0d26) 65%, transparent);
+  backdrop-filter: blur(12px);
+}
+.profile-root .p-card[data-style="outline"] {
+  background: transparent;
+  border-color: var(--p-accent, #8b5cf6);
+}
+.profile-root .p-card[data-style="flat"] {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.profile-root .p-button {
+  border-radius: var(--p-radius, 16px);
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--p-accent, #8b5cf6);
+  color: var(--p-text, #e8eaf6);
+}
+.profile-root .p-button[data-style="neon"] {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--p-accent, #8b5cf6) 55%, transparent);
+}
+.profile-root .p-button[data-style="solid"] {
+  background: var(--p-accent, #8b5cf6);
+  color: #fff;
+}
+.profile-root .p-button[data-style="glass"] {
+  background: color-mix(in srgb, var(--p-accent, #8b5cf6) 20%, transparent);
+  backdrop-filter: blur(8px);
+}
+.profile-root .p-button[data-style="pill"] { border-radius: 999px; }
+
+/*
+ * D6 — every animation has an off switch or it does not ship. A profile is the
+ * most decorated page on the platform and the one most likely to move.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .profile-root *,
+  .profile-root *::before,
+  .profile-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

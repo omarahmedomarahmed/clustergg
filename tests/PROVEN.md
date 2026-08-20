@@ -1865,3 +1865,49 @@ Its second half — *no page draws a card-shaped thing of its own* — went red 
 `app/api/uploads/route.ts`, which says in a **comment** that a card is
 1200×630. That is explaining, not drawing. Comments stripped, the same way
 `94-reachability` learned to.
+
+## Sprint 16 · the gamer profile
+
+v1 shipped a full customization engine. v3 shipped nothing — `04-SURFACES`
+listed `/profile` and never said what was on it, so there was no profile. The
+engine is `ported-design/theme.ts`, carried deliberately, with its README's
+changes applied on arrival.
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 271 | **The sections are v3's, and no deleted surface survived the port** (`97-profile`, D21) | put `quests` back into `SECTIONS` | *"linked accounts, trophy case, challenges entered, standings, rank history"*, naming it | clean, 8/8 |
+| 272 | **A stored theme naming a dead section cannot resurrect it** (`97-profile`) | — | asserted through `resolveTheme` on a saved order containing `quests` and `spaces`. **This is the path that mattered**: a gamer's order is storage, and storage outlives a deploy | — |
+| 273 | **Every field degrades on its own** (`97-profile`, D16/E18) | made one bad colour throw instead of falling back | the whole case, on `bg` — the point being that the good accent beside it survives | clean |
+| 274 | **A theme cannot leak into Cluster's chrome** (`97-profile`, D17/E17) | renamed `--p-accent` to `--color-accent` | *"every custom property the theme sets is prefixed --p-"*, naming it | clean |
+| 275 | **Every rule in the theme layer is scoped to `.profile-root`** (`97-profile`) | — | read from `globals.css` directly, with a canary that the layer really is the theme layer | — |
+| 276 | **The podium is not gamer-settable** (`97-profile`, 13-DESIGN §1) | — | `.p-gold`/`.p-silver`/`.p-bronze` exist in the scope and none is a `--p-` variable. A meaning is not a theme | — |
+| 277 | **Nothing a gamer types escapes into CSS** (`97-profile`) | — | a background URL carrying `"); } body { display:none }`, a `javascript:` cover, an accent that is a CSS rule — all refused, and a real upload path still kept | — |
+| 278 | **The background is never `background-attachment: fixed`** (`97-profile`, D18) | — | asserted on the style object and on the page, which renders its own fixed layer | — |
+| 279 | **The builder previews the public page's own component** (`97-profile`, E19) | — | source-level: both import and render `ProfileView`, and the builder feeds it `profileBySlug` | — |
+| 280 | **No font stack points at a variable v3 does not define** (`97-profile`) | — | README change 5, and trap 31: `--font-grotesk` named a font nothing loads, so every gamer who picked it silently got system sans | — |
+
+### What the port would have carried in
+
+`theme.ts`'s `SECTIONS` named eight, and **four of them were surfaces v3
+deleted**: quests and Cluster Points, badges, "recent posts", "my planets".
+Guard 272 is the one worth reading — the danger was never the constant, it was
+that a gamer's saved theme stores its section order **by key**, so v1's list
+would have come back through storage on the first read, and the builder would
+have offered it as a checkbox.
+
+### Two guards that went red on their own explanations
+
+`97-profile`'s D17 check reads the profile view for a `<style>` tag, and its
+D18 check reads it for `background-attachment`. Both went red on the file's own
+header comment, which says it does neither. Comments stripped — the same lesson
+`94-reachability` and `97-copy-rule` each learned separately.
+
+### And one `02-structural` caught in the builder
+
+The action's form reader was named after the drizzle column type that reads
+strings, so `02-structural` saw a column declaration and flagged the theme's
+`panel` field — the word contains the three letters of a primary account
+number. The guard was right to be suspicious: the fix is the helper's name, not
+an allowlist entry, because that list is for names which really are columns.
+Its explanation had to be reworded too, since that guard does not strip
+comments and a comment quoting the pattern **is** the pattern.

@@ -10,6 +10,10 @@ import { Nav } from "../components.tsx";
 
 export const SETTINGS_TABS = [
   { href: "/settings", label: "Account" },
+  // D14's rule, one surface along: a door nothing points at is a door nobody
+  // finds. The builder is the largest thing a gamer can edit and it would
+  // otherwise be reachable only by typing the URL.
+  { href: "/settings/profile", label: "Profile" },
   { href: "/settings/connections", label: "Connections" },
   { href: "/settings/privacy", label: "Privacy" },
   { href: "/settings/notifications", label: "Notifications" },

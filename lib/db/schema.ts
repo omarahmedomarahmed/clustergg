@@ -1437,3 +1437,26 @@ export const contentOverrides = pgTable(
 );
 
 export type ContentOverride = typeof contentOverrides.$inferSelect;
+
+/**
+ * A gamer's profile theme. `13-DESIGN` §5, `14-EDITABLE` §5.
+ *
+ * ===== A SMALL JSON BLOB WITH A VERSION STAMP (D20) =====
+ *
+ * On its own table rather than a column on `users`, for one reason: the gamer
+ * directory is admin-only (house rule 7) and a theme is **public** — it is what
+ * `/u/[slug]` renders to anybody. Putting it on `users` would mean every query
+ * that reads a public profile selects from the table the rule exists to keep
+ * people out of.
+ *
+ * One row per gamer, updated in place. This is not `content_overrides`: an
+ * operator's copy edit is a change to the platform and needs a history with an
+ * author, and a gamer moving their own avatar is neither.
+ */
+export const profileThemes = pgTable("profile_themes", {
+  userId: text("user_id").primaryKey(),
+  theme: jsonb("theme").notNull().$type<Record<string, unknown>>(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ProfileThemeRow = typeof profileThemes.$inferSelect;
