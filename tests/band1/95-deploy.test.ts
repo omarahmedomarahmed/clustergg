@@ -60,6 +60,36 @@ test("the build command runs the migrator, and runs it first", async () => {
   );
 });
 
+test("`npm run verify` is the sprint-close gate, and it runs both halves", async () => {
+  // ===== THE RULING THAT CAME OUT OF `next build` FAILING FOR FIVE SPRINTS ==
+  //
+  // *"Add `npm run verify` = `npm test && next build`, require it at every
+  // sprint close, and put that in PLAN.md §2.0 and DEPLOYMENT.md as the
+  // definition of deployable. Keep `npm test` as it is — a minutes-long compile
+  // inside the band is how the band stops being run."*
+  //
+  // Guard 292 below checks the one failure mode that has actually happened. It
+  // does not close the class, and only a real build does. So the gate is a
+  // script, and a script nothing asserts is a script somebody deletes the week
+  // it is inconvenient — which is the same shape as the migrator that was
+  // correct and that nothing ran.
+  const pkg = await readJson<{ scripts?: Record<string, string> }>("package.json");
+  const verify = pkg.scripts?.verify ?? "";
+
+  ok(verify !== "", "there is a `verify` script at all");
+  ok(/\bnpm (run )?test\b/.test(verify), `verify runs the band: ${verify}`);
+  ok(/\bnext build\b/.test(verify), `verify runs a real build: ${verify}`);
+
+  // And the band stays what it is. A build inside `npm test` would make the
+  // thing that runs forty times a sprint take four minutes, and the fix
+  // somebody reaches for at that point is to stop running it.
+  const test = pkg.scripts?.test ?? "";
+  ok(
+    !/next build/.test(test),
+    `\`npm test\` does not build — it is the fast one, and it has to stay fast: ${test}`,
+  );
+});
+
 test("every cron route has a schedule, and every schedule has a route", async () => {
   // ===== THE SECOND GAP: NO vercel.json AT ALL =====
   //

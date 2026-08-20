@@ -1,12 +1,59 @@
 # Deployment
 
-Everything here is done from a dashboard. There are no terminal commands in
-this document and there never will be — 10-SETUP's rule is that the owner has
-no terminal, ever.
+Everything the **owner** does here is done from a dashboard. 10-SETUP's rule is
+that no step asks them for a terminal, and none below does.
+
+The one command in this document is §0, and it is not theirs. It is what a
+developer runs before saying a sprint is deployable, and it is written down
+because the last five sprints were called deployable without it.
 
 If you want to know whether the platform is healthy right now, do not read this
 document. Open **`/admin/preflight`**. It shows every variable, every service,
 the schema version and the three schedules, green or red, with the reason.
+
+---
+
+## 0 · What "deployable" means
+
+```
+npm run verify
+```
+
+`npm test && next build`. **Both halves, green, on the finished tree.** That is
+the definition, it is required at every sprint close, and nothing else counts:
+
+| | |
+|---|---|
+| `npm test` | `tsc --noEmit`, then the band. Fast, run constantly |
+| `next build` | Next's own compiler, over rules TypeScript does not have |
+
+### Why the build is a separate half, and why it is not inside `npm test`
+
+At the end of Sprint 16, with the band at 517/517 and the typecheck clean,
+`next build` refused the tree:
+
+```
+app/settings/layout.tsx
+Type error: "SETTINGS_TABS" is not a valid Layout export field.
+```
+
+Next type-checks a route file's exports against a fixed set of its own.
+`SETTINGS_TABS` had been exported since Sprint 11 and **nothing ever imported
+it** — the deploy had been failing for five sprints on a keyword that did
+nothing, and no test run could have seen it, because `tsc --noEmit` passes the
+file happily. Two compilers, two rule sets; the band ran one of them.
+
+`95-deploy` now checks every route file's exports against what its kind may
+export. That closes the one failure that happened. **It is not a build**, and
+the class of things only a build can catch stays open — hence this gate.
+
+And the build stays *out* of `npm test` deliberately. `npm test` runs forty
+times a sprint; a four-minute compile inside it is how the band stops being
+run at all. The band is the fast one. `verify` is the slow one, and it runs
+once, at the end.
+
+`95-deploy` fails if the `verify` script stops running either half, and if
+`npm test` ever grows a build.
 
 ---
 

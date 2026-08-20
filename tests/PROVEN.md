@@ -2081,3 +2081,27 @@ caught, zero holes, exit 0** — and the mutation reported as a hole reads
 ```
 
 which is the suite that was catching it the whole time.
+
+### Guard 294 — the gate that came out of it
+
+The owner's ruling: *"Add `npm run verify` = `npm test && next build`, require it
+at every sprint close, and put that in PLAN.md §2.0 and DEPLOYMENT.md as the
+definition of deployable. Keep `npm test` as it is — a minutes-long compile
+inside the band is how the band stops being run."*
+
+Guard 292 closes the one failure mode that happened. It does not close the
+class, and only a real build does — so the gate is a build, not another guard.
+
+A script nothing asserts is a script somebody deletes the week it is
+inconvenient, which is the same shape as the migrator that was correct and that
+nothing ran. So both halves of the ruling are held by the band:
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 294 | **`npm run verify` runs the band AND a real build, and `npm test` never grows one** (`95-deploy`) | (a) `verify` cut down to `npm test` | *"verify runs a real build: npm test"* | clean |
+| | | (b) `next build` inserted into `npm test` | *"`npm test` does not build — it is the fast one, and it has to stay fast: tsc --noEmit && next build && tsx tests/run.mts"* | clean |
+
+Break (b) is the half worth having. Nothing about a build inside `npm test`
+looks wrong in a diff — it looks like more rigour. What it actually does is make
+the command that runs forty times a sprint take four minutes, and the fix
+somebody reaches for at that point is to stop running it.

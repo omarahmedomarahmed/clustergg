@@ -233,17 +233,36 @@ and pushed; everything below is unstarted.
 | **17 · The design pass** | Not started. `13-DESIGN` in full: palette, typography, `/pool` first, the logo, the OG image, game art, trophy art |
 | **18 · The unexport pass** | Not started. See below — 64 exports that should never have been exports |
 
-**518 tests, 3,117 assertions, 293 guards proven by breaking, 34 of 34
+**519 tests, 3,121 assertions, 294 guards proven by breaking, 34 of 34
 mutations caught, typecheck gating the band inside `npm test`.** Band 1 is entirely green, and so
 is band 2 — now **four** passes, each run twice back to back (trap 14), against
 `next build` + `next start` rather than the dev server.
 
-**And `next build` is now something somebody runs.** It was refusing the tree
-for five sprints — `app/settings/layout.tsx` exported `SETTINGS_TABS`, which
-Next does not allow a layout to export and `tsc --noEmit` does not mind. Nothing
-imported it. `95-deploy` now checks every route file's exports against what its
-kind may export (guard 292), which is not a build and does not replace running
-one: **run `npx next build` before believing a sprint is deployable.**
+#### `npm run verify` is the sprint close, and it is the definition of deployable
+
+```
+npm run verify        # npm test && next build
+```
+
+**Required at every sprint close. Both halves green, on the finished tree.**
+Also in `DEPLOYMENT.md` §0, which is the copy an owner-facing reader finds.
+
+It exists because `next build` was refusing the tree for five sprints and
+nobody ran it: `app/settings/layout.tsx` exported `SETTINGS_TABS`, which Next
+does not allow a layout to export and `tsc --noEmit` does not mind, and which
+nothing imported. `95-deploy` has asserted since Sprint 9 that the build command
+runs the migrator; it had never asserted the build succeeds.
+
+Guard 292 now checks every route file's exports against what its kind may
+export. **That closes the one failure mode that happened, not the class** — only
+a real build closes the class, which is why the gate is a build and not another
+guard.
+
+And the build stays **out** of `npm test`, deliberately. `npm test` runs forty
+times a sprint; a minutes-long compile inside it is how the band stops being run
+at all. The band is the fast one; `verify` is the slow one and runs once. A
+guard in `95-deploy` holds both halves of that: `verify` must run the band and a
+real build, and `npm test` must never grow one.
 
 #### Sprint 18 · the unexport pass, and why it is its own sprint
 
